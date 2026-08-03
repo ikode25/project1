@@ -2570,6 +2570,80 @@ function updateClass(id, classData, currentUser, currentRole) {
   }
 }
 
+// Standard Ghana school structure (Creche through JHS 3) — used to power the "Auto-Generate" classes button
+var GHANA_CLASS_LEVELS = [
+  { name: 'Creche',    grade: 0,  stage: 'creche' },
+  { name: 'Nursery 1', grade: 0,  stage: 'nursery' },
+  { name: 'Nursery 2', grade: 0,  stage: 'nursery' },
+  { name: 'KG 1',      grade: 0,  stage: 'kg' },
+  { name: 'KG 2',      grade: 0,  stage: 'kg' },
+  { name: 'Basic 1',   grade: 1,  stage: 'lower_primary' },
+  { name: 'Basic 2',   grade: 2,  stage: 'lower_primary' },
+  { name: 'Basic 3',   grade: 3,  stage: 'lower_primary' },
+  { name: 'Basic 4',   grade: 4,  stage: 'upper_primary' },
+  { name: 'Basic 5',   grade: 5,  stage: 'upper_primary' },
+  { name: 'Basic 6',   grade: 6,  stage: 'upper_primary' },
+  { name: 'JHS 1',     grade: 7,  stage: 'jhs' },
+  { name: 'JHS 2',     grade: 8,  stage: 'jhs' },
+  { name: 'JHS 3',     grade: 9,  stage: 'jhs' }
+];
+
+function getGhanaClassLevels(currentUser, currentRole) {
+  return { success: true, data: GHANA_CLASS_LEVELS };
+}
+
+// Auto-generate classes for the standard Ghana levels. payload: { academicYear, levels: [{ name, grade, stage, streams }] }
+// streams=1 -> single class named e.g. "Basic 1" Section "A"; streams>1 -> "A","B","C"... sections, one row per stream.
+function autoGenerateClasses(payload, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+
+    var sh = getSheet(CLASSES_SHEET);
+    if (!sh) return { success: false, message: 'Classes sheet not found' };
+
+    var academicYear = String((payload && payload.academicYear) || '').trim();
+    if (!validAcademicYear(academicYear)) return { success: false, message: 'AcademicYear must be YYYY-YYYY (e.g. 2026-2027)' };
+
+    var levels = (payload && payload.levels) || [];
+    if (!levels.length) return { success: false, message: 'Pick at least one level to generate' };
+
+    var letters = 'ABCDEFGHIJ';
+    var created = 0, skipped = 0, ts = nowIso(), id = nextClassId(sh);
+    var rows = [];
+
+    levels.forEach(function (lvl) {
+      var name = String(lvl.name || '').trim();
+      if (!name) return;
+      var streams = parseInt(lvl.streams, 10);
+      if (isNaN(streams) || streams < 1) streams = 1;
+      if (streams > letters.length) streams = letters.length;
+      var grade = parseInt(lvl.grade, 10);
+      if (isNaN(grade) || grade < 0) grade = 0;
+      var stage = String(lvl.stage || 'lower_primary').toLowerCase();
+
+      for (var s = 0; s < streams; s++) {
+        var section = letters[s];
+        if (classExists(sh, name, section, academicYear)) { skipped++; continue; }
+        var classCode = (name.replace(/[^A-Za-z0-9]/g, '') + section).toUpperCase().slice(0, 20);
+        rows.push([
+          id++, name, section, academicYear, '', 0, '0', ts, ts,
+          grade, classCode, stage, 'english', 'general', 30, '', 'Main', '', '1', 'full_day'
+        ]);
+        created++;
+      }
+    });
+
+    if (rows.length) {
+      sh.getRange(sh.getLastRow() + 1, 1, rows.length, CLASS_HEADERS.length).setValues(rows);
+    }
+
+    addLog(currentUser, 'Classes Auto-Generated', created + ' class(es) created for ' + academicYear + (skipped ? ', ' + skipped + ' skipped (already existed)' : ''));
+    return { success: true, message: created + ' class(es) created' + (skipped ? ', ' + skipped + ' skipped (already existed)' : ''), created: created, skipped: skipped };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
 // soft delete
 function deleteClass(id, currentUser, currentRole) {
   try {

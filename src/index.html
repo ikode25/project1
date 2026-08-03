@@ -7188,6 +7188,7 @@
       const classes = classesData || [];
       const [showModal, setShowModal] = useState(false);
       const [editingClass, setEditingClass] = useState(null);
+      const [showAutoGen, setShowAutoGen] = useState(false);
       // today's timetable drill-down
       const [showTtModal, setShowTtModal] = useState(false);
       const [ttClass, setTtClass] = useState(null);
@@ -7507,6 +7508,14 @@
               </button>
               {isAdmin && (
                 <button
+                  className="btn btn-secondary"
+                  onClick={() => setShowAutoGen(true)}
+                >
+                  <i className="fas fa-magic"></i> Auto-Generate
+                </button>
+              )}
+              {isAdmin && (
+                <button
                   className="btn btn-success"
                   onClick={() => { setEditingClass(null); setShowModal(true); }}
                 >
@@ -7629,6 +7638,15 @@
               role={role}
               onClose={() => { setShowModal(false); setEditingClass(null); }}
               onSave={handleSave}
+            />
+          )}
+
+          {showAutoGen && (
+            <AutoGenerateClassesModal
+              currentUser={currentUser}
+              role={role}
+              onClose={() => setShowAutoGen(false)}
+              onDone={() => { setShowAutoGen(false); refreshClasses(); }}
             />
           )}
 
@@ -7858,6 +7876,133 @@
     }
 
     // ============== Class Modal (Add/Edit) ==============
+    function AutoGenerateClassesModal({ currentUser, role, onClose, onDone }) {
+      const [academicYear, setAcademicYear] = useState(() => {
+        const y = new Date().getFullYear();
+        return `${y}-${y + 1}`;
+      });
+      const [levels, setLevels] = useState([]);
+      const [defaultStreams, setDefaultStreams] = useState(1);
+      const [loading, setLoading] = useState(true);
+      const [saving, setSaving] = useState(false);
+
+      useEffect(() => {
+        google.script.run
+          .withSuccessHandler((res) => {
+            setLoading(false);
+            if (res.success) {
+              setLevels((res.data || []).map(l => ({ ...l, checked: true, streams: 1 })));
+            }
+          })
+          .withFailureHandler(() => setLoading(false))
+          .getGhanaClassLevels();
+      }, []);
+
+      const applyDefaultToAll = (n) => {
+        setDefaultStreams(n);
+        setLevels(levels.map(l => ({ ...l, streams: n })));
+      };
+
+      const toggleLevel = (idx) => {
+        const copy = [...levels];
+        copy[idx] = { ...copy[idx], checked: !copy[idx].checked };
+        setLevels(copy);
+      };
+
+      const setStreams = (idx, n) => {
+        const copy = [...levels];
+        copy[idx] = { ...copy[idx], streams: Math.max(1, Math.min(10, parseInt(n, 10) || 1)) };
+        setLevels(copy);
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!/^\d{4}-\d{4}$/.test(academicYear)) {
+          Swal.fire({ icon: 'error', title: 'Invalid Academic Year', text: 'Format: YYYY-YYYY (e.g. 2026-2027)' });
+          return;
+        }
+        const picked = levels.filter(l => l.checked);
+        if (!picked.length) {
+          Swal.fire({ icon: 'warning', title: 'Nothing selected', text: 'Pick at least one level to generate.' });
+          return;
+        }
+        setSaving(true);
+        google.script.run
+          .withSuccessHandler((res) => {
+            setSaving(false);
+            if (res.success) {
+              Swal.fire({ icon: 'success', title: 'Done!', text: res.message, timer: 2500, showConfirmButton: false });
+              onDone();
+            } else {
+              Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+            }
+          })
+          .withFailureHandler((err) => { setSaving(false); Swal.fire({ icon: 'error', title: 'Error', text: err.message }); })
+          .autoGenerateClasses({ academicYear, levels: picked }, currentUser, role);
+      };
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'560px'}}>
+            <div className="modal-header">
+              <h3><i className="fas fa-magic"></i> Auto-Generate Classes</h3>
+              <button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button>
+            </div>
+            <div className="modal-body">
+              <form onSubmit={handleSubmit}>
+                <div className="form-group">
+                  <label><i className="fas fa-calendar-alt"></i> Academic Year</label>
+                  <input type="text" value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} placeholder="e.g. 2026-2027" />
+                </div>
+
+                <div className="form-group">
+                  <label><i className="fas fa-stream"></i> Streams per level <span style={{fontWeight:400,color:'#888',fontSize:'11px'}}>(1 = single-stream, 2+ = multi-stream A, B, C…)</span></label>
+                  <input type="number" min="1" max="10" value={defaultStreams} onChange={(e) => applyDefaultToAll(parseInt(e.target.value, 10) || 1)} style={{maxWidth:'120px'}} />
+                  <div style={{fontSize:'11px',color:'#888',marginTop:'4px'}}>Sets the default for every level below — you can still fine-tune each one individually.</div>
+                </div>
+
+                <div className="form-group">
+                  <label><i className="fas fa-list"></i> Levels to create</label>
+                  {loading ? (
+                    <div style={{padding:'10px',color:'#888'}}><i className="fas fa-spinner fa-spin"></i> Loading levels…</div>
+                  ) : (
+                    <div style={{maxHeight:'320px',overflowY:'auto',border:'1px solid #e0e0e0',borderRadius:'6px'}}>
+                      {levels.map((l, idx) => (
+                        <div key={l.name} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',borderBottom:'1px solid #f0f0f0'}}>
+                          <input type="checkbox" checked={l.checked} onChange={() => toggleLevel(idx)} />
+                          <span style={{flex:1,fontWeight:600}}>{l.name}</span>
+                          <span style={{fontSize:'11px',color:'#888'}}>Streams</span>
+                          <input
+                            type="number" min="1" max="10" value={l.streams} disabled={!l.checked}
+                            onChange={(e) => setStreams(idx, e.target.value)}
+                            style={{width:'56px',padding:'4px 6px'}}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="settings-info-message" style={{marginTop:'14px'}}>
+                  <i className="fas fa-info-circle" style={{marginRight:'6px'}}></i>
+                  Levels/sections that already exist for the chosen academic year are skipped automatically.
+                </div>
+
+                <div className="form-actions">
+                  <button type="submit" className="btn btn-primary" disabled={saving || loading}>
+                    {saving ? <><i className="fas fa-spinner fa-spin"></i> Generating...</> : <><i className="fas fa-magic"></i> Generate Classes</>}
+                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={onClose}>
+                    <i className="fas fa-times"></i> Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     function ClassModal({ cls, currentUser, role, onClose, onSave }) {
       const [formData, setFormData] = useState({
         ClassName: cls?.ClassName || '',
@@ -7881,6 +8026,7 @@
       });
       const [teachers, setTeachers] = useState([]);
       const [saving, setSaving] = useState(false);
+      const [showAdvanced, setShowAdvanced] = useState(!!cls);
 
       const set = (k, v) => setFormData({ ...formData, [k]: v });
 
@@ -7967,7 +8113,7 @@
             <div className="modal-body">
               <form onSubmit={handleSubmit}>
 
-                {/* Section: Basics */}
+                {/* Section: Basics — kept short on purpose; everything else lives behind "Advanced options" */}
                 <h4 style={{margin:'0 0 12px',color:'var(--navy-primary)',fontSize:'15px',borderBottom:'2px solid var(--navy-primary)',paddingBottom:'6px'}}>
                   <i className="fas fa-info-circle"></i> Basics
                 </h4>
@@ -7984,14 +8130,14 @@
                     />
                   </div>
                   <div className="form-group">
-                    <label><i className="fas fa-layer-group"></i> Section *</label>
+                    <label><i className="fas fa-layer-group"></i> Section (Stream) *</label>
                     <input
                       type="text"
                       value={formData.Section}
                       onChange={(e) => set('Section', e.target.value.toUpperCase())}
                       required
                       maxLength="10"
-                      placeholder="e.g. A"
+                      placeholder="A (single-stream) or A/B/C (multi-stream)"
                     />
                   </div>
                   <SearchableDropdown
@@ -8010,35 +8156,6 @@
                     placeholder="Select academic year..."
                     required={true}
                   />
-                  <div className="form-group">
-                    <label><i className="fas fa-sort-numeric-up"></i> Grade Level</label>
-                    <input
-                      type="number"
-                      value={formData.GradeLevel}
-                      onChange={(e) => set('GradeLevel', e.target.value)}
-                      min="0"
-                      max="13"
-                      placeholder="0-13 (use 0 if N/A)"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label><i className="fas fa-barcode"></i> Class Code</label>
-                    <input
-                      type="text"
-                      value={formData.ClassCode}
-                      onChange={(e) => set('ClassCode', e.target.value.toUpperCase())}
-                      maxLength="20"
-                      placeholder={codeHint}
-                      style={{fontFamily:'monospace',textTransform:'uppercase'}}
-                    />
-                  </div>
-                </div>
-
-                {/* Section: Curriculum & Capacity */}
-                <h4 style={{margin:'18px 0 12px',color:'var(--navy-primary)',fontSize:'15px',borderBottom:'2px solid var(--navy-primary)',paddingBottom:'6px'}}>
-                  <i className="fas fa-book-open"></i> Curriculum &amp; Capacity
-                </h4>
-                <div className="form-grid">
                   <SearchableDropdown
                     label="Curriculum Stage"
                     icon="fas fa-graduation-cap"
@@ -8055,39 +8172,6 @@
                     placeholder="Select stage..."
                     required={true}
                   />
-                  <SearchableDropdown
-                    label="Medium of Instruction"
-                    icon="fas fa-language"
-                    options={[
-                      { value: 'english', label: 'English' },
-                      { value: 'french', label: 'French' },
-                      { value: 'spanish', label: 'Spanish' },
-                      { value: 'mandarin', label: 'Mandarin' },
-                      { value: 'arabic', label: 'Arabic' },
-                      { value: 'bilingual_en_fr', label: 'Bilingual (EN/FR)' },
-                      { value: 'bilingual_en_zh', label: 'Bilingual (EN/ZH)' },
-                      { value: 'immersion', label: 'Immersion' }
-                    ]}
-                    value={formData.MediumOfInstruction}
-                    onChange={(val) => set('MediumOfInstruction', val)}
-                    placeholder="Select medium..."
-                    required={true}
-                  />
-                  <SearchableDropdown
-                    label="Subject Stream"
-                    icon="fas fa-stream"
-                    options={[
-                      { value: 'science', label: 'Science' },
-                      { value: 'commerce', label: 'Commerce' },
-                      { value: 'arts', label: 'Arts' },
-                      { value: 'vocational', label: 'Vocational' },
-                      { value: 'general', label: 'General' },
-                      { value: 'none', label: 'None' }
-                    ]}
-                    value={formData.SubjectStream}
-                    onChange={(val) => set('SubjectStream', val)}
-                    placeholder="Select stream..."
-                  />
                   <div className="form-group">
                     <label><i className="fas fa-user-friends"></i> Max Capacity *</label>
                     <input
@@ -8099,43 +8183,6 @@
                       placeholder="30"
                     />
                   </div>
-                  <div className="form-group">
-                    <label><i className="fas fa-users"></i> Total Strength <span style={{fontWeight:400,color:'#888',fontSize:'11px'}}>(current count)</span></label>
-                    <input
-                      type="number"
-                      value={formData.TotalStrength}
-                      onChange={(e) => set('TotalStrength', e.target.value)}
-                      min="0"
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
-
-                {/* Section: Location & Staff */}
-                <h4 style={{margin:'18px 0 12px',color:'var(--navy-primary)',fontSize:'15px',borderBottom:'2px solid var(--navy-primary)',paddingBottom:'6px'}}>
-                  <i className="fas fa-map-marker-alt"></i> Location &amp; Staff
-                </h4>
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label><i className="fas fa-building"></i> Building</label>
-                    <input
-                      type="text"
-                      value={formData.Building}
-                      onChange={(e) => set('Building', e.target.value)}
-                      maxLength="50"
-                      placeholder="Main"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label><i className="fas fa-door-open"></i> Room Number</label>
-                    <input
-                      type="text"
-                      value={formData.RoomNumber}
-                      onChange={(e) => set('RoomNumber', e.target.value)}
-                      maxLength="20"
-                      placeholder="e.g. A-101"
-                    />
-                  </div>
                   <SearchableDropdown
                     label="Class Teacher"
                     icon="fas fa-chalkboard-teacher"
@@ -8144,15 +8191,115 @@
                     onChange={(val) => set('ClassTeacherID', val)}
                     placeholder="— Unassigned —"
                   />
-                  <SearchableDropdown
-                    label="Assistant Teacher"
-                    icon="fas fa-user-friends"
-                    options={teacherOpts}
-                    value={formData.AssistantTeacherID}
-                    onChange={(val) => set('AssistantTeacherID', val)}
-                    placeholder="— Unassigned —"
-                  />
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                  style={{margin:'14px 0 4px',padding:0,border:'none',background:'none',cursor:'pointer',color:'var(--navy-primary)',fontWeight:600,fontSize:'14px',display:'flex',alignItems:'center',gap:'6px'}}
+                >
+                  <i className={`fas fa-chevron-${showAdvanced ? 'up' : 'down'}`}></i> {showAdvanced ? 'Hide' : 'Show'} advanced options
+                  <span style={{fontWeight:400,color:'#888',fontSize:'11px',marginLeft:'8px'}}>(grade level, class code, medium, subject stream, room, assistant teacher…)</span>
+                </button>
+
+                {showAdvanced && (
+                  <div style={{marginTop:'10px'}}>
+                    <div className="form-grid">
+                      <div className="form-group">
+                        <label><i className="fas fa-sort-numeric-up"></i> Grade Level</label>
+                        <input
+                          type="number"
+                          value={formData.GradeLevel}
+                          onChange={(e) => set('GradeLevel', e.target.value)}
+                          min="0"
+                          max="13"
+                          placeholder="0-13 (use 0 if N/A)"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label><i className="fas fa-barcode"></i> Class Code</label>
+                        <input
+                          type="text"
+                          value={formData.ClassCode}
+                          onChange={(e) => set('ClassCode', e.target.value.toUpperCase())}
+                          maxLength="20"
+                          placeholder={codeHint}
+                          style={{fontFamily:'monospace',textTransform:'uppercase'}}
+                        />
+                      </div>
+                      <SearchableDropdown
+                        label="Medium of Instruction"
+                        icon="fas fa-language"
+                        options={[
+                          { value: 'english', label: 'English' },
+                          { value: 'french', label: 'French' },
+                          { value: 'spanish', label: 'Spanish' },
+                          { value: 'mandarin', label: 'Mandarin' },
+                          { value: 'arabic', label: 'Arabic' },
+                          { value: 'bilingual_en_fr', label: 'Bilingual (EN/FR)' },
+                          { value: 'bilingual_en_zh', label: 'Bilingual (EN/ZH)' },
+                          { value: 'immersion', label: 'Immersion' }
+                        ]}
+                        value={formData.MediumOfInstruction}
+                        onChange={(val) => set('MediumOfInstruction', val)}
+                        placeholder="Select medium..."
+                      />
+                      <SearchableDropdown
+                        label="Subject Stream"
+                        icon="fas fa-stream"
+                        options={[
+                          { value: 'science', label: 'Science' },
+                          { value: 'commerce', label: 'Commerce' },
+                          { value: 'arts', label: 'Arts' },
+                          { value: 'vocational', label: 'Vocational' },
+                          { value: 'general', label: 'General' },
+                          { value: 'none', label: 'None' }
+                        ]}
+                        value={formData.SubjectStream}
+                        onChange={(val) => set('SubjectStream', val)}
+                        placeholder="Select stream..."
+                      />
+                      <div className="form-group">
+                        <label><i className="fas fa-users"></i> Total Strength <span style={{fontWeight:400,color:'#888',fontSize:'11px'}}>(current count)</span></label>
+                        <input
+                          type="number"
+                          value={formData.TotalStrength}
+                          onChange={(e) => set('TotalStrength', e.target.value)}
+                          min="0"
+                          placeholder="0"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label><i className="fas fa-building"></i> Building</label>
+                        <input
+                          type="text"
+                          value={formData.Building}
+                          onChange={(e) => set('Building', e.target.value)}
+                          maxLength="50"
+                          placeholder="Main"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label><i className="fas fa-door-open"></i> Room Number</label>
+                        <input
+                          type="text"
+                          value={formData.RoomNumber}
+                          onChange={(e) => set('RoomNumber', e.target.value)}
+                          maxLength="20"
+                          placeholder="e.g. A-101"
+                        />
+                      </div>
+                      <SearchableDropdown
+                        label="Assistant Teacher"
+                        icon="fas fa-user-friends"
+                        options={teacherOpts}
+                        value={formData.AssistantTeacherID}
+                        onChange={(val) => set('AssistantTeacherID', val)}
+                        placeholder="— Unassigned —"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <div className="form-group" style={{marginTop:'18px'}}>
                   <label style={{display:'flex',alignItems:'center',gap:'12px',cursor:'pointer'}}>
