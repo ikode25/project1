@@ -23750,6 +23750,8 @@
     function SmsSettingsForm({ currentUser, role }) {
       const [data, setData] = useState(null);
       const [saving, setSaving] = useState(false);
+      const [testingDigest, setTestingDigest] = useState(false);
+      const [reinstalling, setReinstalling] = useState(false);
 
       useEffect(() => {
         google.script.run
@@ -23772,6 +23774,30 @@
           })
           .withFailureHandler((err) => { setSaving(false); Swal.fire({ icon: 'error', title: 'Error', text: err.message }); })
           .updateSmsSettings(data, currentUser, role);
+      };
+
+      const handleTestDigest = () => {
+        setTestingDigest(true);
+        google.script.run
+          .withSuccessHandler((res) => {
+            setTestingDigest(false);
+            if (res.success) Swal.fire({ icon: 'success', title: 'Sent!', text: res.message });
+            else Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+          })
+          .withFailureHandler((err) => { setTestingDigest(false); Swal.fire({ icon: 'error', title: 'Error', text: err.message }); })
+          .sendOwnerDigestNow(currentUser, role);
+      };
+
+      const handleReinstallTrigger = () => {
+        setReinstalling(true);
+        google.script.run
+          .withSuccessHandler((res) => {
+            setReinstalling(false);
+            if (res.success) Swal.fire({ icon: 'success', title: 'Scheduled!', text: res.message, timer: 2500, showConfirmButton: false });
+            else Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+          })
+          .withFailureHandler((err) => { setReinstalling(false); Swal.fire({ icon: 'error', title: 'Error', text: err.message }); })
+          .reinstallOwnerDigestTrigger(currentUser, role);
       };
 
       return (
@@ -23872,9 +23898,17 @@
               <input type="time" value={data.DailyDigestTime} onChange={(e) => set('DailyDigestTime', e.target.value)} />
             </div>
 
-            <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? <><i className="fas fa-spinner fa-spin"></i> Saving...</> : <><i className="fas fa-save"></i> Save SMS & Digest Settings</>}
-            </button>
+            <div style={{display:'flex',gap:'10px',flexWrap:'wrap'}}>
+              <button type="submit" className="btn btn-primary" disabled={saving}>
+                {saving ? <><i className="fas fa-spinner fa-spin"></i> Saving...</> : <><i className="fas fa-save"></i> Save SMS & Digest Settings</>}
+              </button>
+              <button type="button" className="btn btn-secondary" disabled={testingDigest || !(data.OwnerEmail || data.OwnerPhone)} onClick={handleTestDigest}>
+                {testingDigest ? <><i className="fas fa-spinner fa-spin"></i> Sending...</> : <><i className="fas fa-paper-plane"></i> Send Test Digest Now</>}
+              </button>
+              <button type="button" className="btn btn-secondary" disabled={reinstalling} onClick={handleReinstallTrigger}>
+                {reinstalling ? <><i className="fas fa-spinner fa-spin"></i> Scheduling...</> : <><i className="fas fa-sync"></i> Reinstall Digest Trigger</>}
+              </button>
+            </div>
           </form>
         </div>
       );

@@ -10436,8 +10436,11 @@ function updateSmsSettings(d, currentUser, currentRole) {
     sh.getRange(foundRow, 30).setValue(digestTime);
     sh.getRange(foundRow, 16).setValue(ts);
 
+    // keep the daily-digest trigger in sync with whatever time the admin just set
+    try { _installOwnerDigestTrigger(digestTime); } catch (e) { Logger.log('Trigger install failed: ' + e.toString()); }
+
     addLog(currentUser, 'SMS Settings Updated', 'Provider: ' + (provider || 'none'));
-    return { success: true, message: 'SMS & owner digest settings saved' };
+    return { success: true, message: 'SMS & owner digest settings saved. Daily digest scheduled for ' + digestTime + '.' };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
@@ -10823,6 +10826,116 @@ function sendFeeReminderSms(studentId, amountDue, currentUser, currentRole) {
     });
 
     return sendSms(phone, msg, 'fees', sid, currentUser, currentRole);
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// ============== Owner Daily Digest (close-of-day SMS + email) ==============
+
+// (re)installs the single time-based trigger for sendOwnerDailyDigest at the given HH:MM,
+// removing any previous copy first so saving settings twice never creates duplicates.
+function _installOwnerDigestTrigger(digestTimeHHMM) {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'sendOwnerDailyDigest') ScriptApp.deleteTrigger(t);
+  });
+  var parts = String(digestTimeHHMM || '18:00').split(':');
+  var hour = parseInt(parts[0], 10);
+  if (isNaN(hour) || hour < 0 || hour > 23) hour = 18;
+  var minute = parseInt(parts[1], 10);
+  if (isNaN(minute) || minute < 0 || minute > 59) minute = 0;
+  ScriptApp.newTrigger('sendOwnerDailyDigest')
+    .timeBased()
+    .everyDays(1)
+    .atHour(hour)
+    .nearMinute(minute)
+    .create();
+}
+
+// admin-callable — re-syncs the trigger with whatever DailyDigestTime is currently saved.
+// Useful after copying the sheet to a new deployment, where triggers don't carry over automatically.
+function reinstallOwnerDigestTrigger(currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var ext = getAdminExtendedSettings(currentUser, currentRole);
+    var digestTime = ext.success ? (ext.data.DailyDigestTime || '18:00') : '18:00';
+    _installOwnerDigestTrigger(digestTime);
+    addLog(currentUser, 'Owner Digest Trigger Reinstalled', 'Scheduled for ' + digestTime);
+    return { success: true, message: 'Daily digest trigger scheduled for ' + digestTime };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// builds + sends today's activity/financial digest to the configured OwnerEmail/OwnerPhone.
+// Runs unattended off the time-based trigger — no user session, so it authenticates itself as 'System'/'admin'.
+function sendOwnerDailyDigest() {
+  try {
+    var ext = getAdminExtendedSettings('System', 'admin');
+    if (!ext.success) return;
+    var ownerEmail = ext.data.OwnerEmail, ownerPhone = ext.data.OwnerPhone;
+    if (!ownerEmail && !ownerPhone) return; // nothing configured — nothing to do
+
+    var settingsRes = getSchoolSettings();
+    var schoolName = settingsRes.success ? settingsRes.data.SchoolName : 'School';
+    var today = todayStr();
+
+    var activity = getOwnerDailyActivityReport(today, 'System', 'admin');
+    var financial = getOwnerFinancialSummary({ fromDate: today, toDate: today }, 'System', 'admin');
+
+    var totalActions = activity.success ? activity.data.totalEntries : 0;
+    var topActions = (activity.success ? activity.data.byAction : []).slice(0, 6)
+      .map(function (a) { return a.Action + ' (' + a.Count + ')'; }).join(', ') || 'No activity recorded';
+    var income = financial.success ? (financial.summary['Total Income'] || 0) : 0;
+    var expense = financial.success ? (financial.summary['Total Expense'] || 0) : 0;
+    var outstanding = financial.success ? (financial.summary['Total Outstanding Fees'] || 0) : 0;
+
+    if (ownerEmail) {
+      try {
+        var rowsHtml = (activity.success ? activity.data.entries : []).slice(0, 50).map(function (e) {
+          return '<tr><td style="padding:4px 8px;border:1px solid #ddd">' + String(e.Time).slice(11, 16) + '</td>'
+            + '<td style="padding:4px 8px;border:1px solid #ddd">' + e.User + '</td>'
+            + '<td style="padding:4px 8px;border:1px solid #ddd">' + e.Action + '</td>'
+            + '<td style="padding:4px 8px;border:1px solid #ddd">' + (e.Details || '') + '</td></tr>';
+        }).join('');
+        var htmlBody = '<div style="font-family:Arial,sans-serif;color:#333">'
+          + '<h2 style="color:#001f3f">' + schoolName + ' — Daily Activity Report</h2>'
+          + '<p><b>Date:</b> ' + today + '</p>'
+          + '<p><b>Total System Actions:</b> ' + totalActions + '</p>'
+          + '<p><b>Top Actions:</b> ' + topActions + '</p>'
+          + '<p><b>Income Today:</b> GHS ' + income.toFixed(2) + '</p>'
+          + '<p><b>Expenses Today:</b> GHS ' + expense.toFixed(2) + '</p>'
+          + '<p><b>Total Fees Outstanding (all-time):</b> GHS ' + outstanding.toFixed(2) + '</p>'
+          + (rowsHtml ? '<h3 style="color:#001f3f">Activity Log</h3><table style="border-collapse:collapse;font-size:12px">'
+              + '<tr><th style="padding:4px 8px;border:1px solid #ddd;background:#001f3f;color:#fff">Time</th>'
+              + '<th style="padding:4px 8px;border:1px solid #ddd;background:#001f3f;color:#fff">User</th>'
+              + '<th style="padding:4px 8px;border:1px solid #ddd;background:#001f3f;color:#fff">Action</th>'
+              + '<th style="padding:4px 8px;border:1px solid #ddd;background:#001f3f;color:#fff">Details</th></tr>'
+              + rowsHtml + '</table>' : '')
+          + '<hr><p style="font-size:11px;color:#888">Automated daily digest from ' + schoolName + '. Sent at close of day.</p>'
+          + '</div>';
+        MailApp.sendEmail({ to: ownerEmail, subject: schoolName + ' — Daily Activity Report (' + today + ')', htmlBody: htmlBody });
+      } catch (e) { Logger.log('Owner digest email failed: ' + e.toString()); }
+    }
+
+    if (ownerPhone) {
+      var smsMsg = schoolName + ' Daily Report ' + today + ': ' + totalActions + ' action(s), GHS ' + income.toFixed(2) + ' collected, GHS ' + expense.toFixed(2) + ' spent.';
+      try { sendSms(ownerPhone, smsMsg, 'other', null, 'System', 'admin'); } catch (e) { Logger.log('Owner digest SMS failed: ' + e.toString()); }
+    }
+
+    addLog('System', 'Owner Daily Digest Sent', 'To ' + (ownerEmail || '—') + ' / ' + (ownerPhone || '—') + ' for ' + today);
+  } catch (err) {
+    Logger.log('sendOwnerDailyDigest error: ' + err.toString());
+  }
+}
+
+// admin-callable — sends today's digest immediately, so the admin can verify email/SMS delivery works
+// before relying on the unattended trigger.
+function sendOwnerDigestNow(currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    sendOwnerDailyDigest();
+    return { success: true, message: 'Digest sent (check owner email/phone).' };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
