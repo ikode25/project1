@@ -495,6 +495,13 @@
       border-top: 1px solid rgba(255,255,255,0.06);
     }
     .sidebar-group:first-child .sidebar-menu-title { border-top: none; padding-top: 0; }
+    .sidebar-group-toggle {
+      display: flex; align-items: center; justify-content: space-between; width: 100%;
+      background: none; border: none; cursor: pointer; font: inherit; text-align: left;
+      color: rgba(255,255,255,0.4); padding: 6px 10px 4px; margin: 0;
+    }
+    .sidebar-group-toggle:hover { color: rgba(255,255,255,0.7); }
+    .sidebar-group-toggle i { font-size: 9px; }
     .sidebar-group { margin-bottom: 8px; }
     .sidebar.collapsed .sidebar-group { margin-bottom: 0; }
     .sidebar.collapsed .sidebar-group + .sidebar-group ul { border-top: 1px solid rgba(255,255,255,0.08); padding-top: 6px; margin-top: 6px; }
@@ -2973,8 +2980,17 @@
     .grade-P { background: #d4edda; color: #155724; }
     .grade-AP { background: #e3d1f4; color: #4a1a7a; }
     .grade-D { background: #ffe5d0; color: #8a4b00; }
-    .grade-B { background: #f8d7da; color: #721c24; }
+    .grade-E { background: #f8d7da; color: #721c24; }
     .grade-AB { background: #e0e0e0; color: #555; }
+    /* JHS 9-grade scale */
+    .grade-Aplus { background: #c8e6c9; color: #1b5e20; }
+    .grade-A { background: #d4edda; color: #155724; }
+    .grade-Bplus { background: #b3e5fc; color: #01579b; }
+    .grade-B { background: #cce5ff; color: #004085; }
+    .grade-Cplus { background: #e3d1f4; color: #4a1a7a; }
+    .grade-C { background: #ead1f7; color: #4a1a7a; }
+    .grade-Dplus { background: #fff3cd; color: #856404; }
+    .grade-F { background: #f8d7da; color: #721c24; }
 
     body.dark-mode .marks-table { background: rgba(30, 30, 46, 0.95); }
     body.dark-mode .marks-table tbody td { color: #e8eaf6; border-bottom-color: rgba(255,255,255,0.05); }
@@ -3652,10 +3668,16 @@
       account: 'Profile'
     };
 
-    function buildSidebarItems(role) {
+    // ids an admin can never hide — always present regardless of HiddenMenuIds
+    const PROTECTED_MENU_IDS = ['dashboard', 'settings', 'account', 'about'];
+    function buildSidebarItems(role, hiddenMenuIds) {
       const r = String(role || '').toLowerCase();
       const order = MENU_PRIORITY[r] || MENU_PRIORITY.admin;
-      return order.filter(id => MENU_CATALOG[id]).map(id => ({ id: id, ...MENU_CATALOG[id] }));
+      const hidden = new Set(String(hiddenMenuIds || '').split(',').map(x => x.trim()).filter(Boolean));
+      return order
+        .filter(id => MENU_CATALOG[id])
+        .filter(id => PROTECTED_MENU_IDS.includes(id) || !hidden.has(id))
+        .map(id => ({ id: id, ...MENU_CATALOG[id] }));
     }
 
     // ============== Sidebar Component ==============
@@ -3671,7 +3693,7 @@
     };
 
     function Sidebar({ activeMenu, setActiveMenu, role, user, fullName, profileImage, themeMode, onThemeToggle, onLogout, collapsed, setCollapsed, showMobile, setShowMobile, schoolSettings, badges }) {
-      const items = buildSidebarItems(role);
+      const items = buildSidebarItems(role, schoolSettings && schoolSettings.HiddenMenuIds);
       const b = badges || {};
       const schoolName = (schoolSettings && schoolSettings.SchoolName) || 'Dashboard';
       const schoolShort = (schoolSettings && schoolSettings.SchoolShortName) || (schoolName.split(/\s+/).map(w => w[0]).join('').slice(0, 3).toUpperCase());
@@ -3684,6 +3706,20 @@
         grouped[grouped.findIndex(g => g.group === it.group)].items.push(it);
       });
       const displayName = fullName || user;
+
+      // collapsible groups — collapsed state persists per-browser; the group holding the active menu always opens
+      const [closedGroups, setClosedGroups] = useState(() => {
+        try { return new Set(JSON.parse(localStorage.getItem('sms_closed_sidebar_groups') || '[]')); } catch (e) { return new Set(); }
+      });
+      const activeGroup = (items.find(it => it.id === activeMenu) || {}).group;
+      const toggleGroup = (g) => {
+        setClosedGroups(prev => {
+          const next = new Set(prev);
+          if (next.has(g)) next.delete(g); else next.add(g);
+          try { localStorage.setItem('sms_closed_sidebar_groups', JSON.stringify([...next])); } catch (e) {}
+          return next;
+        });
+      };
 
       return (
         <>
@@ -3706,38 +3742,48 @@
 
             <div className="sidebar-user-info">
               <div className="sidebar-profile-image">
-                <img src={profileImage || 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiGXxCe0WNNedmFqSWeF761f7Kshhc-NP5ChRQKz9fr97cO8VaarvD0KlCwqHojJVBWv-RAxfOqMI5rD4H78KnARyOc6QgwL1nRRFWf5xNQ1d9F9HfAoLPPGlTyP0GwNl4n-INMEsWLQ4Y7zJtz5bOdAnc2ePH9-uCRgshlo6BsS6gJEz6fhrxL-5U5O3sX/s160/channels4_profile.jpg'} alt="Profile" />
+                <img src={profileImage || DEFAULT_LOGO} alt="Profile" />
               </div>
               <div className="sidebar-user-name">{displayName}</div>
               <div className="sidebar-user-role">{role}</div>
             </div>
 
             <div className="sidebar-menu-section">
-              {grouped.map(g => (
-                <div key={g.group} className="sidebar-group">
-                  {!collapsed && <div className="sidebar-menu-title">{GROUP_LABELS[g.group] || g.group}</div>}
-                  <ul className="sidebar-menu">
-                    {g.items.map(m => {
-                      const bv = b[m.id] || 0;
-                      const bs = SIDEBAR_BADGE_STYLE[m.id] || {};
-                      const bcls = 'sidebar-badge' + (bs.color ? ' sb-' + bs.color : '') + (bs.pulse ? ' sb-pulse' : '');
-                      return (
-                        <li key={m.id}>
-                          <button
-                            className={activeMenu === m.id ? 'active' : ''}
-                            onClick={() => { setActiveMenu(m.id); setShowMobile(false); }}
-                            title={collapsed ? m.label + (bv ? ' (' + bv + ')' : '') : undefined}
-                          >
-                            <i className={'fas fa-' + m.icon}></i>
-                            <span>{m.label}</span>
-                            {bv > 0 && <span className={bcls}>{bv > 99 ? '99+' : bv}</span>}
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              ))}
+              {grouped.map(g => {
+                const isOpen = g.group === activeGroup || !closedGroups.has(g.group);
+                return (
+                  <div key={g.group} className="sidebar-group">
+                    {!collapsed && (
+                      <button type="button" className="sidebar-menu-title sidebar-group-toggle" onClick={() => toggleGroup(g.group)}>
+                        <span>{GROUP_LABELS[g.group] || g.group}</span>
+                        <i className={`fas fa-chevron-${isOpen ? 'up' : 'down'}`}></i>
+                      </button>
+                    )}
+                    {(collapsed || isOpen) && (
+                      <ul className="sidebar-menu">
+                        {g.items.map(m => {
+                          const bv = b[m.id] || 0;
+                          const bs = SIDEBAR_BADGE_STYLE[m.id] || {};
+                          const bcls = 'sidebar-badge' + (bs.color ? ' sb-' + bs.color : '') + (bs.pulse ? ' sb-pulse' : '');
+                          return (
+                            <li key={m.id}>
+                              <button
+                                className={activeMenu === m.id ? 'active' : ''}
+                                onClick={() => { setActiveMenu(m.id); setShowMobile(false); }}
+                                title={collapsed ? m.label + (bv ? ' (' + bv + ')' : '') : undefined}
+                              >
+                                <i className={'fas fa-' + m.icon}></i>
+                                <span>{m.label}</span>
+                                {bv > 0 && <span className={bcls}>{bv > 99 ? '99+' : bv}</span>}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             <div className="sidebar-theme-toggle">
@@ -7859,7 +7905,7 @@
                       onChange={(e) => set('ClassName', e.target.value)}
                       required
                       maxLength="50"
-                      placeholder="e.g. Class 1, Grade 5"
+                      placeholder="e.g. Creche, KG 1, Basic 4, JHS 2"
                     />
                   </div>
                   <div className="form-group">
@@ -8075,6 +8121,7 @@
       const subjects = subjectsData || [];
       const [showModal, setShowModal] = useState(false);
       const [editing, setEditing] = useState(null);
+      const [allClasses, setAllClasses] = useState([]);
       const tableInstanceRef = useRef(null);
 
       const [filters, setFilters] = useState({
@@ -8084,6 +8131,36 @@
         activeOnly: false,
         search: ''
       });
+
+      useEffect(() => {
+        google.script.run
+          .withSuccessHandler((res) => { if (res.success) setAllClasses(res.data || []); })
+          .getAllClasses(currentUser, role);
+      }, []);
+
+      const quickSetup = () => {
+        if (allClasses.length === 0) { Swal.fire({ icon: 'info', text: 'No classes yet — add a class first.' }); return; }
+        const options = {};
+        allClasses.forEach(c => { options[c.ID] = `${c.ClassName} ${c.Section} (${c.AcademicYear})`; });
+        Swal.fire({
+          title: 'Quick Setup Subjects',
+          html: 'Adds the standard NaCCA subject list for the class\'s key phase (KG, Lower/Upper Primary, or JHS) — skips any subject already there.',
+          input: 'select',
+          inputOptions: options,
+          inputPlaceholder: 'Pick a class...',
+          showCancelButton: true,
+          confirmButtonText: 'Add Subjects'
+        }).then((r) => {
+          if (!r.isConfirmed || !r.value) return;
+          google.script.run
+            .withSuccessHandler((res) => {
+              if (res.success) { Swal.fire({ icon: 'success', text: res.message, timer: 2500, showConfirmButton: false }); refreshSubjects(); }
+              else Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+            })
+            .withFailureHandler((err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }))
+            .quickSetupSubjects(r.value, currentUser, role);
+        });
+      };
 
       const TYPE_META = {
         theory:    { label: 'Theory',    color: '#0074D9', icon: 'book' },
@@ -8291,9 +8368,14 @@
           <div className="section-header">
             <h2><i className="fas fa-book"></i> Subjects{syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}</h2>
             {isAdmin && (
-              <button className="btn btn-success" onClick={() => { setEditing(null); setShowModal(true); }}>
-                <i className="fas fa-plus"></i> Add Subject
-              </button>
+              <div style={{display:'flex',gap:'8px'}}>
+                <button className="btn btn-secondary" onClick={quickSetup} title="Auto-add the standard subject list for a class's key phase">
+                  <i className="fas fa-magic"></i> Quick Setup
+                </button>
+                <button className="btn btn-success" onClick={() => { setEditing(null); setShowModal(true); }}>
+                  <i className="fas fa-plus"></i> Add Subject
+                </button>
+              </div>
             )}
           </div>
 
@@ -9798,7 +9880,7 @@
         MotherTongue: student?.MotherTongue || '',
         HomeLanguage: student?.HomeLanguage || '',
         EnglishProficiency: student?.EnglishProficiency || 'b2',
-        CurriculumTrack: student?.CurriculumTrack || 'british',
+        CurriculumTrack: student?.CurriculumTrack || 'ges',
         AdmissionType: student?.AdmissionType || 'fresh',
         // intl: safeguarding
         CustodyArrangement: student?.CustodyArrangement || 'joint',
@@ -9819,6 +9901,7 @@
 
       const [classes, setClasses] = useState([]);
       const [saving, setSaving] = useState(false);
+      const [showMore, setShowMore] = useState(false);
       const set = (k, v) => setFormData({ ...formData, [k]: v });
 
       useEffect(() => {
@@ -10112,6 +10195,12 @@
                   </div>
                 </div>
 
+                <button type="button" className="btn btn-secondary no-print" style={{margin:'16px 0 4px'}}
+                  onClick={() => setShowMore(!showMore)}>
+                  <i className={`fas fa-chevron-${showMore ? 'up' : 'down'}`}></i> {showMore ? 'Hide' : 'Show'} additional information (optional)
+                </button>
+                {showMore && (<>
+
                 {/* intl: identity & citizenship */}
                 <SectionHdr icon="passport" label="Identity & Citizenship" />
                 <div className="form-grid">
@@ -10119,7 +10208,7 @@
                     <label><i className="fas fa-globe"></i> Nationality</label>
                     <input type="text" value={formData.Nationality}
                       onChange={(e) => set('Nationality', e.target.value)}
-                      maxLength="50" placeholder="British" />
+                      maxLength="50" placeholder="Ghanaian" />
                   </div>
                   <div className="form-group">
                     <label><i className="fas fa-globe-americas"></i> Second Nationality</label>
@@ -10387,6 +10476,8 @@
                     <small style={{color:'#777'}}>Visible to teaching staff for classroom accommodations</small>
                   </div>
                 </div>
+
+                </>)}
 
                 <SectionHdr icon="key" label="Login Credentials" />
                 <div className="form-grid">
@@ -11220,8 +11311,48 @@
     // ============== Student Drill-down: A4 Report Card ==============
     // Ghana Basic/JHS report card — SBA/Exam split, per-subject position, attendance,
     // overall class position, JHS3 BECE aggregate, and conduct/remarks — printed A4.
-    const SBA_GRADE_COLORS = { HP: '#0a7a32', P: '#0074D9', AP: '#6a1b9a', D: '#d49500', B: '#b71c1c', AB: '#666' };
-    function sbaGradeColor(g) { return SBA_GRADE_COLORS[String(g || '').toUpperCase()] || '#888'; }
+    //
+    // Two grading bands (mirrors Code.gs computeGrade/jhsGradeInfo):
+    //  - 'basic' (Creche..Basic 6): NaCCA 5-band SBA scale
+    //  - 'jhs'   (Basic 7-9): 9-grade WAEC-style scale
+    const BASIC_GRADE_TABLE = [
+      { min: 80, code: 'HP', label: 'Highly Proficient', color: '#0a7a32' },
+      { min: 68, code: 'P',  label: 'Proficient',         color: '#0074D9' },
+      { min: 54, code: 'AP', label: 'Approaching Proficiency', color: '#6a1b9a' },
+      { min: 40, code: 'D',  label: 'Developing',         color: '#d49500' },
+      { min: 0,  code: 'E',  label: 'Emerging',            color: '#b71c1c' }
+    ];
+    const JHS_GRADE_TABLE = [
+      { min: 90, code: 'A+', label: 'Highest',      color: '#0a7a32' },
+      { min: 80, code: 'A',  label: 'Higher',       color: '#1e7e34' },
+      { min: 70, code: 'B+', label: 'High',         color: '#0074D9' },
+      { min: 60, code: 'B',  label: 'High Average', color: '#0a5db5' },
+      { min: 55, code: 'C+', label: 'Average',      color: '#6a1b9a' },
+      { min: 50, code: 'C',  label: 'Low Average',  color: '#8e24aa' },
+      { min: 40, code: 'D+', label: 'Low',          color: '#d49500' },
+      { min: 35, code: 'E',  label: 'Lower',        color: '#e65100' },
+      { min: 0,  code: 'F',  label: 'Low',          color: '#b71c1c' }
+    ];
+    function gradeTableFor(band) { return band === 'jhs' ? JHS_GRADE_TABLE : BASIC_GRADE_TABLE; }
+    function gradeInfoFromPercent(pct, band) {
+      const t = gradeTableFor(band);
+      return t.find(r => pct >= r.min) || t[t.length - 1];
+    }
+    function computeGradeClientBand(obtained, max, isAbsent, band) {
+      if (isAbsent) return 'AB';
+      if (!max || max <= 0) return '';
+      return gradeInfoFromPercent((obtained / max) * 100, band).code;
+    }
+    function gradeDescriptor(code, band) {
+      if (String(code).toUpperCase() === 'AB') return 'Absent';
+      const row = gradeTableFor(band).find(r => r.code === code);
+      return row ? row.label : '';
+    }
+    function sbaGradeColor(g, band) {
+      if (String(g).toUpperCase() === 'AB') return '#666';
+      const row = gradeTableFor(band).find(r => r.code === g);
+      return row ? row.color : '#888';
+    }
 
     function StudentResultsModal({ student, currentUser, role, onClose }) {
       const [examList, setExamList] = useState(null);   // { id: examMeta } from getStudentResults
@@ -11378,15 +11509,21 @@
                     <div><b>Reopening:</b> {fmtDate(card.exam.ReopeningDate) || '—'}</div>
                   </div>
 
-                  {/* marks table */}
+                  {/* marks table — SBA/Exam split only for End of Term exams; other exam types show a single Score column */}
                   <table className="rc-mtable">
                     <thead>
                       <tr>
                         <th style={{width:'30px'}}>#</th>
                         <th>Subject</th>
-                        <th style={{width:'60px',textAlign:'center'}}>SBA<br/>/{card.subjects[0] ? Math.round((card.subjects[0].MaxMarks || 100) / 2) : 50}</th>
-                        <th style={{width:'60px',textAlign:'center'}}>Exam<br/>/{card.subjects[0] ? Math.round((card.subjects[0].MaxMarks || 100) / 2) : 50}</th>
-                        <th style={{width:'60px',textAlign:'center'}}>Total</th>
+                        {card.exam.IsSplitScore ? (
+                          <>
+                            <th style={{width:'60px',textAlign:'center'}}>SBA<br/>/{card.exam.SbaMaxMarks || 50}</th>
+                            <th style={{width:'60px',textAlign:'center'}}>Exam<br/>/{card.exam.ExamMaxMarks || 50}</th>
+                            <th style={{width:'60px',textAlign:'center'}}>Total</th>
+                          </>
+                        ) : (
+                          <th style={{width:'70px',textAlign:'center'}}>Score<br/>/{card.subjects[0] ? card.subjects[0].MaxMarks : 100}</th>
+                        )}
                         <th style={{width:'55px',textAlign:'center'}}>Grade</th>
                         <th style={{width:'55px',textAlign:'center'}}>Pos.</th>
                         <th>Remarks</th>
@@ -11397,13 +11534,17 @@
                         <tr key={s.SubjectID}>
                           <td>{i + 1}</td>
                           <td>{s.SubjectName}</td>
-                          <td style={{textAlign:'center'}}>{s.IsAbsent ? '—' : s.SBA}</td>
-                          <td style={{textAlign:'center'}}>{s.IsAbsent ? '—' : s.Exam}</td>
+                          {card.exam.IsSplitScore ? (
+                            <>
+                              <td style={{textAlign:'center'}}>{s.IsAbsent ? '—' : s.SBA}</td>
+                              <td style={{textAlign:'center'}}>{s.IsAbsent ? '—' : s.Exam}</td>
+                            </>
+                          ) : null}
                           <td style={{textAlign:'center',fontWeight:600}}>
                             {s.IsAbsent ? <span style={{color:'#888',fontStyle:'italic'}}>Absent</span> : (s.Total != null ? s.Total : '—')}
                           </td>
                           <td style={{textAlign:'center'}}>
-                            <span className="rc-grade-pill" style={{background: sbaGradeColor(s.Grade)}}>{s.Grade || '—'}</span>
+                            <span className="rc-grade-pill" style={{background: sbaGradeColor(s.Grade, card.class.GradeBand)}}>{s.Grade || '—'}</span>
                           </td>
                           <td style={{textAlign:'center'}}>{s.Position ? ordinal(s.Position) : '—'}</td>
                           <td style={{fontSize:'12px',color:'#444'}}>{s.Remarks || ''}</td>
@@ -11413,8 +11554,10 @@
                     <tfoot>
                       <tr>
                         <td colSpan="2" style={{textAlign:'right'}}>GRAND TOTAL</td>
-                        <td style={{textAlign:'center'}}>{card.grandTotal.SBA}</td>
-                        <td style={{textAlign:'center'}}>{card.grandTotal.Exam}</td>
+                        {card.exam.IsSplitScore && <>
+                          <td style={{textAlign:'center'}}>{card.grandTotal.SBA}</td>
+                          <td style={{textAlign:'center'}}>{card.grandTotal.Exam}</td>
+                        </>}
                         <td style={{textAlign:'center'}}>{card.grandTotal.Total}</td>
                         <td colSpan="3"></td>
                       </tr>
@@ -11511,7 +11654,10 @@
                   {/* grade interpretation key */}
                   <div className="rc-grade-key">
                     <b>Grade Interpretation Key:</b>{' '}
-                    HP = Highly Proficient (80–100) &nbsp;·&nbsp; P = Proficient (70–79) &nbsp;·&nbsp; AP = Approaching Proficiency (60–69) &nbsp;·&nbsp; D = Developing (50–59) &nbsp;·&nbsp; B = Beginning (0–49)
+                    {gradeTableFor(card.class.GradeBand).map((r, i, arr) => {
+                      const max = i === 0 ? 100 : arr[i - 1].min - 1;
+                      return <React.Fragment key={r.code}>{i > 0 && <>&nbsp;·&nbsp;</>}{r.code} = {r.label} ({r.min}–{max})</React.Fragment>;
+                    })}
                   </div>
 
                   <div className="rc-foot">
@@ -13125,12 +13271,10 @@
                   <label><i className="fas fa-tag"></i> Type</label>
                   <SearchableDropdown
                     options={[
-                      { value: 'unit_test', label: 'Unit Test' },
-                      { value: 'quarterly', label: 'Quarterly' },
-                      { value: 'half_yearly', label: 'Half Yearly' },
-                      { value: 'mid_term', label: 'Mid Term' },
-                      { value: 'final', label: 'Final' },
-                      { value: 'annual', label: 'Annual' },
+                      { value: 'class_test', label: 'Class Test' },
+                      { value: 'mid_term', label: 'Mid-Term Exam' },
+                      { value: 'end_of_term', label: 'End of Term Exam' },
+                      { value: 'mock', label: 'Mock Exam (Basic 9)' },
                       { value: 'other', label: 'Other' }
                     ]}
                     value={filters.examType}
@@ -13363,9 +13507,10 @@
       useEffect(() => {
         if (!data || !chartRef.current || typeof Chart === 'undefined') return;
         if (chartInst.current) { try { chartInst.current.destroy(); } catch (e) {} }
-        const labels = ['HP','P','AP','D','B','Absent'];
-        const values = [data.grades['HP']||0, data.grades['P']||0, data.grades['AP']||0, data.grades['D']||0, data.grades['B']||0, data.absentCount||0];
-        const colors = ['#0a7a32','#0074D9','#6a1b9a','#d49500','#b71c1c','#888'];
+        const gt = gradeTableFor(data.gradeBand);
+        const labels = gt.map(r => r.code).concat(['Absent']);
+        const values = gt.map(r => data.grades[r.code] || 0).concat([data.absentCount || 0]);
+        const colors = gt.map(r => r.color).concat(['#888']);
         chartInst.current = new Chart(chartRef.current.getContext('2d'), {
           type: 'doughnut',
           data: { labels: labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }] },
@@ -13426,7 +13571,7 @@
                       </h4>
                       <table style={{width:'100%',fontSize:'13px',borderCollapse:'collapse'}}>
                         <tbody>
-                          {[['HP','#0a7a32'],['P','#0074D9'],['AP','#6a1b9a'],['D','#d49500'],['B','#b71c1c'],['Absent','#888']].map(([g, c]) => {
+                          {gradeTableFor(data.gradeBand).map(r => [r.code, r.color]).concat([['Absent', '#888']]).map(([g, c]) => {
                             const v = g === 'Absent' ? data.absentCount : (data.grades[g] || 0);
                             return (
                               <tr key={g} style={{borderBottom:'1px solid #eee'}}>
@@ -13517,7 +13662,7 @@
         catch { return String(d).split('T')[0]; }
       };
 
-      const gradeColor = sbaGradeColor;
+      const gradeColor = (g) => sbaGradeColor(g, data && data.exam && data.exam.GradeBand);
 
       const handlePrint = () => {
         document.body.classList.add('print-target');
@@ -13639,7 +13784,7 @@
       const dStr = (v) => v ? String(v).split('T')[0] : '';
       const [formData, setFormData] = useState({
         ExamName: exam?.ExamName || '',
-        ExamType: exam?.ExamType || 'unit_test',
+        ExamType: exam?.ExamType || 'end_of_term',
         ClassID: exam?.ClassID ? String(exam.ClassID) : '',
         AcademicYear: exam?.AcademicYear || (() => {
           const y = new Date().getFullYear();
@@ -13648,6 +13793,8 @@
         StartDate: dStr(exam?.StartDate),
         EndDate: dStr(exam?.EndDate),
         MaxMarksPerSubject: exam?.MaxMarksPerSubject != null ? exam.MaxMarksPerSubject : 100,
+        SbaMaxMarks: exam?.SbaMaxMarks != null && exam.SbaMaxMarks !== '' ? exam.SbaMaxMarks : 50,
+        ExamMaxMarks: exam?.ExamMaxMarks != null && exam.ExamMaxMarks !== '' ? exam.ExamMaxMarks : 50,
         // new fields
         Term: exam?.Term || 'term1',
         AssessmentType: exam?.AssessmentType || 'summative',
@@ -13666,7 +13813,14 @@
       });
       const [classes, setClasses] = useState([]);
       const [saving, setSaving] = useState(false);
+      const [showAdvanced, setShowAdvanced] = useState(false);
       const set = (k, v) => setFormData({ ...formData, [k]: v });
+      // picking a class auto-derives its grading band — no manual "Curriculum Stage" / "Grading Scheme" pickers needed
+      const setClassId = (v) => {
+        const cls = classes.find(c => String(c.ID) === String(v));
+        const stage = cls ? cls.CurriculumStage : formData.CurriculumStage;
+        setFormData({ ...formData, ClassID: v, CurriculumStage: stage, GradingScheme: stage === 'jhs' ? 'bece_9grade' : 'sba_5band' });
+      };
 
       useEffect(() => {
         google.script.run
@@ -13713,8 +13867,17 @@
             return;
           }
         }
+        let toSave = formData;
+        if (formData.ExamType === 'end_of_term') {
+          const sba = parseFloat(formData.SbaMaxMarks), ex = parseFloat(formData.ExamMaxMarks);
+          if (isNaN(sba) || sba <= 0 || isNaN(ex) || ex <= 0) {
+            Swal.fire({ icon: 'error', title: 'Missing scores', text: 'Enter both the class score (SBA) and exam paper max marks.' });
+            return;
+          }
+          toSave = { ...formData, MaxMarksPerSubject: sba + ex };
+        }
         setSaving(true);
-        onSave(formData);
+        onSave(toSave);
       };
 
       const yearOptions = (() => {
@@ -13736,32 +13899,21 @@
             </div>
             <div className="modal-body">
               <form onSubmit={handleSubmit}>
-                {/* Section 1: Basics */}
-                <h4 style={sectionH4}>
-                  <i className="fas fa-info-circle"></i> Basics
-                </h4>
+                {/* Basics — everything a school actually needs to create an exam */}
                 <div className="form-grid">
                   <div className="form-group">
                     <label><i className="fas fa-file-alt"></i> Exam Name *</label>
                     <input type="text" value={formData.ExamName}
                       onChange={(e) => set('ExamName', e.target.value)}
-                      required maxLength="100" placeholder="e.g. Quarterly" />
-                  </div>
-                  <div className="form-group">
-                    <label><i className="fas fa-hashtag"></i> Exam Code</label>
-                    <input type="text" value={formData.ExamCode}
-                      onChange={(e) => set('ExamCode', e.target.value.toUpperCase())}
-                      maxLength="40" placeholder="e.g. Q1-2025" style={{fontFamily:'monospace'}} />
+                      required maxLength="100" placeholder="e.g. End of Term 1 Exam" />
                   </div>
                   <SearchableDropdown
                     label="Exam Type" icon="fas fa-tag"
                     options={[
-                      { value: 'unit_test', label: 'Unit Test' },
-                      { value: 'quarterly', label: 'Quarterly' },
-                      { value: 'half_yearly', label: 'Half Yearly' },
-                      { value: 'mid_term', label: 'Mid Term' },
-                      { value: 'final', label: 'Final' },
-                      { value: 'annual', label: 'Annual' },
+                      { value: 'class_test', label: 'Class Test (monthly)' },
+                      { value: 'mid_term', label: 'Mid-Term Exam' },
+                      { value: 'end_of_term', label: 'End of Term Exam' },
+                      { value: 'mock', label: 'Mock Exam (Basic 9)' },
                       { value: 'other', label: 'Other' }
                     ]}
                     value={formData.ExamType}
@@ -13776,8 +13928,18 @@
                       label: c.ClassName + ' ' + c.Section + ' (' + c.AcademicYear + ')'
                     }))}
                     value={formData.ClassID}
-                    onChange={(v) => set('ClassID', v)}
+                    onChange={setClassId}
                     placeholder="Select class..."
+                    required={true}
+                  />
+                  <SearchableDropdown
+                    label="Term" icon="fas fa-calendar-week"
+                    options={[
+                      { value: 'term1', label: 'Term 1' }, { value: 'term2', label: 'Term 2' }, { value: 'term3', label: 'Term 3' }
+                    ]}
+                    value={formData.Term}
+                    onChange={(v) => set('Term', v)}
+                    placeholder="Pick term..."
                     required={true}
                   />
                   <SearchableDropdown
@@ -13798,146 +13960,111 @@
                     <input type="date" value={formData.EndDate}
                       onChange={(e) => set('EndDate', e.target.value)} required />
                   </div>
-                  <div className="form-group">
-                    <label><i className="fas fa-bullseye"></i> Max Marks per Subject</label>
-                    <input type="number" value={formData.MaxMarksPerSubject}
-                      onChange={(e) => set('MaxMarksPerSubject', e.target.value)}
-                      min="1" placeholder="100" />
-                  </div>
+                  {formData.ExamType === 'end_of_term' ? (
+                    <>
+                      <div className="form-group">
+                        <label><i className="fas fa-tasks"></i> Class Score (SBA) Max *</label>
+                        <input type="number" value={formData.SbaMaxMarks}
+                          onChange={(e) => set('SbaMaxMarks', e.target.value)}
+                          min="1" max="100" placeholder="e.g. 40 or 50" required />
+                      </div>
+                      <div className="form-group">
+                        <label><i className="fas fa-file-alt"></i> Exam Paper Max *</label>
+                        <input type="number" value={formData.ExamMaxMarks}
+                          onChange={(e) => set('ExamMaxMarks', e.target.value)}
+                          min="1" max="100" placeholder="e.g. 50 or 60" required />
+                        <small style={{color:'#777'}}>
+                          Total per subject: {(parseFloat(formData.SbaMaxMarks) || 0) + (parseFloat(formData.ExamMaxMarks) || 0)}
+                        </small>
+                      </div>
+                      <div className="form-group">
+                        <label><i className="fas fa-umbrella-beach"></i> Vacation Date</label>
+                        <input type="date" value={formData.VacationDate}
+                          onChange={(e) => set('VacationDate', e.target.value)} />
+                      </div>
+                      <div className="form-group">
+                        <label><i className="fas fa-door-open"></i> Reopening Date</label>
+                        <input type="date" value={formData.ReopeningDate}
+                          onChange={(e) => set('ReopeningDate', e.target.value)} />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="form-group">
+                      <label><i className="fas fa-bullseye"></i> Max Marks per Subject *</label>
+                      <input type="number" value={formData.MaxMarksPerSubject}
+                        onChange={(e) => set('MaxMarksPerSubject', e.target.value)}
+                        min="1" required
+                        placeholder={formData.ExamType === 'class_test' ? '10 or 20' : '100'} />
+                    </div>
+                  )}
                 </div>
 
-                {/* Section 2: Term & Assessment */}
-                <h4 style={sectionH4}>
-                  <i className="fas fa-calendar-week"></i> Term &amp; Assessment
-                </h4>
-                <div className="form-grid">
-                  <SearchableDropdown
-                    label="Term" icon="fas fa-calendar-week"
-                    options={[
-                      { value: 'term1', label: 'Term 1' }, { value: 'term2', label: 'Term 2' }, { value: 'term3', label: 'Term 3' }
-                    ]}
-                    value={formData.Term}
-                    onChange={(v) => set('Term', v)}
-                    placeholder="Pick term..."
-                    required={true}
-                  />
-                  <SearchableDropdown
-                    label="Assessment Type" icon="fas fa-tags"
-                    options={[
-                      { value: 'summative', label: 'Summative' }, { value: 'formative', label: 'Formative' },
-                      { value: 'mock', label: 'Mock' }, { value: 'project', label: 'Project' },
-                      { value: 'oral', label: 'Oral' }, { value: 'practical', label: 'Practical' }
-                    ]}
-                    value={formData.AssessmentType}
-                    onChange={(v) => set('AssessmentType', v)}
-                    placeholder="Pick type..."
-                    required={true}
-                  />
-                  <SearchableDropdown
-                    label="Curriculum Stage" icon="fas fa-graduation-cap"
-                    options={[
-                      { value: 'creche', label: 'Creche' },
-                      { value: 'nursery', label: 'Nursery' },
-                      { value: 'kg', label: 'Kindergarten' },
-                      { value: 'lower_primary', label: 'Lower Primary (Basic 1-3)' },
-                      { value: 'upper_primary', label: 'Upper Primary (Basic 4-6)' },
-                      { value: 'jhs', label: 'JHS (Basic 7-9)' }
-                    ]}
-                    value={formData.CurriculumStage}
-                    onChange={(v) => set('CurriculumStage', v)}
-                    placeholder="Pick stage..."
-                    required={true}
-                  />
-                </div>
+                {/* everything below is optional — collapsed by default to keep the form short */}
+                <button type="button" className="btn btn-secondary no-print" style={{marginTop:'6px'}}
+                  onClick={() => setShowAdvanced(!showAdvanced)}>
+                  <i className={`fas fa-chevron-${showAdvanced ? 'up' : 'down'}`}></i> {showAdvanced ? 'Hide' : 'Show'} advanced options
+                </button>
 
-                {/* Section 3: Grading & Schedule */}
-                <h4 style={sectionH4}>
-                  <i className="fas fa-chart-line"></i> Grading &amp; Schedule
-                </h4>
-                <div className="form-grid">
-                  <SearchableDropdown
-                    label="Grading Scheme" icon="fas fa-chart-line"
-                    options={[
-                      { value: 'sba_5band', label: 'SBA 5-Band (HP/P/AP/D/B)' },
-                      { value: 'bece_9grade', label: 'BECE 1-9 (JHS3)' },
-                      { value: 'percentage', label: 'Percentage' },
-                      { value: 'pass_fail', label: 'Pass/Fail' }
-                    ]}
-                    value={formData.GradingScheme}
-                    onChange={(v) => set('GradingScheme', v)}
-                    placeholder="Pick scheme..."
-                    required={true}
-                  />
-                  <div className="form-group">
-                    <label><i className="fas fa-percentage"></i> Weightage (% of final)</label>
-                    <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
-                      <input type="number" value={formData.WeightagePercent}
-                        onChange={(e) => set('WeightagePercent', e.target.value)}
-                        min="0" max="100" placeholder="0" style={{flex:1}} />
-                      <span style={{fontWeight:600,color:'var(--navy-primary)'}}>%</span>
+                {showAdvanced && (
+                  <div className="form-grid" style={{marginTop:'14px'}}>
+                    <div className="form-group">
+                      <label><i className="fas fa-hashtag"></i> Exam Code</label>
+                      <input type="text" value={formData.ExamCode}
+                        onChange={(e) => set('ExamCode', e.target.value.toUpperCase())}
+                        maxLength="40" placeholder="e.g. EOT1-2026" style={{fontFamily:'monospace'}} />
+                    </div>
+                    <div className="form-group">
+                      <label><i className="fas fa-percentage"></i> Weightage (% of final)</label>
+                      <div style={{display:'flex',alignItems:'center',gap:'6px'}}>
+                        <input type="number" value={formData.WeightagePercent}
+                          onChange={(e) => set('WeightagePercent', e.target.value)}
+                          min="0" max="100" placeholder="0" style={{flex:1}} />
+                        <span style={{fontWeight:600,color:'var(--navy-primary)'}}>%</span>
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label><i className="fas fa-clock"></i> Duration (minutes)</label>
+                      <input type="number" value={formData.ExamDuration}
+                        onChange={(e) => set('ExamDuration', e.target.value)}
+                        min="0" max="600" placeholder="60" />
+                    </div>
+                    <div className="form-group">
+                      <label><i className="fas fa-lock"></i> Results Lock Date</label>
+                      <input type="date" value={formData.ResultsLockedDate}
+                        onChange={(e) => set('ResultsLockedDate', e.target.value)} />
+                    </div>
+                    <div className="form-group">
+                      <label><i className="fas fa-flag-checkered"></i> Pass Marks Override</label>
+                      <input type="number" step="0.5" value={formData.PassMarksOverride}
+                        onChange={(e) => set('PassMarksOverride', e.target.value)}
+                        min="0" placeholder="Leave empty for default" />
+                    </div>
+                    <div className="form-group">
+                      <label><i className="fas fa-forward"></i> Next Exam ID</label>
+                      <input type="number" value={formData.NextExamID}
+                        onChange={(e) => set('NextExamID', e.target.value)}
+                        min="1" placeholder="Next exam in series" />
+                    </div>
+                    <div className="form-group">
+                      <label><i className="fas fa-list"></i> Applicable Sections</label>
+                      <input type="text" value={formData.ApplicableSections}
+                        onChange={(e) => set('ApplicableSections', e.target.value.toUpperCase())}
+                        maxLength="100" placeholder="Comma-separated section codes, e.g. A,B,C" />
+                    </div>
+                    <div className="form-group">
+                      <label style={{display:'flex',alignItems:'center',gap:'12px',cursor:'pointer'}}>
+                        <span className="toggle-switch">
+                          <input type="checkbox" checked={!!formData.ReportCardGenerated}
+                            onChange={(e) => set('ReportCardGenerated', e.target.checked)} />
+                          <span className="toggle-slider"></span>
+                        </span>
+                        <span style={{fontWeight:600,color: formData.ReportCardGenerated ? '#34a853' : '#888'}}>
+                          Report card generated
+                        </span>
+                      </label>
                     </div>
                   </div>
-                  <div className="form-group">
-                    <label><i className="fas fa-clock"></i> Duration (minutes)</label>
-                    <input type="number" value={formData.ExamDuration}
-                      onChange={(e) => set('ExamDuration', e.target.value)}
-                      min="0" max="600" placeholder="60" />
-                  </div>
-                  <div className="form-group">
-                    <label><i className="fas fa-lock"></i> Results Lock Date</label>
-                    <input type="date" value={formData.ResultsLockedDate}
-                      onChange={(e) => set('ResultsLockedDate', e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label><i className="fas fa-flag-checkered"></i> Pass Marks Override</label>
-                    <input type="number" step="0.5" value={formData.PassMarksOverride}
-                      onChange={(e) => set('PassMarksOverride', e.target.value)}
-                      min="0" placeholder="Leave empty for default" />
-                  </div>
-                  <div className="form-group">
-                    <label><i className="fas fa-umbrella-beach"></i> Vacation Date</label>
-                    <input type="date" value={formData.VacationDate}
-                      onChange={(e) => set('VacationDate', e.target.value)} />
-                    <small style={{color:'#777'}}>Term closing date — printed on the report card</small>
-                  </div>
-                  <div className="form-group">
-                    <label><i className="fas fa-door-open"></i> Reopening Date</label>
-                    <input type="date" value={formData.ReopeningDate}
-                      onChange={(e) => set('ReopeningDate', e.target.value)} />
-                    <small style={{color:'#777'}}>Next term's resumption date — printed on the report card</small>
-                  </div>
-                </div>
-
-                {/* Section 4: Advanced */}
-                <h4 style={sectionH4}>
-                  <i className="fas fa-cogs"></i> Advanced (Optional)
-                </h4>
-                <div className="form-grid">
-                  <div className="form-group">
-                    <label><i className="fas fa-forward"></i> Next Exam ID</label>
-                    <input type="number" value={formData.NextExamID}
-                      onChange={(e) => set('NextExamID', e.target.value)}
-                      min="1" placeholder="Next exam in series" />
-                  </div>
-                  <div className="form-group">
-                    <label><i className="fas fa-list"></i> Applicable Sections</label>
-                    <input type="text" value={formData.ApplicableSections}
-                      onChange={(e) => set('ApplicableSections', e.target.value.toUpperCase())}
-                      maxLength="100" placeholder="Comma-separated section codes, e.g. A,B,C" />
-                  </div>
-                </div>
-                <div className="form-group" style={{marginTop:'10px'}}>
-                  <label style={{display:'flex',alignItems:'center',gap:'12px',cursor:'pointer'}}>
-                    <span className="toggle-switch">
-                      <input type="checkbox" checked={!!formData.ReportCardGenerated}
-                        onChange={(e) => set('ReportCardGenerated', e.target.checked)} />
-                      <span className="toggle-slider"></span>
-                    </span>
-                    <span style={{fontWeight:600,color: formData.ReportCardGenerated ? '#34a853' : '#888'}}>
-                      <i className={`fas fa-${formData.ReportCardGenerated ? 'check' : 'pause'}-circle`}></i> Report card generated for this exam
-                    </span>
-                  </label>
-                </div>
+                )}
 
                 <div className="settings-info-message" style={{marginTop:'18px'}}>
                   <i className="fas fa-info-circle" style={{marginRight:'6px'}}></i>
@@ -14166,7 +14293,8 @@
       })();
 
       // is grading scheme one that exposes internal/external
-      const showInternalExternal = ['sba_5band', 'bece_9grade'].includes(String(exam.GradingScheme || '').toLowerCase());
+      const showInternalExternal = String(exam.ExamType || '').toLowerCase() === 'end_of_term';
+      const gradeBand = String(exam.CurriculumStage || '').toLowerCase() === 'jhs' ? 'jhs' : 'basic';
 
       // load subjects of the exam's class
       useEffect(() => {
@@ -14244,20 +14372,9 @@
         return sub ? sub.MaxMarks : (exam.MaxMarksPerSubject || 100);
       };
 
-      const computeGradeClient = (obtained, max, isAbsent) => {
-        if (isAbsent) return 'AB';
-        if (max <= 0) return '';
-        const pct = (obtained / max) * 100;
-        if (pct >= 80) return 'HP';
-        if (pct >= 70) return 'P';
-        if (pct >= 60) return 'AP';
-        if (pct >= 50) return 'D';
-        return 'B';
-      };
+      const computeGradeClient = (obtained, max, isAbsent) => computeGradeClientBand(obtained, max, isAbsent, gradeBand);
 
-      const gradeClass = (g) => ({
-        'HP': 'grade-HP', 'P': 'grade-P', 'AP': 'grade-AP', 'D': 'grade-D', 'B': 'grade-B', 'AB': 'grade-AB'
-      })[g] || '';
+      const gradeClass = (g) => 'grade-' + String(g || '').replace('+', 'plus');
 
       // chip color by pct band
       const pctChipColor = (pct) => {
@@ -22818,7 +22935,8 @@
         AcademicYear: '', Currency: 'GH₵', TimeZone: 'Africa/Accra',
         AboutText: '',
         WorkingDays: 'monday,tuesday,wednesday,thursday,friday',
-        AcademicYearStartDate: '', AcademicYearEndDate: ''
+        AcademicYearStartDate: '', AcademicYearEndDate: '',
+        HiddenMenuIds: ''
       });
       const [saving, setSaving] = useState(false);
 
@@ -22839,11 +22957,18 @@
           AboutText: schoolSettings.AboutText || '',
           WorkingDays: schoolSettings.WorkingDays || 'monday,tuesday,wednesday,thursday,friday',
           AcademicYearStartDate: (schoolSettings.AcademicYearStartDate || '').split('T')[0],
-          AcademicYearEndDate: (schoolSettings.AcademicYearEndDate || '').split('T')[0]
+          AcademicYearEndDate: (schoolSettings.AcademicYearEndDate || '').split('T')[0],
+          HiddenMenuIds: schoolSettings.HiddenMenuIds || ''
         });
       }, [schoolSettings]);
 
       const set = (k, v) => setData({ ...data, [k]: v });
+      const hiddenSet = new Set(data.HiddenMenuIds.split(',').map(x => x.trim()).filter(Boolean));
+      const toggleMenuId = (id) => {
+        const next = new Set(hiddenSet);
+        if (next.has(id)) next.delete(id); else next.add(id);
+        set('HiddenMenuIds', [...next].join(','));
+      };
 
       const handleSave = (e) => {
         e.preventDefault();
@@ -23004,6 +23129,31 @@
               <label><i className="fas fa-align-left"></i> About Text (shown in About sections)</label>
               <textarea value={data.AboutText} onChange={(e) => set('AboutText', e.target.value)} rows="4" maxLength="1000" />
             </div>
+          </div>
+
+          <h3 style={{marginTop: '22px', marginBottom: '6px', color: 'var(--navy-primary)', fontSize: '15px', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+            <i className="fas fa-bars"></i> Sidebar Menu
+          </h3>
+          <p style={{color:'#777', fontSize:'13px', marginBottom:'12px'}}>
+            Untick anything the school doesn't use to keep the sidebar short. Dashboard, Settings, My Account and About can't be hidden.
+          </p>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:'14px'}}>
+            {Object.keys(GROUP_LABELS).map(g => {
+              const ids = Object.keys(MENU_CATALOG).filter(id => MENU_CATALOG[id].group === g && !PROTECTED_MENU_IDS.includes(id));
+              if (ids.length === 0) return null;
+              return (
+                <div key={g} style={{border:'1px solid #e0e0e0',borderRadius:'4px',padding:'10px 12px'}}>
+                  <div style={{fontSize:'11px',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',color:'#888',marginBottom:'6px'}}>{GROUP_LABELS[g]}</div>
+                  {ids.map(id => (
+                    <label key={id} style={{display:'flex',alignItems:'center',gap:'8px',padding:'4px 0',fontSize:'13px',cursor:'pointer'}}>
+                      <input type="checkbox" checked={!hiddenSet.has(id)} onChange={() => toggleMenuId(id)} />
+                      <i className={'fas fa-' + MENU_CATALOG[id].icon} style={{width:'14px',color:'var(--navy-accent)'}}></i>
+                      {MENU_CATALOG[id].label}
+                    </label>
+                  ))}
+                </div>
+              );
+            })}
           </div>
 
           <div className="form-actions" style={{marginTop:'25px'}}>

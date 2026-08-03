@@ -139,8 +139,8 @@ var PARENT_HEADERS = ['ID','FullName','Email','Mobile','PasswordHash','Relation'
 // UNIQUE(ParentID, StudentID) — hard delete per schema (no is_deleted)
 var PARENT_STUDENT_HEADERS = ['ID','ParentID','StudentID','IsPrimaryContact','CreatedAt','UpdatedAt'];
 
-// exams cols (27):
-// 0=ID, 1=ExamName, 2=ExamType, 3=ClassID (FK), 4=AcademicYear, 5=StartDate, 6=EndDate,
+// exams cols (31):
+// 0=ID, 1=ExamName, 2=ExamType (class_test|mid_term|end_of_term|mock), 3=ClassID (FK), 4=AcademicYear, 5=StartDate, 6=EndDate,
 // 7=MaxMarksPerSubject, 8=IsPublished, 9=PublishedAt, 10=PublishedBy (FK→Users), 11=IsDeleted,
 // 12=CreatedAt, 13=UpdatedAt,
 // 14=Term (enum), 15=AssessmentType (enum), 16=ExamCode (str<=30), 17=WeightagePercent (0-100),
@@ -149,8 +149,10 @@ var PARENT_STUDENT_HEADERS = ['ID','ParentID','StudentID','IsPrimaryContact','Cr
 // 24=NextExamID (FK self opt), 25=ApplicableSections (csv<=200),
 // 26=PassingPercentageRequired (overall % to pass exam — drives promotion),
 // 27=VacationDate (YYYY-MM-DD — term closing date, printed on the report card),
-// 28=ReopeningDate (YYYY-MM-DD — next term's resumption date, printed on the report card)
-var EXAM_HEADERS = ['ID','ExamName','ExamType','ClassID','AcademicYear','StartDate','EndDate','MaxMarksPerSubject','IsPublished','PublishedAt','PublishedBy','IsDeleted','CreatedAt','UpdatedAt','Term','AssessmentType','ExamCode','WeightagePercent','GradingScheme','CurriculumStage','ExamDuration','ResultsLockedDate','PassMarksOverride','ReportCardGenerated','NextExamID','ApplicableSections','PassingPercentageRequired','VacationDate','ReopeningDate'];
+// 28=ReopeningDate (YYYY-MM-DD — next term's resumption date, printed on the report card),
+// 29=SbaMaxMarks (end_of_term only — class-score/continuous-assessment max, e.g. 40 or 50; '' otherwise),
+// 30=ExamMaxMarks (end_of_term only — exam-paper max, e.g. 50 or 60; '' otherwise. SbaMaxMarks+ExamMaxMarks = MaxMarksPerSubject)
+var EXAM_HEADERS = ['ID','ExamName','ExamType','ClassID','AcademicYear','StartDate','EndDate','MaxMarksPerSubject','IsPublished','PublishedAt','PublishedBy','IsDeleted','CreatedAt','UpdatedAt','Term','AssessmentType','ExamCode','WeightagePercent','GradingScheme','CurriculumStage','ExamDuration','ResultsLockedDate','PassMarksOverride','ReportCardGenerated','NextExamID','ApplicableSections','PassingPercentageRequired','VacationDate','ReopeningDate','SbaMaxMarks','ExamMaxMarks'];
 
 // marks cols (26):
 // 0=ID, 1=ExamID (FK), 2=StudentID (FK), 3=SubjectID (FK), 4=MarksObtained, 5=MaxMarks,
@@ -280,13 +282,14 @@ var DOCUMENT_HEADERS = ['ID','DocumentName','DocumentType','EntityType','EntityI
 // UNIQUE(PeriodNumber, AcademicYear, DayType)
 var PERIOD_HEADERS = ['ID','PeriodNumber','StartTime','EndTime','IsBreak','Label','AcademicYear','DisplayOrder','IsDeleted','CreatedAt','UpdatedAt','DayType'];
 
-// school_settings cols (19) — single-row config table; ID always 1.
+// school_settings cols (20) — single-row config table; ID always 1.
 // 0=ID, 1=SchoolName, 2=SchoolShortName, 3=SchoolLogo (URL), 4=SchoolEmail, 5=SchoolContact (phone),
 // 6=SchoolAddress, 7=SchoolWebsite, 8=AdminName, 9=AdminEmail, 10=AcademicYear,
 // 11=Currency, 12=TimeZone, 13=AboutText, 14=CreatedAt, 15=UpdatedAt,
 // 16=WorkingDays (CSV: monday,tuesday,wednesday,thursday,friday — drives attendance % and timetable),
-// 17=AcademicYearStartDate (ISO), 18=AcademicYearEndDate (ISO)
-var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate'];
+// 17=AcademicYearStartDate (ISO), 18=AcademicYearEndDate (ISO),
+// 19=HiddenMenuIds (CSV of sidebar menu ids the admin has hidden — keeps the menu short per school)
+var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds'];
 
 // timetable cols (18):
 // 0=ID, 1=ClassID (FK), 2=DayOfWeek (lower: monday..sunday), 3=PeriodNumber,
@@ -425,7 +428,10 @@ function getClassesMap() {
       className: data[i][1],
       section: data[i][2],
       academicYear: data[i][3],
-      label: data[i][1] + ' ' + data[i][2] + ' (' + data[i][3] + ')'
+      label: data[i][1] + ' ' + data[i][2] + ' (' + data[i][3] + ')',
+      curriculumStage: String(data[i][11] || 'lower_primary').toLowerCase(),
+      gradeLevel: parseInt(data[i][9], 10) || 0,
+      gradeBand: gradeBandForStage(data[i][11])
     };
   }
   return map;
@@ -599,75 +605,105 @@ function getTeacherAssignmentsMap(teacherUserId) {
   return map;
 }
 
-// NaCCA Standards-Based Curriculum 5-band proficiency scale (used KG through JHS3 for
-// School-Based/continuous assessment and termly report cards); returns 'AB' for absent.
-// Band cut-offs: HP 80-100, P 70-79, AP 60-69, D 50-59, B 0-49.
-function computeGrade(obtained, max, isAbsent) {
+// Ghana basic education has two grading bands, selected by the class's CurriculumStage:
+//  - 'basic' (Creche..Basic 6): NaCCA 5-band SBA proficiency scale
+//  - 'jhs'   (Basic 7-9): 9-grade WAEC-style scale (used for class tests, mid-terms,
+//     end-of-term exams AND BECE mocks — they all share this one table)
+// gradeBandForStage(curriculumStage) resolves which table to use.
+function gradeBandForStage(curriculumStage) {
+  return String(curriculumStage || '').toLowerCase() === 'jhs' ? 'jhs' : 'basic';
+}
+
+// NaCCA Standards-Based Curriculum 5-band proficiency scale (Creche through Basic 6).
+// Band cut-offs: HP 80-100, P 68-79, AP 54-67, D 40-53, E 0-39.
+function basicGradeFromPercent(pct) {
+  if (pct >= 80) return 'HP';
+  if (pct >= 68) return 'P';
+  if (pct >= 54) return 'AP';
+  if (pct >= 40) return 'D';
+  return 'E';
+}
+var BASIC_GRADE_DESCRIPTORS = { HP: 'Highly Proficient', P: 'Proficient', AP: 'Approaching Proficiency', D: 'Developing', E: 'Emerging', AB: 'Absent' };
+
+// JHS (Basic 7-9) 9-grade scale — used for class tests, mid-terms, end-of-term exams and
+// BECE mocks. Number is the WAEC-style grade (1=best..9=weakest); letter/label are what
+// gets printed on the report card's Grade and Remarks columns.
+var JHS_GRADE_TABLE = [
+  { min: 90, number: 1, letter: 'A+', label: 'Highest' },
+  { min: 80, number: 2, letter: 'A',  label: 'Higher' },
+  { min: 70, number: 3, letter: 'B+', label: 'High' },
+  { min: 60, number: 4, letter: 'B',  label: 'High Average' },
+  { min: 55, number: 5, letter: 'C+', label: 'Average' },
+  { min: 50, number: 6, letter: 'C',  label: 'Low Average' },
+  { min: 40, number: 7, letter: 'D+', label: 'Low' },
+  { min: 35, number: 8, letter: 'E',  label: 'Lower' },
+  { min: 0,  number: 9, letter: 'F',  label: 'Low' }
+];
+function jhsGradeInfo(pct) {
+  for (var i = 0; i < JHS_GRADE_TABLE.length; i++) {
+    if (pct >= JHS_GRADE_TABLE[i].min) return JHS_GRADE_TABLE[i];
+  }
+  return JHS_GRADE_TABLE[JHS_GRADE_TABLE.length - 1];
+}
+
+// obtained/max -> short grade code for the given band ('basic'|'jhs'); returns 'AB' for absent.
+function computeGrade(obtained, max, isAbsent, band) {
   if (isAbsent === true || String(isAbsent) === '1' || isAbsent === 1) return 'AB';
   var o = parseFloat(obtained), m = parseFloat(max);
   if (isNaN(o) || isNaN(m) || m <= 0) return '';
   var pct = (o / m) * 100;
-  return sbaGradeFromPercent(pct);
+  return String(band).toLowerCase() === 'jhs' ? jhsGradeInfo(pct).letter : basicGradeFromPercent(pct);
 }
 
-// pct (0-100) -> short SBA grade code
-function sbaGradeFromPercent(pct) {
-  if (pct >= 80) return 'HP';
-  if (pct >= 70) return 'P';
-  if (pct >= 60) return 'AP';
-  if (pct >= 50) return 'D';
-  return 'B';
+// short grade code -> full descriptor (printed in the Remarks column of the report card)
+function sbaGradeDescriptor(grade, band) {
+  var g = String(grade || '').toUpperCase();
+  if (g === 'AB') return 'Absent';
+  if (String(band).toLowerCase() === 'jhs') {
+    var row = JHS_GRADE_TABLE.filter(function(r) { return r.letter === g; })[0];
+    return row ? row.label : '';
+  }
+  return BASIC_GRADE_DESCRIPTORS[g] || '';
 }
 
-// short SBA grade code -> full descriptor (printed in the Remarks column of the report card)
-var SBA_GRADE_DESCRIPTORS = { HP: 'Highly Proficient', P: 'Proficient', AP: 'Approaching Proficiency', D: 'Developing', B: 'Beginning', AB: 'Absent' };
-function sbaGradeDescriptor(grade) {
-  return SBA_GRADE_DESCRIPTORS[String(grade || '').toUpperCase()] || '';
-}
-
-// BECE (JHS3 terminal exam) 1-9 stanine grade from raw percentage. WAEC's actual cut-offs
-// are norm-referenced and can shift year to year — these bands are a reasonable indicative
-// default; adjust here if the school has the officially released bands for a given year.
+// BECE-style 1-9 grade number from raw percentage — same table as jhsGradeInfo, used for
+// aggregate scoring (lower number = better, mirrors WAEC's post-2024 grading reform).
 function computeBeceGrade(pct) {
-  if (pct >= 90) return 1;
-  if (pct >= 80) return 2;
-  if (pct >= 75) return 3;
-  if (pct >= 70) return 4;
-  if (pct >= 65) return 5;
-  if (pct >= 60) return 6;
-  if (pct >= 50) return 7;
-  if (pct >= 35) return 8;
-  return 9;
+  return jhsGradeInfo(pct).number;
 }
 
-// BECE aggregate: sum of the 4 core subjects (English Language, Mathematics, Integrated
-// Science, Social Studies) + the best 2 elective grades (lowest = best in the 1-9 scale).
-// subjectResults: [{ subjectName, isOptional, pct }]. Returns { aggregate, breakdown } or null
-// if fewer than 4 core + 2 elective results are available.
+// BECE aggregate: sum of the 4 named core subjects (English Language, Mathematics, Science,
+// Social Studies) + the best 2 grades among every other subject sat (French, RME, Ghanaian
+// Language, Computing, Creative Arts & Design, Career Technology, etc). Matching is by
+// subject NAME only — a subject counts as "core" only if its name matches one of the four,
+// regardless of the timetable's IsOptional flag. subjectResults: [{ subjectName, pct }].
+// Returns { aggregate, breakdown } or null if fewer than 4 core + 2 other results exist.
 function computeBeceAggregate(subjectResults) {
   var CORE_NAMES = ['english language', 'english', 'mathematics', 'maths', 'integrated science', 'science', 'social studies'];
-  var core = [], electives = [];
+  var core = [], others = [];
   (subjectResults || []).forEach(function(r) {
     var nameLc = String(r.subjectName || '').toLowerCase().trim();
     var grade = computeBeceGrade(r.pct);
     var item = { subjectName: r.subjectName, grade: grade };
-    if (!r.isOptional && CORE_NAMES.indexOf(nameLc) !== -1) core.push(item);
-    else if (!r.isOptional) core.push(item); // any other compulsory (non-elective) subject counts as core-equivalent
-    else electives.push(item);
+    if (CORE_NAMES.indexOf(nameLc) !== -1) core.push(item);
+    else others.push(item);
   });
   // de-dupe core subjects that map to the same underlying requirement (e.g. 'english'/'english language')
   var seenCore = {}, coreUnique = [];
   core.forEach(function(c) {
     var key = String(c.subjectName || '').toLowerCase().trim();
-    if (seenCore[key]) return;
-    seenCore[key] = true;
+    var canon = (key === 'english' || key === 'english language') ? 'english language'
+      : (key === 'mathematics' || key === 'maths') ? 'mathematics'
+      : (key === 'integrated science' || key === 'science') ? 'science' : key;
+    if (seenCore[canon]) return;
+    seenCore[canon] = true;
     coreUnique.push(c);
   });
-  if (coreUnique.length < 4 || electives.length < 2) return null;
+  if (coreUnique.length < 4 || others.length < 2) return null;
   coreUnique.sort(function(a, b) { return a.grade - b.grade; });
   var coreFour = coreUnique.slice(0, 4);
-  electives.sort(function(a, b) { return a.grade - b.grade; });
-  var bestTwo = electives.slice(0, 2);
+  others.sort(function(a, b) { return a.grade - b.grade; });
+  var bestTwo = others.slice(0, 2);
   var breakdown = coreFour.concat(bestTwo);
   var aggregate = breakdown.reduce(function(s, x) { return s + x.grade; }, 0);
   return { aggregate: aggregate, breakdown: breakdown };
@@ -2618,6 +2654,89 @@ function subjectExists(sh, subjectCode, classId, excludeId) {
     }
   }
   return false;
+}
+
+// NaCCA subject list per key phase, so a school never has to type subjects in by hand.
+// name/code/subjectGroup match the curriculum; IsOptional flags subjects some schools skip
+// (French at upper primary; the BECE aggregate itself only cares about subject NAME, not this flag).
+var GHANA_CURRICULUM_SUBJECTS = {
+  kg: [
+    { name: 'Language and Literacy', code: 'LANLIT', group: 'core' },
+    { name: 'Numeracy', code: 'NUM', group: 'core' },
+    { name: 'Our World Our People', code: 'OWOP', group: 'core' },
+    { name: 'Creative Arts', code: 'CRART', group: 'arts' }
+  ],
+  lower_primary: [
+    { name: 'Mathematics', code: 'MATH', group: 'core' },
+    { name: 'English Language', code: 'ENG', group: 'core' },
+    { name: 'Ghanaian Language', code: 'GHLANG', group: 'languages' },
+    { name: 'Computing', code: 'COMP', group: 'core' },
+    { name: 'Religious and Moral Education', code: 'RME', group: 'humanities' },
+    { name: 'Creative Arts', code: 'CRART', group: 'arts' },
+    { name: 'History', code: 'HIST', group: 'humanities' }
+  ],
+  upper_primary: [
+    { name: 'Mathematics', code: 'MATH', group: 'core' },
+    { name: 'English Language', code: 'ENG', group: 'core' },
+    { name: 'Ghanaian Language', code: 'GHLANG', group: 'languages' },
+    { name: 'Science', code: 'SCI', group: 'sciences' },
+    { name: 'History', code: 'HIST', group: 'humanities' },
+    { name: 'Computing', code: 'COMP', group: 'core' },
+    { name: 'French', code: 'FR', group: 'languages', optional: true },
+    { name: 'Creative Arts', code: 'CRART', group: 'arts' },
+    { name: 'Religious and Moral Education', code: 'RME', group: 'humanities' }
+  ],
+  jhs: [
+    { name: 'Mathematics', code: 'MATH', group: 'core' },
+    { name: 'English Language', code: 'ENG', group: 'core' },
+    { name: 'Science', code: 'SCI', group: 'core' },
+    { name: 'Social Studies', code: 'SOST', group: 'core' },
+    { name: 'Computing', code: 'COMP', group: 'core' },
+    { name: 'Ghanaian Language', code: 'GHLANG', group: 'languages' },
+    { name: 'French', code: 'FR', group: 'languages', optional: true },
+    { name: 'Religious and Moral Education', code: 'RME', group: 'humanities' },
+    { name: 'Creative Arts and Design', code: 'CRAD', group: 'arts' },
+    { name: 'Career Technology', code: 'CARTECH', group: 'vocational' }
+  ]
+};
+// creche/nursery share the KG (Key Phase 1) broad-domain subject list
+GHANA_CURRICULUM_SUBJECTS.creche = GHANA_CURRICULUM_SUBJECTS.kg;
+GHANA_CURRICULUM_SUBJECTS.nursery = GHANA_CURRICULUM_SUBJECTS.kg;
+
+function recommendedSubjectsForStage(curriculumStage) {
+  return GHANA_CURRICULUM_SUBJECTS[String(curriculumStage || '').toLowerCase()] || GHANA_CURRICULUM_SUBJECTS.lower_primary;
+}
+
+// one-click "Quick Setup" — adds every NaCCA subject for a class's key phase that isn't
+// already there. Admin never has to know the curriculum by heart to set a class up.
+function quickSetupSubjects(classId, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var cid = parseInt(classId, 10);
+    if (isNaN(cid)) return { success: false, message: 'Invalid ClassID' };
+    var cmap = getClassesMap();
+    if (!cmap[cid]) return { success: false, message: 'Selected class does not exist or is deleted' };
+
+    var sh = getSheet(SUBJECTS_SHEET);
+    if (!sh) return { success: false, message: 'Subjects sheet not found' };
+
+    var recommended = recommendedSubjectsForStage(cmap[cid].curriculumStage);
+    var ts = nowIso(), id = nextSubjectId(sh), added = [], skipped = [];
+    recommended.forEach(function(s) {
+      if (subjectExists(sh, s.code, cid)) { skipped.push(s.name); return; }
+      sh.appendRow([
+        id, s.name, s.code, cid, 100, '0', ts, ts,
+        50, 'theory', 100, 0, 50, 0, '1', s.optional ? '1' : '0', s.group || 'other'
+      ]);
+      added.push(s.name);
+      id++;
+    });
+
+    addLog(currentUser, 'Subjects Quick Setup', cmap[cid].label + ' — added ' + added.length + ' subject(s)');
+    return { success: true, message: added.length + ' subject(s) added' + (skipped.length ? ', ' + skipped.length + ' already existed' : ''), added: added, skipped: skipped };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
 }
 
 // shared validator — returns { ok, error, normalized:{...} } for the 7 marks/type fields
@@ -4824,6 +4943,7 @@ function getExamResultReport(p, currentUser, currentRole) {
     if (String(currentRole).toLowerCase() === 'teacher' && getTeacherClassIds(currentUser).indexOf(classId) === -1) {
       return { success: false, message: 'Forbidden — that exam is not in your assigned classes' };
     }
+    var gradeBand = (getClassesMap()[classId] || {}).gradeBand || 'basic';
 
     // students in class (getStudentsLite already excludes deleted)
     var slite = getStudentsLite(), studentsArr = [];
@@ -4886,9 +5006,9 @@ function getExamResultReport(p, currentUser, currentRole) {
       row.Total = total;
       row.MaxTotal = maxTotal;
       row.Percentage = pct;
-      row.Grade = computeGrade(total, maxTotal, false);
-      row.Result = pct >= 33 ? 'Pass' : 'Fail';
-      if (pct >= 33) passed++; else failed++;
+      row.Grade = computeGrade(total, maxTotal, false, gradeBand);
+      row.Result = pct >= 50 ? 'Pass' : 'Fail';
+      if (pct >= 50) passed++; else failed++;
       pctSum += pct;
       hi = (hi === null || pct > hi) ? pct : hi;
       lo = (lo === null || pct < lo) ? pct : lo;
@@ -5826,7 +5946,9 @@ function rowToExam(row, umap) {
     ApplicableSections: row[25] || '',
     PassingPercentageRequired: row[26] === '' || row[26] == null ? '' : (parseFloat(row[26]) || 0),
     VacationDate: row[27] ? toIso(row[27]) : '',
-    ReopeningDate: row[28] ? toIso(row[28]) : ''
+    ReopeningDate: row[28] ? toIso(row[28]) : '',
+    SbaMaxMarks: row[29] === '' || row[29] == null ? '' : (parseFloat(row[29]) || 0),
+    ExamMaxMarks: row[30] === '' || row[30] == null ? '' : (parseFloat(row[30]) || 0)
   };
 }
 
@@ -5935,6 +6057,20 @@ function validateExamFields(d) {
   var reopeningDate = String(d.ReopeningDate || '').trim();
   if (reopeningDate && !/^\d{4}-\d{2}-\d{2}$/.test(reopeningDate)) return { ok: false, error: 'ReopeningDate must be YYYY-MM-DD' };
 
+  // end_of_term exams split MaxMarksPerSubject into a class-score (SBA) component and an
+  // exam-paper component (e.g. 50+50 or 40+60) — the two must add up to MaxMarksPerSubject.
+  // Other exam types (class_test/mid_term/mock) are a single score and leave these blank.
+  var examType = String(d.ExamType || '').toLowerCase();
+  var sbaMax = '', examMax = '';
+  if (examType === 'end_of_term') {
+    sbaMax = parseFloat(d.SbaMaxMarks);
+    examMax = parseFloat(d.ExamMaxMarks);
+    if (isNaN(sbaMax) || sbaMax <= 0) return { ok: false, error: 'SbaMaxMarks (class score) must be a positive number' };
+    if (isNaN(examMax) || examMax <= 0) return { ok: false, error: 'ExamMaxMarks (exam paper) must be a positive number' };
+    var wantMax = parseInt(d.MaxMarksPerSubject, 10) || (sbaMax + examMax);
+    if (Math.round(sbaMax + examMax) !== wantMax) return { ok: false, error: 'SbaMaxMarks + ExamMaxMarks must equal MaxMarksPerSubject (' + wantMax + ')' };
+  }
+
   return {
     ok: true,
     normalized: {
@@ -5943,7 +6079,8 @@ function validateExamFields(d) {
       resultsLockedDate: toIso(lockedDate), passMarksOverride: passOverride,
       reportCardGenerated: rcGen, nextExamID: nextEx, applicableSections: sections,
       passingPercentageRequired: passPctRequired,
-      vacationDate: vacationDate, reopeningDate: reopeningDate
+      vacationDate: vacationDate, reopeningDate: reopeningDate,
+      sbaMaxMarks: sbaMax, examMaxMarks: examMax
     }
   };
 }
@@ -5958,7 +6095,7 @@ function addExam(data, currentUser, currentRole) {
     if (!data.ExamName || !data.ExamType || !data.ClassID || !data.AcademicYear || !data.StartDate || !data.EndDate) {
       return { success: false, message: 'ExamName, ExamType, ClassID, AcademicYear, StartDate, EndDate are required' };
     }
-    var allowedTypes = ['unit_test','quarterly','half_yearly','annual','mid_term','final','other'];
+    var allowedTypes = ['class_test','mid_term','end_of_term','mock','other'];
     var t = String(data.ExamType).toLowerCase();
     if (allowedTypes.indexOf(t) === -1) return { success: false, message: 'Invalid exam type' };
     if (!validAcademicYear(data.AcademicYear)) return { success: false, message: 'AcademicYear must be YYYY-YYYY' };
@@ -5972,7 +6109,12 @@ function addExam(data, currentUser, currentRole) {
       return { success: false, message: 'EndDate must be on or after StartDate' };
     }
     var max = parseInt(data.MaxMarksPerSubject, 10);
-    if (isNaN(max) || max < 1) max = 100;
+    if (isNaN(max) || max < 1) {
+      // end_of_term derives its total from Sba+Exam if MaxMarksPerSubject wasn't sent
+      var sbaGuess = parseFloat(data.SbaMaxMarks), examGuess = parseFloat(data.ExamMaxMarks);
+      max = (t === 'end_of_term' && !isNaN(sbaGuess) && !isNaN(examGuess)) ? Math.round(sbaGuess + examGuess) : 100;
+    }
+    data.MaxMarksPerSubject = max;
 
     // new field validation
     var v = validateExamFields(data);
@@ -6001,7 +6143,9 @@ function addExam(data, currentUser, currentRole) {
       // 26 — passing % required
       n.passingPercentageRequired,
       // 27-28 — vacation / reopening dates
-      toIso(n.vacationDate), toIso(n.reopeningDate)
+      toIso(n.vacationDate), toIso(n.reopeningDate),
+      // 29-30 — SBA / exam-paper max marks (end_of_term only)
+      n.sbaMaxMarks, n.examMaxMarks
     ]);
 
     addLog(currentUser, 'Exam Added', 'Added: ' + data.ExamName + ' (' + t + ') -> ' + cmap[cid].label);
@@ -6023,7 +6167,7 @@ function updateExam(id, data, currentUser, currentRole) {
     if (!data.ExamName || !data.ExamType || !data.ClassID || !data.AcademicYear || !data.StartDate || !data.EndDate) {
       return { success: false, message: 'Required fields missing' };
     }
-    var allowedTypes = ['unit_test','quarterly','half_yearly','annual','mid_term','final','other'];
+    var allowedTypes = ['class_test','mid_term','end_of_term','mock','other'];
     var t = String(data.ExamType).toLowerCase();
     if (allowedTypes.indexOf(t) === -1) return { success: false, message: 'Invalid exam type' };
     if (!validAcademicYear(data.AcademicYear)) return { success: false, message: 'AcademicYear must be YYYY-YYYY' };
@@ -6037,7 +6181,11 @@ function updateExam(id, data, currentUser, currentRole) {
       return { success: false, message: 'EndDate must be on or after StartDate' };
     }
     var max = parseInt(data.MaxMarksPerSubject, 10);
-    if (isNaN(max) || max < 1) max = 100;
+    if (isNaN(max) || max < 1) {
+      var sbaGuess2 = parseFloat(data.SbaMaxMarks), examGuess2 = parseFloat(data.ExamMaxMarks);
+      max = (t === 'end_of_term' && !isNaN(sbaGuess2) && !isNaN(examGuess2)) ? Math.round(sbaGuess2 + examGuess2) : 100;
+    }
+    data.MaxMarksPerSubject = max;
 
     // new field validation
     var v = validateExamFields(data);
@@ -6072,6 +6220,8 @@ function updateExam(id, data, currentUser, currentRole) {
       sh.getRange(row, 27).setValue(n.passingPercentageRequired);
       sh.getRange(row, 28).setValue(toIso(n.vacationDate));
       sh.getRange(row, 29).setValue(toIso(n.reopeningDate));
+      sh.getRange(row, 30).setValue(n.sbaMaxMarks);
+      sh.getRange(row, 31).setValue(n.examMaxMarks);
       addLog(currentUser, 'Exam Updated', 'Updated id ' + idn + ': ' + data.ExamName);
       return { success: true, message: 'Exam updated successfully' };
     }
@@ -6379,6 +6529,7 @@ function bulkSaveMarks(examId, subjectId, entries, currentUser, currentRole) {
     }
 
     var maxMarks = parseFloat(smap[sub].maxMarks) || parseInt(examRow[7], 10) || 100;
+    var gradeBand = (getClassesMap()[examClassId] || {}).gradeBand || 'basic';
     var inserted = 0, updated = 0;
     var ts = nowIso();
 
@@ -6393,7 +6544,7 @@ function bulkSaveMarks(examId, subjectId, entries, currentUser, currentRole) {
         if (isNaN(obtained) || obtained < 0) obtained = 0;
         if (obtained > maxMarks) obtained = maxMarks;
       }
-      var grade = computeGrade(obtained, maxMarks, isAbsent === '1');
+      var grade = computeGrade(obtained, maxMarks, isAbsent === '1', gradeBand);
       var remarks = e.remarks || '';
 
       // validate new fields (defaults via validator if missing)
@@ -9749,7 +9900,8 @@ function getSchoolSettings() {
             UpdatedAt: toIso(data[i][15]),
             WorkingDays: data[i][16] || 'monday,tuesday,wednesday,thursday,friday',
             AcademicYearStartDate: toIso(data[i][17]),
-            AcademicYearEndDate: toIso(data[i][18])
+            AcademicYearEndDate: toIso(data[i][18]),
+            HiddenMenuIds: data[i][19] || ''
           }
         };
       }
@@ -9779,7 +9931,8 @@ function defaultSchoolSettings() {
     AboutText: '',
     WorkingDays: 'monday,tuesday,wednesday,thursday,friday',
     AcademicYearStartDate: cy + '-09-01',
-    AcademicYearEndDate: (cy + 1) + '-07-31'
+    AcademicYearEndDate: (cy + 1) + '-07-31',
+    HiddenMenuIds: ''
   };
 }
 
@@ -9814,6 +9967,15 @@ function updateSchoolSettings(d, currentUser, currentRole) {
     if (ayEnd && !/^\d{4}-\d{2}-\d{2}$/.test(ayEnd)) return { success: false, message: 'AcademicYearEndDate must be YYYY-MM-DD' };
     if (ayStart && ayEnd && ayStart > ayEnd) return { success: false, message: 'AcademicYearStartDate must be on or before AcademicYearEndDate' };
 
+    // sidebar menu visibility — always-on ids can never be hidden
+    var PROTECTED_MENU_IDS = ['dashboard', 'settings', 'account', 'about'];
+    var hiddenRaw = d.HiddenMenuIds;
+    var hiddenList = Array.isArray(hiddenRaw) ? hiddenRaw : String(hiddenRaw || '').split(',');
+    var hiddenMenuIds = hiddenList
+      .map(function(x) { return String(x).trim(); })
+      .filter(function(x) { return x && /^[a-zA-Z]+$/.test(x) && PROTECTED_MENU_IDS.indexOf(x) === -1; })
+      .join(',');
+
     var values = [
       1,
       String(d.SchoolName || '').trim(),
@@ -9832,13 +9994,14 @@ function updateSchoolSettings(d, currentUser, currentRole) {
     ];
 
     if (foundRow === -1) {
-      sh.appendRow(values.concat([ts, ts, workingDays, ayStart, ayEnd]));
+      sh.appendRow(values.concat([ts, ts, workingDays, ayStart, ayEnd, hiddenMenuIds]));
     } else {
       sh.getRange(foundRow, 1, 1, values.length).setValues([values]);
       sh.getRange(foundRow, 16).setValue(ts);
       sh.getRange(foundRow, 17).setValue(workingDays);
       sh.getRange(foundRow, 18).setValue(ayStart);
       sh.getRange(foundRow, 19).setValue(ayEnd);
+      sh.getRange(foundRow, 20).setValue(hiddenMenuIds);
     }
     addLog(currentUser, 'School Settings Updated', d.SchoolName || '');
     return { success: true, message: 'School settings saved successfully' };
@@ -11502,7 +11665,8 @@ function setupDemoData() {
         nowIso(),
         'monday,tuesday,wednesday,thursday,friday',
         '2026-09-01',
-        '2027-07-31'
+        '2027-07-31',
+        ''
       ]]]
     ];
     sheetSpec.forEach(function(spec) {
@@ -15111,11 +15275,14 @@ function getExamDistribution(examId, currentUser, currentRole) {
     var examRow = getExamRow(eid);
     if (!examRow) return { success: false, message: 'Exam not found' };
     var passingPct = parseFloat(examRow[26]) || 50;
+    var gradeBand = (getClassesMap()[parseInt(examRow[3], 10)] || {}).gradeBand || 'basic';
 
     var subjMap = getSubjectsMap();
     var subjectStats = {};
     var byStudent = {};
-    var grades = { 'HP':0, 'P':0, 'AP':0, 'D':0, 'B':0 };
+    var grades = gradeBand === 'jhs'
+      ? { 'A+':0, 'A':0, 'B+':0, 'B':0, 'C+':0, 'C':0, 'D+':0, 'E':0, 'F':0 }
+      : { 'HP':0, 'P':0, 'AP':0, 'D':0, 'E':0 };
     var totalCount = 0, absentCount = 0;
 
     var msh = getSheet(MARKS_SHEET);
@@ -15128,7 +15295,7 @@ function getExamDistribution(examId, currentUser, currentRole) {
         var obtained = parseFloat(data[i][4]) || 0;
         var maxM = parseFloat(data[i][5]) || 0;
         var isAbsent = String(data[i][7]) === '1';
-        var grade = String(data[i][6] || (isAbsent ? 'AB' : computeGrade(obtained, maxM, isAbsent))).toUpperCase();
+        var grade = String(data[i][6] || (isAbsent ? 'AB' : computeGrade(obtained, maxM, isAbsent, gradeBand))).toUpperCase();
 
         totalCount++;
         if (isAbsent) absentCount++;
@@ -15183,6 +15350,7 @@ function getExamDistribution(examId, currentUser, currentRole) {
       success: true,
       data: {
         exam: { ID: eid, Name: examRow[1], PassingPct: passingPct },
+        gradeBand: gradeBand,
         grades: grades,
         absentCount: absentCount,
         totalMarkRecords: totalCount,
@@ -15204,6 +15372,7 @@ function getExamClassMarksheet(examId, currentUser, currentRole) {
     var classId = parseInt(examRow[3], 10);
     var passingPct = parseFloat(examRow[26]) || 50;
     var cmap = getClassesMap();
+    var gradeBand = (cmap[classId] || {}).gradeBand || 'basic';
 
     var _role = String(currentRole).toLowerCase();
     var _scope = getViewerScope(currentUser, currentRole);
@@ -15256,7 +15425,7 @@ function getExamClassMarksheet(examId, currentUser, currentRole) {
         var obtained = parseFloat(mdata[j][4]);
         var maxM = parseFloat(mdata[j][5]) || 0;
         var isAbsent = String(mdata[j][7]) === '1';
-        var grade = String(mdata[j][6] || (isAbsent ? 'AB' : computeGrade(obtained, maxM, isAbsent))).toUpperCase();
+        var grade = String(mdata[j][6] || (isAbsent ? 'AB' : computeGrade(obtained, maxM, isAbsent, gradeBand))).toUpperCase();
         if (!marksMap[sid]) marksMap[sid] = {};
         marksMap[sid][subjId] = {
           MarksObtained: isAbsent ? null : (isNaN(obtained) ? null : obtained),
@@ -15286,7 +15455,7 @@ function getExamClassMarksheet(examId, currentUser, currentRole) {
         Percentage: pct,
         IsAbsent: absent,
         Result: absent ? 'INCOMPLETE' : (pct >= passingPct ? 'PASS' : 'FAIL'),
-        OverallGrade: absent ? 'AB' : computeGrade(total, max, false)
+        OverallGrade: absent ? 'AB' : computeGrade(total, max, false, gradeBand)
       };
     });
 
@@ -15297,7 +15466,7 @@ function getExamClassMarksheet(examId, currentUser, currentRole) {
     return {
       success: true,
       data: {
-        exam: { ID: eid, Name: examRow[1], Type: String(examRow[2] || '').toLowerCase(), AcademicYear: examRow[4], StartDate: toIso(examRow[5]).split('T')[0], EndDate: toIso(examRow[6]).split('T')[0], MaxPerSubject: parseFloat(examRow[7]) || 0, IsPublished: String(examRow[8]) === '1', Term: examRow[14] || '', PassingPct: passingPct },
+        exam: { ID: eid, Name: examRow[1], Type: String(examRow[2] || '').toLowerCase(), AcademicYear: examRow[4], StartDate: toIso(examRow[5]).split('T')[0], EndDate: toIso(examRow[6]).split('T')[0], MaxPerSubject: parseFloat(examRow[7]) || 0, IsPublished: String(examRow[8]) === '1', Term: examRow[14] || '', PassingPct: passingPct, GradeBand: gradeBand },
         class: cmap[classId] ? { ID: classId, Label: cmap[classId].label } : { ID: classId, Label: '— deleted —' },
         subjects: subjects,
         rows: rows
@@ -15461,6 +15630,7 @@ function getStudentResults(studentId, currentUser, currentRole) {
     if (!msh) return { success: true, data: { student: s, marks: [], summary: { count:0, attempted:0, absent:0, avgPercent:0 } } };
 
     // build exam map (name + type + year + dates + term + passing pct)
+    var cmap = getClassesMap();
     var esh = getSheet(EXAMS_SHEET);
     var emap = {}, examsOut = {};
     if (esh) {
@@ -15468,6 +15638,7 @@ function getStudentResults(studentId, currentUser, currentRole) {
       for (var e = 1; e < edata.length; e++) {
         if (String(edata[e][11]) === '1') continue; // soft-deleted exams
         var exId = edata[e][0];
+        var exClassId = parseInt(edata[e][3], 10);
         var exObj = {
           ID: exId,
           Name: edata[e][1] || '',
@@ -15482,7 +15653,7 @@ function getStudentResults(studentId, currentUser, currentRole) {
           ExamCode: edata[e][16] || '',
           PassingPct: parseFloat(edata[e][26]) || 0
         };
-        emap[exId] = { name: exObj.Name, type: exObj.Type, year: exObj.AcademicYear, isPublished: exObj.IsPublished };
+        emap[exId] = { name: exObj.Name, type: exObj.Type, year: exObj.AcademicYear, isPublished: exObj.IsPublished, gradeBand: (cmap[exClassId] || {}).gradeBand || 'basic' };
         examsOut[exId] = exObj;
       }
     }
@@ -15501,7 +15672,7 @@ function getStudentResults(studentId, currentUser, currentRole) {
       var obtained = parseFloat(data[i][4]);
       var maxM = parseFloat(data[i][5]) || 0;
       var isAbsent = String(data[i][7]) === '1' || data[i][7] === true;
-      var grade = data[i][6] || computeGrade(obtained, maxM, isAbsent);
+      var grade = data[i][6] || computeGrade(obtained, maxM, isAbsent, ex.gradeBand);
       var pct = (!isAbsent && maxM > 0) ? Math.round((obtained / maxM) * 1000) / 10 : 0;
 
       if (isAbsent) absentCount++;
@@ -15602,6 +15773,10 @@ function getStudentReportCard(studentId, examId, currentUser, currentRole) {
     var classLabel = classRow[1] + ' ' + classRow[2];
     var curriculumStage = String(classRow[11] || 'lower_primary').toLowerCase();
     var isJhs = curriculumStage === 'jhs';
+    var gradeBand = gradeBandForStage(curriculumStage);
+    var examType = String(examRow[2] || '').toLowerCase();
+    var isSplitScore = examType === 'end_of_term'; // SBA + Exam columns vs a single Score column
+    var sbaMax = parseFloat(examRow[29]) || 0, examMax = parseFloat(examRow[30]) || 0;
 
     // active students in this class (for class size + overall position)
     var classStudents = [];
@@ -15709,9 +15884,9 @@ function getStudentReportCard(studentId, examId, currentUser, currentRole) {
         row.Exam = m.External || 0;
         row.Total = m.IsAbsent ? null : m.MarksObtained;
         row.MaxMarks = m.MaxMarks || sub.MaxMarks;
-        var grade = m.IsAbsent ? 'AB' : computeGrade(m.MarksObtained, row.MaxMarks, false);
+        var grade = m.IsAbsent ? 'AB' : computeGrade(m.MarksObtained, row.MaxMarks, false, gradeBand);
         row.Grade = grade;
-        row.Remarks = sbaGradeDescriptor(grade);
+        row.Remarks = sbaGradeDescriptor(grade, gradeBand);
         row.Position = (!m.IsAbsent && subjectPositions[sub.ID] && subjectPositions[sub.ID][sid]) ? subjectPositions[sub.ID][sid] : '';
         if (!m.IsAbsent) {
           grandSba += row.SBA; grandExam += row.Exam; grandTotal += (row.Total || 0);
@@ -15775,11 +15950,12 @@ function getStudentReportCard(studentId, examId, currentUser, currentRole) {
           Gender: studentRow[5],
           RollNumber: studentRow[26]
         },
-        class: { ID: classId, Label: classLabel, Size: classSize, CurriculumStage: curriculumStage, IsJhs: isJhs },
+        class: { ID: classId, Label: classLabel, Size: classSize, CurriculumStage: curriculumStage, IsJhs: isJhs, GradeBand: gradeBand },
         exam: {
-          ID: eid, Name: examRow[1], Term: examRow[14] || '', AcademicYear: examRow[4],
+          ID: eid, Name: examRow[1], Type: examType, Term: examRow[14] || '', AcademicYear: examRow[4],
           StartDate: toIso(examRow[5]).split('T')[0], EndDate: examEnd,
-          IsPublished: isPublished, VacationDate: examRow[27] ? toIso(examRow[27]) : '', ReopeningDate: examRow[28] ? toIso(examRow[28]) : ''
+          IsPublished: isPublished, VacationDate: examRow[27] ? toIso(examRow[27]) : '', ReopeningDate: examRow[28] ? toIso(examRow[28]) : '',
+          IsSplitScore: isSplitScore, SbaMaxMarks: sbaMax, ExamMaxMarks: examMax
         },
         subjects: subjectRows,
         grandTotal: { SBA: grandSba, Exam: grandExam, Total: grandTotal },
