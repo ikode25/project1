@@ -16188,6 +16188,42 @@ function getStudentReportCard(studentId, examId, currentUser, currentRole) {
   }
 }
 
+// admin/teacher bulk preview & print — one report card per active student in the exam's class.
+// Reuses getStudentReportCard() per student so RBAC/scope stays identical to the single-student view.
+function getClassReportCards(classId, examId, currentUser, currentRole) {
+  try {
+    if (!canReadMarks(currentRole)) return { success: false, message: 'Forbidden — no access' };
+    var cid = parseInt(classId, 10), eid = parseInt(examId, 10);
+    if (isNaN(cid) || isNaN(eid)) return { success: false, message: 'Invalid class or exam id' };
+
+    var ssh = getSheet(STUDENTS_SHEET);
+    if (!ssh) return { success: false, message: 'Students sheet not found' };
+    var sdata = ssh.getDataRange().getValues();
+    var studentIds = [];
+    for (var i = 1; i < sdata.length; i++) {
+      if (String(sdata[i][36]) === '1') continue; // deleted
+      if (parseInt(sdata[i][25], 10) === cid) studentIds.push(parseInt(sdata[i][0], 10));
+    }
+    if (!studentIds.length) return { success: false, message: 'No students found in this class' };
+
+    var cards = [], errors = [];
+    studentIds.forEach(function (sid) {
+      var r = getStudentReportCard(sid, eid, currentUser, currentRole);
+      if (r.success) cards.push(r.data);
+      else errors.push({ studentId: sid, message: r.message });
+    });
+
+    return {
+      success: true,
+      data: cards,
+      errors: errors,
+      message: cards.length + ' report card(s) loaded' + (errors.length ? ', ' + errors.length + ' skipped' : '')
+    };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
 // admin/teacher — upsert the free-text remarks block for one student's termly report card
 function upsertReportRemarks(d, currentUser, currentRole) {
   try {

@@ -3059,6 +3059,15 @@
       }
       @page { size: A4 portrait; margin: 15mm; }
 
+      /* bulk report cards — one card per page, printed in normal document flow
+         (overrides the single-card position:absolute rule above via higher specificity) */
+      body.print-target .rc-bulk-wrap { visibility: visible !important; position: static !important; }
+      body.print-target .rc-bulk-item { visibility: visible !important; border-bottom: none !important; margin-bottom: 0 !important; padding-bottom: 0 !important; page-break-after: always; }
+      body.print-target .rc-bulk-item:last-child { page-break-after: avoid; }
+      body.print-target .rc-bulk-wrap .report-card {
+        position: static !important; left: auto !important; top: auto !important;
+      }
+
       /* timetable print — landscape, edge-to-edge, preserve pastel colors */
       .tt-wrap {
         position: absolute; left: 0; top: 0; width: 100%; max-width: 100%;
@@ -11723,6 +11732,242 @@
       return row ? row.color : '#888';
     }
 
+    // read-only report card markup — shared by the single-student preview print button
+    // (StudentResultsModal) and the admin bulk report-card preview/print modal (BulkReportCardsModal)
+    function ReportCardStatic({ card, school }) {
+      const fmtDate = (d) => {
+        if (!d) return '';
+        try {
+          const dt = new Date(d);
+          if (isNaN(dt.getTime())) return String(d).split('T')[0];
+          return dt.toLocaleDateString('en-US', { day:'2-digit', month:'short', year:'numeric' });
+        } catch { return String(d).split('T')[0]; }
+      };
+      const ordinal = (n) => {
+        const s = ['th','st','nd','rd'], v = n % 100;
+        return n + (s[(v - 20) % 10] || s[v] || s[0]);
+      };
+      const termLabel = (t) => ({ term1: 'Term 1', term2: 'Term 2', term3: 'Term 3' }[String(t || '').toLowerCase()] || t || '—');
+
+      const schoolName = (school && school.SchoolName) || 'School Name';
+      const schoolAddr = (school && school.SchoolAddress) || '';
+      const schoolPhone = (school && school.SchoolContact) || '';
+      const schoolLogo = (school && school.SchoolLogo) || DEFAULT_LOGO;
+
+      if (!card) return null;
+
+      return (
+        <div className="report-card">
+          <div className="rc-school-hdr">
+            {schoolLogo && <img src={schoolLogo} alt="" onError={(e) => { e.target.style.display = 'none'; }} />}
+            <div style={{flex:1}}>
+              <div className="rc-sname">{schoolName}</div>
+              {schoolAddr && <div className="rc-sline"><i className="fas fa-map-marker-alt"></i> {schoolAddr}</div>}
+              {schoolPhone && <div className="rc-sline"><i className="fas fa-phone"></i> Tel: {schoolPhone}</div>}
+            </div>
+          </div>
+
+          <div className="rc-title">Student ID: <b>{card.student.AdmissionNumber || '—'}</b></div>
+
+          <div className="rc-info">
+            <div><b>Name:</b> {card.student.FullName || ''}</div>
+            <div><b>Class:</b> {card.class.Label || '—'}</div>
+            <div><b>Gender:</b> {String(card.student.Gender || '').replace(/^./, c => c.toUpperCase()) || '—'}</div>
+            <div><b>Term:</b> {termLabel(card.exam.Term)}</div>
+            <div><b>Class Size:</b> {card.class.Size}</div>
+            <div><b>Year:</b> {card.exam.AcademicYear || '—'}</div>
+            <div><b>Vacation:</b> {fmtDate(card.exam.VacationDate) || '—'}</div>
+            <div><b>Reopening:</b> {fmtDate(card.exam.ReopeningDate) || '—'}</div>
+          </div>
+
+          <table className="rc-mtable">
+            <thead>
+              <tr>
+                <th style={{width:'30px'}}>#</th>
+                <th>Subject</th>
+                {card.exam.IsSplitScore ? (
+                  <>
+                    <th style={{width:'60px',textAlign:'center'}}>SBA<br/>/{card.exam.SbaMaxMarks || 50}</th>
+                    <th style={{width:'60px',textAlign:'center'}}>Exam<br/>/{card.exam.ExamMaxMarks || 50}</th>
+                    <th style={{width:'60px',textAlign:'center'}}>Total</th>
+                  </>
+                ) : (
+                  <th style={{width:'70px',textAlign:'center'}}>Score<br/>/{card.subjects[0] ? card.subjects[0].MaxMarks : 100}</th>
+                )}
+                <th style={{width:'55px',textAlign:'center'}}>Grade</th>
+                <th style={{width:'55px',textAlign:'center'}}>Pos.</th>
+                <th>Remarks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {card.subjects.map((s, i) => (
+                <tr key={s.SubjectID}>
+                  <td>{i + 1}</td>
+                  <td>{s.SubjectName}</td>
+                  {card.exam.IsSplitScore ? (
+                    <>
+                      <td style={{textAlign:'center'}}>{s.IsAbsent ? '—' : s.SBA}</td>
+                      <td style={{textAlign:'center'}}>{s.IsAbsent ? '—' : s.Exam}</td>
+                    </>
+                  ) : null}
+                  <td style={{textAlign:'center',fontWeight:600}}>
+                    {s.IsAbsent ? <span style={{color:'#888',fontStyle:'italic'}}>Absent</span> : (s.Total != null ? s.Total : '—')}
+                  </td>
+                  <td style={{textAlign:'center'}}>
+                    <span className="rc-grade-pill" style={{background: sbaGradeColor(s.Grade, card.class.GradeBand)}}>{s.Grade || '—'}</span>
+                  </td>
+                  <td style={{textAlign:'center'}}>{s.Position ? ordinal(s.Position) : '—'}</td>
+                  <td style={{fontSize:'12px',color:'#444'}}>{s.Remarks || ''}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan="2" style={{textAlign:'right'}}>GRAND TOTAL</td>
+                {card.exam.IsSplitScore && <>
+                  <td style={{textAlign:'center'}}>{card.grandTotal.SBA}</td>
+                  <td style={{textAlign:'center'}}>{card.grandTotal.Exam}</td>
+                </>}
+                <td style={{textAlign:'center'}}>{card.grandTotal.Total}</td>
+                <td colSpan="3"></td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <div className="rc-summary">
+            <div>
+              <div className="rc-lbl">Attendance</div>
+              <div className="rc-val">{card.attendance.present} / {card.attendance.total}</div>
+            </div>
+            <div>
+              <div className="rc-lbl">Total Score</div>
+              <div className="rc-val">{card.grandTotal.Total}</div>
+            </div>
+            <div>
+              <div className="rc-lbl">Average</div>
+              <div className="rc-val">{card.average}</div>
+            </div>
+            <div>
+              <div className="rc-lbl">Subjects</div>
+              <div className="rc-val">{card.subjectsCount}</div>
+            </div>
+          </div>
+
+          <div className="rc-position-bar">
+            Overall Class Position: <b>{card.overallClassPosition ? ordinal(card.overallClassPosition) + ' / ' + card.class.Size : '—'}</b>
+          </div>
+
+          {card.class.IsJhs && (
+            <div className="rc-position-bar rc-bece-bar">
+              {card.beceAggregate
+                ? <>BECE Aggregate: <b>{card.beceAggregate.aggregate}</b> ({card.beceAggregate.breakdown.map(b => `${b.subjectName} ${b.grade}`).join(', ')})</>
+                : 'BECE Aggregate: not enough graded core + elective subjects yet'}
+            </div>
+          )}
+
+          <div className="rc-remarks-block">
+            <div className="rc-remarks-hdr">Conduct &amp; Remarks</div>
+            <div className="rc-remarks-grid">
+              <div><b>Interest / Talent:</b> {card.remarks.InterestTalent || '—'}</div>
+              <div><b>Conduct:</b> {card.remarks.Conduct || '—'}</div>
+              <div><b>Attitude to Work:</b> {card.remarks.AttitudeToWork || '—'}</div>
+              <div><b>Class Teacher's Remark:</b> {card.remarks.ClassTeacherRemark || '—'}</div>
+              <div><b>Headmaster's Remark:</b> {card.remarks.HeadmasterRemark || '—'}</div>
+              {card.remarks.PromotionStatus && <div><b>Promotion:</b> {card.remarks.PromotionStatus.replace(/_/g, ' ')}</div>}
+            </div>
+          </div>
+
+          <div className="rc-sign" style={{gridTemplateColumns:'1fr 1fr'}}>
+            <div>Official School Stamp</div>
+            <div>Headmaster / Headmistress Signature</div>
+          </div>
+
+          <div className="rc-grade-key">
+            <b>Grade Interpretation Key:</b>{' '}
+            {gradeTableFor(card.class.GradeBand).map((r, i, arr) => {
+              const max = i === 0 ? 100 : arr[i - 1].min - 1;
+              return <React.Fragment key={r.code}>{i > 0 && <>&nbsp;·&nbsp;</>}{r.code} = {r.label} ({r.min}–{max})</React.Fragment>;
+            })}
+          </div>
+
+          <div className="rc-foot">
+            Generated by {schoolName} on {new Date().toLocaleDateString('en-US', { day:'2-digit', month:'short', year:'numeric' })}
+            {' · '}{card.class.Label} · {termLabel(card.exam.Term)} · {card.exam.AcademicYear}
+            {card.exam.IsPublished ? '' : ' · DRAFT (results not yet published)'}
+          </div>
+        </div>
+      );
+    }
+
+    // admin/teacher: preview + bulk-print every report card in an exam's class at once
+    function BulkReportCardsModal({ exam, currentUser, role, onClose }) {
+      const [loading, setLoading] = useState(true);
+      const [cards, setCards] = useState([]);
+      const [skipped, setSkipped] = useState(0);
+      const [school, setSchool] = useState(null);
+
+      useEffect(() => {
+        google.script.run
+          .withSuccessHandler((res) => { if (res && res.success) setSchool(res.data || null); })
+          .getSchoolSettings();
+
+        google.script.run
+          .withSuccessHandler((res) => {
+            setLoading(false);
+            if (res.success) { setCards(res.data || []); setSkipped((res.errors || []).length); }
+            else { setCards([]); Swal.fire({ icon: 'error', title: 'Error', text: res.message }); }
+          })
+          .withFailureHandler((err) => { setLoading(false); Swal.fire({ icon: 'error', title: 'Error', text: err.message }); })
+          .getClassReportCards(exam.ClassID, exam.ID, currentUser, role);
+      }, [exam.ID]);
+
+      const handlePrint = () => {
+        document.body.classList.add('print-target');
+        setTimeout(() => {
+          window.print();
+          setTimeout(() => document.body.classList.remove('print-target'), 250);
+        }, 60);
+      };
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'960px'}}>
+            <div className="modal-header">
+              <h3><i className="fas fa-id-card"></i> Report Cards — {exam.ExamName} {exam.AcademicYear ? `(${exam.AcademicYear})` : ''}</h3>
+              <button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button>
+            </div>
+            <div className="modal-body">
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'18px'}} className="no-print">
+                <div style={{fontSize:'13px',color:'#555'}}>
+                  {loading ? 'Loading…' : `${cards.length} report card(s) ready to print${skipped ? `, ${skipped} student(s) skipped (no marks recorded)` : ''}`}
+                </div>
+                <button className="btn btn-primary" onClick={handlePrint} disabled={loading || cards.length === 0}>
+                  <i className="fas fa-print"></i> Print All ({cards.length})
+                </button>
+              </div>
+
+              {loading ? (
+                <TableSkeleton rows={6} columns={5} />
+              ) : cards.length === 0 ? (
+                <div style={{textAlign:'center',padding:'34px',background:'#f8f9fa',color:'#888',border:'1px dashed #ccc'}}>
+                  <i className="fas fa-id-card" style={{fontSize:'40px',color:'#ccc',marginBottom:'10px',display:'block'}}></i>
+                  No report cards available yet — marks haven't been recorded for this class/exam.
+                </div>
+              ) : (
+                <div className="rc-bulk-wrap">
+                  {cards.map((card) => (
+                    <div key={card.student.ID} className="rc-bulk-item" style={{marginBottom:'24px',paddingBottom:'24px',borderBottom:'2px dashed #ccc'}}>
+                      <ReportCardStatic card={card} school={school} />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     function StudentResultsModal({ student, currentUser, role, onClose }) {
       const [examList, setExamList] = useState(null);   // { id: examMeta } from getStudentResults
       const [examId, setExamId] = useState('');
@@ -13297,6 +13542,7 @@
       const [showToppersModal, setShowToppersModal] = useState(false);
       const [showDistroModal, setShowDistroModal] = useState(false);
       const [showSheetModal, setShowSheetModal] = useState(false);
+      const [showBulkCardsModal, setShowBulkCardsModal] = useState(false);
       const [drillExam, setDrillExam] = useState(null);
       const tableInstanceRef = useRef(null);
 
@@ -13442,6 +13688,7 @@
                 html += `<button class="action-icon edit-icon" data-action="toppers" title="Toppers" style="color:#fbbc04"><i class="fas fa-trophy"></i></button>`;
                 html += `<button class="action-icon edit-icon" data-action="distro" title="Grade Distribution" style="color:#0074D9"><i class="fas fa-chart-pie"></i></button>`;
                 html += `<button class="action-icon edit-icon" data-action="marksheet" title="Class Marksheet (A4)" style="color:#001f3f"><i class="fas fa-print"></i></button>`;
+                html += `<button class="action-icon edit-icon" data-action="reportcards" title="Report Cards (Preview / Bulk Print)" style="color:#6a1b9a"><i class="fas fa-id-card"></i></button>`;
                 if (isAdmin) {
                   html += `<button class="action-icon edit-icon" data-action="edit" title="Edit"><i class="fas fa-edit"></i></button>`;
                   html += row.IsPublished
@@ -13480,6 +13727,7 @@
               else if (action === 'toppers') { setDrillExam(rowData); setShowToppersModal(true); }
               else if (action === 'distro') { setDrillExam(rowData); setShowDistroModal(true); }
               else if (action === 'marksheet') { setDrillExam(rowData); setShowSheetModal(true); }
+              else if (action === 'reportcards') { setDrillExam(rowData); setShowBulkCardsModal(true); }
             });
             tableInstanceRef.current = table;
           } catch (e) {
@@ -13728,6 +13976,10 @@
           {showSheetModal && drillExam && (
             <ExamClassMarksheetModal exam={drillExam} currentUser={currentUser} role={role}
               onClose={() => { setShowSheetModal(false); setDrillExam(null); }} />
+          )}
+          {showBulkCardsModal && drillExam && (
+            <BulkReportCardsModal exam={drillExam} currentUser={currentUser} role={role}
+              onClose={() => { setShowBulkCardsModal(false); setDrillExam(null); }} />
           )}
         </div>
       );
