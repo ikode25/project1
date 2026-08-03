@@ -3989,6 +3989,135 @@ function updateStudent(id, s, currentUser, currentRole) {
   }
 }
 
+// Ghana promotion rule: move every active student in one class to another, carrying forward
+// any outstanding fee balance into the new class as an "Arrears (Carried Forward)" fee item.
+function promoteStudents(payload, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+
+    var fromClassId = parseInt(payload && payload.fromClassId, 10);
+    var toClassId = parseInt(payload && payload.toClassId, 10);
+    if (isNaN(fromClassId) || isNaN(toClassId)) return { success: false, message: 'Invalid fromClassId/toClassId' };
+    if (fromClassId === toClassId) return { success: false, message: 'From and To class must be different' };
+
+    var cmap = getClassesMap();
+    if (!cmap[fromClassId]) return { success: false, message: 'From-class not found or deleted' };
+    if (!cmap[toClassId]) return { success: false, message: 'To-class not found or deleted' };
+
+    var ssh = getSheet(STUDENTS_SHEET);
+    if (!ssh) return { success: false, message: 'Students sheet not found' };
+    var sdata = ssh.getDataRange().getValues();
+
+    var pickIds = null;
+    if (payload.studentIds && payload.studentIds.length) {
+      pickIds = {};
+      payload.studentIds.forEach(function (x) { pickIds[parseInt(x, 10)] = true; });
+    }
+
+    var targetRows = [];
+    for (var i = 1; i < sdata.length; i++) {
+      if (String(sdata[i][36]) === '1') continue; // deleted
+      if (parseInt(sdata[i][25], 10) !== fromClassId) continue;
+      var sid = parseInt(sdata[i][0], 10);
+      if (pickIds && !pickIds[sid]) continue;
+      targetRows.push({ row: i + 1, sid: sid });
+    }
+    if (!targetRows.length) return { success: false, message: 'No students found to promote in the source class' };
+
+    // pull all non-deleted fee payments once, grouped by student, to compute + close out outstanding balances
+    var fpsh = getSheet(FEE_PAYMENTS_SHEET);
+    if (!fpsh) return { success: false, message: 'Fee_Payments sheet not found' };
+    var fpdata = fpsh.getDataRange().getValues();
+    var duesByStudent = {}; // sid -> [{ rowIdx, amountDue }]
+    for (var f = 1; f < fpdata.length; f++) {
+      if (String(fpdata[f][15]) === '1') continue; // deleted
+      var due = parseFloat(fpdata[f][4]) || 0;
+      if (due <= 0) continue;
+      var fsid = parseInt(fpdata[f][1], 10);
+      if (!duesByStudent[fsid]) duesByStudent[fsid] = [];
+      duesByStudent[fsid].push({ rowIdx: f, amountDue: due });
+    }
+
+    // find (or create) the "Arrears" fee structure item for the target class + year
+    var newAcademicYear = String((payload && payload.newAcademicYear) || cmap[toClassId].academicYear || '').trim();
+    var fsh = getSheet(FEE_STRUCTURE_SHEET);
+    if (!fsh) return { success: false, message: 'Fee_Structure sheet not found' };
+    var fsdata = fsh.getDataRange().getValues();
+    var arrearsFeeStructureId = null;
+    for (var g = 1; g < fsdata.length; g++) {
+      if (String(fsdata[g][9]) === '1') continue; // deleted
+      if (parseInt(fsdata[g][1], 10) !== toClassId) continue;
+      if (String(fsdata[g][2]).toLowerCase() !== 'arrears') continue;
+      if (String(fsdata[g][5] || '').trim() !== newAcademicYear) continue;
+      arrearsFeeStructureId = fsdata[g][0];
+      break;
+    }
+    if (arrearsFeeStructureId === null) {
+      arrearsFeeStructureId = nextFeeStructureId(fsh);
+      var fts = nowIso();
+      fsh.appendRow([
+        arrearsFeeStructureId, toClassId, 'arrears', 0, 'one_time', newAcademicYear,
+        10, 0, '1', '0', fts, fts, '0', 1, 0, 'Balances carried forward from a previous class/term'
+      ]);
+    }
+
+    var promoted = 0, withArrears = 0, totalArrears = 0;
+    var fpNextId = nextPaymentId(fpsh);
+    var newPaymentRows = [];
+    var ts = nowIso();
+    var fromLabel = cmap[fromClassId].label, toLabel = cmap[toClassId].label;
+
+    targetRows.forEach(function (t) {
+      // 1) move the student's ClassID
+      ssh.getRange(t.row, 26).setValue(toClassId);
+      ssh.getRange(t.row, 39).setValue(ts);
+      promoted++;
+
+      // 2) close out old outstanding balance(s) and roll the total into one new arrears payment row
+      var dues = duesByStudent[t.sid] || [];
+      var balance = 0;
+      dues.forEach(function (d) {
+        balance += d.amountDue;
+        var r = d.rowIdx + 1;
+        fpsh.getRange(r, 5).setValue(0); // AmountDue -> 0, balance now lives on the new arrears row
+        fpsh.getRange(r, 13).setValue('transferred'); // PaymentStatus
+        var oldRemarks = String(fpdata[d.rowIdx][14] || '');
+        fpsh.getRange(r, 15).setValue((oldRemarks ? oldRemarks + ' — ' : '') + 'Balance carried forward to ' + toLabel);
+      });
+      if (balance > 0) {
+        newPaymentRows.push([
+          fpNextId++, t.sid, arrearsFeeStructureId, 0, balance, 0, 0,
+          todayStr(), 'Arrears Carried Forward', 'cash', '', '', 'pending', '',
+          'Carried forward from ' + fromLabel, '0', ts, ts, newAcademicYear, 0, '', '', ''
+        ]);
+        withArrears++;
+        totalArrears += balance;
+      }
+    });
+
+    if (newPaymentRows.length) {
+      fpsh.getRange(fpsh.getLastRow() + 1, 1, newPaymentRows.length, FEE_PAYMENT_HEADERS.length).setValues(newPaymentRows);
+    }
+
+    recomputeClassStrength(fromClassId);
+    recomputeClassStrength(toClassId);
+
+    addLog(currentUser, 'Students Promoted', promoted + ' student(s) moved from ' + fromLabel + ' to ' + toLabel +
+      (withArrears ? ', ' + withArrears + ' with arrears totalling ' + totalArrears.toFixed(2) : ''));
+
+    return {
+      success: true,
+      promoted: promoted,
+      withArrears: withArrears,
+      totalArrears: totalArrears,
+      message: promoted + ' student(s) promoted from ' + fromLabel + ' to ' + toLabel +
+        (withArrears ? ' — ' + withArrears + ' student(s) carried forward GH₵' + totalArrears.toFixed(2) + ' in arrears' : '')
+    };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
 function deleteStudent(id, currentUser, currentRole) {
   try {
     if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
@@ -7299,7 +7428,7 @@ function addFeeStructure(data, currentUser, currentRole) {
     if (!data.ClassID || !data.FeeCategory || data.Amount == null || !data.Frequency || !data.AcademicYear) {
       return { success: false, message: 'ClassID, FeeCategory, Amount, Frequency, AcademicYear are required' };
     }
-    var allowedCats = ['tuition','admission','transport','exam','library','sports','lab','annual','other'];
+    var allowedCats = ['tuition','admission','transport','exam','library','sports','lab','annual','arrears','other'];
     var cat = String(data.FeeCategory).toLowerCase();
     if (allowedCats.indexOf(cat) === -1) return { success: false, message: 'Invalid fee category' };
     var allowedFreq = ['monthly','quarterly','half_yearly','annual','one_time'];
@@ -7359,7 +7488,7 @@ function updateFeeStructure(id, data, currentUser, currentRole) {
     if (!data.ClassID || !data.FeeCategory || data.Amount == null || !data.Frequency || !data.AcademicYear) {
       return { success: false, message: 'Required fields missing' };
     }
-    var allowedCats = ['tuition','admission','transport','exam','library','sports','lab','annual','other'];
+    var allowedCats = ['tuition','admission','transport','exam','library','sports','lab','annual','arrears','other'];
     var cat = String(data.FeeCategory).toLowerCase();
     if (allowedCats.indexOf(cat) === -1) return { success: false, message: 'Invalid fee category' };
     var allowedFreq = ['monthly','quarterly','half_yearly','annual','one_time'];

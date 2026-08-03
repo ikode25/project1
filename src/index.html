@@ -6953,7 +6953,7 @@
 
     // ============== Reports Hub ==============
     // inline filter option lists
-    const FEE_CAT_OPTS = [{value:'',label:'All categories'},{value:'tuition',label:'Tuition'},{value:'admission',label:'Admission'},{value:'transport',label:'Transport'},{value:'exam',label:'Exam'},{value:'library',label:'Library'},{value:'sports',label:'Sports'},{value:'lab',label:'Lab'},{value:'annual',label:'Annual'},{value:'other',label:'Other'}];
+    const FEE_CAT_OPTS = [{value:'',label:'All categories'},{value:'tuition',label:'Tuition'},{value:'admission',label:'Admission'},{value:'transport',label:'Transport'},{value:'exam',label:'Exam'},{value:'library',label:'Library'},{value:'sports',label:'Sports'},{value:'lab',label:'Lab'},{value:'annual',label:'Annual'},{value:'arrears',label:'Arrears (Carried Forward)'},{value:'other',label:'Other'}];
     const ADM_STATUS_FILTER_OPTS = [{value:'',label:'All'},{value:'registered',label:'Registered'},{value:'admitted',label:'Admitted'},{value:'enrolled',label:'Enrolled'},{value:'rejected',label:'Rejected'},{value:'cancelled',label:'Cancelled'}];
     const ADM_TYPE_FILTER_OPTS = [{value:'',label:'All'},{value:'new',label:'New'},{value:'transfer',label:'Transfer'},{value:'re_admission',label:'Re-admission'}];
     const STU_STATUS_OPTS = [{value:'',label:'All'},{value:'active',label:'Active'},{value:'inactive',label:'Inactive'},{value:'transferred',label:'Transferred'},{value:'passed_out',label:'Passed Out'},{value:'suspended',label:'Suspended'}];
@@ -7267,6 +7267,7 @@
       const [showModal, setShowModal] = useState(false);
       const [editingClass, setEditingClass] = useState(null);
       const [showAutoGen, setShowAutoGen] = useState(false);
+      const [showPromote, setShowPromote] = useState(false);
       const [viewMode, setViewMode] = useState('table');
       // today's timetable drill-down
       const [showTtModal, setShowTtModal] = useState(false);
@@ -7596,6 +7597,14 @@
               )}
               {isAdmin && (
                 <button
+                  className="btn btn-secondary"
+                  onClick={() => setShowPromote(true)}
+                >
+                  <i className="fas fa-arrow-up-right-dots"></i> Promote Students
+                </button>
+              )}
+              {isAdmin && (
+                <button
                   className="btn btn-success"
                   onClick={() => { setEditingClass(null); setShowModal(true); }}
                 >
@@ -7766,6 +7775,16 @@
               role={role}
               onClose={() => setShowAutoGen(false)}
               onDone={() => { setShowAutoGen(false); refreshClasses(); }}
+            />
+          )}
+
+          {showPromote && (
+            <PromoteStudentsModal
+              classes={classes}
+              currentUser={currentUser}
+              role={role}
+              onClose={() => setShowPromote(false)}
+              onDone={() => { setShowPromote(false); refreshClasses(); swrRevalidate('getAllStudents'); swrRevalidate('getAllPayments'); }}
             />
           )}
 
@@ -8110,6 +8129,111 @@
                 <div className="form-actions">
                   <button type="submit" className="btn btn-primary" disabled={saving || loading}>
                     {saving ? <><i className="fas fa-spinner fa-spin"></i> Generating...</> : <><i className="fas fa-magic"></i> Generate Classes</>}
+                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={onClose}>
+                    <i className="fas fa-times"></i> Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Ghana rule: every 3rd term, students move up a class and any unpaid balance
+    // follows them into the new class as an "Arrears (Carried Forward)" fee item.
+    function PromoteStudentsModal({ classes, currentUser, role, onClose, onDone }) {
+      const [fromClassId, setFromClassId] = useState('');
+      const [toClassId, setToClassId] = useState('');
+      const [newAcademicYear, setNewAcademicYear] = useState('');
+      const [saving, setSaving] = useState(false);
+
+      const classOpts = classes
+        .slice()
+        .sort((a, b) => (a.ClassName + a.Section).localeCompare(b.ClassName + b.Section))
+        .map(c => ({ value: String(c.ID), label: `${c.ClassName} ${c.Section} (${c.AcademicYear}) — ${c.TotalStrength || 0} student(s)` }));
+
+      const fromClass = classes.find(c => String(c.ID) === String(fromClassId));
+      const toClass = classes.find(c => String(c.ID) === String(toClassId));
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!fromClassId || !toClassId) {
+          Swal.fire({ icon: 'warning', title: 'Missing selection', text: 'Pick both the current class and the class to promote into.' });
+          return;
+        }
+        if (fromClassId === toClassId) {
+          Swal.fire({ icon: 'error', title: 'Invalid selection', text: 'From-class and To-class must be different.' });
+          return;
+        }
+        const count = fromClass ? (fromClass.TotalStrength || 0) : 0;
+        Swal.fire({
+          icon: 'warning',
+          title: 'Promote Students?',
+          html: `This will move <b>${count}</b> student(s) from <b>${fromClass ? fromClass.ClassName + ' ' + fromClass.Section : ''}</b> to <b>${toClass ? toClass.ClassName + ' ' + toClass.Section : ''}</b>.<br><br>Any outstanding fee balance will be carried forward into the new class as <b>Arrears</b>. This cannot be undone automatically.`,
+          showCancelButton: true,
+          confirmButtonColor: '#001f3f',
+          confirmButtonText: 'Yes, Promote'
+        }).then((res) => {
+          if (!res.isConfirmed) return;
+          setSaving(true);
+          google.script.run
+            .withSuccessHandler((r) => {
+              setSaving(false);
+              if (r && r.success) {
+                Swal.fire({ icon: 'success', title: 'Promoted!', text: r.message, confirmButtonColor: 'var(--navy-primary)' });
+                onDone();
+              } else {
+                Swal.fire({ icon: 'error', title: 'Error', text: (r && r.message) || 'Failed' });
+              }
+            })
+            .withFailureHandler((err) => { setSaving(false); Swal.fire({ icon: 'error', title: 'Error', text: err.message }); })
+            .promoteStudents({ fromClassId, toClassId, newAcademicYear: newAcademicYear.trim() }, currentUser, role);
+        });
+      };
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'560px'}}>
+            <div className="modal-header">
+              <h3><i className="fas fa-arrow-up-right-dots"></i> Promote Students</h3>
+              <button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button>
+            </div>
+            <div className="modal-body">
+              <form onSubmit={handleSubmit}>
+                <SearchableDropdown
+                  label="From Class (current)"
+                  icon="fas fa-school"
+                  options={classOpts}
+                  value={fromClassId}
+                  onChange={setFromClassId}
+                  placeholder="Select current class..."
+                  required={true}
+                />
+                <SearchableDropdown
+                  label="To Class (promote into)"
+                  icon="fas fa-arrow-right"
+                  options={classOpts}
+                  value={toClassId}
+                  onChange={setToClassId}
+                  placeholder="Select destination class..."
+                  required={true}
+                />
+                <div className="form-group">
+                  <label><i className="fas fa-calendar-alt"></i> Arrears Academic Year <span style={{fontWeight:400,color:'#888',fontSize:'11px'}}>(optional — defaults to the destination class's year)</span></label>
+                  <input type="text" value={newAcademicYear} onChange={(e) => setNewAcademicYear(e.target.value)} placeholder={toClass ? toClass.AcademicYear : 'e.g. 2026-2027'} />
+                </div>
+
+                <div className="settings-info-message" style={{marginTop:'10px'}}>
+                  <i className="fas fa-info-circle" style={{marginRight:'6px'}}></i>
+                  Every active student in the "From" class moves to the "To" class. Any unpaid fee balance is
+                  totalled up and added to the new class as a one-time <b>Arrears (Carried Forward)</b> fee item.
+                </div>
+
+                <div className="form-actions">
+                  <button type="submit" className="btn btn-primary" disabled={saving}>
+                    {saving ? <><i className="fas fa-spinner fa-spin"></i> Promoting...</> : <><i className="fas fa-arrow-up-right-dots"></i> Promote Students</>}
                   </button>
                   <button type="button" className="btn btn-secondary" onClick={onClose}>
                     <i className="fas fa-times"></i> Cancel
@@ -16188,6 +16312,7 @@
                       { value: 'sports', label: 'Sports' },
                       { value: 'lab', label: 'Lab' },
                       { value: 'annual', label: 'Annual' },
+                      { value: 'arrears', label: 'Arrears (Carried Forward)' },
                       { value: 'other', label: 'Other' }
                     ]}
                     value={filters.category}
@@ -16307,6 +16432,7 @@
                       { value: 'sports', label: 'Sports' },
                       { value: 'lab', label: 'Lab' },
                       { value: 'annual', label: 'Annual' },
+                      { value: 'arrears', label: 'Arrears (Carried Forward)' },
                       { value: 'other', label: 'Other' }
                     ]}
                     value={formData.FeeCategory}
