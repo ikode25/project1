@@ -42,6 +42,8 @@ var STOCK_TRANSACTIONS_SHEET = 'Stock_Transactions';
 var LOGS_SHEET = 'Logs';
 var ADMISSIONS_SHEET = 'Admissions';
 var ACCOUNT_TXN_SHEET = 'Account_Transactions';
+var SMS_LOG_SHEET = 'SMS_Log';
+var SMS_TEMPLATES_SHEET = 'SMS_Templates';
 var ASSETS_FOLDER_NAME = 'ASSETS';
 
 // neutral graduation-cap placeholder (inline SVG) — schools replace this via School Settings > Logo
@@ -202,6 +204,24 @@ var FEE_PAYMENT_HEADERS = ['ID','StudentID','FeeStructureID','AmountPaid','Amoun
 // 6=Status (pending|paid|partial|waived), 7=PaymentID (FK→Fee_Payments when paid), 8=PaidAmount,
 // 9=PaidDate, 10=CreatedAt, 11=UpdatedAt
 var FEE_DUE_HEADERS = ['ID','StudentID','FeeStructureID','BillingMonth','BillingMonthLabel','Amount','Status','PaymentID','PaidAmount','PaidDate','CreatedAt','UpdatedAt'];
+
+// sms_log cols (10): one row per SMS attempt
+// 0=ID, 1=SentAt, 2=Recipient, 3=Message, 4=TemplateType, 5=Status (sent|failed), 6=ProviderResponse,
+// 7=RelatedStudentID, 8=SentBy, 9=RelatedType (fees|exams|birthday|report_card|other)
+var SMS_LOG_HEADERS = ['ID','SentAt','Recipient','Message','TemplateType','Status','ProviderResponse','RelatedStudentID','SentBy','RelatedType'];
+
+// sms_templates cols (6): admin-editable message templates, one row per TemplateType
+// 0=ID, 1=TemplateType (fees|exam_published|birthday|report_card|other), 2=TemplateText (placeholders like {StudentName}),
+// 3=IsActive, 4=CreatedAt, 5=UpdatedAt
+var SMS_TEMPLATE_HEADERS = ['ID','TemplateType','TemplateText','IsActive','CreatedAt','UpdatedAt'];
+
+var SMS_DEFAULT_TEMPLATES = [
+  { type: 'fees', text: 'Dear Parent, {StudentName} ({ClassName}) has an outstanding balance of GHS {Amount}. Kindly settle at your earliest convenience. Thank you. - {SchoolName}' },
+  { type: 'exam_published', text: 'Dear Parent, results for {StudentName} ({ClassName}) - {ExamName} have been published. Log in to the school portal to view. - {SchoolName}' },
+  { type: 'birthday', text: 'Happy Birthday {StudentName}! Wishing you a wonderful day and a great year ahead. From all of us at {SchoolName}.' },
+  { type: 'report_card', text: 'Dear Parent, the report card for {StudentName} ({ClassName}) is ready. Please log in to the school portal or contact the school office to collect it. - {SchoolName}' },
+  { type: 'other', text: 'Dear Parent, this is a message from {SchoolName} regarding {StudentName}: {CustomMessage}' }
+];
 
 // discipline cols (16):
 // 0=ID, 1=StudentID (FK), 2=IncidentDate, 3=IncidentType (enum), 4=Severity (enum),
@@ -4160,7 +4180,10 @@ function isAdminOrClerk(role) {
 
 // reports hub — full set is admin/clerk/supervisor only
 function canViewReports(role) {
-  return ['admin', 'clerk', 'supervisor'].indexOf(String(role || '').toLowerCase()) !== -1;
+  return ['admin', 'clerk', 'supervisor', 'owner'].indexOf(String(role || '').toLowerCase()) !== -1;
+}
+function isOwnerOrAdmin(role) {
+  return ['admin', 'owner'].indexOf(String(role || '').toLowerCase()) !== -1;
 }
 // own-class academic reports (Attendance Summary, Exam Result) — also open to teachers, scoped to their classes
 function canViewClassReports(role) {
@@ -5142,6 +5165,152 @@ function getIncomeExpenseReport(p, currentUser, currentRole) {
       ],
       generatedAt: nowIso()
     };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// ============== Owner Portal — read-only monitoring: financials, class/student summaries, daily activity ==============
+
+// financial summary — income/expense breakdown (reuses the existing report) plus total fees still outstanding
+function getOwnerFinancialSummary(p, currentUser, currentRole) {
+  try {
+    if (!isOwnerOrAdmin(currentRole)) return { success: false, message: 'Forbidden — owner/admin only' };
+    var base = getIncomeExpenseReport(p, currentUser, currentRole);
+    if (!base.success) return base;
+
+    var fsh = getSheet(FEE_PAYMENTS_SHEET);
+    var totalOutstanding = 0;
+    if (fsh) {
+      var fd = fsh.getDataRange().getValues();
+      for (var i = 1; i < fd.length; i++) {
+        if (String(fd[i][15]) === '1') continue;
+        totalOutstanding += parseFloat(fd[i][4]) || 0;
+      }
+    }
+    base.summary['Total Outstanding Fees'] = totalOutstanding;
+    return base;
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// one row per active class: strength, capacity, fee collection %, avg exam performance (if any results exist)
+function getOwnerClassSummaries(currentUser, currentRole) {
+  try {
+    if (!isOwnerOrAdmin(currentRole)) return { success: false, message: 'Forbidden — owner/admin only' };
+
+    var csh = getSheet(CLASSES_SHEET);
+    if (!csh) return { success: false, message: 'Classes sheet not found' };
+    var cdata = csh.getDataRange().getValues();
+
+    var fmap = getFeeStructuresLite();
+    var fsh = getSheet(FEE_PAYMENTS_SHEET);
+    var fpdata = fsh ? fsh.getDataRange().getValues() : [];
+    // classId -> { paid, due }
+    var feesByClass = {};
+    for (var f = 1; f < fpdata.length; f++) {
+      if (String(fpdata[f][15]) === '1') continue;
+      var fs = fmap[fpdata[f][2]];
+      if (!fs) continue;
+      var cid = fs.classId;
+      if (!feesByClass[cid]) feesByClass[cid] = { paid: 0, due: 0 };
+      feesByClass[cid].paid += parseFloat(fpdata[f][3]) || 0;
+      feesByClass[cid].due += parseFloat(fpdata[f][4]) || 0;
+    }
+
+    var out = [];
+    for (var i = 1; i < cdata.length; i++) {
+      if (String(cdata[i][6]) === '1') continue;
+      var id = cdata[i][0];
+      var strength = parseInt(cdata[i][5], 10) || 0;
+      var capacity = parseInt(cdata[i][14], 10) || 0;
+      var fees = feesByClass[id] || { paid: 0, due: 0 };
+      out.push({
+        ID: id,
+        ClassName: cdata[i][1],
+        Section: cdata[i][2],
+        AcademicYear: cdata[i][3],
+        TotalStrength: strength,
+        MaxCapacity: capacity,
+        FeesCollected: fees.paid,
+        FeesOutstanding: fees.due,
+        IsActive: String(cdata[i][18]) !== '0'
+      });
+    }
+    out.sort(function (a, b) { return String(a.ClassName + a.Section).localeCompare(String(b.ClassName + b.Section)); });
+    return { success: true, data: out };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// one row per active student: class, status, fees outstanding
+function getOwnerStudentSummaries(currentUser, currentRole) {
+  try {
+    if (!isOwnerOrAdmin(currentRole)) return { success: false, message: 'Forbidden — owner/admin only' };
+
+    var ssh = getSheet(STUDENTS_SHEET);
+    if (!ssh) return { success: false, message: 'Students sheet not found' };
+    var sdata = ssh.getDataRange().getValues();
+    var cmap = getClassesMap();
+
+    var fmap = getFeeStructuresLite();
+    var fsh = getSheet(FEE_PAYMENTS_SHEET);
+    var fpdata = fsh ? fsh.getDataRange().getValues() : [];
+    var dueByStudent = {};
+    for (var f = 1; f < fpdata.length; f++) {
+      if (String(fpdata[f][15]) === '1') continue;
+      var sid = parseInt(fpdata[f][1], 10);
+      dueByStudent[sid] = (dueByStudent[sid] || 0) + (parseFloat(fpdata[f][4]) || 0);
+    }
+
+    var out = [];
+    for (var i = 1; i < sdata.length; i++) {
+      if (String(sdata[i][36]) === '1') continue;
+      var id = sdata[i][0];
+      var classId = parseInt(sdata[i][25], 10);
+      out.push({
+        ID: id,
+        AdmissionNumber: sdata[i][1],
+        FullName: [sdata[i][2], sdata[i][3], sdata[i][4]].filter(function (x) { return x; }).join(' '),
+        ClassLabel: cmap[classId] ? cmap[classId].label : '— unassigned —',
+        Status: String(sdata[i][35] || '').toLowerCase(),
+        FeesOutstanding: dueByStudent[id] || 0
+      });
+    }
+    out.sort(function (a, b) { return a.FullName.localeCompare(b.FullName); });
+    return { success: true, data: out };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// activity log for a single day (defaults to today), grouped by action type — powers the owner's daily digest too
+function getOwnerDailyActivityReport(dateStr, currentUser, currentRole) {
+  try {
+    if (!isOwnerOrAdmin(currentRole)) return { success: false, message: 'Forbidden — owner/admin only' };
+
+    var sh = getSheet(LOGS_SHEET);
+    if (!sh) return { success: true, data: { date: dateStr || todayStr(), entries: [], byAction: [] } };
+
+    var target = String(dateStr || todayStr()).slice(0, 10);
+    var data = sh.getDataRange().getValues();
+    var entries = [];
+    var byAction = {};
+    for (var i = 1; i < data.length; i++) {
+      var ts = data[i][0];
+      var d = ts ? String(toIso(ts)).slice(0, 10) : '';
+      if (d !== target) continue;
+      var action = data[i][2] || 'Other';
+      entries.push({ Time: toIso(ts), User: data[i][1], Action: action, Details: data[i][3] });
+      byAction[action] = (byAction[action] || 0) + 1;
+    }
+    entries.sort(function (a, b) { return String(a.Time).localeCompare(String(b.Time)); });
+    var byActionArr = Object.keys(byAction).map(function (k) { return { Action: k, Count: byAction[k] }; })
+      .sort(function (a, b) { return b.Count - a.Count; });
+
+    return { success: true, data: { date: target, entries: entries, byAction: byActionArr, totalEntries: entries.length } };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
@@ -10269,6 +10438,391 @@ function updateSmsSettings(d, currentUser, currentRole) {
 
     addLog(currentUser, 'SMS Settings Updated', 'Provider: ' + (provider || 'none'));
     return { success: true, message: 'SMS & owner digest settings saved' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// ============== SMS Module ==============
+
+function _ensureSmsLogSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(SMS_LOG_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(SMS_LOG_SHEET);
+    sh.appendRow(SMS_LOG_HEADERS);
+    sh.getRange(1, 1, 1, SMS_LOG_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function _ensureSmsTemplatesSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(SMS_TEMPLATES_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(SMS_TEMPLATES_SHEET);
+    sh.appendRow(SMS_TEMPLATE_HEADERS);
+    sh.getRange(1, 1, 1, SMS_TEMPLATE_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+    sh.setFrozenRows(1);
+    var ts = nowIso(), id = 1, rows = [];
+    SMS_DEFAULT_TEMPLATES.forEach(function (t) {
+      rows.push([id++, t.type, t.text, '1', ts, ts]);
+    });
+    sh.getRange(2, 1, rows.length, SMS_TEMPLATE_HEADERS.length).setValues(rows);
+  }
+  return sh;
+}
+
+function _getSmsConfig() {
+  var sh = getSheet(SETTINGS_SHEET);
+  if (!sh) return null;
+  var data = sh.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (parseInt(data[i][0], 10) === 1) {
+      var row = data[i];
+      return {
+        provider: String(row[21] || '').toLowerCase(),
+        apiKey: row[22] || '',
+        apiSecret: row[23] || '',
+        senderId: row[24] || 'School',
+        customEndpoint: row[25] || '',
+        customConfig: row[26] || ''
+      };
+    }
+  }
+  return null;
+}
+
+// low-level provider dispatch. Returns { ok, response } — never throws (network/API errors come back as ok:false).
+function _dispatchSms(cfg, recipient, message) {
+  try {
+    if (!cfg || !cfg.provider) return { ok: false, response: 'SMS provider not configured' };
+    var phone = String(recipient || '').replace(/[^\d+]/g, '');
+    if (!phone) return { ok: false, response: 'Invalid recipient number' };
+
+    if (cfg.provider === 'arkesel') {
+      if (!cfg.apiKey) return { ok: false, response: 'Arkesel API key not configured' };
+      var url = 'https://sms.arkesel.com/api/v2/sms/send';
+      var resp = UrlFetchApp.fetch(url, {
+        method: 'post',
+        contentType: 'application/json',
+        headers: { 'api-key': cfg.apiKey },
+        payload: JSON.stringify({ sender: cfg.senderId || 'School', message: message, recipients: [phone] }),
+        muteHttpExceptions: true
+      });
+      var body = resp.getContentText();
+      var code = resp.getResponseCode();
+      var ok = code >= 200 && code < 300;
+      try { var j = JSON.parse(body); if (String(j.status || '').toLowerCase() !== 'success' && ok) ok = false; } catch (e) {}
+      return { ok: ok, response: body };
+    }
+
+    if (cfg.provider === 'hubtel') {
+      if (!cfg.apiKey || !cfg.apiSecret) return { ok: false, response: 'Hubtel Client ID / Secret not configured' };
+      var hUrl = 'https://smsc.hubtel.com/v1/messages/send'
+        + '?clientid=' + encodeURIComponent(cfg.apiKey)
+        + '&clientsecret=' + encodeURIComponent(cfg.apiSecret)
+        + '&from=' + encodeURIComponent(cfg.senderId || 'School')
+        + '&to=' + encodeURIComponent(phone)
+        + '&content=' + encodeURIComponent(message);
+      var hResp = UrlFetchApp.fetch(hUrl, { method: 'get', muteHttpExceptions: true });
+      var hCode = hResp.getResponseCode();
+      return { ok: hCode >= 200 && hCode < 300, response: hResp.getContentText() };
+    }
+
+    if (cfg.provider === 'custom') {
+      if (!cfg.customEndpoint) return { ok: false, response: 'Custom SMS endpoint not configured' };
+      var conf = {};
+      try { conf = cfg.customConfig ? JSON.parse(cfg.customConfig) : {}; } catch (e) { return { ok: false, response: 'SmsCustomConfig is not valid JSON' }; }
+      var subst = function (v) {
+        if (typeof v !== 'string') return v;
+        return v.replace(/\{recipient\}/g, phone).replace(/\{message\}/g, message)
+                .replace(/\{sender\}/g, cfg.senderId || '').replace(/\{apiKey\}/g, cfg.apiKey || '')
+                .replace(/\{apiSecret\}/g, cfg.apiSecret || '');
+      };
+      var deepSubst = function (obj) {
+        if (obj == null) return obj;
+        if (typeof obj === 'string') return subst(obj);
+        if (Array.isArray(obj)) return obj.map(deepSubst);
+        if (typeof obj === 'object') {
+          var out = {};
+          Object.keys(obj).forEach(function (k) { out[k] = deepSubst(obj[k]); });
+          return out;
+        }
+        return obj;
+      };
+      var method = String(conf.method || 'POST').toLowerCase();
+      var endpoint = cfg.customEndpoint;
+      var query = conf.queryTemplate ? deepSubst(conf.queryTemplate) : null;
+      if (query) {
+        var qs = Object.keys(query).map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(query[k]); }).join('&');
+        endpoint += (endpoint.indexOf('?') === -1 ? '?' : '&') + qs;
+      }
+      var options = { method: method, muteHttpExceptions: true };
+      if (conf.headers) options.headers = deepSubst(conf.headers);
+      if (method === 'post' && conf.bodyTemplate) {
+        options.contentType = 'application/json';
+        options.payload = JSON.stringify(deepSubst(conf.bodyTemplate));
+      }
+      var cResp = UrlFetchApp.fetch(endpoint, options);
+      var cCode = cResp.getResponseCode();
+      return { ok: cCode >= 200 && cCode < 300, response: cResp.getContentText() };
+    }
+
+    return { ok: false, response: 'Unknown SMS provider: ' + cfg.provider };
+  } catch (err) {
+    return { ok: false, response: 'Error: ' + err.toString() };
+  }
+}
+
+function _renderSmsTemplate(text, vars) {
+  var out = String(text || '');
+  Object.keys(vars || {}).forEach(function (k) {
+    out = out.split('{' + k + '}').join(vars[k] == null ? '' : String(vars[k]));
+  });
+  return out;
+}
+
+// core send — logs every attempt regardless of outcome. admin/clerk only.
+function sendSms(recipient, message, templateType, relatedStudentId, currentUser, currentRole) {
+  try {
+    var role = String(currentRole || '').toLowerCase();
+    if (role !== 'admin' && role !== 'clerk') return { success: false, message: 'Forbidden — admin or clerk only' };
+    if (!String(recipient || '').trim()) return { success: false, message: 'Recipient number required' };
+    if (!String(message || '').trim()) return { success: false, message: 'Message text required' };
+
+    var cfg = _getSmsConfig();
+    var result = _dispatchSms(cfg, recipient, message);
+
+    var logSh = _ensureSmsLogSheet();
+    var ts = nowIso();
+    var sid = relatedStudentId ? (parseInt(relatedStudentId, 10) || '') : '';
+    logSh.appendRow([
+      nextRowId(logSh), ts, String(recipient).trim(), String(message).trim(),
+      templateType || 'other', result.ok ? 'sent' : 'failed', String(result.response || '').slice(0, 500),
+      sid, currentUser || '', templateType || 'other'
+    ]);
+
+    if (!result.ok) return { success: false, message: 'SMS failed: ' + String(result.response || 'unknown error').slice(0, 200) };
+    return { success: true, message: 'SMS sent to ' + recipient };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// bulk send — one message (rendered per-recipient with their own vars) to many recipients at once.
+// payload: { recipients: [{ phone, studentId, vars }], templateType, rawMessage (used if templateType is blank/custom) }
+function sendBulkSms(payload, currentUser, currentRole) {
+  try {
+    var role = String(currentRole || '').toLowerCase();
+    if (role !== 'admin' && role !== 'clerk') return { success: false, message: 'Forbidden — admin or clerk only' };
+    var recipients = (payload && payload.recipients) || [];
+    if (!recipients.length) return { success: false, message: 'No recipients provided' };
+
+    var templateType = payload.templateType || 'other';
+    var templateText = payload.rawMessage || '';
+    if (!templateText) {
+      var tplRes = getSmsTemplates(currentUser, currentRole);
+      var tpl = tplRes.success ? (tplRes.data || []).find(function (t) { return t.TemplateType === templateType && t.IsActive; }) : null;
+      templateText = tpl ? tpl.TemplateText : '';
+    }
+    if (!templateText) return { success: false, message: 'No message template found for type: ' + templateType };
+
+    var cfg = _getSmsConfig();
+    var logSh = _ensureSmsLogSheet();
+    var ts = nowIso();
+    var nextId = nextRowId(logSh);
+    var rows = [];
+    var sent = 0, failed = 0;
+
+    recipients.forEach(function (r) {
+      var msg = _renderSmsTemplate(templateText, r.vars || {});
+      var result = _dispatchSms(cfg, r.phone, msg);
+      if (result.ok) sent++; else failed++;
+      rows.push([
+        nextId++, ts, String(r.phone || '').trim(), msg, templateType,
+        result.ok ? 'sent' : 'failed', String(result.response || '').slice(0, 500),
+        r.studentId || '', currentUser || '', templateType
+      ]);
+    });
+
+    if (rows.length) logSh.getRange(logSh.getLastRow() + 1, 1, rows.length, SMS_LOG_HEADERS.length).setValues(rows);
+    addLog(currentUser, 'Bulk SMS Sent', sent + ' sent, ' + failed + ' failed (' + templateType + ')');
+
+    return { success: true, sent: sent, failed: failed, message: sent + ' sent, ' + failed + ' failed' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function getSmsTemplates(currentUser, currentRole) {
+  try {
+    var role = String(currentRole || '').toLowerCase();
+    if (role !== 'admin' && role !== 'clerk') return { success: false, message: 'Forbidden — admin or clerk only' };
+    var sh = _ensureSmsTemplatesSheet();
+    var data = sh.getDataRange().getValues();
+    var out = [];
+    for (var i = 1; i < data.length; i++) {
+      out.push({
+        ID: data[i][0], TemplateType: data[i][1], TemplateText: data[i][2],
+        IsActive: String(data[i][3]) === '1', CreatedAt: toIso(data[i][4]), UpdatedAt: toIso(data[i][5])
+      });
+    }
+    return { success: true, data: out };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function updateSmsTemplate(id, data, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var sh = _ensureSmsTemplatesSheet();
+    var idn = parseInt(id, 10);
+    if (isNaN(idn)) return { success: false, message: 'Invalid id' };
+    var text = String(data.TemplateText || '').trim();
+    if (!text) return { success: false, message: 'TemplateText is required' };
+    if (text.length > 1000) return { success: false, message: 'TemplateText max 1000 chars' };
+    var isActive = (data.IsActive === false || String(data.IsActive) === '0') ? '0' : '1';
+
+    var sdata = sh.getDataRange().getValues();
+    for (var i = 1; i < sdata.length; i++) {
+      if (parseInt(sdata[i][0], 10) !== idn) continue;
+      var row = i + 1;
+      sh.getRange(row, 3).setValue(text);
+      sh.getRange(row, 4).setValue(isActive);
+      sh.getRange(row, 6).setValue(nowIso());
+      addLog(currentUser, 'SMS Template Updated', 'Updated template #' + idn + ' (' + sdata[i][1] + ')');
+      return { success: true, message: 'Template updated' };
+    }
+    return { success: false, message: 'Template not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// checks the provider's balance endpoint (best-effort — providers vary), caches into Settings for ~30 min.
+function getSmsBalance(currentUser, currentRole, forceRefresh) {
+  try {
+    var role = String(currentRole || '').toLowerCase();
+    if (role !== 'admin' && role !== 'clerk') return { success: false, message: 'Forbidden — admin or clerk only' };
+
+    var sh = getSheet(SETTINGS_SHEET);
+    if (!sh) return { success: true, data: { balance: null, cachedAt: '', provider: '' } };
+    var data = sh.getDataRange().getValues();
+    var row = null, rowIdx = -1;
+    for (var i = 1; i < data.length; i++) {
+      if (parseInt(data[i][0], 10) === 1) { row = data[i]; rowIdx = i + 1; break; }
+    }
+    if (!row) return { success: true, data: { balance: null, cachedAt: '', provider: '' } };
+
+    var provider = String(row[21] || '').toLowerCase();
+    var cachedVal = row[30] === '' || row[30] == null ? null : parseFloat(row[30]);
+    var cachedAt = row[31] ? new Date(row[31]) : null;
+    var freshEnoughMs = 30 * 60 * 1000;
+    if (!forceRefresh && cachedAt && (Date.now() - cachedAt.getTime()) < freshEnoughMs) {
+      return { success: true, data: { balance: cachedVal, cachedAt: toIso(row[31]), provider: provider } };
+    }
+
+    var cfg = _getSmsConfig();
+    var balance = cachedVal;
+    if (cfg && cfg.provider === 'arkesel' && cfg.apiKey) {
+      try {
+        var aResp = UrlFetchApp.fetch('https://sms.arkesel.com/api/v2/clients/balance-details', {
+          method: 'get', headers: { 'api-key': cfg.apiKey }, muteHttpExceptions: true
+        });
+        var aJson = JSON.parse(aResp.getContentText());
+        if (aJson && aJson.data && aJson.data.sms_balance != null) balance = parseFloat(aJson.data.sms_balance);
+      } catch (e) { /* keep last cached value on failure */ }
+    } else if (cfg && cfg.provider === 'hubtel' && cfg.apiKey && cfg.apiSecret) {
+      try {
+        var hResp = UrlFetchApp.fetch('https://smsc.hubtel.com/v1/messages/' + encodeURIComponent(cfg.apiKey) + '/balance'
+          + '?clientsecret=' + encodeURIComponent(cfg.apiSecret), { method: 'get', muteHttpExceptions: true });
+        var hJson = JSON.parse(hResp.getContentText());
+        if (hJson && hJson.balance != null) balance = parseFloat(hJson.balance);
+      } catch (e) { /* keep last cached value on failure */ }
+    }
+
+    var ts = nowIso();
+    if (rowIdx > 0) {
+      sh.getRange(rowIdx, 31).setValue(balance == null ? '' : balance);
+      sh.getRange(rowIdx, 32).setValue(ts);
+    }
+    return { success: true, data: { balance: balance, cachedAt: ts, provider: provider } };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function getSmsDashboardStats(currentUser, currentRole) {
+  try {
+    var role = String(currentRole || '').toLowerCase();
+    if (role !== 'admin' && role !== 'clerk') return { success: false, message: 'Forbidden — admin or clerk only' };
+    var sh = _ensureSmsLogSheet();
+    var data = sh.getDataRange().getValues();
+    var sent = 0, failed = 0, recent = [];
+    for (var i = data.length - 1; i >= 1; i--) {
+      var status = String(data[i][5] || '').toLowerCase();
+      if (status === 'sent') sent++; else if (status === 'failed') failed++;
+      if (recent.length < 25) {
+        recent.push({
+          ID: data[i][0], SentAt: toIso(data[i][1]), Recipient: data[i][2], Message: data[i][3],
+          TemplateType: data[i][4], Status: status, SentBy: data[i][8]
+        });
+      }
+    }
+    var bal = getSmsBalance(currentUser, currentRole, false);
+    return {
+      success: true,
+      data: {
+        balance: bal.success ? bal.data.balance : null,
+        balanceCachedAt: bal.success ? bal.data.cachedAt : '',
+        provider: bal.success ? bal.data.provider : '',
+        totalSent: sent, totalFailed: failed, recent: recent
+      }
+    };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// convenience: send a fee-arrears reminder to one student's father/guardian mobile, using the "fees" template
+function sendFeeReminderSms(studentId, amountDue, currentUser, currentRole) {
+  try {
+    var role = String(currentRole || '').toLowerCase();
+    if (role !== 'admin' && role !== 'clerk') return { success: false, message: 'Forbidden — admin or clerk only' };
+    var sid = parseInt(studentId, 10);
+    if (isNaN(sid)) return { success: false, message: 'Invalid student id' };
+
+    var ssh = getSheet(STUDENTS_SHEET);
+    if (!ssh) return { success: false, message: 'Students sheet not found' };
+    var sdata = ssh.getDataRange().getValues();
+    var student = null;
+    for (var i = 1; i < sdata.length; i++) {
+      if (parseInt(sdata[i][0], 10) === sid && String(sdata[i][36]) !== '1') { student = sdata[i]; break; }
+    }
+    if (!student) return { success: false, message: 'Student not found' };
+    var phone = student[17] || student[20]; // FatherMobile, else MotherMobile
+    if (!phone) return { success: false, message: 'No parent mobile number on file for this student' };
+
+    var cmap = getClassesMap();
+    var classId = parseInt(student[25], 10);
+    var settingsRes = getSchoolSettings();
+    var schoolName = settingsRes.success ? settingsRes.data.SchoolName : 'School';
+
+    var tplRes = getSmsTemplates(currentUser, currentRole);
+    var tpl = tplRes.success ? (tplRes.data || []).find(function (t) { return t.TemplateType === 'fees' && t.IsActive; }) : null;
+    var text = tpl ? tpl.TemplateText : SMS_DEFAULT_TEMPLATES[0].text;
+
+    var msg = _renderSmsTemplate(text, {
+      StudentName: [student[2], student[4]].filter(function (x) { return x; }).join(' '),
+      ClassName: cmap[classId] ? cmap[classId].label : '',
+      Amount: parseFloat(amountDue || 0).toFixed(2),
+      SchoolName: schoolName
+    });
+
+    return sendSms(phone, msg, 'fees', sid, currentUser, currentRole);
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }

@@ -3735,6 +3735,8 @@
       feeStructure: { icon: 'money-bill-wave',       label: 'Fee Structure',      group: 'finance' },
       feePayments:  { icon: 'money-bill-wave',  label: 'Fees Collection',    group: 'finance' },
       accounts:     { icon: 'wallet',           label: 'Daily Accounts',     group: 'finance' },
+      sms:          { icon: 'sms',              label: 'SMS Center',         group: 'communication' },
+      ownerPortal:  { icon: 'binoculars',       label: 'Owner Portal',       group: 'overview' },
       complaints:   { icon: 'comment-dots',     label: 'Complaints',         group: 'support' },
       helpdesk:     { icon: 'headset',          label: 'Helpdesk',           group: 'support' },
       documents:    { icon: 'folder-open',      label: 'Documents',          group: 'support' },
@@ -3757,14 +3759,16 @@
     //  - student: timetable + attendance + marks + notices first
     //  - parent: notices + child's attendance/marks/fees first
     const MENU_PRIORITY = {
-      admin: ['dashboard','reports','admissions','students','classes','timetable','attendance','substitutes','exams','marks','hallTickets','feePayments','accounts','feeStructure','notices','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','account','settings','about'],
+      admin: ['dashboard','ownerPortal','reports','admissions','students','classes','timetable','attendance','substitutes','exams','marks','hallTickets','feePayments','accounts','feeStructure','sms','notices','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','account','settings','about'],
       supervisor: ['dashboard','reports','attendance','substitutes','marks','hallTickets','exams','notices','ptm','calendar','discipline','conduct','helpdesk','complaints','lessonPlans','logbook','activities','students','parents','classes','subjects','assignments','documents','timetable','account','about'],
-      clerk: ['admissions','students','parents','feePayments','accounts','feeStructure','reports','attendance','helpdesk','complaints','documents','assets','inventory','timetable','classes','notices','calendar','account','about'],
+      clerk: ['admissions','students','parents','feePayments','accounts','feeStructure','sms','reports','attendance','helpdesk','complaints','documents','assets','inventory','timetable','classes','notices','calendar','account','about'],
       teacher: ['timetable','attendance','substitutes','marks','hallTickets','exams','lessonPlans','ptm','logbook','students','discipline','conduct','activities','notices','reports','calendar','documents','complaints','classes','subjects','account','about'],
       // student: dashboard → own-class academics → own records → support → profile. Read-only everywhere except helpdesk/complaints/account.
       student: ['dashboard','timetable','attendance','marks','hallTickets','exams','notices','calendar','feePayments','feeStructure','activities','conduct','discipline','documents','helpdesk','complaints','account','about'],
       // parent: like student + PTM booking with teachers
-      parent: ['dashboard','notices','ptm','calendar','timetable','attendance','marks','hallTickets','exams','feePayments','feeStructure','conduct','discipline','activities','documents','helpdesk','complaints','account','about']
+      parent: ['dashboard','notices','ptm','calendar','timetable','attendance','marks','hallTickets','exams','feePayments','feeStructure','conduct','discipline','activities','documents','helpdesk','complaints','account','about'],
+      // owner: read-only monitoring portal — no operational menus
+      owner: ['ownerPortal','account','about']
     };
 
     const GROUP_LABELS = {
@@ -3772,6 +3776,7 @@
       daily: 'Daily',
       academic: 'Academic',
       finance: 'Finance',
+      communication: 'Communication',
       records: 'Records',
       support: 'Support',
       admin: 'Administration',
@@ -4084,6 +4089,8 @@
         useSWR('getAdminDashboardCharts', () => swrFetcher('getAdminDashboardCharts', currentUser, role));
       const { data: enrich, isValidating: syncE } =
         useSWR('getAdminDashboardEnrich', () => swrFetcher('getAdminDashboardEnrich', currentUser, role));
+      const { data: smsStats } =
+        useSWR('getSmsDashboardStats', () => swrFetcher('getSmsDashboardStats', currentUser, role));
       const syncing = syncS || syncC || syncE;
 
       // chart refs
@@ -4169,6 +4176,10 @@
             <DashKpi icon="calendar-check" label="Today Attendance" value={(extras?.todayAttPct || 0) + '%'} sub={`${stats.todayMarked} records`} color="orange" onClick={() => goto('attendance')} />
             <DashKpi icon="graduation-cap" label="Active Exams" value={stats.totalExams} sub={`${stats.publishedExams} published`} color="amber" onClick={() => goto('exams')} />
             <DashKpi icon="gavel" label="Open Incidents" value={stats.openIncidents} sub={`${stats.criticalIncidents} critical`} color="red" onClick={() => goto('discipline')} />
+            <DashKpi icon="sms" label="SMS Balance"
+              value={smsStats ? (smsStats.balance == null ? 'N/A' : fmt(smsStats.balance)) : '…'}
+              sub={smsStats ? `${fmt(smsStats.totalSent)} sent · ${fmt(smsStats.totalFailed)} failed` : 'loading…'}
+              color="teal" onClick={() => goto('sms')} />
           </div>
 
           {/* day-book snapshot */}
@@ -5294,6 +5305,7 @@
                         { value: 'clerk', label: 'Clerk' },
                         { value: 'teacher', label: 'Teacher' },
                         { value: 'supervisor', label: 'Supervisor' },
+                        { value: 'owner', label: 'School Owner' },
                         { value: 'student', label: 'Student' },
                         { value: 'parent', label: 'Parent' }
                       ]}
@@ -5859,6 +5871,7 @@
                       { value: 'clerk', label: 'Clerk' },
                       { value: 'teacher', label: 'Teacher' },
                       { value: 'supervisor', label: 'Supervisor' },
+                      { value: 'owner', label: 'School Owner (read-only monitoring)' },
                       { value: 'student', label: 'Student' },
                       { value: 'parent', label: 'Parent' }
                     ]}
@@ -23395,6 +23408,695 @@
       );
     }
 
+    // ============== SMS Center ==============
+    const SMS_TEMPLATE_LABELS = { fees: 'Fee Reminder', exam_published: 'Exam Results Published', birthday: 'Birthday Wishes', report_card: 'Report Card Ready', other: 'Other / Custom' };
+    const SMS_TEMPLATE_ICONS = { fees: 'money-bill-wave', exam_published: 'graduation-cap', birthday: 'birthday-cake', report_card: 'id-card', other: 'comment' };
+    // client-side fallback text — used only until the real template loads from the backend (Code.gs SMS_DEFAULT_TEMPLATES mirrors this)
+    const SMS_DEFAULT_TEMPLATES_CLIENT = {
+      fees: 'Dear Parent, {StudentName} ({ClassName}) has an outstanding balance of GHS {Amount}. Kindly settle at your earliest convenience. Thank you. - {SchoolName}',
+      exam_published: 'Dear Parent, results for {StudentName} ({ClassName}) - {ExamName} have been published. Log in to the school portal to view. - {SchoolName}',
+      birthday: 'Happy Birthday {StudentName}! Wishing you a wonderful day and a great year ahead. From all of us at {SchoolName}.',
+      report_card: 'Dear Parent, the report card for {StudentName} ({ClassName}) is ready. Please log in to the school portal or contact the school office to collect it. - {SchoolName}',
+      other: 'Dear Parent, this is a message from {SchoolName} regarding {StudentName}: {CustomMessage}'
+    };
+
+    function SmsView({ currentUser, role, schoolSettings }) {
+      const isAdmin = String(role).toLowerCase() === 'admin';
+      const [tab, setTab] = useState('dashboard');
+
+      return (
+        <div className="data-section">
+          <div className="section-header">
+            <h2><i className="fas fa-sms"></i> SMS Center</h2>
+          </div>
+
+          <div style={{display:'flex',gap:'8px',marginBottom:'18px',borderBottom:'2px solid #eee'}}>
+            {[
+              ['dashboard', 'Dashboard', 'chart-bar'],
+              ['send', 'Send SMS', 'paper-plane'],
+              ['templates', 'Templates', 'file-alt']
+            ].map(([key, label, icon]) => (
+              <button
+                key={key}
+                onClick={() => setTab(key)}
+                style={{
+                  padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer',
+                  fontWeight: 600, fontSize: '14px',
+                  color: tab === key ? 'var(--navy-primary)' : '#888',
+                  borderBottom: tab === key ? '2px solid var(--navy-primary)' : '2px solid transparent',
+                  marginBottom: '-2px'
+                }}
+              >
+                <i className={`fas fa-${icon}`}></i> {label}
+              </button>
+            ))}
+          </div>
+
+          {tab === 'dashboard' && <SmsDashboardTab currentUser={currentUser} role={role} />}
+          {tab === 'send' && <SmsSendTab currentUser={currentUser} role={role} schoolSettings={schoolSettings} />}
+          {tab === 'templates' && <SmsTemplatesTab currentUser={currentUser} role={role} isAdmin={isAdmin} />}
+        </div>
+      );
+    }
+
+    function SmsDashboardTab({ currentUser, role }) {
+      const { data: stats, isLoading: loading, mutate: refreshStats } =
+        useSWR('getSmsDashboardStats', () => swrFetcher('getSmsDashboardStats', currentUser, role));
+
+      const refreshBalance = () => {
+        google.script.run
+          .withSuccessHandler(() => refreshStats())
+          .withFailureHandler(() => {})
+          .getSmsBalance(currentUser, role, true);
+      };
+
+      if (loading || !stats) return <TableSkeleton rows={5} columns={4} />;
+
+      return (
+        <div>
+          <div className="dash-kpi-grid">
+            <DashKpi icon="wallet" label="SMS Balance" value={stats.balance == null ? 'N/A' : Number(stats.balance).toLocaleString()} sub={stats.provider ? `Provider: ${stats.provider}` : 'No provider configured'} color="teal" onClick={refreshBalance} />
+            <DashKpi icon="paper-plane" label="Total Sent" value={stats.totalSent} sub="all-time" color="green" />
+            <DashKpi icon="times-circle" label="Total Failed" value={stats.totalFailed} sub="all-time" color="red" />
+          </div>
+
+          <button className="btn btn-secondary" style={{marginBottom:'14px'}} onClick={refreshBalance}>
+            <i className="fas fa-sync"></i> Refresh Balance
+          </button>
+
+          <h4 style={{color:'var(--navy-primary)',marginBottom:'10px'}}><i className="fas fa-history"></i> Recent Activity</h4>
+          {stats.recent.length === 0 ? (
+            <div className="settings-info-message"><i className="fas fa-inbox" style={{marginRight:'6px'}}></i> No SMS sent yet.</div>
+          ) : (
+            <div style={{overflowX:'auto'}}>
+              <table className="display" style={{width:'100%'}}>
+                <thead>
+                  <tr><th>Sent At</th><th>Recipient</th><th>Type</th><th>Message</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                  {stats.recent.map(r => (
+                    <tr key={r.ID}>
+                      <td style={{fontSize:'12px',whiteSpace:'nowrap'}}>{new Date(r.SentAt).toLocaleString()}</td>
+                      <td style={{fontFamily:'monospace'}}>{r.Recipient}</td>
+                      <td>{SMS_TEMPLATE_LABELS[r.TemplateType] || r.TemplateType}</td>
+                      <td style={{fontSize:'12px',maxWidth:'320px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}} title={r.Message}>{r.Message}</td>
+                      <td><span className={`status-badge ${r.Status === 'sent' ? 'status-active' : 'status-inactive'}`}>{r.Status}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function SmsSendTab({ currentUser, role, schoolSettings }) {
+      const { data: classesRaw } = useSWR('getAllClasses', () => swrFetcher('getAllClasses', currentUser, role));
+      const { data: studentsRaw } = useSWR('getAllStudents', () => swrFetcher('getAllStudents', currentUser, role));
+      const { data: paymentsRaw } = useSWR('getAllPayments', () => swrFetcher('getAllPayments', currentUser, role));
+      const { data: examsRaw } = useSWR('getAllExams', () => swrFetcher('getAllExams', currentUser, role));
+      const { data: templatesRaw } = useSWR('getSmsTemplates', () => swrFetcher('getSmsTemplates', currentUser, role));
+      const classes = classesRaw || [];
+      const students = studentsRaw || [];
+      const payments = paymentsRaw || [];
+      const exams = examsRaw || [];
+      const templates = templatesRaw || [];
+
+      const [mode, setMode] = useState('single'); // single | class
+      const [phone, setPhone] = useState('');
+      const [studentIdForSingle, setStudentIdForSingle] = useState('');
+      const [classId, setClassId] = useState('');
+      const [templateType, setTemplateType] = useState('other');
+      const [examId, setExamId] = useState('');
+      const [customMessage, setCustomMessage] = useState('');
+      const [sending, setSending] = useState(false);
+
+      const activeTemplate = templates.find(t => t.TemplateType === templateType && t.IsActive);
+      const templateText = activeTemplate ? activeTemplate.TemplateText : (SMS_DEFAULT_TEMPLATES_CLIENT[templateType] || '');
+
+      const dueByStudent = React.useMemo(() => {
+        const m = {};
+        payments.forEach(p => { m[p.StudentID] = (m[p.StudentID] || 0) + (parseFloat(p.AmountDue) || 0); });
+        return m;
+      }, [payments]);
+
+      const buildVars = (s) => {
+        const cls = classes.find(c => String(c.ID) === String(s.ClassID));
+        return {
+          StudentName: s.FullName || '',
+          ClassName: cls ? `${cls.ClassName} ${cls.Section}` : (s.ClassLabel || ''),
+          Amount: (dueByStudent[s.ID] || 0).toFixed(2),
+          ExamName: exams.find(e => String(e.ID) === String(examId))?.ExamName || '',
+          SchoolName: (schoolSettings && schoolSettings.SchoolName) || 'School',
+          CustomMessage: customMessage
+        };
+      };
+
+      const previewFor = (s) => {
+        let vars = buildVars(s);
+        let text = templateText;
+        Object.keys(vars).forEach(k => { text = text.split('{' + k + '}').join(vars[k] || ''); });
+        return text;
+      };
+
+      const singleStudent = students.find(s => String(s.ID) === String(studentIdForSingle));
+      const classStudents = students.filter(s => String(s.ClassID) === String(classId));
+
+      const handleSend = () => {
+        if (mode === 'single') {
+          if (!phone.trim()) { Swal.fire({ icon: 'warning', text: 'Enter a recipient phone number.' }); return; }
+          const msg = singleStudent ? previewFor(singleStudent) : templateText.split('{CustomMessage}').join(customMessage);
+          setSending(true);
+          google.script.run
+            .withSuccessHandler((r) => {
+              setSending(false);
+              if (r.success) Swal.fire({ icon: 'success', text: r.message, timer: 2500, showConfirmButton: false });
+              else Swal.fire({ icon: 'error', title: 'Error', text: r.message });
+            })
+            .withFailureHandler((err) => { setSending(false); Swal.fire({ icon: 'error', title: 'Error', text: err.message }); })
+            .sendSms(phone.trim(), msg, templateType, singleStudent ? singleStudent.ID : null, currentUser, role);
+          return;
+        }
+
+        // class mode
+        if (!classId) { Swal.fire({ icon: 'warning', text: 'Pick a class.' }); return; }
+        const recipients = classStudents
+          .map(s => ({ phone: s.FatherMobile || s.MotherMobile, studentId: s.ID, vars: buildVars(s) }))
+          .filter(r => r.phone);
+        if (!recipients.length) { Swal.fire({ icon: 'warning', text: 'No students with a parent mobile number in this class.' }); return; }
+
+        Swal.fire({
+          icon: 'question', title: 'Send SMS?', text: `Send to ${recipients.length} parent(s) in this class?`,
+          showCancelButton: true, confirmButtonColor: 'var(--navy-primary)', confirmButtonText: 'Send'
+        }).then((res) => {
+          if (!res.isConfirmed) return;
+          setSending(true);
+          google.script.run
+            .withSuccessHandler((r) => {
+              setSending(false);
+              if (r.success) Swal.fire({ icon: 'success', title: 'Done', text: r.message });
+              else Swal.fire({ icon: 'error', title: 'Error', text: r.message });
+            })
+            .withFailureHandler((err) => { setSending(false); Swal.fire({ icon: 'error', title: 'Error', text: err.message }); })
+            .sendBulkSms({ recipients, templateType }, currentUser, role);
+        });
+      };
+
+      return (
+        <div style={{maxWidth:'700px'}}>
+          <div className="form-group">
+            <label><i className="fas fa-users"></i> Send To</label>
+            <div style={{display:'flex',gap:'10px'}}>
+              <button type="button" className={mode === 'single' ? 'btn btn-primary' : 'btn btn-secondary'} onClick={() => setMode('single')}>
+                <i className="fas fa-user"></i> Single Number
+              </button>
+              <button type="button" className={mode === 'class' ? 'btn btn-primary' : 'btn btn-secondary'} onClick={() => setMode('class')}>
+                <i className="fas fa-school"></i> Whole Class
+              </button>
+            </div>
+          </div>
+
+          {mode === 'single' ? (
+            <>
+              <SearchableDropdown
+                label="Link to Student (optional — fills in name/class/amount)"
+                icon="fas fa-user-graduate"
+                options={students.map(s => ({ value: String(s.ID), label: `${s.FullName} (${s.AdmissionNumber})` }))}
+                value={studentIdForSingle}
+                onChange={(v) => { setStudentIdForSingle(v); const s = students.find(x => String(x.ID) === v); if (s) setPhone(s.FatherMobile || s.MotherMobile || ''); }}
+                placeholder="— none, custom message only —"
+              />
+              <div className="form-group">
+                <label><i className="fas fa-phone"></i> Recipient Number</label>
+                <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g. 0244000000" />
+              </div>
+            </>
+          ) : (
+            <SearchableDropdown
+              label="Class"
+              icon="fas fa-school"
+              options={classes.map(c => ({ value: String(c.ID), label: `${c.ClassName} ${c.Section} (${c.AcademicYear}) — ${students.filter(s => String(s.ClassID) === String(c.ID)).length} student(s)` }))}
+              value={classId}
+              onChange={setClassId}
+              placeholder="Select class..."
+              required={true}
+            />
+          )}
+
+          <SearchableDropdown
+            label="Message Template"
+            icon="fas fa-file-alt"
+            options={Object.keys(SMS_TEMPLATE_LABELS).map(k => ({ value: k, label: SMS_TEMPLATE_LABELS[k] }))}
+            value={templateType}
+            onChange={setTemplateType}
+            required={true}
+          />
+
+          {templateType === 'exam_published' && (
+            <SearchableDropdown
+              label="Exam"
+              icon="fas fa-graduation-cap"
+              options={exams.map(e => ({ value: String(e.ID), label: `${e.ExamName} (${e.AcademicYear})` }))}
+              value={examId}
+              onChange={setExamId}
+              placeholder="Select exam..."
+            />
+          )}
+
+          {templateType === 'other' && (
+            <div className="form-group">
+              <label><i className="fas fa-comment"></i> Custom Message</label>
+              <textarea rows="2" value={customMessage} onChange={(e) => setCustomMessage(e.target.value)} placeholder="Enter the custom message content..." />
+            </div>
+          )}
+
+          <div className="form-group">
+            <label><i className="fas fa-eye"></i> Preview</label>
+            <div className="settings-info-message" style={{minHeight:'50px'}}>
+              {mode === 'single'
+                ? (singleStudent ? previewFor(singleStudent) : templateText.split('{CustomMessage}').join(customMessage || '…'))
+                : (classStudents[0] ? previewFor(classStudents[0]) + ' (per-student, first match shown)' : templateText)}
+            </div>
+          </div>
+
+          <button className="btn btn-primary" disabled={sending} onClick={handleSend}>
+            {sending ? <><i className="fas fa-spinner fa-spin"></i> Sending...</> : <><i className="fas fa-paper-plane"></i> Send SMS</>}
+          </button>
+        </div>
+      );
+    }
+
+    function SmsTemplatesTab({ currentUser, role, isAdmin }) {
+      const { data: templatesRaw, isLoading: loading, mutate: refreshTemplates } =
+        useSWR('getSmsTemplates', () => swrFetcher('getSmsTemplates', currentUser, role));
+      const templates = templatesRaw || [];
+      const [editingId, setEditingId] = useState(null);
+      const [text, setText] = useState('');
+      const [saving, setSaving] = useState(false);
+
+      if (loading) return <TableSkeleton rows={5} columns={2} />;
+
+      const startEdit = (t) => { setEditingId(t.ID); setText(t.TemplateText); };
+      const save = (t) => {
+        if (!text.trim()) { Swal.fire({ icon: 'warning', text: 'Template text cannot be empty.' }); return; }
+        setSaving(true);
+        google.script.run
+          .withSuccessHandler((r) => {
+            setSaving(false);
+            if (r.success) { setEditingId(null); refreshTemplates(); }
+            else Swal.fire({ icon: 'error', title: 'Error', text: r.message });
+          })
+          .withFailureHandler((err) => { setSaving(false); Swal.fire({ icon: 'error', title: 'Error', text: err.message }); })
+          .updateSmsTemplate(t.ID, { TemplateText: text, IsActive: t.IsActive }, currentUser, role);
+      };
+
+      return (
+        <div>
+          <div className="settings-info-message" style={{marginBottom:'16px'}}>
+            <i className="fas fa-info-circle" style={{marginRight:'6px'}}></i>
+            Available placeholders: <code>{'{StudentName}'}</code> <code>{'{ClassName}'}</code> <code>{'{Amount}'}</code> <code>{'{ExamName}'}</code> <code>{'{SchoolName}'}</code> <code>{'{CustomMessage}'}</code>
+          </div>
+          {templates.map(t => (
+            <div key={t.ID} style={{border:'1px solid #e0e0e0',borderRadius:'8px',padding:'14px',marginBottom:'12px'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
+                <div style={{fontWeight:700,color:'var(--navy-primary)'}}>
+                  <i className={`fas fa-${SMS_TEMPLATE_ICONS[t.TemplateType] || 'comment'}`}></i> {SMS_TEMPLATE_LABELS[t.TemplateType] || t.TemplateType}
+                </div>
+                {isAdmin && editingId !== t.ID && (
+                  <button className="action-icon edit-icon" onClick={() => startEdit(t)} title="Edit"><i className="fas fa-edit"></i></button>
+                )}
+              </div>
+              {editingId === t.ID ? (
+                <>
+                  <textarea rows="3" style={{width:'100%'}} value={text} onChange={(e) => setText(e.target.value)} maxLength="1000" />
+                  <div style={{display:'flex',gap:'8px',marginTop:'8px'}}>
+                    <button className="btn btn-primary btn-sm" disabled={saving} onClick={() => save(t)}>
+                      {saving ? 'Saving...' : 'Save'}
+                    </button>
+                    <button className="btn btn-secondary btn-sm" onClick={() => setEditingId(null)}>Cancel</button>
+                  </div>
+                </>
+              ) : (
+                <div style={{fontSize:'13px',color:'#555'}}>{t.TemplateText}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    // admin-only settings form: SMS gateway config (Arkesel / Hubtel / custom) + owner daily-digest contact/time
+    function SmsSettingsForm({ currentUser, role }) {
+      const [data, setData] = useState(null);
+      const [saving, setSaving] = useState(false);
+
+      useEffect(() => {
+        google.script.run
+          .withSuccessHandler((res) => { if (res.success) setData(res.data); else Swal.fire({ icon: 'error', title: 'Error', text: res.message }); })
+          .withFailureHandler((err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }))
+          .getAdminExtendedSettings(currentUser, role);
+      }, []);
+
+      if (!data) return <TableSkeleton rows={6} columns={2} />;
+      const set = (k, v) => setData({ ...data, [k]: v });
+
+      const handleSave = (e) => {
+        e.preventDefault();
+        setSaving(true);
+        google.script.run
+          .withSuccessHandler((res) => {
+            setSaving(false);
+            if (res.success) Swal.fire({ icon: 'success', title: 'Saved!', text: res.message, timer: 2000, showConfirmButton: false });
+            else Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+          })
+          .withFailureHandler((err) => { setSaving(false); Swal.fire({ icon: 'error', title: 'Error', text: err.message }); })
+          .updateSmsSettings(data, currentUser, role);
+      };
+
+      return (
+        <div style={{marginTop:'20px',maxWidth:'700px'}}>
+          <form onSubmit={handleSave}>
+            <h3 style={{marginBottom:'12px',color:'var(--navy-primary)',fontSize:'17px'}}>
+              <i className="fas fa-sms"></i> SMS Gateway
+            </h3>
+            <SearchableDropdown
+              label="SMS Provider"
+              icon="fas fa-server"
+              options={[
+                { value: '', label: '— None configured —' },
+                { value: 'arkesel', label: 'Arkesel' },
+                { value: 'hubtel', label: 'Hubtel' },
+                { value: 'custom', label: 'Custom API' }
+              ]}
+              value={data.SmsProvider}
+              onChange={(v) => set('SmsProvider', v)}
+            />
+
+            {data.SmsProvider === 'arkesel' && (
+              <>
+                <div className="form-group">
+                  <label><i className="fas fa-key"></i> Arkesel API Key</label>
+                  <input type="text" value={data.SmsApiKey} onChange={(e) => set('SmsApiKey', e.target.value)} placeholder="Your Arkesel API key" />
+                </div>
+                <div className="form-group">
+                  <label><i className="fas fa-signature"></i> Sender ID</label>
+                  <input type="text" value={data.SmsSenderId} onChange={(e) => set('SmsSenderId', e.target.value)} maxLength="11" placeholder="e.g. YourSchool (max 11 chars)" />
+                </div>
+              </>
+            )}
+
+            {data.SmsProvider === 'hubtel' && (
+              <>
+                <div className="form-group">
+                  <label><i className="fas fa-key"></i> Hubtel Client ID</label>
+                  <input type="text" value={data.SmsApiKey} onChange={(e) => set('SmsApiKey', e.target.value)} placeholder="Client ID" />
+                </div>
+                <div className="form-group">
+                  <label><i className="fas fa-lock"></i> Hubtel Client Secret</label>
+                  <input type="password" value={data.SmsApiSecret} onChange={(e) => set('SmsApiSecret', e.target.value)} placeholder="Client Secret" />
+                </div>
+                <div className="form-group">
+                  <label><i className="fas fa-signature"></i> Sender ID</label>
+                  <input type="text" value={data.SmsSenderId} onChange={(e) => set('SmsSenderId', e.target.value)} maxLength="11" placeholder="e.g. YourSchool (max 11 chars)" />
+                </div>
+              </>
+            )}
+
+            {data.SmsProvider === 'custom' && (
+              <>
+                <div className="form-group">
+                  <label><i className="fas fa-link"></i> Custom API Endpoint</label>
+                  <input type="text" value={data.SmsCustomEndpoint} onChange={(e) => set('SmsCustomEndpoint', e.target.value)} placeholder="https://your-sms-provider.com/api/send" />
+                </div>
+                <div className="form-group">
+                  <label><i className="fas fa-key"></i> API Key</label>
+                  <input type="text" value={data.SmsApiKey} onChange={(e) => set('SmsApiKey', e.target.value)} placeholder="API key" />
+                </div>
+                <div className="form-group">
+                  <label><i className="fas fa-lock"></i> API Secret (optional)</label>
+                  <input type="password" value={data.SmsApiSecret} onChange={(e) => set('SmsApiSecret', e.target.value)} placeholder="API secret, if required" />
+                </div>
+                <div className="form-group">
+                  <label><i className="fas fa-signature"></i> Sender ID</label>
+                  <input type="text" value={data.SmsSenderId} onChange={(e) => set('SmsSenderId', e.target.value)} maxLength="11" placeholder="e.g. YourSchool (max 11 chars)" />
+                </div>
+                <div className="form-group">
+                  <label><i className="fas fa-code"></i> Custom Config (JSON)</label>
+                  <textarea rows="6" style={{fontFamily:'monospace',fontSize:'12px'}} value={data.SmsCustomConfig} onChange={(e) => set('SmsCustomConfig', e.target.value)}
+                    placeholder={'{\n  "method": "POST",\n  "headers": { "Authorization": "Bearer {apiKey}" },\n  "bodyTemplate": { "to": "{recipient}", "message": "{message}", "sender_id": "{sender}" }\n}'} />
+                  <div style={{fontSize:'11px',color:'#888',marginTop:'4px'}}>
+                    Placeholders available: <code>{'{recipient}'}</code> <code>{'{message}'}</code> <code>{'{sender}'}</code> <code>{'{apiKey}'}</code> <code>{'{apiSecret}'}</code>
+                  </div>
+                </div>
+              </>
+            )}
+
+            <h3 style={{margin:'26px 0 12px',color:'var(--navy-primary)',fontSize:'17px'}}>
+              <i className="fas fa-binoculars"></i> School Owner — Daily Digest
+            </h3>
+            <div className="settings-info-message" style={{marginBottom:'14px'}}>
+              <i className="fas fa-info-circle" style={{marginRight:'6px'}}></i>
+              The owner receives an automatic SMS + email summary of the day's activity at the time below.
+            </div>
+            <div className="form-group">
+              <label><i className="fas fa-envelope"></i> Owner Email</label>
+              <input type="email" value={data.OwnerEmail} onChange={(e) => set('OwnerEmail', e.target.value)} placeholder="owner@example.com" />
+            </div>
+            <div className="form-group">
+              <label><i className="fas fa-phone"></i> Owner Phone</label>
+              <input type="text" value={data.OwnerPhone} onChange={(e) => set('OwnerPhone', e.target.value)} placeholder="e.g. 0244000000" />
+            </div>
+            <div className="form-group">
+              <label><i className="fas fa-clock"></i> Daily Digest Time</label>
+              <input type="time" value={data.DailyDigestTime} onChange={(e) => set('DailyDigestTime', e.target.value)} />
+            </div>
+
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? <><i className="fas fa-spinner fa-spin"></i> Saving...</> : <><i className="fas fa-save"></i> Save SMS & Digest Settings</>}
+            </button>
+          </form>
+        </div>
+      );
+    }
+
+    // ============== Owner Portal (read-only monitoring) ==============
+    function OwnerPortalView({ currentUser, role }) {
+      const [tab, setTab] = useState('financial');
+
+      return (
+        <div className="data-section">
+          <div className="section-header">
+            <h2><i className="fas fa-binoculars"></i> Owner Portal</h2>
+          </div>
+          <div className="settings-info-message" style={{marginBottom:'16px'}}>
+            <i className="fas fa-info-circle" style={{marginRight:'6px'}}></i>
+            Read-only monitoring view — financial summary, class/student overview, and the day's system activity.
+          </div>
+
+          <div style={{display:'flex',gap:'8px',marginBottom:'18px',borderBottom:'2px solid #eee',flexWrap:'wrap'}}>
+            {[
+              ['financial', 'Financial', 'wallet'],
+              ['classes', 'Classes', 'school'],
+              ['students', 'Students', 'user-graduate'],
+              ['activity', 'Daily Activity', 'history']
+            ].map(([key, label, icon]) => (
+              <button
+                key={key}
+                onClick={() => setTab(key)}
+                style={{
+                  padding: '10px 18px', border: 'none', background: 'none', cursor: 'pointer',
+                  fontWeight: 600, fontSize: '14px',
+                  color: tab === key ? 'var(--navy-primary)' : '#888',
+                  borderBottom: tab === key ? '2px solid var(--navy-primary)' : '2px solid transparent',
+                  marginBottom: '-2px'
+                }}
+              >
+                <i className={`fas fa-${icon}`}></i> {label}
+              </button>
+            ))}
+          </div>
+
+          {tab === 'financial' && <OwnerFinancialTab currentUser={currentUser} role={role} />}
+          {tab === 'classes' && <OwnerClassesTab currentUser={currentUser} role={role} />}
+          {tab === 'students' && <OwnerStudentsTab currentUser={currentUser} role={role} />}
+          {tab === 'activity' && <OwnerActivityTab currentUser={currentUser} role={role} />}
+        </div>
+      );
+    }
+
+    function OwnerFinancialTab({ currentUser, role }) {
+      const [fromDate, setFromDate] = useState('');
+      const [toDate, setToDate] = useState('');
+      const [report, setReport] = useState(null);
+      const [loading, setLoading] = useState(true);
+
+      const load = () => {
+        setLoading(true);
+        google.script.run
+          .withSuccessHandler((res) => { setLoading(false); if (res.success) setReport(res); else Swal.fire({ icon: 'error', title: 'Error', text: res.message }); })
+          .withFailureHandler((err) => { setLoading(false); Swal.fire({ icon: 'error', title: 'Error', text: err.message }); })
+          .getOwnerFinancialSummary({ fromDate, toDate }, currentUser, role);
+      };
+      useEffect(load, []);
+
+      if (loading || !report) return <TableSkeleton rows={6} columns={4} />;
+      const s = report.summary || {};
+      const fmt = (n) => 'GH₵' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      return (
+        <div>
+          <div style={{display:'flex',gap:'10px',alignItems:'flex-end',marginBottom:'18px',flexWrap:'wrap'}}>
+            <div className="form-group" style={{marginBottom:0}}>
+              <label>From</label>
+              <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+            </div>
+            <div className="form-group" style={{marginBottom:0}}>
+              <label>To</label>
+              <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+            </div>
+            <button className="btn btn-primary" onClick={load}><i className="fas fa-filter"></i> Apply</button>
+          </div>
+
+          <div className="dash-kpi-grid">
+            <DashKpi icon="arrow-down" label="Total Income" value={fmt(s['Total Income'])} color="green" />
+            <DashKpi icon="arrow-up" label="Total Expense" value={fmt(s['Total Expense'])} color="red" />
+            <DashKpi icon="balance-scale" label="Net Surplus/Deficit" value={fmt(s['Net Surplus/Deficit'])} color={(s['Net Surplus/Deficit'] || 0) >= 0 ? 'green' : 'red'} />
+            <DashKpi icon="exclamation-circle" label="Fees Outstanding" value={fmt(s['Total Outstanding Fees'])} color="orange" />
+          </div>
+
+          <h4 style={{color:'var(--navy-primary)',margin:'20px 0 10px'}}><i className="fas fa-list"></i> Breakdown by Category</h4>
+          <div style={{overflowX:'auto'}}>
+            <table className="display" style={{width:'100%'}}>
+              <thead><tr><th>Type</th><th>Category</th><th>Entries</th><th>Amount</th></tr></thead>
+              <tbody>
+                {(report.rows || []).map((r, i) => (
+                  <tr key={i}>
+                    <td><span className={`status-badge ${r.Type === 'income' ? 'status-active' : 'status-inactive'}`}>{r.Type}</span></td>
+                    <td style={{textTransform:'capitalize'}}>{r.Category}</td>
+                    <td>{r.Count}</td>
+                    <td>{fmt(r.Amount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    function OwnerClassesTab({ currentUser, role }) {
+      const { data, isLoading: loading } = useSWR('getOwnerClassSummaries', () => swrFetcher('getOwnerClassSummaries', currentUser, role));
+      const classes = data || [];
+      if (loading) return <TableSkeleton rows={6} columns={5} />;
+      const fmt = (n) => 'GH₵' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      return (
+        <GridCards
+          items={classes}
+          emptyText="No classes found."
+          renderCard={(c) => (
+            <div key={c.ID} className="grid-card" style={{border:'1px solid #e0e0e0',borderRadius:'8px',padding:'14px',background:'#fff'}}>
+              <div style={{fontWeight:700,color:'var(--navy-primary)',fontSize:16}}>{c.ClassName} {c.Section}</div>
+              <div style={{fontSize:12,color:'#888',marginBottom:8}}>{c.AcademicYear}</div>
+              <div style={{fontSize:13,color:'#555'}}>
+                <div><i className="fas fa-users" style={{width:16}}></i> {c.TotalStrength} / {c.MaxCapacity} students</div>
+                <div><i className="fas fa-money-bill-wave" style={{width:16,color:'#34a853'}}></i> Collected: {fmt(c.FeesCollected)}</div>
+                <div><i className="fas fa-exclamation-circle" style={{width:16,color:'#ea4335'}}></i> Outstanding: {fmt(c.FeesOutstanding)}</div>
+              </div>
+            </div>
+          )}
+        />
+      );
+    }
+
+    function OwnerStudentsTab({ currentUser, role }) {
+      const { data, isLoading: loading } = useSWR('getOwnerStudentSummaries', () => swrFetcher('getOwnerStudentSummaries', currentUser, role));
+      const students = data || [];
+      const [search, setSearch] = useState('');
+      if (loading) return <TableSkeleton rows={8} columns={5} />;
+      const fmt = (n) => 'GH₵' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const filtered = search ? students.filter(s => (s.FullName + s.AdmissionNumber).toLowerCase().includes(search.toLowerCase())) : students;
+
+      return (
+        <div>
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search students..." className="filter-input" style={{marginBottom:'14px',maxWidth:'320px'}} />
+          <div style={{overflowX:'auto'}}>
+            <table className="display" style={{width:'100%'}}>
+              <thead><tr><th>Adm #</th><th>Name</th><th>Class</th><th>Status</th><th>Fees Outstanding</th></tr></thead>
+              <tbody>
+                {filtered.map(s => (
+                  <tr key={s.ID}>
+                    <td style={{fontFamily:'monospace'}}>{s.AdmissionNumber}</td>
+                    <td>{s.FullName}</td>
+                    <td>{s.ClassLabel}</td>
+                    <td><span className={`status-badge ${s.Status === 'active' ? 'status-active' : 'status-inactive'}`}>{s.Status}</span></td>
+                    <td style={{color: s.FeesOutstanding > 0 ? '#ea4335' : '#34a853',fontWeight:600}}>{fmt(s.FeesOutstanding)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      );
+    }
+
+    function OwnerActivityTab({ currentUser, role }) {
+      const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
+      const [report, setReport] = useState(null);
+      const [loading, setLoading] = useState(true);
+
+      const load = () => {
+        setLoading(true);
+        google.script.run
+          .withSuccessHandler((res) => { setLoading(false); if (res.success) setReport(res.data); else Swal.fire({ icon: 'error', title: 'Error', text: res.message }); })
+          .withFailureHandler((err) => { setLoading(false); Swal.fire({ icon: 'error', title: 'Error', text: err.message }); })
+          .getOwnerDailyActivityReport(date, currentUser, role);
+      };
+      useEffect(load, [date]);
+
+      return (
+        <div>
+          <div className="form-group" style={{maxWidth:'240px',marginBottom:'18px'}}>
+            <label><i className="fas fa-calendar-day"></i> Date</label>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+
+          {loading || !report ? <TableSkeleton rows={6} columns={3} /> : (
+            <>
+              <div className="dash-kpi-grid">
+                <DashKpi icon="list" label="Total Actions" value={report.totalEntries} color="navy" />
+                {report.byAction.slice(0, 4).map(a => (
+                  <DashKpi key={a.Action} icon="check-circle" label={a.Action} value={a.Count} color="teal" />
+                ))}
+              </div>
+
+              <h4 style={{color:'var(--navy-primary)',margin:'20px 0 10px'}}><i className="fas fa-history"></i> Activity Log</h4>
+              {report.entries.length === 0 ? (
+                <div className="settings-info-message"><i className="fas fa-inbox" style={{marginRight:'6px'}}></i> No activity recorded for this date.</div>
+              ) : (
+                <div style={{overflowX:'auto'}}>
+                  <table className="display" style={{width:'100%'}}>
+                    <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Details</th></tr></thead>
+                    <tbody>
+                      {report.entries.map((e, i) => (
+                        <tr key={i}>
+                          <td style={{fontSize:'12px',whiteSpace:'nowrap'}}>{new Date(e.Time).toLocaleTimeString()}</td>
+                          <td>{e.User}</td>
+                          <td>{e.Action}</td>
+                          <td style={{fontSize:'12px'}}>{e.Details}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      );
+    }
+
     // ============== Settings Page ==============
     function SettingsView({ currentUser, role, onSettingsUpdate, schoolSettings, refreshSchoolSettings }) {
       const [uploading, setUploading] = useState(false);
@@ -23539,6 +24241,9 @@
               <button className={'tt-tab' + (tab === 'theme' ? ' active' : '')} onClick={() => setTab('theme')}>
                 <i className="fas fa-palette"></i> Theme & Colors
               </button>
+              <button className={'tt-tab' + (tab === 'sms' ? ' active' : '')} onClick={() => setTab('sms')}>
+                <i className="fas fa-sms"></i> SMS & Owner Digest
+              </button>
               <button className={'tt-tab' + (tab === 'maintenance' ? ' active' : '')} onClick={() => setTab('maintenance')}>
                 <i className="fas fa-wrench"></i> Maintenance
               </button>
@@ -23552,6 +24257,10 @@
               role={role}
               onSaved={() => { if (refreshSchoolSettings) refreshSchoolSettings(); }}
             />
+          )}
+
+          {isAdmin && tab === 'sms' && (
+            <SmsSettingsForm currentUser={currentUser} role={role} />
           )}
 
           {isAdmin && tab === 'maintenance' && (
@@ -25871,7 +26580,9 @@
         { id:'student',    label:'Student',    badge:'role-student',    blurb:'Read-only view of own academic life. Can raise helpdesk tickets & complaints and edit own profile.',
           day:'Own timetable, attendance, results, hall tickets, fees, notices, calendar, activities.' },
         { id:'parent',     label:'Parent',     badge:'role-parent',     blurb:"Read-only view of the child's records. Can book PTM slots, raise helpdesk tickets & complaints.",
-          day:"Notices, PTM booking, child's attendance, results, hall tickets, fees, calendar." }
+          day:"Notices, PTM booking, child's attendance, results, hall tickets, fees, calendar." },
+        { id:'owner',      label:'School Owner', badge:'role-supervisor', blurb:'Read-only monitoring portal. Financial income/expense reports, class & student summaries, and a daily activity report.',
+          day:'Owner Portal only — financial summary, class/student overview, daily activity report. Receives an automatic SMS + email digest at close of day.' }
       ];
 
       // modules everyone effectively "uses" regardless of role
@@ -26021,6 +26732,8 @@
       const canSeeFeeStructure = r === 'admin' || r === 'clerk' || isStudent || isParent;
       const canSeeFeePayments = r === 'admin' || r === 'clerk' || isStudent || isParent;
       const canSeeAccounts = r === 'admin' || r === 'clerk';
+      const canSeeSms = r === 'admin' || r === 'clerk';
+      const canSeeOwnerPortal = r === 'admin' || r === 'owner';
       const canSeeDiscipline = r === 'admin' || r === 'teacher' || r === 'supervisor' || isStudent || isParent;
       const canSeeConduct = r === 'admin' || r === 'teacher' || r === 'supervisor' || isStudent || isParent;
       const canSeeActivities = r === 'admin' || r === 'teacher' || r === 'supervisor' || isStudent || isParent;
@@ -26090,6 +26803,10 @@
           return canSeeFeePayments ? <FeePaymentsView currentUser={user} role={role} /> : denied('Fees Collection');
         case 'accounts':
           return canSeeAccounts ? <AccountsView currentUser={user} role={role} /> : denied('Daily Accounts');
+        case 'sms':
+          return canSeeSms ? <SmsView currentUser={user} role={role} schoolSettings={schoolSettings} /> : denied('SMS Center');
+        case 'ownerPortal':
+          return canSeeOwnerPortal ? <OwnerPortalView currentUser={user} role={role} /> : denied('Owner Portal');
         case 'discipline':
           return canSeeDiscipline ? <DisciplineView currentUser={user} role={role} /> : denied('Discipline / Behavior');
         case 'conduct':
@@ -26135,10 +26852,11 @@
     function Dashboard({ user, fullName, email, role, profileImage, themeMode, onThemeToggle, onSettingsUpdate, onLogout, schoolSettings, refreshSchoolSettings }) {
       const r = String(role).toLowerCase();
       const isAdmin = r === 'admin';
-      // landing: admin → dashboard, clerk/teacher → students, student/parent → notices, others → classes
+      // landing: admin → dashboard, clerk/teacher → students, student/parent → notices, owner → owner portal, others → classes
       const initialMenu = isAdmin ? 'dashboard'
         : (r === 'clerk' || r === 'teacher') ? 'students'
         : (r === 'student' || r === 'parent') ? 'notices'
+        : r === 'owner' ? 'ownerPortal'
         : 'classes';
       const [activeMenu, setActiveMenu] = useState(initialMenu);
       const [collapsed, setCollapsed] = useState(false);
