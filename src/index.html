@@ -3097,6 +3097,9 @@
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
 
+    // neutral graduation-cap placeholder (mirrors Code.gs DEFAULT_LOGO) — used when a school/user hasn't set a photo yet
+    const DEFAULT_LOGO = 'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2214%22%20fill%3D%22%23001f3f%22%2F%3E%3Cpath%20d%3D%22M50%2022%20L88%2038%20L50%2054%20L12%2038%20Z%22%20fill%3D%22%23ffd166%22%2F%3E%3Cpath%20d%3D%22M28%2046%20v18%20c0%206%2010%2012%2022%2012%20s22%20-6%2022%20-12%20v-18%20L50%2054%20Z%22%20fill%3D%22%23ffffff%22%2F%3E%3Ccircle%20cx%3D%2288%22%20cy%3D%2238%22%20r%3D%223%22%20fill%3D%22%23ffd166%22%2F%3E%3Cline%20x1%3D%2288%22%20y1%3D%2238%22%20x2%3D%2288%22%20y2%3D%2258%22%20stroke%3D%22%23ffd166%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E';
+
     // reusable DataTables pdf button — landscape A4, navy header, auto-fit cols
     function dtPdfButton(title) {
       return {
@@ -3253,6 +3256,73 @@
     }
 
     // ============== SearchableDropdown (single) — per docs/searchable-dropdown.md ==============
+    // Reusable photo picker — click/tap to choose an image, uploads to Drive via
+    // uploadProfileImage(), stores the returned URL via onChange. Works for student/admission
+    // photos and the school logo alike.
+    function PhotoPicker({ value, onChange, currentUser, label, shape = 'circle', size = 96 }) {
+      const [uploading, setUploading] = useState(false);
+      const inputRef = useRef(null);
+
+      const handleFile = (e) => {
+        const file = e.target.files[0];
+        e.target.value = ''; // allow re-picking the same file later
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+          Swal.fire({ icon: 'error', title: 'Error', text: 'Please choose an image file' });
+          return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          Swal.fire({ icon: 'error', title: 'Too large', text: 'Choose an image under 5MB.' });
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          setUploading(true);
+          google.script.run
+            .withSuccessHandler((res) => {
+              setUploading(false);
+              if (res.success) onChange(res.fileUrl);
+              else Swal.fire({ icon: 'error', title: 'Upload failed', text: res.message });
+            })
+            .withFailureHandler((err) => { setUploading(false); Swal.fire({ icon: 'error', title: 'Upload failed', text: err.message }); })
+            .uploadProfileImage(ev.target.result, file.name, currentUser || 'system');
+        };
+        reader.readAsDataURL(file);
+      };
+
+      const radius = shape === 'circle' ? '50%' : '8px';
+      return (
+        <div className="form-group">
+          {label && <label>{label}</label>}
+          <div style={{display:'flex',alignItems:'center',gap:'14px'}}>
+            <div
+              onClick={() => !uploading && inputRef.current?.click()}
+              style={{
+                width: size, height: size, borderRadius: radius, cursor: uploading ? 'wait' : 'pointer',
+                border: '2px dashed #ccc', background: '#f8f9fa', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', overflow: 'hidden', flexShrink: 0
+              }}
+              title="Click to choose a photo">
+              {uploading ? <i className="fas fa-spinner fa-spin" style={{color:'#888'}}></i>
+                : value ? <img src={value} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={(e) => e.currentTarget.style.display='none'} />
+                : <i className="fas fa-camera" style={{color:'#aaa',fontSize:'22px'}}></i>}
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:'6px'}}>
+              <button type="button" className="btn btn-secondary" disabled={uploading} onClick={() => inputRef.current?.click()}>
+                <i className="fas fa-upload"></i> {value ? 'Change Photo' : 'Choose Photo'}
+              </button>
+              {value && (
+                <button type="button" className="btn btn-secondary" disabled={uploading} onClick={() => onChange('')}>
+                  <i className="fas fa-times"></i> Remove
+                </button>
+              )}
+            </div>
+            <input ref={inputRef} type="file" accept="image/*" onChange={handleFile} style={{display:'none'}} />
+          </div>
+        </div>
+      );
+    }
+
     function SearchableDropdown({ options, value, onChange, placeholder = 'Select...', label, icon, required = false }) {
       const [isOpen, setIsOpen] = useState(false);
       const [search, setSearch] = useState('');
@@ -3480,7 +3550,7 @@
       const [remember, setRemember] = useState(true);
       const sch = schoolSettings || {};
       const schoolName = sch.SchoolName || 'School Management System';
-      const schoolLogo = sch.SchoolLogo || 'https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiGXxCe0WNNedmFqSWeF761f7Kshhc-NP5ChRQKz9fr97cO8VaarvD0KlCwqHojJVBWv-RAxfOqMI5rD4H78KnARyOc6QgwL1nRRFWf5xNQ1d9F9HfAoLPPGlTyP0GwNl4n-INMEsWLQ4Y7zJtz5bOdAnc2ePH9-uCRgshlo6BsS6gJEz6fhrxL-5U5O3sX/s160/channels4_profile.jpg';
+      const schoolLogo = sch.SchoolLogo || DEFAULT_LOGO;
 
       const handleSubmit = (e) => {
         e.preventDefault();
@@ -5904,6 +5974,11 @@
     ];
     const BLOOD_OPTS = ['A+','A-','B+','B-','AB+','AB-','O+','O-'].map(b => ({ value: b, label: b }));
     const CATEGORY_OPTS = [{ value: 'day', label: 'Day Student' }, { value: 'boarding', label: 'Boarding' }];
+    const RELIGION_OPTS = [
+      { value: 'Christianity', label: 'Christianity' },
+      { value: 'Islam', label: 'Islam' },
+      { value: 'Traditional', label: 'Traditional (African Traditional Religion)' }
+    ];
     const GHANA_REGION_OPTS = ['Ahafo','Ashanti','Bono','Bono East','Central','Eastern','Greater Accra','North East','Northern','Oti','Savannah','Upper East','Upper West','Volta','Western','Western North'].map(r => ({ value: r, label: r }));
     const admTypeLabel = (v) => ({ new: 'New', transfer: 'Transfer', re_admission: 'Re-admission' }[v] || (v || '—'));
     const admTypeBadgeColor = (v) => ({ new: '#0074D9', transfer: '#fb8c00', re_admission: '#6a1b9a' }[v] || '#6c757d');
@@ -6335,14 +6410,15 @@
         AcademicYear: editing?.AcademicYear || defaultYear,
         RegistrationFee: editing?.RegistrationFee != null && editing?.RegistrationFee !== '' ? String(editing.RegistrationFee) : '',
         RegistrationFeeMode: editing?.RegistrationFeeMode || 'cash',
-        Remarks: editing?.Remarks || ''
+        Remarks: editing?.Remarks || '',
+        PhotoURL: editing?.PhotoURL || ''
       });
       const [saving, setSaving] = useState(false);
       const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
 
       const handleSubmit = (e) => {
         e.preventDefault();
-        const req = [['FirstName','First Name'],['LastName','Last Name'],['Gender','Gender'],['DateOfBirth','Date of Birth'],['AddressLine','Address Line'],['City','City'],['Region','Region'],['GhanaPostGPS','Digital Address'],['FatherName','Father Name'],['FatherMobile','Father Mobile'],['MotherName','Mother Name'],['AcademicYear','Academic Year'],['AdmissionType','Admission Type']];
+        const req = [['FirstName','First Name'],['LastName','Last Name']];
         for (const [k, lbl] of req) {
           if (!String(f[k] || '').trim()) { Swal.fire({ icon: 'error', title: 'Missing field', text: lbl + ' is required.' }); return; }
         }
@@ -6364,7 +6440,7 @@
           TransferCertificateNumber: f.TransferCertificateNumber.trim(), LastClassAttended: f.LastClassAttended.trim(),
           AcademicYear: f.AcademicYear.trim(),
           RegistrationFee: isNaN(fee) ? 0 : fee, RegistrationFeeMode: (!isNaN(fee) && fee > 0) ? f.RegistrationFeeMode : '',
-          Remarks: f.Remarks.trim()
+          Remarks: f.Remarks.trim(), PhotoURL: f.PhotoURL || ''
         };
         setSaving(true);
         const handler = (res) => {
@@ -6398,6 +6474,7 @@
             <div className="modal-body">
               <form onSubmit={handleSubmit}>
                 <SectionHdr icon="user" label="Applicant" />
+                <PhotoPicker label="Applicant Photo" value={f.PhotoURL} onChange={(url) => set('PhotoURL', url)} currentUser={currentUser} />
                 <div className="form-grid">
                   <div className="form-group">
                     <label><i className="fas fa-user"></i> First Name *</label>
@@ -6413,10 +6490,10 @@
                   </div>
                   <SearchableDropdown label="Gender" icon="fas fa-venus-mars"
                     options={[{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }, { value: 'other', label: 'Other' }]}
-                    value={f.Gender} onChange={(v) => set('Gender', v)} placeholder="Select gender..." required={true} />
+                    value={f.Gender} onChange={(v) => set('Gender', v)} placeholder="Select gender..." />
                   <div className="form-group">
-                    <label><i className="fas fa-birthday-cake"></i> Date of Birth *</label>
-                    <input type="date" value={f.DateOfBirth} onChange={(e) => set('DateOfBirth', e.target.value)} required />
+                    <label><i className="fas fa-birthday-cake"></i> Date of Birth</label>
+                    <input type="date" value={f.DateOfBirth} onChange={(e) => set('DateOfBirth', e.target.value)} />
                   </div>
                 </div>
 
@@ -6429,10 +6506,10 @@
                     <input type="number" min="0" max="13" value={f.AppliedForGrade} onChange={(e) => set('AppliedForGrade', e.target.value)} placeholder="e.g. 6" />
                   </div>
                   <SearchableDropdown label="Admission Type" icon="fas fa-tag"
-                    options={ADM_TYPE_OPTS} value={f.AdmissionType} onChange={(v) => set('AdmissionType', v)} placeholder="Select type..." required={true} />
+                    options={ADM_TYPE_OPTS} value={f.AdmissionType} onChange={(v) => set('AdmissionType', v)} placeholder="Select type..." />
                   <div className="form-group">
-                    <label><i className="fas fa-calendar"></i> Academic Year *</label>
-                    <input type="text" value={f.AcademicYear} onChange={(e) => set('AcademicYear', e.target.value)} required placeholder="2025-2026" maxLength="20" />
+                    <label><i className="fas fa-calendar"></i> Academic Year</label>
+                    <input type="text" value={f.AcademicYear} onChange={(e) => set('AcademicYear', e.target.value)} placeholder="2025-2026" maxLength="20" />
                   </div>
                   {isTransfer && (
                     <>
@@ -6455,16 +6532,16 @@
                 <SectionHdr icon="users" label="Parents / Guardian" />
                 <div className="form-grid">
                   <div className="form-group">
-                    <label><i className="fas fa-male"></i> Father Name *</label>
-                    <input type="text" value={f.FatherName} onChange={(e) => set('FatherName', e.target.value)} required maxLength="100" />
+                    <label><i className="fas fa-male"></i> Father Name</label>
+                    <input type="text" value={f.FatherName} onChange={(e) => set('FatherName', e.target.value)} maxLength="100" />
                   </div>
                   <div className="form-group">
-                    <label><i className="fas fa-phone"></i> Father Mobile *</label>
-                    <input type="tel" value={f.FatherMobile} onChange={(e) => set('FatherMobile', e.target.value)} required maxLength="15" />
+                    <label><i className="fas fa-phone"></i> Father Mobile</label>
+                    <input type="tel" value={f.FatherMobile} onChange={(e) => set('FatherMobile', e.target.value)} maxLength="15" />
                   </div>
                   <div className="form-group">
-                    <label><i className="fas fa-female"></i> Mother Name *</label>
-                    <input type="text" value={f.MotherName} onChange={(e) => set('MotherName', e.target.value)} required maxLength="100" />
+                    <label><i className="fas fa-female"></i> Mother Name</label>
+                    <input type="text" value={f.MotherName} onChange={(e) => set('MotherName', e.target.value)} maxLength="100" />
                   </div>
                   <div className="form-group">
                     <label><i className="fas fa-phone"></i> Mother Mobile</label>
@@ -6495,18 +6572,18 @@
                     <input type="email" value={f.Email} onChange={(e) => set('Email', e.target.value)} maxLength="100" />
                   </div>
                   <div className="form-group" style={{ gridColumn: '1 / -1' }}>
-                    <label><i className="fas fa-map-marker-alt"></i> Address Line *</label>
-                    <input type="text" value={f.AddressLine} onChange={(e) => set('AddressLine', e.target.value)} required maxLength="255" />
+                    <label><i className="fas fa-map-marker-alt"></i> Address Line</label>
+                    <input type="text" value={f.AddressLine} onChange={(e) => set('AddressLine', e.target.value)} maxLength="255" />
                   </div>
                   <div className="form-group">
-                    <label><i className="fas fa-city"></i> City *</label>
-                    <input type="text" value={f.City} onChange={(e) => set('City', e.target.value)} required maxLength="50" />
+                    <label><i className="fas fa-city"></i> City</label>
+                    <input type="text" value={f.City} onChange={(e) => set('City', e.target.value)} maxLength="50" />
                   </div>
                   <SearchableDropdown label="Region *" icon="fas fa-flag"
-                    options={GHANA_REGION_OPTS} value={f.Region} onChange={(v) => set('Region', v)} placeholder="Select region..." required={true} />
+                    options={GHANA_REGION_OPTS} value={f.Region} onChange={(v) => set('Region', v)} placeholder="Select region..." />
                   <div className="form-group">
-                    <label><i className="fas fa-map-pin"></i> Digital Address (GhanaPost GPS) *</label>
-                    <input type="text" value={f.GhanaPostGPS} onChange={(e) => set('GhanaPostGPS', e.target.value)} required maxLength="12" placeholder="GA-183-8541" />
+                    <label><i className="fas fa-map-pin"></i> Digital Address (GhanaPost GPS)</label>
+                    <input type="text" value={f.GhanaPostGPS} onChange={(e) => set('GhanaPostGPS', e.target.value)} maxLength="12" placeholder="GA-183-8541" />
                   </div>
                 </div>
 
@@ -6620,12 +6697,10 @@
                 <div className="form-grid">
                   <SearchableDropdown label="Blood Group" icon="fas fa-tint"
                     options={BLOOD_OPTS} value={f.BloodGroup} onChange={(v) => set('BloodGroup', v)} placeholder="Select blood group..." />
-                  <div className="form-group">
-                    <label><i className="fas fa-pray"></i> Religion</label>
-                    <input type="text" value={f.Religion} onChange={(e) => set('Religion', e.target.value)} maxLength="50" />
-                  </div>
+                  <SearchableDropdown label="Religion" icon="fas fa-pray"
+                    options={RELIGION_OPTS} value={f.Religion} onChange={(v) => set('Religion', v)} placeholder="Select religion..." />
                   <SearchableDropdown label="Category" icon="fas fa-layer-group"
-                    options={CATEGORY_OPTS} value={f.Category} onChange={(v) => set('Category', v)} placeholder="Select / type category..." required={true} />
+                    options={CATEGORY_OPTS} value={f.Category} onChange={(v) => set('Category', v)} placeholder="Select / type category..." />
                   <div className="form-group" style={{ gridColumn: '1 / -1' }}>
                     <label><i className="fas fa-notes-medical"></i> Medical Notes</label>
                     <textarea value={f.MedicalNotes} onChange={(e) => set('MedicalNotes', e.target.value)} rows="2" maxLength="500" />
@@ -9592,7 +9667,11 @@
           .withSuccessHandler((res) => {
             if (res.success) {
               setShowFormModal(false); setEditing(null);
-              Swal.fire({ icon: 'success', title: 'Success!', text: res.message, timer: 2000, showConfirmButton: false });
+              const generated = res.message && res.message.indexOf('generated password') !== -1;
+              Swal.fire({
+                icon: 'success', title: 'Success!', text: res.message,
+                timer: generated ? undefined : 2000, showConfirmButton: !!generated
+              });
               refreshStudents(); // silent background revalidate
             } else Swal.fire({ icon: 'error', title: 'Error', text: res.message });
           })
@@ -9908,18 +9987,16 @@
         google.script.run
           .withSuccessHandler((res) => { if (res.success) setClasses(res.data || []); })
           .getAllClasses(currentUser, role);
+        // preview the auto-generated Admission Number for brand-new students
+        if (!student) {
+          google.script.run
+            .withSuccessHandler((res) => { if (res.success) set('AdmissionNumber', res.admissionNumber); })
+            .getNextAdmissionNumber(currentUser, role);
+        }
       }, []);
 
       const handleSubmit = (e) => {
         e.preventDefault();
-        if (!formData.ClassID) {
-          Swal.fire({ icon: 'error', title: 'Class required', text: 'Pick a class.' });
-          return;
-        }
-        if (!student && (!formData.LoginPassword || formData.LoginPassword.trim() === '')) {
-          Swal.fire({ icon: 'error', title: 'Password required', text: 'New students must have a login password.' });
-          return;
-        }
         // intl date validations
         const dateRe = /^\d{4}-\d{2}-\d{2}$/;
         if (formData.PassportExpiry && !dateRe.test(formData.PassportExpiry)) {
@@ -9967,10 +10044,11 @@
                 <SectionHdr icon="id-card" label="Identity & Academic" />
                 <div className="form-grid">
                   <div className="form-group">
-                    <label><i className="fas fa-hashtag"></i> Admission Number *</label>
+                    <label><i className="fas fa-hashtag"></i> Admission Number</label>
                     <input type="text" value={formData.AdmissionNumber}
                       onChange={(e) => set('AdmissionNumber', e.target.value)}
-                      required maxLength="50" placeholder="2024-00000001" />
+                      maxLength="50" placeholder="Auto-generated" />
+                    <small style={{color:'#777'}}>Auto-generated from the Settings prefix — edit to override.</small>
                   </div>
                   <SearchableDropdown
                     label="Class" icon="fas fa-school"
@@ -9981,18 +10059,18 @@
                     value={formData.ClassID}
                     onChange={(v) => set('ClassID', v)}
                     placeholder="Select class..."
-                    required={true}
+                    required={false}
                   />
                   <div className="form-group">
-                    <label><i className="fas fa-list-ol"></i> Roll Number *</label>
+                    <label><i className="fas fa-list-ol"></i> Roll Number</label>
                     <input type="text" value={formData.RollNumber}
                       onChange={(e) => set('RollNumber', e.target.value)}
-                      required maxLength="20" />
+                      maxLength="20" />
                   </div>
                   <div className="form-group">
-                    <label><i className="fas fa-calendar-plus"></i> Admission Date *</label>
+                    <label><i className="fas fa-calendar-plus"></i> Admission Date</label>
                     <input type="date" value={formData.AdmissionDate}
-                      onChange={(e) => set('AdmissionDate', e.target.value)} required />
+                      onChange={(e) => set('AdmissionDate', e.target.value)} />
                   </div>
                   <SearchableDropdown
                     label="Status" icon="fas fa-toggle-on"
@@ -10007,12 +10085,7 @@
                     onChange={(v) => set('Status', v)}
                     placeholder="Select status..."
                   />
-                  <div className="form-group">
-                    <label><i className="fas fa-image"></i> Photo URL</label>
-                    <input type="text" value={formData.PhotoURL}
-                      onChange={(e) => set('PhotoURL', e.target.value)}
-                      maxLength="255" placeholder="https://..." />
-                  </div>
+                  <PhotoPicker label="Profile Photo" value={formData.PhotoURL} onChange={(url) => set('PhotoURL', url)} currentUser={currentUser} />
                 </div>
 
                 <SectionHdr icon="user" label="Personal" />
@@ -10020,7 +10093,7 @@
                   <div className="form-group">
                     <label><i className="fas fa-user"></i> First Name *</label>
                     <input type="text" value={formData.FirstName}
-                      onChange={(e) => set('FirstName', e.target.value)} required maxLength="50" />
+                      onChange={(e) => set('FirstName', e.target.value)} maxLength="50" />
                   </div>
                   <div className="form-group">
                     <label><i className="fas fa-user"></i> Middle Name</label>
@@ -10030,7 +10103,7 @@
                   <div className="form-group">
                     <label><i className="fas fa-user"></i> Last Name *</label>
                     <input type="text" value={formData.LastName}
-                      onChange={(e) => set('LastName', e.target.value)} required maxLength="50" />
+                      onChange={(e) => set('LastName', e.target.value)} maxLength="50" />
                   </div>
                   <SearchableDropdown
                     label="Gender" icon="fas fa-venus-mars"
@@ -10042,12 +10115,12 @@
                     value={formData.Gender}
                     onChange={(v) => set('Gender', v)}
                     placeholder="Select gender..."
-                    required={true}
+                    required={false}
                   />
                   <div className="form-group">
-                    <label><i className="fas fa-birthday-cake"></i> Date of Birth *</label>
+                    <label><i className="fas fa-birthday-cake"></i> Date of Birth</label>
                     <input type="date" value={formData.DateOfBirth}
-                      onChange={(e) => set('DateOfBirth', e.target.value)} required />
+                      onChange={(e) => set('DateOfBirth', e.target.value)} />
                   </div>
                   <SearchableDropdown
                     label="Blood Group" icon="fas fa-tint"
@@ -10077,30 +10150,30 @@
                       onChange={(e) => set('Email', e.target.value)} maxLength="100" />
                   </div>
                   <div className="form-group" style={{gridColumn:'1 / -1'}}>
-                    <label><i className="fas fa-map-marker-alt"></i> Address Line *</label>
+                    <label><i className="fas fa-map-marker-alt"></i> Address Line</label>
                     <input type="text" value={formData.AddressLine}
-                      onChange={(e) => set('AddressLine', e.target.value)} required maxLength="255" />
+                      onChange={(e) => set('AddressLine', e.target.value)} maxLength="255" />
                   </div>
                   <div className="form-group">
-                    <label><i className="fas fa-city"></i> City *</label>
+                    <label><i className="fas fa-city"></i> City</label>
                     <input type="text" value={formData.City}
-                      onChange={(e) => set('City', e.target.value)} required maxLength="50" />
+                      onChange={(e) => set('City', e.target.value)} maxLength="50" />
                   </div>
                   <SearchableDropdown label="Region *" icon="fas fa-flag"
-                    options={GHANA_REGION_OPTS} value={formData.Region} onChange={(v) => set('Region', v)} placeholder="Select region..." required={true} />
+                    options={GHANA_REGION_OPTS} value={formData.Region} onChange={(v) => set('Region', v)} placeholder="Select region..." />
                   <div className="form-group">
-                    <label><i className="fas fa-map-pin"></i> Digital Address (GhanaPost GPS) *</label>
+                    <label><i className="fas fa-map-pin"></i> Digital Address (GhanaPost GPS)</label>
                     <input type="text" value={formData.GhanaPostGPS}
-                      onChange={(e) => set('GhanaPostGPS', e.target.value)} required maxLength="12" placeholder="GA-183-8541" />
+                      onChange={(e) => set('GhanaPostGPS', e.target.value)} maxLength="12" placeholder="GA-183-8541" />
                   </div>
                 </div>
 
                 <SectionHdr icon="users" label="Family" />
                 <div className="form-grid">
                   <div className="form-group">
-                    <label><i className="fas fa-male"></i> Father Name *</label>
+                    <label><i className="fas fa-male"></i> Father Name</label>
                     <input type="text" value={formData.FatherName}
-                      onChange={(e) => set('FatherName', e.target.value)} required maxLength="100" />
+                      onChange={(e) => set('FatherName', e.target.value)} maxLength="100" />
                   </div>
                   <div className="form-group">
                     <label><i className="fas fa-briefcase"></i> Father Occupation</label>
@@ -10108,14 +10181,14 @@
                       onChange={(e) => set('FatherOccupation', e.target.value)} maxLength="100" />
                   </div>
                   <div className="form-group">
-                    <label><i className="fas fa-phone"></i> Father Mobile *</label>
+                    <label><i className="fas fa-phone"></i> Father Mobile</label>
                     <input type="tel" value={formData.FatherMobile}
-                      onChange={(e) => set('FatherMobile', e.target.value)} required maxLength="15" />
+                      onChange={(e) => set('FatherMobile', e.target.value)} maxLength="15" />
                   </div>
                   <div className="form-group">
-                    <label><i className="fas fa-female"></i> Mother Name *</label>
+                    <label><i className="fas fa-female"></i> Mother Name</label>
                     <input type="text" value={formData.MotherName}
-                      onChange={(e) => set('MotherName', e.target.value)} required maxLength="100" />
+                      onChange={(e) => set('MotherName', e.target.value)} maxLength="100" />
                   </div>
                   <div className="form-group">
                     <label><i className="fas fa-briefcase"></i> Mother Occupation</label>
@@ -10152,13 +10225,10 @@
                     value={formData.Category}
                     onChange={(v) => set('Category', v)}
                     placeholder="Select category..."
-                    required={true}
                   />
-                  <div className="form-group">
-                    <label><i className="fas fa-place-of-worship"></i> Religion</label>
-                    <input type="text" value={formData.Religion}
-                      onChange={(e) => set('Religion', e.target.value)} maxLength="50" />
-                  </div>
+                  <SearchableDropdown label="Religion" icon="fas fa-place-of-worship"
+                    options={RELIGION_OPTS} value={formData.Religion}
+                    onChange={(v) => set('Religion', v)} placeholder="Select religion..." />
                   <div className="form-group" style={{gridColumn:'1 / -1'}}>
                     <label><i className="fas fa-school"></i> Previous School</label>
                     <input type="text" value={formData.PreviousSchool}
@@ -10482,11 +10552,11 @@
                 <SectionHdr icon="key" label="Login Credentials" />
                 <div className="form-grid">
                   <div className="form-group" style={{gridColumn:'1 / -1'}}>
-                    <label><i className="fas fa-key"></i> Login Password {student ? '(blank = keep current)' : '*'}</label>
+                    <label><i className="fas fa-key"></i> Login Password</label>
                     <input type="password" value={formData.LoginPassword}
                       onChange={(e) => set('LoginPassword', e.target.value)}
-                      required={!student} autoComplete="new-password"
-                      placeholder={student ? 'Leave blank to keep current password' : ''} />
+                      autoComplete="new-password"
+                      placeholder={student ? 'Leave blank to keep current password' : 'Leave blank to auto-generate'} />
                   </div>
                 </div>
 
@@ -11446,7 +11516,7 @@
       const schoolName = (school && school.SchoolName) || 'School Name';
       const schoolAddr = (school && school.SchoolAddress) || '';
       const schoolPhone = (school && school.SchoolContact) || '';
-      const schoolLogo = (school && school.SchoolLogo) || (typeof DEFAULT_LOGO !== 'undefined' ? DEFAULT_LOGO : '');
+      const schoolLogo = (school && school.SchoolLogo) || DEFAULT_LOGO;
       const currency = (school && school.Currency) || 'GH₵';
 
       return (
@@ -14404,15 +14474,12 @@
             studentId: s.ID,
             marksObtained: m.IsAbsent ? 0 : marksObtained,
             isAbsent: m.IsAbsent ? '1' : '0',
-            remarks: m.Remarks || '',
-            // new fields
+            // Remarks is auto-generated server-side from the grade — no manual entry
             theoryMarks: m.IsAbsent ? 0 : theoryMarks,
             practicalMarks: m.IsAbsent ? 0 : practicalMarks,
             internalMarks: m.IsAbsent ? 0 : internalMarks,
             externalMarks: m.IsAbsent ? 0 : externalMarks,
-            attemptNumber: parseInt(m.AttemptNumber, 10) || 1,
-            status: statusToSend,
-            comments: (m.Comments || '').slice(0, 500)
+            status: statusToSend
           };
         });
 
@@ -14597,11 +14664,9 @@
                                 <th style={{width:'80px',textAlign:'center'}}>Exam</th>
                               </>
                             )}
-                            <th style={{width:'70px',textAlign:'center'}}>Att#</th>
                             <th style={{width:'70px',textAlign:'center'}}>Absent</th>
                             <th style={{width:'90px',textAlign:'center'}}>Grade / %</th>
-                            <th style={{minWidth:'140px'}}>Remarks</th>
-                            <th style={{minWidth:'140px'}}>Comments</th>
+                            <th style={{minWidth:'160px'}}>Remarks</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -14691,18 +14756,6 @@
                                 )}
 
                                 <td style={{textAlign:'center'}}>
-                                  <select
-                                    value={m.AttemptNumber || 1}
-                                    onChange={(e) => updateRow(s.ID, 'AttemptNumber', e.target.value)}
-                                    disabled={inputsDisabled}
-                                    style={{padding:'4px 6px',border:'1px solid #ccc',width:'55px',fontSize:'12px'}}>
-                                    <option value="1">1</option>
-                                    <option value="2">2</option>
-                                    <option value="3">3</option>
-                                  </select>
-                                </td>
-
-                                <td style={{textAlign:'center'}}>
                                   <input type="checkbox"
                                     checked={!!m.IsAbsent}
                                     disabled={inputsDisabled}
@@ -14723,25 +14776,8 @@
                                   )}
                                 </td>
 
-                                <td>
-                                  <input type="text" className="marks-input"
-                                    style={{width:'100%'}}
-                                    value={m.Remarks || ''}
-                                    onChange={(e) => updateRow(s.ID, 'Remarks', e.target.value)}
-                                    disabled={inputsDisabled}
-                                    maxLength="200"
-                                    placeholder="(optional)" />
-                                </td>
-
-                                <td>
-                                  <textarea className="marks-input"
-                                    style={{width:'100%',minHeight:'30px',fontSize:'12px'}}
-                                    value={m.Comments || ''}
-                                    onChange={(e) => updateRow(s.ID, 'Comments', e.target.value)}
-                                    disabled={inputsDisabled}
-                                    maxLength="500"
-                                    rows="1"
-                                    placeholder="(optional, max 500)" />
+                                <td style={{fontSize:'12px',color:'#555'}}>
+                                  {m.IsAbsent ? 'Absent' : (hasAnyValue ? gradeDescriptor(grade, gradeBand) : '—')}
                                 </td>
                               </tr>
                             );
@@ -23020,10 +23056,7 @@
               <label><i className="fas fa-tag"></i> Short Name (sidebar abbreviation)</label>
               <input type="text" value={data.SchoolShortName} onChange={(e) => set('SchoolShortName', e.target.value)} maxLength="20" placeholder="e.g. DPS, ACE" />
             </div>
-            <div className="form-group">
-              <label><i className="fas fa-image"></i> Logo URL</label>
-              <input type="text" value={data.SchoolLogo} onChange={(e) => set('SchoolLogo', e.target.value)} placeholder="https://..." />
-            </div>
+            <PhotoPicker label="School Logo" value={data.SchoolLogo} onChange={(url) => set('SchoolLogo', url)} currentUser={currentUser} shape="square" />
           </div>
 
           <h3 style={{marginTop: '22px', marginBottom: '14px', color: 'var(--navy-primary)', fontSize: '15px', textTransform:'uppercase', letterSpacing:'0.5px'}}>

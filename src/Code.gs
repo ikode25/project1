@@ -106,7 +106,7 @@ var STUDENT_HEADERS = ['ID','AdmissionNumber','FirstName','MiddleName','LastName
 // 8=PartyName (opt), 9=RecordedBy (FK→Users), 10=IsDeleted (0/1), 11=CreatedAt, 12=UpdatedAt
 var ACCOUNT_TXN_HEADERS = ['ID','TxnDate','TxnType','Category','Description','Amount','PaymentMode','ReferenceNo','PartyName','RecordedBy','IsDeleted','CreatedAt','UpdatedAt'];
 
-// admissions cols (55) — admission pipeline: register → confirm → enroll (+ rejected/cancelled side states)
+// admissions cols (56) — admission pipeline: register → confirm → enroll (+ rejected/cancelled side states)
 // 0=ID, 1=RegistrationNumber (REG-YYYY-NNNN, UNIQUE), 2=FirstName, 3=MiddleName, 4=LastName, 5=Gender, 6=DateOfBirth,
 // 7=AppliedForClassID (FK opt), 8=AppliedForGrade (int opt), 9=AdmissionType (new|transfer|re_admission),
 // 10=PreviousSchool, 11=TransferCertificateNumber, 12=LastClassAttended,
@@ -119,8 +119,9 @@ var ACCOUNT_TXN_HEADERS = ['ID','TxnDate','TxnType','Category','Description','Am
 // 36=AdmissionFee, 37=AdmissionFeeMode, 38=AdmissionFeeReceiptNo (ADMF-...), 39=AdmissionConfirmedDate,
 // 40=AllottedClassID (FK), 41=RollNumber, 42=AdmissionNumber, 43=AdmissionDate, 44=EntryPoint (session_start|mid_session), 45=TransportRequired (0/1), 46=TransportRoute,
 // 47=LinkedStudentID (FK→Students once enrolled), 48=FeePaymentID (FK→Fee_Payments — admission fee receipt),
-// 49=RejectionReason, 50=Remarks, 51=ProcessedBy (FK→Users), 52=IsDeleted, 53=CreatedAt, 54=UpdatedAt
-var ADMISSION_HEADERS = ['ID','RegistrationNumber','FirstName','MiddleName','LastName','Gender','DateOfBirth','AppliedForClassID','AppliedForGrade','AdmissionType','PreviousSchool','TransferCertificateNumber','LastClassAttended','AddressLine','City','Region','GhanaPostGPS','FatherName','FatherMobile','MotherName','MotherMobile','GuardianName','GuardianRelation','GuardianMobile','Email','Mobile','AcademicYear','RegistrationDate','RegistrationFee','RegistrationFeeMode','RegistrationFeeReceiptNo','Status','BloodGroup','Religion','Category','MedicalNotes','AdmissionFee','AdmissionFeeMode','AdmissionFeeReceiptNo','AdmissionConfirmedDate','AllottedClassID','RollNumber','AdmissionNumber','AdmissionDate','EntryPoint','TransportRequired','TransportRoute','LinkedStudentID','FeePaymentID','RejectionReason','Remarks','ProcessedBy','IsDeleted','CreatedAt','UpdatedAt'];
+// 49=RejectionReason, 50=Remarks, 51=ProcessedBy (FK→Users), 52=IsDeleted, 53=CreatedAt, 54=UpdatedAt,
+// 55=PhotoURL (set via photo picker, stored in Drive)
+var ADMISSION_HEADERS = ['ID','RegistrationNumber','FirstName','MiddleName','LastName','Gender','DateOfBirth','AppliedForClassID','AppliedForGrade','AdmissionType','PreviousSchool','TransferCertificateNumber','LastClassAttended','AddressLine','City','Region','GhanaPostGPS','FatherName','FatherMobile','MotherName','MotherMobile','GuardianName','GuardianRelation','GuardianMobile','Email','Mobile','AcademicYear','RegistrationDate','RegistrationFee','RegistrationFeeMode','RegistrationFeeReceiptNo','Status','BloodGroup','Religion','Category','MedicalNotes','AdmissionFee','AdmissionFeeMode','AdmissionFeeReceiptNo','AdmissionConfirmedDate','AllottedClassID','RollNumber','AdmissionNumber','AdmissionDate','EntryPoint','TransportRequired','TransportRoute','LinkedStudentID','FeePaymentID','RejectionReason','Remarks','ProcessedBy','IsDeleted','CreatedAt','UpdatedAt','PhotoURL'];
 
 // parents cols (32):
 // 0=ID, 1=FullName, 2=Email (UNIQUE when populated), 3=Mobile (UNIQUE always),
@@ -282,14 +283,23 @@ var DOCUMENT_HEADERS = ['ID','DocumentName','DocumentType','EntityType','EntityI
 // UNIQUE(PeriodNumber, AcademicYear, DayType)
 var PERIOD_HEADERS = ['ID','PeriodNumber','StartTime','EndTime','IsBreak','Label','AcademicYear','DisplayOrder','IsDeleted','CreatedAt','UpdatedAt','DayType'];
 
-// school_settings cols (20) — single-row config table; ID always 1.
-// 0=ID, 1=SchoolName, 2=SchoolShortName, 3=SchoolLogo (URL), 4=SchoolEmail, 5=SchoolContact (phone),
+// school_settings cols (32) — single-row config table; ID always 1.
+// 0=ID, 1=SchoolName, 2=SchoolShortName, 3=SchoolLogo (URL — set via photo picker, stored in Drive), 4=SchoolEmail, 5=SchoolContact (phone),
 // 6=SchoolAddress, 7=SchoolWebsite, 8=AdminName, 9=AdminEmail, 10=AcademicYear,
 // 11=Currency, 12=TimeZone, 13=AboutText, 14=CreatedAt, 15=UpdatedAt,
 // 16=WorkingDays (CSV: monday,tuesday,wednesday,thursday,friday — drives attendance % and timetable),
 // 17=AcademicYearStartDate (ISO), 18=AcademicYearEndDate (ISO),
-// 19=HiddenMenuIds (CSV of sidebar menu ids the admin has hidden — keeps the menu short per school)
-var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds'];
+// 19=HiddenMenuIds (CSV of sidebar menu ids the admin has hidden — keeps the menu short per school),
+// 20=AdmissionNumberPrefix (e.g. 'RAD' — system auto-generates AdmissionNumber as PREFIX+YEAR+SEQ),
+// SMS gateway config (21-26):
+// 21=SmsProvider (arkesel|hubtel|custom|''), 22=SmsApiKey, 23=SmsApiSecret,
+// 24=SmsSenderId (max 11 chars per GH carrier rules), 25=SmsCustomEndpoint (custom provider POST URL),
+// 26=SmsCustomConfig (JSON: {phoneField,messageField,senderField,authHeader,authValue,extraBody} for a custom provider),
+// School owner daily digest (27-29):
+// 27=OwnerEmail, 28=OwnerPhone, 29=DailyDigestTime (HH:MM, 24h, school-close time the digest fires at),
+// SMS balance cache (30-31, refreshed on demand — avoids hammering the provider's balance API):
+// 30=SmsBalanceCache (numeric, '' if never checked), 31=SmsBalanceCacheAt (ISO timestamp)
+var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt'];
 
 // timetable cols (18):
 // 0=ID, 1=ClassID (FK), 2=DayOfWeek (lower: monday..sunday), 3=PeriodNumber,
@@ -3381,6 +3391,36 @@ function admissionNumberExists(sh, admNo, excludeId) {
   return false;
 }
 
+// PREFIX + YEAR + 4-digit sequence, e.g. ROA20260001 — scans existing admission numbers
+// sharing the same prefix+year to find the next free sequence (never reuses a number).
+function generateNextAdmissionNumber(sh) {
+  var settingsRes = getSchoolSettings();
+  var prefix = (settingsRes.data && settingsRes.data.AdmissionNumberPrefix) ? settingsRes.data.AdmissionNumberPrefix : 'STU';
+  var year = new Date().getFullYear();
+  var base = prefix + year;
+  var data = sh.getDataRange().getValues();
+  var maxSeq = 0;
+  for (var i = 1; i < data.length; i++) {
+    var admNo = String(data[i][1] || '');
+    if (admNo.indexOf(base) !== 0) continue;
+    var seq = parseInt(admNo.slice(base.length), 10);
+    if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+  }
+  return base + String(maxSeq + 1).padStart(4, '0');
+}
+
+// exposed for the frontend to preview the next AdmissionNumber before saving
+function getNextAdmissionNumber(currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var sh = getSheet(STUDENTS_SHEET);
+    if (!sh) return { success: false, message: 'Students sheet not found' };
+    return { success: true, admissionNumber: generateNextAdmissionNumber(sh) };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
 function ghanaCardExists(sh, ghanaCard, excludeId) {
   if (!ghanaCard) return false;
   var data = sh.getDataRange().getValues();
@@ -3423,7 +3463,7 @@ function validateStudentIntlFields(d) {
   var prof = String(d.EnglishProficiency || 'b2').toLowerCase();
   if (profEnum.indexOf(prof) === -1) return { ok: false, error: 'EnglishProficiency must be one of: ' + profEnum.join(', ') };
 
-  var cur = String(d.CurriculumTrack || 'british').toLowerCase();
+  var cur = String(d.CurriculumTrack || 'ges').toLowerCase();
   if (curEnum.indexOf(cur) === -1) return { ok: false, error: 'CurriculumTrack must be one of: ' + curEnum.join(', ') };
 
   var cust = String(d.CustodyArrangement || 'joint').toLowerCase();
@@ -3631,6 +3671,10 @@ function backfillUserMirrors() {
   return msg;
 }
 
+// Only FirstName/LastName are enforced — every other field is optional so admins can
+// complete a student record in stages. ClassID left blank means "unassigned" (the student
+// just won't show up in attendance/marks/fees/timetable until a class is set). AdmissionNumber
+// and LoginPassword auto-generate when left blank so nothing blocks saving.
 function addStudent(s, currentUser, currentRole) {
   try {
     if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
@@ -3638,32 +3682,31 @@ function addStudent(s, currentUser, currentRole) {
     var sh = getSheet(STUDENTS_SHEET);
     if (!sh) return { success: false, message: 'Students sheet not found' };
 
-    // required fields per schema
-    var required = ['AdmissionNumber','FirstName','LastName','Gender','DateOfBirth',
-                    'AddressLine','City','Region','GhanaPostGPS','FatherName','FatherMobile',
-                    'MotherName','AdmissionDate','ClassID','RollNumber','Category','LoginPassword'];
-    for (var k = 0; k < required.length; k++) {
-      var f = required[k];
-      if (!s[f] || String(s[f]).trim() === '') {
-        return { success: false, message: f + ' is required' };
-      }
+    if (!String(s.FirstName || '').trim() || !String(s.LastName || '').trim()) {
+      return { success: false, message: 'First Name and Last Name are required' };
     }
 
-    var cid = parseInt(s.ClassID, 10);
-    if (isNaN(cid)) return { success: false, message: 'Invalid ClassID' };
+    var cid = null;
+    if (s.ClassID !== '' && s.ClassID != null) {
+      cid = parseInt(s.ClassID, 10);
+      if (isNaN(cid)) return { success: false, message: 'Invalid ClassID' };
+    }
     var cmap = getClassesMap();
-    if (!cmap[cid]) return { success: false, message: 'Selected class does not exist or is deleted' };
+    if (cid !== null && !cmap[cid]) return { success: false, message: 'Selected class does not exist or is deleted' };
 
-    if (admissionNumberExists(sh, s.AdmissionNumber)) {
+    var admissionNumber = String(s.AdmissionNumber || '').trim() || generateNextAdmissionNumber(sh);
+    if (admissionNumberExists(sh, admissionNumber)) {
       return { success: false, message: 'Admission Number already exists' };
     }
     if (s.GhanaCardNumber && ghanaCardExists(sh, s.GhanaCardNumber)) {
       return { success: false, message: 'Ghana Card Number already in use' };
     }
     var statusVal = String(s.Status || 'active').toLowerCase();
-    if (studentRollExists(sh, cid, s.RollNumber, statusVal)) {
+    var rollNumber = String(s.RollNumber || '').trim();
+    if (cid !== null && rollNumber && studentRollExists(sh, cid, rollNumber, statusVal)) {
       return { success: false, message: 'Roll Number already used in this class for status: ' + statusVal };
     }
+    var loginPassword = String(s.LoginPassword || '').trim() || Utilities.getUuid().slice(0, 8);
 
     // intl/safeguarding validation + normalize
     var iv = validateStudentIntlFields(s);
@@ -3675,40 +3718,40 @@ function addStudent(s, currentUser, currentRole) {
 
     sh.appendRow([
       id,
-      String(s.AdmissionNumber).trim(),
+      admissionNumber,
       String(s.FirstName).trim(),
       s.MiddleName ? String(s.MiddleName).trim() : '',
       String(s.LastName).trim(),
-      String(s.Gender).toLowerCase(),
-      toIso(s.DateOfBirth),
+      String(s.Gender || '').toLowerCase(),
+      s.DateOfBirth ? toIso(s.DateOfBirth) : '',
       s.BloodGroup || 'unknown',
       s.GhanaCardNumber ? String(s.GhanaCardNumber).trim() : '',
       s.Mobile || '',
       s.Email || '',
-      String(s.AddressLine).trim(),
-      String(s.City).trim(),
-      String(s.Region).trim(),
-      String(s.GhanaPostGPS).trim(),
-      String(s.FatherName).trim(),
+      String(s.AddressLine || '').trim(),
+      String(s.City || '').trim(),
+      String(s.Region || '').trim(),
+      String(s.GhanaPostGPS || '').trim(),
+      String(s.FatherName || '').trim(),
       s.FatherOccupation || '',
-      String(s.FatherMobile).trim(),
-      String(s.MotherName).trim(),
+      String(s.FatherMobile || '').trim(),
+      String(s.MotherName || '').trim(),
       s.MotherOccupation || '',
       s.MotherMobile || '',
       s.GuardianName || '',
       s.GuardianRelation || '',
       s.GuardianMobile || '',
       toIso(s.AdmissionDate || todayStr()),
-      cid,
-      String(s.RollNumber).trim(),
-      String(s.Category).toLowerCase(),
+      cid === null ? '' : cid,
+      rollNumber,
+      String(s.Category || '').toLowerCase(),
       s.Religion || '',
       s.PreviousSchool || '',
       transportReq,
       s.TransportRoute || '',
       s.MedicalNotes || '',
       s.PhotoURL || '',
-      s.LoginPassword,  // plain per Apps Script rule, schema field name kept
+      loginPassword,  // plain per Apps Script rule, schema field name kept
       statusVal,
       '0',
       ts, ts,
@@ -3723,16 +3766,16 @@ function addStudent(s, currentUser, currentRole) {
       ni.concessionPercent, ni.specialNeeds
     ]);
 
-    recomputeClassStrength(cid);
+    if (cid !== null) recomputeClassStrength(cid);
     // mirror into Users so the student can log in via the unified auth path
     var _fullName = [String(s.FirstName).trim(), s.MiddleName ? String(s.MiddleName).trim() : '', String(s.LastName).trim()]
       .filter(function(x){ return x; }).join(' ');
-    _mirrorStudentToUsers(id, String(s.AdmissionNumber).trim(), _fullName, s.Email || '', s.Mobile || '',
-      s.LoginPassword, s.Gender || '', toIso(s.DateOfBirth), s.PhotoURL || '', currentUser);
+    _mirrorStudentToUsers(id, admissionNumber, _fullName, s.Email || '', s.Mobile || '',
+      loginPassword, s.Gender || '', s.DateOfBirth ? toIso(s.DateOfBirth) : '', s.PhotoURL || '', currentUser);
     // auto-generate monthly dues from admission month → current month
-    try { generateStudentDues(id, currentUser); } catch (e) { Logger.log('generateStudentDues hook failed: ' + e.toString()); }
-    addLog(currentUser, 'Student Added', 'Added: ' + s.AdmissionNumber + ' / ' + s.FirstName + ' ' + s.LastName + ' -> ' + cmap[cid].label);
-    return { success: true, message: 'Student added successfully', id: id };
+    if (cid !== null) { try { generateStudentDues(id, currentUser); } catch (e) { Logger.log('generateStudentDues hook failed: ' + e.toString()); } }
+    addLog(currentUser, 'Student Added', 'Added: ' + admissionNumber + ' / ' + s.FirstName + ' ' + s.LastName + (cmap[cid] ? ' -> ' + cmap[cid].label : ''));
+    return { success: true, message: 'Student added successfully' + (String(s.LoginPassword || '').trim() ? '' : ' — generated password: ' + loginPassword), id: id, admissionNumber: admissionNumber };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
@@ -3748,29 +3791,28 @@ function updateStudent(id, s, currentUser, currentRole) {
     var idn = parseInt(id, 10);
     if (isNaN(idn)) return { success: false, message: 'Invalid id' };
 
-    var requiredOnUpdate = ['AdmissionNumber','FirstName','LastName','Gender','DateOfBirth',
-                            'AddressLine','City','Region','GhanaPostGPS','FatherName','FatherMobile',
-                            'MotherName','AdmissionDate','ClassID','RollNumber','Category'];
-    for (var k = 0; k < requiredOnUpdate.length; k++) {
-      var f = requiredOnUpdate[k];
-      if (!s[f] || String(s[f]).trim() === '') {
-        return { success: false, message: f + ' is required' };
-      }
+    if (!String(s.FirstName || '').trim() || !String(s.LastName || '').trim()) {
+      return { success: false, message: 'First Name and Last Name are required' };
     }
 
-    var cid = parseInt(s.ClassID, 10);
-    if (isNaN(cid)) return { success: false, message: 'Invalid ClassID' };
+    var cid = null;
+    if (s.ClassID !== '' && s.ClassID != null) {
+      cid = parseInt(s.ClassID, 10);
+      if (isNaN(cid)) return { success: false, message: 'Invalid ClassID' };
+    }
     var cmap = getClassesMap();
-    if (!cmap[cid]) return { success: false, message: 'Selected class does not exist or is deleted' };
+    if (cid !== null && !cmap[cid]) return { success: false, message: 'Selected class does not exist or is deleted' };
 
-    if (admissionNumberExists(sh, s.AdmissionNumber, idn)) {
+    var admissionNumber = String(s.AdmissionNumber || '').trim();
+    if (admissionNumber && admissionNumberExists(sh, admissionNumber, idn)) {
       return { success: false, message: 'Admission Number already exists' };
     }
     if (s.GhanaCardNumber && ghanaCardExists(sh, s.GhanaCardNumber, idn)) {
       return { success: false, message: 'Ghana Card Number already in use' };
     }
     var statusVal = String(s.Status || 'active').toLowerCase();
-    if (studentRollExists(sh, cid, s.RollNumber, statusVal, idn)) {
+    var rollNumber = String(s.RollNumber || '').trim();
+    if (cid !== null && rollNumber && studentRollExists(sh, cid, rollNumber, statusVal, idn)) {
       return { success: false, message: 'Roll Number already used in this class for status: ' + statusVal };
     }
 
@@ -3783,36 +3825,38 @@ function updateStudent(id, s, currentUser, currentRole) {
     for (var i = 1; i < data.length; i++) {
       if (data[i][0] !== idn || String(data[i][36]) === '1') continue;
       var row = i + 1, ts = nowIso();
-      var oldClassId = parseInt(data[i][25], 10);
+      var oldClassIdRaw = parseInt(data[i][25], 10);
+      var oldClassId = isNaN(oldClassIdRaw) ? null : oldClassIdRaw;
       var transportReq = (s.TransportRequired === true || String(s.TransportRequired) === '1' || String(s.TransportRequired).toLowerCase() === 'true') ? '1' : '0';
+      if (!admissionNumber) admissionNumber = data[i][1]; // keep existing if cleared
 
-      sh.getRange(row, 2).setValue(String(s.AdmissionNumber).trim());
+      sh.getRange(row, 2).setValue(admissionNumber);
       sh.getRange(row, 3).setValue(String(s.FirstName).trim());
       sh.getRange(row, 4).setValue(s.MiddleName || '');
       sh.getRange(row, 5).setValue(String(s.LastName).trim());
-      sh.getRange(row, 6).setValue(String(s.Gender).toLowerCase());
-      sh.getRange(row, 7).setValue(toIso(s.DateOfBirth));
+      sh.getRange(row, 6).setValue(String(s.Gender || '').toLowerCase());
+      sh.getRange(row, 7).setValue(s.DateOfBirth ? toIso(s.DateOfBirth) : '');
       sh.getRange(row, 8).setValue(s.BloodGroup || 'unknown');
       sh.getRange(row, 9).setValue(s.GhanaCardNumber ? String(s.GhanaCardNumber).trim() : '');
       sh.getRange(row, 10).setValue(s.Mobile || '');
       sh.getRange(row, 11).setValue(s.Email || '');
-      sh.getRange(row, 12).setValue(String(s.AddressLine).trim());
-      sh.getRange(row, 13).setValue(String(s.City).trim());
-      sh.getRange(row, 14).setValue(String(s.Region).trim());
-      sh.getRange(row, 15).setValue(String(s.GhanaPostGPS).trim());
-      sh.getRange(row, 16).setValue(String(s.FatherName).trim());
+      sh.getRange(row, 12).setValue(String(s.AddressLine || '').trim());
+      sh.getRange(row, 13).setValue(String(s.City || '').trim());
+      sh.getRange(row, 14).setValue(String(s.Region || '').trim());
+      sh.getRange(row, 15).setValue(String(s.GhanaPostGPS || '').trim());
+      sh.getRange(row, 16).setValue(String(s.FatherName || '').trim());
       sh.getRange(row, 17).setValue(s.FatherOccupation || '');
-      sh.getRange(row, 18).setValue(String(s.FatherMobile).trim());
-      sh.getRange(row, 19).setValue(String(s.MotherName).trim());
+      sh.getRange(row, 18).setValue(String(s.FatherMobile || '').trim());
+      sh.getRange(row, 19).setValue(String(s.MotherName || '').trim());
       sh.getRange(row, 20).setValue(s.MotherOccupation || '');
       sh.getRange(row, 21).setValue(s.MotherMobile || '');
       sh.getRange(row, 22).setValue(s.GuardianName || '');
       sh.getRange(row, 23).setValue(s.GuardianRelation || '');
       sh.getRange(row, 24).setValue(s.GuardianMobile || '');
       sh.getRange(row, 25).setValue(toIso(s.AdmissionDate || todayStr()));
-      sh.getRange(row, 26).setValue(cid);
-      sh.getRange(row, 27).setValue(String(s.RollNumber).trim());
-      sh.getRange(row, 28).setValue(String(s.Category).toLowerCase());
+      sh.getRange(row, 26).setValue(cid === null ? '' : cid);
+      sh.getRange(row, 27).setValue(rollNumber);
+      sh.getRange(row, 28).setValue(String(s.Category || '').toLowerCase());
       sh.getRange(row, 29).setValue(s.Religion || '');
       sh.getRange(row, 30).setValue(s.PreviousSchool || '');
       sh.getRange(row, 31).setValue(transportReq);
@@ -3853,16 +3897,16 @@ function updateStudent(id, s, currentUser, currentRole) {
       sh.getRange(row, 63).setValue(ni.specialNeeds);
 
       // recompute strength on both old + new class if class changed
-      recomputeClassStrength(cid);
-      if (oldClassId !== cid) recomputeClassStrength(oldClassId);
+      if (cid !== null) recomputeClassStrength(cid);
+      if (oldClassId !== cid && oldClassId !== null) recomputeClassStrength(oldClassId);
 
       // sync mirror in Users sheet (preserves login)
       var _fullName = [String(s.FirstName).trim(), s.MiddleName ? String(s.MiddleName).trim() : '', String(s.LastName).trim()]
         .filter(function(x){ return x; }).join(' ');
-      _mirrorStudentToUsers(idn, String(s.AdmissionNumber).trim(), _fullName, s.Email || '', s.Mobile || '',
-        s.LoginPassword || '', s.Gender || '', toIso(s.DateOfBirth), s.PhotoURL || '', currentUser);
+      _mirrorStudentToUsers(idn, admissionNumber, _fullName, s.Email || '', s.Mobile || '',
+        s.LoginPassword || '', s.Gender || '', s.DateOfBirth ? toIso(s.DateOfBirth) : '', s.PhotoURL || '', currentUser);
 
-      addLog(currentUser, 'Student Updated', 'Updated id ' + idn + ': ' + s.AdmissionNumber);
+      addLog(currentUser, 'Student Updated', 'Updated id ' + idn + ': ' + admissionNumber);
       return { success: true, message: 'Student updated successfully' };
     }
     return { success: false, message: 'Student not found' };
@@ -4012,7 +4056,8 @@ function rowToAdmission(row, cmap, umap) {
     ProcessedByName: (procBy && umap[procBy]) ? umap[procBy].fullName : '',
     IsDeleted: String(row[52]) === '1',
     CreatedAt: toIso(row[53]),
-    UpdatedAt: toIso(row[54])
+    UpdatedAt: toIso(row[54]),
+    PhotoURL: row[55] || ''
   };
 }
 
@@ -4044,12 +4089,10 @@ function getAllAdmissions(currentUser, currentRole) {
 // validate + apply the registration-stage fields onto a row-values array (used by add + update)
 // returns { ok, error, vals: {col index -> value} } — vals only contains the reg-stage cols
 function _validateRegistrationFields(d, opts) {
-  var required = ['FirstName','LastName','Gender','DateOfBirth','AddressLine','City','Region','GhanaPostGPS','FatherName','FatherMobile','MotherName','AcademicYear','AdmissionType'];
-  for (var k = 0; k < required.length; k++) {
-    var f = required[k];
-    if (d[f] == null || String(d[f]).trim() === '') return { ok: false, error: f + ' is required' };
+  if (!String(d.FirstName || '').trim() || !String(d.LastName || '').trim()) {
+    return { ok: false, error: 'First Name and Last Name are required' };
   }
-  var admType = String(d.AdmissionType).toLowerCase();
+  var admType = String(d.AdmissionType || 'new').toLowerCase();
   if (ADMISSION_TYPES.indexOf(admType) === -1) return { ok: false, error: 'Invalid admission type' };
   if (admType === 'transfer' && (d.PreviousSchool == null || String(d.PreviousSchool).trim() === '')) {
     return { ok: false, error: 'PreviousSchool is required for transfer admissions' };
@@ -4082,28 +4125,28 @@ function _validateRegistrationFields(d, opts) {
       2: String(d.FirstName).trim(),
       3: d.MiddleName ? String(d.MiddleName).trim() : '',
       4: String(d.LastName).trim(),
-      5: String(d.Gender).toLowerCase(),
-      6: toIso(d.DateOfBirth),
+      5: d.Gender ? String(d.Gender).toLowerCase() : '',
+      6: d.DateOfBirth ? toIso(d.DateOfBirth) : '',
       7: aClassId,
       8: aGrade,
       9: admType,
       10: d.PreviousSchool ? String(d.PreviousSchool).trim() : '',
       11: d.TransferCertificateNumber ? String(d.TransferCertificateNumber).trim() : '',
       12: d.LastClassAttended ? String(d.LastClassAttended).trim() : '',
-      13: String(d.AddressLine).trim(),
-      14: String(d.City).trim(),
-      15: String(d.Region).trim(),
-      16: String(d.GhanaPostGPS).trim(),
-      17: String(d.FatherName).trim(),
-      18: String(d.FatherMobile).trim(),
-      19: String(d.MotherName).trim(),
+      13: d.AddressLine ? String(d.AddressLine).trim() : '',
+      14: d.City ? String(d.City).trim() : '',
+      15: d.Region ? String(d.Region).trim() : '',
+      16: d.GhanaPostGPS ? String(d.GhanaPostGPS).trim() : '',
+      17: d.FatherName ? String(d.FatherName).trim() : '',
+      18: d.FatherMobile ? String(d.FatherMobile).trim() : '',
+      19: d.MotherName ? String(d.MotherName).trim() : '',
       20: d.MotherMobile ? String(d.MotherMobile).trim() : '',
       21: d.GuardianName ? String(d.GuardianName).trim() : '',
       22: d.GuardianRelation ? String(d.GuardianRelation).trim() : '',
       23: d.GuardianMobile ? String(d.GuardianMobile).trim() : '',
       24: d.Email ? String(d.Email).trim() : '',
       25: d.Mobile ? String(d.Mobile).trim() : '',
-      26: String(d.AcademicYear).trim(),
+      26: d.AcademicYear ? String(d.AcademicYear).trim() : '',
       28: regFee,
       29: regFeeMode,
       50: d.Remarks != null ? String(d.Remarks).trim() : ''
@@ -4132,7 +4175,8 @@ function addRegistration(d, currentUser, currentRole) {
       id, regNo, fld[2], fld[3], fld[4], fld[5], fld[6], fld[7], fld[8], fld[9], fld[10], fld[11], fld[12],
       fld[13], fld[14], fld[15], fld[16], fld[17], fld[18], fld[19], fld[20], fld[21], fld[22], fld[23],
       fld[24], fld[25], fld[26], toIso(todayStr()), fld[28], fld[29], regFeeRcpt, 'registered',
-      '', '', '', '', 0, '', '', '', '', '', '', '', '', '0', '', '', '', '', fld[50], procBy, '0', ts, ts
+      '', '', '', '', 0, '', '', '', '', '', '', '', '', '0', '', '', '', '', fld[50], procBy, '0', ts, ts,
+      String(d.PhotoURL || '').trim()
     ];
     sh.appendRow(rowArr);
     addLog(currentUser, 'Registration Created', regNo + ' — ' + fld[2] + ' ' + fld[4]);
@@ -4173,6 +4217,7 @@ function updateRegistration(id, d, currentUser, currentRole) {
       });
       sh.getRange(row, 31).setValue(regFeeRcpt); // col 30 = RegistrationFeeReceiptNo
       sh.getRange(row, 55).setValue(ts);          // col 54 = UpdatedAt
+      if (d.PhotoURL != null) sh.getRange(row, 56).setValue(String(d.PhotoURL || '').trim()); // col 55 = PhotoURL
       addLog(currentUser, 'Registration Updated', 'id ' + idn + ' — ' + (data[i][1] || ''));
       return { success: true, message: 'Registration updated' };
     }
@@ -4242,13 +4287,10 @@ function enrollAdmission(id, d, currentUser, currentRole) {
     d = d || {};
 
     var allottedClassId = parseInt(d.AllottedClassID, 10);
-    if (isNaN(allottedClassId)) return { success: false, message: 'Invalid AllottedClassID' };
+    if (isNaN(allottedClassId)) return { success: false, message: 'Pick a class to enroll this applicant into' };
     var cmap = getClassesMap();
     if (!cmap[allottedClassId]) return { success: false, message: 'Allotted class does not exist or is deleted' };
-    if (d.RollNumber == null || String(d.RollNumber).trim() === '') return { success: false, message: 'RollNumber is required' };
-    if (d.AdmissionNumber == null || String(d.AdmissionNumber).trim() === '') return { success: false, message: 'AdmissionNumber is required' };
-    if (d.LoginPassword == null || String(d.LoginPassword).trim() === '') return { success: false, message: 'LoginPassword is required' };
-    if (d.AdmissionDate == null || String(d.AdmissionDate).trim() === '') return { success: false, message: 'AdmissionDate is required' };
+    var admissionDate = String(d.AdmissionDate || '').trim() || todayStr();
     var entryPoint = String(d.EntryPoint || '').toLowerCase();
     if (ADMISSION_ENTRY_POINTS.indexOf(entryPoint) === -1) return { success: false, message: 'Invalid EntryPoint' };
     var transportReq = (d.TransportRequired === true || String(d.TransportRequired) === '1' || String(d.TransportRequired).toLowerCase() === 'true');
@@ -4261,33 +4303,34 @@ function enrollAdmission(id, d, currentUser, currentRole) {
       var row = i + 1, ar = data[i];
       var ad = rowToAdmission(ar, cmap, getUsersMap());
 
+      var rollNumber = String(d.RollNumber || '').trim();
+      var admissionNumber = String(d.AdmissionNumber || '').trim();
       var payload = {
-        AdmissionNumber: String(d.AdmissionNumber).trim(),
+        AdmissionNumber: admissionNumber,
         FirstName: ad.FirstName, MiddleName: ad.MiddleName, LastName: ad.LastName,
         Gender: ad.Gender, DateOfBirth: ad.DateOfBirth ? String(ad.DateOfBirth).split('T')[0] : '',
         AddressLine: ad.AddressLine, City: ad.City, Region: ad.Region, GhanaPostGPS: ad.GhanaPostGPS,
         FatherName: ad.FatherName, FatherMobile: ad.FatherMobile,
         MotherName: ad.MotherName, MotherMobile: ad.MotherMobile,
         GuardianName: ad.GuardianName, GuardianRelation: ad.GuardianRelation, GuardianMobile: ad.GuardianMobile,
-        Email: ad.Email, Mobile: ad.Mobile,
-        AdmissionDate: String(d.AdmissionDate).trim(), ClassID: allottedClassId, RollNumber: String(d.RollNumber).trim(),
+        Email: ad.Email, Mobile: ad.Mobile, PhotoURL: ad.PhotoURL || '',
+        AdmissionDate: admissionDate, ClassID: allottedClassId, RollNumber: rollNumber,
         Category: ad.Category, Religion: ad.Religion, BloodGroup: ad.BloodGroup, MedicalNotes: ad.MedicalNotes, PreviousSchool: ad.PreviousSchool,
         AdmissionType: ({ 'new': 'fresh', 'transfer': 'transfer', 're_admission': 're_admission' })[String(ad.AdmissionType || 'new')] || 'fresh',
         TransportRequired: transportReq, TransportRoute: d.TransportRoute || '',
-        LoginPassword: d.LoginPassword, Status: 'active'
+        LoginPassword: d.LoginPassword || '', Status: 'active'
       };
-      if (!payload.DateOfBirth) return { success: false, message: 'Applicant date of birth missing on the registration record' };
-      if (!payload.Category) return { success: false, message: 'Applicant category missing — confirm the admission first' };
 
       var sres = addStudent(payload, currentUser, 'admin');
       if (!sres || !sres.success) return { success: false, message: 'Enrollment failed: ' + (sres ? sres.message : 'unknown error') };
       var newStudentId = sres.id;
+      admissionNumber = sres.admissionNumber || admissionNumber;
 
       // write back enroll-stage fields onto the admission row
       sh.getRange(row, 41).setValue(allottedClassId);                 // 40 AllottedClassID
-      sh.getRange(row, 42).setValue(String(d.RollNumber).trim());     // 41 RollNumber
-      sh.getRange(row, 43).setValue(String(d.AdmissionNumber).trim());// 42 AdmissionNumber
-      sh.getRange(row, 44).setValue(toIso(d.AdmissionDate));  // 43 AdmissionDate
+      sh.getRange(row, 42).setValue(rollNumber);                      // 41 RollNumber
+      sh.getRange(row, 43).setValue(admissionNumber);                 // 42 AdmissionNumber
+      sh.getRange(row, 44).setValue(toIso(admissionDate));   // 43 AdmissionDate
       sh.getRange(row, 45).setValue(entryPoint);                      // 44 EntryPoint
       sh.getRange(row, 46).setValue(transportReq ? '1' : '0');        // 45 TransportRequired
       sh.getRange(row, 47).setValue(d.TransportRoute || '');          // 46 TransportRoute
@@ -6545,7 +6588,8 @@ function bulkSaveMarks(examId, subjectId, entries, currentUser, currentRole) {
         if (obtained > maxMarks) obtained = maxMarks;
       }
       var grade = computeGrade(obtained, maxMarks, isAbsent === '1', gradeBand);
-      var remarks = e.remarks || '';
+      // Remarks is always auto-generated from the grade — never taken from client input
+      var remarks = isAbsent === '1' ? 'Absent' : sbaGradeDescriptor(grade, gradeBand);
 
       // validate new fields (defaults via validator if missing)
       var mv = validateMarkFields(e, maxMarks);
@@ -9901,7 +9945,8 @@ function getSchoolSettings() {
             WorkingDays: data[i][16] || 'monday,tuesday,wednesday,thursday,friday',
             AcademicYearStartDate: toIso(data[i][17]),
             AcademicYearEndDate: toIso(data[i][18]),
-            HiddenMenuIds: data[i][19] || ''
+            HiddenMenuIds: data[i][19] || '',
+            AdmissionNumberPrefix: data[i][20] || ''
           }
         };
       }
@@ -9932,8 +9977,98 @@ function defaultSchoolSettings() {
     WorkingDays: 'monday,tuesday,wednesday,thursday,friday',
     AcademicYearStartDate: cy + '-09-01',
     AcademicYearEndDate: (cy + 1) + '-07-31',
-    HiddenMenuIds: ''
+    HiddenMenuIds: '',
+    AdmissionNumberPrefix: ''
   };
+}
+
+// admin-only — the sensitive/advanced half of settings (SMS gateway creds, owner contact,
+// digest schedule). Kept OUT of getSchoolSettings() so API keys never reach non-admin roles.
+function getAdminExtendedSettings(currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var sh = getSheet(SETTINGS_SHEET);
+    var row = null;
+    if (sh) {
+      var data = sh.getDataRange().getValues();
+      for (var i = 1; i < data.length; i++) {
+        if (parseInt(data[i][0], 10) === 1) { row = data[i]; break; }
+      }
+    }
+    if (!row) {
+      return {
+        success: true,
+        data: { SmsProvider: '', SmsApiKey: '', SmsApiSecret: '', SmsSenderId: '', SmsCustomEndpoint: '', SmsCustomConfig: '',
+                OwnerEmail: '', OwnerPhone: '', DailyDigestTime: '18:00', SmsBalanceCache: '', SmsBalanceCacheAt: '' }
+      };
+    }
+    return {
+      success: true,
+      data: {
+        SmsProvider: row[21] || '', SmsApiKey: row[22] || '', SmsApiSecret: row[23] || '',
+        SmsSenderId: row[24] || '', SmsCustomEndpoint: row[25] || '', SmsCustomConfig: row[26] || '',
+        OwnerEmail: row[27] || '', OwnerPhone: row[28] || '', DailyDigestTime: row[29] || '18:00',
+        SmsBalanceCache: row[30] === '' || row[30] == null ? '' : parseFloat(row[30]),
+        SmsBalanceCacheAt: row[31] ? toIso(row[31]) : ''
+      }
+    };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// admin-only — SMS gateway config + owner digest contact/schedule. Separate from
+// updateSchoolSettings() so saving the general form never clobbers API credentials.
+function updateSmsSettings(d, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var sh = getSheet(SETTINGS_SHEET);
+    if (!sh) return { success: false, message: 'Settings sheet not found. Run setup() first.' };
+
+    var providerEnum = ['', 'arkesel', 'hubtel', 'custom'];
+    var provider = String(d.SmsProvider || '').toLowerCase();
+    if (providerEnum.indexOf(provider) === -1) return { success: false, message: 'Invalid SmsProvider' };
+
+    var digestTime = String(d.DailyDigestTime || '18:00').trim();
+    if (!/^\d{2}:\d{2}$/.test(digestTime)) return { success: false, message: 'DailyDigestTime must be HH:MM' };
+
+    var ownerEmail = String(d.OwnerEmail || '').trim();
+    if (ownerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ownerEmail)) return { success: false, message: 'Invalid OwnerEmail' };
+
+    var customConfig = String(d.SmsCustomConfig || '').trim();
+    if (customConfig) {
+      try { JSON.parse(customConfig); } catch (e) { return { success: false, message: 'SmsCustomConfig must be valid JSON' }; }
+    }
+
+    var data = sh.getDataRange().getValues();
+    var foundRow = -1;
+    for (var i = 1; i < data.length; i++) {
+      if (parseInt(data[i][0], 10) === 1) { foundRow = i + 1; break; }
+    }
+    var ts = nowIso();
+    if (foundRow === -1) {
+      // no settings row yet — create a bare one carrying just the SMS/owner fields
+      var blank = new Array(SETTINGS_HEADERS.length).fill('');
+      blank[0] = 1; blank[14] = ts; blank[15] = ts;
+      sh.appendRow(blank);
+      foundRow = sh.getLastRow();
+    }
+    sh.getRange(foundRow, 22).setValue(provider);
+    sh.getRange(foundRow, 23).setValue(String(d.SmsApiKey || '').trim());
+    sh.getRange(foundRow, 24).setValue(String(d.SmsApiSecret || '').trim());
+    sh.getRange(foundRow, 25).setValue(String(d.SmsSenderId || '').trim().slice(0, 11));
+    sh.getRange(foundRow, 26).setValue(String(d.SmsCustomEndpoint || '').trim());
+    sh.getRange(foundRow, 27).setValue(customConfig);
+    sh.getRange(foundRow, 28).setValue(ownerEmail);
+    sh.getRange(foundRow, 29).setValue(String(d.OwnerPhone || '').trim());
+    sh.getRange(foundRow, 30).setValue(digestTime);
+    sh.getRange(foundRow, 16).setValue(ts);
+
+    addLog(currentUser, 'SMS Settings Updated', 'Provider: ' + (provider || 'none'));
+    return { success: true, message: 'SMS & owner digest settings saved' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
 }
 
 // admin-only — upserts the single settings row (ID=1)
@@ -9976,6 +10111,8 @@ function updateSchoolSettings(d, currentUser, currentRole) {
       .filter(function(x) { return x && /^[a-zA-Z]+$/.test(x) && PROTECTED_MENU_IDS.indexOf(x) === -1; })
       .join(',');
 
+    var admissionPrefix = String(d.AdmissionNumberPrefix || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+
     var values = [
       1,
       String(d.SchoolName || '').trim(),
@@ -9994,7 +10131,7 @@ function updateSchoolSettings(d, currentUser, currentRole) {
     ];
 
     if (foundRow === -1) {
-      sh.appendRow(values.concat([ts, ts, workingDays, ayStart, ayEnd, hiddenMenuIds]));
+      sh.appendRow(values.concat([ts, ts, workingDays, ayStart, ayEnd, hiddenMenuIds, admissionPrefix]));
     } else {
       sh.getRange(foundRow, 1, 1, values.length).setValues([values]);
       sh.getRange(foundRow, 16).setValue(ts);
@@ -10002,6 +10139,7 @@ function updateSchoolSettings(d, currentUser, currentRole) {
       sh.getRange(foundRow, 18).setValue(ayStart);
       sh.getRange(foundRow, 19).setValue(ayEnd);
       sh.getRange(foundRow, 20).setValue(hiddenMenuIds);
+      sh.getRange(foundRow, 21).setValue(admissionPrefix);
     }
     addLog(currentUser, 'School Settings Updated', d.SchoolName || '');
     return { success: true, message: 'School settings saved successfully' };
@@ -11666,7 +11804,11 @@ function setupDemoData() {
         'monday,tuesday,wednesday,thursday,friday',
         '2026-09-01',
         '2027-07-31',
-        ''
+        '',
+        'ROA',
+        '', '', '', '', '', '',
+        '', '', '18:00',
+        '', ''
       ]]]
     ];
     sheetSpec.forEach(function(spec) {
