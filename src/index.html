@@ -3323,6 +3323,37 @@
       );
     }
 
+    // table/grid switcher — used by Students, Admissions, Classes, Fee Payments
+    function ViewToggle({ mode, onChange }) {
+      const btnStyle = (active) => ({
+        padding: '8px 14px', border: 'none', cursor: 'pointer',
+        background: active ? 'var(--navy-primary)' : '#fff',
+        color: active ? '#fff' : '#555'
+      });
+      return (
+        <div style={{display:'inline-flex',border:'1px solid #ddd',borderRadius:'6px',overflow:'hidden'}}>
+          <button type="button" title="Table view" style={btnStyle(mode === 'table')} onClick={() => onChange('table')}>
+            <i className="fas fa-table"></i>
+          </button>
+          <button type="button" title="Grid view" style={btnStyle(mode === 'grid')} onClick={() => onChange('grid')}>
+            <i className="fas fa-th-large"></i>
+          </button>
+        </div>
+      );
+    }
+
+    // simple responsive card grid shell — pass items + a card renderer
+    function GridCards({ items, renderCard, emptyText = 'No records found.' }) {
+      if (!items || !items.length) {
+        return <div className="settings-info-message" style={{textAlign:'center',padding:'30px'}}><i className="fas fa-inbox" style={{marginRight:'8px'}}></i>{emptyText}</div>;
+      }
+      return (
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(260px, 1fr))',gap:'14px'}}>
+          {items.map((item, idx) => renderCard(item, idx))}
+        </div>
+      );
+    }
+
     function SearchableDropdown({ options, value, onChange, placeholder = 'Select...', label, icon, required = false }) {
       const [isOpen, setIsOpen] = useState(false);
       const [search, setSearch] = useState('');
@@ -5998,6 +6029,7 @@
       const [confirmTarget, setConfirmTarget] = useState(null);
       const [showEnrollModal, setShowEnrollModal] = useState(false);
       const [enrollTarget, setEnrollTarget] = useState(null);
+      const [viewMode, setViewMode] = useState('table');
       const tableInstanceRef = useRef(null);
 
       const [filters, setFilters] = useState({
@@ -6261,9 +6293,12 @@
         <div className="data-section">
           <div className="section-header">
             <h2><i className="fas fa-file-signature"></i> Admissions{syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}</h2>
-            <button className="btn btn-success" onClick={() => { setEditingReg(null); setShowRegModal(true); }}>
-              <i className="fas fa-plus"></i> New Registration
-            </button>
+            <div style={{display:'flex',gap:'10px'}}>
+              <ViewToggle mode={viewMode} onChange={setViewMode} />
+              <button className="btn btn-success" onClick={() => { setEditingReg(null); setShowRegModal(true); }}>
+                <i className="fas fa-plus"></i> New Registration
+              </button>
+            </div>
           </div>
 
           {loadError && !loading && admissions.length === 0 && (
@@ -6337,10 +6372,44 @@
             </>
           )}
 
-          {loading && <TableSkeleton rows={6} columns={12} />}
-          <div style={{ display: loading ? 'none' : 'block' }}>
+          {loading && viewMode === 'table' && <TableSkeleton rows={6} columns={12} />}
+          <div style={{ display: (loading || viewMode !== 'table') ? 'none' : 'block' }}>
             <table id="admissionsTable" className="display" style={{ width: '100%' }}></table>
           </div>
+
+          {!loading && viewMode === 'grid' && (
+            <GridCards
+              items={admissions}
+              emptyText="No admissions found."
+              renderCard={(a) => {
+                const statusColor = admStatusColor(a.Status);
+                return (
+                  <div key={a.ID} className="grid-card" style={{border:'1px solid #e0e0e0',borderRadius:'8px',padding:'14px',background:'#fff'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                      <div>
+                        <div style={{fontWeight:700,color:'var(--navy-primary)',fontSize:'16px'}}>{a.ApplicantName || '—'}</div>
+                        <div style={{fontSize:'12px',color:'#888',fontFamily:'monospace'}}>{a.RegistrationNumber || '—'}</div>
+                      </div>
+                      <span style={{display:'inline-block',padding:'3px 9px',background:statusColor,color:'#fff',fontSize:11,fontWeight:600,textTransform:'uppercase',borderRadius:3}}>{a.Status || '—'}</span>
+                    </div>
+                    <div style={{margin:'10px 0',fontSize:13,color:'#555'}}>
+                      <div><i className="fas fa-graduation-cap" style={{width:16,color:'var(--navy-accent)'}}></i> {a.AllottedClassLabel || a.AppliedForGrade || '—'}</div>
+                      <div><i className="fas fa-tag" style={{width:16,color:'#888'}}></i> {admTypeLabel(a.AdmissionType)}</div>
+                      {a.ContactNumber && <div><i className="fas fa-phone" style={{width:16,color:'#888'}}></i> {a.ContactNumber}</div>}
+                    </div>
+                    {canEdit && (
+                      <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
+                        <button className="action-icon edit-icon" onClick={() => { setEditingReg(a); setShowRegModal(true); }} title="Edit"><i className="fas fa-edit"></i></button>
+                        {a.Status === 'registered' && <button className="action-icon" onClick={() => { setConfirmTarget(a); setShowConfirmModal(true); }} title="Confirm"><i className="fas fa-check"></i></button>}
+                        {a.Status === 'admitted' && <button className="action-icon" onClick={() => { setEnrollTarget(a); setShowEnrollModal(true); }} title="Enroll"><i className="fas fa-user-graduate"></i></button>}
+                        <button className="action-icon delete-icon" onClick={() => handleDelete(a)} title="Delete"><i className="fas fa-trash"></i></button>
+                      </div>
+                    )}
+                  </div>
+                );
+              }}
+            />
+          )}
 
           {showRegModal && (
             <RegistrationModal
@@ -7189,6 +7258,7 @@
       const [showModal, setShowModal] = useState(false);
       const [editingClass, setEditingClass] = useState(null);
       const [showAutoGen, setShowAutoGen] = useState(false);
+      const [viewMode, setViewMode] = useState('table');
       // today's timetable drill-down
       const [showTtModal, setShowTtModal] = useState(false);
       const [ttClass, setTtClass] = useState(null);
@@ -7503,6 +7573,7 @@
           <div className="section-header">
             <h2><i className="fas fa-school"></i> Classes & Sections{syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}</h2>
             <div style={{display:'flex',gap:'10px'}}>
+              <ViewToggle mode={viewMode} onChange={setViewMode} />
               <button className="btn btn-primary" onClick={handleEmailPdf}>
                 <i className="fas fa-paper-plane"></i> Email PDF
               </button>
@@ -7626,10 +7697,49 @@
             </>
           )}
 
-          {loading && <TableSkeleton rows={6} columns={14} />}
-          <div style={{ display: loading ? 'none' : 'block' }}>
+          {loading && viewMode === 'table' && <TableSkeleton rows={6} columns={14} />}
+          <div style={{ display: (loading || viewMode !== 'table') ? 'none' : 'block' }}>
             <table id="classesTable" className="display" style={{width: '100%'}}></table>
           </div>
+
+          {!loading && viewMode === 'grid' && (
+            <GridCards
+              items={classes}
+              emptyText="No classes found."
+              renderCard={(c) => {
+                const m = STAGE_META[c.CurriculumStage] || { label: c.CurriculumStage || '—', color: '#999' };
+                const cur = parseInt(c.TotalStrength, 10) || 0;
+                const max = parseInt(c.MaxCapacity, 10) || 0;
+                const pct = max > 0 ? Math.min(100, Math.round((cur / max) * 100)) : 0;
+                const barColor = pct >= 95 ? '#ea4335' : pct >= 80 ? '#fbbc04' : '#34a853';
+                return (
+                  <div key={c.ID} className="grid-card" style={{border:'1px solid #e0e0e0',borderRadius:'8px',padding:'14px',background:'#fff'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                      <div>
+                        <div style={{fontWeight:700,color:'var(--navy-primary)',fontSize:'16px'}}>{c.ClassName} {c.Section}</div>
+                        <div style={{fontSize:'12px',color:'#888'}}>{c.AcademicYear}</div>
+                      </div>
+                      <span style={{display:'inline-block',padding:'3px 9px',background:m.color,color:'#fff',fontSize:11,fontWeight:600,textTransform:'uppercase',borderRadius:3}}>{m.label}</span>
+                    </div>
+                    <div style={{margin:'10px 0',fontSize:13,color:'#555'}}>
+                      <div><i className="fas fa-chalkboard-teacher" style={{width:16,color:'var(--navy-accent)'}}></i> {c.ClassTeacherName || 'Unassigned'}</div>
+                      {c.RoomNumber && <div><i className="fas fa-door-open" style={{width:16,color:'#888'}}></i> {c.RoomNumber}</div>}
+                    </div>
+                    <div style={{fontSize:12,marginBottom:8}}>
+                      <strong>{cur}</strong> / {max} students
+                      <div style={{height:4,width:'100%',background:'#e9ecef',marginTop:4}}><div style={{height:'100%',width:pct+'%',background:barColor}}></div></div>
+                    </div>
+                    {isAdmin && (
+                      <div style={{display:'flex',gap:8,marginTop:10}}>
+                        <button className="action-icon edit-icon" onClick={() => { setEditingClass(c); setShowModal(true); }} title="Edit"><i className="fas fa-edit"></i></button>
+                        <button className="action-icon delete-icon" onClick={() => handleDelete(c)} title="Delete"><i className="fas fa-trash"></i></button>
+                      </div>
+                    )}
+                  </div>
+                );
+              }}
+            />
+          )}
 
           {showModal && (
             <ClassModal
@@ -9572,6 +9682,7 @@
       const [showParentsModal, setShowParentsModal] = useState(false);
       const [showResultsModal, setShowResultsModal] = useState(false);
       const [drillStudent, setDrillStudent] = useState(null);
+      const [viewMode, setViewMode] = useState('table');
       const tableInstanceRef = useRef(null);
 
       const [filters, setFilters] = useState({
@@ -9858,11 +9969,14 @@
         <div className="data-section">
           <div className="section-header">
             <h2><i className="fas fa-user-graduate"></i> {headerLabel}{syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}</h2>
-            {isAdmin && (
-              <button className="btn btn-success" onClick={() => { setEditing(null); setShowFormModal(true); }}>
-                <i className="fas fa-plus"></i> Add Student
-              </button>
-            )}
+            <div style={{display:'flex',gap:'10px'}}>
+              <ViewToggle mode={viewMode} onChange={setViewMode} />
+              {isAdmin && (
+                <button className="btn btn-success" onClick={() => { setEditing(null); setShowFormModal(true); }}>
+                  <i className="fas fa-plus"></i> Add Student
+                </button>
+              )}
+            </div>
           </div>
 
           {loadError && !loading && items.length === 0 && (
@@ -10000,10 +10114,48 @@
             </>
           )}
 
-          {loading && <TableSkeleton rows={6} columns={isClerk ? 9 : 10} />}
-          <div style={{ display: loading ? 'none' : 'block' }}>
+          {loading && viewMode === 'table' && <TableSkeleton rows={6} columns={isClerk ? 9 : 10} />}
+          <div style={{ display: (loading || viewMode !== 'table') ? 'none' : 'block' }}>
             <table id="studentsTable" className="display" style={{width: '100%'}}></table>
           </div>
+
+          {!loading && viewMode === 'grid' && (
+            <GridCards
+              items={items}
+              emptyText="No students found."
+              renderCard={(s) => {
+                const statusCls = String(s.Status || '').toLowerCase();
+                const statusColor = statusCls === 'active' ? '#34a853' : statusCls === 'inactive' ? '#999' : statusCls === 'suspended' ? '#ea4335' : '#0074D9';
+                return (
+                  <div key={s.ID} className="grid-card" style={{border:'1px solid #e0e0e0',borderRadius:'8px',padding:'14px',background:'#fff'}}>
+                    <div style={{display:'flex',gap:10,alignItems:'center'}}>
+                      {s.PhotoURL
+                        ? <img src={s.PhotoURL} style={{width:44,height:44,borderRadius:'50%',objectFit:'cover'}} onError={(e) => { e.target.style.display = 'none'; }} />
+                        : <div className="profile-avatar" style={{width:44,height:44,fontSize:16}}>{(s.FirstName || '?').charAt(0).toUpperCase()}</div>
+                      }
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:700,color:'var(--navy-primary)',fontSize:15,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{s.FullName || '—'}</div>
+                        <div style={{fontSize:11,color:'#888',fontFamily:'monospace'}}>{s.AdmissionNumber || '—'}</div>
+                      </div>
+                      <span style={{display:'inline-block',padding:'3px 9px',background:statusColor,color:'#fff',fontSize:10,fontWeight:600,textTransform:'uppercase',borderRadius:3}}>{s.Status || '—'}</span>
+                    </div>
+                    <div style={{margin:'10px 0',fontSize:13,color:'#555'}}>
+                      <div><i className="fas fa-school" style={{width:16,color:'var(--navy-accent)'}}></i> {s.ClassLabel || '—'} · Roll {s.RollNumber || '-'}</div>
+                      {!isClerk && s.FatherName && <div><i className="fas fa-user" style={{width:16,color:'#888'}}></i> {s.FatherName}</div>}
+                    </div>
+                    <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
+                      <button className="action-icon edit-icon" style={{color:'var(--navy-accent)'}} onClick={() => { setViewing(s); setShowViewModal(true); }} title="View"><i className="fas fa-eye"></i></button>
+                      {(isAdmin || isClerk) && <button className="action-icon edit-icon" style={{color:'#34a853'}} onClick={() => { setDrillStudent(s); setShowFeesModal(true); }} title="Fees"><i className="fas fa-money-bill-wave"></i></button>}
+                      {(isAdmin || isTeacher || isSupervisor) && <button className="action-icon edit-icon" style={{color:'#fb8c00'}} onClick={() => { setDrillStudent(s); setShowAttendanceModal(true); }} title="Attendance"><i className="fas fa-calendar-check"></i></button>}
+                      {(isAdmin || isTeacher || isSupervisor) && <button className="action-icon edit-icon" style={{color:'#0074D9'}} onClick={() => { setDrillStudent(s); setShowResultsModal(true); }} title="Results"><i className="fas fa-graduation-cap"></i></button>}
+                      {isAdmin && <button className="action-icon edit-icon" onClick={() => { setEditing(s); setShowFormModal(true); }} title="Edit"><i className="fas fa-edit"></i></button>}
+                      {isAdmin && <button className="action-icon delete-icon" onClick={() => handleDelete(s)} title="Delete"><i className="fas fa-trash"></i></button>}
+                    </div>
+                  </div>
+                );
+              }}
+            />
+          )}
 
           {showFormModal && (
             <StudentFormModal
@@ -16482,6 +16634,7 @@
       // receipt drill-down
       const [showReceiptModal, setShowReceiptModal] = useState(false);
       const [drillPayment, setDrillPayment] = useState(null);
+      const [viewMode, setViewMode] = useState('table');
       const tableInstanceRef = useRef(null);
 
       const [filters, setFilters] = useState({ status: '', mode: '', search: '' });
@@ -16748,11 +16901,14 @@
         <div className="data-section">
           <div className="section-header">
             <h2><i className="fas fa-money-bill-wave"></i> {isAdmin ? 'Fees Collection' : 'Fees Collection (Read-only)'}{syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}</h2>
-            {(isAdmin || isClerk) && (
-              <button className="btn btn-success" onClick={() => { setEditing(null); setShowModal('add'); }}>
-                <i className="fas fa-plus"></i> Record Payment
-              </button>
-            )}
+            <div style={{display:'flex',gap:'10px'}}>
+              <ViewToggle mode={viewMode} onChange={setViewMode} />
+              {(isAdmin || isClerk) && (
+                <button className="btn btn-success" onClick={() => { setEditing(null); setShowModal('add'); }}>
+                  <i className="fas fa-plus"></i> Record Payment
+                </button>
+              )}
+            </div>
           </div>
 
           {loadError && !loading && items.length === 0 && (
@@ -16842,10 +16998,44 @@
             </>
           )}
 
-          {loading && <TableSkeleton rows={5} columns={8} />}
-          <div style={{ display: loading ? 'none' : 'block' }}>
+          {loading && viewMode === 'table' && <TableSkeleton rows={5} columns={8} />}
+          <div style={{ display: (loading || viewMode !== 'table') ? 'none' : 'block' }}>
             <table id="paymentsTable" className="display" style={{width: '100%'}}></table>
           </div>
+
+          {!loading && viewMode === 'grid' && (
+            <GridCards
+              items={items}
+              emptyText="No payments found."
+              renderCard={(p) => {
+                const s = String(p.PaymentStatus || '').toLowerCase();
+                const statusColor = s === 'paid' ? '#34a853' : s === 'partial' ? '#fbbc04' : s === 'pending' ? '#0074D9' : s === 'failed' ? '#ea4335' : '#6a1b9a';
+                return (
+                  <div key={p.ID} className="grid-card" style={{border:'1px solid #e0e0e0',borderRadius:'8px',padding:'14px',background:'#fff'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                      <div style={{minWidth:0}}>
+                        <div style={{fontWeight:700,color:'var(--navy-primary)',fontSize:15,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{p.StudentName || '—'}</div>
+                        <div style={{fontSize:11,color:'#888',fontFamily:'monospace'}}>{p.ReceiptNumber || '—'}</div>
+                      </div>
+                      <span style={{display:'inline-block',padding:'3px 9px',background:statusColor,color:'#fff',fontSize:10,fontWeight:600,textTransform:'uppercase',borderRadius:3}}>{p.PaymentStatus || '—'}</span>
+                    </div>
+                    <div style={{margin:'10px 0',fontSize:13,color:'#555'}}>
+                      <div style={{textTransform:'capitalize'}}><i className="fas fa-tag" style={{width:16,color:'var(--navy-accent)'}}></i> {p.FeeCategory || '—'} {p.BillingPeriod ? `(${p.BillingPeriod})` : ''}</div>
+                      <div><strong style={{color:'#34a853'}}>GH₵{parseFloat(p.AmountPaid || 0).toFixed(2)}</strong>{parseFloat(p.AmountDue) > 0 && <span style={{color:'#ea4335',fontSize:11,marginLeft:6}}>Due GH₵{parseFloat(p.AmountDue).toFixed(2)}</span>}</div>
+                      <div style={{fontSize:11,color:'#888',textTransform:'uppercase'}}>{(p.PaymentMode || '').replace('_',' ')}</div>
+                    </div>
+                    <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
+                      <button className="action-icon edit-icon" style={{color:'var(--navy-accent)'}} onClick={() => { setEditing(p); setShowModal('view'); }} title="View"><i className="fas fa-eye"></i></button>
+                      {(isAdmin || isClerk) && <button className="action-icon edit-icon" style={{color:'#001f3f'}} onClick={() => { setDrillPayment(p); setShowReceiptModal(true); }} title="Receipt"><i className="fas fa-print"></i></button>}
+                      {(isAdmin || isClerk) && <button className="action-icon edit-icon" onClick={() => { setEditing(p); setShowModal('edit'); }} title="Edit"><i className="fas fa-edit"></i></button>}
+                      {isAdmin && p.PaymentStatus !== 'refunded' && <button className="action-icon edit-icon" style={{color:'#ea4335'}} onClick={() => handleRefund(p)} title="Refund"><i className="fas fa-undo"></i></button>}
+                      {isAdmin && <button className="action-icon delete-icon" onClick={() => handleDelete(p)} title="Delete"><i className="fas fa-trash"></i></button>}
+                    </div>
+                  </div>
+                );
+              }}
+            />
+          )}
 
           {showModal && (
             <FeePaymentModal
