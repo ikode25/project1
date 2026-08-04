@@ -10017,6 +10017,32 @@ function uploadProfileImage(base64Data, filename, username) {
   }
 }
 
+// generic file upload for the Documents module — unlike uploadProfileImage() this preserves the
+// real MIME type (PDF, Word, etc.) instead of hardcoding image/jpeg, so downloaded files aren't corrupted.
+function uploadDocumentFile(base64Data, filename, mimeType, username) {
+  try {
+    var folder = getAssetsFolder();
+    if (!folder) return { success: false, message: 'Failed to access ASSETS folder' };
+
+    var b64 = base64Data.split(',')[1] || base64Data;
+    var bytes = Utilities.base64Decode(b64);
+    var blob = Utilities.newBlob(bytes, mimeType || 'application/octet-stream', filename);
+    var file = folder.createFile(blob);
+    file.setName(username + '_' + new Date().getTime() + '_' + filename);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    var fileId = file.getId();
+    var fileUrl = 'https://drive.google.com/file/d/' + fileId + '/view';
+    addLog(username, 'Document Uploaded', 'Uploaded: ' + file.getName());
+    return {
+      success: true, fileId: fileId, fileUrl: fileUrl, fileName: file.getName(),
+      mimeType: mimeType || 'application/octet-stream', fileSizeKB: Math.round(bytes.length / 1024)
+    };
+  } catch (err) {
+    return { success: false, message: 'Upload error: ' + err.toString() };
+  }
+}
+
 // ============== User Settings (theme/colors/photo) ==============
 function updateUserSettings(username, settings) {
   try {

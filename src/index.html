@@ -3290,6 +3290,75 @@
     // Reusable photo picker — click/tap to choose an image, uploads to Drive via
     // uploadProfileImage(), stores the returned URL via onChange. Works for student/admission
     // photos and the school logo alike.
+    // generic drag-and-drop file uploader — used by the Documents module (any file type, not just images)
+    function FileDropzone({ fileName, onUploaded, currentUser, label, accept }) {
+      const [uploading, setUploading] = useState(false);
+      const [dragOver, setDragOver] = useState(false);
+      const inputRef = useRef(null);
+
+      const doUpload = (file) => {
+        if (!file) return;
+        if (file.size > 10 * 1024 * 1024) {
+          Swal.fire({ icon: 'error', title: 'Too large', text: 'Choose a file under 10MB.' });
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          setUploading(true);
+          google.script.run
+            .withSuccessHandler((res) => {
+              setUploading(false);
+              if (res.success) onUploaded(res);
+              else Swal.fire({ icon: 'error', title: 'Upload failed', text: res.message });
+            })
+            .withFailureHandler((err) => { setUploading(false); Swal.fire({ icon: 'error', title: 'Upload failed', text: err.message }); })
+            .uploadDocumentFile(ev.target.result, file.name, file.type, currentUser || 'system');
+        };
+        reader.readAsDataURL(file);
+      };
+
+      const handlePick = (e) => { doUpload(e.target.files[0]); e.target.value = ''; };
+      const handleDrop = (e) => {
+        e.preventDefault(); e.stopPropagation(); setDragOver(false);
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) doUpload(e.dataTransfer.files[0]);
+      };
+
+      return (
+        <div className="form-group">
+          {label && <label>{label}</label>}
+          <div
+            onClick={() => !uploading && inputRef.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+            style={{
+              border: `2px dashed ${dragOver ? 'var(--navy-accent)' : '#ccc'}`,
+              borderRadius: '8px', padding: '22px', textAlign: 'center',
+              background: dragOver ? 'rgba(0,116,217,0.06)' : '#f8f9fa',
+              cursor: uploading ? 'wait' : 'pointer', transition: 'background 0.15s, border-color 0.15s'
+            }}
+          >
+            {uploading ? (
+              <><i className="fas fa-spinner fa-spin" style={{fontSize:'22px',color:'var(--navy-accent)'}}></i><div style={{fontSize:'13px',marginTop:'6px',color:'#666'}}>Uploading…</div></>
+            ) : fileName ? (
+              <>
+                <i className="fas fa-file-alt" style={{fontSize:'22px',color:'#34a853'}}></i>
+                <div style={{fontSize:'13px',marginTop:'6px',fontWeight:600,color:'var(--navy-primary)',wordBreak:'break-all'}}>{fileName}</div>
+                <div style={{fontSize:'11px',color:'#888',marginTop:'4px'}}>Click or drop to replace</div>
+              </>
+            ) : (
+              <>
+                <i className="fas fa-cloud-upload-alt" style={{fontSize:'26px',color:'#aaa'}}></i>
+                <div style={{fontSize:'13px',marginTop:'6px',color:'#666'}}>Drag & drop a file here, or click to browse</div>
+                <div style={{fontSize:'11px',color:'#999',marginTop:'2px'}}>Max 10MB</div>
+              </>
+            )}
+          </div>
+          <input ref={inputRef} type="file" accept={accept} onChange={handlePick} style={{display:'none'}} />
+        </div>
+      );
+    }
+
     function PhotoPicker({ value, onChange, currentUser, label, shape = 'circle', size = 96 }) {
       const [uploading, setUploading] = useState(false);
       const inputRef = useRef(null);
@@ -22255,6 +22324,7 @@
         EntityType: r === 'clerk' ? 'student' : (r === 'teacher' ? 'teacher' : 'student'),
         EntityID: '',
         FileURL: '',
+        FileName: '',
         FileSizeKB: '',
         MimeType: '',
         Remarks: '',
@@ -22275,7 +22345,11 @@
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header"><h3><i className="fas fa-upload"></i> Upload Document</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
             <div className="modal-body">
-              <form onSubmit={(e) => { e.preventDefault(); onSave(formData); }}>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (!formData.FileURL) { Swal.fire({ icon: 'warning', text: 'Please upload a file first.' }); return; }
+                onSave(formData);
+              }}>
                 <div className="form-grid">
                   <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Document Name *</label><input type="text" value={formData.DocumentName} onChange={(e) => set('DocumentName', e.target.value)} required maxLength="200" /></div>
                   <SearchableDropdown label="Document Type" icon="fas fa-tag" required
@@ -22299,9 +22373,14 @@
                   ) : (
                     <div className="form-group"><label>Entity ID *</label><input type="number" value={formData.EntityID} onChange={(e) => set('EntityID', e.target.value)} required /></div>
                   )}
-                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>File URL *</label><input type="text" value={formData.FileURL} onChange={(e) => set('FileURL', e.target.value)} required maxLength="255" placeholder="https://..." /></div>
-                  <div className="form-group"><label>File Size (KB)</label><input type="number" value={formData.FileSizeKB} onChange={(e) => set('FileSizeKB', e.target.value)} min="0" /></div>
-                  <div className="form-group"><label>MIME Type</label><input type="text" value={formData.MimeType} onChange={(e) => set('MimeType', e.target.value)} maxLength="50" placeholder="application/pdf" /></div>
+                  <div style={{gridColumn:'1 / -1'}}>
+                    <FileDropzone
+                      label="File *"
+                      fileName={formData.FileName}
+                      currentUser={currentUser}
+                      onUploaded={(res) => setFormData({ ...formData, FileURL: res.fileUrl, FileName: res.fileName, MimeType: res.mimeType, FileSizeKB: res.fileSizeKB })}
+                    />
+                  </div>
                   <div className="form-group"><label><i className="fas fa-hourglass-end"></i> Expiry Date</label><input type="date" value={formData.ExpiryDate} onChange={(e) => set('ExpiryDate', e.target.value)} /></div>
                   <div className="form-group"><label><i className="fas fa-hashtag"></i> Document Number</label><input type="text" value={formData.DocumentNumber} onChange={(e) => set('DocumentNumber', e.target.value)} maxLength="100" placeholder="Passport/Cert no." /></div>
                   <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Remarks</label><textarea value={formData.Remarks} onChange={(e) => set('Remarks', e.target.value)} rows="2" /></div>
