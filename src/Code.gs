@@ -546,6 +546,15 @@ function canReadStudents(role) {
 function isClerkBasicView(role) { var r = String(role || '').toLowerCase(); return r === 'clerk' || r === 'supervisor'; }
 
 // teacher's class_ids — for student own-class filter
+// set of "classId|subjectId" keys a teacher is explicitly assigned to teach (Teacher_Assignments rows).
+// Being the Classes.ClassTeacherID for a class does NOT by itself grant visibility into every subject
+// in that class — only an actual subject assignment row does (a class teacher who also teaches Math
+// there needs a Teacher_Assignments row for Math, same as any other subject teacher). Thin wrapper
+// around the canonical getTeacherAssignmentsMap() used by bulkSaveMarks() for write-side enforcement.
+function _getTeacherSubjectClassKeys(currentUser) {
+  return getTeacherAssignmentsMap(getCurrentUserId(currentUser));
+}
+
 function getTeacherClassIds(currentUser) {
   var users = getSheet(USERS_SHEET);
   if (!users) return [];
@@ -2763,10 +2772,13 @@ function getAllSubjects(currentUser, currentRole) {
     var cmap = getClassesMap();
     var subjects = [];
     var scope = getViewerScope(currentUser, currentRole);
+    var isTeacher = String(currentRole || '').toLowerCase() === 'teacher';
+    var teacherSubjectKeys = isTeacher ? _getTeacherSubjectClassKeys(currentUser) : null;
 
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][5]) === '1') continue; // soft-deleted
       if (!scope.all && scope.classIds.indexOf(parseInt(data[i][3], 10)) === -1) continue; // student/parent: own class only
+      if (isTeacher && !teacherSubjectKeys[parseInt(data[i][3], 10) + '|' + parseInt(data[i][0], 10)]) continue; // teacher: only subjects they're assigned to teach
 
       var clsId = data[i][3];
       var cls = cmap[clsId];
@@ -3101,11 +3113,14 @@ function getSubjectsForClass(classId, currentUser, currentRole) {
     if (isNaN(cid)) return { success: true, data: [] };
     var _scope = getViewerScope(currentUser, currentRole);
     if (!_scope.all && _scope.classIds.indexOf(cid) === -1) return { success: false, message: 'Forbidden — own class only' };
+    var isTeacher = String(currentRole || '').toLowerCase() === 'teacher';
+    var teacherSubjectKeys = isTeacher ? _getTeacherSubjectClassKeys(currentUser) : null;
 
     var data = sh.getDataRange().getValues(), out = [];
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][5]) === '1') continue;
       if (parseInt(data[i][3], 10) !== cid) continue;
+      if (isTeacher && !teacherSubjectKeys[cid + '|' + parseInt(data[i][0], 10)]) continue;
       var maxMarks = parseInt(data[i][4], 10) || 100;
       out.push({
         ID: data[i][0],
@@ -7514,12 +7529,15 @@ function getSubjectsForClassId(classId, currentUser, currentRole) {
     if (isNaN(cid)) return { success: false, message: 'Invalid class id' };
     var _scope = getViewerScope(currentUser, currentRole);
     if (!_scope.all && _scope.classIds.indexOf(cid) === -1) return { success: false, message: 'Forbidden — own class only' };
+    var isTeacher2 = String(currentRole || '').toLowerCase() === 'teacher';
+    var teacherSubjectKeys2 = isTeacher2 ? _getTeacherSubjectClassKeys(currentUser) : null;
     var sh = getSheet(SUBJECTS_SHEET);
     if (!sh) return { success: true, data: [] };
     var data = sh.getDataRange().getValues(), out = [];
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][5]) === '1') continue;
       if (parseInt(data[i][3], 10) !== cid) continue;
+      if (isTeacher2 && !teacherSubjectKeys2[cid + '|' + parseInt(data[i][0], 10)]) continue;
       out.push({
         ID: data[i][0],
         SubjectName: data[i][1],
