@@ -319,7 +319,7 @@ var PERIOD_HEADERS = ['ID','PeriodNumber','StartTime','EndTime','IsBreak','Label
 // 27=OwnerEmail, 28=OwnerPhone, 29=DailyDigestTime (HH:MM, 24h, school-close time the digest fires at),
 // SMS balance cache (30-31, refreshed on demand — avoids hammering the provider's balance API):
 // 30=SmsBalanceCache (numeric, '' if never checked), 31=SmsBalanceCacheAt (ISO timestamp)
-var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt'];
+var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt','ShowOverallPositionOnReportCard','ShowSubjectAverageOnReportCard'];
 
 // timetable cols (18):
 // 0=ID, 1=ClassID (FK), 2=DayOfWeek (lower: monday..sunday), 3=PeriodNumber,
@@ -10318,7 +10318,9 @@ function getSchoolSettings() {
             AcademicYearStartDate: toIso(data[i][17]),
             AcademicYearEndDate: toIso(data[i][18]),
             HiddenMenuIds: data[i][19] || '',
-            AdmissionNumberPrefix: data[i][20] || ''
+            AdmissionNumberPrefix: data[i][20] || '',
+            ShowOverallPositionOnReportCard: data[i][32] === '' || data[i][32] == null ? true : String(data[i][32]) === '1',
+            ShowSubjectAverageOnReportCard: String(data[i][33]) === '1'
           }
         };
       }
@@ -10350,7 +10352,9 @@ function defaultSchoolSettings() {
     AcademicYearStartDate: cy + '-09-01',
     AcademicYearEndDate: (cy + 1) + '-07-31',
     HiddenMenuIds: '',
-    AdmissionNumberPrefix: ''
+    AdmissionNumberPrefix: '',
+    ShowOverallPositionOnReportCard: true,
+    ShowSubjectAverageOnReportCard: false
   };
 }
 
@@ -10982,6 +10986,8 @@ function updateSchoolSettings(d, currentUser, currentRole) {
       .join(',');
 
     var admissionPrefix = String(d.AdmissionNumberPrefix || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10);
+    var showOverallPosition = (d.ShowOverallPositionOnReportCard === false || d.ShowOverallPositionOnReportCard === '0') ? '0' : '1';
+    var showSubjectAverage = (d.ShowSubjectAverageOnReportCard === true || d.ShowSubjectAverageOnReportCard === '1') ? '1' : '0';
 
     var values = [
       1,
@@ -11001,7 +11007,11 @@ function updateSchoolSettings(d, currentUser, currentRole) {
     ];
 
     if (foundRow === -1) {
-      sh.appendRow(values.concat([ts, ts, workingDays, ayStart, ayEnd, hiddenMenuIds, admissionPrefix]));
+      var newRow = values.concat([ts, ts, workingDays, ayStart, ayEnd, hiddenMenuIds, admissionPrefix]);
+      while (newRow.length < 32) newRow.push('');
+      newRow[32] = showOverallPosition;
+      newRow[33] = showSubjectAverage;
+      sh.appendRow(newRow);
     } else {
       sh.getRange(foundRow, 1, 1, values.length).setValues([values]);
       sh.getRange(foundRow, 16).setValue(ts);
@@ -11010,6 +11020,8 @@ function updateSchoolSettings(d, currentUser, currentRole) {
       sh.getRange(foundRow, 19).setValue(ayEnd);
       sh.getRange(foundRow, 20).setValue(hiddenMenuIds);
       sh.getRange(foundRow, 21).setValue(admissionPrefix);
+      sh.getRange(foundRow, 33).setValue(showOverallPosition);
+      sh.getRange(foundRow, 34).setValue(showSubjectAverage);
     }
     addLog(currentUser, 'School Settings Updated', d.SchoolName || '');
     return { success: true, message: 'School settings saved successfully' };
@@ -16907,6 +16919,9 @@ function getStudentReportCard(studentId, examId, currentUser, currentRole) {
           beceInput.push({ subjectName: sub.SubjectName, isOptional: sub.IsOptional, pct: pct });
         }
       }
+      // class average for this subject (across non-absent students who have marks)
+      var subjScores = (subjectAllScores[sub.ID] || []).filter(function(r) { return !r.absent; });
+      row.ClassAverage = subjScores.length ? Math.round(subjScores.reduce(function(s, r) { return s + r.total; }, 0) / subjScores.length) : null;
       subjectRows.push(row);
     });
     var average = subjectsWithMarks > 0 ? Math.round(grandTotal / subjectsWithMarks) : 0;
@@ -16976,7 +16991,11 @@ function getStudentReportCard(studentId, examId, currentUser, currentRole) {
         attendance: attendance,
         overallClassPosition: overallPosMap[sid] || '',
         beceAggregate: beceAggregate,
-        remarks: remarks
+        remarks: remarks,
+        displaySettings: {
+          ShowOverallPosition: settingsRes.data ? settingsRes.data.ShowOverallPositionOnReportCard !== false : true,
+          ShowSubjectAverage: settingsRes.data ? !!settingsRes.data.ShowSubjectAverageOnReportCard : false
+        }
       }
     };
   } catch (err) {
@@ -17021,33 +17040,52 @@ function getClassReportCards(classId, examId, currentUser, currentRole) {
 }
 
 // admin/teacher — upsert the free-text remarks block for one student's termly report card
+// Class Teacher's Remarks (Interest/Talent, Conduct, Attitude, ClassTeacherRemark, PromotionStatus) — teacher/admin.
+// Head Teacher's Remarks (HeadmasterRemark) — supervisor/admin (supervisor = academic-oversight/headteacher role).
+// Each caller only sends the fields it owns; the other module's stored values are preserved untouched.
 function upsertReportRemarks(d, currentUser, currentRole) {
   try {
     var role = String(currentRole || '').toLowerCase();
-    if (role !== 'admin' && role !== 'teacher') return { success: false, message: 'Forbidden — admin or teacher only' };
+    var isClassTeacherSide = role === 'admin' || role === 'teacher';
+    var isHeadTeacherSide = role === 'admin' || role === 'supervisor';
+    if (!isClassTeacherSide && !isHeadTeacherSide) return { success: false, message: 'Forbidden — admin, teacher, or supervisor only' };
+
     var sid = parseInt(d.StudentID, 10), eid = parseInt(d.ExamID, 10);
     if (isNaN(sid) || isNaN(eid)) return { success: false, message: 'Invalid StudentID/ExamID' };
 
     var sh = getSheet(REPORT_REMARKS_SHEET);
     if (!sh) return { success: false, message: 'Report_Remarks sheet not found. Run setup() first.' };
     var data = sh.getDataRange().getValues();
-    var foundRow = -1;
+    var foundRow = -1, existing = null;
     for (var i = 1; i < data.length; i++) {
-      if (parseInt(data[i][1], 10) === sid && parseInt(data[i][2], 10) === eid) { foundRow = i + 1; break; }
+      if (parseInt(data[i][1], 10) === sid && parseInt(data[i][2], 10) === eid) { foundRow = i + 1; existing = data[i]; break; }
+    }
+    var cur = {
+      InterestTalent: existing ? (existing[3] || '') : '',
+      Conduct: existing ? (existing[4] || '') : '',
+      AttitudeToWork: existing ? (existing[5] || '') : '',
+      ClassTeacherRemark: existing ? (existing[6] || '') : '',
+      HeadmasterRemark: existing ? (existing[7] || '') : '',
+      PromotionStatus: existing ? (existing[8] || '') : ''
+    };
+
+    if (isClassTeacherSide) {
+      if (d.InterestTalent !== undefined) cur.InterestTalent = String(d.InterestTalent || '').trim().slice(0, 100);
+      if (d.Conduct !== undefined) cur.Conduct = String(d.Conduct || '').trim().slice(0, 100);
+      if (d.AttitudeToWork !== undefined) cur.AttitudeToWork = String(d.AttitudeToWork || '').trim().slice(0, 100);
+      if (d.ClassTeacherRemark !== undefined) cur.ClassTeacherRemark = String(d.ClassTeacherRemark || '').trim().slice(0, 300);
+      if (d.PromotionStatus !== undefined) {
+        var promoEnum = ['', 'promoted', 'not_promoted', 'on_trial'];
+        var promo = String(d.PromotionStatus || '').toLowerCase();
+        if (promoEnum.indexOf(promo) === -1) return { success: false, message: 'Invalid PromotionStatus' };
+        cur.PromotionStatus = promo;
+      }
+    }
+    if (isHeadTeacherSide && d.HeadmasterRemark !== undefined) {
+      cur.HeadmasterRemark = String(d.HeadmasterRemark || '').trim().slice(0, 300);
     }
 
-    var promoEnum = ['', 'promoted', 'not_promoted', 'on_trial'];
-    var promo = String(d.PromotionStatus || '').toLowerCase();
-    if (promoEnum.indexOf(promo) === -1) return { success: false, message: 'Invalid PromotionStatus' };
-
-    var vals = [
-      String(d.InterestTalent || '').trim().slice(0, 300),
-      String(d.Conduct || '').trim().slice(0, 300),
-      String(d.AttitudeToWork || '').trim().slice(0, 300),
-      String(d.ClassTeacherRemark || '').trim().slice(0, 500),
-      String(d.HeadmasterRemark || '').trim().slice(0, 500),
-      promo
-    ];
+    var vals = [cur.InterestTalent, cur.Conduct, cur.AttitudeToWork, cur.ClassTeacherRemark, cur.HeadmasterRemark, cur.PromotionStatus];
     var ts = nowIso();
 
     if (foundRow === -1) {

@@ -6055,6 +6055,42 @@
       { value: 'Traditional', label: 'Traditional (African Traditional Religion)' }
     ];
     const GHANA_REGION_OPTS = ['Ahafo','Ashanti','Bono','Bono East','Central','Eastern','Greater Accra','North East','Northern','Oti','Savannah','Upper East','Upper West','Volta','Western','Western North'].map(r => ({ value: r, label: r }));
+
+    // report-card remark dropdown vocabularies — Ghana GES style
+    const CONDUCT_OPTS = ['Excellent','Very Good','Good','Fair','Needs Improvement','Poor'].map(v => ({ value: v, label: v }));
+    const ATTITUDE_OPTS = ['Excellent','Very Good','Good','Fair','Needs Improvement','Poor'].map(v => ({ value: v, label: v }));
+    const TALENT_OPTS = ['Sports & Athletics','Music','Art & Craft','Debate / Public Speaking','Leadership','ICT / Computing','Reading','Drama','Dance','Science & Innovation','Handwriting','None Identified Yet','Other'].map(v => ({ value: v, label: v }));
+    const CLASS_TEACHER_REMARK_OPTS = [
+      'Outstanding performance, keep it up',
+      'Excellent performance this term',
+      'Very good result, well done',
+      'Good performance, can do even better',
+      'Satisfactory performance',
+      'Fair performance, needs more effort',
+      'Below average, needs serious improvement',
+      'Poor performance, requires close attention',
+      'A hardworking and dedicated student',
+      'Needs to pay more attention in class',
+      'Shows great improvement this term',
+      'Inconsistent performance, needs consistency'
+    ].map(v => ({ value: v, label: v }));
+    const HEAD_TEACHER_REMARK_OPTS = [
+      'An excellent result, congratulations',
+      'A very good result, well done',
+      'A good result, keep up the effort',
+      'A satisfactory result',
+      'A fair result, more effort is needed',
+      'Result needs significant improvement',
+      'Promising result, continue working hard',
+      'Commendable effort this term',
+      'Must improve next term'
+    ].map(v => ({ value: v, label: v }));
+    const PROMOTION_STATUS_OPTS = [
+      { value: '', label: '— Not set —' },
+      { value: 'promoted', label: 'Promoted' },
+      { value: 'on_trial', label: 'On Trial' },
+      { value: 'not_promoted', label: 'Not Promoted / Repeat' }
+    ];
     const admTypeLabel = (v) => ({ new: 'New', transfer: 'Transfer', re_admission: 'Re-admission' }[v] || (v || '—'));
     const admTypeBadgeColor = (v) => ({ new: '#0074D9', transfer: '#fb8c00', re_admission: '#6a1b9a' }[v] || '#6c757d');
     const admStatusColor = (v) => (ADM_STATUS_OPTS.find(o => o.value === v) || { color: '#6c757d' }).color;
@@ -11955,6 +11991,7 @@
                 )}
                 <th style={{width:'55px',textAlign:'center'}}>Grade</th>
                 <th style={{width:'55px',textAlign:'center'}}>Pos.</th>
+                {card.displaySettings?.ShowSubjectAverage && <th style={{width:'65px',textAlign:'center'}}>Class Avg</th>}
                 <th>Remarks</th>
               </tr>
             </thead>
@@ -11976,6 +12013,7 @@
                     <span className="rc-grade-pill" style={{background: sbaGradeColor(s.Grade, card.class.GradeBand)}}>{s.Grade || '—'}</span>
                   </td>
                   <td style={{textAlign:'center'}}>{s.Position ? ordinal(s.Position) : '—'}</td>
+                  {card.displaySettings?.ShowSubjectAverage && <td style={{textAlign:'center',color:'#666'}}>{s.ClassAverage != null ? s.ClassAverage : '—'}</td>}
                   <td style={{fontSize:'12px',color:'#444'}}>{s.Remarks || ''}</td>
                 </tr>
               ))}
@@ -11988,7 +12026,7 @@
                   <td style={{textAlign:'center'}}>{card.grandTotal.Exam}</td>
                 </>}
                 <td style={{textAlign:'center'}}>{card.grandTotal.Total}</td>
-                <td colSpan="3"></td>
+                <td colSpan={card.displaySettings?.ShowSubjectAverage ? 4 : 3}></td>
               </tr>
             </tfoot>
           </table>
@@ -12012,9 +12050,11 @@
             </div>
           </div>
 
-          <div className="rc-position-bar">
-            Overall Class Position: <b>{card.overallClassPosition ? ordinal(card.overallClassPosition) + ' / ' + card.class.Size : '—'}</b>
-          </div>
+          {card.displaySettings?.ShowOverallPosition !== false && (
+            <div className="rc-position-bar">
+              Overall Class Position: <b>{card.overallClassPosition ? ordinal(card.overallClassPosition) + ' / ' + card.class.Size : '—'}</b>
+            </div>
+          )}
 
           {card.class.IsJhs && (
             <div className="rc-position-bar rc-bece-bar">
@@ -12127,16 +12167,65 @@
       );
     }
 
+    // one editable remarks block — used for both "Class Teacher's Remarks" and "Head Teacher's Remarks"
+    function RemarksPanel({ title, icon, canEdit, fields, values, onSave, saving }) {
+      const [editing, setEditing] = useState(false);
+      const [form, setForm] = useState(values);
+      useEffect(() => { if (!editing) setForm(values); }, [values, editing]);
+
+      const displayValue = (f) => {
+        const v = values[f.key];
+        if (!v) return '—';
+        return f.key === 'PromotionStatus' ? v.replace(/_/g, ' ') : v;
+      };
+
+      return (
+        <div className="rc-remarks-block no-print" style={{marginTop:'14px'}}>
+          <div className="rc-remarks-hdr">
+            <i className={`fas fa-${icon}`}></i> {title}
+            {canEdit && !editing && (
+              <button type="button" className="btn btn-secondary" style={{marginLeft:'10px',padding:'2px 10px',fontSize:'12px'}} onClick={() => { setForm(values); setEditing(true); }}>
+                <i className="fas fa-edit"></i> Edit
+              </button>
+            )}
+          </div>
+          {editing ? (
+            <div className="rc-remarks-edit">
+              {fields.map(f => (
+                <div className="form-group" key={f.key}>
+                  <label>{f.label}</label>
+                  <select value={form[f.key] || ''} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}>
+                    {f.options[0] && f.options[0].value !== '' && <option value="">— Select —</option>}
+                    {f.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+              ))}
+              <div style={{display:'flex',gap:'8px'}}>
+                <button type="button" className="btn btn-primary" disabled={saving} onClick={() => onSave(form).then(() => setEditing(false))}>
+                  {saving ? 'Saving...' : 'Save'}
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={() => setEditing(false)}>Cancel</button>
+              </div>
+            </div>
+          ) : (
+            <div className="rc-remarks-grid">
+              {fields.map(f => <div key={f.key}><b>{f.label}:</b> {displayValue(f)}</div>)}
+            </div>
+          )}
+        </div>
+      );
+    }
+
     function StudentResultsModal({ student, currentUser, role, onClose }) {
       const [examList, setExamList] = useState(null);   // { id: examMeta } from getStudentResults
       const [examId, setExamId] = useState('');
       const [loading, setLoading] = useState(true);
       const [card, setCard] = useState(null);            // getStudentReportCard() payload
       const [school, setSchool] = useState(null);
-      const [editingRemarks, setEditingRemarks] = useState(false);
-      const [remarksForm, setRemarksForm] = useState(null);
-      const [savingRemarks, setSavingRemarks] = useState(false);
-      const canEditRemarks = String(role).toLowerCase() === 'admin' || String(role).toLowerCase() === 'teacher';
+      const [savingWhich, setSavingWhich] = useState(''); // 'class' | 'head' | ''
+      const r = String(role).toLowerCase();
+      const canEditClassTeacherRemarks = r === 'admin' || r === 'teacher';
+      const canEditHeadTeacherRemarks = r === 'admin' || r === 'supervisor';
 
       useEffect(() => {
         google.script.run
@@ -12165,7 +12254,7 @@
         google.script.run
           .withSuccessHandler((res) => {
             setLoading(false);
-            if (res.success) { setCard(res.data); setRemarksForm(res.data.remarks); setEditingRemarks(false); }
+            if (res.success) setCard(res.data);
             else { setCard(null); Swal.fire({ icon: 'error', title: 'Error', text: res.message }); }
           })
           .withFailureHandler((err) => { setLoading(false); Swal.fire({ icon: 'error', title: 'Error', text: err.message }); })
@@ -12181,19 +12270,10 @@
             }))
         : [];
 
-      const fmtDate = (d) => {
-        if (!d) return '';
-        try {
-          const dt = new Date(d);
-          if (isNaN(dt.getTime())) return String(d).split('T')[0];
-          return dt.toLocaleDateString('en-US', { day:'2-digit', month:'short', year:'numeric' });
-        } catch { return String(d).split('T')[0]; }
-      };
       const ordinal = (n) => {
         const s = ['th','st','nd','rd'], v = n % 100;
         return n + (s[(v - 20) % 10] || s[v] || s[0]);
       };
-      const termLabel = (t) => ({ term1: 'Term 1', term2: 'Term 2', term3: 'Term 3' }[String(t || '').toLowerCase()] || t || '—');
 
       const handlePrint = () => {
         document.body.classList.add('print-target');
@@ -12203,24 +12283,20 @@
         }, 60);
       };
 
-      const saveRemarks = () => {
-        setSavingRemarks(true);
-        google.script.run
-          .withSuccessHandler((res) => {
-            setSavingRemarks(false);
-            if (res.success) { setCard({ ...card, remarks: remarksForm }); setEditingRemarks(false); }
-            else Swal.fire({ icon: 'error', title: 'Error', text: res.message });
-          })
-          .withFailureHandler((err) => { setSavingRemarks(false); Swal.fire({ icon: 'error', title: 'Error', text: err.message }); })
-          .upsertReportRemarks({ StudentID: student.ID, ExamID: examId, ...remarksForm }, currentUser, role);
+      // each panel only sends the fields it owns — the backend preserves the other panel's stored values
+      const saveRemarksPartial = (which, fields) => {
+        setSavingWhich(which);
+        return new Promise((resolve) => {
+          google.script.run
+            .withSuccessHandler((res) => {
+              setSavingWhich('');
+              if (res.success) { setCard({ ...card, remarks: { ...card.remarks, ...fields } }); resolve(); }
+              else { Swal.fire({ icon: 'error', title: 'Error', text: res.message }); resolve(); }
+            })
+            .withFailureHandler((err) => { setSavingWhich(''); Swal.fire({ icon: 'error', title: 'Error', text: err.message }); resolve(); })
+            .upsertReportRemarks({ StudentID: student.ID, ExamID: examId, ...fields }, currentUser, role);
+        });
       };
-
-      // school header values with safe fallbacks
-      const schoolName = (school && school.SchoolName) || 'School Name';
-      const schoolAddr = (school && school.SchoolAddress) || '';
-      const schoolPhone = (school && school.SchoolContact) || '';
-      const schoolLogo = (school && school.SchoolLogo) || DEFAULT_LOGO;
-      const currency = (school && school.Currency) || 'GH₵';
 
       return (
         <div className="modal-overlay" onClick={onClose}>
@@ -12257,188 +12333,57 @@
                   <i className="fas fa-hand-pointer"></i> Pick a term above to render the report card.
                 </div>
               ) : (
-                <div className="report-card">
-                  {/* school header */}
-                  <div className="rc-school-hdr">
-                    {schoolLogo && <img src={schoolLogo} alt="" onError={(e) => { e.target.style.display = 'none'; }} />}
-                    <div style={{flex:1}}>
-                      <div className="rc-sname">{schoolName}</div>
-                      {schoolAddr && <div className="rc-sline"><i className="fas fa-map-marker-alt"></i> {schoolAddr}</div>}
-                      {schoolPhone && <div className="rc-sline"><i className="fas fa-phone"></i> Tel: {schoolPhone}</div>}
-                    </div>
-                  </div>
+                <>
+                  <ReportCardStatic card={card} school={school} />
 
-                  <div className="rc-title">Student ID: <b>{card.student.AdmissionNumber || '—'}</b></div>
-
-                  {/* student + term info */}
-                  <div className="rc-info">
-                    <div><b>Name:</b> {card.student.FullName || ''}</div>
-                    <div><b>Class:</b> {card.class.Label || '—'}</div>
-                    <div><b>Gender:</b> {String(card.student.Gender || '').replace(/^./, c => c.toUpperCase()) || '—'}</div>
-                    <div><b>Term:</b> {termLabel(card.exam.Term)}</div>
-                    <div><b>Class Size:</b> {card.class.Size}</div>
-                    <div><b>Year:</b> {card.exam.AcademicYear || '—'}</div>
-                    <div><b>Vacation:</b> {fmtDate(card.exam.VacationDate) || '—'}</div>
-                    <div><b>Reopening:</b> {fmtDate(card.exam.ReopeningDate) || '—'}</div>
-                  </div>
-
-                  {/* marks table — SBA/Exam split only for End of Term exams; other exam types show a single Score column */}
-                  <table className="rc-mtable">
-                    <thead>
-                      <tr>
-                        <th style={{width:'30px'}}>#</th>
-                        <th>Subject</th>
-                        {card.exam.IsSplitScore ? (
-                          <>
-                            <th style={{width:'60px',textAlign:'center'}}>SBA<br/>/{card.exam.SbaMaxMarks || 50}</th>
-                            <th style={{width:'60px',textAlign:'center'}}>Exam<br/>/{card.exam.ExamMaxMarks || 50}</th>
-                            <th style={{width:'60px',textAlign:'center'}}>Total</th>
-                          </>
-                        ) : (
-                          <th style={{width:'70px',textAlign:'center'}}>Score<br/>/{card.subjects[0] ? card.subjects[0].MaxMarks : 100}</th>
-                        )}
-                        <th style={{width:'55px',textAlign:'center'}}>Grade</th>
-                        <th style={{width:'55px',textAlign:'center'}}>Pos.</th>
-                        <th>Remarks</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {card.subjects.map((s, i) => (
-                        <tr key={s.SubjectID}>
-                          <td>{i + 1}</td>
-                          <td>{s.SubjectName}</td>
-                          {card.exam.IsSplitScore ? (
-                            <>
-                              <td style={{textAlign:'center'}}>{s.IsAbsent ? '—' : s.SBA}</td>
-                              <td style={{textAlign:'center'}}>{s.IsAbsent ? '—' : s.Exam}</td>
-                            </>
-                          ) : null}
-                          <td style={{textAlign:'center',fontWeight:600}}>
-                            {s.IsAbsent ? <span style={{color:'#888',fontStyle:'italic'}}>Absent</span> : (s.Total != null ? s.Total : '—')}
-                          </td>
-                          <td style={{textAlign:'center'}}>
-                            <span className="rc-grade-pill" style={{background: sbaGradeColor(s.Grade, card.class.GradeBand)}}>{s.Grade || '—'}</span>
-                          </td>
-                          <td style={{textAlign:'center'}}>{s.Position ? ordinal(s.Position) : '—'}</td>
-                          <td style={{fontSize:'12px',color:'#444'}}>{s.Remarks || ''}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr>
-                        <td colSpan="2" style={{textAlign:'right'}}>GRAND TOTAL</td>
-                        {card.exam.IsSplitScore && <>
-                          <td style={{textAlign:'center'}}>{card.grandTotal.SBA}</td>
-                          <td style={{textAlign:'center'}}>{card.grandTotal.Exam}</td>
-                        </>}
-                        <td style={{textAlign:'center'}}>{card.grandTotal.Total}</td>
-                        <td colSpan="3"></td>
-                      </tr>
-                    </tfoot>
-                  </table>
-
-                  {/* summary strip */}
-                  <div className="rc-summary">
-                    <div>
-                      <div className="rc-lbl">Attendance</div>
-                      <div className="rc-val">{card.attendance.present} / {card.attendance.total}</div>
-                    </div>
-                    <div>
-                      <div className="rc-lbl">Total Score</div>
-                      <div className="rc-val">{card.grandTotal.Total}</div>
-                    </div>
-                    <div>
-                      <div className="rc-lbl">Average</div>
-                      <div className="rc-val">{card.average}</div>
-                    </div>
-                    <div>
-                      <div className="rc-lbl">Subjects</div>
-                      <div className="rc-val">{card.subjectsCount}</div>
-                    </div>
-                  </div>
-
-                  <div className="rc-position-bar">
-                    Overall Class Position: <b>{card.overallClassPosition ? ordinal(card.overallClassPosition) + ' / ' + card.class.Size : '—'}</b>
-                  </div>
-
-                  {card.class.IsJhs && (
-                    <div className="rc-position-bar rc-bece-bar">
-                      {card.beceAggregate
-                        ? <>BECE Aggregate: <b>{card.beceAggregate.aggregate}</b> ({card.beceAggregate.breakdown.map(b => `${b.subjectName} ${b.grade}`).join(', ')})</>
-                        : 'BECE Aggregate: not enough graded core + elective subjects yet'}
-                    </div>
+                  {/* editable remarks — outside .report-card so they never print blank/unsaved-looking; each
+                      panel shows the student's position/score/attendance (already visible in the card above)
+                      before the teacher/head teacher picks a remark */}
+                  {canEditClassTeacherRemarks && (
+                    <RemarksPanel
+                      title="Class Teacher's Remarks"
+                      icon="chalkboard-teacher"
+                      canEdit={true}
+                      saving={savingWhich === 'class'}
+                      values={card.remarks}
+                      fields={[
+                        { key: 'InterestTalent', label: 'Interest / Talent', options: TALENT_OPTS },
+                        { key: 'Conduct', label: 'Conduct', options: CONDUCT_OPTS },
+                        { key: 'AttitudeToWork', label: 'Attitude to Work', options: ATTITUDE_OPTS },
+                        { key: 'ClassTeacherRemark', label: "Class Teacher's Remark", options: CLASS_TEACHER_REMARK_OPTS },
+                        { key: 'PromotionStatus', label: 'Promotion Status (reflects on report card every 3rd term — moving students to the next class stays admin-only)', options: PROMOTION_STATUS_OPTS }
+                      ]}
+                      onSave={(form) => saveRemarksPartial('class', {
+                        InterestTalent: form.InterestTalent, Conduct: form.Conduct, AttitudeToWork: form.AttitudeToWork,
+                        ClassTeacherRemark: form.ClassTeacherRemark, PromotionStatus: form.PromotionStatus
+                      })}
+                    />
                   )}
 
-                  {/* conduct & remarks */}
-                  <div className="rc-remarks-block">
-                    <div className="rc-remarks-hdr">
-                      Conduct &amp; Remarks
-                      {canEditRemarks && !editingRemarks && (
-                        <button type="button" className="btn btn-secondary no-print" style={{marginLeft:'10px',padding:'2px 10px',fontSize:'12px'}} onClick={() => setEditingRemarks(true)}>
-                          <i className="fas fa-edit"></i> Edit
-                        </button>
-                      )}
-                    </div>
-                    {editingRemarks ? (
-                      <div className="rc-remarks-edit no-print">
-                        {[
-                          ['InterestTalent', 'Interest / Talent'], ['Conduct', 'Conduct'], ['AttitudeToWork', 'Attitude to Work'],
-                          ['ClassTeacherRemark', "Class Teacher's Remark"], ['HeadmasterRemark', "Headmaster's Remark"]
-                        ].map(([key, label]) => (
-                          <div className="form-group" key={key}>
-                            <label>{label}</label>
-                            <input type="text" value={remarksForm?.[key] || ''} onChange={(e) => setRemarksForm({ ...remarksForm, [key]: e.target.value })} maxLength="500" />
-                          </div>
-                        ))}
-                        <div className="form-group">
-                          <label>Promotion Status</label>
-                          <select value={remarksForm?.PromotionStatus || ''} onChange={(e) => setRemarksForm({ ...remarksForm, PromotionStatus: e.target.value })}>
-                            <option value="">—</option>
-                            <option value="promoted">Promoted</option>
-                            <option value="on_trial">On Trial</option>
-                            <option value="not_promoted">Not Promoted</option>
-                          </select>
-                        </div>
-                        <div style={{display:'flex',gap:'8px'}}>
-                          <button type="button" className="btn btn-primary" disabled={savingRemarks} onClick={saveRemarks}>
-                            {savingRemarks ? 'Saving...' : 'Save'}
-                          </button>
-                          <button type="button" className="btn btn-secondary" onClick={() => { setEditingRemarks(false); setRemarksForm(card.remarks); }}>Cancel</button>
-                        </div>
-                      </div>
-                    ) : (
+                  {canEditHeadTeacherRemarks && (
+                    <RemarksPanel
+                      title="Head Teacher's Remarks"
+                      icon="user-tie"
+                      canEdit={true}
+                      saving={savingWhich === 'head'}
+                      values={card.remarks}
+                      fields={[
+                        { key: 'HeadmasterRemark', label: "Head Teacher's Remark", options: HEAD_TEACHER_REMARK_OPTS }
+                      ]}
+                      onSave={(form) => saveRemarksPartial('head', { HeadmasterRemark: form.HeadmasterRemark })}
+                    />
+                  )}
+
+                  {!canEditClassTeacherRemarks && !canEditHeadTeacherRemarks && (card.remarks.ClassTeacherRemark || card.remarks.HeadmasterRemark) && (
+                    <div className="rc-remarks-block no-print" style={{marginTop:'14px'}}>
+                      <div className="rc-remarks-hdr">Remarks</div>
                       <div className="rc-remarks-grid">
-                        <div><b>Interest / Talent:</b> {card.remarks.InterestTalent || '—'}</div>
-                        <div><b>Conduct:</b> {card.remarks.Conduct || '—'}</div>
-                        <div><b>Attitude to Work:</b> {card.remarks.AttitudeToWork || '—'}</div>
                         <div><b>Class Teacher's Remark:</b> {card.remarks.ClassTeacherRemark || '—'}</div>
-                        <div><b>Headmaster's Remark:</b> {card.remarks.HeadmasterRemark || '—'}</div>
-                        {card.remarks.PromotionStatus && <div><b>Promotion:</b> {card.remarks.PromotionStatus.replace(/_/g, ' ')}</div>}
+                        <div><b>Head Teacher's Remark:</b> {card.remarks.HeadmasterRemark || '—'}</div>
                       </div>
-                    )}
-                  </div>
-
-                  {/* signatures */}
-                  <div className="rc-sign" style={{gridTemplateColumns:'1fr 1fr'}}>
-                    <div>Official School Stamp</div>
-                    <div>Headmaster / Headmistress Signature</div>
-                  </div>
-
-                  {/* grade interpretation key */}
-                  <div className="rc-grade-key">
-                    <b>Grade Interpretation Key:</b>{' '}
-                    {gradeTableFor(card.class.GradeBand).map((r, i, arr) => {
-                      const max = i === 0 ? 100 : arr[i - 1].min - 1;
-                      return <React.Fragment key={r.code}>{i > 0 && <>&nbsp;·&nbsp;</>}{r.code} = {r.label} ({r.min}–{max})</React.Fragment>;
-                    })}
-                  </div>
-
-                  <div className="rc-foot">
-                    Generated by {schoolName} on {new Date().toLocaleDateString('en-US', { day:'2-digit', month:'short', year:'numeric' })}
-                    {' · '}{card.class.Label} · {termLabel(card.exam.Term)} · {card.exam.AcademicYear}
-                    {card.exam.IsPublished ? '' : ' · DRAFT (results not yet published)'}
-                  </div>
-                </div>
+                    </div>
+                  )}
+                </>
               )}
 
               <div className="form-actions no-print" style={{borderTop:'1px solid #e0e0e0',marginTop:'18px',paddingTop:'14px',display:'flex',gap:'10px',justifyContent:'flex-end'}}>
@@ -24452,7 +24397,10 @@
         AboutText: '',
         WorkingDays: 'monday,tuesday,wednesday,thursday,friday',
         AcademicYearStartDate: '', AcademicYearEndDate: '',
-        HiddenMenuIds: ''
+        HiddenMenuIds: '',
+        AdmissionNumberPrefix: '',
+        ShowOverallPositionOnReportCard: true,
+        ShowSubjectAverageOnReportCard: false
       });
       const [saving, setSaving] = useState(false);
 
@@ -24474,7 +24422,10 @@
           WorkingDays: schoolSettings.WorkingDays || 'monday,tuesday,wednesday,thursday,friday',
           AcademicYearStartDate: (schoolSettings.AcademicYearStartDate || '').split('T')[0],
           AcademicYearEndDate: (schoolSettings.AcademicYearEndDate || '').split('T')[0],
-          HiddenMenuIds: schoolSettings.HiddenMenuIds || ''
+          HiddenMenuIds: schoolSettings.HiddenMenuIds || '',
+          AdmissionNumberPrefix: schoolSettings.AdmissionNumberPrefix || '',
+          ShowOverallPositionOnReportCard: schoolSettings.ShowOverallPositionOnReportCard !== false,
+          ShowSubjectAverageOnReportCard: !!schoolSettings.ShowSubjectAverageOnReportCard
         });
       }, [schoolSettings]);
 
@@ -24641,6 +24592,45 @@
             <div className="form-group" style={{gridColumn:'1 / -1'}}>
               <label><i className="fas fa-align-left"></i> About Text (shown in About sections)</label>
               <textarea value={data.AboutText} onChange={(e) => set('AboutText', e.target.value)} rows="4" maxLength="1000" />
+            </div>
+          </div>
+
+          <h3 style={{marginTop: '22px', marginBottom: '14px', color: 'var(--navy-primary)', fontSize: '15px', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+            <i className="fas fa-id-card"></i> Admissions
+          </h3>
+          <div className="form-grid">
+            <div className="form-group">
+              <label><i className="fas fa-hashtag"></i> Admission ID Prefix</label>
+              <input type="text" value={data.AdmissionNumberPrefix} onChange={(e) => set('AdmissionNumberPrefix', e.target.value.toUpperCase())} maxLength="10" placeholder="e.g. RES" style={{fontFamily:'monospace',textTransform:'uppercase'}} />
+              <div style={{fontSize:'11px',color:'#888',marginTop:'4px'}}>New Student IDs auto-generate as PREFIX + YEAR + sequence (e.g. RES20260001).</div>
+            </div>
+          </div>
+
+          <h3 style={{marginTop: '22px', marginBottom: '6px', color: 'var(--navy-primary)', fontSize: '15px', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+            <i className="fas fa-id-card-alt"></i> Report Card Display
+          </h3>
+          <div style={{display:'flex',flexDirection:'column',gap:'14px',marginBottom:'10px'}}>
+            <div>
+              <div style={{fontSize:'13px',fontWeight:600,color:'#333',marginBottom:'6px'}}>Show Overall Class Position on Report Card?</div>
+              <div style={{display:'flex',gap:'18px'}}>
+                <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px'}}>
+                  <input type="radio" name="showOverallPosition" checked={data.ShowOverallPositionOnReportCard === true} onChange={() => set('ShowOverallPositionOnReportCard', true)} /> Yes
+                </label>
+                <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px'}}>
+                  <input type="radio" name="showOverallPosition" checked={data.ShowOverallPositionOnReportCard === false} onChange={() => set('ShowOverallPositionOnReportCard', false)} /> No
+                </label>
+              </div>
+            </div>
+            <div>
+              <div style={{fontSize:'13px',fontWeight:600,color:'#333',marginBottom:'6px'}}>Show Class Average column (per subject) on Report Card?</div>
+              <div style={{display:'flex',gap:'18px'}}>
+                <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px'}}>
+                  <input type="radio" name="showSubjectAverage" checked={data.ShowSubjectAverageOnReportCard === true} onChange={() => set('ShowSubjectAverageOnReportCard', true)} /> Yes
+                </label>
+                <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px'}}>
+                  <input type="radio" name="showSubjectAverage" checked={data.ShowSubjectAverageOnReportCard === false} onChange={() => set('ShowSubjectAverageOnReportCard', false)} /> No
+                </label>
+              </div>
             </div>
           </div>
 
