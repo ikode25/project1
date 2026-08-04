@@ -8652,6 +8652,7 @@
       const [showModal, setShowModal] = useState(false);
       const [editing, setEditing] = useState(null);
       const [allClasses, setAllClasses] = useState([]);
+      const [viewMode, setViewMode] = useState('grid');
       const tableInstanceRef = useRef(null);
 
       const [filters, setFilters] = useState({
@@ -8893,20 +8894,44 @@
       // unique classes for filter dropdown
       const classOpts = [...new Map(subjects.map(s => [s.ClassID, { value: String(s.ClassID), label: s.ClassLabel }])).values()];
 
+      // grid mode: same filters as the table, applied client-side, then grouped by class
+      const filteredForGrid = subjects.filter(s => {
+        if (filters.classId && String(s.ClassID) !== String(filters.classId)) return false;
+        if (filters.academicYear && s.AcademicYear !== filters.academicYear) return false;
+        if (filters.subjectType && s.SubjectType !== filters.subjectType) return false;
+        if (filters.activeOnly === true && !s.IsActive) return false;
+        if (filters.activeOnly === 'inactive' && s.IsActive) return false;
+        if (filters.search && !(s.SubjectName + ' ' + s.SubjectCode).toLowerCase().includes(filters.search.toLowerCase())) return false;
+        return true;
+      });
+      const groupedByClass = [];
+      const groupIndex = {};
+      filteredForGrid.forEach(s => {
+        if (!(s.ClassID in groupIndex)) {
+          groupIndex[s.ClassID] = groupedByClass.length;
+          groupedByClass.push({ ClassID: s.ClassID, ClassLabel: s.ClassLabel, subjects: [] });
+        }
+        groupedByClass[groupIndex[s.ClassID]].subjects.push(s);
+      });
+      groupedByClass.sort((a, b) => String(a.ClassLabel).localeCompare(String(b.ClassLabel)));
+
       return (
         <div className="data-section">
           <div className="section-header">
             <h2><i className="fas fa-book"></i> Subjects{syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}</h2>
-            {isAdmin && (
-              <div style={{display:'flex',gap:'8px'}}>
-                <button className="btn btn-secondary" onClick={quickSetup} title="Auto-add the standard subject list for a class's key phase">
-                  <i className="fas fa-magic"></i> Quick Setup
-                </button>
-                <button className="btn btn-success" onClick={() => { setEditing(null); setShowModal(true); }}>
-                  <i className="fas fa-plus"></i> Add Subject
-                </button>
-              </div>
-            )}
+            <div style={{display:'flex',gap:'8px'}}>
+              <ViewToggle mode={viewMode} onChange={setViewMode} />
+              {isAdmin && (
+                <>
+                  <button className="btn btn-secondary" onClick={quickSetup} title="Auto-add the standard subject list for a class's key phase">
+                    <i className="fas fa-magic"></i> Quick Setup
+                  </button>
+                  <button className="btn btn-success" onClick={() => { setEditing(null); setShowModal(true); }}>
+                    <i className="fas fa-plus"></i> Add Subject
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           {loadError && !loading && subjects.length === 0 && (
@@ -8988,9 +9013,54 @@
           )}
 
           {loading && <TableSkeleton rows={6} columns={isAdmin ? 9 : 8} />}
-          <div style={{ display: loading ? 'none' : 'block' }}>
+          <div style={{ display: (loading || viewMode !== 'table') ? 'none' : 'block' }}>
             <table id="subjectsTable" className="display" style={{width: '100%'}}></table>
           </div>
+
+          {!loading && viewMode === 'grid' && (
+            groupedByClass.length === 0 ? (
+              <div className="settings-info-message" style={{textAlign:'center',padding:'30px'}}>
+                <i className="fas fa-inbox" style={{marginRight:'8px'}}></i>No subjects found.
+              </div>
+            ) : (
+              <div style={{display:'flex',flexDirection:'column',gap:'16px'}}>
+                {groupedByClass.map(g => (
+                  <div key={g.ClassID} style={{border:'1px solid #e0e0e0',borderRadius:'8px',overflow:'hidden'}}>
+                    <div style={{background:'var(--navy-primary)',color:'#fff',padding:'10px 16px',fontWeight:700,display:'flex',alignItems:'center',gap:'8px'}}>
+                      <i className="fas fa-school"></i> {g.ClassLabel}
+                      <span style={{marginLeft:'auto',fontWeight:400,fontSize:'12px',opacity:0.85}}>{g.subjects.length} subject{g.subjects.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(220px, 1fr))',gap:'10px',padding:'14px'}}>
+                      {g.subjects.map(s => {
+                        const m = TYPE_META[s.SubjectType] || { label: s.SubjectType || '—', color: '#999', icon: 'question' };
+                        return (
+                          <div key={s.ID} style={{border:'1px solid #eee',borderRadius:'6px',padding:'10px 12px',background: s.IsActive ? '#fff' : '#fafafa'}}>
+                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                              <div style={{fontWeight:600,color:'var(--navy-primary)'}}>{s.SubjectName}</div>
+                              <span style={{fontFamily:'monospace',fontSize:'11px',color:'#888'}}>{s.SubjectCode}</span>
+                            </div>
+                            <div style={{display:'flex',gap:'6px',marginTop:'6px',flexWrap:'wrap',alignItems:'center'}}>
+                              <span style={{display:'inline-flex',alignItems:'center',gap:'4px',padding:'2px 7px',background:m.color,color:'#fff',fontSize:10,fontWeight:600,textTransform:'capitalize',borderRadius:3}}>
+                                <i className={`fas fa-${m.icon}`} style={{fontSize:9}}></i> {m.label}
+                              </span>
+                              <span style={{fontSize:11,color:'#666'}}>Max {s.MaxMarks || 0} · Pass {s.PassMarks || 0}</span>
+                              {!s.IsActive && <span style={{fontSize:10,color:'#ea4335'}}><i className="fas fa-pause-circle"></i> inactive</span>}
+                            </div>
+                            {isAdmin && (
+                              <div style={{display:'flex',gap:6,marginTop:8}}>
+                                <button className="action-icon edit-icon" onClick={() => { setEditing(s); setShowModal(true); }} title="Edit"><i className="fas fa-edit"></i></button>
+                                <button className="action-icon delete-icon" onClick={() => handleDelete(s)} title="Delete"><i className="fas fa-trash"></i></button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          )}
 
           {showModal && (
             <SubjectModal
