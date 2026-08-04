@@ -5191,12 +5191,13 @@
             if (result.success) {
               setShowModal(false);
               setEditingUser(null);
+              const hasGenerated = /generated|username:/i.test(result.message || '');
               Swal.fire({
                 icon: 'success',
                 title: 'Success!',
                 text: result.message,
-                timer: 2000,
-                showConfirmButton: false
+                timer: hasGenerated ? undefined : 2000,
+                showConfirmButton: !!hasGenerated
               });
               refreshUsers(); // silent background revalidate
             } else {
@@ -5836,12 +5837,11 @@
                 </h4>
                 <div className="form-grid">
                   <div className="form-group">
-                    <label><i className="fas fa-at"></i> Username *</label>
+                    <label><i className="fas fa-at"></i> Username <span style={{fontWeight:400,color:'#888',fontSize:'11px'}}>(leave blank to auto-generate)</span></label>
                     <input
                       type="text"
                       value={formData.Username}
                       onChange={(e) => set('Username', e.target.value)}
-                      required
                       disabled={!!user}
                       autoComplete="off"
                     />
@@ -5856,32 +5856,29 @@
                     />
                   </div>
                   <div className="form-group">
-                    <label><i className="fas fa-envelope"></i> Email *</label>
+                    <label><i className="fas fa-envelope"></i> Email</label>
                     <input
                       type="email"
                       value={formData.Email}
                       onChange={(e) => set('Email', e.target.value)}
-                      required
                     />
                   </div>
                   <div className="form-group">
-                    <label><i className="fas fa-phone"></i> Mobile *</label>
+                    <label><i className="fas fa-phone"></i> Mobile</label>
                     <input
                       type="tel"
                       value={formData.Mobile}
                       onChange={(e) => set('Mobile', e.target.value)}
-                      required
                       placeholder="+233 24 000 0000"
                       maxLength="15"
                     />
                   </div>
                   <div className="form-group">
-                    <label><i className="fas fa-key"></i> Password {user ? '(blank = keep)' : '*'}</label>
+                    <label><i className="fas fa-key"></i> Password <span style={{fontWeight:400,color:'#888',fontSize:'11px'}}>(leave blank to {user ? 'keep current' : 'auto-generate'})</span></label>
                     <input
                       type="password"
                       value={formData.Password}
                       onChange={(e) => set('Password', e.target.value)}
-                      required={!user}
                       autoComplete="new-password"
                     />
                   </div>
@@ -5900,7 +5897,6 @@
                     value={formData.Role}
                     onChange={(val) => set('Role', val)}
                     placeholder="Select role..."
-                    required={true}
                   />
                   <SearchableDropdown
                     label="Gender"
@@ -5913,7 +5909,6 @@
                     value={formData.Gender}
                     onChange={(val) => set('Gender', val)}
                     placeholder="Select gender..."
-                    required={true}
                   />
                   <SearchableDropdown
                     label="Status"
@@ -5944,12 +5939,11 @@
                     />
                   </div>
                   <div className="form-group">
-                    <label><i className="fas fa-calendar-plus"></i> Joining Date *</label>
+                    <label><i className="fas fa-calendar-plus"></i> Joining Date</label>
                     <input
                       type="date"
                       value={formData.JoiningDate}
                       onChange={(e) => set('JoiningDate', e.target.value)}
-                      required
                     />
                   </div>
                   <div className="form-group">
@@ -6833,12 +6827,12 @@
                 <SectionHdr icon="money-bill-wave" label="Admission Fee" />
                 <div className="form-grid">
                   <div className="form-group">
-                    <label><i className="fas fa-money-bill-wave"></i> Admission Fee *</label>
-                    <input type="number" min="0" step="0.01" value={f.AdmissionFee} onChange={(e) => set('AdmissionFee', e.target.value)} required placeholder="0" />
+                    <label><i className="fas fa-money-bill-wave"></i> Admission Fee</label>
+                    <input type="number" min="0" step="0.01" value={f.AdmissionFee} onChange={(e) => set('AdmissionFee', e.target.value)} placeholder="0" />
                   </div>
                   {showMode && (
                     <SearchableDropdown label="Payment Mode" icon="fas fa-money-check"
-                      options={PAY_MODE_OPTS} value={f.AdmissionFeeMode} onChange={(v) => set('AdmissionFeeMode', v)} placeholder="Select mode..." required={true} />
+                      options={PAY_MODE_OPTS} value={f.AdmissionFeeMode} onChange={(v) => set('AdmissionFeeMode', v)} placeholder="Select mode..." />
                   )}
                 </div>
 
@@ -6967,24 +6961,24 @@
                   <SearchableDropdown label="Allotted Class / Section" icon="fas fa-school"
                     options={classOpts} value={f.AllottedClassID} onChange={(v) => set('AllottedClassID', v)} placeholder="Select class..." required={true} />
                   <div className="form-group">
-                    <label><i className="fas fa-list-ol"></i> Roll Number *</label>
-                    <input type="text" value={f.RollNumber} onChange={(e) => set('RollNumber', e.target.value)} required maxLength="20" />
+                    <label><i className="fas fa-list-ol"></i> Roll Number</label>
+                    <input type="text" value={f.RollNumber} onChange={(e) => set('RollNumber', e.target.value)} maxLength="20" />
                   </div>
                   <div className="form-group">
-                    <label><i className="fas fa-hashtag"></i> Admission Number *</label>
-                    <input type="text" value={f.AdmissionNumber} onChange={(e) => set('AdmissionNumber', e.target.value)} required maxLength="50" />
+                    <label><i className="fas fa-hashtag"></i> Admission Number <span style={{fontWeight:400,color:'#888',fontSize:'11px'}}>(blank = auto-generate)</span></label>
+                    <input type="text" value={f.AdmissionNumber} onChange={(e) => set('AdmissionNumber', e.target.value)} maxLength="50" />
                   </div>
                   <div className="form-group">
-                    <label><i className="fas fa-key"></i> Login Password *</label>
-                    <input type="text" value={f.LoginPassword} onChange={(e) => set('LoginPassword', e.target.value)} required maxLength="50" />
+                    <label><i className="fas fa-key"></i> Login Password <span style={{fontWeight:400,color:'#888',fontSize:'11px'}}>(blank = auto-generate)</span></label>
+                    <input type="text" value={f.LoginPassword} onChange={(e) => set('LoginPassword', e.target.value)} maxLength="50" />
                     <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>Student can change this later</div>
                   </div>
                   <div className="form-group">
-                    <label><i className="fas fa-calendar-plus"></i> Admission Date *</label>
-                    <input type="date" value={f.AdmissionDate} onChange={(e) => set('AdmissionDate', e.target.value)} required />
+                    <label><i className="fas fa-calendar-plus"></i> Admission Date</label>
+                    <input type="date" value={f.AdmissionDate} onChange={(e) => set('AdmissionDate', e.target.value)} />
                   </div>
                   <SearchableDropdown label="Entry Point" icon="fas fa-sign-in-alt"
-                    options={ENTRY_POINT_OPTS} value={f.EntryPoint} onChange={(v) => set('EntryPoint', v)} placeholder="Select entry point..." required={true} />
+                    options={ENTRY_POINT_OPTS} value={f.EntryPoint} onChange={(v) => set('EntryPoint', v)} placeholder="Select entry point..." />
                 </div>
 
                 <SectionHdr icon="bus" label="Transport" />
@@ -9124,10 +9118,10 @@
                       required maxLength="100" placeholder="e.g. Mathematics" />
                   </div>
                   <div className="form-group">
-                    <label><i className="fas fa-hashtag"></i> Subject Code *</label>
+                    <label><i className="fas fa-hashtag"></i> Subject Code <span style={{fontWeight:400,color:'#888',fontSize:'11px'}}>(blank = auto-generate)</span></label>
                     <input type="text" value={formData.SubjectCode}
                       onChange={(e) => set('SubjectCode', e.target.value.toUpperCase())}
-                      required maxLength="20" placeholder="e.g. MATH" />
+                      maxLength="20" placeholder="e.g. MATH" />
                   </div>
                   <SearchableDropdown
                     label="Class" icon="fas fa-school"
@@ -9152,7 +9146,6 @@
                     value={formData.SubjectType}
                     onChange={onTypeChange}
                     placeholder="Pick type..."
-                    required={true}
                   />
                 </div>
 
@@ -9163,7 +9156,7 @@
 
                 <div className="form-grid">
                   <div className="form-group">
-                    <label><i className="fas fa-bullseye"></i> Max Marks * {isBoth && <span style={{fontSize:'10px',color:'#888'}}>(auto = theory + practical)</span>}</label>
+                    <label><i className="fas fa-bullseye"></i> Max Marks {isBoth && <span style={{fontSize:'10px',color:'#888'}}>(auto = theory + practical)</span>}</label>
                     <input type="number" value={formData.MaxMarks}
                       onChange={(e) => set('MaxMarks', e.target.value)}
                       min="0" placeholder="100"
@@ -9171,10 +9164,10 @@
                       style={isBoth ? {background:'#f8f9fa',cursor:'not-allowed'} : {}} />
                   </div>
                   <div className="form-group">
-                    <label><i className="fas fa-flag-checkered"></i> Pass Marks *</label>
+                    <label><i className="fas fa-flag-checkered"></i> Pass Marks</label>
                     <input type="number" value={formData.PassMarks}
                       onChange={(e) => set('PassMarks', e.target.value)}
-                      min="0" max={formData.MaxMarks} placeholder="33" required />
+                      min="0" max={formData.MaxMarks} placeholder="33" />
                   </div>
                 </div>
 
@@ -9186,16 +9179,16 @@
                     </div>
                     <div className="form-grid">
                       <div className="form-group">
-                        <label><i className="fas fa-book"></i> Theory Max *</label>
+                        <label><i className="fas fa-book"></i> Theory Max</label>
                         <input type="number" value={formData.TheoryMaxMarks}
                           onChange={(e) => set('TheoryMaxMarks', e.target.value)}
-                          min="0" placeholder="80" required />
+                          min="0" placeholder="80" />
                       </div>
                       <div className="form-group">
-                        <label><i className="fas fa-flask"></i> Practical Max *</label>
+                        <label><i className="fas fa-flask"></i> Practical Max</label>
                         <input type="number" value={formData.PracticalMaxMarks}
                           onChange={(e) => set('PracticalMaxMarks', e.target.value)}
-                          min="0" placeholder="20" required />
+                          min="0" placeholder="20" />
                       </div>
                       <div className="form-group">
                         <label><i className="fas fa-flag-checkered"></i> Theory Pass</label>
@@ -14644,7 +14637,6 @@
                     value={formData.ExamType}
                     onChange={(v) => set('ExamType', v)}
                     placeholder="Select type..."
-                    required={true}
                   />
                   <SearchableDropdown
                     label="Class" icon="fas fa-school"
@@ -14665,7 +14657,6 @@
                     value={formData.Term}
                     onChange={(v) => set('Term', v)}
                     placeholder="Pick term..."
-                    required={true}
                   />
                   <SearchableDropdown
                     label="Academic Year" icon="fas fa-calendar-alt"
@@ -14673,33 +14664,32 @@
                     value={formData.AcademicYear}
                     onChange={(v) => set('AcademicYear', v)}
                     placeholder="Select year..."
-                    required={true}
                   />
                   <div className="form-group">
-                    <label><i className="fas fa-calendar-day"></i> Start Date *</label>
+                    <label><i className="fas fa-calendar-day"></i> Start Date</label>
                     <input type="date" value={formData.StartDate}
-                      onChange={(e) => set('StartDate', e.target.value)} required />
+                      onChange={(e) => set('StartDate', e.target.value)} />
                   </div>
                   <div className="form-group">
-                    <label><i className="fas fa-calendar-check"></i> End Date *</label>
+                    <label><i className="fas fa-calendar-check"></i> End Date</label>
                     <input type="date" value={formData.EndDate}
-                      onChange={(e) => set('EndDate', e.target.value)} required />
+                      onChange={(e) => set('EndDate', e.target.value)} />
                   </div>
                   {formData.ExamType === 'end_of_term' ? (
                     <>
                       <div className="form-group">
-                        <label><i className="fas fa-tasks"></i> Class Score (SBA) Max *</label>
+                        <label><i className="fas fa-tasks"></i> Class Score (SBA) Max</label>
                         <input type="number" value={formData.SbaMaxMarks}
                           onChange={(e) => set('SbaMaxMarks', e.target.value)}
-                          min="1" max="100" placeholder="e.g. 40 or 50" required />
+                          min="1" max="100" placeholder="e.g. 40 or 50 (blank = 50)" />
                       </div>
                       <div className="form-group">
-                        <label><i className="fas fa-file-alt"></i> Exam Paper Max *</label>
+                        <label><i className="fas fa-file-alt"></i> Exam Paper Max</label>
                         <input type="number" value={formData.ExamMaxMarks}
                           onChange={(e) => set('ExamMaxMarks', e.target.value)}
-                          min="1" max="100" placeholder="e.g. 50 or 60" required />
+                          min="1" max="100" placeholder="e.g. 50 or 60 (blank = 50)" />
                         <small style={{color:'#777'}}>
-                          Total per subject: {(parseFloat(formData.SbaMaxMarks) || 0) + (parseFloat(formData.ExamMaxMarks) || 0)}
+                          Total per subject: {(parseFloat(formData.SbaMaxMarks) || 50) + (parseFloat(formData.ExamMaxMarks) || 50)}
                         </small>
                       </div>
                       <div className="form-group">
@@ -14715,11 +14705,11 @@
                     </>
                   ) : (
                     <div className="form-group">
-                      <label><i className="fas fa-bullseye"></i> Max Marks per Subject *</label>
+                      <label><i className="fas fa-bullseye"></i> Max Marks per Subject</label>
                       <input type="number" value={formData.MaxMarksPerSubject}
                         onChange={(e) => set('MaxMarksPerSubject', e.target.value)}
-                        min="1" required
-                        placeholder={formData.ExamType === 'class_test' ? '10 or 20' : '100'} />
+                        min="1"
+                        placeholder={formData.ExamType === 'class_test' ? '10 or 20' : '100 (default)'} />
                     </div>
                   )}
                 </div>
@@ -17814,18 +17804,18 @@
                         required={!isView}
                       />
                       <div className="form-group">
-                        <label><i className="fas fa-calendar-week"></i> Billing Period *</label>
+                        <label><i className="fas fa-calendar-week"></i> Billing Period <span style={{fontWeight:400,color:'#888',fontSize:'11px'}}>(blank = current month)</span></label>
                         <input type="text" value={formData.BillingPeriod}
                           onChange={(e) => set('BillingPeriod', e.target.value)}
-                          required maxLength="20" disabled={isView}
+                          maxLength="20" disabled={isView}
                           placeholder="e.g. Sept 2024 or Q1 2024-2025"
                           style={isView ? {background:'#f8f9fa',cursor:'not-allowed'} : {}} />
                       </div>
                       <div className="form-group">
-                        <label><i className="fas fa-calendar-day"></i> Payment Date *</label>
+                        <label><i className="fas fa-calendar-day"></i> Payment Date <span style={{fontWeight:400,color:'#888',fontSize:'11px'}}>(blank = today)</span></label>
                         <input type="date" value={formData.PaymentDate}
                           onChange={(e) => set('PaymentDate', e.target.value)}
-                          required disabled={isView}
+                          disabled={isView}
                           style={isView ? {background:'#f8f9fa',cursor:'not-allowed'} : {}} />
                       </div>
                     </div>

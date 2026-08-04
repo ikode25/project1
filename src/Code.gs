@@ -1681,6 +1681,21 @@ function getAllUsers(currentUser, currentRole) {
   }
 }
 
+// derives a unique login username from a full name (lowercase, no spaces, numeric suffix on collision)
+function _generateUsername(sh, fullName) {
+  var base = String(fullName || 'user').toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '').slice(0, 20) || 'user';
+  var data = sh.getDataRange().getValues();
+  var existing = {};
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][16]) === '1') continue;
+    existing[String(data[i][1] || '').toLowerCase()] = true;
+  }
+  if (!existing[base]) return base;
+  var n = 2;
+  while (existing[base + n]) n++;
+  return base + n;
+}
+
 function addUser(userData, currentUser, currentRole) {
   try {
     if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
@@ -1688,17 +1703,27 @@ function addUser(userData, currentUser, currentRole) {
     var sh = getSheet(USERS_SHEET);
     if (!sh) return { success: false, message: 'Users sheet not found' };
 
-    // required validation
-    if (!userData.Username || !userData.Email || !userData.Password || !userData.FullName || !userData.Mobile) {
-      return { success: false, message: 'Username, FullName, Email, Mobile, Password are required' };
+    if (!String(userData.FullName || '').trim()) {
+      return { success: false, message: 'Full Name is required' };
     }
 
-    // dupe check (active rows)
+    var username = String(userData.Username || '').trim();
     var data = sh.getDataRange().getValues();
-    for (var i = 1; i < data.length; i++) {
-      if (String(data[i][16]) === '1') continue;
-      if (data[i][1] === userData.Username) return { success: false, message: 'Username already exists' };
-      if (data[i][3] === userData.Email) return { success: false, message: 'Email already in use' };
+    if (username) {
+      for (var i = 1; i < data.length; i++) {
+        if (String(data[i][16]) === '1') continue;
+        if (data[i][1] === username) return { success: false, message: 'Username already exists' };
+      }
+    } else {
+      username = _generateUsername(sh, userData.FullName);
+    }
+
+    var email = String(userData.Email || '').trim();
+    if (email) {
+      for (var e = 1; e < data.length; e++) {
+        if (String(data[e][16]) === '1') continue;
+        if (data[e][3] === email) return { success: false, message: 'Email already in use' };
+      }
     }
 
     // employee code dupe check (only when provided)
@@ -1710,14 +1735,18 @@ function addUser(userData, currentUser, currentRole) {
       }
     }
 
+    var generatedPassword = '';
+    var password = String(userData.Password || '').trim();
+    if (!password) { password = Utilities.getUuid().slice(0, 8); generatedPassword = password; }
+
     var ts = nowIso(), id = nextUserId(sh);
     sh.appendRow([
       id,
-      userData.Username,
-      userData.FullName,
-      userData.Email,
-      userData.Password,
-      userData.Mobile,
+      username,
+      String(userData.FullName).trim(),
+      email,
+      password,
+      String(userData.Mobile || '').trim(),
       String(userData.Role || 'teacher').toLowerCase(),
       String(userData.Gender || 'other').toLowerCase(),
       toIso(userData.DateOfBirth),
@@ -1737,8 +1766,10 @@ function addUser(userData, currentUser, currentRole) {
       String(userData.EmergencyContactPhone || '').trim()
     ]);
 
-    addLog(currentUser, 'User Added', 'Added: ' + userData.Username + ' (' + userData.Role + ')');
-    return { success: true, message: 'User added successfully' };
+    addLog(currentUser, 'User Added', 'Added: ' + username + ' (' + (userData.Role || 'teacher') + ')');
+    var msg = 'User added successfully' + (username !== String(userData.Username || '').trim() ? ' — username: ' + username : '');
+    if (generatedPassword) msg += ' — generated password: ' + generatedPassword;
+    return { success: true, message: msg, username: username };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
@@ -2920,19 +2951,26 @@ function addSubject(subjectData, currentUser, currentRole) {
     var sh = getSheet(SUBJECTS_SHEET);
     if (!sh) return { success: false, message: 'Subjects sheet not found' };
 
-    if (!subjectData.SubjectName || !subjectData.SubjectCode || !subjectData.ClassID) {
-      return { success: false, message: 'SubjectName, SubjectCode, ClassID are required' };
+    if (!subjectData.SubjectName || !subjectData.ClassID) {
+      return { success: false, message: 'SubjectName and ClassID are required' };
     }
     if (String(subjectData.SubjectName).length > 100) return { success: false, message: 'SubjectName max 100 chars' };
-    if (String(subjectData.SubjectCode).length > 20) return { success: false, message: 'SubjectCode max 20 chars' };
 
     var cid = parseInt(subjectData.ClassID, 10);
     if (isNaN(cid)) return { success: false, message: 'Invalid ClassID' };
     var cmap = getClassesMap();
     if (!cmap[cid]) return { success: false, message: 'Selected class does not exist or is deleted' };
 
-    if (subjectExists(sh, subjectData.SubjectCode, cid)) {
-      return { success: false, message: 'SubjectCode already exists for this class' };
+    var subjectCode = String(subjectData.SubjectCode || '').trim();
+    if (!subjectCode) subjectCode = String(subjectData.SubjectName).replace(/[^A-Za-z]/g, '').slice(0, 6).toUpperCase() || 'SUB';
+    if (subjectCode.length > 20) return { success: false, message: 'SubjectCode max 20 chars' };
+    subjectData.SubjectCode = subjectCode;
+
+    if (subjectExists(sh, subjectCode, cid)) {
+      var suffix = 2;
+      while (subjectExists(sh, subjectCode + suffix, cid)) suffix++;
+      subjectCode = subjectCode + suffix;
+      subjectData.SubjectCode = subjectCode;
     }
 
     var v = validateSubjectMarksFields(subjectData);
@@ -4546,7 +4584,7 @@ function enrollAdmission(id, d, currentUser, currentRole) {
     var cmap = getClassesMap();
     if (!cmap[allottedClassId]) return { success: false, message: 'Allotted class does not exist or is deleted' };
     var admissionDate = String(d.AdmissionDate || '').trim() || todayStr();
-    var entryPoint = String(d.EntryPoint || '').toLowerCase();
+    var entryPoint = String(d.EntryPoint || 'session_start').toLowerCase();
     if (ADMISSION_ENTRY_POINTS.indexOf(entryPoint) === -1) return { success: false, message: 'Invalid EntryPoint' };
     var transportReq = (d.TransportRequired === true || String(d.TransportRequired) === '1' || String(d.TransportRequired).toLowerCase() === 'true');
 
@@ -6511,10 +6549,8 @@ function validateExamFields(d) {
   if (examType === 'end_of_term') {
     sbaMax = parseFloat(d.SbaMaxMarks);
     examMax = parseFloat(d.ExamMaxMarks);
-    if (isNaN(sbaMax) || sbaMax <= 0) return { ok: false, error: 'SbaMaxMarks (class score) must be a positive number' };
-    if (isNaN(examMax) || examMax <= 0) return { ok: false, error: 'ExamMaxMarks (exam paper) must be a positive number' };
-    var wantMax = parseInt(d.MaxMarksPerSubject, 10) || (sbaMax + examMax);
-    if (Math.round(sbaMax + examMax) !== wantMax) return { ok: false, error: 'SbaMaxMarks + ExamMaxMarks must equal MaxMarksPerSubject (' + wantMax + ')' };
+    if (isNaN(sbaMax) || sbaMax <= 0) sbaMax = 50;
+    if (isNaN(examMax) || examMax <= 0) examMax = 50;
   }
 
   return {
@@ -6526,7 +6562,8 @@ function validateExamFields(d) {
       reportCardGenerated: rcGen, nextExamID: nextEx, applicableSections: sections,
       passingPercentageRequired: passPctRequired,
       vacationDate: vacationDate, reopeningDate: reopeningDate,
-      sbaMaxMarks: sbaMax, examMaxMarks: examMax
+      sbaMaxMarks: sbaMax, examMaxMarks: examMax,
+      maxMarksPerSubject: (examType === 'end_of_term') ? Math.round(sbaMax + examMax) : (parseInt(d.MaxMarksPerSubject, 10) || 100)
     }
   };
 }
@@ -6538,31 +6575,32 @@ function addExam(data, currentUser, currentRole) {
     var sh = getSheet(EXAMS_SHEET);
     if (!sh) return { success: false, message: 'Exams sheet not found' };
 
-    if (!data.ExamName || !data.ExamType || !data.ClassID || !data.AcademicYear || !data.StartDate || !data.EndDate) {
-      return { success: false, message: 'ExamName, ExamType, ClassID, AcademicYear, StartDate, EndDate are required' };
+    if (!data.ExamName || !data.ClassID) {
+      return { success: false, message: 'ExamName and ClassID are required' };
     }
     var allowedTypes = ['class_test','mid_term','end_of_term','mock','other'];
-    var t = String(data.ExamType).toLowerCase();
+    var t = String(data.ExamType || 'end_of_term').toLowerCase();
     if (allowedTypes.indexOf(t) === -1) return { success: false, message: 'Invalid exam type' };
-    if (!validAcademicYear(data.AcademicYear)) return { success: false, message: 'AcademicYear must be YYYY-YYYY' };
+
+    var academicYear = String(data.AcademicYear || '').trim();
+    if (!academicYear) {
+      var settingsRes0 = getSchoolSettings();
+      academicYear = (settingsRes0.data && settingsRes0.data.AcademicYear) || (new Date().getFullYear() + '-' + (new Date().getFullYear() + 1));
+    }
+    if (!validAcademicYear(academicYear)) return { success: false, message: 'AcademicYear must be YYYY-YYYY' };
+    data.AcademicYear = academicYear;
 
     var cid = parseInt(data.ClassID, 10);
     if (isNaN(cid)) return { success: false, message: 'Invalid ClassID' };
     var cmap = getClassesMap();
     if (!cmap[cid]) return { success: false, message: 'Selected class does not exist or is deleted' };
 
+    if (!String(data.StartDate || '').trim()) data.StartDate = todayStr();
+    if (!String(data.EndDate || '').trim()) data.EndDate = data.StartDate;
     if (new Date(data.StartDate) > new Date(data.EndDate)) {
       return { success: false, message: 'EndDate must be on or after StartDate' };
     }
-    var max = parseInt(data.MaxMarksPerSubject, 10);
-    if (isNaN(max) || max < 1) {
-      // end_of_term derives its total from Sba+Exam if MaxMarksPerSubject wasn't sent
-      var sbaGuess = parseFloat(data.SbaMaxMarks), examGuess = parseFloat(data.ExamMaxMarks);
-      max = (t === 'end_of_term' && !isNaN(sbaGuess) && !isNaN(examGuess)) ? Math.round(sbaGuess + examGuess) : 100;
-    }
-    data.MaxMarksPerSubject = max;
-
-    // new field validation
+    // new field validation — also derives MaxMarksPerSubject from Sba+Exam for end_of_term exams
     var v = validateExamFields(data);
     if (!v.ok) return { success: false, message: v.error };
     var n = v.normalized;
@@ -6576,7 +6614,7 @@ function addExam(data, currentUser, currentRole) {
       String(data.AcademicYear).trim(),
       toIso(data.StartDate),
       toIso(data.EndDate),
-      max,
+      n.maxMarksPerSubject,
       '0',         // is_published
       '',          // published_at
       '',          // published_by
@@ -6610,30 +6648,33 @@ function updateExam(id, data, currentUser, currentRole) {
     var idn = parseInt(id, 10);
     if (isNaN(idn)) return { success: false, message: 'Invalid id' };
 
-    if (!data.ExamName || !data.ExamType || !data.ClassID || !data.AcademicYear || !data.StartDate || !data.EndDate) {
-      return { success: false, message: 'Required fields missing' };
+    if (!data.ExamName || !data.ClassID) {
+      return { success: false, message: 'ExamName and ClassID are required' };
     }
     var allowedTypes = ['class_test','mid_term','end_of_term','mock','other'];
-    var t = String(data.ExamType).toLowerCase();
+    var t = String(data.ExamType || 'end_of_term').toLowerCase();
     if (allowedTypes.indexOf(t) === -1) return { success: false, message: 'Invalid exam type' };
-    if (!validAcademicYear(data.AcademicYear)) return { success: false, message: 'AcademicYear must be YYYY-YYYY' };
+
+    var academicYear2 = String(data.AcademicYear || '').trim();
+    if (!academicYear2) {
+      var settingsRes1 = getSchoolSettings();
+      academicYear2 = (settingsRes1.data && settingsRes1.data.AcademicYear) || (new Date().getFullYear() + '-' + (new Date().getFullYear() + 1));
+    }
+    if (!validAcademicYear(academicYear2)) return { success: false, message: 'AcademicYear must be YYYY-YYYY' };
+    data.AcademicYear = academicYear2;
 
     var cid = parseInt(data.ClassID, 10);
     if (isNaN(cid)) return { success: false, message: 'Invalid ClassID' };
     var cmap = getClassesMap();
     if (!cmap[cid]) return { success: false, message: 'Selected class does not exist or is deleted' };
 
+    if (!String(data.StartDate || '').trim()) data.StartDate = todayStr();
+    if (!String(data.EndDate || '').trim()) data.EndDate = data.StartDate;
     if (new Date(data.StartDate) > new Date(data.EndDate)) {
       return { success: false, message: 'EndDate must be on or after StartDate' };
     }
-    var max = parseInt(data.MaxMarksPerSubject, 10);
-    if (isNaN(max) || max < 1) {
-      var sbaGuess2 = parseFloat(data.SbaMaxMarks), examGuess2 = parseFloat(data.ExamMaxMarks);
-      max = (t === 'end_of_term' && !isNaN(sbaGuess2) && !isNaN(examGuess2)) ? Math.round(sbaGuess2 + examGuess2) : 100;
-    }
-    data.MaxMarksPerSubject = max;
 
-    // new field validation
+    // new field validation — also derives MaxMarksPerSubject from Sba+Exam for end_of_term exams
     var v = validateExamFields(data);
     if (!v.ok) return { success: false, message: v.error };
     var n = v.normalized;
@@ -6648,7 +6689,7 @@ function updateExam(id, data, currentUser, currentRole) {
       sh.getRange(row, 5).setValue(String(data.AcademicYear).trim());
       sh.getRange(row, 6).setValue(toIso(data.StartDate));
       sh.getRange(row, 7).setValue(toIso(data.EndDate));
-      sh.getRange(row, 8).setValue(max);
+      sh.getRange(row, 8).setValue(n.maxMarksPerSubject);
       sh.getRange(row, 14).setValue(ts);
       // new cols 15-26
       sh.getRange(row, 15).setValue(n.term);
@@ -7916,11 +7957,13 @@ function addPayment(p, currentUser, currentRole) {
     var sh = getSheet(FEE_PAYMENTS_SHEET);
     if (!sh) return { success: false, message: 'Fee_Payments sheet not found' };
 
-    if (!p.StudentID || !p.FeeStructureID || p.AmountPaid == null || !p.PaymentDate || !p.BillingPeriod || !p.PaymentMode) {
-      return { success: false, message: 'StudentID, FeeStructureID, AmountPaid, PaymentDate, BillingPeriod, PaymentMode are required' };
+    if (!p.StudentID || !p.FeeStructureID || p.AmountPaid == null) {
+      return { success: false, message: 'Student, Fee Item, and Amount Paid are required' };
     }
+    if (!String(p.PaymentDate || '').trim()) p.PaymentDate = todayStr();
+    if (!String(p.BillingPeriod || '').trim()) p.BillingPeriod = _MONTH_LABELS[new Date().getMonth()] + ' ' + new Date().getFullYear();
     var allowedModes = ['cash','cheque','online','mobile_money','card','bank_transfer'];
-    var mode = String(p.PaymentMode).toLowerCase();
+    var mode = String(p.PaymentMode || 'cash').toLowerCase();
     if (allowedModes.indexOf(mode) === -1) return { success: false, message: 'Invalid payment mode' };
 
     // FK validations
@@ -8109,9 +8152,12 @@ function updatePayment(id, p, currentUser, currentRole) {
     var idn = parseInt(id, 10);
     if (isNaN(idn)) return { success: false, message: 'Invalid id' };
 
-    if (!p.StudentID || !p.FeeStructureID || p.AmountPaid == null || !p.PaymentDate || !p.BillingPeriod || !p.PaymentMode) {
-      return { success: false, message: 'Required fields missing' };
+    if (!p.StudentID || !p.FeeStructureID || p.AmountPaid == null) {
+      return { success: false, message: 'Student, Fee Item, and Amount Paid are required' };
     }
+    if (!String(p.PaymentDate || '').trim()) p.PaymentDate = todayStr();
+    if (!String(p.BillingPeriod || '').trim()) p.BillingPeriod = _MONTH_LABELS[new Date().getMonth()] + ' ' + new Date().getFullYear();
+    if (!String(p.PaymentMode || '').trim()) p.PaymentMode = 'cash';
 
     // find row first to check the existing payment_date for clerk same-day gate
     var rows = sh.getDataRange().getValues();
