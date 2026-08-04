@@ -21611,7 +21611,7 @@
       const [showModal, setShowModal] = useState(false);
       const [editing, setEditing] = useState(null);
       const tableInstanceRef = useRef(null);
-      const [filters, setFilters] = useState({ status: '', period: '', classLabel: '', search: '' });
+      const [filters, setFilters] = useState({ status: '', classLabel: '', search: '' });
 
       // status badge map
       const statusBadgeCls = (s) => {
@@ -21645,7 +21645,7 @@
       };
 
       const handleDelete = (p) => {
-        Swal.fire({ icon: 'warning', title: 'Delete plan?', text: p.Topic, showCancelButton: true, confirmButtonColor: '#ea4335' })
+        Swal.fire({ icon: 'warning', title: 'Delete plan?', text: `${p.SubjectName || ''} — ${p.ClassLabel || ''} (${p.LessonDate ? new Date(p.LessonDate).toLocaleDateString() : ''})`, showCancelButton: true, confirmButtonColor: '#ea4335' })
           .then((rr) => {
             if (rr.isConfirmed) {
               google.script.run.withSuccessHandler((res) => {
@@ -21674,26 +21674,21 @@
 
             const cols = [
               {
-                data: 'Topic', title: 'Topic',
+                data: 'Strand', title: 'Strand / Sub-Strand',
                 render: (d, t, row) => {
-                  const top = esc(d || '—');
-                  const obj = String(row.Objectives || '');
-                  const trim = obj.length > 80 ? obj.slice(0, 80) + '…' : obj;
-                  return `<div style="font-weight:600;color:var(--navy-primary)">${top}</div><div style="font-size:11px;color:#888">${esc(trim)}</div>`;
+                  const strand = esc(d || '—');
+                  const sub = String(row.SubStrand || '');
+                  return `<div style="font-weight:600;color:var(--navy-primary)">${strand}</div><div style="font-size:11px;color:#888">${esc(sub)}</div>`;
                 }
               },
               { data: 'ClassLabel', title: 'Class', render: (d) => d ? esc(d) : '<span style="color:#bbb">—</span>' },
               { data: 'SubjectName', title: 'Subject', render: (d) => d ? esc(d) : '<span style="color:#bbb">—</span>' },
               { data: 'TeacherName', title: 'Teacher', render: (d) => d ? esc(d) : '<span style="color:#bbb">—</span>' },
               {
-                data: 'PlanPeriod', title: 'Period',
-                render: (d, t, row) => {
-                  const lbl = esc(row.PlanPeriodLabel || cap(d) || '—');
-                  return `<span class="role-badge role-clerk">${lbl}</span>`;
-                }
+                data: 'WeekNumber', title: 'Week',
+                render: (d, t, row) => `<span class="role-badge role-clerk">${d ? 'Wk ' + esc(d) : '—'}${row.LessonNumber ? ' · L' + esc(row.LessonNumber) : ''}</span>`
               },
-              { data: 'StartDate', title: 'Start', render: fmtDate },
-              { data: 'EndDate', title: 'End', render: fmtDate },
+              { data: 'LessonDate', title: 'Date', render: fmtDate },
               {
                 data: 'Status', title: 'Status',
                 render: (d, t, row) => {
@@ -21757,16 +21752,15 @@
       const applyFilters = () => {
         if (!tableInstanceRef.current) return;
         tableInstanceRef.current.columns().search('').draw();
-        // cols: 0=Topic,1=Class,2=Subject,3=Teacher,4=Period,5=Start,6=End,7=Status[,8=Actions]
-        if (filters.status) tableInstanceRef.current.column(7).search(filters.status, false, false).draw(false);
-        if (filters.period) tableInstanceRef.current.column(4).search(filters.period, false, false).draw(false);
+        // cols: 0=Strand,1=Class,2=Subject,3=Teacher,4=Week,5=Date,6=Status[,7=Actions]
+        if (filters.status) tableInstanceRef.current.column(6).search(filters.status, false, false).draw(false);
         if (filters.classLabel) tableInstanceRef.current.column(1).search('^' + filters.classLabel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', true, false).draw(false);
         if (filters.search) tableInstanceRef.current.search(filters.search).draw(false);
         tableInstanceRef.current.draw();
       };
 
       const clearFilters = () => {
-        setFilters({ status: '', period: '', classLabel: '', search: '' });
+        setFilters({ status: '', classLabel: '', search: '' });
         if (tableInstanceRef.current) tableInstanceRef.current.search('').columns().search('').draw();
       };
 
@@ -21816,20 +21810,6 @@
                   />
                 </div>
                 <div className="filter-group">
-                  <label><i className="fas fa-clock"></i> Period</label>
-                  <SearchableDropdown
-                    options={[
-                      { value: 'daily', label: 'Daily' },
-                      { value: 'weekly', label: 'Weekly' },
-                      { value: 'monthly', label: 'Monthly' },
-                      { value: 'term', label: 'Term' }
-                    ]}
-                    value={filters.period}
-                    onChange={(v) => setFilters({ ...filters, period: v })}
-                    placeholder="All Periods"
-                  />
-                </div>
-                <div className="filter-group">
                   <label><i className="fas fa-school"></i> Class</label>
                   <SearchableDropdown
                     options={classOpts}
@@ -21846,7 +21826,7 @@
             </>
           )}
 
-          {loading && <TableSkeleton rows={5} columns={showActionsCol ? 9 : 8} />}
+          {loading && <TableSkeleton rows={5} columns={showActionsCol ? 8 : 7} />}
           {!loading && items.length === 0 && (
             <div style={{textAlign:'center',padding:'40px',color:'#888',background:'#f8f9fa'}}>No lesson plans yet.</div>
           )}
@@ -21859,6 +21839,9 @@
       );
     }
 
+    // Ghana GES weekly lesson plan — Date/Period/Lesson#/Duration, Strand/Sub-Strand, Content Standard +
+    // Indicators, Performance Indicators, Core Competencies, References, Keywords, and 3 phases
+    // (Starter / New Learning / Reflection) each with Learner Activities + Resources.
     function LessonPlanModal({ plan, currentUser, role, onClose, onSave }) {
       const dStr = (v) => v ? String(v).split('T')[0] : '';
       const [classes, setClasses] = useState([]);
@@ -21866,14 +21849,25 @@
       const [formData, setFormData] = useState({
         ClassID: plan?.ClassID ? String(plan.ClassID) : '',
         SubjectID: plan?.SubjectID ? String(plan.SubjectID) : '',
-        PlanPeriod: plan?.PlanPeriod || 'weekly',
-        StartDate: dStr(plan?.StartDate) || new Date().toISOString().split('T')[0],
-        EndDate: dStr(plan?.EndDate) || new Date().toISOString().split('T')[0],
-        Topic: plan?.Topic || '',
-        Objectives: plan?.Objectives || '',
-        TeachingMethods: plan?.TeachingMethods || '',
-        Resources: plan?.Resources || '',
-        AssessmentPlan: plan?.AssessmentPlan || '',
+        LessonDate: dStr(plan?.LessonDate) || new Date().toISOString().split('T')[0],
+        Period: plan?.Period || '',
+        WeekNumber: plan?.WeekNumber || '',
+        LessonNumber: plan?.LessonNumber || 1,
+        DurationMinutes: plan?.DurationMinutes || 40,
+        Strand: plan?.Strand || '',
+        SubStrand: plan?.SubStrand || '',
+        ContentStandard: plan?.ContentStandard || '',
+        Indicators: plan?.Indicators || '',
+        PerformanceIndicators: plan?.PerformanceIndicators || '',
+        CoreCompetencies: plan?.CoreCompetencies || '',
+        ReferencesText: plan?.ReferencesText || '',
+        Keywords: plan?.Keywords || '',
+        Phase1Activities: plan?.Phase1Activities || '',
+        Phase1Resources: plan?.Phase1Resources || '',
+        Phase2Activities: plan?.Phase2Activities || '',
+        Phase2Resources: plan?.Phase2Resources || '',
+        Phase3Activities: plan?.Phase3Activities || '',
+        Phase3Resources: plan?.Phase3Resources || '',
         Status: plan?.Status || 'planned'
       });
       const set = (k, v) => setFormData({ ...formData, [k]: v });
@@ -21882,12 +21876,17 @@
         if (!formData.ClassID) { setSubjects([]); return; }
         google.script.run.withSuccessHandler((res) => { if (res.success) setSubjects(res.data || []); }).getSubjectsForClass(formData.ClassID, currentUser, role);
       }, [formData.ClassID]);
+      const selectedClass = classes.find(c => String(c.ID) === String(formData.ClassID));
+
       return (
         <div className="modal-overlay" onClick={onClose}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header"><h3><i className="fas fa-clipboard-list"></i> {plan ? 'Edit' : 'New'} Lesson Plan</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'880px'}}>
+            <div className="modal-header"><h3><i className="fas fa-clipboard-list"></i> {plan ? 'Edit' : 'New'} Weekly Lesson Plan</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
             <div className="modal-body">
               <form onSubmit={(e) => { e.preventDefault(); onSave(formData); }}>
+                <h4 style={{margin:'0 0 12px',color:'var(--navy-primary)',fontSize:'15px',borderBottom:'2px solid var(--navy-primary)',paddingBottom:'6px'}}>
+                  <i className="fas fa-info-circle"></i> Basics
+                </h4>
                 <div className="form-grid">
                   <SearchableDropdown label="Class" icon="fas fa-school" required
                     options={classes.map(c => ({ value: String(c.ID), label: c.Label }))}
@@ -21895,21 +21894,55 @@
                   <SearchableDropdown label="Subject" icon="fas fa-book" required
                     options={subjects.map(s => ({ value: String(s.ID), label: s.SubjectName + ' (' + s.SubjectCode + ')' }))}
                     value={formData.SubjectID} onChange={(v) => set('SubjectID', v)} placeholder={formData.ClassID ? 'Select subject...' : 'Pick a class first'} />
-                  <SearchableDropdown label="Plan Period" icon="fas fa-clock" required
-                    options={['daily','weekly','monthly','term'].map(v => ({ value: v, label: v.charAt(0).toUpperCase() + v.slice(1) }))}
-                    value={formData.PlanPeriod} onChange={(v) => set('PlanPeriod', v)} placeholder="Select..." />
+                  <div className="form-group"><label>Class Size</label><input type="text" value={selectedClass ? (selectedClass.TotalStrength || 0) : ''} readOnly style={{background:'#f8f9fa'}} placeholder="Auto from class roster" /></div>
+                  <div className="form-group"><label>Date</label><input type="date" value={formData.LessonDate} onChange={(e) => set('LessonDate', e.target.value)} /></div>
+                  <div className="form-group"><label>Period</label><input type="text" value={formData.Period} onChange={(e) => set('Period', e.target.value)} placeholder="e.g. 1 or 9:00-9:40am" /></div>
+                  <div className="form-group"><label>Week</label><input type="number" value={formData.WeekNumber} onChange={(e) => set('WeekNumber', e.target.value)} min="1" max="20" placeholder="1" /></div>
+                  <div className="form-group"><label>Lesson</label><input type="number" value={formData.LessonNumber} onChange={(e) => set('LessonNumber', e.target.value)} min="1" placeholder="1" /></div>
+                  <div className="form-group"><label>Duration (minutes)</label><input type="number" value={formData.DurationMinutes} onChange={(e) => set('DurationMinutes', e.target.value)} min="1" placeholder="40" /></div>
                   <SearchableDropdown label="Status" icon="fas fa-toggle-on"
                     options={['planned','in_progress','completed','postponed'].map(v => ({ value: v, label: v.replace('_', ' ').charAt(0).toUpperCase() + v.replace('_', ' ').slice(1) }))}
                     value={formData.Status} onChange={(v) => set('Status', v)} placeholder="Select..." />
-                  <div className="form-group"><label>Start Date *</label><input type="date" value={formData.StartDate} onChange={(e) => set('StartDate', e.target.value)} required /></div>
-                  <div className="form-group"><label>End Date *</label><input type="date" value={formData.EndDate} onChange={(e) => set('EndDate', e.target.value)} required /></div>
-                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Topic *</label><input type="text" value={formData.Topic} onChange={(e) => set('Topic', e.target.value)} required maxLength="200" /></div>
-                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Objectives *</label><textarea value={formData.Objectives} onChange={(e) => set('Objectives', e.target.value)} rows="2" required /></div>
-                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Teaching Methods</label><textarea value={formData.TeachingMethods} onChange={(e) => set('TeachingMethods', e.target.value)} rows="2" /></div>
-                  <div className="form-group"><label>Resources</label><textarea value={formData.Resources} onChange={(e) => set('Resources', e.target.value)} rows="2" /></div>
-                  <div className="form-group"><label>Assessment Plan</label><textarea value={formData.AssessmentPlan} onChange={(e) => set('AssessmentPlan', e.target.value)} rows="2" /></div>
                 </div>
-                <div className="form-actions">
+
+                <h4 style={{margin:'18px 0 12px',color:'var(--navy-primary)',fontSize:'15px',borderBottom:'2px solid var(--navy-primary)',paddingBottom:'6px'}}>
+                  <i className="fas fa-book-open"></i> Curriculum
+                </h4>
+                <div className="form-grid">
+                  <div className="form-group"><label>Strand</label><input type="text" value={formData.Strand} onChange={(e) => set('Strand', e.target.value)} maxLength="150" placeholder="e.g. Nationhood" /></div>
+                  <div className="form-group"><label>Sub Strand</label><input type="text" value={formData.SubStrand} onChange={(e) => set('SubStrand', e.target.value)} maxLength="150" placeholder="e.g. The Republics" /></div>
+                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Content Standard</label><textarea value={formData.ContentStandard} onChange={(e) => set('ContentStandard', e.target.value)} rows="2" placeholder="e.g. B8.6.2.1 Analyse the main developments in the Republic between 1960 and 1972" /></div>
+                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Indicators</label><textarea value={formData.Indicators} onChange={(e) => set('Indicators', e.target.value)} rows="2" placeholder="e.g. B8.6.2.1.1 Explain how the First Republic came into being" /></div>
+                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Performance Indicators</label><textarea value={formData.PerformanceIndicators} onChange={(e) => set('PerformanceIndicators', e.target.value)} rows="2" placeholder="What learners will be able to do by the end of the lesson" /></div>
+                  <div className="form-group"><label>Core Competencies</label><input type="text" value={formData.CoreCompetencies} onChange={(e) => set('CoreCompetencies', e.target.value)} maxLength="200" placeholder="e.g. CP 5.1: CC 8.1: CC 9.1" /></div>
+                  <div className="form-group"><label>References</label><input type="text" value={formData.ReferencesText} onChange={(e) => set('ReferencesText', e.target.value)} maxLength="200" placeholder="e.g. Social Studies Curriculum Pg 260" /></div>
+                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Keywords</label><input type="text" value={formData.Keywords} onChange={(e) => set('Keywords', e.target.value)} maxLength="200" placeholder="e.g. Election, Referendum, Independence" /></div>
+                </div>
+
+                {[
+                  { n: 1, title: 'Phase 1: Starter', hint: 'Recap of previous lesson, introduction, sharing performance indicators', act: 'Phase1Activities', res: 'Phase1Resources' },
+                  { n: 2, title: 'Phase 2: New Learning', hint: 'Main lesson delivery — the core teaching & learning activities', act: 'Phase2Activities', res: 'Phase2Resources' },
+                  { n: 3, title: 'Phase 3: Reflection', hint: 'Assessment, closure, summary, and homework', act: 'Phase3Activities', res: 'Phase3Resources' }
+                ].map(ph => (
+                  <div key={ph.n}>
+                    <h4 style={{margin:'18px 0 4px',color:'var(--navy-primary)',fontSize:'15px',borderBottom:'2px solid var(--navy-primary)',paddingBottom:'6px'}}>
+                      <i className="fas fa-layer-group"></i> {ph.title}
+                    </h4>
+                    <p style={{color:'#888',fontSize:'12px',margin:'0 0 10px'}}>{ph.hint}</p>
+                    <div className="form-grid">
+                      <div className="form-group" style={{gridColumn:'1 / -1'}}>
+                        <label>Learner Activities</label>
+                        <textarea value={formData[ph.act]} onChange={(e) => set(ph.act, e.target.value)} rows="3" />
+                      </div>
+                      <div className="form-group" style={{gridColumn:'1 / -1'}}>
+                        <label>Resources</label>
+                        <textarea value={formData[ph.res]} onChange={(e) => set(ph.res, e.target.value)} rows="2" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <div className="form-actions" style={{marginTop:'18px'}}>
                   <button type="submit" className="btn btn-primary"><i className="fas fa-save"></i> Save</button>
                   <button type="button" className="btn btn-secondary" onClick={onClose}><i className="fas fa-times"></i> Cancel</button>
                 </div>

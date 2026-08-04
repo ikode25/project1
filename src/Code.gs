@@ -278,7 +278,14 @@ var HELPDESK_HEADERS = ['ID','TicketCode','RaisedByType','RaiserID','RelatedStud
 // 7=Topic, 8=Objectives, 9=TeachingMethods, 10=Resources, 11=AssessmentPlan, 12=Status (4 enum),
 // 13=IsDeleted, 14=CreatedAt, 15=UpdatedAt,
 // 16=ReviewedBy (FK→Users — HOD/Coordinator), 17=ReviewStatus (pending|approved|rework|na)
-var LESSON_PLAN_HEADERS = ['ID','TeacherID','ClassID','SubjectID','PlanPeriod','StartDate','EndDate','Topic','Objectives','TeachingMethods','Resources','AssessmentPlan','Status','IsDeleted','CreatedAt','UpdatedAt','ReviewedBy','ReviewStatus'];
+// Ghana GES weekly lesson plan format: Date/Period/Lesson#/Duration, Strand/Sub-Strand, Content
+// Standard + Indicators (NaCCA curriculum refs), Performance Indicators, Core Competencies,
+// References, Keywords, and 3 phases (Starter / New Learning / Reflection) each with its own
+// Learner Activities + Resources columns.
+var LESSON_PLAN_HEADERS = ['ID','TeacherID','ClassID','SubjectID','LessonDate','Period','WeekNumber','LessonNumber','DurationMinutes',
+  'Strand','SubStrand','ContentStandard','Indicators','PerformanceIndicators','CoreCompetencies','ReferencesText','Keywords',
+  'Phase1Activities','Phase1Resources','Phase2Activities','Phase2Resources','Phase3Activities','Phase3Resources',
+  'Status','IsDeleted','CreatedAt','UpdatedAt','ReviewedBy','ReviewStatus'];
 
 // teaching_logbook cols (15) — NO is_deleted, hard delete per schema
 // UNIQUE(teacher_id, class_id, subject_id, log_date, period_number)
@@ -9466,27 +9473,35 @@ function deleteHelpdeskTicket(id, currentUser, currentRole) {
 // ============== Lesson Plans CRUD (admin can delete but NOT write/update) ==============
 function rowToLessonPlan(row, cmap, smap, umap) {
   var tid = row[1], cid = row[2], sbid = row[3];
-  // label maps
-  var pp = String(row[4] || '').toLowerCase();
-  var st = String(row[12] || '').toLowerCase();
+  var st = String(row[23] || '').toLowerCase();
   var cap = function(s){ return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; };
   return {
     ID: row[0], TeacherID: tid,
     TeacherName: (tid && umap[tid]) ? umap[tid].fullName : '',
     ClassID: cid, ClassLabel: cmap[cid] ? cmap[cid].label : '',
     SubjectID: sbid, SubjectName: smap[sbid] ? smap[sbid].subjectName : '',
-    PlanPeriod: pp,
-    PlanPeriodLabel: cap(pp),
-    StartDate: toIso(row[5]), EndDate: toIso(row[6]),
-    Topic: row[7], Objectives: row[8],
-    TeachingMethods: row[9] || '', Resources: row[10] || '',
-    AssessmentPlan: row[11] || '',
+    LessonDate: toIso(row[4]),
+    Period: row[5] || '',
+    WeekNumber: row[6] || '',
+    LessonNumber: row[7] || '',
+    DurationMinutes: row[8] || '',
+    Strand: row[9] || '',
+    SubStrand: row[10] || '',
+    ContentStandard: row[11] || '',
+    Indicators: row[12] || '',
+    PerformanceIndicators: row[13] || '',
+    CoreCompetencies: row[14] || '',
+    ReferencesText: row[15] || '',
+    Keywords: row[16] || '',
+    Phase1Activities: row[17] || '', Phase1Resources: row[18] || '',
+    Phase2Activities: row[19] || '', Phase2Resources: row[20] || '',
+    Phase3Activities: row[21] || '', Phase3Resources: row[22] || '',
     Status: st,
     StatusLabel: cap(st.replace('_', ' ')),
-    CreatedAt: toIso(row[14]), UpdatedAt: toIso(row[15]),
-    ReviewedBy: row[16] === '' || row[16] == null ? null : (parseInt(row[16], 10) || null),
-    ReviewedByName: (row[16] && umap && umap[row[16]]) ? umap[row[16]].fullName : '',
-    ReviewStatus: String(row[17] || 'pending').toLowerCase()
+    CreatedAt: toIso(row[25]), UpdatedAt: toIso(row[26]),
+    ReviewedBy: row[27] === '' || row[27] == null ? null : (parseInt(row[27], 10) || null),
+    ReviewedByName: (row[27] && umap && umap[row[27]]) ? umap[row[27]].fullName : '',
+    ReviewStatus: String(row[28] || 'pending').toLowerCase()
   };
 }
 
@@ -9501,12 +9516,12 @@ function getAllLessonPlans(currentUser, currentRole) {
     var cmap = getClassesMap(), smap = getSubjectsMap(), umap = getUsersMap();
     var data = sh.getDataRange().getValues(), out = [];
     for (var i = 1; i < data.length; i++) {
-      if (String(data[i][13]) === '1') continue;
+      if (String(data[i][24]) === '1') continue;
       // teacher: own plans only
       if (teacherUid !== null && parseInt(data[i][1], 10) !== teacherUid) continue;
       out.push(rowToLessonPlan(data[i], cmap, smap, umap));
     }
-    out.sort(function(a,b){ return (b.StartDate||'').localeCompare(a.StartDate||''); }); // newest first
+    out.sort(function(a,b){ return (b.LessonDate||'').localeCompare(a.LessonDate||''); }); // newest first
     return { success: true, data: out };
   } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
 }
@@ -9519,17 +9534,11 @@ function addLessonPlan(p, currentUser, currentRole) {
     var sh = getSheet(LESSON_PLANS_SHEET);
     if (!sh) return { success: false, message: 'Lesson_Plans sheet not found' };
 
-    if (!p.ClassID || !p.SubjectID || !p.PlanPeriod || !p.StartDate || !p.EndDate || !p.Topic || !p.Objectives) {
-      return { success: false, message: 'ClassID, SubjectID, PlanPeriod, StartDate, EndDate, Topic, Objectives are required' };
+    if (!p.ClassID || !p.SubjectID) {
+      return { success: false, message: 'Class and Subject are required' };
     }
-    var allowedPeriods = ['daily','weekly','monthly','term'];
-    var pp = String(p.PlanPeriod).toLowerCase();
-    if (allowedPeriods.indexOf(pp) === -1) return { success: false, message: 'Invalid plan_period' };
     var status = String(p.Status || 'planned').toLowerCase();
     if (['planned','in_progress','completed','postponed'].indexOf(status) === -1) status = 'planned';
-    if (new Date(p.StartDate) > new Date(p.EndDate)) {
-      return { success: false, message: 'EndDate must be on or after StartDate' };
-    }
 
     var cid = parseInt(p.ClassID, 10), sid = parseInt(p.SubjectID, 10);
     var cmap = getClassesMap(), smap = getSubjectsMap();
@@ -9542,16 +9551,23 @@ function addLessonPlan(p, currentUser, currentRole) {
     var asgMap = getTeacherAssignmentsMap(teacherUid);
     if (!asgMap[cid + '|' + sid]) return { success: false, message: 'You are not assigned to this class+subject' };
 
+    var duration = parseInt(p.DurationMinutes, 10);
+    if (isNaN(duration) || duration <= 0) duration = 40;
+
     var ts = nowIso(), id = nextRowId(sh);
     sh.appendRow([
-      id, teacherUid, cid, sid, pp,
-      toIso(p.StartDate), toIso(p.EndDate),
-      String(p.Topic).trim(), String(p.Objectives).trim(),
-      p.TeachingMethods || '', p.Resources || '', p.AssessmentPlan || '',
+      id, teacherUid, cid, sid,
+      toIso(p.LessonDate || todayStr()), String(p.Period || '').trim(), parseInt(p.WeekNumber, 10) || '', parseInt(p.LessonNumber, 10) || 1, duration,
+      String(p.Strand || '').trim(), String(p.SubStrand || '').trim(), String(p.ContentStandard || '').trim(),
+      String(p.Indicators || '').trim(), String(p.PerformanceIndicators || '').trim(), String(p.CoreCompetencies || '').trim(),
+      String(p.ReferencesText || '').trim(), String(p.Keywords || '').trim(),
+      String(p.Phase1Activities || '').trim(), String(p.Phase1Resources || '').trim(),
+      String(p.Phase2Activities || '').trim(), String(p.Phase2Resources || '').trim(),
+      String(p.Phase3Activities || '').trim(), String(p.Phase3Resources || '').trim(),
       status, '0', ts, ts,
       '', 'pending'
     ]);
-    addLog(currentUser, 'Lesson Plan Added', 'Class ' + cid + ' / Subject ' + sid + ' / ' + pp);
+    addLog(currentUser, 'Lesson Plan Added', 'Class ' + cid + ' / Subject ' + sid + ' / ' + toIso(p.LessonDate || todayStr()));
     return { success: true, message: 'Lesson plan added successfully', id: id };
   } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
 }
@@ -9565,7 +9581,7 @@ function updateLessonPlan(id, p, currentUser, currentRole) {
     var idn = parseInt(id, 10);
     var rows = sh.getDataRange().getValues(), foundIdx = -1;
     for (var i = 1; i < rows.length; i++) {
-      if (rows[i][0] === idn && String(rows[i][13]) === '0') { foundIdx = i; break; }
+      if (rows[i][0] === idn && String(rows[i][24]) === '0') { foundIdx = i; break; }
     }
     if (foundIdx === -1) return { success: false, message: 'Lesson plan not found' };
 
@@ -9574,23 +9590,33 @@ function updateLessonPlan(id, p, currentUser, currentRole) {
       return { success: false, message: 'You can only edit your own lesson plans' };
     }
 
-    var allowedPeriods = ['daily','weekly','monthly','term'];
-    var pp = String(p.PlanPeriod || rows[foundIdx][4]).toLowerCase();
-    if (allowedPeriods.indexOf(pp) === -1) return { success: false, message: 'Invalid plan_period' };
     var status = String(p.Status || 'planned').toLowerCase();
     if (['planned','in_progress','completed','postponed'].indexOf(status) === -1) status = 'planned';
+    var duration = parseInt(p.DurationMinutes, 10);
+    if (isNaN(duration) || duration <= 0) duration = 40;
 
     var row = foundIdx + 1, ts = nowIso();
-    sh.getRange(row, 5).setValue(pp);
-    sh.getRange(row, 6).setValue(toIso(p.StartDate));
-    sh.getRange(row, 7).setValue(toIso(p.EndDate));
-    sh.getRange(row, 8).setValue(String(p.Topic || rows[foundIdx][7]).trim());
-    sh.getRange(row, 9).setValue(String(p.Objectives || rows[foundIdx][8]).trim());
-    sh.getRange(row, 10).setValue(p.TeachingMethods || '');
-    sh.getRange(row, 11).setValue(p.Resources || '');
-    sh.getRange(row, 12).setValue(p.AssessmentPlan || '');
-    sh.getRange(row, 13).setValue(status);
-    sh.getRange(row, 16).setValue(ts);
+    sh.getRange(row, 5).setValue(toIso(p.LessonDate || rows[foundIdx][4]));
+    sh.getRange(row, 6).setValue(String(p.Period || '').trim());
+    sh.getRange(row, 7).setValue(parseInt(p.WeekNumber, 10) || '');
+    sh.getRange(row, 8).setValue(parseInt(p.LessonNumber, 10) || 1);
+    sh.getRange(row, 9).setValue(duration);
+    sh.getRange(row, 10).setValue(String(p.Strand || '').trim());
+    sh.getRange(row, 11).setValue(String(p.SubStrand || '').trim());
+    sh.getRange(row, 12).setValue(String(p.ContentStandard || '').trim());
+    sh.getRange(row, 13).setValue(String(p.Indicators || '').trim());
+    sh.getRange(row, 14).setValue(String(p.PerformanceIndicators || '').trim());
+    sh.getRange(row, 15).setValue(String(p.CoreCompetencies || '').trim());
+    sh.getRange(row, 16).setValue(String(p.ReferencesText || '').trim());
+    sh.getRange(row, 17).setValue(String(p.Keywords || '').trim());
+    sh.getRange(row, 18).setValue(String(p.Phase1Activities || '').trim());
+    sh.getRange(row, 19).setValue(String(p.Phase1Resources || '').trim());
+    sh.getRange(row, 20).setValue(String(p.Phase2Activities || '').trim());
+    sh.getRange(row, 21).setValue(String(p.Phase2Resources || '').trim());
+    sh.getRange(row, 22).setValue(String(p.Phase3Activities || '').trim());
+    sh.getRange(row, 23).setValue(String(p.Phase3Resources || '').trim());
+    sh.getRange(row, 24).setValue(status);
+    sh.getRange(row, 27).setValue(ts);
     addLog(currentUser, 'Lesson Plan Updated', 'id ' + idn);
     return { success: true, message: 'Lesson plan updated successfully' };
   } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
@@ -9606,14 +9632,14 @@ function deleteLessonPlan(id, currentUser, currentRole) {
     var idn = parseInt(id, 10);
     var rows = sh.getDataRange().getValues();
     for (var i = 1; i < rows.length; i++) {
-      if (rows[i][0] !== idn || String(rows[i][13]) === '1') continue;
+      if (rows[i][0] !== idn || String(rows[i][24]) === '1') continue;
       // teacher can delete own only
       if (role === 'teacher' && parseInt(rows[i][1], 10) !== getCurrentUserId(currentUser)) {
         return { success: false, message: 'You can only delete your own lesson plans' };
       }
       var row = i + 1, ts = nowIso();
-      sh.getRange(row, 14).setValue('1');
-      sh.getRange(row, 16).setValue(ts);
+      sh.getRange(row, 25).setValue('1');
+      sh.getRange(row, 27).setValue(ts);
       addLog(currentUser, 'Lesson Plan Deleted', 'Soft-deleted lesson plan id ' + idn);
       return { success: true, message: 'Lesson plan deleted successfully' };
     }
@@ -12322,19 +12348,59 @@ function setupDemoData() {
       return [n + 1, code, t[0], t[1], t[2], t[3], t[4], t[5], t[6], t[7], t[8], '', resolvedAt, ts, ts, dueBy];
     });
 
-    // 6p. demo lesson_plans — [teacherId, classId, subjectId, period, startDate, endDate, topic, objectives, methods, resources, assessment, status]
+    // 6p. demo lesson_plans (Ghana GES weekly format) —
+    // [teacherId, classId, subjectId, lessonDate, period, week, lessonNo, durationMin,
+    //  strand, subStrand, contentStandard, indicators, performanceIndicators, coreCompetencies,
+    //  references, keywords, phase1Act, phase1Res, phase2Act, phase2Res, phase3Act, phase3Res, status]
     var demoLessonPlans = [
-      [5, 1, 1, 'weekly', '2026-09-09', '2026-09-13', 'Numbers up to 100',                      'Students recognize, read, write 1-100', 'Counting games, worksheets', 'Number charts', 'Oral test',  'completed'],
-      [5, 1, 1, 'weekly', '2026-09-16', '2026-09-20', 'Addition single digit',                  'Add numbers up to 9 + 9',                'Demo + practice',           'Math kit',      'Worksheet',  'completed'],
-      [6, 1, 2, 'weekly', '2026-09-09', '2026-09-13', 'Alphabet recognition',                   'Identify A-Z in print',                  'Flash cards',                'ABC chart',     'Recitation', 'completed'],
-      [7, 3, 9, 'monthly','2026-10-01', '2026-10-31', 'Plants & their parts',                   'Identify root, stem, leaf, flower',      'Field walk + diagram',       'Garden visit',  'Quiz',       'in_progress']
+      [5, 1, 1, '2026-09-09', '1', 1, 1, 40,
+        'Number', 'Counting', 'B1.1.1.1 Count and represent numbers up to 100',
+        'B1.1.1.1.1 Count objects up to 100 and represent the number of objects with numerals',
+        'Learners can count and write numbers 1-100', 'CC 1.1: CC 2.1',
+        'NaCCA Mathematics Curriculum Pg 12', 'Counting, numeral, digit',
+        'Recap counting 1-20 with learners using bottle tops', '',
+        'Guide learners to count objects in groups of 10 up to 100; write matching numerals', 'Number charts, bottle tops, counters',
+        'Learners count and write numbers on the board; assign counting homework', 'Worksheets',
+        'completed'],
+      [5, 1, 1, '2026-09-16', '2', 2, 2, 40,
+        'Number', 'Addition', 'B1.1.2.1 Add two single-digit whole numbers',
+        'B1.1.2.1.1 Add two single-digit numbers with sums up to 18',
+        'Learners can add numbers up to 9 + 9', 'CC 1.1: CC 5.1',
+        'NaCCA Mathematics Curriculum Pg 18', 'Addition, sum, plus',
+        'Sing the addition song and recap counting on from a number', '',
+        'Demonstrate addition using counters; learners practice in pairs', 'Math kit, counters',
+        'Learners solve addition worksheet independently; mark and review', 'Worksheet',
+        'completed'],
+      [6, 1, 2, '2026-09-09', '1', 1, 1, 40,
+        'Reading', 'Phonics', 'B1.2.1.1 Identify letters of the alphabet',
+        'B1.2.1.1.1 Recognize and name upper- and lower-case letters A-Z',
+        'Learners can identify A-Z in print', 'CC 1.1: CC 4.1',
+        'NaCCA English Curriculum Pg 9', 'Alphabet, letter, sound',
+        'Sing the alphabet song together as a class', '',
+        'Use flash cards to introduce each letter and its sound', 'ABC chart, flash cards',
+        'Learners recite the alphabet individually; assess recognition', '',
+        'completed'],
+      [7, 3, 9, '2026-10-05', '3', 5, 1, 60,
+        'Diversity of Matter', 'Living Things', 'B3.3.1.1 Understand the parts of a plant and their functions',
+        'B3.3.1.1.1 Identify the root, stem, leaf and flower of a plant',
+        'Learners can identify root, stem, leaf, flower', 'CC 3.1: CC 6.1',
+        'NaCCA Science Curriculum Pg 34', 'Root, stem, leaf, flower, photosynthesis',
+        'Take learners on a short walk around the school garden', 'Garden visit',
+        'Discuss and label the parts of a plant using a real specimen and diagram', 'Real plant, diagram, chart',
+        'Learners draw and label a plant; short oral quiz on plant parts', 'Drawing sheets',
+        'in_progress']
     ];
     var lessonPlanRows = demoLessonPlans.map(function(p, n) {
       var ts = new Date(Date.now() - (demoLessonPlans.length - n) * 11000000).toISOString();
-      // first 2 plans approved by supervisor 10, last in_progress = pending review
+      // first 2 plans approved by supervisor 10, 3rd needs rework, last is pending review
       var revBy = n < 2 ? 10 : (n === 2 ? 8 : '');
       var revStatus = n < 2 ? 'approved' : (n === 2 ? 'rework' : 'pending');
-      return [n + 1, p[0], p[1], p[2], p[3], toIso(p[4]), toIso(p[5]), p[6], p[7], p[8], p[9], p[10], p[11], '0', ts, ts, revBy, revStatus];
+      return [
+        n + 1, p[0], p[1], p[2], toIso(p[3]), p[4], p[5], p[6], p[7],
+        p[8], p[9], p[10], p[11], p[12], p[13], p[14], p[15],
+        p[16], p[17], p[18], p[19], p[20], p[21],
+        p[22], '0', ts, ts, revBy, revStatus
+      ];
     });
 
     // 6q. demo teaching_logbook — today + yesterday for Class 1A Math by Teacher 1 (id=5)
@@ -15407,10 +15473,9 @@ function getSupervisorDashboardData(currentUser, currentRole) {
     if (lpsh) {
       var lpd = lpsh.getDataRange().getValues();
       for (var lp = 1; lp < lpd.length; lp++) {
-        if (String(lpd[lp][13]) === '1') continue;
-        var sd3 = toIso(lpd[lp][5]).split('T')[0];
-        var ed3 = toIso(lpd[lp][6]).split('T')[0];
-        if (sd3 <= todayStr_ && ed3 >= weekStartStr) lpThisWeek++;
+        if (String(lpd[lp][24]) === '1') continue;
+        var ld3 = toIso(lpd[lp][4]).split('T')[0];
+        if (ld3 >= weekStartStr && ld3 <= todayStr_) lpThisWeek++;
       }
     }
 
@@ -15724,9 +15789,9 @@ function getTeacherDashboardData(currentUser, currentRole) {
     if (lpsh) {
       var lpd = lpsh.getDataRange().getValues();
       for (var lp = 1; lp < lpd.length; lp++) {
-        if (String(lpd[lp][13]) === '1') continue;
+        if (String(lpd[lp][24]) === '1') continue;
         if (parseInt(lpd[lp][1], 10) !== tid) continue;
-        var st = String(lpd[lp][12] || '').toLowerCase();
+        var st = String(lpd[lp][23] || '').toLowerCase();
         if (st === 'active' || st === 'in_progress' || st === 'planned') activePlans++;
       }
     }
