@@ -3005,6 +3005,7 @@
       padding: 28px 32px; border: 1px solid #d0d0d0;
       box-shadow: 0 4px 16px rgba(0,0,0,0.08);
       position: relative;
+      box-sizing: border-box;
     }
     .rc-school-hdr { display: flex; align-items: center; gap: 18px; border-bottom: 3px double #001f3f; padding-bottom: 14px; margin-bottom: 16px; }
     .rc-school-hdr img { width: 70px; height: 70px; object-fit: contain; }
@@ -3016,6 +3017,15 @@
     .rc-mtable { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 12px; }
     .rc-mtable th { background: #001f3f; color: #fff; padding: 8px 10px; text-align: left; font-weight: 600; border: 1px solid #001f3f; }
     .rc-mtable td { padding: 7px 10px; border: 1px solid #cfcfcf; }
+    /* plain (non-DataTables) summary tables — Owner Portal, SMS dashboard, etc. */
+    .simple-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .simple-table th { background: var(--navy-primary); color: #fff; padding: 9px 12px; text-align: left; font-weight: 600; white-space: nowrap; }
+    .simple-table td { padding: 8px 12px; border-bottom: 1px solid #e5e5e5; vertical-align: middle; }
+    .simple-table tbody tr:nth-child(even) { background: #fafbfc; }
+    .simple-table tbody tr:hover { background: #f0f4f8; }
+    body.dark-mode .simple-table td { border-bottom-color: #333; }
+    body.dark-mode .simple-table tbody tr:nth-child(even) { background: rgba(255,255,255,0.03); }
+    body.dark-mode .simple-table tbody tr:hover { background: rgba(255,255,255,0.06); }
     .rc-mtable tbody tr:nth-child(even) td { background: #f7f9fc; }
     .rc-mtable tfoot td { background: #e8eef5; font-weight: 700; color: #001f3f; }
     .rc-grade-pill { display: inline-block; padding: 2px 9px; border-radius: 3px; color: #fff; font-weight: 700; font-family: monospace; font-size: 12px; }
@@ -3049,20 +3059,23 @@
       body.print-target * { visibility: hidden !important; }
       body.print-target .report-card, body.print-target .report-card *,
       body.print-target .tt-wrap, body.print-target .tt-wrap * { visibility: visible !important; }
+      html, body { width: 100%; height: auto; }
       body.print-target .report-card {
-        position: absolute; left: 0; top: 0; width: 100%; max-width: 100%;
-        margin: 0; border: 0; box-shadow: none; padding: 0;
+        position: absolute !important; left: 0 !important; top: 0 !important;
+        width: 100% !important; max-width: 100% !important; height: auto !important;
+        margin: 0 !important; border: 0 !important; box-shadow: none !important; padding: 0 !important;
+        box-sizing: border-box !important;
         -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
       }
       .rc-mtable th, .rc-title, .rc-mtable tfoot td, .rc-grade-pill {
         -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
       }
-      @page { size: A4 portrait; margin: 15mm; }
+      @page { size: auto; margin: 12mm; }
 
       /* bulk report cards — one card per page, printed in normal document flow
          (overrides the single-card position:absolute rule above via higher specificity) */
-      body.print-target .rc-bulk-wrap { visibility: visible !important; position: static !important; }
-      body.print-target .rc-bulk-item { visibility: visible !important; border-bottom: none !important; margin-bottom: 0 !important; padding-bottom: 0 !important; page-break-after: always; }
+      body.print-target .rc-bulk-wrap { visibility: visible !important; position: static !important; width: 100% !important; }
+      body.print-target .rc-bulk-item { visibility: visible !important; border-bottom: none !important; margin-bottom: 0 !important; padding-bottom: 0 !important; page-break-after: always; width: 100% !important; }
       body.print-target .rc-bulk-item:last-child { page-break-after: avoid; }
       body.print-target .rc-bulk-wrap .report-card {
         position: static !important; left: auto !important; top: auto !important;
@@ -3156,13 +3169,22 @@
     }
 
     // standard fetcher — calls a backend fn returning {success,data,message} and unwraps it
+    function _delay(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+
+    // google.script.run occasionally resolves with a null/undefined payload under load (a known
+    // Apps Script client-bridge quirk, not a real server error) — retry a couple of times with
+    // backoff before surfacing it as a failure, so the UI self-heals instead of showing a false error.
     function swrFetcher(fnName /*, ...args */) {
       const args = Array.prototype.slice.call(arguments, 1);
-      return gsrCall(fnName, args).then((res) => {
-        if (res == null) throw new Error('No response from server');
+      const attempt = (n) => gsrCall(fnName, args).then((res) => {
+        if (res == null) {
+          if (n < 2) return _delay(400 * (n + 1)).then(() => attempt(n + 1));
+          throw new Error('No response from server — please use the refresh button to retry.');
+        }
         if (res.success === false) throw new Error(res.message || 'Request failed');
         return Object.prototype.hasOwnProperty.call(res, 'data') ? res.data : res;
       });
+      return attempt(0);
     }
 
     // kick a background refetch for a key; dedupes; returns the in-flight promise
@@ -23489,7 +23511,7 @@
             <div className="settings-info-message"><i className="fas fa-inbox" style={{marginRight:'6px'}}></i> No SMS sent yet.</div>
           ) : (
             <div style={{overflowX:'auto'}}>
-              <table className="display" style={{width:'100%'}}>
+              <table className="simple-table">
                 <thead>
                   <tr><th>Sent At</th><th>Recipient</th><th>Type</th><th>Message</th><th>Status</th></tr>
                 </thead>
@@ -24001,7 +24023,7 @@
 
           <h4 style={{color:'var(--navy-primary)',margin:'20px 0 10px'}}><i className="fas fa-list"></i> Breakdown by Category</h4>
           <div style={{overflowX:'auto'}}>
-            <table className="display" style={{width:'100%'}}>
+            <table className="simple-table">
               <thead><tr><th>Type</th><th>Category</th><th>Entries</th><th>Amount</th></tr></thead>
               <tbody>
                 {(report.rows || []).map((r, i) => (
@@ -24056,7 +24078,7 @@
         <div>
           <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search students..." className="filter-input" style={{marginBottom:'14px',maxWidth:'320px'}} />
           <div style={{overflowX:'auto'}}>
-            <table className="display" style={{width:'100%'}}>
+            <table className="simple-table">
               <thead><tr><th>Adm #</th><th>Name</th><th>Class</th><th>Status</th><th>Fees Outstanding</th></tr></thead>
               <tbody>
                 {filtered.map(s => (
@@ -24110,7 +24132,7 @@
                 <div className="settings-info-message"><i className="fas fa-inbox" style={{marginRight:'6px'}}></i> No activity recorded for this date.</div>
               ) : (
                 <div style={{overflowX:'auto'}}>
-                  <table className="display" style={{width:'100%'}}>
+                  <table className="simple-table">
                     <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Details</th></tr></thead>
                     <tbody>
                       {report.entries.map((e, i) => (
