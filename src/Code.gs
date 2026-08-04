@@ -11264,6 +11264,97 @@ function deleteFoodMenu(id, currentUser, currentRole) {
   }
 }
 
+// ============== Birthday Notifications ==============
+// any logged-in role — used by every dashboard's "Birthdays Today" banner.
+// Best-effort mirrors today's birthdays into a School Notice so they also reach
+// the existing notices feed for every user, without a separate trigger/pipeline.
+function getTodayBirthdays(currentUser, currentRole) {
+  try {
+    var now = new Date();
+    var mm = now.getMonth() + 1, dd = now.getDate();
+    var isBirthdayToday = function (dobRaw) {
+      if (!dobRaw) return false;
+      var iso = toIso(dobRaw);
+      if (!iso) return false;
+      var parts = iso.split('T')[0].split('-');
+      if (parts.length !== 3) return false;
+      return parseInt(parts[1], 10) === mm && parseInt(parts[2], 10) === dd;
+    };
+
+    var out = [];
+
+    var stSh = getSheet(STUDENTS_SHEET);
+    if (stSh) {
+      var stData = stSh.getDataRange().getValues();
+      var cmap = getClassesMap();
+      for (var i = 1; i < stData.length; i++) {
+        var srow = stData[i];
+        if (String(srow[36]) === '1') continue; // IsDeleted
+        if (String(srow[35]).toLowerCase() !== 'active') continue; // Status
+        if (!isBirthdayToday(srow[6])) continue; // DateOfBirth
+        var cls = cmap[srow[25]]; // ClassID
+        out.push({
+          Name: [srow[2], srow[4]].filter(Boolean).join(' '), // FirstName + LastName
+          Type: 'student',
+          SubLabel: cls ? cls.shortLabel : ''
+        });
+      }
+    }
+
+    var usSh = getSheet(USERS_SHEET);
+    if (usSh) {
+      var usData = usSh.getDataRange().getValues();
+      for (var j = 1; j < usData.length; j++) {
+        var urow = usData[j];
+        if (String(urow[16]) === '1') continue; // IsDeleted
+        if (String(urow[14]).toLowerCase() !== 'active') continue; // Status
+        if (!isBirthdayToday(urow[8])) continue; // DateOfBirth
+        var roleRaw = String(urow[6] || '');
+        out.push({
+          Name: urow[2] || '', // FullName
+          Type: 'staff',
+          SubLabel: roleRaw ? roleRaw.charAt(0).toUpperCase() + roleRaw.slice(1) : ''
+        });
+      }
+    }
+
+    if (out.length) _postBirthdayNotice(out, currentUser);
+
+    return { success: true, data: out };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function _postBirthdayNotice(people, currentUser) {
+  try {
+    var sh = getSheet(NOTICES_SHEET);
+    if (!sh) return;
+    var today = todayStr();
+    var title = 'Birthdays Today (' + today + ')';
+
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][12]) === '1') continue; // IsDeleted
+      if (String(data[i][1] || '') === title) return; // already posted today
+    }
+
+    var desc = 'Join us in wishing a happy birthday to: ' + people.map(function (p) {
+      return p.Name + (p.SubLabel ? ' (' + p.SubLabel + ')' : '');
+    }).join(', ');
+    var postedBy = getCurrentUserId(currentUser) || '';
+    var ts = nowIso(), id = nextRowId(sh);
+    sh.appendRow([
+      id, title, desc, 'announcement', toIso(today),
+      'all', '', '', 'medium', '',
+      postedBy, '1', '0', ts, ts,
+      '0'
+    ]);
+  } catch (e) {
+    Logger.log('_postBirthdayNotice failed: ' + e.toString());
+  }
+}
+
 // admin-only — upserts the single settings row (ID=1)
 function updateSchoolSettings(d, currentUser, currentRole) {
   try {

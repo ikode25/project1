@@ -4129,6 +4129,30 @@
       );
     }
 
+    // "birthdays today" banner — shown on every role's dashboard, driven off Student/Staff DateOfBirth
+    function BirthdayBanner({ currentUser, role }) {
+      const { data: people, isLoading: loading } = useSWR('getTodayBirthdays', () => swrFetcher('getTodayBirthdays', currentUser, role));
+      if (loading || !people || people.length === 0) return null;
+      return (
+        <div style={{
+          display:'flex', alignItems:'center', gap:'14px', padding:'14px 18px', marginBottom:'18px',
+          background:'linear-gradient(135deg,#fce4ec,#f8bbd0)', borderLeft:'4px solid #d81b60', borderRadius:'4px'
+        }}>
+          <i className="fas fa-birthday-cake" style={{fontSize:'22px',color:'#d81b60'}}></i>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:700,color:'#880e4f',fontSize:'13px',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:'4px'}}>
+              {people.length === 1 ? "Birthday Today" : "Birthdays Today"}
+            </div>
+            <div style={{fontSize:'13px',color:'#880e4f',display:'flex',gap:'14px',flexWrap:'wrap'}}>
+              {people.map((p, i) => (
+                <span key={i}><b>{p.Name}</b>{p.SubLabel ? ` (${p.SubLabel})` : ''}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     // today's accounts widget — day-book income/expense/net, click → accounts page
     function TodayAccountsCard({ goto, currentUser, role }) {
       // backend returns the obj directly (has .success but no .data wrapper) — keep raw, accept only on success
@@ -4258,6 +4282,7 @@
           </h2>
 
           <TodayFoodMenuCard currentUser={currentUser} role={role} />
+          <BirthdayBanner currentUser={currentUser} role={role} />
 
           {/* Quick Actions */}
           <div className="dash-quick">
@@ -4555,6 +4580,7 @@
           </div>
 
           <TodayFoodMenuCard currentUser={currentUser} role={role} />
+          <BirthdayBanner currentUser={currentUser} role={role} />
 
           <div className="dash-kpi-grid">
             <DashKpi icon="school" label="Class" value={s.ClassLabel || '—'} sub={`Roll ${s.RollNumber || '—'}`} color="blue" onClick={() => goto('classes')} />
@@ -4666,6 +4692,7 @@
           </div>
 
           <TodayFoodMenuCard currentUser={currentUser} role={role} />
+          <BirthdayBanner currentUser={currentUser} role={role} />
 
           <div className="dash-kpi-grid">
             <DashKpi icon="child" label="My Children" value={k.totalChildren} color="blue" />
@@ -4784,6 +4811,7 @@
           </h2>
 
           <TodayFoodMenuCard currentUser={currentUser} role={role} />
+          <BirthdayBanner currentUser={currentUser} role={role} />
 
           <div className="dash-kpi-grid">
             <DashKpi icon="user-graduate" label="Active Students" value={fmt(k.totalStudents)} color="blue" onClick={() => goto('students')} />
@@ -4876,6 +4904,7 @@
           </h2>
 
           <TodayFoodMenuCard currentUser={currentUser} role={role} />
+          <BirthdayBanner currentUser={currentUser} role={role} />
 
           <div className="dash-kpi-grid">
             <DashKpi icon="money-bill-wave" label="Today's Collection" value={fmt(k.todayCollection)} sub={`${k.todayReceipts} receipts`} color="green" onClick={() => goto('feePayments')} />
@@ -4967,6 +4996,7 @@
           </h2>
 
           <TodayFoodMenuCard currentUser={currentUser} role={role} />
+          <BirthdayBanner currentUser={currentUser} role={role} />
 
           <div className="dash-kpi-grid">
             <DashKpi icon="school" label="My Classes" value={k.classes} sub={`${k.students} students`} color="blue" onClick={() => goto('classes')} />
