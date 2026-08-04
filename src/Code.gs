@@ -11092,6 +11092,178 @@ function sendOwnerDigestNow(currentUser, currentRole) {
   }
 }
 
+// ============== Daily Food Menu ==============
+var FOOD_MENU_SHEET = 'Food_Menu';
+var FOOD_MENU_HEADERS = ['ID','MenuDate','Breakfast','Lunch','Snack','Notes','CreatedBy','IsDeleted','CreatedAt','UpdatedAt'];
+
+function _ensureFoodMenuSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(FOOD_MENU_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(FOOD_MENU_SHEET);
+    sh.appendRow(FOOD_MENU_HEADERS);
+    sh.getRange(1, 1, 1, FOOD_MENU_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function _rowToFoodMenu(row) {
+  return {
+    ID: row[0], MenuDate: toIso(row[1]).split('T')[0],
+    Breakfast: row[2] || '', Lunch: row[3] || '', Snack: row[4] || '', Notes: row[5] || '',
+    CreatedBy: row[6] || '', CreatedAt: toIso(row[8]), UpdatedAt: toIso(row[9])
+  };
+}
+
+// any logged-in role — used by every dashboard's "Today's Menu" card
+function getTodayFoodMenu(currentUser, currentRole) {
+  try {
+    var sh = _ensureFoodMenuSheet();
+    var data = sh.getDataRange().getValues();
+    var today = todayStr();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][7]) === '1') continue;
+      if (toIso(data[i][1]).split('T')[0] === today) return { success: true, data: _rowToFoodMenu(data[i]) };
+    }
+    return { success: true, data: null };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// admin-only — full list for the management view
+function getAllFoodMenus(currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var sh = _ensureFoodMenuSheet();
+    var data = sh.getDataRange().getValues(), out = [];
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][7]) === '1') continue;
+      out.push(_rowToFoodMenu(data[i]));
+    }
+    out.sort(function (a, b) { return String(b.MenuDate).localeCompare(String(a.MenuDate)); });
+    return { success: true, data: out };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// best-effort — mirrors the day's menu into a School Notice so it also shows up in the existing
+// notices feed for every role, without building a second parallel notification pipeline.
+function _postFoodMenuNotice(menuDate, breakfast, lunch, snack, currentUser) {
+  try {
+    var sh = getSheet(NOTICES_SHEET);
+    if (!sh) return;
+    var parts = [];
+    if (breakfast) parts.push('Breakfast: ' + breakfast);
+    if (lunch) parts.push('Lunch: ' + lunch);
+    if (snack) parts.push('Snack: ' + snack);
+    if (!parts.length) return;
+    var desc = parts.join(' | ');
+    var title = "Today's Food Menu (" + menuDate + ')';
+
+    // update in place if a menu notice for this date already exists, else create one
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][12]) === '1') continue;
+      if (String(data[i][1] || '').indexOf('Food Menu') !== -1 && toIso(data[i][4]).split('T')[0] === menuDate) {
+        var row = i + 1, ts = nowIso();
+        sh.getRange(row, 3).setValue(desc);
+        sh.getRange(row, 15).setValue(ts);
+        return;
+      }
+    }
+    var postedBy = getCurrentUserId(currentUser) || '';
+    var ts2 = nowIso(), id = nextRowId(sh);
+    sh.appendRow([
+      id, title, desc, 'announcement', toIso(menuDate),
+      'all', '', '', 'low', '',
+      postedBy, '1', '0', ts2, ts2,
+      '0'
+    ]);
+  } catch (e) {
+    Logger.log('_postFoodMenuNotice failed: ' + e.toString());
+  }
+}
+
+function addFoodMenu(d, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var menuDate = String(d.MenuDate || '').trim() || todayStr();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(menuDate)) return { success: false, message: 'MenuDate must be YYYY-MM-DD' };
+    if (!String(d.Breakfast || '').trim() && !String(d.Lunch || '').trim() && !String(d.Snack || '').trim()) {
+      return { success: false, message: 'Enter at least one meal (Breakfast, Lunch, or Snack)' };
+    }
+
+    var sh = _ensureFoodMenuSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][7]) === '1') continue;
+      if (toIso(data[i][1]).split('T')[0] === menuDate) {
+        return { success: false, message: 'A menu already exists for ' + menuDate + ' — edit it instead' };
+      }
+    }
+
+    var ts = nowIso(), id = nextRowId(sh);
+    sh.appendRow([
+      id, toIso(menuDate), String(d.Breakfast || '').trim(), String(d.Lunch || '').trim(), String(d.Snack || '').trim(),
+      String(d.Notes || '').trim(), currentUser || '', '0', ts, ts
+    ]);
+    _postFoodMenuNotice(menuDate, d.Breakfast, d.Lunch, d.Snack, currentUser);
+    addLog(currentUser, 'Food Menu Added', menuDate);
+    return { success: true, message: 'Food menu saved for ' + menuDate, id: id };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function updateFoodMenu(id, d, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var idn = parseInt(id, 10);
+    if (isNaN(idn)) return { success: false, message: 'Invalid id' };
+    var sh = _ensureFoodMenuSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] !== idn || String(data[i][7]) === '1') continue;
+      var row = i + 1, ts = nowIso();
+      var menuDate = toIso(data[i][1]).split('T')[0];
+      sh.getRange(row, 3).setValue(String(d.Breakfast || '').trim());
+      sh.getRange(row, 4).setValue(String(d.Lunch || '').trim());
+      sh.getRange(row, 5).setValue(String(d.Snack || '').trim());
+      sh.getRange(row, 6).setValue(String(d.Notes || '').trim());
+      sh.getRange(row, 10).setValue(ts);
+      _postFoodMenuNotice(menuDate, d.Breakfast, d.Lunch, d.Snack, currentUser);
+      addLog(currentUser, 'Food Menu Updated', menuDate);
+      return { success: true, message: 'Food menu updated' };
+    }
+    return { success: false, message: 'Food menu not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function deleteFoodMenu(id, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var idn = parseInt(id, 10);
+    var sh = _ensureFoodMenuSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] !== idn) continue;
+      var row = i + 1;
+      sh.getRange(row, 8).setValue('1');
+      sh.getRange(row, 10).setValue(nowIso());
+      addLog(currentUser, 'Food Menu Deleted', 'id ' + idn);
+      return { success: true, message: 'Food menu deleted' };
+    }
+    return { success: false, message: 'Food menu not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
 // admin-only — upserts the single settings row (ID=1)
 function updateSchoolSettings(d, currentUser, currentRole) {
   try {

@@ -3827,6 +3827,7 @@
       feePayments:  { icon: 'money-bill-wave',  label: 'Fees Collection',    group: 'finance' },
       accounts:     { icon: 'wallet',           label: 'Daily Accounts',     group: 'finance' },
       sms:          { icon: 'sms',              label: 'SMS Center',         group: 'communication' },
+      foodMenu:     { icon: 'utensils',         label: 'Food Menu',          group: 'daily' },
       ownerPortal:  { icon: 'binoculars',       label: 'Owner Portal',       group: 'overview' },
       complaints:   { icon: 'comment-dots',     label: 'Complaints',         group: 'support' },
       helpdesk:     { icon: 'headset',          label: 'Helpdesk',           group: 'support' },
@@ -3850,7 +3851,7 @@
     //  - student: timetable + attendance + marks + notices first
     //  - parent: notices + child's attendance/marks/fees first
     const MENU_PRIORITY = {
-      admin: ['dashboard','ownerPortal','reports','admissions','students','classes','timetable','attendance','substitutes','exams','marks','hallTickets','feePayments','accounts','feeStructure','sms','notices','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','account','settings','about'],
+      admin: ['dashboard','ownerPortal','reports','admissions','students','classes','timetable','attendance','substitutes','exams','marks','hallTickets','feePayments','accounts','feeStructure','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','account','settings','about'],
       supervisor: ['dashboard','reports','attendance','substitutes','marks','hallTickets','exams','notices','ptm','calendar','discipline','conduct','helpdesk','complaints','lessonPlans','logbook','activities','students','parents','classes','subjects','assignments','documents','timetable','account','about'],
       clerk: ['admissions','students','parents','feePayments','accounts','feeStructure','sms','reports','attendance','helpdesk','complaints','documents','assets','inventory','timetable','classes','notices','calendar','account','about'],
       teacher: ['timetable','attendance','substitutes','marks','hallTickets','exams','lessonPlans','ptm','logbook','students','discipline','conduct','activities','notices','reports','calendar','documents','complaints','classes','subjects','account','about'],
@@ -4105,6 +4106,29 @@
       );
     }
 
+    // "today's food menu" banner — shown on every role's dashboard
+    function TodayFoodMenuCard({ currentUser, role }) {
+      const { data: menu, isLoading: loading } = useSWR('getTodayFoodMenu', () => swrFetcher('getTodayFoodMenu', currentUser, role));
+      if (loading || !menu) return null;
+      return (
+        <div style={{
+          display:'flex', alignItems:'center', gap:'14px', padding:'14px 18px', marginBottom:'18px',
+          background:'linear-gradient(135deg,#fff8e1,#ffecb3)', borderLeft:'4px solid #fb8c00', borderRadius:'4px'
+        }}>
+          <i className="fas fa-utensils" style={{fontSize:'22px',color:'#fb8c00'}}></i>
+          <div style={{flex:1}}>
+            <div style={{fontWeight:700,color:'#5d4200',fontSize:'13px',textTransform:'uppercase',letterSpacing:'0.5px',marginBottom:'4px'}}>Today's Food Menu</div>
+            <div style={{fontSize:'13px',color:'#5d4200',display:'flex',gap:'18px',flexWrap:'wrap'}}>
+              {menu.Breakfast && <span><b>Breakfast:</b> {menu.Breakfast}</span>}
+              {menu.Lunch && <span><b>Lunch:</b> {menu.Lunch}</span>}
+              {menu.Snack && <span><b>Snack:</b> {menu.Snack}</span>}
+            </div>
+            {menu.Notes && <div style={{fontSize:'12px',color:'#7a5c00',marginTop:'4px',fontStyle:'italic'}}>{menu.Notes}</div>}
+          </div>
+        </div>
+      );
+    }
+
     // today's accounts widget — day-book income/expense/net, click → accounts page
     function TodayAccountsCard({ goto, currentUser, role }) {
       // backend returns the obj directly (has .success but no .data wrapper) — keep raw, accept only on success
@@ -4232,6 +4256,8 @@
             <i className="fas fa-tachometer-alt"></i> Admin Dashboard
             {syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}
           </h2>
+
+          <TodayFoodMenuCard currentUser={currentUser} role={role} />
 
           {/* Quick Actions */}
           <div className="dash-quick">
@@ -4528,6 +4554,8 @@
             </div>
           </div>
 
+          <TodayFoodMenuCard currentUser={currentUser} role={role} />
+
           <div className="dash-kpi-grid">
             <DashKpi icon="school" label="Class" value={s.ClassLabel || '—'} sub={`Roll ${s.RollNumber || '—'}`} color="blue" onClick={() => goto('classes')} />
             <DashKpi icon="book" label="Subjects" value={k.subjectsCount} color="purple" onClick={() => goto('subjects')} />
@@ -4636,6 +4664,8 @@
               </p>
             </div>
           </div>
+
+          <TodayFoodMenuCard currentUser={currentUser} role={role} />
 
           <div className="dash-kpi-grid">
             <DashKpi icon="child" label="My Children" value={k.totalChildren} color="blue" />
@@ -4753,6 +4783,8 @@
             {syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}
           </h2>
 
+          <TodayFoodMenuCard currentUser={currentUser} role={role} />
+
           <div className="dash-kpi-grid">
             <DashKpi icon="user-graduate" label="Active Students" value={fmt(k.totalStudents)} color="blue" onClick={() => goto('students')} />
             <DashKpi icon="chalkboard-teacher" label="Teachers" value={k.totalTeachers} color="green" onClick={() => goto('users')} />
@@ -4843,6 +4875,8 @@
             {syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}
           </h2>
 
+          <TodayFoodMenuCard currentUser={currentUser} role={role} />
+
           <div className="dash-kpi-grid">
             <DashKpi icon="money-bill-wave" label="Today's Collection" value={fmt(k.todayCollection)} sub={`${k.todayReceipts} receipts`} color="green" onClick={() => goto('feePayments')} />
             <DashKpi icon="receipt" label="Receipts Today" value={k.todayReceipts} sub="generated today" color="blue" onClick={() => goto('feePayments')} />
@@ -4931,6 +4965,8 @@
             <span style={{fontSize:'13px',color:'#888',fontWeight:500,marginLeft:'10px'}}>{todayLabel}</span>
             {syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}
           </h2>
+
+          <TodayFoodMenuCard currentUser={currentUser} role={role} />
 
           <div className="dash-kpi-grid">
             <DashKpi icon="school" label="My Classes" value={k.classes} sub={`${k.students} students`} color="blue" onClick={() => goto('classes')} />
@@ -21226,6 +21262,117 @@
       );
     }
 
+    // ============== Food Menu (admin) ==============
+    function FoodMenuModal({ menu, currentUser, role, onClose, onSave }) {
+      const dStr = (v) => v ? String(v).split('T')[0] : '';
+      const [formData, setFormData] = useState({
+        MenuDate: dStr(menu?.MenuDate) || new Date().toISOString().split('T')[0],
+        Breakfast: menu?.Breakfast || '',
+        Lunch: menu?.Lunch || '',
+        Snack: menu?.Snack || '',
+        Notes: menu?.Notes || ''
+      });
+      const set = (k, v) => setFormData({ ...formData, [k]: v });
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header"><h3><i className="fas fa-utensils"></i> {menu ? 'Edit' : 'Add'} Food Menu</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
+            <div className="modal-body">
+              <form onSubmit={(e) => { e.preventDefault(); onSave(formData); }}>
+                <div className="form-grid">
+                  <div className="form-group"><label>Date *</label><input type="date" value={formData.MenuDate} onChange={(e) => set('MenuDate', e.target.value)} required disabled={!!menu} /></div>
+                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Breakfast</label><input type="text" value={formData.Breakfast} onChange={(e) => set('Breakfast', e.target.value)} placeholder="e.g. Koko & bread" maxLength="200" /></div>
+                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Lunch</label><input type="text" value={formData.Lunch} onChange={(e) => set('Lunch', e.target.value)} placeholder="e.g. Jollof rice & chicken" maxLength="200" /></div>
+                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Snack</label><input type="text" value={formData.Snack} onChange={(e) => set('Snack', e.target.value)} placeholder="e.g. Fruit & biscuits" maxLength="200" /></div>
+                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Notes</label><textarea value={formData.Notes} onChange={(e) => set('Notes', e.target.value)} rows="2" placeholder="Allergy info, special instructions..." /></div>
+                </div>
+                <div className="form-actions">
+                  <button type="submit" className="btn btn-primary"><i className="fas fa-save"></i> Save</button>
+                  <button type="button" className="btn btn-secondary" onClick={onClose}><i className="fas fa-times"></i> Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function FoodMenuView({ currentUser, role }) {
+      const { data: menusData, error: loadError, isLoading: loading, mutate: load } =
+        useSWR('getAllFoodMenus', () => swrFetcher('getAllFoodMenus', currentUser, role));
+      const items = (menusData || []).slice().sort((a, b) => String(b.MenuDate).localeCompare(String(a.MenuDate)));
+      const [showModal, setShowModal] = useState(false);
+      const [editing, setEditing] = useState(null);
+      const todayStr = new Date().toISOString().split('T')[0];
+
+      const handleSave = (data) => {
+        const action = editing ? 'updateFoodMenu' : 'addFoodMenu';
+        const params = editing ? [editing.ID, data, currentUser, role] : [data, currentUser, role];
+        google.script.run.withSuccessHandler((res) => { if (res.success) { setShowModal(false); setEditing(null); Swal.fire({ icon: 'success', text: res.message, timer: 1500, showConfirmButton: false }); load(); } else Swal.fire({ icon: 'error', text: res.message }); })[action](...params);
+      };
+
+      const handleDelete = (m) => {
+        Swal.fire({ icon: 'warning', title: 'Delete menu?', text: m.MenuDate, showCancelButton: true, confirmButtonColor: '#ea4335' })
+          .then((rr) => {
+            if (rr.isConfirmed) {
+              google.script.run.withSuccessHandler((res) => {
+                Swal.fire({ icon: res.success ? 'success' : 'error', text: res.message, timer: 1500, showConfirmButton: false });
+                load();
+              }).deleteFoodMenu(m.ID, currentUser, role);
+            }
+          });
+      };
+
+      const fmtDate = (d) => { const dt = new Date(d); return isNaN(dt.getTime()) ? d : dt.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }); };
+
+      return (
+        <div className="data-section">
+          <div className="section-header">
+            <h2><i className="fas fa-utensils"></i> Food Menu</h2>
+            <button className="btn btn-success" onClick={() => { setEditing(null); setShowModal(true); }}><i className="fas fa-plus"></i> Add Menu</button>
+          </div>
+          {loadError && !loading && items.length === 0 && (
+            <div className="settings-info-message" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>
+              <i className="fas fa-triangle-exclamation" style={{marginRight:'6px',color:'#ea4335'}}></i>
+              Couldn't load food menus — {String((loadError && loadError.message) || loadError)}. Use the <i className="fas fa-arrows-rotate"></i> refresh button to retry.
+            </div>
+          )}
+          {loading && <TableSkeleton rows={5} columns={5} />}
+          {!loading && items.length === 0 && (
+            <div style={{textAlign:'center',padding:'40px',color:'#888',background:'#f8f9fa'}}>No food menus yet. Click "Add Menu" to create today's menu.</div>
+          )}
+          {!loading && items.length > 0 && (
+            <div style={{overflowX:'auto'}}>
+              <table className="simple-table" style={{width:'100%'}}>
+                <thead>
+                  <tr><th>Date</th><th>Breakfast</th><th>Lunch</th><th>Snack</th><th>Notes</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                  {items.map((m) => (
+                    <tr key={m.ID} style={m.MenuDate === todayStr ? { background: '#fff8e1' } : undefined}>
+                      <td style={{fontWeight:600,color:'var(--navy-primary)',whiteSpace:'nowrap'}}>
+                        {fmtDate(m.MenuDate)}{m.MenuDate === todayStr && <span className="role-badge role-clerk" style={{marginLeft:'6px',fontSize:'10px'}}>Today</span>}
+                      </td>
+                      <td>{m.Breakfast || <span style={{color:'#bbb'}}>—</span>}</td>
+                      <td>{m.Lunch || <span style={{color:'#bbb'}}>—</span>}</td>
+                      <td>{m.Snack || <span style={{color:'#bbb'}}>—</span>}</td>
+                      <td style={{fontSize:'12px',color:'#888'}}>{m.Notes || <span style={{color:'#bbb'}}>—</span>}</td>
+                      <td style={{whiteSpace:'nowrap'}}>
+                        <button className="action-icon edit-icon" title="Edit" onClick={() => { setEditing(m); setShowModal(true); }}><i className="fas fa-edit"></i></button>
+                        <button className="action-icon delete-icon" title="Delete" onClick={() => handleDelete(m)}><i className="fas fa-trash"></i></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {showModal && <FoodMenuModal menu={editing} currentUser={currentUser} role={role} onClose={() => { setShowModal(false); setEditing(null); }} onSave={handleSave} />}
+        </div>
+      );
+    }
+
     // ============== Helpdesk Tickets ==============
     function HelpdeskView({ currentUser, role }) {
       const r = String(role).toLowerCase();
@@ -26951,6 +27098,7 @@
       const canSeeFeePayments = r === 'admin' || r === 'clerk' || isStudent || isParent;
       const canSeeAccounts = r === 'admin' || r === 'clerk';
       const canSeeSms = r === 'admin' || r === 'clerk';
+      const canSeeFoodMenu = r === 'admin';
       const canSeeOwnerPortal = r === 'admin' || r === 'owner';
       const canSeeDiscipline = r === 'admin' || r === 'teacher' || r === 'supervisor' || isStudent || isParent;
       const canSeeConduct = r === 'admin' || r === 'teacher' || r === 'supervisor' || isStudent || isParent;
@@ -27023,6 +27171,8 @@
           return canSeeAccounts ? <AccountsView currentUser={user} role={role} /> : denied('Daily Accounts');
         case 'sms':
           return canSeeSms ? <SmsView currentUser={user} role={role} schoolSettings={schoolSettings} /> : denied('SMS Center');
+        case 'foodMenu':
+          return canSeeFoodMenu ? <FoodMenuView currentUser={user} role={role} /> : denied('Food Menu');
         case 'ownerPortal':
           return canSeeOwnerPortal ? <OwnerPortalView currentUser={user} role={role} /> : denied('Owner Portal');
         case 'discipline':
