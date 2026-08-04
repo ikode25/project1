@@ -6606,7 +6606,7 @@
 
       const showFee = !isNaN(parseFloat(f.RegistrationFee)) && parseFloat(f.RegistrationFee) > 0;
       const isTransfer = f.AdmissionType === 'transfer';
-      const classOpts = (classes || []).map(c => ({ value: String(c.ID), label: c.ClassName + ' ' + c.Section + ' (' + c.AcademicYear + ')' }));
+      const classOpts = (classes || []).map(c => ({ value: String(c.ID), label: c.Label }));
       const SectionHdr = ({ icon, label }) => (
         <h4 style={{ color: 'var(--navy-primary)', margin: '18px 0 12px', fontSize: '15px', borderBottom: '2px solid var(--navy-primary)', paddingBottom: '6px' }}>
           <i className={`fas fa-${icon}`}></i> {label}
@@ -6942,7 +6942,7 @@
           .enrollAdmission(target.ID, d, currentUser, role);
       };
 
-      const classOpts = (classes || []).map(c => ({ value: String(c.ID), label: c.ClassName + ' ' + c.Section + ' (' + c.AcademicYear + ')' }));
+      const classOpts = (classes || []).map(c => ({ value: String(c.ID), label: c.Label }));
       const SectionHdr = ({ icon, label }) => (
         <h4 style={{ color: 'var(--navy-primary)', margin: '18px 0 12px', fontSize: '15px', borderBottom: '2px solid var(--navy-primary)', paddingBottom: '6px' }}>
           <i className={`fas fa-${icon}`}></i> {label}
@@ -7173,8 +7173,8 @@
       };
 
       const optsFor = (f) => {
-        if (f.optionsFrom === 'classes') return [{value:'',label:'All classes'}].concat((classes||[]).map(c => ({value:String(c.ID),label:c.ClassName+' '+c.Section+' ('+c.AcademicYear+')'})));
-        if (f.optionsFrom === 'classesReq') return (classes||[]).map(c => ({value:String(c.ID),label:c.ClassName+' '+c.Section+' ('+c.AcademicYear+')'}));
+        if (f.optionsFrom === 'classes') return [{value:'',label:'All classes'}].concat((classes||[]).map(c => ({value:String(c.ID),label:c.Label})));
+        if (f.optionsFrom === 'classesReq') return (classes||[]).map(c => ({value:String(c.ID),label:c.Label}));
         if (f.optionsFrom === 'exams') return (exams||[]).map(e => ({value:String(e.ID),label:e.label}));
         return f.options || [];
       };
@@ -7594,7 +7594,7 @@
         Swal.fire({
           icon: 'warning',
           title: 'Delete Class?',
-          text: `Delete "${cls.ClassName} ${cls.Section} (${cls.AcademicYear})"?`,
+          text: `Delete "${cls.Label || (cls.ClassName + ' ' + cls.Section + ' (' + cls.AcademicYear + ')')}"?`,
           showCancelButton: true,
           confirmButtonColor: '#ea4335',
           confirmButtonText: 'Delete'
@@ -7805,7 +7805,7 @@
                   <div key={c.ID} className="grid-card" style={{border:'1px solid #e0e0e0',borderRadius:'8px',padding:'14px',background:'#fff'}}>
                     <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
                       <div>
-                        <div style={{fontWeight:700,color:'var(--navy-primary)',fontSize:'16px'}}>{c.ClassName} {c.Section}</div>
+                        <div style={{fontWeight:700,color:'var(--navy-primary)',fontSize:'16px'}}>{c.ShortLabel || (c.ClassName + ' ' + c.Section)}</div>
                         <div style={{fontSize:'12px',color:'#888'}}>{c.AcademicYear}</div>
                       </div>
                       <span style={{display:'inline-block',padding:'3px 9px',background:m.color,color:'#fff',fontSize:11,fontWeight:600,textTransform:'uppercase',borderRadius:3}}>{m.label}</span>
@@ -8223,7 +8223,7 @@
       const classOpts = classes
         .slice()
         .sort((a, b) => (a.ClassName + a.Section).localeCompare(b.ClassName + b.Section))
-        .map(c => ({ value: String(c.ID), label: `${c.ClassName} ${c.Section} (${c.AcademicYear}) — ${c.TotalStrength || 0} student(s)` }));
+        .map(c => ({ value: String(c.ID), label: `${c.Label} — ${c.TotalStrength || 0} student(s)` }));
 
       const fromClass = classes.find(c => String(c.ID) === String(fromClassId));
       const toClass = classes.find(c => String(c.ID) === String(toClassId));
@@ -8677,7 +8677,7 @@
       const quickSetup = () => {
         if (allClasses.length === 0) { Swal.fire({ icon: 'info', text: 'No classes yet — add a class first.' }); return; }
         const options = {};
-        allClasses.forEach(c => { options[c.ID] = `${c.ClassName} ${c.Section} (${c.AcademicYear})`; });
+        allClasses.forEach(c => { options[c.ID] = `${c.Label}`; });
         Swal.fire({
           title: 'Quick Setup Subjects',
           html: 'Adds the standard NaCCA subject list for the class\'s key phase (KG, Lower/Upper Primary, or JHS) — skips any subject already there.',
@@ -9133,7 +9133,7 @@
                     label="Class" icon="fas fa-school"
                     options={classes.map(c => ({
                       value: String(c.ID),
-                      label: c.ClassName + ' ' + c.Section + ' (' + c.AcademicYear + ')'
+                      label: c.Label
                     }))}
                     value={formData.ClassID}
                     onChange={(v) => set('ClassID', v)}
@@ -9762,7 +9762,7 @@
                         label="Class" icon="fas fa-school"
                         options={classes.map(c => ({
                           value: String(c.ID),
-                          label: c.ClassName + ' ' + c.Section + ' (' + c.AcademicYear + ')'
+                          label: c.Label
                         }))}
                         value={pickerClassId}
                         onChange={(v) => setPickerClassId(v)}
@@ -10557,7 +10557,7 @@
                     label="Class" icon="fas fa-school"
                     options={classes.map(c => ({
                       value: String(c.ID),
-                      label: c.ClassName + ' ' + c.Section + ' (' + c.AcademicYear + ')'
+                      label: c.Label
                     }))}
                     value={formData.ClassID}
                     onChange={(v) => set('ClassID', v)}
@@ -14650,7 +14650,7 @@
                     label="Class" icon="fas fa-school"
                     options={classes.map(c => ({
                       value: String(c.ID),
-                      label: c.ClassName + ' ' + c.Section + ' (' + c.AcademicYear + ')'
+                      label: c.Label
                     }))}
                     value={formData.ClassID}
                     onChange={setClassId}
@@ -15776,7 +15776,7 @@
                 <SearchableDropdown
                   options={classes.map(c => ({
                     value: String(c.ID),
-                    label: c.ClassName + ' ' + c.Section + ' (' + c.AcademicYear + ')'
+                    label: c.Label
                   }))}
                   value={classId}
                   onChange={(v) => {
@@ -16394,7 +16394,7 @@
                     label="Class" icon="fas fa-school"
                     options={classes.map(c => ({
                       value: String(c.ID),
-                      label: c.ClassName + ' ' + c.Section + ' (' + c.AcademicYear + ')'
+                      label: c.Label
                     }))}
                     value={formData.ClassID}
                     onChange={(v) => set('ClassID', v)}
@@ -20254,7 +20254,7 @@
                     value={formData.ApplicableTo} onChange={(v) => set('ApplicableTo', v)} placeholder="Select..." />
                   {formData.ApplicableTo === 'class_specific' && (
                     <SearchableDropdown label="Target Class" icon="fas fa-school" required
-                      options={classes.map(c => ({ value: String(c.ID), label: c.ClassName + ' ' + c.Section + ' (' + c.AcademicYear + ')' }))}
+                      options={classes.map(c => ({ value: String(c.ID), label: c.Label }))}
                       value={formData.TargetClassID} onChange={(v) => set('TargetClassID', v)} placeholder="Select class..." />
                   )}
                   <div className="form-group">
@@ -21064,7 +21064,7 @@
                     value={formData.TargetAudience} onChange={(v) => set('TargetAudience', v)} placeholder="Select..." />
                   {formData.TargetAudience === 'class_specific' && (
                     <SearchableDropdown label="Class" icon="fas fa-school" required
-                      options={classes.map(c => ({ value: String(c.ID), label: c.ClassName + ' ' + c.Section + ' (' + c.AcademicYear + ')' }))}
+                      options={classes.map(c => ({ value: String(c.ID), label: c.Label }))}
                       value={formData.TargetClassID} onChange={(v) => set('TargetClassID', v)} placeholder={_isTeacher ? "Pick one of your classes..." : "Select class..."} />
                   )}
                   <SearchableDropdown label="Priority" icon="fas fa-exclamation-triangle"
@@ -21476,7 +21476,7 @@
       const { data: classesRaw } = useSWR('getAllClasses', () => swrFetcher('getAllClasses', currentUser, role));
       const items = plansData || [];
       const classOpts = (classesRaw || []).map((c) => {
-        const lbl = c.ClassName + ' ' + c.Section + ' (' + c.AcademicYear + ')';
+        const lbl = c.Label;
         return { value: lbl, label: lbl };
       });
       const [showModal, setShowModal] = useState(false);
@@ -21761,7 +21761,7 @@
               <form onSubmit={(e) => { e.preventDefault(); onSave(formData); }}>
                 <div className="form-grid">
                   <SearchableDropdown label="Class" icon="fas fa-school" required
-                    options={classes.map(c => ({ value: String(c.ID), label: c.ClassName + ' ' + c.Section + ' (' + c.AcademicYear + ')' }))}
+                    options={classes.map(c => ({ value: String(c.ID), label: c.Label }))}
                     value={formData.ClassID} onChange={(v) => setFormData({...formData, ClassID: v, SubjectID: ''})} placeholder="Select..." />
                   <SearchableDropdown label="Subject" icon="fas fa-book" required
                     options={subjects.map(s => ({ value: String(s.ID), label: s.SubjectName + ' (' + s.SubjectCode + ')' }))}
@@ -22061,7 +22061,7 @@
               <form onSubmit={(e) => { e.preventDefault(); onSave(formData); }}>
                 <div className="form-grid">
                   <SearchableDropdown label="Class" icon="fas fa-school" required
-                    options={classes.map(c => ({ value: String(c.ID), label: c.ClassName + ' ' + c.Section }))}
+                    options={classes.map(c => ({ value: String(c.ID), label: c.ShortLabel || (c.ClassName + ' ' + c.Section) }))}
                     value={formData.ClassID} onChange={(v) => setFormData({...formData, ClassID: v, SubjectID: ''})} placeholder="Select..." />
                   <SearchableDropdown label="Subject" icon="fas fa-book" required
                     options={subjects.map(s => ({ value: String(s.ID), label: s.SubjectName }))}
@@ -22907,14 +22907,14 @@
 
       const classLabel = (() => {
         const c = classes.find(c => String(c.ID) === String(selectedClassId));
-        return c ? c.ClassName + ' ' + c.Section + ' (' + c.AcademicYear + ')' : '';
+        return c ? c.Label : '';
       })();
 
       // determine the user's own classLabel for student/parent display
       const myClassLabel = (() => {
         if ((isStudent || isParent) && ctx.classId) {
           const c = classes.find(c => parseInt(c.ID, 10) === parseInt(ctx.classId, 10));
-          return c ? c.ClassName + ' ' + c.Section + ' (' + c.AcademicYear + ')' : (ctx.classLabel || '');
+          return c ? c.Label : (ctx.classLabel || '');
         }
         return '';
       })();
@@ -22988,7 +22988,7 @@
                   <div className="filter-group">
                     <label><i className="fas fa-school"></i> Class</label>
                     <SearchableDropdown
-                      options={classes.map(c => ({ value: String(c.ID), label: c.ClassName + ' ' + c.Section + ' (' + c.AcademicYear + ')' }))}
+                      options={classes.map(c => ({ value: String(c.ID), label: c.Label }))}
                       value={selectedClassId}
                       onChange={(v) => setSelectedClassId(v)}
                       placeholder="Pick a class..."
@@ -23147,7 +23147,7 @@
               <div className="filter-group">
                 <label><i className="fas fa-school"></i> Source class</label>
                 <SearchableDropdown
-                  options={otherClasses.map(c => ({ value: String(c.ID), label: c.ClassName + ' ' + c.Section + ' (' + c.AcademicYear + ')' }))}
+                  options={otherClasses.map(c => ({ value: String(c.ID), label: c.Label }))}
                   value={fromClassId}
                   onChange={setFromClassId}
                   placeholder="Pick a class to copy from..."
@@ -23603,7 +23603,7 @@
             <SearchableDropdown
               label="Class"
               icon="fas fa-school"
-              options={classes.map(c => ({ value: String(c.ID), label: `${c.ClassName} ${c.Section} (${c.AcademicYear}) — ${students.filter(s => String(s.ClassID) === String(c.ID)).length} student(s)` }))}
+              options={classes.map(c => ({ value: String(c.ID), label: `${c.Label} — ${students.filter(s => String(s.ClassID) === String(c.ID)).length} student(s)` }))}
               value={classId}
               onChange={setClassId}
               placeholder="Select class..."
@@ -23998,7 +23998,7 @@
           emptyText="No classes found."
           renderCard={(c) => (
             <div key={c.ID} className="grid-card" style={{border:'1px solid #e0e0e0',borderRadius:'8px',padding:'14px',background:'#fff'}}>
-              <div style={{fontWeight:700,color:'var(--navy-primary)',fontSize:16}}>{c.ClassName} {c.Section}</div>
+              <div style={{fontWeight:700,color:'var(--navy-primary)',fontSize:16}}>{c.ShortLabel || (c.ClassName + ' ' + c.Section)}</div>
               <div style={{fontSize:12,color:'#888',marginBottom:8}}>{c.AcademicYear}</div>
               <div style={{fontSize:13,color:'#555'}}>
                 <div><i className="fas fa-users" style={{width:16}}></i> {c.TotalStrength} / {c.MaxCapacity} students</div>
@@ -25136,7 +25136,7 @@
                     <input type="text" value={duration + ' min'} readOnly style={{background:'#f5f5f5'}} />
                   </div>
                   <SearchableDropdown label="Class" icon="fas fa-school" required
-                    options={classes.map(c => ({ value: String(c.ID), label: c.ClassName + ' ' + (c.Section || '') + (c.AcademicYear ? ' ('+c.AcademicYear+')' : '') }))}
+                    options={classes.map(c => ({ value: String(c.ID), label: c.Label || (c.ClassName + ' ' + (c.Section || '') + (c.AcademicYear ? ' ('+c.AcademicYear+')' : '')) }))}
                     value={data.ClassID} onChange={(v) => {
                       set('ClassID', v);
                       const c = classes.find(cc => String(cc.ID) === String(v));

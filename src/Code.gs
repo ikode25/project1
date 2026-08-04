@@ -452,16 +452,30 @@ function getClassesMap() {
   var sh = getSheet(CLASSES_SHEET);
   if (!sh) return {};
   var data = sh.getDataRange().getValues(), map = {};
+
+  // count active classes per (className+academicYear) to know which levels are single-stream
+  var streamCount = {};
   for (var i = 1; i < data.length; i++) {
     if (String(data[i][6]) === '1') continue;
-    map[data[i][0]] = {
-      className: data[i][1],
-      section: data[i][2],
-      academicYear: data[i][3],
-      label: data[i][1] + ' ' + data[i][2] + ' (' + data[i][3] + ')',
-      curriculumStage: String(data[i][11] || 'lower_primary').toLowerCase(),
-      gradeLevel: parseInt(data[i][9], 10) || 0,
-      gradeBand: gradeBandForStage(data[i][11])
+    var key = String(data[i][1]).trim().toLowerCase() + '|' + String(data[i][3]).trim();
+    streamCount[key] = (streamCount[key] || 0) + 1;
+  }
+
+  for (var j = 1; j < data.length; j++) {
+    if (String(data[j][6]) === '1') continue;
+    var k = String(data[j][1]).trim().toLowerCase() + '|' + String(data[j][3]).trim();
+    var isSingleStream = (streamCount[k] || 0) <= 1;
+    var classLabel = isSingleStream ? data[j][1] : (data[j][1] + ' ' + data[j][2]);
+    map[data[j][0]] = {
+      className: data[j][1],
+      section: data[j][2],
+      academicYear: data[j][3],
+      isSingleStream: isSingleStream,
+      label: classLabel + ' (' + data[j][3] + ')',
+      shortLabel: classLabel,
+      curriculumStage: String(data[j][11] || 'lower_primary').toLowerCase(),
+      gradeLevel: parseInt(data[j][9], 10) || 0,
+      gradeBand: gradeBandForStage(data[j][11])
     };
   }
   return map;
@@ -2113,6 +2127,14 @@ function getAllClasses(currentUser, currentRole) {
     var scope = getViewerScope(currentUser, currentRole);
     var teacherClassIds = String(currentRole).toLowerCase() === 'teacher' ? getTeacherClassIds(currentUser) : null;
 
+    // count active classes per (className+academicYear) to know which levels are single-stream
+    var streamCount = {};
+    for (var s = 1; s < data.length; s++) {
+      if (String(data[s][6]) === '1') continue;
+      var sKey = String(data[s][1]).trim().toLowerCase() + '|' + String(data[s][3]).trim();
+      streamCount[sKey] = (streamCount[sKey] || 0) + 1;
+    }
+
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][6]) === '1') continue; // soft-deleted
       var thisClassId = parseInt(data[i][0], 10);
@@ -2128,11 +2150,18 @@ function getAllClasses(currentUser, currentRole) {
       var assistantId = data[i][17];
       var assistantName = (assistantId !== '' && assistantId != null && umap[assistantId]) ? umap[assistantId].fullName : '';
 
+      var cKey = String(data[i][1]).trim().toLowerCase() + '|' + String(data[i][3]).trim();
+      var isSingleStream = (streamCount[cKey] || 0) <= 1;
+      var shortLabel = isSingleStream ? data[i][1] : (data[i][1] + ' ' + data[i][2]);
+
       classes.push({
         ID: data[i][0],
         ClassName: data[i][1],
         Section: data[i][2],
         AcademicYear: data[i][3],
+        IsSingleStream: isSingleStream,
+        Label: shortLabel + ' (' + data[i][3] + ')',
+        ShortLabel: shortLabel,
         ClassTeacherID: teacherId === '' ? null : teacherId,
         ClassTeacherName: teacherName,
         TotalStrength: parseInt(data[i][5], 10) || 0,
@@ -5203,6 +5232,7 @@ function getOwnerClassSummaries(currentUser, currentRole) {
     var csh = getSheet(CLASSES_SHEET);
     if (!csh) return { success: false, message: 'Classes sheet not found' };
     var cdata = csh.getDataRange().getValues();
+    var cmap = getClassesMap();
 
     var fmap = getFeeStructuresLite();
     var fsh = getSheet(FEE_PAYMENTS_SHEET);
@@ -5231,6 +5261,7 @@ function getOwnerClassSummaries(currentUser, currentRole) {
         ClassName: cdata[i][1],
         Section: cdata[i][2],
         AcademicYear: cdata[i][3],
+        ShortLabel: cmap[id] ? cmap[id].shortLabel : (cdata[i][1] + ' ' + cdata[i][2]),
         TotalStrength: strength,
         MaxCapacity: capacity,
         FeesCollected: fees.paid,
