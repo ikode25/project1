@@ -338,7 +338,79 @@ var PERIOD_HEADERS = ['ID','PeriodNumber','StartTime','EndTime','IsBreak','Label
 // matters (Exams, Fee_Structure, Admissions, LessonPlans, etc.) already carries its own
 // AcademicYear/Term columns, so old sessions stay fully queryable forever; this pair only drives
 // which session NEW records default into and what the dashboard banner shows.)
-var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt','ShowOverallPositionOnReportCard','ShowSubjectAverageOnReportCard','SchoolStampURL','HeadteacherSignatureURL','AdminSignatureURL','PublicAppBaseURL','ActiveTerm'];
+var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt','ShowOverallPositionOnReportCard','ShowSubjectAverageOnReportCard','SchoolStampURL','HeadteacherSignatureURL','AdminSignatureURL','PublicAppBaseURL','ActiveTerm','DietaryOptions'];
+// col 40 = DietaryOptions — admin-editable CSV of "value|label" pairs shown as checkboxes on the
+// student form (Ghana-appropriate defaults; the old hardcoded Halal/Kosher/Pescatarian/etc. list
+// is now just the fallback seed, not a fixed enum — see defaultDietaryOptions()).
+function defaultDietaryOptions() {
+  return [
+    { v: 'none', l: 'No Restrictions' },
+    { v: 'vegetarian', l: 'Vegetarian' },
+    { v: 'halal', l: 'Halal' },
+    { v: 'diabetic', l: 'Diabetic-Friendly' },
+    { v: 'lactose_intolerant', l: 'Lactose-Intolerant' },
+    { v: 'peanut_allergy', l: 'Peanut/Nut Allergy' },
+    { v: 'seafood_allergy', l: 'Seafood Allergy' },
+    { v: 'other', l: 'Other (see Allergies field)' }
+  ];
+}
+function parseDietaryOptionsCsv(csv) {
+  var raw = String(csv || '').trim();
+  if (!raw) return defaultDietaryOptions();
+  var out = raw.split(',').map(function(pair) {
+    var parts = String(pair).split('|');
+    var v = (parts[0] || '').trim();
+    var l = (parts[1] || '').trim();
+    return v ? { v: v, l: l || v } : null;
+  }).filter(Boolean);
+  return out.length ? out : defaultDietaryOptions();
+}
+function dietaryOptionsToCsv(list) {
+  return (list || []).map(function(o) {
+    var v = String(o.v || o.value || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    var l = String(o.l || o.label || '').trim().slice(0, 60);
+    return v ? (v + '|' + l) : null;
+  }).filter(Boolean).join(',');
+}
+function getDietaryOptions() {
+  try {
+    var sh = getSheet(SETTINGS_SHEET);
+    if (!sh) return { success: true, data: defaultDietaryOptions() };
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (parseInt(data[i][0], 10) === 1) return { success: true, data: parseDietaryOptionsCsv(data[i][39]) };
+    }
+    return { success: true, data: defaultDietaryOptions() };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString(), data: defaultDietaryOptions() };
+  }
+}
+function updateDietaryOptions(list, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    if (!Array.isArray(list) || !list.length) return { success: false, message: 'Provide at least one dietary option' };
+    var csv = dietaryOptionsToCsv(list);
+    if (!csv) return { success: false, message: 'Provide at least one valid dietary option' };
+    var sh = getSheet(SETTINGS_SHEET);
+    if (!sh) return { success: false, message: 'Settings sheet not found. Run setup() first.' };
+    var data = sh.getDataRange().getValues();
+    var foundRow = -1;
+    for (var i = 1; i < data.length; i++) { if (parseInt(data[i][0], 10) === 1) { foundRow = i + 1; break; } }
+    var ts = nowIso();
+    if (foundRow === -1) {
+      var blank = new Array(SETTINGS_HEADERS.length).fill('');
+      blank[0] = 1; blank[14] = ts; blank[15] = ts;
+      sh.appendRow(blank);
+      foundRow = sh.getLastRow();
+    }
+    sh.getRange(foundRow, 40).setValue(csv);  // col 40 = DietaryOptions
+    sh.getRange(foundRow, 16).setValue(ts);   // col 16 = UpdatedAt
+    addLog(currentUser, 'Dietary Options Updated', String(list.length) + ' options');
+    return { success: true, message: 'Dietary options updated', data: parseDietaryOptionsCsv(csv) };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
 
 // timetable cols (18):
 // 0=ID, 1=ClassID (FK), 2=DayOfWeek (lower: monday..sunday), 3=PeriodNumber,
@@ -12051,7 +12123,8 @@ function getSchoolSettings() {
             HeadteacherSignatureURL: data[i][35] || '',
             AdminSignatureURL: data[i][36] || '',
             PublicAppBaseURL: data[i][37] || '',
-            ActiveTerm: data[i][38] || 'term1'
+            ActiveTerm: data[i][38] || 'term1',
+            DietaryOptions: parseDietaryOptionsCsv(data[i][39])
           }
         };
       }
@@ -12090,7 +12163,8 @@ function defaultSchoolSettings() {
     HeadteacherSignatureURL: '',
     AdminSignatureURL: '',
     PublicAppBaseURL: '',
-    ActiveTerm: 'term1'
+    ActiveTerm: 'term1',
+    DietaryOptions: defaultDietaryOptions()
   };
 }
 
@@ -12527,6 +12601,50 @@ function getSmsDashboardStats(currentUser, currentRole) {
     };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// ---- lightweight "who's online" presence tracker ----
+// No dedicated sheet/session table needed — CacheService holds a single small JSON blob of
+// {username: {t: epochMs, role, name}}, refreshed by a heartbeat ping from the browser every
+// ~90s (see pingPresence calls in index.html's App()). Entries older than the TTL are pruned
+// on every read/write, so a closed tab silently drops off within a couple minutes with no
+// explicit "logout" bookkeeping required.
+var ONLINE_PRESENCE_CACHE_KEY = 'sms_online_presence_v1';
+var ONLINE_PRESENCE_TTL_MS = 4 * 60 * 1000; // 4 minutes — a bit over 2x the heartbeat interval
+
+function _readPresenceMap() {
+  try {
+    var raw = CacheService.getScriptCache().get(ONLINE_PRESENCE_CACHE_KEY);
+    var map = raw ? JSON.parse(raw) : {};
+    var now = Date.now();
+    Object.keys(map).forEach(function(k) { if (!map[k] || (now - map[k].t) > ONLINE_PRESENCE_TTL_MS) delete map[k]; });
+    return map;
+  } catch (err) {
+    return {};
+  }
+}
+
+function pingPresence(currentUser, currentRole, currentFullName) {
+  try {
+    if (!currentUser) return { success: false };
+    var map = _readPresenceMap();
+    map[String(currentUser)] = { t: Date.now(), role: String(currentRole || ''), name: String(currentFullName || currentUser) };
+    CacheService.getScriptCache().put(ONLINE_PRESENCE_CACHE_KEY, JSON.stringify(map), 600); // 10 min cache TTL — self-heals even if nobody prunes it
+    return { success: true, data: { count: Object.keys(map).length } };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function getOnlineUsersCount(currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var map = _readPresenceMap();
+    var users = Object.keys(map).map(function(k) { return { Username: k, Role: map[k].role, FullName: map[k].name }; });
+    return { success: true, data: { count: users.length, users: users } };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString(), data: { count: 0, users: [] } };
   }
 }
 

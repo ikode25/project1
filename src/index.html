@@ -289,6 +289,32 @@
       text-transform: uppercase;
       letter-spacing: 0.4px;
     }
+    .login-role-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+      text-align: left;
+    }
+    .login-role-card {
+      background: #f8f9fb;
+      border: 1px solid #eef0f3;
+      border-radius: 8px;
+      padding: 8px 9px;
+    }
+    .login-role-card .lrc-hdr {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #444;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      margin-bottom: 3px;
+    }
+    .login-role-card .lrc-hdr i { color: var(--navy-accent, #0074D9); font-size: 12px; }
+    .login-role-card .lrc-desc { font-size: 10.5px; color: #888; line-height: 1.35; }
 
     @media (max-width: 480px) {
       .login-box { padding: 28px 22px 24px; border-radius: 14px; max-width: 95%; }
@@ -1901,6 +1927,22 @@
     .dash-kpi .dk-sub.up { color: #1e7e34; }
     .dash-kpi .dk-sub.down { color: #b71c1c; }
 
+    /* live indicators — SMS balance + users online pulse gently to signal "this is live data" */
+    .dk-blink-dot {
+      display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+      background: #34a853; margin-right: 5px; vertical-align: middle;
+      animation: dk-dot-pulse 1.4s ease-in-out infinite;
+    }
+    .dk-val-blink { animation: dk-val-pulse 1.8s ease-in-out infinite; }
+    @keyframes dk-dot-pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(52,168,83,0.5); }
+      50% { opacity: 0.4; box-shadow: 0 0 0 4px rgba(52,168,83,0); }
+    }
+    @keyframes dk-val-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.55; }
+    }
+
     /* color variants */
     .dash-kpi.k-blue { border-left-color: #0074D9; }
     .dash-kpi.k-blue .dk-ico { color: #0074D9; }
@@ -3049,7 +3091,9 @@
     .rc-remarks-edit input, .rc-remarks-edit select { width: 100%; padding: 6px 8px; border: 1px solid #ccc; font-size: 13px; }
     .rc-grade-key { font-size: 11px; color: #555; padding: 8px 14px; border: 1px dashed #ccc; background: #fafafa; margin-bottom: 10px; }
     .rc-sign { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-top: 28px; font-size: 12px; text-align: center; color: #444; }
-    .rc-sign div { border-top: 1px solid #555; padding-top: 4px; }
+    /* direct children only — a stamp/signature image inside one of these adds its own inner
+       <div> label, which must NOT also get the signature line (that was the "double line" bug) */
+    .rc-sign > div { border-top: 1px solid #555; padding-top: 4px; }
     .rc-foot { text-align: center; font-size: 10px; color: #888; border-top: 1px solid #e0e0e0; margin-top: 14px; padding-top: 6px; }
 
     @media print {
@@ -3842,12 +3886,14 @@
 
             <div className="login-footer">
               <div>{sch.SchoolEmail && <span><i className="fas fa-envelope"></i> {sch.SchoolEmail}</span>}{sch.SchoolEmail && sch.SchoolContact && ' · '}{sch.SchoolContact && <span><i className="fas fa-phone"></i> {sch.SchoolContact}</span>}</div>
-              <div className="login-roles">
-                <span><i className="fas fa-user-shield"></i> Admin</span>
-                <span><i className="fas fa-clipboard"></i> Clerk</span>
-                <span><i className="fas fa-chalkboard-teacher"></i> Teacher</span>
-                <span><i className="fas fa-user-graduate"></i> Student</span>
-                <span><i className="fas fa-users"></i> Parent</span>
+              <div style={{fontSize:'10px',color:'#aaa',textTransform:'uppercase',letterSpacing:'0.5px',marginTop:'12px',textAlign:'center'}}>Portals available on this system</div>
+              <div className="login-role-grid">
+                {LOGIN_ROLE_DESCRIPTIONS.map((r) => (
+                  <div className="login-role-card" key={r.role} title={r.desc}>
+                    <div className="lrc-hdr"><i className={`fas fa-${r.icon}`}></i> {r.role}</div>
+                    <div className="lrc-desc">{r.desc}</div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -4637,7 +4683,7 @@
     }
 
     // shared KPI card component — clickable when onClick is provided
-    function DashKpi({ icon, label, value, sub, color, onClick }) {
+    function DashKpi({ icon, label, value, sub, color, onClick, blink }) {
       const isClickable = typeof onClick === 'function';
       return (
         <div
@@ -4648,8 +4694,8 @@
           onKeyDown={isClickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
           title={isClickable ? 'Click to view ' + label : undefined}
         >
-          <div className="dk-lbl">{label}</div>
-          <div className="dk-val">{value != null ? value : '—'}</div>
+          <div className="dk-lbl">{blink && <span className="dk-blink-dot" aria-hidden="true"></span>}{label}</div>
+          <div className={'dk-val' + (blink ? ' dk-val-blink' : '')}>{value != null ? value : '—'}</div>
           {sub && <div className="dk-sub">{sub}</div>}
           <i className={`fas fa-${icon} dk-ico`}></i>
           {isClickable && <i className="fas fa-arrow-right dk-go"></i>}
@@ -4835,6 +4881,13 @@
         useSWR('getSmsDashboardStats', () => swrFetcher('getSmsDashboardStats', currentUser, role));
       const { data: inquiries } =
         useSWR('getAllInquiries', () => swrFetcher('getAllInquiries', currentUser, role));
+      const { data: onlineStats, refresh: refreshOnline } =
+        useSWR('getOnlineUsersCount', () => swrFetcher('getOnlineUsersCount', currentUser, role));
+      // live-ish — re-poll every 45s so the "Users Online" count doesn't need a manual refresh
+      useEffect(() => {
+        const iv = setInterval(() => refreshOnline(), 45000);
+        return () => clearInterval(iv);
+      }, []);
       const newInquiriesCount = (inquiries || []).filter(i => i.Status === 'new').length;
       const syncing = syncS || syncC || syncE;
 
@@ -4928,8 +4981,9 @@
             <DashKpi icon="sms" label="SMS Balance"
               value={smsStats ? (smsStats.balance == null ? 'N/A' : fmt(smsStats.balance)) : '…'}
               sub={smsStats ? `${fmt(smsStats.totalSent)} sent · ${fmt(smsStats.totalFailed)} failed` : 'loading…'}
-              color="teal" onClick={() => goto('sms')} />
+              color="teal" onClick={() => goto('sms')} blink />
             <DashKpi icon="comment-dots" label="New Inquiries" value={newInquiriesCount} sub={`${(inquiries || []).length} total`} color="pink" onClick={() => goto('inquiries')} />
+            <DashKpi icon="circle-nodes" label="Users Online" value={onlineStats ? onlineStats.count : '…'} sub="live · refreshes every 45s" color="green" blink />
           </div>
 
           {/* day-book snapshot */}
@@ -6809,6 +6863,16 @@
       { value: 'Traditional', label: 'Traditional (African Traditional Religion)' }
     ];
     const GHANA_REGION_OPTS = ['Ahafo','Ashanti','Bono','Bono East','Central','Eastern','Greater Accra','North East','Northern','Oti','Savannah','Upper East','Upper West','Volta','Western','Western North'].map(r => ({ value: r, label: r }));
+
+    // shown on the login page footer so everyone knows which portal they'll land in
+    const LOGIN_ROLE_DESCRIPTIONS = [
+      { role: 'Admin', icon: 'user-shield', desc: 'Full control — students, staff, fees, exams, website & settings' },
+      { role: 'Clerk', icon: 'clipboard', desc: 'Front office — admissions, records & fee collection' },
+      { role: 'Bursar', icon: 'coins', desc: 'Finance only — fees, payroll, expenses & stock/asset inventory' },
+      { role: 'Teacher', icon: 'chalkboard-teacher', desc: 'Class & subject teacher — marks, attendance & lesson plans' },
+      { role: 'Student', icon: 'user-graduate', desc: 'View your own timetable, results, fees & report card' },
+      { role: 'Parent', icon: 'users', desc: "Track your ward's attendance, fees, results & school updates" }
+    ];
 
     // report-card remark dropdown vocabularies — Ghana GES style
     const CONDUCT_OPTS = ['Excellent','Very Good','Good','Fair','Needs Improvement','Poor'].map(v => ({ value: v, label: v }));
@@ -11898,13 +11962,11 @@
                     {(() => {
                       const dietList = (formData.DietaryRequirements || '').split(',').map(x => x.trim()).filter(Boolean);
                       const hasRestriction = dietList.length > 0 && !(dietList.length === 1 && dietList[0] === 'none');
-                      const dietOpts = [
-                        { v:'halal', l:'Halal' }, { v:'kosher', l:'Kosher' },
-                        { v:'vegetarian', l:'Vegetarian' }, { v:'vegan', l:'Vegan' },
-                        { v:'pescatarian', l:'Pescatarian' }, { v:'dairy_free', l:'Dairy-Free' },
-                        { v:'gluten_free', l:'Gluten-Free' }, { v:'nut_free', l:'Nut-Free' },
-                        { v:'none', l:'No Restrictions' }
-                      ];
+                      // admin-configurable — set on Settings → Dietary Options; falls back to the
+                      // server's Ghana-appropriate defaults if the school hasn't customized it yet
+                      const dietOpts = (window.SMS_SCHOOL && window.SMS_SCHOOL.DietaryOptions && window.SMS_SCHOOL.DietaryOptions.length)
+                        ? window.SMS_SCHOOL.DietaryOptions
+                        : [{ v:'none', l:'No Restrictions' }, { v:'vegetarian', l:'Vegetarian' }, { v:'halal', l:'Halal' }];
                       return (
                         <div style={{display:'flex',gap:'8px',flexWrap:'wrap',padding:'8px 0'}}>
                           {dietOpts.map(o => {
@@ -13023,23 +13085,36 @@
 
           {card.class.IsJhs && (
             <div className="rc-position-bar rc-bece-bar">
-              {card.beceAggregate
-                ? <>BECE Aggregate: <b>{card.beceAggregate.aggregate}</b> ({card.beceAggregate.breakdown.map(b => `${b.subjectName} ${b.grade}`).join(', ')})</>
-                : 'BECE Aggregate: not enough graded core + elective subjects yet'}
+              {card.beceAggregate ? (() => {
+                // breakdown is server-ordered: first 4 = core subjects, next 2 = best electives
+                const core = card.beceAggregate.breakdown.slice(0, 4);
+                const electives = card.beceAggregate.breakdown.slice(4, 6);
+                const coreTotal = core.reduce((s, b) => s + Number(b.grade || 0), 0);
+                const electiveTotal = electives.reduce((s, b) => s + Number(b.grade || 0), 0);
+                return (
+                  <>
+                    Core Subject Total Marks: <b>{coreTotal}</b>
+                    {' · '}Best Two Elective Subject: <b>{electiveTotal}</b> ({electives.map(b => b.subjectName).join(', ')})
+                    {' · '}Aggregate: <b>{card.beceAggregate.aggregate}</b>
+                  </>
+                );
+              })() : 'BECE Aggregate: not enough graded core + elective subjects yet'}
             </div>
           )}
 
-          <div className="rc-remarks-block">
-            <div className="rc-remarks-hdr">Conduct &amp; Remarks</div>
-            <div className="rc-remarks-grid">
-              <div><b>Interest / Talent:</b> {card.remarks.InterestTalent || '—'}</div>
-              <div><b>Conduct:</b> {card.remarks.Conduct || '—'}</div>
-              <div><b>Attitude to Work:</b> {card.remarks.AttitudeToWork || '—'}</div>
-              <div><b>Class Teacher's Remark:</b> {card.remarks.ClassTeacherRemark || '—'}</div>
-              <div><b>Headmaster's Remark:</b> {card.remarks.HeadmasterRemark || '—'}</div>
-              {card.remarks.PromotionStatus && <div><b>Promotion:</b> {card.remarks.PromotionStatus.replace(/_/g, ' ')}</div>}
+          {card.exam.Type === 'end_of_term' && (
+            <div className="rc-remarks-block">
+              <div className="rc-remarks-hdr">Conduct &amp; Remarks</div>
+              <div className="rc-remarks-grid">
+                <div><b>Interest / Talent:</b> {card.remarks.InterestTalent || '—'}</div>
+                <div><b>Conduct:</b> {card.remarks.Conduct || '—'}</div>
+                <div><b>Attitude to Work:</b> {card.remarks.AttitudeToWork || '—'}</div>
+                <div><b>Class Teacher's Remark:</b> {card.remarks.ClassTeacherRemark || '—'}</div>
+                <div><b>Headmaster's Remark:</b> {card.remarks.HeadmasterRemark || '—'}</div>
+                {card.remarks.PromotionStatus && <div><b>Promotion:</b> {card.remarks.PromotionStatus.replace(/_/g, ' ')}</div>}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="rc-sign" style={{gridTemplateColumns:'1fr 1fr'}}>
             <div>
@@ -13338,8 +13413,15 @@
 
                   {/* editable remarks — outside .report-card so they never print blank/unsaved-looking; each
                       panel shows the student's position/score/attendance (already visible in the card above)
-                      before the teacher/head teacher picks a remark */}
-                  {canEditClassTeacherRemarks && (
+                      before the teacher/head teacher picks a remark. Conduct/attitude/remarks only apply to
+                      end-of-term report cards (GES practice) — class tests, mid-terms and mocks skip them
+                      both here and on the printed card. */}
+                  {card.exam.Type !== 'end_of_term' && (
+                    <div className="rc-remarks-block no-print" style={{marginTop:'14px',padding:'12px 14px',color:'#888',fontSize:'13px'}}>
+                      <i className="fas fa-info-circle"></i> Conduct, attitude, talent/interest and remarks only apply to End of Term report cards.
+                    </div>
+                  )}
+                  {canEditClassTeacherRemarks && card.exam.Type === 'end_of_term' && (
                     <RemarksPanel
                       title="Class Teacher's Remarks"
                       icon="chalkboard-teacher"
@@ -13360,7 +13442,7 @@
                     />
                   )}
 
-                  {canEditHeadTeacherRemarks && (
+                  {canEditHeadTeacherRemarks && card.exam.Type === 'end_of_term' && (
                     <RemarksPanel
                       title="Head Teacher's Remarks"
                       icon="user-tie"
@@ -13374,7 +13456,7 @@
                     />
                   )}
 
-                  {!canEditClassTeacherRemarks && !canEditHeadTeacherRemarks && (card.remarks.ClassTeacherRemark || card.remarks.HeadmasterRemark) && (
+                  {card.exam.Type === 'end_of_term' && !canEditClassTeacherRemarks && !canEditHeadTeacherRemarks && (card.remarks.ClassTeacherRemark || card.remarks.HeadmasterRemark) && (
                     <div className="rc-remarks-block no-print" style={{marginTop:'14px'}}>
                       <div className="rc-remarks-hdr">Remarks</div>
                       <div className="rc-remarks-grid">
@@ -27146,6 +27228,9 @@
               <button className={'tt-tab' + (tab === 'sms' ? ' active' : '')} onClick={() => setTab('sms')}>
                 <i className="fas fa-sms"></i> SMS & Owner Digest
               </button>
+              <button className={'tt-tab' + (tab === 'dietary' ? ' active' : '')} onClick={() => setTab('dietary')}>
+                <i className="fas fa-utensils"></i> Dietary Options
+              </button>
               <button className={'tt-tab' + (tab === 'maintenance' ? ' active' : '')} onClick={() => setTab('maintenance')}>
                 <i className="fas fa-wrench"></i> Maintenance
               </button>
@@ -27167,6 +27252,10 @@
 
           {isAdmin && tab === 'sms' && (
             <SmsSettingsForm currentUser={currentUser} role={role} />
+          )}
+
+          {isAdmin && tab === 'dietary' && (
+            <DietaryOptionsTab schoolSettings={schoolSettings} currentUser={currentUser} role={role} onSaved={() => { if (refreshSchoolSettings) refreshSchoolSettings(); }} />
           )}
 
           {isAdmin && tab === 'maintenance' && (
@@ -27367,6 +27456,69 @@
               </table>
             </div>
           )}
+        </div>
+      );
+    }
+
+    // admin-editable list of dietary-restriction checkboxes shown on the student form — replaces
+    // the old hardcoded Halal/Kosher/Pescatarian/Dairy-Free/etc. list with whatever the school's
+    // own kitchen actually caters for (Ghana-appropriate defaults seeded server-side).
+    function DietaryOptionsTab({ schoolSettings, currentUser, role, onSaved }) {
+      const [opts, setOpts] = useState((schoolSettings?.DietaryOptions || []).map(o => ({ ...o })));
+      const [saving, setSaving] = useState(false);
+
+      useEffect(() => {
+        if (schoolSettings?.DietaryOptions) setOpts(schoolSettings.DietaryOptions.map(o => ({ ...o })));
+      }, [schoolSettings]);
+
+      const updateLabel = (i, l) => setOpts(opts.map((o, idx) => idx === i ? { ...o, l } : o));
+      const removeOpt = (i) => setOpts(opts.filter((_, idx) => idx !== i));
+      const addOpt = () => setOpts([...opts, { v: 'option_' + (opts.length + 1), l: '' }]);
+
+      const handleSave = () => {
+        const clean = opts.map(o => ({ ...o, l: String(o.l || '').trim() })).filter(o => o.l);
+        if (!clean.length) { Swal.fire({ icon: 'error', text: 'Add at least one dietary option' }); return; }
+        setSaving(true);
+        google.script.run
+          .withSuccessHandler((res) => {
+            setSaving(false);
+            if (res.success) { Swal.fire({ icon: 'success', text: res.message, timer: 2000, showConfirmButton: false }); if (res.data) setOpts(res.data.map(o => ({ ...o }))); if (onSaved) onSaved(); }
+            else Swal.fire({ icon: 'error', text: res.message });
+          })
+          .withFailureHandler((err) => { setSaving(false); Swal.fire({ icon: 'error', text: err.message }); })
+          .updateDietaryOptions(clean, currentUser, role);
+      };
+
+      return (
+        <div style={{marginTop:'20px'}}>
+          <div className="settings-info-message" style={{marginBottom:'18px'}}>
+            <i className="fas fa-info-circle"></i> These are the choices shown on every student's <strong>Dietary Requirements</strong> checklist. Set them to what your kitchen actually caters for — no need to keep options that don't apply to your school.
+          </div>
+
+          <h3 style={{marginBottom:'14px',color:'var(--navy-primary)',fontSize:'15px',textTransform:'uppercase',letterSpacing:'0.5px'}}>
+            <i className="fas fa-utensils"></i> Dietary Requirement Options
+          </h3>
+
+          <div style={{display:'flex',flexDirection:'column',gap:'8px',marginBottom:'16px',maxWidth:'480px'}}>
+            {opts.map((o, i) => (
+              <div key={i} style={{display:'flex',gap:'8px',alignItems:'center'}}>
+                <input type="text" value={o.l} onChange={(e) => updateLabel(i, e.target.value)}
+                  placeholder="e.g. Vegetarian" style={{flex:1}} maxLength="60" />
+                <button type="button" className="btn btn-sm btn-danger" onClick={() => removeOpt(i)} title="Remove">
+                  <i className="fas fa-trash"></i>
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div style={{display:'flex',gap:'10px'}}>
+            <button type="button" className="btn btn-secondary" onClick={addOpt}>
+              <i className="fas fa-plus"></i> Add Option
+            </button>
+            <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>
+              <i className="fas fa-save"></i> {saving ? 'Saving…' : 'Save Options'}
+            </button>
+          </div>
         </div>
       );
     }
@@ -30114,6 +30266,17 @@
           .withFailureHandler(() => {})
           .getSchoolSettings();
       };
+
+      // "who's online" heartbeat — pings every 90s while logged in so the admin dashboard's
+      // Users Online count stays live; server-side TTL means a closed tab just stops renewing
+      // and drops off within a few minutes, no explicit logout bookkeeping needed
+      useEffect(() => {
+        if (!isLoggedIn || !currentUser) return undefined;
+        const ping = () => google.script.run.withFailureHandler(() => {}).pingPresence(currentUser, userRole, currentFullName);
+        ping();
+        const iv = setInterval(ping, 90000);
+        return () => clearInterval(iv);
+      }, [isLoggedIn, currentUser, userRole]);
 
       const SESSION_DURATION = 60 * 60 * 1000;
 
