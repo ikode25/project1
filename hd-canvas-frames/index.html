@@ -355,15 +355,10 @@
                  class="w-full text-left px-4 py-3 text-gray-800 hover:bg-gray-100 rounded-t-lg transition-colors">
                 <i class="fas fa-user-shield mr-2"></i>Admin Login
               </button>
-              <button 
+              <button
                  @click="openLoginPage('workshop')"
-                 class="w-full text-left px-4 py-3 text-gray-800 hover:bg-gray-100 transition-colors">
-                <i class="fas fa-tools mr-2"></i>Workshop Login
-              </button>
-              <button 
-                 @click="openLoginPage('delivery')"
                  class="w-full text-left px-4 py-3 text-gray-800 hover:bg-gray-100 rounded-b-lg transition-colors">
-                <i class="fas fa-shipping-fast mr-2"></i>Delivery Login
+                <i class="fas fa-tools mr-2"></i>Workshop Login
               </button>
             </div>
           </div>
@@ -738,44 +733,27 @@
           </div>
         </div>
         
-        <!-- Delivery Address (if delivery selected) -->
+        <!-- Delivery Address (if delivery selected) - this shop has no store/personal rider, so
+             every delivery goes through a 3rd-party service (Yango/Bolt/Uber/etc.) -->
         <div v-if="checkoutForm.orderType === 'delivery'" class="mb-6">
           <h3 class="text-lg font-semibold mb-3">Delivery Address</h3>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label class="block text-gray-400 text-sm mb-1">City *</label>
-              <select
+              <input
                 v-model="checkoutForm.city"
-                @change="checkoutForm.area = ''"
+                type="text"
                 required
+                placeholder="e.g. Accra"
                 class="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none">
-                <option value="">Select City/Region</option>
-                <option v-for="dc in deliveryCharges" :key="dc.location" :value="dc.location">
-                  {{ dc.location }} ({{ settings.currency || 'GH₵' }} {{ dc.charge }})
-                </option>
-              </select>
             </div>
             <div>
               <label class="block text-gray-400 text-sm mb-1">Area *</label>
-              <!-- If the admin priced specific areas for this city (e.g. Dansoman vs East Legon vs Pokuase,
-                   all in Accra), offer a dropdown so the right area-specific charge applies. Otherwise a
-                   free-text field is used and the flat city-wide charge applies. -->
-              <select
-                v-if="areasForSelectedCity.length > 0"
-                v-model="checkoutForm.area"
-                required
-                class="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none">
-                <option value="">Select your area</option>
-                <option v-for="ac in areasForSelectedCity" :key="ac.area" :value="ac.area">
-                  {{ ac.area }} ({{ settings.currency || 'GH₵' }} {{ ac.charge }})
-                </option>
-              </select>
               <input
-                v-else
                 v-model="checkoutForm.area"
                 type="text"
                 required
-                placeholder="Enter your area"
+                placeholder="e.g. Dansoman, East Legon"
                 class="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none">
             </div>
             <div class="md:col-span-2">
@@ -797,17 +775,17 @@
                 v-for="app in deliveryApps"
                 :key="app.name"
                 type="button"
-                @click="checkoutForm.deliveryOption = app.name; checkoutForm.deliveryBookingMode = (app.name === 'Shop Rider') ? '' : checkoutForm.deliveryBookingMode"
+                @click="checkoutForm.deliveryOption = app.name"
                 :class="['p-3 rounded-lg border-2 text-center transition-colors',
                          checkoutForm.deliveryOption === app.name ? 'border-yellow-400 bg-yellow-400/10 text-white' : 'border-gray-700 text-gray-400 hover:border-gray-500']">
-                <i :class="['mb-1 block text-xl', app.name === 'Shop Rider' ? 'fas fa-motorcycle text-yellow-400' : 'fas fa-shipping-fast text-blue-400']"></i>
+                <i class="fas fa-shipping-fast mb-1 block text-xl text-blue-400"></i>
                 <p class="font-semibold text-sm">{{ app.name }}</p>
               </button>
             </div>
           </div>
 
-          <!-- Who books the ride? Only shown for 3rd-party services (Yango/Bolt/Uber/etc.) -->
-          <div v-if="isThirdPartyDelivery" class="mt-4 p-4 bg-[#1a1a1a] rounded-lg border border-gray-800">
+          <!-- Who books the ride? -->
+          <div v-if="checkoutForm.deliveryOption" class="mt-4 p-4 bg-[#1a1a1a] rounded-lg border border-gray-800">
             <label class="block text-gray-300 text-sm font-semibold mb-2">
               <i class="fas fa-question-circle text-yellow-400 mr-1"></i>
               Who should book the {{ checkoutForm.deliveryOption }} ride? *
@@ -1470,8 +1448,8 @@
             area: '',
             address: '',
             branch: '',
-            deliveryOption: 'Shop Rider',
-            // Who books/pays the ride when a 3rd-party service (Yango/Bolt/Uber/etc.) is chosen:
+            deliveryOption: '',
+            // Who books/pays the ride via the chosen 3rd-party service (Yango/Bolt/Uber/etc.):
             // 'admin' = shop books & pays, then shares fee/rider/tracking details with the customer
             // 'self'  = customer books & pays the ride themselves via the delivery app
             deliveryBookingMode: '',
@@ -1488,38 +1466,12 @@
         cartTotal() {
           return this.cart.reduce((total, item) => total + (item.price * item.quantity), 0);
         },
+        // This shop has no store/personal rider - every delivery goes through a 3rd-party
+        // service the customer or admin books directly, so the shop itself never charges a
+        // delivery fee (whatever the ride costs is handled between the customer/admin and the
+        // 3rd-party service, not added to the order total).
         deliveryCharge() {
-          if (this.checkoutForm.orderType !== 'delivery') return 0;
-          if (this.checkoutForm.deliveryOption !== 'Shop Rider') return 0;
-          
-          const selectedCity = this.checkoutForm.city;
-          const selectedArea = this.checkoutForm.area;
-          if (!selectedCity) return 0;
-          
-          // Area-specific charge takes priority over the flat city-wide charge, so the shop's
-          // own rider can charge differently for e.g. Dansoman vs East Legon vs Pokuase (all Accra).
-          if (selectedArea) {
-            const areaMatch = this.areaDeliveryCharges.find(ac => 
-              ac.city.trim().toLowerCase() === selectedCity.trim().toLowerCase() &&
-              ac.area.trim().toLowerCase() === selectedArea.trim().toLowerCase()
-            );
-            if (areaMatch) return Number(areaMatch.charge);
-          }
-          
-          const matchingRate = this.deliveryCharges.find(dc => dc.location === selectedCity);
-          return matchingRate ? Number(matchingRate.charge) : 0;
-        },
-        // Areas with a specific admin-configured rate for the selected city (used to offer
-        // a dropdown of priced areas instead of a free-text field when they exist).
-        areasForSelectedCity() {
-          if (!this.checkoutForm.city) return [];
-          return this.areaDeliveryCharges.filter(ac => 
-            ac.city.trim().toLowerCase() === this.checkoutForm.city.trim().toLowerCase()
-          );
-        },
-        // Whether the customer picked a 3rd-party ride-hailing service instead of the shop's own rider
-        isThirdPartyDelivery() {
-          return this.checkoutForm.orderType === 'delivery' && this.checkoutForm.deliveryOption && this.checkoutForm.deliveryOption !== 'Shop Rider';
+          return 0;
         },
         activePaymentMethods() {
           return this.paymentMethods.filter(pm => pm.active !== false);
@@ -1923,13 +1875,11 @@
             });
             this.deliveryApps = apps.filter(app => app.active);
             if (this.deliveryApps.length > 0) {
-              const shopRider = this.deliveryApps.find(a => a.name === 'Shop Rider');
-              this.checkoutForm.deliveryOption = shopRider ? shopRider.name : this.deliveryApps[0].name;
+              this.checkoutForm.deliveryOption = this.deliveryApps[0].name;
             }
           } catch (error) {
             console.error('Error fetching delivery apps:', error);
             this.deliveryApps = [
-              { name: 'Shop Rider' },
               { name: 'Yango' },
               { name: 'Bolt' },
               { name: 'Uber' }
@@ -2085,7 +2035,7 @@
               area: this.checkoutForm.area,
               branch: this.checkoutForm.branch,
               deliveryOption: this.checkoutForm.orderType === 'delivery' ? this.checkoutForm.deliveryOption : '',
-              deliveryBookingMode: (this.checkoutForm.orderType === 'delivery' && this.isThirdPartyDelivery) ? this.checkoutForm.deliveryBookingMode : (this.checkoutForm.orderType === 'delivery' ? 'shop' : ''),
+              deliveryBookingMode: this.checkoutForm.orderType === 'delivery' ? this.checkoutForm.deliveryBookingMode : '',
               items: this.cart,
               subtotal: this.cartTotal,
               deliveryCharge: this.checkoutForm.orderType === 'delivery' ? this.deliveryCharge : 0,
@@ -2152,7 +2102,7 @@
             if (!form.city || !form.area || !form.address || !form.deliveryOption) {
               return false;
             }
-            if (this.isThirdPartyDelivery && !form.deliveryBookingMode) {
+            if (!form.deliveryBookingMode) {
               return false;
             }
           } else {
@@ -2165,7 +2115,6 @@
         },
 
         resetCheckoutForm() {
-          const shopRider = this.deliveryApps.find(a => a.name === 'Shop Rider');
           this.checkoutForm = {
             orderType: 'delivery',
             name: '',
@@ -2175,7 +2124,7 @@
             area: '',
             address: '',
             branch: '',
-            deliveryOption: shopRider ? shopRider.name : (this.deliveryApps.length > 0 ? this.deliveryApps[0].name : 'Shop Rider'),
+            deliveryOption: this.deliveryApps.length > 0 ? this.deliveryApps[0].name : '',
             deliveryBookingMode: '',
             notes: '',
             transactionId: '',

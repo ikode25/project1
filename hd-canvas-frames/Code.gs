@@ -45,16 +45,9 @@ function doGet(e) {
       template = HtmlService.createTemplateFromFile('workshop');
       title = 'Workshop Dashboard - Frame Production';
       break;
-    case 'delivery':
-      template = HtmlService.createTemplateFromFile('delivery');
-      title = 'Delivery Portal - Order Dispatch';
-      break;
-    case 'riderportal':
-      // Diagnostic alias - identical to 'delivery', just a differently-named route/file, to test
-      // whether the broken authorization dialog is somehow tied to the word "delivery" itself.
-      template = HtmlService.createTemplateFromFile('riderportal');
-      title = 'Rider Portal - Order Dispatch';
-      break;
+    // The in-house delivery rider portal has been removed - this shop has no store/personal
+    // rider, all deliveries go through 3rd-party services (Yango/Bolt/Uber/etc.) that customers
+    // or the admin book directly, so there is no internal rider role to log into anymore.
     default:
       template = HtmlService.createTemplateFromFile('index');
       title = 'HD Laminated Canvas Frames - Order Online';
@@ -1560,8 +1553,9 @@ function setupDeliveryAppsSheet() {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#f3f4f6');
     
+    // No in-house "Shop Rider" option - this shop has no store/personal rider, so every
+    // delivery goes through a 3rd-party service the customer or admin books directly.
     const defaultApps = [
-      ['Shop Rider', true, ''],
       ['Yango', true, 'https://yango.com'],
       ['Bolt', true, 'https://bolt.eu'],
       ['Uber', true, 'https://uber.com']

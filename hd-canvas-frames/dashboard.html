@@ -246,13 +246,6 @@
             <i class="fas fa-chart-pie w-5 mr-2"></i>Sales Reports
           </button>
           
-          <button 
-            @click="currentView = 'deliveryCharges'"
-            :class="['w-full text-left px-4 py-2 rounded-lg mb-1 transition-colors text-sm', 
-                     currentView === 'deliveryCharges' ? 'bg-yellow-400 text-black font-semibold' : 'hover:bg-[#1a1a1a]']">
-            <i class="fas fa-map-marker-alt w-5 mr-2"></i>Delivery Charges
-          </button>
-          
           <button
             @click="currentView = 'deliveryApps'"
             :class="['w-full text-left px-4 py-2 rounded-lg mb-1 transition-colors text-sm',
@@ -1265,8 +1258,7 @@
                         class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition-colors text-sm">
                         <i class="fas fa-edit"></i>
                       </button>
-                      <button 
-                        v-if="app.name !== 'Shop Rider'"
+                      <button
                         @click="deleteDeliveryAppConfirm(app)"
                         class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 transition-colors text-sm">
                         <i class="fas fa-trash"></i>
@@ -1533,164 +1525,6 @@
           </div>
         </div>
 
-        <!-- Delivery Charges Management View -->
-        <div v-if="currentView === 'deliveryCharges'" class="p-8">
-          <div class="flex justify-between items-center mb-8">
-            <h2 class="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-400">
-              <i class="fas fa-map-marker-alt mr-3 text-yellow-400"></i>Delivery Charges
-            </h2>
-            <button 
-              @click="openAddDeliveryChargeModal()"
-              class="bg-yellow-400 text-black font-bold px-5 py-2.5 rounded-lg hover:bg-yellow-300 transition-colors flex items-center gap-2 shadow-lg">
-              <i class="fas fa-plus"></i> Add New Location
-            </button>
-          </div>
-          
-          <div class="bg-[#121212] rounded-xl shadow-[0_10px_15px_-3px_rgba(0,0,0,0.7)] overflow-hidden">
-            <div class="overflow-x-auto">
-              <table class="w-full">
-                <thead>
-                  <tr class="bg-[#1a1a1a] text-gray-400 text-xs uppercase tracking-wider text-left border-b border-gray-800">
-                    <th class="px-6 py-4">Location/City Name</th>
-                    <th class="px-6 py-4">Delivery Charge ({{ settings.currency || 'Rs' }})</th>
-                    <th class="px-6 py-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-800 text-sm text-gray-300">
-                  <tr v-for="item in deliveryCharges" :key="item.rowIndex" class="hover:bg-[#151515] transition-colors">
-                    <td class="px-6 py-4 font-semibold text-white">{{ item.location }}</td>
-                    <td class="px-6 py-4 text-yellow-400 font-mono font-bold">{{ settings.currency || 'Rs' }} {{ item.charge }}</td>
-                    <td class="px-6 py-4 text-right">
-                      <button 
-                        @click="editDeliveryCharge(item)"
-                        class="bg-blue-600 text-white px-3 py-1.5 rounded mr-2 hover:bg-blue-700 transition-colors text-xs">
-                        <i class="fas fa-edit"></i> Edit
-                      </button>
-                      <button 
-                        @click="deleteDeliveryCharge(item.rowIndex)"
-                        class="bg-red-600 text-white px-3 py-1.5 rounded hover:bg-red-700 transition-colors text-xs">
-                        <i class="fas fa-trash"></i> Delete
-                      </button>
-                    </td>
-                  </tr>
-                  <tr v-if="deliveryCharges.length === 0">
-                    <td colspan="3" class="px-6 py-8 text-center text-gray-500">
-                      No locations set. Add locations to enable delivery pricing.
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <!-- Area-Specific "Shop Rider" Charges -->
-          <div class="flex justify-between items-center mt-10 mb-4">
-            <div>
-              <h3 class="text-xl font-bold text-white"><i class="fas fa-motorcycle mr-2 text-yellow-400"></i>Area-Specific Store Rider Charges</h3>
-              <p class="text-gray-400 text-sm mt-1 max-w-2xl">
-                When your own rider ("Shop Rider") delivers, different areas within the same city can cost different amounts
-                (e.g. Accra - Dansoman vs Accra - East Legon vs Accra - Pokuase). Set those here; if an area isn't listed
-                the flat city-wide charge above is used instead.
-              </p>
-            </div>
-            <button
-              @click="openAddAreaDeliveryChargeModal()"
-              class="bg-yellow-400 text-black font-bold px-5 py-2.5 rounded-lg hover:bg-yellow-300 transition-colors flex items-center gap-2 shadow-lg whitespace-nowrap">
-              <i class="fas fa-plus"></i> Add Area Rate
-            </button>
-          </div>
-
-          <div class="bg-[#121212] rounded-xl shadow-[0_10px_15px_-3px_rgba(0,0,0,0.7)] overflow-hidden">
-            <div class="overflow-x-auto">
-              <table class="w-full">
-                <thead>
-                  <tr class="bg-[#1a1a1a] text-gray-400 text-xs uppercase tracking-wider text-left border-b border-gray-800">
-                    <th class="px-6 py-4">City</th>
-                    <th class="px-6 py-4">Area</th>
-                    <th class="px-6 py-4">Delivery Charge ({{ settings.currency || 'Rs' }})</th>
-                    <th class="px-6 py-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-800 text-sm text-gray-300">
-                  <tr v-for="item in areaDeliveryCharges" :key="item.rowIndex" class="hover:bg-[#151515] transition-colors">
-                    <td class="px-6 py-4 font-semibold text-white">{{ item.city }}</td>
-                    <td class="px-6 py-4">{{ item.area }}</td>
-                    <td class="px-6 py-4 text-yellow-400 font-mono font-bold">{{ settings.currency || 'Rs' }} {{ item.charge }}</td>
-                    <td class="px-6 py-4 text-right">
-                      <button
-                        @click="editAreaDeliveryCharge(item)"
-                        class="bg-blue-600 text-white px-3 py-1.5 rounded mr-2 hover:bg-blue-700 transition-colors text-xs">
-                        <i class="fas fa-edit"></i> Edit
-                      </button>
-                      <button
-                        @click="deleteAreaDeliveryChargeConfirm(item.rowIndex)"
-                        class="bg-red-600 text-white px-3 py-1.5 rounded hover:bg-red-700 transition-colors text-xs">
-                        <i class="fas fa-trash"></i> Delete
-                      </button>
-                    </td>
-                  </tr>
-                  <tr v-if="areaDeliveryCharges.length === 0">
-                    <td colspan="4" class="px-6 py-8 text-center text-gray-500">
-                      No area-specific rates set. All areas use the flat city-wide charge above.
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- Add/Edit Area Delivery Charge Modal -->
-        <div v-if="showAreaDeliveryChargeModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div class="bg-[#121212] rounded-xl p-6 w-full max-w-md border border-gray-800 shadow-2xl">
-            <h3 class="text-xl font-bold mb-4 text-yellow-400">
-              {{ editingAreaDeliveryCharge ? 'Edit Area Rate' : 'Add Area Rate' }}
-            </h3>
-            <form @submit.prevent="saveAreaDeliveryCharge">
-              <div class="mb-4">
-                <label class="block text-gray-400 text-sm font-semibold mb-2">City *</label>
-                <input
-                  v-model="areaDeliveryChargeForm.city"
-                  type="text"
-                  required
-                  placeholder="e.g. Accra"
-                  class="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none">
-              </div>
-              <div class="mb-4">
-                <label class="block text-gray-400 text-sm font-semibold mb-2">Area *</label>
-                <input
-                  v-model="areaDeliveryChargeForm.area"
-                  type="text"
-                  required
-                  placeholder="e.g. Dansoman, East Legon, Pokuase"
-                  class="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none">
-              </div>
-              <div class="mb-6">
-                <label class="block text-gray-400 text-sm font-semibold mb-2">Delivery Charge ({{ settings.currency || 'Rs' }}) *</label>
-                <input
-                  v-model.number="areaDeliveryChargeForm.charge"
-                  type="number"
-                  required
-                  placeholder="e.g. 35"
-                  class="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none">
-              </div>
-              <div class="flex justify-end gap-3">
-                <button
-                  type="button"
-                  @click="showAreaDeliveryChargeModal = false"
-                  class="px-4 py-2 rounded-lg bg-gray-800 text-gray-400 hover:bg-gray-700 transition-colors text-sm">
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  class="px-4 py-2 rounded-lg bg-yellow-400 text-black font-bold hover:bg-yellow-300 transition-colors text-sm">
-                  Save
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-
         <!-- Stock Inventory View -->
         <div v-if="currentView === 'inventory'" class="p-8">
           <div class="flex justify-between items-center mb-8">
@@ -1946,48 +1780,6 @@
             <div class="relative h-96 w-full">
               <canvas id="salesChart"></canvas>
             </div>
-          </div>
-        </div>
-
-        <!-- Add/Edit Delivery Charge Modal -->
-        <div v-if="showDeliveryChargeModal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div class="bg-[#121212] rounded-xl p-6 w-full max-w-md border border-gray-800 shadow-2xl">
-            <h3 class="text-xl font-bold mb-4 text-yellow-400">
-              {{ editingDeliveryCharge ? 'Edit Delivery Location' : 'Add Delivery Location' }}
-            </h3>
-            <form @submit.prevent="saveDeliveryCharge">
-              <div class="mb-4">
-                <label class="block text-gray-400 text-sm font-semibold mb-2">Location/City Name *</label>
-                <input 
-                  v-model="deliveryChargeForm.location"
-                  type="text"
-                  required
-                  placeholder="e.g. Accra, Kumasi, Ho"
-                  class="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none">
-              </div>
-              <div class="mb-6">
-                <label class="block text-gray-400 text-sm font-semibold mb-2">Delivery Charge ({{ settings.currency || 'Rs' }}) *</label>
-                <input 
-                  v-model.number="deliveryChargeForm.charge"
-                  type="number"
-                  required
-                  placeholder="e.g. 50"
-                  class="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none">
-              </div>
-              <div class="flex justify-end gap-3">
-                <button 
-                  type="button"
-                  @click="showDeliveryChargeModal = false"
-                  class="px-4 py-2 rounded-lg bg-gray-800 text-gray-400 hover:bg-gray-700 transition-colors text-sm">
-                  Cancel
-                </button>
-                <button 
-                  type="submit"
-                  class="px-4 py-2 rounded-lg bg-yellow-400 text-black font-bold hover:bg-yellow-300 transition-colors text-sm">
-                  Save
-                </button>
-              </div>
-            </form>
           </div>
         </div>
 
@@ -2915,7 +2707,6 @@
           bannerImagePreview: null,
           theme: 'dark',
           ordersViewMode: 'table',
-          deliveryCharges: [],
           inventorySearch: '',
           quickStockAdjust: {},
           ledgerFilter: '',
@@ -2926,13 +2717,6 @@
             monthly: { amount: 0, orders: 0 },
             yearly: { amount: 0, orders: 0 }
           },
-          showDeliveryChargeModal: false,
-          editingDeliveryCharge: null,
-          deliveryChargeForm: { location: '', charge: 0 },
-          areaDeliveryCharges: [],
-          showAreaDeliveryChargeModal: false,
-          editingAreaDeliveryCharge: null,
-          areaDeliveryChargeForm: { city: '', area: '', charge: 0 },
           paymentMethods: [],
           showPaymentMethodModal: false,
           editingPaymentMethod: null,
@@ -3431,8 +3215,6 @@
             this.fetchBranches(),
             this.fetchBanners(),
             this.fetchDeliveryApps(),
-            this.loadDeliveryCharges(),
-            this.loadAreaDeliveryCharges(),
             this.fetchPaymentMethods(),
             this.loadCashLedger(),
             this.loadReportData(),
@@ -4554,186 +4336,6 @@
               color: '#fff',
               confirmButtonColor: '#EAB308'
             });
-          }
-        },
-
-        // Delivery Charges Methods
-        async loadDeliveryCharges() {
-          try {
-            const list = await new Promise((resolve, reject) => {
-              google.script.run
-                .withSuccessHandler(resolve)
-                .withFailureHandler(reject)
-                .getDeliveryCharges();
-            });
-            this.deliveryCharges = list;
-          } catch (e) {
-            console.error('Error loading delivery charges:', e);
-          }
-        },
-
-        openAddDeliveryChargeModal() {
-          this.editingDeliveryCharge = null;
-          this.deliveryChargeForm = { location: '', charge: 0 };
-          this.showDeliveryChargeModal = true;
-        },
-
-        editDeliveryCharge(item) {
-          this.editingDeliveryCharge = item;
-          this.deliveryChargeForm = { location: item.location, charge: item.charge };
-          this.showDeliveryChargeModal = true;
-        },
-
-        async saveDeliveryCharge() {
-          try {
-            if (this.editingDeliveryCharge) {
-              const res = await new Promise((resolve, reject) => {
-                google.script.run
-                  .withSuccessHandler(resolve)
-                  .withFailureHandler(reject)
-                  .updateDeliveryCharge(this.editingDeliveryCharge.rowIndex, this.deliveryChargeForm);
-              });
-              if (res.success) {
-                this.showDeliveryChargeModal = false;
-                this.loadDeliveryCharges();
-                Swal.fire({ icon: 'success', title: 'Updated', text: 'Location charge updated.', background: '#121212', color: '#fff', confirmButtonColor: '#EAB308' });
-              }
-            } else {
-              const res = await new Promise((resolve, reject) => {
-                google.script.run
-                  .withSuccessHandler(resolve)
-                  .withFailureHandler(reject)
-                  .addDeliveryCharge(this.deliveryChargeForm);
-              });
-              if (res.success) {
-                this.showDeliveryChargeModal = false;
-                this.loadDeliveryCharges();
-                Swal.fire({ icon: 'success', title: 'Added', text: 'Location charge added.', background: '#121212', color: '#fff', confirmButtonColor: '#EAB308' });
-              }
-            }
-          } catch (e) {
-            Swal.fire({ icon: 'error', title: 'Error', text: e.message || 'Operation failed.', background: '#121212', color: '#fff', confirmButtonColor: '#EAB308' });
-          }
-        },
-
-        async deleteDeliveryCharge(rowIndex) {
-          try {
-            Swal.fire({
-              title: 'Delete Location?',
-              text: 'Are you sure you want to remove this delivery charge location?',
-              icon: 'warning',
-              showCancelButton: true,
-              background: '#121212',
-              color: '#fff',
-              confirmButtonColor: '#EF4444',
-              cancelButtonColor: '#374151',
-              confirmButtonText: 'Yes, Delete!'
-            }).then(async (result) => {
-              if (result.isConfirmed) {
-                const res = await new Promise((resolve, reject) => {
-                  google.script.run
-                    .withSuccessHandler(resolve)
-                    .withFailureHandler(reject)
-                    .deleteDeliveryCharge(rowIndex);
-                });
-                if (res.success) {
-                  this.loadDeliveryCharges();
-                  Swal.fire({ icon: 'success', title: 'Deleted', text: 'Location deleted.', background: '#121212', color: '#fff', confirmButtonColor: '#EAB308' });
-                }
-              }
-            });
-          } catch (e) {
-            console.error('Error deleting delivery charge:', e);
-          }
-        },
-
-        // Area-Specific (Shop Rider) Delivery Charges Methods
-        async loadAreaDeliveryCharges() {
-          try {
-            const list = await new Promise((resolve, reject) => {
-              google.script.run
-                .withSuccessHandler(resolve)
-                .withFailureHandler(reject)
-                .getAreaDeliveryCharges();
-            });
-            this.areaDeliveryCharges = list;
-          } catch (e) {
-            console.error('Error loading area delivery charges:', e);
-          }
-        },
-
-        openAddAreaDeliveryChargeModal() {
-          this.editingAreaDeliveryCharge = null;
-          this.areaDeliveryChargeForm = { city: '', area: '', charge: 0 };
-          this.showAreaDeliveryChargeModal = true;
-        },
-
-        editAreaDeliveryCharge(item) {
-          this.editingAreaDeliveryCharge = item;
-          this.areaDeliveryChargeForm = { city: item.city, area: item.area, charge: item.charge };
-          this.showAreaDeliveryChargeModal = true;
-        },
-
-        async saveAreaDeliveryCharge() {
-          try {
-            if (this.editingAreaDeliveryCharge) {
-              const res = await new Promise((resolve, reject) => {
-                google.script.run
-                  .withSuccessHandler(resolve)
-                  .withFailureHandler(reject)
-                  .updateAreaDeliveryCharge(this.editingAreaDeliveryCharge.rowIndex, this.areaDeliveryChargeForm);
-              });
-              if (res.success) {
-                this.showAreaDeliveryChargeModal = false;
-                this.loadAreaDeliveryCharges();
-                Swal.fire({ icon: 'success', title: 'Updated', text: 'Area rate updated.', background: '#121212', color: '#fff', confirmButtonColor: '#EAB308' });
-              }
-            } else {
-              const res = await new Promise((resolve, reject) => {
-                google.script.run
-                  .withSuccessHandler(resolve)
-                  .withFailureHandler(reject)
-                  .addAreaDeliveryCharge(this.areaDeliveryChargeForm);
-              });
-              if (res.success) {
-                this.showAreaDeliveryChargeModal = false;
-                this.loadAreaDeliveryCharges();
-                Swal.fire({ icon: 'success', title: 'Added', text: 'Area rate added.', background: '#121212', color: '#fff', confirmButtonColor: '#EAB308' });
-              }
-            }
-          } catch (e) {
-            Swal.fire({ icon: 'error', title: 'Error', text: e.message || 'Operation failed.', background: '#121212', color: '#fff', confirmButtonColor: '#EAB308' });
-          }
-        },
-
-        async deleteAreaDeliveryChargeConfirm(rowIndex) {
-          try {
-            Swal.fire({
-              title: 'Delete Area Rate?',
-              text: 'Are you sure you want to remove this area-specific rate?',
-              icon: 'warning',
-              showCancelButton: true,
-              background: '#121212',
-              color: '#fff',
-              confirmButtonColor: '#EF4444',
-              cancelButtonColor: '#374151',
-              confirmButtonText: 'Yes, Delete!'
-            }).then(async (result) => {
-              if (result.isConfirmed) {
-                const res = await new Promise((resolve, reject) => {
-                  google.script.run
-                    .withSuccessHandler(resolve)
-                    .withFailureHandler(reject)
-                    .deleteAreaDeliveryCharge(rowIndex);
-                });
-                if (res.success) {
-                  this.loadAreaDeliveryCharges();
-                  Swal.fire({ icon: 'success', title: 'Deleted', text: 'Area rate deleted.', background: '#121212', color: '#fff', confirmButtonColor: '#EAB308' });
-                }
-              }
-            });
-          } catch (e) {
-            console.error('Error deleting area delivery charge:', e);
           }
         },
 
