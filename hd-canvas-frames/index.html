@@ -601,64 +601,18 @@
           </div>
         </div>
         
-        <!-- Photo Selection Method -->
-        <div class="mb-6">
-          <label class="block text-sm font-semibold text-gray-300 mb-3">Photo Submission Method *</label>
-          <div class="flex gap-4">
-            <button 
-              @click="customizationForm.photoOption = 'system'"
-              type="button"
-              :class="['flex-1 p-4 rounded-lg border-2 text-center transition-colors', 
-                       customizationForm.photoOption === 'system' ? 'border-yellow-400 bg-yellow-400/10 text-white' : 'border-gray-700 text-gray-400']">
-              <i class="fas fa-upload text-xl mb-2 text-yellow-400"></i>
-              <p class="font-semibold text-sm">Upload to App</p>
-            </button>
-            <button 
-              @click="customizationForm.photoOption = 'whatsapp'"
-              type="button"
-              :class="['flex-1 p-4 rounded-lg border-2 text-center transition-colors', 
-                       customizationForm.photoOption === 'whatsapp' ? 'border-yellow-400 bg-yellow-400/10 text-white' : 'border-gray-700 text-gray-400']">
-              <i class="fab fa-whatsapp text-xl mb-2 text-green-400"></i>
-              <p class="font-semibold text-sm">Send via WhatsApp</p>
-            </button>
-          </div>
-        </div>
-        
-        <!-- System Upload Field -->
-        <div v-if="customizationForm.photoOption === 'system'" class="mb-6">
-          <label class="block text-sm text-gray-400 mb-2">Choose your photo (JPG, PNG) *</label>
-          <div class="border-2 border-dashed border-gray-700 rounded-lg p-6 text-center hover:border-yellow-400 transition-colors relative">
-            <input 
-              type="file" 
-              accept="image/*"
-              @change="handlePhotoUpload"
-              class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
-            <div v-if="!customizationForm.photoPreview">
-              <i class="fas fa-cloud-upload-alt text-3xl text-gray-500 mb-2"></i>
-              <p class="text-sm text-gray-400">Click or Drag & Drop photo here</p>
-            </div>
-            <div v-else class="flex flex-col items-center">
-              <div class="relative w-32 h-32 mb-2 border border-gray-800 rounded overflow-hidden">
-                <img :src="customizationForm.photoPreview" class="w-full h-full object-cover">
-              </div>
-              <p class="text-xs text-green-400 font-semibold mb-1"><i class="fas fa-check-circle mr-1"></i>Photo attached</p>
-              <p class="text-xs text-gray-500 truncate max-w-xs">{{ customizationForm.photoName }}</p>
-            </div>
-          </div>
-        </div>
-        
-        <!-- WhatsApp Information -->
-        <div v-if="customizationForm.photoOption === 'whatsapp'" class="mb-6 p-4 bg-green-950/20 border border-green-500/20 rounded-lg">
+        <!-- Photo Submission: WhatsApp hand-off (photos are sent directly to the shop's WhatsApp
+             after checkout - nothing is uploaded to or stored on our servers). -->
+        <div class="mb-6 p-4 bg-green-950/20 border border-green-500/20 rounded-lg">
           <p class="text-sm text-green-400 flex items-start">
             <i class="fab fa-whatsapp text-lg mr-2 mt-0.5"></i>
             <span>You can complete your order now. An instant link will be provided on your receipt to message the shop and send your photo(s) on WhatsApp. Please remember to quote your Order ID!</span>
           </p>
         </div>
-        
-        <button 
+
+        <button
           @click="addCustomizedToCart"
           type="button"
-          :disabled="customizationForm.photoOption === 'system' && !customizationForm.photoBase64"
           class="w-full bg-yellow-400 text-black font-bold py-3 rounded-lg hover:bg-yellow-300 transition-colors disabled:opacity-50">
           Add Frame to Cart
         </button>
@@ -1490,11 +1444,11 @@
           placingOrder: false,
           orderDetails: null,
           
-          // Customization & Uploads
+          // Customization & Uploads (photos are handed off via WhatsApp - never uploaded to our servers)
           showCustomization: false,
           customizingItem: {},
           customizationForm: {
-            photoOption: 'system',
+            photoOption: 'whatsapp',
             photoBase64: '',
             photoPreview: '',
             photoName: ''
@@ -2022,24 +1976,12 @@
         openCustomizationModal(item) {
           this.customizingItem = item;
           this.customizationForm = {
-            photoOption: 'system',
+            photoOption: 'whatsapp',
             photoBase64: '',
             photoPreview: '',
             photoName: ''
           };
           this.showCustomization = true;
-        },
-        handlePhotoUpload(event) {
-          const file = event.target.files[0];
-          if (file) {
-            this.customizationForm.photoName = file.name;
-            const reader = new FileReader();
-            reader.onload = (e) => {
-              this.customizationForm.photoPreview = e.target.result;
-              this.customizationForm.photoBase64 = e.target.result;
-            };
-            reader.readAsDataURL(file);
-          }
         },
         addCustomizedToCart() {
           const item = this.customizingItem;
@@ -2052,9 +1994,9 @@
             price: item.price,
             image: item.image,
             size: item.size || item.servings || '',
-            photoOption: this.customizationForm.photoOption,
-            photoBase64: this.customizationForm.photoOption === 'system' ? this.customizationForm.photoBase64 : null,
-            photoName: this.customizationForm.photoOption === 'system' ? this.customizationForm.photoName : null,
+            photoOption: 'whatsapp',
+            photoBase64: null,
+            photoName: null,
             photoUrl: null,
             quantity: 1
           };

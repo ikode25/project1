@@ -1,31 +1,29 @@
 
-function getFrameFolder() {
-  const folderName = 'CanvasFramesPhotos';
-  const folders = DriveApp.getFoldersByName(folderName);
-  if (folders.hasNext()) {
-    return folders.next();
-  } else {
-    return DriveApp.createFolder(folderName);
+// NOTE: This deployment intentionally avoids Google Drive (DriveApp) and any external HTTP
+// calls (UrlFetchApp). Both are "sensitive/restricted" OAuth scopes, and on some accounts the
+// in-app authorization dialog Google shows for those scopes fails to render (a Google-side bug,
+// not something this script can control) - which blocks the ENTIRE web app from loading, not
+// just the features that use them. Sticking to only the Sheets scope keeps the app reliably
+// deployable. Images are instead stored directly in the sheet as a data URI (when small enough)
+// or as a plain image URL the admin supplies; customer order photos use the WhatsApp hand-off
+// flow instead of uploading anywhere.
+
+// Sheet cells have a ~50,000 character limit. Keep a safety margin under that for a base64
+// data URI (which is ~33% larger than the original file) so the row never fails to save.
+const MAX_INLINE_IMAGE_LENGTH = 45000;
+
+function resolveImageValue(base64Image, existingUrlOrValue) {
+  if (base64Image) {
+    if (base64Image.length <= MAX_INLINE_IMAGE_LENGTH) {
+      return { value: base64Image, warning: null };
+    }
+    // Too large to store inline - fall back to whatever URL/value was already provided.
+    return {
+      value: existingUrlOrValue || 'https://via.placeholder.com/400',
+      warning: 'Image file was too large to save directly. Please use a hosted image URL instead (e.g. from Imgur, your website, or Google Drive share link).'
+    };
   }
-}
-function uploadImageToDrive(base64Image, fileName) {
-  try {
-    const frameFolder = getFrameFolder();
-    const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
-    const blob = Utilities.newBlob(Utilities.base64Decode(base64Data));
-    blob.setName(fileName || 'frame_photo_' + new Date().getTime() + '.jpg');
-    const file = frameFolder.createFile(blob);
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    
-    // Get file ID
-    const fileId = file.getId();
-    
-    // Return formatted URL
-    return 'https://lh3.google.com/u/0/d/' + fileId;
-  } catch (error) {
-    console.error('Error uploading image:', error);
-    throw new Error('Failed to upload image: ' + error.toString());
-  }
+  return { value: existingUrlOrValue || 'https://via.placeholder.com/400', warning: null };
 }
 
 function doGet(e) {
@@ -631,53 +629,21 @@ function submitOrder(orderData) {
       createOrdersSheet();
     }
     
-    // Process items: upload any base64 images to Drive and get URLs
-    const processedItems = orderData.items.map(item => {
-      if (item.photoOption === 'system' && item.photoBase64) {
-        try {
-          const fileName = 'FRAME_ORDER_' + Date.now() + '_' + (item.photoName || 'photo.jpg');
-          const fileUrl = uploadImageToDrive(item.photoBase64, fileName);
-          // Return item without base64 to avoid bloating sheet cell limit
-          return {
-            id: item.id,
-            menuItemId: item.menuItemId,
-            name: item.name,
-            price: item.price,
-            image: item.image,
-            size: item.size,
-            photoOption: item.photoOption,
-            photoUrl: fileUrl,
-            photoName: item.photoName,
-            quantity: item.quantity
-          };
-        } catch (uploadError) {
-          console.error('Error uploading item photo:', uploadError);
-          return {
-            id: item.id,
-            menuItemId: item.menuItemId,
-            name: item.name,
-            price: item.price,
-            image: item.image,
-            size: item.size,
-            photoOption: item.photoOption,
-            photoUrl: 'failed_to_upload',
-            photoName: item.photoName,
-            quantity: item.quantity
-          };
-        }
-      }
-      return {
-        id: item.id,
-        menuItemId: item.menuItemId,
-        name: item.name,
-        price: item.price,
-        image: item.image,
-        size: item.size,
-        photoOption: item.photoOption,
-        photoUrl: null,
-        quantity: item.quantity
-      };
-    });
+    // Order photos are always handled via the WhatsApp hand-off (no server-side storage needed -
+    // the customer sends the photo directly to the shop's WhatsApp after checkout). Strip any
+    // base64 payload before saving so it never bloats the Orders sheet.
+    const processedItems = orderData.items.map(item => ({
+      id: item.id,
+      menuItemId: item.menuItemId,
+      name: item.name,
+      price: item.price,
+      image: item.image,
+      size: item.size,
+      photoOption: item.photoOption || 'whatsapp',
+      photoUrl: null,
+      photoName: item.photoName || null,
+      quantity: item.quantity
+    }));
     
     const orderId = 'ORD' + Date.now();
     const timestamp = new Date().toISOString();
@@ -984,20 +950,11 @@ function addMenuItem(item) {
       sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#f3f4f6');
     }
     
-    // Handle image upload if base64 image is provided
-    let imageUrl = item.image || 'https://via.placeholder.com/400';
-    if (item.imageBase64) {
-      try {
-        imageUrl = uploadImageToDrive(item.imageBase64, item.imageName || item.name + '_image.jpg');
-      } catch (error) {
-        console.error('Error uploading image:', error);
-        // Keep the default or existing image URL if upload fails
-      }
-    } else if (item.image && !item.image.startsWith('https://lh3.google.com/u/0/d/')) {
-      // If an image URL is provided but not in the correct format, keep it as is
-      imageUrl = item.image;
-    }
-    
+    // Resolve image: use uploaded base64 directly (stored inline) if small enough, else fall
+    // back to whatever image URL was supplied. No Drive upload - see resolveImageValue() note.
+    const resolvedImage = resolveImageValue(item.imageBase64, item.image);
+    const imageUrl = resolvedImage.value;
+
     const newRow = [
       item.name,
       item.price,
@@ -1010,9 +967,9 @@ function addMenuItem(item) {
       item.category || 'Popular!',
       item.stock === undefined || item.stock === '' ? 50 : Number(item.stock)
     ];
-    
+
     sheet.appendRow(newRow);
-    return { success: true, message: 'Item added successfully', imageUrl: imageUrl };
+    return { success: true, message: resolvedImage.warning || 'Item added successfully', imageUrl: imageUrl };
   } catch (error) {
     console.error('Error adding item:', error);
     return { success: false, message: 'Failed to add item' };
@@ -1030,21 +987,11 @@ function updateMenuItem(itemId, item) {
     // So we use itemId directly without adding 1
     const actualRow = itemId
     
-    // Handle image upload if base64 image is provided
-    let imageUrl = item.image || 'https://via.placeholder.com/400';
-    if (item.imageBase64) {
-      try {
-        imageUrl = uploadImageToDrive(item.imageBase64, item.imageName || item.name + '_image.jpg');
-      } catch (error) {
-        console.error('Error uploading image:', error);
-        // Keep the existing image URL if upload fails
-        imageUrl = item.image || 'https://via.placeholder.com/400';
-      }
-    } else if (item.image && !item.image.startsWith('https://lh3.google.com/u/0/d/')) {
-      // If an image URL is provided but not in the correct format, keep it as is
-      imageUrl = item.image;
-    }
-    
+    // Resolve image: use uploaded base64 directly (stored inline) if small enough, else fall
+    // back to whatever image URL was supplied. No Drive upload - see resolveImageValue() note.
+    const resolvedImage = resolveImageValue(item.imageBase64, item.image);
+    const imageUrl = resolvedImage.value;
+
     const range = sheet.getRange(actualRow, 1, 1, 10); // actualRow already includes header offset
     
     const updatedRow = [
@@ -1061,7 +1008,7 @@ function updateMenuItem(itemId, item) {
     ];
     
     range.setValues([updatedRow]);
-    return { success: true, message: 'Item updated successfully', rowUpdated: actualRow };
+    return { success: true, message: resolvedImage.warning || 'Item updated successfully', rowUpdated: actualRow };
   } catch (error) {
     console.error('Error updating item:', error);
     return { success: false, message: 'Failed to update item' };
@@ -1188,16 +1135,11 @@ function addBanner(banner) {
       sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#f3f4f6');
     }
     
-    // Handle image upload if base64 image is provided
-    let imageUrl = banner.image || '';
-    if (banner.imageBase64) {
-      try {
-        imageUrl = uploadImageToDrive(banner.imageBase64, banner.imageName || 'banner_' + new Date().getTime() + '.jpg');
-      } catch (error) {
-        console.error('Error uploading banner image:', error);
-      }
-    }
-    
+    // Resolve image: use uploaded base64 directly (stored inline) if small enough, else fall
+    // back to whatever image URL was supplied. No Drive upload - see resolveImageValue() note.
+    const resolvedImage = resolveImageValue(banner.imageBase64, banner.image);
+    const imageUrl = resolvedImage.value;
+
     const newRow = [
       banner.title,
       banner.subtitle,
@@ -1205,9 +1147,9 @@ function addBanner(banner) {
       banner.link,
       banner.active !== false
     ];
-    
+
     sheet.appendRow(newRow);
-    return { success: true, message: 'Banner added successfully' };
+    return { success: true, message: resolvedImage.warning || 'Banner added successfully' };
   } catch (error) {
     console.error('Error adding banner:', error);
     return { success: false, message: 'Failed to add banner' };
@@ -1221,21 +1163,15 @@ function updateBanner(bannerId, banner) {
       return { success: false, message: 'Banners sheet not found' };
     }
     
-    // Handle image upload if base64 image is provided
-    let imageUrl = banner.image || '';
-    if (banner.imageBase64) {
-      try {
-        imageUrl = uploadImageToDrive(banner.imageBase64, banner.imageName || 'banner_' + new Date().getTime() + '.jpg');
-      } catch (error) {
-        console.error('Error uploading banner image:', error);
-        imageUrl = banner.image || '';
-      }
-    }
-    
+    // Resolve image: use uploaded base64 directly (stored inline) if small enough, else fall
+    // back to whatever image URL was supplied. No Drive upload - see resolveImageValue() note.
+    const resolvedImage = resolveImageValue(banner.imageBase64, banner.image);
+    const imageUrl = resolvedImage.value;
+
     // bannerId is the actual row number in the sheet (including header)
     const actualRow = bannerId;
     const range = sheet.getRange(actualRow, 1, 1, 5); // actualRow already includes header offset
-    
+
     const updatedRow = [
       banner.title,
       banner.subtitle,
@@ -1243,9 +1179,9 @@ function updateBanner(bannerId, banner) {
       banner.link,
       banner.active !== false
     ];
-    
+
     range.setValues([updatedRow]);
-    return { success: true, message: 'Banner updated successfully', rowUpdated: actualRow };
+    return { success: true, message: resolvedImage.warning || 'Banner updated successfully', rowUpdated: actualRow };
   } catch (error) {
     console.error('Error updating banner:', error);
     return { success: false, message: 'Failed to update banner' };
@@ -1732,60 +1668,89 @@ function setupSettingsSheet() {
   }
 }
 
-function sendArkeselSMS(recipient, message) {
+// NOTE: This deployment does not call any external SMS API (that requires the UrlFetchApp /
+// "connect to an external service" OAuth scope, which - like Drive above - can trigger a broken
+// authorization dialog on some accounts and block the whole web app from loading). Instead,
+// every notification (automatic or manual) is queued in the "Notifications" sheet, and the
+// admin sends it themselves with one tap via a WhatsApp deep-link from the dashboard. This still
+// gives the admin full control over automatic vs. manual sending, per the original requirement -
+// it just means the last "tap to actually send" step is done by a human, not a server API call.
+
+function setupNotificationsQueueSheet() {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = spreadsheet.getSheetByName('Notifications');
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet('Notifications');
+    const headers = ['ID', 'Timestamp', 'Order ID', 'Phone', 'Customer Name', 'Message', 'Source', 'Sent'];
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#f3f4f6');
+  }
+  return sheet;
+}
+
+function queuePendingNotification(phone, message, orderId, customerName, source) {
   try {
-    const settings = getSystemSettings();
-    const apiKey = settings.smsApiKey;
-    const senderId = settings.smsSenderId;
-    
-    if (!apiKey || !senderId) {
-      console.warn('Arkesel SMS API Key or Sender ID is not configured in settings.');
-      return { success: false, message: 'SMS configuration is missing.' };
-    }
-    
-    // Format recipient to international format
-    let formattedRecipient = String(recipient).trim().replace(/[^0-9+]/g, '');
-    if (formattedRecipient.startsWith('0')) {
-      formattedRecipient = '233' + formattedRecipient.substring(1);
-    } else if (formattedRecipient.startsWith('+')) {
-      formattedRecipient = formattedRecipient.substring(1);
-    }
-    
-    const url = 'https://sms.arkesel.com/api/v2/sms/send';
-    const payload = {
-      sender: senderId,
-      message: message,
-      recipients: [formattedRecipient]
-    };
-    
-    const options = {
-      method: 'post',
-      contentType: 'application/json',
-      headers: {
-        'api-key': apiKey
-      },
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    };
-    
-    const response = UrlFetchApp.fetch(url, options);
-    const code = response.getResponseCode();
-    const text = response.getContentText();
-    console.log('Arkesel response code:', code, 'body:', text);
-    
-    if (code >= 200 && code < 300) {
-      return { success: true, message: 'SMS sent successfully', response: text };
-    } else {
-      return { success: false, message: 'Failed to send SMS (Status: ' + code + '): ' + text };
-    }
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Notifications') || setupNotificationsQueueSheet();
+    const id = 'NOTIF' + Date.now();
+    sheet.appendRow([
+      id,
+      new Date().toISOString(),
+      orderId || '',
+      phone || '',
+      customerName || '',
+      message || '',
+      source || 'manual',
+      false
+    ]);
+    return { success: true, message: 'Notification queued. Send it from the dashboard when ready.', id: id };
   } catch (error) {
-    console.error('Error in sendArkeselSMS:', error);
+    console.error('Error queuing notification:', error);
     return { success: false, message: error.toString() };
   }
 }
 
-function sendManualSMS(phone, message) {
-  return sendArkeselSMS(phone, message);
+function getPendingNotifications() {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Notifications') || setupNotificationsQueueSheet();
+    const data = sheet.getDataRange().getValues();
+    const list = [];
+    for (let i = 1; i < data.length; i++) {
+      if (!data[i][0]) continue;
+      if (data[i][7] === true) continue; // already sent
+      list.push({
+        id: data[i][0],
+        timestamp: data[i][1],
+        orderId: data[i][2],
+        phone: data[i][3],
+        customerName: data[i][4],
+        message: data[i][5],
+        source: data[i][6],
+        rowIndex: i + 1
+      });
+    }
+    return list.reverse();
+  } catch (error) {
+    console.error('Error fetching pending notifications:', error);
+    return [];
+  }
+}
+
+function markNotificationSent(rowIndex) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Notifications');
+    if (!sheet) return { success: false, message: 'Notifications sheet not found' };
+    sheet.getRange(rowIndex, 8).setValue(true);
+    return { success: true, message: 'Marked as sent' };
+  } catch (error) {
+    console.error('Error marking notification sent:', error);
+    return { success: false, message: error.toString() };
+  }
+}
+
+// Kept for backward compatibility with existing client calls - no longer calls any external
+// API. Queues the message for the admin to send manually via WhatsApp instead.
+function sendManualSMS(phone, message, orderId, customerName) {
+  return queuePendingNotification(phone, message, orderId, customerName, 'manual');
 }
 
 function triggerStatusChangeSMS(orderId, newStatus) {
@@ -1794,10 +1759,10 @@ function triggerStatusChangeSMS(orderId, newStatus) {
     if (settings.autoSms !== 'true' && settings.autoSms !== true) {
       return;
     }
-    
+
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Orders');
     if (!sheet) return;
-    
+
     const data = sheet.getDataRange().getValues();
     let orderRow = null;
     for (let i = 1; i < data.length; i++) {
@@ -1806,13 +1771,13 @@ function triggerStatusChangeSMS(orderId, newStatus) {
         break;
       }
     }
-    
+
     if (!orderRow) return;
-    
+
     const customerName = orderRow[3];
     const phone = orderRow[4];
     const shopName = settings.businessName || 'HD Canvas Frames';
-    
+
     let message = '';
     if (newStatus === 'Confirmed') {
       message = 'Hi ' + customerName + ', your order ' + orderId + ' has been confirmed by ' + shopName + '! We are starting work on your frames.';
@@ -1827,8 +1792,8 @@ function triggerStatusChangeSMS(orderId, newStatus) {
     } else {
       return;
     }
-    
-    sendArkeselSMS(phone, message);
+
+    queuePendingNotification(phone, message, orderId, customerName, 'auto');
   } catch (error) {
     console.error('Error triggering status change SMS:', error);
   }
@@ -2063,6 +2028,9 @@ function checkAndMigrateSheets() {
 
   // 7. Area-specific (Shop Rider) delivery charges sheet setup
   setupAreaDeliveryChargesSheet();
+
+  // 8. Notifications queue sheet setup (manual/auto SMS queue - no external API calls)
+  setupNotificationsQueueSheet();
 }
 
 function setupDeliveryChargesSheet() {

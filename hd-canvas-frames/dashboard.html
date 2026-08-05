@@ -370,6 +370,34 @@
             </div>
           </div>
 
+          <!-- Pending Notifications: messages queued (auto status-changes or manual) waiting to be sent -->
+          <div v-if="pendingNotifications.length > 0" class="mb-8">
+            <h3 class="text-lg font-bold text-white mb-3">
+              <i class="fas fa-bell text-yellow-400 mr-2"></i>Pending Notifications
+              <span class="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full align-middle">{{ pendingNotifications.length }}</span>
+            </h3>
+            <div class="bg-[#121212] rounded-xl shadow-[0_10px_15px_-3px_rgba(0,0,0,0.7)] divide-y divide-gray-800">
+              <div v-for="n in pendingNotifications.slice(0, 8)" :key="n.id" class="p-4 flex flex-wrap items-center gap-3 justify-between">
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm text-white truncate"><span class="font-semibold">{{ n.customerName || n.phone }}</span> <span class="text-gray-500">({{ n.orderId }})</span></p>
+                  <p class="text-xs text-gray-400 truncate">{{ n.message }}</p>
+                  <span :class="['inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase', n.source === 'auto' ? 'bg-blue-950 text-blue-400' : 'bg-purple-950 text-purple-400']">{{ n.source }}</span>
+                </div>
+                <div class="flex gap-2 flex-shrink-0">
+                  <a :href="'https://wa.me/' + String(n.phone).replace(/[^0-9]/g, '') + '?text=' + encodeURIComponent(n.message)"
+                     target="_blank" @click="markNotificationSentAndRefresh(n.rowIndex)"
+                     class="px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-500 transition-colors text-xs font-bold">
+                    <i class="fab fa-whatsapp mr-1"></i>Send
+                  </a>
+                  <button @click="markNotificationSentAndRefresh(n.rowIndex)"
+                          class="px-3 py-1.5 bg-gray-700 text-gray-300 rounded hover:bg-gray-600 transition-colors text-xs">
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Daily Breakdown: last 14 days at a glance -->
           <div class="mb-8">
             <h3 class="text-lg font-bold text-white mb-3"><i class="fas fa-table text-yellow-400 mr-2"></i>Daily Breakdown (Last 14 Days)</h3>
@@ -1452,28 +1480,25 @@
             
             <!-- Right Column: SMS Configurations & Save Button -->
             <div class="space-y-6 flex flex-col justify-between">
-              <!-- Arkesel SMS Configuration -->
+              <!-- Order Status Notifications -->
               <div class="bg-[#121212] p-6 rounded-xl border border-gray-800 shadow-lg">
-                <h3 class="text-lg font-bold mb-4 text-white"><i class="fas fa-sms mr-2 text-yellow-400"></i>Arkesel SMS Gateway</h3>
-                
-                <div class="space-y-4">
-                  <div>
-                    <label class="block text-gray-400 text-sm font-semibold mb-2">Arkesel API Key</label>
-                    <input v-model="settings.smsApiKey" type="password" class="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none" placeholder="Enter Arkesel v2 API Key">
-                  </div>
-                  <div>
-                    <label class="block text-gray-400 text-sm font-semibold mb-2">SMS Sender ID</label>
-                    <input v-model="settings.smsSenderId" type="text" maxlength="11" class="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none" placeholder="e.g. CanvasShop (Max 11 chars)">
-                  </div>
-                  <div class="flex items-center pt-2">
-                    <input v-model="settings.autoSms" type="checkbox" id="auto-sms-checkbox" :true-value="'true'" :false-value="'false'" class="rounded bg-[#1a1a1a] border-gray-700 text-yellow-400 focus:ring-yellow-400 w-5 h-5 mr-3">
-                    <label for="auto-sms-checkbox" class="text-sm font-semibold text-gray-300 cursor-pointer">
-                      Enable Automatic Status SMS
-                    </label>
-                  </div>
+                <h3 class="text-lg font-bold mb-2 text-white"><i class="fas fa-bell mr-2 text-yellow-400"></i>Order Status Notifications</h3>
+                <p class="text-xs text-gray-500 mb-4">
+                  Notifications are queued, not auto-sent through a paid SMS API - you (or your staff) send each one
+                  with one tap via WhatsApp from the "Pending Notifications" list on the Dashboard. This keeps you in
+                  control of every message that goes out and needs no extra account permissions.
+                </p>
+                <div class="flex items-center pt-2">
+                  <input v-model="settings.autoSms" type="checkbox" id="auto-sms-checkbox" :true-value="'true'" :false-value="'false'" class="rounded bg-[#1a1a1a] border-gray-700 text-yellow-400 focus:ring-yellow-400 w-5 h-5 mr-3">
+                  <label for="auto-sms-checkbox" class="text-sm font-semibold text-gray-300 cursor-pointer">
+                    Automatically queue a notification on every status change
+                  </label>
                 </div>
+                <p class="text-xs text-gray-500 mt-2">
+                  When off, you can still compose and send a message manually for any order from its details view.
+                </p>
               </div>
-              
+
               <!-- Quick Actions / Save Settings -->
               <div class="bg-[#121212] p-6 rounded-xl border border-gray-800 shadow-lg mt-auto">
                 <button @click="saveSettings" :disabled="savingSettings" class="w-full py-4 bg-yellow-400 text-black font-bold text-lg rounded-xl hover:bg-yellow-300 transition-colors shadow-lg flex items-center justify-center gap-2 disabled:opacity-50">
@@ -2220,23 +2245,24 @@
           <p class="text-sm">{{ selectedOrder.notes }}</p>
         </div>
 
-        <!-- Arkesel Manual SMS Panel -->
+        <!-- Manual Notification Composer (no automatic API sending - queue it, then send it yourself via WhatsApp) -->
         <div class="bg-[#1a1a1a] rounded-lg p-4 mt-4">
-          <h4 class="font-semibold mb-2 text-yellow-400"><i class="fas fa-sms mr-2"></i>Send Custom SMS</h4>
-          <div class="flex gap-2">
-            <input 
-              v-model="manualSmsMessage" 
-              type="text" 
-              placeholder="Enter message for customer..." 
+          <h4 class="font-semibold mb-2 text-yellow-400"><i class="fas fa-comment-dots mr-2"></i>Send Custom Message</h4>
+          <div class="flex gap-2 mb-2">
+            <input
+              v-model="manualSmsMessage"
+              type="text"
+              placeholder="Enter message for customer..."
               class="flex-1 px-3 py-2 rounded bg-[#2a2a2a] text-white border border-gray-700 focus:outline-none focus:border-yellow-400 text-sm">
-            <button 
-              @click="sendCustomOrderSms" 
+            <button
+              @click="sendCustomOrderSms"
               :disabled="sendingCustomSms || !manualSmsMessage"
-              class="px-4 py-2 bg-yellow-400 text-black font-semibold rounded hover:bg-yellow-300 transition-colors text-sm disabled:opacity-50">
-              <span v-if="!sendingCustomSms">Send</span>
+              class="px-4 py-2 bg-yellow-400 text-black font-semibold rounded hover:bg-yellow-300 transition-colors text-sm disabled:opacity-50 whitespace-nowrap">
+              <span v-if="!sendingCustomSms"><i class="fab fa-whatsapp mr-1"></i>Send via WhatsApp</span>
               <span v-else><i class="fas fa-spinner fa-spin"></i></span>
             </button>
           </div>
+          <p class="text-xs text-gray-500">Opens WhatsApp with this message pre-filled to {{ selectedOrder.phone }} and logs it as sent.</p>
         </div>
       </div>
     </div>
@@ -2904,6 +2930,7 @@
           savingSettings: false,
           manualSmsMessage: '',
           sendingCustomSms: false,
+          pendingNotifications: [],
           // Third-party (Yango/Bolt/Uber) delivery info the admin books & pays for on the customer's behalf
           thirdPartyDeliveryForm: { fee: 0, bikeNumber: '', trackingUrl: '' },
           savingThirdPartyDelivery: false,
@@ -3281,38 +3308,30 @@
           }
         },
 
+        // Opens WhatsApp with the message pre-filled (100% client-side, no special permissions
+        // needed) and logs it in the Notifications sheet for record-keeping.
         async sendCustomOrderSms() {
           if (!this.manualSmsMessage) return;
           this.sendingCustomSms = true;
           try {
-            const result = await new Promise((resolve, reject) => {
+            const waLink = 'https://wa.me/' + String(this.selectedOrder.phone).replace(/[^0-9]/g, '') + '?text=' + encodeURIComponent(this.manualSmsMessage);
+            window.open(waLink, '_blank');
+
+            await new Promise((resolve, reject) => {
               google.script.run
                 .withSuccessHandler(resolve)
                 .withFailureHandler(reject)
-                .sendManualSMS(this.selectedOrder.phone, this.manualSmsMessage);
+                .sendManualSMS(this.selectedOrder.phone, this.manualSmsMessage, this.selectedOrder.id, this.selectedOrder.customerName);
             });
-            if (result.success) {
-              Swal.fire({
-                title: 'Sent!',
-                text: 'SMS has been sent successfully to ' + this.selectedOrder.customerName,
-                icon: 'success',
-                confirmButtonColor: '#EAB308',
-                background: '#121212',
-                color: '#fff'
-              });
-              this.manualSmsMessage = '';
-            } else {
-              Swal.fire({
-                title: 'Error!',
-                text: result.message || 'Failed to send SMS.',
-                icon: 'error',
-                confirmButtonColor: '#EAB308',
-                background: '#121212',
-                color: '#fff'
-              });
-            }
+
+            this.manualSmsMessage = '';
+            Swal.fire({
+              toast: true, position: 'top-end', icon: 'success',
+              title: 'WhatsApp opened - logged to notifications', showConfirmButton: false, timer: 2500,
+              background: '#121212', color: '#fff'
+            });
           } catch (error) {
-            console.error('Error sending SMS:', error);
+            console.error('Error logging notification:', error);
           } finally {
             this.sendingCustomSms = false;
           }
@@ -3387,8 +3406,37 @@
             this.loadAreaDeliveryCharges(),
             this.fetchPaymentMethods(),
             this.loadCashLedger(),
-            this.loadReportData()
+            this.loadReportData(),
+            this.fetchPendingNotifications()
           ]);
+        },
+
+        async fetchPendingNotifications() {
+          try {
+            const list = await new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .getPendingNotifications();
+            });
+            this.pendingNotifications = list;
+          } catch (e) {
+            console.error('Error fetching pending notifications:', e);
+          }
+        },
+
+        async markNotificationSentAndRefresh(rowIndex) {
+          try {
+            await new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .markNotificationSent(rowIndex);
+            });
+            this.fetchPendingNotifications();
+          } catch (e) {
+            console.error('Error marking notification sent:', e);
+          }
         },
         
         async fetchMenuItems() {
