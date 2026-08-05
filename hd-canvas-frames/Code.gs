@@ -49,6 +49,12 @@ function doGet(e) {
       template = HtmlService.createTemplateFromFile('delivery');
       title = 'Delivery Portal - Order Dispatch';
       break;
+    case 'riderportal':
+      // Diagnostic alias - identical to 'delivery', just a differently-named route/file, to test
+      // whether the broken authorization dialog is somehow tied to the word "delivery" itself.
+      template = HtmlService.createTemplateFromFile('riderportal');
+      title = 'Rider Portal - Order Dispatch';
+      break;
     default:
       template = HtmlService.createTemplateFromFile('index');
       title = 'HD Laminated Canvas Frames - Order Online';
