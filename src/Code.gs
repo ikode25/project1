@@ -53,8 +53,9 @@ var DEFAULT_LOGO = 'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.o
 //       8=DateOfBirth, 9=Qualification, 10=Specialization, 11=JoiningDate, 12=ProfilePhoto,
 //       13=Address, 14=Status, 15=LastLogin, 16=IsDeleted, 17=ThemeMode, 18=CustomColors,
 //       19=CreatedAt, 20=CreatedBy, 21=UpdatedAt, 22=UpdatedBy,
-//       23=EmployeeCode (UNIQUE staff ID), 24=EmergencyContactName, 25=EmergencyContactPhone
-var USER_HEADERS = ['ID','Username','FullName','Email','Password','Mobile','Role','Gender','DateOfBirth','Qualification','Specialization','JoiningDate','ProfilePhoto','Address','Status','LastLogin','IsDeleted','ThemeMode','CustomColors','CreatedAt','CreatedBy','UpdatedAt','UpdatedBy','EmployeeCode','EmergencyContactName','EmergencyContactPhone'];
+//       23=EmployeeCode (UNIQUE staff ID), 24=EmergencyContactName, 25=EmergencyContactPhone,
+//       26=SSNITNumber (required before a payslip/SSNIT record can be generated for this user)
+var USER_HEADERS = ['ID','Username','FullName','Email','Password','Mobile','Role','Gender','DateOfBirth','Qualification','Specialization','JoiningDate','ProfilePhoto','Address','Status','LastLogin','IsDeleted','ThemeMode','CustomColors','CreatedAt','CreatedBy','UpdatedAt','UpdatedBy','EmployeeCode','EmergencyContactName','EmergencyContactPhone','SSNITNumber'];
 
 // classes cols: 0=ID, 1=ClassName, 2=Section, 3=AcademicYear, 4=ClassTeacherID,
 //               5=TotalStrength, 6=IsDeleted, 7=CreatedAt, 8=UpdatedAt,
@@ -461,7 +462,7 @@ function getUsersMap() {
   var data = sh.getDataRange().getValues(), map = {};
   for (var i = 1; i < data.length; i++) {
     if (String(data[i][16]) === '1') continue;
-    map[data[i][0]] = { fullName: data[i][2] || data[i][1], username: data[i][1], role: String(data[i][6] || '').toLowerCase() };
+    map[data[i][0]] = { fullName: data[i][2] || data[i][1], username: data[i][1], role: String(data[i][6] || '').toLowerCase(), employeeCode: data[i][23] || '', ssnitNumber: data[i][26] || '' };
   }
   return map;
 }
@@ -1388,7 +1389,8 @@ function rowToUser(row) {
     UpdatedBy: row[22],
     EmployeeCode: row[23] || '',
     EmergencyContactName: row[24] || '',
-    EmergencyContactPhone: row[25] || ''
+    EmergencyContactPhone: row[25] || '',
+    SSNITNumber: row[26] || ''
   };
 }
 
@@ -1932,7 +1934,8 @@ function addUser(userData, currentUser, currentRole) {
       ts, currentUser, ts, currentUser,
       empCode,
       String(userData.EmergencyContactName || '').trim(),
-      String(userData.EmergencyContactPhone || '').trim()
+      String(userData.EmergencyContactPhone || '').trim(),
+      String(userData.SSNITNumber || '').trim()
     ]);
 
     addLog(currentUser, 'User Added', 'Added: ' + username + ' (' + (userData.Role || 'teacher') + ')');
@@ -1985,6 +1988,7 @@ function updateUser(username, userData, currentUser, currentRole) {
       sh.getRange(row, 24).setValue(newEmpCode);
       sh.getRange(row, 25).setValue(String(userData.EmergencyContactName || '').trim());
       sh.getRange(row, 26).setValue(String(userData.EmergencyContactPhone || '').trim());
+      if (userData.SSNITNumber !== undefined) sh.getRange(row, 27).setValue(String(userData.SSNITNumber || '').trim());
 
       addLog(currentUser, 'User Updated', 'Updated: ' + username);
       return { success: true, message: 'User updated successfully' };
@@ -11269,6 +11273,168 @@ function deleteTestPaper(id, currentUser, currentRole) {
       return { success: true, message: 'Test paper deleted' };
     }
     return { success: false, message: 'Test paper not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// ============== Payslips & SSNIT ==============
+// Ghana-format monthly payslip per staff member. SSNIT (Tier 1) employee contribution is the
+// standard 5.5% of basic salary, computed automatically — but only once the staff member has an
+// SSNIT number on file (Users.SSNITNumber), since a payslip can't legally show a contribution
+// without one. Income tax / other deductions are admin-entered (Ghana PAYE bands change too often
+// and vary by allowance treatment to safely hardcode into a school admin tool).
+var PAYSLIPS_SHEET = 'Payslips';
+var PAYSLIP_HEADERS = ['ID', 'TeacherID', 'PayPeriodMonth', 'PayPeriodYear', 'BasicSalary', 'Allowances', 'GrossPay', 'SSNITContribution', 'IncomeTax', 'OtherDeductions', 'TotalDeductions', 'NetPay', 'Notes', 'GeneratedBy', 'IsDeleted', 'CreatedAt', 'UpdatedAt'];
+var SSNIT_EMPLOYEE_RATE = 0.055; // Tier 1 mandatory employee contribution, 5.5% of basic salary
+
+function _ensurePayslipsSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(PAYSLIPS_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(PAYSLIPS_SHEET);
+    sh.appendRow(PAYSLIP_HEADERS);
+    sh.getRange(1, 1, 1, PAYSLIP_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function _rowToPayslip(row, umap) {
+  var tid = row[1], gb = row[13];
+  var t = umap && umap[tid];
+  return {
+    ID: row[0], TeacherID: tid, TeacherName: t ? t.fullName : '— deleted user —', EmployeeCode: t ? t.employeeCode : '', SSNITNumber: t ? t.ssnitNumber : '',
+    PayPeriodMonth: row[2], PayPeriodYear: row[3],
+    BasicSalary: parseFloat(row[4]) || 0, Allowances: parseFloat(row[5]) || 0, GrossPay: parseFloat(row[6]) || 0,
+    SSNITContribution: parseFloat(row[7]) || 0, IncomeTax: parseFloat(row[8]) || 0, OtherDeductions: parseFloat(row[9]) || 0,
+    TotalDeductions: parseFloat(row[10]) || 0, NetPay: parseFloat(row[11]) || 0, Notes: row[12] || '',
+    GeneratedBy: gb, GeneratedByName: (gb && umap && umap[gb]) ? umap[gb].fullName : '',
+    CreatedAt: toIso(row[15]), UpdatedAt: toIso(row[16])
+  };
+}
+
+// admin/clerk — every payslip; teacher — only their own
+function getAllPayslips(currentUser, currentRole) {
+  try {
+    var role = String(currentRole || '').toLowerCase();
+    if (role !== 'admin' && role !== 'clerk' && role !== 'teacher') return { success: false, message: 'Forbidden' };
+    var sh = _ensurePayslipsSheet();
+    var data = sh.getDataRange().getValues();
+    var umap = getUsersMap();
+    var myId = role === 'teacher' ? getCurrentUserId(currentUser) : null;
+    var out = [];
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][14]) === '1') continue;
+      if (myId && parseInt(data[i][1], 10) !== myId) continue;
+      out.push(_rowToPayslip(data[i], umap));
+    }
+    out.sort(function (a, b) { return String(b.CreatedAt).localeCompare(String(a.CreatedAt)); });
+    return { success: true, data: out };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// admin only — Basic + Allowances + admin-entered IncomeTax/OtherDeductions; SSNIT auto-computed
+function generatePayslip(d, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var tid = parseInt(d.TeacherID, 10);
+    if (isNaN(tid)) return { success: false, message: 'Staff member is required' };
+    var umap = getUsersMap();
+    var teacher = umap[tid];
+    if (!teacher) return { success: false, message: 'Staff member not found' };
+    if (!teacher.ssnitNumber) return { success: false, message: 'This staff member has no SSNIT number on file. Add it via Users / Staff before generating a payslip.' };
+
+    var month = parseInt(d.PayPeriodMonth, 10);
+    var year = parseInt(d.PayPeriodYear, 10);
+    if (isNaN(month) || month < 1 || month > 12) return { success: false, message: 'Invalid pay period month' };
+    if (isNaN(year) || year < 2000) return { success: false, message: 'Invalid pay period year' };
+
+    var basic = parseFloat(d.BasicSalary);
+    if (isNaN(basic) || basic < 0) return { success: false, message: 'Basic Salary must be a non-negative number' };
+    var allowances = parseFloat(d.Allowances); if (isNaN(allowances) || allowances < 0) allowances = 0;
+    var incomeTax = parseFloat(d.IncomeTax); if (isNaN(incomeTax) || incomeTax < 0) incomeTax = 0;
+    var otherDeductions = parseFloat(d.OtherDeductions); if (isNaN(otherDeductions) || otherDeductions < 0) otherDeductions = 0;
+
+    var sh = _ensurePayslipsSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][14]) === '1') continue;
+      if (parseInt(data[i][1], 10) === tid && parseInt(data[i][2], 10) === month && parseInt(data[i][3], 10) === year) {
+        return { success: false, message: 'A payslip already exists for ' + teacher.fullName + ' for this month — edit or delete it instead' };
+      }
+    }
+
+    var ssnit = Math.round(basic * SSNIT_EMPLOYEE_RATE * 100) / 100;
+    var gross = basic + allowances;
+    var totalDeductions = ssnit + incomeTax + otherDeductions;
+    var net = gross - totalDeductions;
+
+    var ts = nowIso(), id = nextRowId(sh);
+    sh.appendRow([
+      id, tid, month, year, basic, allowances, gross, ssnit, incomeTax, otherDeductions, totalDeductions, net,
+      String(d.Notes || '').trim(), getCurrentUserId(currentUser) || '', '0', ts, ts
+    ]);
+    addLog(currentUser, 'Payslip Generated', teacher.fullName + ' — ' + month + '/' + year);
+    return { success: true, message: 'Payslip generated for ' + teacher.fullName, id: id };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function deletePayslip(id, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var idn = parseInt(id, 10);
+    var sh = _ensurePayslipsSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] !== idn) continue;
+      sh.getRange(i + 1, 15).setValue('1');
+      sh.getRange(i + 1, 17).setValue(nowIso());
+      addLog(currentUser, 'Payslip Deleted', '#' + idn);
+      return { success: true, message: 'Payslip deleted' };
+    }
+    return { success: false, message: 'Payslip not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// admin/clerk — every staff member's SSNIT number + running total contributed to date (from
+// their generated payslips), so admin always has an at-a-glance SSNIT register without a second
+// parallel data model — Payslips.SSNITContribution stays the single source of truth.
+function getSsnitRegister(currentUser, currentRole) {
+  try {
+    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
+    var ush = getSheet(USERS_SHEET);
+    if (!ush) return { success: true, data: [] };
+    var udata = ush.getDataRange().getValues();
+    var staff = {}; // id -> { fullName, employeeCode, ssnitNumber, total, count }
+    for (var i = 1; i < udata.length; i++) {
+      if (String(udata[i][16]) === '1') continue; // IsDeleted
+      var role = String(udata[i][6] || '').toLowerCase();
+      if (role !== 'teacher' && role !== 'admin' && role !== 'supervisor' && role !== 'clerk') continue;
+      staff[udata[i][0]] = { FullName: udata[i][2], Role: role, EmployeeCode: udata[i][23] || '', SSNITNumber: udata[i][26] || '', TotalContributed: 0, PayslipCount: 0 };
+    }
+
+    var psh = getSheet(PAYSLIPS_SHEET);
+    if (psh) {
+      var pdata = psh.getDataRange().getValues();
+      for (var j = 1; j < pdata.length; j++) {
+        if (String(pdata[j][14]) === '1') continue;
+        var tid = pdata[j][1];
+        if (!staff[tid]) continue;
+        staff[tid].TotalContributed += parseFloat(pdata[j][7]) || 0;
+        staff[tid].PayslipCount++;
+      }
+    }
+
+    var out = Object.keys(staff).map(function (id) { return Object.assign({ ID: parseInt(id, 10) }, staff[id]); });
+    out.sort(function (a, b) { return String(a.FullName).localeCompare(String(b.FullName)); });
+    return { success: true, data: out };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
