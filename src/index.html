@@ -4613,6 +4613,34 @@
       );
     }
 
+    const TERM_LABELS = { term1: 'Term 1', term2: 'Term 2', term3: 'Term 3' };
+
+    // shown on every role's dashboard — reads window.SMS_SCHOOL directly (already loaded by App()
+    // on boot) rather than a separate fetch, since the active session rarely changes mid-session
+    function ActiveSessionBanner({ role, goto }) {
+      const sch = window.SMS_SCHOOL || {};
+      if (!sch.AcademicYear) return null;
+      const isAdmin = String(role).toLowerCase() === 'admin';
+      return (
+        <div
+          style={{
+            display:'flex', alignItems:'center', gap:'14px', padding:'10px 18px', marginBottom:'18px',
+            background:'linear-gradient(135deg,#001f3f,#003366)', color:'#fff', borderRadius:'4px',
+            cursor: isAdmin ? 'pointer' : 'default'
+          }}
+          onClick={() => isAdmin && goto && goto('settings')}
+          title={isAdmin ? 'Change the active academic session in Settings' : undefined}
+        >
+          <i className="fas fa-calendar-check" style={{fontSize:'18px',color:'#ffd166'}}></i>
+          <div style={{fontSize:'13px'}}>
+            <span style={{opacity:0.75,textTransform:'uppercase',letterSpacing:'0.5px',fontSize:'11px',marginRight:'8px'}}>Current Session</span>
+            <b>{sch.AcademicYear}</b> · <b>{TERM_LABELS[sch.ActiveTerm] || 'Term 1'}</b>
+          </div>
+          {isAdmin && <i className="fas fa-pen" style={{marginLeft:'auto',fontSize:'11px',opacity:0.6}}></i>}
+        </div>
+      );
+    }
+
     // admin/clerk quick-reference: what each fee type costs, at a glance — for parent inquiries
     function FeeBreakdownCard({ currentUser, role, goto }) {
       const { data: rows, isLoading: loading } = useSWR('getFeeTypeBreakdown', () => swrFetcher('getFeeTypeBreakdown', currentUser, role));
@@ -4768,6 +4796,7 @@
             {syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}
           </h2>
 
+          <ActiveSessionBanner role={role} goto={goto} />
           <TodayFoodMenuCard currentUser={currentUser} role={role} />
           <BirthdayBanner currentUser={currentUser} role={role} />
 
@@ -5070,6 +5099,7 @@
             </div>
           </div>
 
+          <ActiveSessionBanner role={role} goto={goto} />
           <TodayFoodMenuCard currentUser={currentUser} role={role} />
           <BirthdayBanner currentUser={currentUser} role={role} />
 
@@ -5182,6 +5212,7 @@
             </div>
           </div>
 
+          <ActiveSessionBanner role={role} goto={goto} />
           <TodayFoodMenuCard currentUser={currentUser} role={role} />
           <BirthdayBanner currentUser={currentUser} role={role} />
 
@@ -5301,6 +5332,7 @@
             {syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}
           </h2>
 
+          <ActiveSessionBanner role={role} goto={goto} />
           <TodayFoodMenuCard currentUser={currentUser} role={role} />
           <BirthdayBanner currentUser={currentUser} role={role} />
 
@@ -5394,6 +5426,7 @@
             {syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}
           </h2>
 
+          <ActiveSessionBanner role={role} goto={goto} />
           <TodayFoodMenuCard currentUser={currentUser} role={role} />
           <BirthdayBanner currentUser={currentUser} role={role} />
 
@@ -5486,6 +5519,7 @@
             {syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}
           </h2>
 
+          <ActiveSessionBanner role={role} goto={goto} />
           <TodayFoodMenuCard currentUser={currentUser} role={role} />
           <BirthdayBanner currentUser={currentUser} role={role} />
 
@@ -26728,6 +26762,9 @@
               <button className={'tt-tab' + (tab === 'school' ? ' active' : '')} onClick={() => setTab('school')}>
                 <i className="fas fa-school"></i> School Settings
               </button>
+              <button className={'tt-tab' + (tab === 'academic' ? ' active' : '')} onClick={() => setTab('academic')}>
+                <i className="fas fa-calendar-check"></i> Academic Session
+              </button>
               <button className={'tt-tab' + (tab === 'theme' ? ' active' : '')} onClick={() => setTab('theme')}>
                 <i className="fas fa-palette"></i> Theme & Colors
               </button>
@@ -26747,6 +26784,10 @@
               role={role}
               onSaved={() => { if (refreshSchoolSettings) refreshSchoolSettings(); }}
             />
+          )}
+
+          {isAdmin && tab === 'academic' && (
+            <AcademicSessionTab schoolSettings={schoolSettings} currentUser={currentUser} role={role} onSaved={() => { if (refreshSchoolSettings) refreshSchoolSettings(); }} />
           )}
 
           {isAdmin && tab === 'sms' && (
@@ -26877,6 +26918,84 @@
     }
 
     // ============== School Settings Form (admin) ==============
+    // The one deliberate control for "what session is the school currently running" — kept
+    // separate from the general School Settings save so it's never changed as a side effect of
+    // editing unrelated settings. Nothing is deleted when this changes; every module (Exams,
+    // Admissions, Fee Structure, ...) already filters by its own AcademicYear column, so past
+    // sessions stay fully reachable — the history table below is a quick proof of that.
+    function AcademicSessionTab({ schoolSettings, currentUser, role, onSaved }) {
+      const defaultYear = (() => { const y = new Date().getFullYear(); return `${y}-${y + 1}`; })();
+      const [year, setYear] = useState(schoolSettings?.AcademicYear || defaultYear);
+      const [term, setTerm] = useState(schoolSettings?.ActiveTerm || 'term1');
+      const [saving, setSaving] = useState(false);
+
+      useEffect(() => {
+        if (schoolSettings) { setYear(schoolSettings.AcademicYear || defaultYear); setTerm(schoolSettings.ActiveTerm || 'term1'); }
+      }, [schoolSettings]);
+
+      const { data: history, isLoading: histLoading, mutate: loadHistory } =
+        useSWR('getAcademicHistory', () => swrFetcher('getAcademicHistory', currentUser, role));
+
+      const handleSave = (e) => {
+        e.preventDefault();
+        if (!/^\d{4}-\d{4}$/.test(year)) { Swal.fire({ icon: 'error', title: 'Invalid format', text: 'Academic Year must be YYYY-YYYY' }); return; }
+        setSaving(true);
+        google.script.run
+          .withSuccessHandler((res) => {
+            setSaving(false);
+            if (res.success) { Swal.fire({ icon: 'success', text: res.message, timer: 2000, showConfirmButton: false }); if (onSaved) onSaved(); loadHistory(); }
+            else Swal.fire({ icon: 'error', text: res.message });
+          })
+          .withFailureHandler((err) => { setSaving(false); Swal.fire({ icon: 'error', text: err.message }); })
+          .setActiveAcademicSession(year, term, currentUser, role);
+      };
+
+      return (
+        <div style={{marginTop:'20px'}}>
+          <div className="settings-info-message" style={{marginBottom:'18px'}}>
+            <i className="fas fa-info-circle"></i> This is the <strong>only</strong> place the active session changes. New exams, fee items, admissions, etc. default into whatever you set here. Nothing from past sessions is ever deleted — every module keeps its own Year filter so you can always go back.
+          </div>
+
+          <h3 style={{marginBottom:'14px',color:'var(--navy-primary)',fontSize:'15px',textTransform:'uppercase',letterSpacing:'0.5px'}}>
+            <i className="fas fa-calendar-check"></i> Current Active Session
+          </h3>
+          <form onSubmit={handleSave} className="form-grid" style={{marginBottom:'22px',alignItems:'flex-end'}}>
+            <div className="form-group">
+              <label>Academic Year</label>
+              <input type="text" value={year} onChange={(e) => setYear(e.target.value)} placeholder="2026-2027" />
+            </div>
+            <SearchableDropdown label="Term" icon="fas fa-calendar-day"
+              options={[{ value: 'term1', label: 'Term 1' }, { value: 'term2', label: 'Term 2' }, { value: 'term3', label: 'Term 3' }]}
+              value={term} onChange={setTerm} placeholder="Select..." />
+            <div className="form-group">
+              <button type="submit" className="btn btn-primary" disabled={saving}><i className="fas fa-save"></i> {saving ? 'Saving…' : 'Set Active Session'}</button>
+            </div>
+          </form>
+
+          <h3 style={{marginBottom:'14px',color:'var(--navy-primary)',fontSize:'15px',textTransform:'uppercase',letterSpacing:'0.5px'}}>
+            <i className="fas fa-history"></i> Records by Academic Year
+          </h3>
+          {histLoading ? <TableSkeleton rows={4} columns={5} /> : !history || history.length === 0 ? (
+            <div style={{textAlign:'center',padding:'30px',color:'#888',background:'#f8f9fa'}}>No historical records yet.</div>
+          ) : (
+            <div style={{overflowX:'auto'}}>
+              <table className="simple-table" style={{width:'100%'}}>
+                <thead><tr><th>Academic Year</th><th>Classes</th><th>Exams</th><th>Admissions</th><th>Fee Items</th></tr></thead>
+                <tbody>
+                  {history.map((h) => (
+                    <tr key={h.AcademicYear} style={h.AcademicYear === year ? { background: '#fff8e1' } : undefined}>
+                      <td style={{fontWeight:700,color:'var(--navy-primary)'}}>{h.AcademicYear}{h.AcademicYear === year && <span className="role-badge role-clerk" style={{marginLeft:'8px',fontSize:'10px'}}>Active</span>}</td>
+                      <td>{h.Classes}</td><td>{h.Exams}</td><td>{h.Admissions}</td><td>{h.FeeItems}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      );
+    }
+
     function SchoolSettingsForm({ schoolSettings, currentUser, role, onSaved }) {
       const [data, setData] = useState({
         SchoolName: '', SchoolShortName: '', SchoolLogo: '',

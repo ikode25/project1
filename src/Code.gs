@@ -332,7 +332,13 @@ var PERIOD_HEADERS = ['ID','PeriodNumber','StartTime','EndTime','IsBreak','Label
 // 37=PublicAppBaseURL (the deployed web app's public /exec URL — used to build the online
 // admission/inquiry links instead of trusting the browser's own window.location, which can be
 // wrong behind a custom domain/proxy)
-var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt','ShowOverallPositionOnReportCard','ShowSubjectAverageOnReportCard','SchoolStampURL','HeadteacherSignatureURL','AdminSignatureURL','PublicAppBaseURL'];
+// 38=ActiveTerm (term1/term2/term3 — paired with AcademicYear [col 10] as THE single "what
+// session is the school currently running" pair; shown school-wide, changed only via
+// setActiveAcademicSession(). Nothing is ever deleted when it changes — every record that
+// matters (Exams, Fee_Structure, Admissions, LessonPlans, etc.) already carries its own
+// AcademicYear/Term columns, so old sessions stay fully queryable forever; this pair only drives
+// which session NEW records default into and what the dashboard banner shows.)
+var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt','ShowOverallPositionOnReportCard','ShowSubjectAverageOnReportCard','SchoolStampURL','HeadteacherSignatureURL','AdminSignatureURL','PublicAppBaseURL','ActiveTerm'];
 
 // timetable cols (18):
 // 0=ID, 1=ClassID (FK), 2=DayOfWeek (lower: monday..sunday), 3=PeriodNumber,
@@ -11654,6 +11660,95 @@ function getReportCardByToken(token) {
   }
 }
 
+// ============== Academic Session (active year/term) & History ==============
+// The school always has exactly one "active" academic year + term (SchoolSettings.AcademicYear +
+// .ActiveTerm) — shown school-wide on every dashboard and used as the default for new records.
+// Changing it is the ONE deliberate admin action below; it never deletes or archives anything —
+// every record that matters (Classes, Exams, Admissions, Fee_Structure, etc.) already carries its
+// own AcademicYear column, so every past session stays fully queryable through the normal Year
+// filters already on those pages. getAcademicHistory() below is a quick "prove it's all still
+// there" summary across years.
+
+// any logged-in role — the active session, for the dashboard-wide banner
+function getActiveAcademicSession(currentUser, currentRole) {
+  try {
+    var res = getSchoolSettings();
+    if (!res.success) return res;
+    return { success: true, data: { AcademicYear: res.data.AcademicYear || '', ActiveTerm: res.data.ActiveTerm || 'term1' } };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// admin only — the single deliberate action that moves the whole school into a new year/term.
+// Deliberately separate from updateSchoolSettings() so saving unrelated settings (school name,
+// currency, ...) can never accidentally change the active session as a side effect.
+function setActiveAcademicSession(academicYear, term, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var ay = String(academicYear || '').trim();
+    if (!validAcademicYear(ay)) return { success: false, message: 'Academic Year must be YYYY-YYYY' };
+    var termEnum = ['term1', 'term2', 'term3'];
+    var t = String(term || '').toLowerCase();
+    if (termEnum.indexOf(t) === -1) return { success: false, message: 'Term must be Term 1, Term 2, or Term 3' };
+
+    var sh = getSheet(SETTINGS_SHEET);
+    if (!sh) return { success: false, message: 'Settings sheet not found. Run setup() first.' };
+    var data = sh.getDataRange().getValues();
+    var foundRow = -1;
+    for (var i = 1; i < data.length; i++) { if (parseInt(data[i][0], 10) === 1) { foundRow = i + 1; break; } }
+    var ts = nowIso();
+    if (foundRow === -1) {
+      var blank = new Array(SETTINGS_HEADERS.length).fill('');
+      blank[0] = 1; blank[14] = ts; blank[15] = ts;
+      sh.appendRow(blank);
+      foundRow = sh.getLastRow();
+    }
+    sh.getRange(foundRow, 11).setValue(ay);  // col 11 = AcademicYear
+    sh.getRange(foundRow, 39).setValue(t);   // col 39 = ActiveTerm
+    sh.getRange(foundRow, 16).setValue(ts);  // col 16 = UpdatedAt
+
+    addLog(currentUser, 'Active Academic Session Changed', ay + ' — ' + t);
+    return { success: true, message: 'Active session set to ' + ay + ' (' + ({ term1: 'Term 1', term2: 'Term 2', term3: 'Term 3' }[t]) + ')' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// admin only — per-academic-year record counts across the sheets that matter most, so admin can
+// see at a glance that nothing was lost when the active session moved on, and jump back into any
+// past year via each module's own Year filter (Exams, Admissions, Fee Structure already have one).
+function getAcademicHistory(currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var years = {}; // year -> { classes, exams, admissions, feeItems }
+    var bump = function (y, key) {
+      y = String(y || '').trim();
+      if (!y) return;
+      if (!years[y]) years[y] = { AcademicYear: y, Classes: 0, Exams: 0, Admissions: 0, FeeItems: 0 };
+      years[y][key]++;
+    };
+
+    var csh = getSheet(CLASSES_SHEET);
+    if (csh) { var cdata = csh.getDataRange().getValues(); for (var c = 1; c < cdata.length; c++) { if (String(cdata[c][6]) === '1') continue; bump(cdata[c][3], 'Classes'); } }
+
+    var esh = getSheet(EXAMS_SHEET);
+    if (esh) { var edata = esh.getDataRange().getValues(); for (var e = 1; e < edata.length; e++) { if (String(edata[e][11]) === '1') continue; bump(edata[e][4], 'Exams'); } }
+
+    var ash = getSheet(ADMISSIONS_SHEET);
+    if (ash) { var adata = ash.getDataRange().getValues(); for (var a = 1; a < adata.length; a++) { if (String(adata[a][52]) === '1') continue; bump(adata[a][26], 'Admissions'); } }
+
+    var fsh = getSheet(FEE_STRUCTURE_SHEET);
+    if (fsh) { var fdata = fsh.getDataRange().getValues(); for (var f = 1; f < fdata.length; f++) { if (String(fdata[f][9]) === '1') continue; bump(fdata[f][5], 'FeeItems'); } }
+
+    var out = Object.keys(years).map(function (y) { return years[y]; });
+    out.sort(function (a, b) { return String(b.AcademicYear).localeCompare(String(a.AcademicYear)); });
+    return { success: true, data: out };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
 // ============== Setup Entrypoints ==============
 function setup() { return initializeSheets(); }
 
@@ -11695,7 +11790,8 @@ function getSchoolSettings() {
             SchoolStampURL: data[i][34] || '',
             HeadteacherSignatureURL: data[i][35] || '',
             AdminSignatureURL: data[i][36] || '',
-            PublicAppBaseURL: data[i][37] || ''
+            PublicAppBaseURL: data[i][37] || '',
+            ActiveTerm: data[i][38] || 'term1'
           }
         };
       }
@@ -11733,7 +11829,8 @@ function defaultSchoolSettings() {
     SchoolStampURL: '',
     HeadteacherSignatureURL: '',
     AdminSignatureURL: '',
-    PublicAppBaseURL: ''
+    PublicAppBaseURL: '',
+    ActiveTerm: 'term1'
   };
 }
 
