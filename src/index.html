@@ -4254,6 +4254,96 @@
       );
     }
 
+    // ============== Public Job Application Form (no login — ?public=job&postingId=...) ==============
+    function PublicJobApplicationForm({ schoolSettings, postingId }) {
+      const sch = schoolSettings || {};
+      const schoolName = sch.SchoolName || 'School';
+      const schoolLogo = sch.SchoolLogo || DEFAULT_LOGO;
+      const [posting, setPosting] = useState(null);
+      const [loadError, setLoadError] = useState('');
+      const [loading, setLoading] = useState(true);
+      const [f, setF] = useState({ FullName: '', Email: '', Phone: '', ResumeURL: '', CoverLetter: '' });
+      const set = (k, v) => setF({ ...f, [k]: v });
+      const [submitting, setSubmitting] = useState(false);
+      const [done, setDone] = useState(false);
+      const [error, setError] = useState('');
+
+      useEffect(() => {
+        google.script.run
+          .withSuccessHandler((res) => { setLoading(false); if (res && res.success) setPosting(res.data); else setLoadError((res && res.message) || 'Job posting not found'); })
+          .withFailureHandler((err) => { setLoading(false); setLoadError((err && err.message) || 'Connection error'); })
+          .getPublicJobPosting(postingId);
+      }, [postingId]);
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!f.ResumeURL) { setError('Please attach your resume/CV before submitting.'); return; }
+        setSubmitting(true); setError('');
+        google.script.run
+          .withSuccessHandler((res) => {
+            setSubmitting(false);
+            if (res && res.success) setDone(true); else setError((res && res.message) || 'Could not submit — please try again.');
+          })
+          .withFailureHandler((err) => { setSubmitting(false); setError((err && err.message) || 'Connection error'); })
+          .submitJobApplication(postingId, f);
+      };
+
+      if (loading) return <div style={{padding:'60px',textAlign:'center',color:'#888'}}><i className="fas fa-spinner fa-spin"></i> Loading…</div>;
+
+      return (
+        <div className="login-container">
+          <div className="login-box">
+            <div className="login-logo-ring"><img src={schoolLogo} alt="Logo" className="login-logo" onError={(e) => e.currentTarget.style.display = 'none'} /></div>
+            <h2>{schoolName}</h2>
+            <p className="login-subtitle">Job Application</p>
+
+            {loadError ? (
+              <div className="login-error-box" style={{marginTop:'16px'}}><i className="fas fa-exclamation-circle"></i> <span>{loadError}</span></div>
+            ) : done ? (
+              <div style={{textAlign:'center',padding:'20px 10px'}}>
+                <i className="fas fa-check-circle" style={{fontSize:'40px',color:'#34a853',marginBottom:'12px',display:'block'}}></i>
+                <p style={{fontSize:'14px',color:'#333'}}>Thank you for applying for <strong>{posting.Title}</strong>! The school will review your application and contact you if shortlisted.</p>
+              </div>
+            ) : (
+              <>
+                <div style={{textAlign:'left',background:'#f8f9fa',border:'1px solid #e0e0e0',borderRadius:'6px',padding:'12px 14px',marginBottom:'16px'}}>
+                  <div style={{fontWeight:700,color:'var(--navy-primary)',fontSize:'15px'}}>{posting.Title}</div>
+                  <div style={{fontSize:'11px',color:'#888',textTransform:'capitalize',marginBottom:'6px'}}>{posting.StaffType.replace('_',' ')}{posting.Department ? ' · ' + posting.Department : ''}</div>
+                  {posting.Description && <div style={{fontSize:'12.5px',color:'#555',whiteSpace:'pre-wrap'}}>{posting.Description}</div>}
+                  {posting.Requirements && <div style={{fontSize:'12px',color:'#777',marginTop:'6px'}}><b>Requirements:</b> {posting.Requirements}</div>}
+                </div>
+
+                <form onSubmit={handleSubmit} className="login-form">
+                  <div className="form-group">
+                    <label><i className="fas fa-user"></i> Full Name *</label>
+                    <div className="login-input-wrap"><input type="text" value={f.FullName} onChange={(e) => set('FullName', e.target.value)} required autoFocus maxLength="100" /></div>
+                  </div>
+                  <div className="form-group">
+                    <label><i className="fas fa-phone"></i> Phone Number</label>
+                    <div className="login-input-wrap"><input type="text" value={f.Phone} onChange={(e) => set('Phone', e.target.value)} maxLength="20" /></div>
+                  </div>
+                  <div className="form-group">
+                    <label><i className="fas fa-envelope"></i> Email</label>
+                    <div className="login-input-wrap"><input type="email" value={f.Email} onChange={(e) => set('Email', e.target.value)} maxLength="120" /></div>
+                  </div>
+                  <FileDropzone label="Resume / CV *" fileName={f.ResumeURL ? 'Resume attached' : ''} onUploaded={(res) => set('ResumeURL', res.fileUrl)} />
+                  <div className="form-group">
+                    <label><i className="fas fa-comment-dots"></i> Cover Letter / Message</label>
+                    <textarea value={f.CoverLetter} onChange={(e) => set('CoverLetter', e.target.value)} rows="4" maxLength="1500"></textarea>
+                  </div>
+
+                  <button type="submit" className="login-submit" disabled={submitting}>
+                    {submitting ? <><i className="fas fa-spinner fa-spin"></i> Submitting…</> : <><i className="fas fa-paper-plane"></i> Submit Application</>}
+                  </button>
+                  {error && <div className="login-error-box"><i className="fas fa-exclamation-circle"></i> <span>{error}</span></div>}
+                </form>
+              </>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     // ============== Menu catalog (single source of truth for sidebar items) ==============
     // Priority key: lower = higher in list. Items with no entry for a role = hidden for that role.
     // Optional `group` lets us insert section headers (Daily / Academic / Records / Admin / Account).
@@ -4283,6 +4373,7 @@
       subjects:     { icon: 'book',             label: 'Subjects',           group: 'records' },
       assignments:  { icon: 'user-plus',        label: 'Teachers',           group: 'records' },
       payroll:      { icon: 'file-invoice-dollar', label: 'Payroll',         group: 'finance' },
+      recruitment:  { icon: 'briefcase',        label: 'Recruitment',        group: 'admin' },
       feeStructure: { icon: 'money-bill-wave',       label: 'Fee Structure',      group: 'finance' },
       feePayments:  { icon: 'money-bill-wave',  label: 'Fees Collection',    group: 'finance' },
       accounts:     { icon: 'wallet',           label: 'Daily Accounts',     group: 'finance' },
@@ -4311,7 +4402,7 @@
     //  - student: timetable + attendance + marks + notices first
     //  - parent: notices + child's attendance/marks/fees first
     const MENU_PRIORITY = {
-      admin: ['dashboard','ownerPortal','reports','admissions','admissionReqs','inquiries','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','questionBank','hallTickets','feePayments','accounts','feeStructure','payroll','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','account','settings','about'],
+      admin: ['dashboard','ownerPortal','reports','admissions','admissionReqs','inquiries','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','questionBank','hallTickets','feePayments','accounts','feeStructure','payroll','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','recruitment','account','settings','about'],
       supervisor: ['dashboard','reports','attendance','substitutes','marks','hallTickets','exams','notices','ptm','calendar','discipline','conduct','helpdesk','complaints','lessonPlans','logbook','activities','students','parents','classes','subjects','assignments','documents','timetable','account','about'],
       clerk: ['admissions','admissionReqs','students','parents','feePayments','accounts','feeStructure','sms','reports','attendance','helpdesk','complaints','documents','assets','inventory','timetable','classes','notices','calendar','account','about'],
       teacher: ['timetable','attendance','substitutes','marks','questionBank','payroll','hallTickets','exams','lessonPlans','ptm','logbook','students','discipline','conduct','activities','notices','reports','calendar','documents','complaints','classes','subjects','account','about'],
@@ -23577,6 +23668,290 @@
       );
     }
 
+    // ============== Recruitment (Job Postings & Applications) ==============
+    const JOB_APP_STATUS_COLORS = { submitted: '#0074D9', shortlisted: '#fb8c00', interview_scheduled: '#6a1b9a', rejected: '#ea4335', hired: '#34a853' };
+    const JOB_APP_STATUS_LABELS = { submitted: 'Submitted', shortlisted: 'Shortlisted', interview_scheduled: 'Interview Scheduled', rejected: 'Rejected', hired: 'Hired' };
+
+    function JobPostingModal({ posting, currentUser, role, onClose, onSave, saving }) {
+      const [f, setF] = useState({
+        Title: posting?.Title || '', StaffType: posting?.StaffType || 'teaching', Department: posting?.Department || '',
+        Description: posting?.Description || '', Requirements: posting?.Requirements || '',
+        ClosingDate: posting?.ClosingDate || '', Status: posting?.Status || 'open'
+      });
+      const set = (k, v) => setF({ ...f, [k]: v });
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'640px'}}>
+            <div className="modal-header"><h3><i className="fas fa-briefcase"></i> {posting ? 'Edit' : 'New'} Job Posting</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
+            <div className="modal-body">
+              <form onSubmit={(e) => { e.preventDefault(); onSave(f); }}>
+                <div className="form-grid">
+                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Title *</label><input type="text" value={f.Title} onChange={(e) => set('Title', e.target.value)} required placeholder="e.g. Mathematics Teacher (Basic 7-9)" /></div>
+                  <SearchableDropdown label="Staff Type" icon="fas fa-users"
+                    options={[{ value: 'teaching', label: 'Teaching Staff' }, { value: 'non_teaching', label: 'Non-Teaching Staff' }]}
+                    value={f.StaffType} onChange={(v) => set('StaffType', v)} placeholder="Select..." />
+                  <div className="form-group"><label>Department</label><input type="text" value={f.Department} onChange={(e) => set('Department', e.target.value)} placeholder="e.g. Science Department" /></div>
+                  <div className="form-group"><label>Closing Date</label><input type="date" value={f.ClosingDate} onChange={(e) => set('ClosingDate', e.target.value)} /></div>
+                  {posting && (
+                    <SearchableDropdown label="Status" icon="fas fa-toggle-on"
+                      options={[{ value: 'open', label: 'Open' }, { value: 'closed', label: 'Closed' }]}
+                      value={f.Status} onChange={(v) => set('Status', v)} placeholder="Select..." />
+                  )}
+                </div>
+                <div className="form-group"><label>Description</label><textarea value={f.Description} onChange={(e) => set('Description', e.target.value)} rows="3" /></div>
+                <div className="form-group"><label>Requirements</label><textarea value={f.Requirements} onChange={(e) => set('Requirements', e.target.value)} rows="2" /></div>
+                <div className="form-actions">
+                  <button type="submit" className="btn btn-primary" disabled={saving}><i className="fas fa-save"></i> {saving ? 'Saving…' : 'Save'}</button>
+                  <button type="button" className="btn btn-secondary" onClick={onClose}><i className="fas fa-times"></i> Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function JobApplicationDetailModal({ application, currentUser, role, onClose, onSave, saving }) {
+      const dtLocal = (v) => v ? String(v).slice(0, 16) : '';
+      const [status, setStatus] = useState(application.Status || 'submitted');
+      const [interviewDate, setInterviewDate] = useState(dtLocal(application.InterviewDate));
+      const [interviewNotes, setInterviewNotes] = useState(application.InterviewNotes || '');
+      const [adminNotes, setAdminNotes] = useState(application.AdminNotes || '');
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'620px'}}>
+            <div className="modal-header"><h3><i className="fas fa-user-tie"></i> {application.FullName}</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
+            <div className="modal-body">
+              <div className="rc-info" style={{marginBottom:'14px'}}>
+                <div><b>Applying for:</b> {application.JobTitle}</div>
+                <div><b>Phone:</b> {application.Phone || '—'}</div>
+                <div><b>Email:</b> {application.Email || '—'}</div>
+                <div><b>Applied:</b> {new Date(application.CreatedAt).toLocaleDateString()}</div>
+                {application.ResumeURL && <div style={{gridColumn:'1 / -1'}}><a href={application.ResumeURL} target="_blank" rel="noopener noreferrer"><i className="fas fa-file-pdf"></i> View Resume/CV</a></div>}
+              </div>
+              {application.CoverLetter && <div className="rc-remarks" style={{marginBottom:'14px'}}><b>Cover Letter:</b><br />{application.CoverLetter}</div>}
+
+              <div className="form-group">
+                <label>Status</label>
+                <select value={status} onChange={(e) => setStatus(e.target.value)} style={{width:'100%',padding:'10px 12px',border:'1px solid #ccc'}}>
+                  {JOB_APPLICATION_STATUSES.map(s => <option key={s} value={s}>{JOB_APP_STATUS_LABELS[s]}</option>)}
+                </select>
+              </div>
+              {status === 'interview_scheduled' && (
+                <div className="form-group"><label>Interview Date &amp; Time</label><input type="datetime-local" value={interviewDate} onChange={(e) => setInterviewDate(e.target.value)} /></div>
+              )}
+              <div className="form-group"><label>Interview Notes</label><textarea value={interviewNotes} onChange={(e) => setInterviewNotes(e.target.value)} rows="2" /></div>
+              <div className="form-group"><label>Internal Admin Notes</label><textarea value={adminNotes} onChange={(e) => setAdminNotes(e.target.value)} rows="2" placeholder="Not visible to the applicant" /></div>
+
+              <div className="form-actions">
+                <button className="btn btn-primary" disabled={saving} onClick={() => onSave(application.ID, { Status: status, InterviewDate: status === 'interview_scheduled' ? interviewDate : '', InterviewNotes: interviewNotes, AdminNotes: adminNotes })}>
+                  <i className="fas fa-save"></i> {saving ? 'Saving…' : 'Save'}
+                </button>
+                <button className="btn btn-secondary" onClick={onClose}><i className="fas fa-times"></i> Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function RecruitmentView({ currentUser, role }) {
+      const [tab, setTab] = useState('postings'); // 'postings' | 'applications' | 'interviews'
+
+      const { data: postingsData, error: postError, isLoading: postLoading, mutate: loadPostings } =
+        useSWR('getAllJobPostings', () => swrFetcher('getAllJobPostings', currentUser, role));
+      const postings = postingsData || [];
+      const [showPostingModal, setShowPostingModal] = useState(false);
+      const [editingPosting, setEditingPosting] = useState(null);
+      const [postingSaving, setPostingSaving] = useState(false);
+
+      const { data: appsData, error: appError, isLoading: appLoading, mutate: loadApps } =
+        useSWR('getAllJobApplications', () => swrFetcher('getAllJobApplications', null, currentUser, role));
+      const applications = appsData || [];
+      const [selectedApp, setSelectedApp] = useState(null);
+      const [appSaving, setAppSaving] = useState(false);
+      const [statusFilter, setStatusFilter] = useState('');
+
+      const interviews = applications.filter(a => a.Status === 'interview_scheduled' && a.InterviewDate)
+        .sort((a, b) => new Date(a.InterviewDate) - new Date(b.InterviewDate));
+
+      const copyPostingLink = (posting) => {
+        const url = publicAppLink('?public=job&postingId=' + posting.ID);
+        navigator.clipboard.writeText(url).then(() => {
+          Swal.fire({ icon: 'success', text: 'Application link copied for "' + posting.Title + '"', timer: 1800, showConfirmButton: false });
+        }).catch(() => Swal.fire({ icon: 'info', title: 'Application Link', text: url }));
+      };
+
+      const handleSavePosting = (data) => {
+        setPostingSaving(true);
+        const action = editingPosting ? 'updateJobPosting' : 'addJobPosting';
+        const params = editingPosting ? [editingPosting.ID, data, currentUser, role] : [data, currentUser, role];
+        google.script.run
+          .withSuccessHandler((res) => {
+            setPostingSaving(false);
+            if (res.success) { setShowPostingModal(false); setEditingPosting(null); Swal.fire({ icon: 'success', text: res.message, timer: 1500, showConfirmButton: false }); loadPostings(); }
+            else Swal.fire({ icon: 'error', text: res.message });
+          })
+          .withFailureHandler((err) => { setPostingSaving(false); Swal.fire({ icon: 'error', text: err.message }); })[action](...params);
+      };
+
+      const handleDeletePosting = (p) => {
+        Swal.fire({ icon: 'warning', title: 'Delete posting?', text: p.Title, showCancelButton: true, confirmButtonColor: '#ea4335' })
+          .then((rr) => {
+            if (rr.isConfirmed) {
+              google.script.run.withSuccessHandler((res) => {
+                Swal.fire({ icon: res.success ? 'success' : 'error', text: res.message, timer: 1500, showConfirmButton: false });
+                loadPostings();
+              }).deleteJobPosting(p.ID, currentUser, role);
+            }
+          });
+      };
+
+      const handleSaveApp = (id, data) => {
+        setAppSaving(true);
+        google.script.run
+          .withSuccessHandler((res) => {
+            setAppSaving(false);
+            if (res.success) { setSelectedApp(null); Swal.fire({ icon: 'success', text: res.message, timer: 1500, showConfirmButton: false }); loadApps(); }
+            else Swal.fire({ icon: 'error', text: res.message });
+          })
+          .withFailureHandler((err) => { setAppSaving(false); Swal.fire({ icon: 'error', text: err.message }); })
+          .updateJobApplication(id, data, currentUser, role);
+      };
+
+      const handleDeleteApp = (a) => {
+        Swal.fire({ icon: 'warning', title: 'Delete application?', text: a.FullName, showCancelButton: true, confirmButtonColor: '#ea4335' })
+          .then((rr) => {
+            if (rr.isConfirmed) {
+              google.script.run.withSuccessHandler((res) => {
+                Swal.fire({ icon: res.success ? 'success' : 'error', text: res.message, timer: 1500, showConfirmButton: false });
+                loadApps();
+              }).deleteJobApplication(a.ID, currentUser, role);
+            }
+          });
+      };
+
+      const filteredApps = statusFilter ? applications.filter(a => a.Status === statusFilter) : applications;
+
+      return (
+        <div className="data-section">
+          <div className="section-header">
+            <h2><i className="fas fa-briefcase"></i> Recruitment</h2>
+          </div>
+          <div style={{display:'flex',gap:'8px',marginBottom:'16px'}}>
+            <button className={`btn btn-sm ${tab === 'postings' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('postings')}><i className="fas fa-briefcase"></i> Job Postings ({postings.length})</button>
+            <button className={`btn btn-sm ${tab === 'applications' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('applications')}><i className="fas fa-file-alt"></i> Applications ({applications.length})</button>
+            <button className={`btn btn-sm ${tab === 'interviews' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('interviews')}><i className="fas fa-calendar-check"></i> Interviews ({interviews.length})</button>
+          </div>
+
+          {tab === 'postings' && (
+            <>
+              <div className="section-header" style={{marginBottom:'12px'}}>
+                <div></div>
+                <button className="btn btn-success" onClick={() => { setEditingPosting(null); setShowPostingModal(true); }}><i className="fas fa-plus"></i> New Job Posting</button>
+              </div>
+              {postError && !postLoading && postings.length === 0 && (
+                <div className="settings-info-message" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>Couldn't load job postings — {String((postError && postError.message) || postError)}.</div>
+              )}
+              {postLoading && <TableSkeleton rows={4} columns={5} />}
+              {!postLoading && postings.length === 0 && (
+                <div style={{textAlign:'center',padding:'40px',color:'#888',background:'#f8f9fa'}}>No job postings yet. Click "New Job Posting" to start recruiting.</div>
+              )}
+              {!postLoading && postings.length > 0 && (
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:'14px'}}>
+                  {postings.map((p) => (
+                    <div key={p.ID} style={{border:'1px solid #e0e0e0',borderRadius:'8px',padding:'14px',background:'#fff'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
+                        <div style={{fontWeight:700,color:'var(--navy-primary)'}}>{p.Title}</div>
+                        <span className={`status-badge ${p.Status === 'open' ? 'status-active' : 'status-inactive'}`} style={{textTransform:'capitalize'}}>{p.Status}</span>
+                      </div>
+                      <div style={{fontSize:'11px',color:'#888',textTransform:'capitalize',margin:'4px 0 10px'}}>{p.StaffType.replace('_',' ')}{p.Department ? ' · ' + p.Department : ''}</div>
+                      <div style={{fontSize:'12px',color:'#555'}}><i className="fas fa-users" style={{width:16,color:'var(--navy-accent)'}}></i> {p.ApplicationCount} application{p.ApplicationCount === 1 ? '' : 's'}</div>
+                      <div style={{display:'flex',gap:8,marginTop:12,flexWrap:'wrap'}}>
+                        <button className="action-icon edit-icon" onClick={() => { setEditingPosting(p); setShowPostingModal(true); }} title="Edit"><i className="fas fa-edit"></i></button>
+                        <button className="action-icon" onClick={() => copyPostingLink(p)} title="Copy Application Link"><i className="fas fa-link"></i></button>
+                        <button className="action-icon delete-icon" onClick={() => handleDeletePosting(p)} title="Delete"><i className="fas fa-trash"></i></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {tab === 'applications' && (
+            <>
+              <div style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
+                <button className={`btn btn-sm ${statusFilter === '' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setStatusFilter('')}>All ({applications.length})</button>
+                {JOB_APPLICATION_STATUSES.map(s => (
+                  <button key={s} className={`btn btn-sm ${statusFilter === s ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setStatusFilter(s)}>
+                    {JOB_APP_STATUS_LABELS[s]} ({applications.filter(a => a.Status === s).length})
+                  </button>
+                ))}
+              </div>
+              {appError && !appLoading && applications.length === 0 && (
+                <div className="settings-info-message" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>Couldn't load applications — {String((appError && appError.message) || appError)}.</div>
+              )}
+              {appLoading && <TableSkeleton rows={5} columns={5} />}
+              {!appLoading && applications.length === 0 && (
+                <div style={{textAlign:'center',padding:'40px',color:'#888',background:'#f8f9fa'}}>No applications yet.</div>
+              )}
+              {!appLoading && filteredApps.length > 0 && (
+                <div style={{overflowX:'auto'}}>
+                  <table className="simple-table" style={{width:'100%'}}>
+                    <thead><tr><th>Applicant</th><th>Applying For</th><th>Contact</th><th>Applied</th><th>Status</th><th>Actions</th></tr></thead>
+                    <tbody>
+                      {filteredApps.map((a) => (
+                        <tr key={a.ID}>
+                          <td style={{fontWeight:600}}>{a.FullName}</td>
+                          <td>{a.JobTitle}</td>
+                          <td style={{fontSize:'12px'}}>{a.Phone}{a.Phone && a.Email && <br />}{a.Email}</td>
+                          <td style={{fontSize:'12px',color:'#888'}}>{new Date(a.CreatedAt).toLocaleDateString()}</td>
+                          <td><span className="role-badge" style={{background:JOB_APP_STATUS_COLORS[a.Status],color:'#fff'}}>{JOB_APP_STATUS_LABELS[a.Status]}</span></td>
+                          <td style={{whiteSpace:'nowrap'}}>
+                            <button className="action-icon edit-icon" title="Review" onClick={() => setSelectedApp(a)}><i className="fas fa-eye"></i></button>
+                            <button className="action-icon delete-icon" title="Delete" onClick={() => handleDeleteApp(a)}><i className="fas fa-trash"></i></button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+
+          {tab === 'interviews' && (
+            <>
+              {interviews.length === 0 ? (
+                <div style={{textAlign:'center',padding:'40px',color:'#888',background:'#f8f9fa'}}>No interviews scheduled. Set an application's status to "Interview Scheduled" to add one here.</div>
+              ) : (
+                <div style={{overflowX:'auto'}}>
+                  <table className="simple-table" style={{width:'100%'}}>
+                    <thead><tr><th>Date &amp; Time</th><th>Applicant</th><th>Position</th><th>Notes</th><th>Actions</th></tr></thead>
+                    <tbody>
+                      {interviews.map((a) => (
+                        <tr key={a.ID}>
+                          <td style={{fontWeight:600,whiteSpace:'nowrap'}}>{new Date(a.InterviewDate).toLocaleString()}</td>
+                          <td>{a.FullName}</td>
+                          <td>{a.JobTitle}</td>
+                          <td style={{fontSize:'12px',color:'#888'}}>{a.InterviewNotes || '—'}</td>
+                          <td><button className="action-icon edit-icon" title="Review" onClick={() => setSelectedApp(a)}><i className="fas fa-eye"></i></button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+
+          {showPostingModal && <JobPostingModal posting={editingPosting} currentUser={currentUser} role={role} saving={postingSaving} onClose={() => { setShowPostingModal(false); setEditingPosting(null); }} onSave={handleSavePosting} />}
+          {selectedApp && <JobApplicationDetailModal application={selectedApp} currentUser={currentUser} role={role} saving={appSaving} onClose={() => setSelectedApp(null)} onSave={handleSaveApp} />}
+        </div>
+      );
+    }
+
     // ============== Helpdesk Tickets ==============
     function HelpdeskView({ currentUser, role }) {
       const r = String(role).toLowerCase();
@@ -29422,6 +29797,7 @@
       const canSeeGradingSystem = r === 'admin';
       const canSeeQuestionBank = r === 'admin' || r === 'teacher';
       const canSeePayroll = r === 'admin' || r === 'teacher';
+      const canSeeRecruitment = r === 'admin';
       const canSeeAdmissionReqs = r === 'admin' || r === 'clerk';
       const canSeeInquiries = r === 'admin';
       const canSeeOwnerPortal = r === 'admin' || r === 'owner';
@@ -29504,6 +29880,8 @@
           return canSeeQuestionBank ? <QuestionBankView currentUser={user} role={role} /> : denied('Question Bank');
         case 'payroll':
           return canSeePayroll ? <PayrollView currentUser={user} role={role} /> : denied('Payroll');
+        case 'recruitment':
+          return canSeeRecruitment ? <RecruitmentView currentUser={user} role={role} /> : denied('Recruitment');
         case 'admissionReqs':
           return canSeeAdmissionReqs ? <AdmissionRequirementsView currentUser={user} role={role} schoolSettings={schoolSettings} /> : denied('Admission Requirements');
         case 'inquiries':
@@ -29940,6 +30318,7 @@
       if (publicPage === 'inquiry') return <PublicInquiryForm schoolSettings={schoolSettings} />;
       if (publicPage === 'admission') return <PublicAdmissionForm schoolSettings={schoolSettings} />;
       if (publicPage === 'reportcard') return <PublicReportCardPage schoolSettings={schoolSettings} shareToken={publicParams.get('token')} />;
+      if (publicPage === 'job') return <PublicJobApplicationForm schoolSettings={schoolSettings} postingId={publicParams.get('postingId')} />;
 
       return (
         <div>

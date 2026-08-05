@@ -11749,6 +11749,266 @@ function getAcademicHistory(currentUser, currentRole) {
   }
 }
 
+// ============== Recruitment (Job Postings & Applications) ==============
+var JOB_POSTINGS_SHEET = 'Job_Postings';
+var JOB_POSTING_HEADERS = ['ID', 'Title', 'StaffType', 'Department', 'Description', 'Requirements', 'Status', 'ClosingDate', 'CreatedBy', 'IsDeleted', 'CreatedAt', 'UpdatedAt'];
+var JOB_APPLICATIONS_SHEET = 'Job_Applications';
+var JOB_APPLICATION_HEADERS = ['ID', 'JobPostingID', 'FullName', 'Email', 'Phone', 'ResumeURL', 'CoverLetter', 'Status', 'InterviewDate', 'InterviewNotes', 'AdminNotes', 'IsDeleted', 'CreatedAt', 'UpdatedAt'];
+var JOB_APPLICATION_STATUSES = ['submitted', 'shortlisted', 'interview_scheduled', 'rejected', 'hired'];
+
+function _ensureJobPostingsSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(JOB_POSTINGS_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(JOB_POSTINGS_SHEET);
+    sh.appendRow(JOB_POSTING_HEADERS);
+    sh.getRange(1, 1, 1, JOB_POSTING_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+function _ensureJobApplicationsSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(JOB_APPLICATIONS_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(JOB_APPLICATIONS_SHEET);
+    sh.appendRow(JOB_APPLICATION_HEADERS);
+    sh.getRange(1, 1, 1, JOB_APPLICATION_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function _rowToJobPosting(row) {
+  return {
+    ID: row[0], Title: row[1] || '', StaffType: row[2] || 'teaching', Department: row[3] || '',
+    Description: row[4] || '', Requirements: row[5] || '', Status: row[6] || 'open',
+    ClosingDate: row[7] ? toIso(row[7]).split('T')[0] : '', CreatedAt: toIso(row[10]), UpdatedAt: toIso(row[11])
+  };
+}
+
+// admin — full management list
+function getAllJobPostings(currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var sh = _ensureJobPostingsSheet();
+    var data = sh.getDataRange().getValues();
+    var psh = _ensureJobApplicationsSheet();
+    var pdata = psh.getDataRange().getValues();
+    var counts = {};
+    for (var p = 1; p < pdata.length; p++) {
+      if (String(pdata[p][11]) === '1') continue;
+      var pid = pdata[p][1];
+      counts[pid] = (counts[pid] || 0) + 1;
+    }
+    var out = [];
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][9]) === '1') continue;
+      var posting = _rowToJobPosting(data[i]);
+      posting.ApplicationCount = counts[posting.ID] || 0;
+      out.push(posting);
+    }
+    out.sort(function (a, b) { return String(b.CreatedAt).localeCompare(String(a.CreatedAt)); });
+    return { success: true, data: out };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// public — no auth. Bare details of one OPEN posting, for the public application page.
+function getPublicJobPosting(id) {
+  try {
+    var idn = parseInt(id, 10);
+    if (isNaN(idn)) return { success: false, message: 'Invalid posting' };
+    var sh = _ensureJobPostingsSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] !== idn || String(data[i][9]) === '1') continue;
+      var posting = _rowToJobPosting(data[i]);
+      if (posting.Status !== 'open') return { success: false, message: 'This position is no longer accepting applications.' };
+      return { success: true, data: posting };
+    }
+    return { success: false, message: 'Job posting not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function addJobPosting(d, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var title = String(d.Title || '').trim();
+    if (!title) return { success: false, message: 'Title is required' };
+    var staffType = String(d.StaffType || '').toLowerCase() === 'non_teaching' ? 'non_teaching' : 'teaching';
+    var closing = String(d.ClosingDate || '').trim();
+    if (closing && !/^\d{4}-\d{2}-\d{2}$/.test(closing)) return { success: false, message: 'ClosingDate must be YYYY-MM-DD' };
+
+    var sh = _ensureJobPostingsSheet();
+    var ts = nowIso(), id = nextRowId(sh);
+    sh.appendRow([
+      id, title, staffType, String(d.Department || '').trim(), String(d.Description || '').trim(), String(d.Requirements || '').trim(),
+      'open', closing ? toIso(closing) : '', getCurrentUserId(currentUser) || '', '0', ts, ts
+    ]);
+    addLog(currentUser, 'Job Posting Added', title);
+    return { success: true, message: 'Job posting created', id: id };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function updateJobPosting(id, d, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var idn = parseInt(id, 10);
+    var sh = _ensureJobPostingsSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] !== idn || String(data[i][9]) === '1') continue;
+      var row = i + 1;
+      if (d.Title !== undefined) sh.getRange(row, 2).setValue(String(d.Title || '').trim());
+      if (d.StaffType !== undefined) sh.getRange(row, 3).setValue(String(d.StaffType).toLowerCase() === 'non_teaching' ? 'non_teaching' : 'teaching');
+      if (d.Department !== undefined) sh.getRange(row, 4).setValue(String(d.Department || '').trim());
+      if (d.Description !== undefined) sh.getRange(row, 5).setValue(String(d.Description || '').trim());
+      if (d.Requirements !== undefined) sh.getRange(row, 6).setValue(String(d.Requirements || '').trim());
+      if (d.Status !== undefined && ['open', 'closed'].indexOf(String(d.Status).toLowerCase()) !== -1) sh.getRange(row, 7).setValue(String(d.Status).toLowerCase());
+      if (d.ClosingDate !== undefined) sh.getRange(row, 8).setValue(d.ClosingDate ? toIso(d.ClosingDate) : '');
+      sh.getRange(row, 12).setValue(nowIso());
+      addLog(currentUser, 'Job Posting Updated', '#' + idn);
+      return { success: true, message: 'Job posting updated' };
+    }
+    return { success: false, message: 'Job posting not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function deleteJobPosting(id, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var idn = parseInt(id, 10);
+    var sh = _ensureJobPostingsSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] !== idn) continue;
+      sh.getRange(i + 1, 10).setValue('1');
+      sh.getRange(i + 1, 12).setValue(nowIso());
+      addLog(currentUser, 'Job Posting Deleted', '#' + idn);
+      return { success: true, message: 'Job posting deleted' };
+    }
+    return { success: false, message: 'Job posting not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function _rowToJobApplication(row, postingMap) {
+  var pid = row[1];
+  return {
+    ID: row[0], JobPostingID: pid, JobTitle: postingMap && postingMap[pid] ? postingMap[pid].Title : '— deleted posting —',
+    FullName: row[2] || '', Email: row[3] || '', Phone: row[4] || '', ResumeURL: row[5] || '', CoverLetter: row[6] || '',
+    Status: row[7] || 'submitted', InterviewDate: row[8] ? toIso(row[8]) : '', InterviewNotes: row[9] || '', AdminNotes: row[10] || '',
+    CreatedAt: toIso(row[12]), UpdatedAt: toIso(row[13])
+  };
+}
+
+// public — no auth. Applies to one open posting; resume is uploaded separately via
+// uploadDocumentFile() first (same pattern as Documents), this just records the resulting URL.
+function submitJobApplication(postingId, d) {
+  try {
+    var pid = parseInt(postingId, 10);
+    if (isNaN(pid)) return { success: false, message: 'Invalid job posting' };
+    var check = getPublicJobPosting(pid);
+    if (!check.success) return check;
+
+    var fullName = String((d && d.FullName) || '').trim();
+    var phone = String((d && d.Phone) || '').trim();
+    var email = String((d && d.Email) || '').trim();
+    if (!fullName) return { success: false, message: 'Name is required' };
+    if (!phone && !email) return { success: false, message: 'A phone number or email is required so the school can reach you' };
+
+    var sh = _ensureJobApplicationsSheet();
+    var ts = nowIso(), id = nextRowId(sh);
+    sh.appendRow([
+      id, pid, fullName, email, phone, String((d && d.ResumeURL) || '').trim(), String((d && d.CoverLetter) || '').trim(),
+      'submitted', '', '', '', '0', ts, ts
+    ]);
+    return { success: true, message: 'Thank you — your application has been received. The school will contact you if shortlisted.' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// admin — all applications, optionally filtered to one posting
+function getAllJobApplications(jobPostingId, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var psh = _ensureJobPostingsSheet();
+    var pdata = psh.getDataRange().getValues();
+    var postingMap = {};
+    for (var p = 1; p < pdata.length; p++) postingMap[pdata[p][0]] = _rowToJobPosting(pdata[p]);
+
+    var sh = _ensureJobApplicationsSheet();
+    var data = sh.getDataRange().getValues();
+    var filterPid = jobPostingId ? parseInt(jobPostingId, 10) : null;
+    var out = [];
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][11]) === '1') continue;
+      if (filterPid && parseInt(data[i][1], 10) !== filterPid) continue;
+      out.push(_rowToJobApplication(data[i], postingMap));
+    }
+    out.sort(function (a, b) { return String(b.CreatedAt).localeCompare(String(a.CreatedAt)); });
+    return { success: true, data: out };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// admin — status changes + interview scheduling all go through here
+function updateJobApplication(id, d, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var idn = parseInt(id, 10);
+    var sh = _ensureJobApplicationsSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] !== idn || String(data[i][11]) === '1') continue;
+      var row = i + 1;
+      if (d.Status !== undefined) {
+        if (JOB_APPLICATION_STATUSES.indexOf(String(d.Status).toLowerCase()) === -1) return { success: false, message: 'Invalid status' };
+        sh.getRange(row, 8).setValue(String(d.Status).toLowerCase());
+      }
+      if (d.InterviewDate !== undefined) sh.getRange(row, 9).setValue(d.InterviewDate ? new Date(d.InterviewDate).toISOString() : '');
+      if (d.InterviewNotes !== undefined) sh.getRange(row, 10).setValue(String(d.InterviewNotes || '').trim());
+      if (d.AdminNotes !== undefined) sh.getRange(row, 11).setValue(String(d.AdminNotes || '').trim());
+      sh.getRange(row, 14).setValue(nowIso());
+      addLog(currentUser, 'Job Application Updated', '#' + idn);
+      return { success: true, message: 'Application updated' };
+    }
+    return { success: false, message: 'Application not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function deleteJobApplication(id, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var idn = parseInt(id, 10);
+    var sh = _ensureJobApplicationsSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] !== idn) continue;
+      sh.getRange(i + 1, 12).setValue('1');
+      sh.getRange(i + 1, 14).setValue(nowIso());
+      addLog(currentUser, 'Job Application Deleted', '#' + idn);
+      return { success: true, message: 'Application deleted' };
+    }
+    return { success: false, message: 'Application not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
 // ============== Setup Entrypoints ==============
 function setup() { return initializeSheets(); }
 
