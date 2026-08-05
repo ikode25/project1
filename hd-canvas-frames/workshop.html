@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workshop - Production Management</title>
+  <script>
+    // Surface any runtime error instead of leaving the page blank, so problems are diagnosable.
+    window.onerror = function(msg, url, line, col, error) {
+      const container = document.createElement('div');
+      container.style.cssText = 'color:red; padding:30px; background:white; font-family:sans-serif; z-index:999999; position:fixed; top:10px; left:10px; right:10px; border:4px solid red; border-radius:8px; box-shadow: 0 0 20px rgba(0,0,0,0.5);';
+      container.innerHTML = '<h3 style="margin-top:0;font-size:18px;">JavaScript Runtime Error</h3>' +
+                            '<p style="margin:8px 0;"><strong>Error:</strong> ' + msg + '</p>' +
+                            '<p style="margin:8px 0;"><strong>Location:</strong> ' + url + ' (Line ' + line + ', Col ' + col + ')</p>';
+      if (document.documentElement) {
+        document.documentElement.appendChild(container);
+      }
+      return false;
+    };
+    window.addEventListener('unhandledrejection', function(event) {
+      const container = document.createElement('div');
+      container.style.cssText = 'color:red; padding:30px; background:white; font-family:sans-serif; z-index:999999; position:fixed; top:10px; left:10px; right:10px; border:4px solid red; border-radius:8px; box-shadow: 0 0 20px rgba(0,0,0,0.5);';
+      container.innerHTML = '<h3 style="margin-top:0;font-size:18px;">Unhandled Promise Rejection</h3>' +
+                            '<p style="margin:8px 0;"><strong>Reason:</strong> ' + event.reason + '</p>';
+      if (document.documentElement) {
+        document.documentElement.appendChild(container);
+      }
+    });
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet"/>
+  <style>
+    [v-cloak] { display: none; }
+    .pulse-animation {
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+    /* Custom scrollbar */
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 3px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
+    
+    /* Pulse animation */
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.5;
+      }
+    }
+    .animate-pulse {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    
+    /* Shimmer animation */
+    @keyframes shimmer {
+      0% {
+        transform: translateX(-100%);
+      }
+      100% {
+        transform: translateX(100%);
+      }
+    }
+    .animate-shimmer {
+      animation: shimmer 3s infinite;
+    }
+
+    /* Light Mode style translations */
+    body.light-mode {
+      background-color: #f3f4f6 !important;
+      color: #111827 !important;
+    }
+    /* NOTE: Tailwind arbitrary-value classes (e.g. bg-[#121212]) contain [ ] # characters that
+       MUST be escaped in a plain CSS selector - otherwise the browser drops the WHOLE rule as
+       invalid. That's why light mode used to look unreadable: these overrides never applied. */
+    body.light-mode .bg-\[\#121212\],
+    body.light-mode .bg-\[\#1a1a1a\],
+    body.light-mode .bg-\[\#2a2a2a\] {
+      background-color: #ffffff !important;
+      color: #1f2937 !important;
+      border-color: #e5e7eb !important;
+    }
+    body.light-mode .text-white {
+      color: #111827 !important;
+    }
+    body.light-mode .text-gray-200,
+    body.light-mode .text-gray-300 {
+      color: #374151 !important;
+    }
+    body.light-mode .text-gray-450,
+    body.light-mode .text-gray-400,
+    body.light-mode .text-gray-500 {
+      color: #4b5563 !important;
+    }
+    body.light-mode .border-gray-700,
+    body.light-mode .border-gray-800 {
+      border-color: #e5e7eb !important;
+    }
+    body.light-mode input,
+    body.light-mode select,
+    body.light-mode textarea {
+      background-color: #ffffff !important;
+      color: #111827 !important;
+      border-color: #d1d5db !important;
+    }
+    body.light-mode input::placeholder,
+    body.light-mode textarea::placeholder {
+      color: #9ca3af !important;
+    }
+    body.light-mode .bg-yellow-400,
+    body.light-mode .bg-yellow-500 {
+      color: #111827 !important;
+    }
+    body.light-mode .bg-gray-700,
+    body.light-mode .bg-gray-800 {
+      background-color: #e5e7eb !important;
+      color: #1f2937 !important;
+    }
+    body.light-mode .bg-gray-700:hover,
+    body.light-mode .bg-gray-800:hover {
+      background-color: #d1d5db !important;
+    }
+  </style>
+</head>
+<body class="bg-[#0d0d0d] text-white">
+  <div id="app" v-cloak>
+    <!-- Login Screen -->
+    <div v-if="!isLoggedIn" class="min-h-screen flex items-center justify-center bg-[#0d0d0d]">
+      <div class="bg-[#121212] p-8 rounded-xl shadow-[0_10px_15px_-3px_rgba(0,0,0,0.7)] w-full max-w-md">
+        <div class="text-center mb-6">
+          <i class="fas fa-tools text-6xl text-yellow-400 mb-4"></i>
+          <h2 class="text-3xl font-bold text-yellow-400">Workshop Login</h2>
+        </div>
+        
+        <form @submit.prevent="handleLogin">
+          <div class="mb-4">
+            <label class="block text-gray-400 text-sm font-bold mb-2">Username</label>
+            <input 
+              v-model="loginForm.username"
+              type="text" 
+              required
+              placeholder="Enter your username"
+              class="w-full px-4 py-3 rounded-lg bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none">
+          </div>
+          
+          <div class="mb-6">
+            <label class="block text-gray-400 text-sm font-bold mb-2">Password</label>
+            <input 
+              v-model="loginForm.password"
+              type="password" 
+              required
+              placeholder="Enter your password"
+              class="w-full px-4 py-3 rounded-lg bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none">
+          </div>
+          
+          <div v-if="loginError" class="mb-4 p-3 bg-red-900 text-red-200 rounded-lg text-sm">
+            <i class="fas fa-exclamation-circle mr-2"></i>{{ loginError }}
+          </div>
+          
+          <button 
+            type="submit"
+            :disabled="loggingIn"
+            class="w-full bg-yellow-400 text-black font-bold py-3 px-4 rounded-lg hover:bg-yellow-300 transition-colors disabled:opacity-50">
+            <span v-if="!loggingIn">Login to Workshop</span>
+            <span v-else><i class="fas fa-spinner fa-spin mr-2"></i>Logging in...</span>
+          </button>
+        </form>
+        
+        <p class="text-gray-500 text-sm mt-4 text-center">
+          Workshop Staff Portal
+        </p>
+      </div>
+    </div>
+
+    <!-- Workshop Dashboard -->
+    <div v-else class="min-h-screen">
+      <!-- Top Header with Live Time -->
+      <div class="bg-[#121212] border-b border-gray-800 shadow-lg">
+        <div class="container mx-auto px-4 py-4">
+          <div class="flex justify-between items-center">
+            <div>
+              <h1 class="text-2xl font-bold text-yellow-400">
+                <i class="fas fa-tools mr-2"></i>Workshop Production Dashboard
+              </h1>
+              <p class="text-sm text-gray-400">Welcome, {{ currentUser.name }}</p>
+            </div>
+            
+            <div class="flex items-center gap-4">
+              <!-- Live Date & Time -->
+              <div class="text-right">
+                <div class="text-2xl font-bold font-mono text-yellow-400">{{ currentTime }}</div>
+                <div class="text-sm text-gray-400">{{ currentDate }}</div>
+              </div>
+
+              <!-- Theme Toggle -->
+              <button 
+                @click="toggleTheme" 
+                class="w-10 h-10 rounded-lg flex items-center justify-center bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+                title="Toggle Theme">
+                <i :class="['fas text-base', theme === 'dark' ? 'fa-sun text-yellow-400' : 'fa-moon text-blue-400']"></i>
+              </button>
+              
+              <button 
+                @click="logout"
+                class="bg-red-600 hover:bg-red-700 px-4 py-2 rounded-lg transition-colors">
+                <i class="fas fa-sign-out-alt mr-2"></i>Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Navigation -->
+      <div class="bg-[#121212] border-b border-gray-800 shadow-sm sticky top-0 z-40">
+        <div class="container mx-auto px-2 sm:px-4">
+          <div class="flex space-x-1 overflow-x-auto scrollbar-hide">
+            <button 
+              @click="activeTab = 'pending'"
+              :class="['px-3 sm:px-6 py-3 font-semibold transition-colors whitespace-nowrap flex-shrink-0', 
+                       activeTab === 'pending' 
+                         ? 'bg-yellow-400 text-black shadow-lg' 
+                         : 'text-gray-400 hover:bg-[#1a1a1a] hover:text-white']">
+              <i class="fas fa-clock mr-2"></i>
+              New Orders 
+              <span v-if="pendingCount > 0" class="ml-1 sm:ml-2 bg-red-500 text-white px-2 py-1 rounded-full text-xs font-bold animate-pulse">
+                {{ pendingCount }}
+              </span>
+            </button>
+            
+            <button 
+              @click="activeTab = 'preparing'"
+              :class="['px-3 sm:px-6 py-3 font-semibold transition-colors whitespace-nowrap flex-shrink-0', 
+                       activeTab === 'preparing' 
+                         ? 'bg-yellow-400 text-black shadow-lg' 
+                         : 'text-gray-400 hover:bg-[#1a1a1a] hover:text-white']">
+              <i class="fas fa-tools mr-2"></i>
+              Framing in Progress 
+              <span v-if="preparingCount > 0" class="ml-1 sm:ml-2 bg-orange-500 text-white px-2 py-1 rounded-full text-xs font-bold animate-pulse">
+                {{ preparingCount }}
+              </span>
+            </button>
+            
+            <button 
+              @click="activeTab = 'history'"
+              :class="['px-3 sm:px-6 py-3 font-semibold transition-colors whitespace-nowrap flex-shrink-0', 
+                       activeTab === 'history' 
+                         ? 'bg-yellow-400 text-black shadow-lg' 
+                         : 'text-gray-400 hover:bg-[#1a1a1a] hover:text-white']">
+              <i class="fas fa-history mr-2"></i>
+              Framing History
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Content -->
+      <div class="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
+        <!-- Pending Orders Tab -->
+        <div v-if="activeTab === 'pending'">
+          <h2 class="text-2xl font-bold mb-4 text-gray-800">
+            <i class="fas fa-hourglass-half text-orange-500 mr-2"></i>
+            Confirmed Orders - Ready to Frame
+          </h2>
+          
+          <div v-if="pendingOrders.length === 0" class="text-center py-12 bg-white rounded-lg shadow">
+            <i class="fas fa-check-circle text-6xl text-green-500 mb-4"></i>
+            <p class="text-xl text-gray-600">No pending orders at the moment</p>
+          </div>
+          
+          <div v-else class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div v-for="order in pendingOrders" :key="order.id" 
+                 class="bg-gradient-to-br from-[#1a1a1a] to-[#2a2a2a] rounded-xl shadow-[0_10px_30px_-5px_rgba(0,0,0,0.9)] overflow-hidden hover:shadow-[0_20px_40px_-5px_rgba(251,146,60,0.3)] transition-all duration-300 border border-orange-500/30 hover:border-orange-400 transform hover:-translate-y-1">
+              <!-- Order Header -->
+              <div class="bg-gradient-to-r from-orange-500 via-red-500 to-pink-500 text-white p-4 relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div>
+                <div class="flex justify-between items-center relative z-10">
+                  <div>
+                    <h3 class="text-xl font-bold drop-shadow-lg">Order #{{ order.id }}</h3>
+                    <p class="text-sm text-orange-100">⏰ {{ formatTime(order.timestamp) }}</p>
+                  </div>
+                  <div class="text-right">
+                    <span class="bg-white/20 backdrop-blur text-white px-4 py-2 rounded-full text-sm font-bold border border-white/30 shadow-lg">
+                      <i class="fas fa-bell animate-pulse mr-1"></i>{{ order.type.toUpperCase() }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Order Items -->
+              <div class="p-4">
+                <h4 class="font-semibold text-orange-400 mb-3 uppercase tracking-wider text-sm flex items-center">
+                  <i class="fas fa-clipboard-list mr-2 text-orange-500"></i>Canvas Frames to Produce
+                </h4>
+                <div class="space-y-3 max-h-60 overflow-y-auto custom-scrollbar">
+                  <div v-for="item in order.items" :key="item.id" 
+                       class="bg-gradient-to-r from-gray-800/50 to-gray-900/50 p-3 rounded-lg border-l-4 border-orange-500 hover:border-orange-400 transition-all hover:bg-gray-800/70">
+                    <div class="flex flex-col w-full">
+                      <div class="flex justify-between items-center">
+                        <div class="flex items-center">
+                          <span class="bg-gradient-to-r from-orange-500 to-red-500 text-white font-bold px-3 py-1 rounded-full mr-3 text-xs shadow-lg">
+                            {{ item.quantity }}x
+                          </span>
+                          <span class="font-medium text-gray-200 text-sm sm:text-base">{{ item.name }}</span>
+                        </div>
+                        <span v-if="item.size" class="text-xs bg-gray-850 text-yellow-400 px-2 py-0.5 rounded font-mono">
+                          <i class="fas fa-ruler-combined mr-1"></i>{{ item.size }}
+                        </span>
+                      </div>
+                      
+                      <!-- Photo Metadata and Download -->
+                      <div class="mt-2 flex items-center justify-between border-t border-gray-700/50 pt-2 text-xs">
+                        <span v-if="item.photoOption === 'whatsapp'" class="text-green-400 flex items-center gap-1 font-semibold">
+                          <i class="fab fa-whatsapp text-sm"></i> WhatsApp Photo
+                        </span>
+                        <span v-else-if="item.photoOption === 'system'" class="text-blue-400 flex items-center gap-1 font-semibold">
+                          <i class="fas fa-upload text-sm"></i> System Upload
+                        </span>
+                        
+                        <a v-if="item.photoUrl && item.photoUrl !== 'failed_to_upload' && item.photoUrl !== 'upload_failed'" 
+                           :href="item.photoUrl" 
+                           target="_blank" 
+                           class="bg-yellow-400 hover:bg-yellow-300 text-black px-2.5 py-1 rounded font-bold transition-all shadow flex items-center gap-1">
+                          <i class="fas fa-external-link-alt"></i> View/Download Photo
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Customer Notes -->
+                <div v-if="order.notes" class="mt-4 p-3 bg-gradient-to-r from-yellow-900/30 to-amber-900/30 border-l-4 border-yellow-500 rounded-lg backdrop-blur">
+                  <p class="text-sm text-yellow-300 flex items-start">
+                    <i class="fas fa-sticky-note text-yellow-400 mr-2 mt-0.5"></i>
+                    <span><strong class="text-yellow-400">Notes:</strong> {{ order.notes }}</span>
+                  </p>
+                </div>
+                
+                <!-- Action Button -->
+                <button 
+                  @click="startPreparing(order)"
+                  class="w-full mt-4 bg-gradient-to-r from-green-500 via-emerald-500 to-teal-600 text-white font-bold py-3 rounded-lg hover:from-green-600 hover:via-emerald-600 hover:to-teal-700 transition-all transform hover:scale-105 shadow-lg hover:shadow-green-500/30 relative overflow-hidden group">
+                  <span class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform"></span>
+                  <span class="relative flex items-center justify-center">
+                    <i class="fas fa-tools mr-2 text-yellow-300"></i>Start Framing
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Preparing Orders Tab -->
+        <div v-if="activeTab === 'preparing'">
+          <h2 class="text-2xl font-bold mb-4 text-gray-800">
+            <i class="fas fa-tools text-yellow-500 mr-2 pulse-animation"></i>
+            Currently Framing
+          </h2>
+          
+          <div v-if="preparingOrders.length === 0" class="text-center py-12 bg-[#121212] rounded-lg shadow-[0_10px_15px_-3px_rgba(0,0,0,0.7)]">
+            <i class="fas fa-tools text-6xl text-gray-400 mb-4"></i>
+            <p class="text-xl text-gray-400">No frames currently in production</p>
+          </div>
+          
+          <div v-else class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div v-for="order in preparingOrders" :key="order.id" 
+                 class="bg-gradient-to-br from-[#1a1a1a] to-[#2a2a2a] rounded-xl shadow-[0_10px_30px_-5px_rgba(0,0,0,0.9)] overflow-hidden hover:shadow-[0_20px_40px_-5px_rgba(250,204,21,0.3)] transition-all duration-300 border border-yellow-500/30 hover:border-yellow-400 transform hover:-translate-y-1">
+              <!-- Order Header -->
+              <div class="bg-gradient-to-r from-yellow-500 via-amber-500 to-orange-500 text-white p-4 relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer"></div>
+                <div class="flex justify-between items-center relative z-10">
+                  <div>
+                    <h3 class="text-xl font-bold drop-shadow-lg">Order #{{ order.id }}</h3>
+                    <p class="text-sm text-yellow-100">⏱ Started: {{ getPreparationTime(order) }} ago</p>
+                  </div>
+                  <div class="text-right">
+                    <span class="bg-white/20 backdrop-blur text-white px-4 py-2 rounded-full text-sm font-bold animate-pulse border border-white/30 shadow-lg">
+                      <i class="fas fa-fire mr-1 text-orange-300"></i>PREPARING
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Order Items -->
+              <div class="p-4">
+                <h4 class="font-semibold text-yellow-400 mb-3 uppercase tracking-wider text-sm flex items-center">
+                  <i class="fas fa-tools mr-2 text-yellow-500"></i>Framing Items
+                </h4>
+                <div class="space-y-3 max-h-60 overflow-y-auto custom-scrollbar">
+                  <div v-for="item in order.items" :key="item.id" 
+                       class="bg-gradient-to-r from-gray-800/50 to-gray-900/50 p-3 rounded-lg border-l-4 border-yellow-500 hover:border-yellow-400 transition-all hover:bg-gray-800/70">
+                    <div class="flex flex-col w-full">
+                      <div class="flex justify-between items-center">
+                        <div class="flex items-center">
+                          <span class="bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-bold px-3 py-1 rounded-full mr-3 text-xs shadow-lg">
+                            {{ item.quantity }}x
+                          </span>
+                          <span class="font-medium text-gray-200 text-sm sm:text-base">{{ item.name }}</span>
+                        </div>
+                        <span v-if="item.size" class="text-xs bg-gray-850 text-yellow-400 px-2 py-0.5 rounded font-mono">
+                          <i class="fas fa-ruler-combined mr-1"></i>{{ item.size }}
+                        </span>
+                      </div>
+                      
+                      <!-- Photo Metadata and Download -->
+                      <div class="mt-2 flex items-center justify-between border-t border-gray-700/50 pt-2 text-xs">
+                        <span v-if="item.photoOption === 'whatsapp'" class="text-green-400 flex items-center gap-1 font-semibold">
+                          <i class="fab fa-whatsapp text-sm"></i> WhatsApp Photo
+                        </span>
+                        <span v-else-if="item.photoOption === 'system'" class="text-blue-400 flex items-center gap-1 font-semibold">
+                          <i class="fas fa-upload text-sm"></i> System Upload
+                        </span>
+                        
+                        <a v-if="item.photoUrl && item.photoUrl !== 'failed_to_upload' && item.photoUrl !== 'upload_failed'" 
+                           :href="item.photoUrl" 
+                           target="_blank" 
+                           class="bg-yellow-400 hover:bg-yellow-300 text-black px-2.5 py-1 rounded font-bold transition-all shadow flex items-center gap-1">
+                          <i class="fas fa-external-link-alt"></i> View/Download Photo
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Customer Info -->
+                <div class="mt-4 p-3 bg-gradient-to-r from-blue-900/30 to-cyan-900/30 border-l-4 border-blue-500 rounded-lg backdrop-blur">
+                  <p class="text-sm text-cyan-300 flex items-center">
+                    <i class="fas fa-user-circle text-cyan-400 mr-2"></i>
+                    <span><strong class="text-cyan-400">Customer:</strong> {{ order.customerName }}</span>
+                  </p>
+                  <p v-if="order.type === 'delivery'" class="text-sm text-blue-300 mt-2 flex items-center">
+                    <i class="fas fa-map-marked-alt text-blue-400 mr-2"></i>
+                    <span><strong class="text-blue-400">Area:</strong> {{ order.area }}</span>
+                  </p>
+                </div>
+                
+                <!-- Action Button -->
+                <button 
+                  @click="markAsReady(order)"
+                  class="w-full mt-4 bg-gradient-to-r from-blue-500 via-cyan-500 to-teal-600 text-white font-bold py-3 rounded-lg hover:from-blue-600 hover:via-cyan-600 hover:to-teal-700 transition-all transform hover:scale-105 shadow-lg hover:shadow-blue-500/30 relative overflow-hidden group">
+                  <span class="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform"></span>
+                  <span class="relative flex items-center justify-center">
+                    <i class="fas fa-check-double mr-2 text-green-300"></i>Mark as Ready
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- History Tab -->
+        <div v-if="activeTab === 'history'">
+          <h2 class="text-xl sm:text-2xl font-bold mb-6 text-white">
+            <i class="fas fa-history text-gray-400 mr-2"></i>
+            <span class="hidden sm:inline">My Preparation History</span>
+            <span class="sm:hidden">History</span>
+          </h2>
+          
+          <!-- Filter Bar -->
+          <div class="bg-[#121212] rounded-xl p-4 mb-6 flex flex-wrap gap-4 items-center">
+            <div class="flex items-center gap-2">
+              <label class="text-sm text-gray-400">Search:</label>
+              <input 
+                v-model="historySearchQuery"
+                type="text"
+                placeholder="Order ID, Customer..."
+                class="px-3 py-1 rounded bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none">
+            </div>
+            
+            <div class="flex items-center gap-2">
+              <label class="text-sm text-gray-400">Status:</label>
+              <select 
+                v-model="historyStatusFilter"
+                class="px-3 py-1 rounded bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none">
+                <option value="">All Status</option>
+                <option value="Ready">Ready</option>
+                <option value="Delivered">Delivered</option>
+                <option value="Cancelled">Cancelled</option>
+              </select>
+            </div>
+            
+            <div class="flex items-center gap-2 ml-auto">
+              <span class="text-sm text-gray-400">
+                Total: {{ filteredHistory.length }} orders
+              </span>
+            </div>
+          </div>
+          
+          <div v-if="filteredHistory.length === 0" class="text-center py-12 bg-[#121212] rounded-lg shadow-[0_10px_15px_-3px_rgba(0,0,0,0.7)]">
+            <i class="fas fa-clipboard-list text-6xl text-gray-400 mb-4"></i>
+            <p class="text-xl text-gray-400">No orders found</p>
+          </div>
+          
+          <div v-else class="bg-[#121212] rounded-xl shadow-[0_10px_15px_-3px_rgba(0,0,0,0.7)] overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full">
+                <thead class="bg-[#1a1a1a]">
+                  <tr>
+                    <th class="px-6 py-4 text-left text-yellow-400">Order ID</th>
+                    <th class="px-6 py-4 text-left text-yellow-400">Date/Time</th>
+                    <th class="px-6 py-4 text-left text-yellow-400">Customer</th>
+                    <th class="px-6 py-4 text-left text-yellow-400">Type</th>
+                    <th class="px-6 py-4 text-left text-yellow-400">Items</th>
+                    <th class="px-6 py-4 text-left text-yellow-400">Total</th>
+                    <th class="px-6 py-4 text-left text-yellow-400">Status</th>
+                    <th class="px-6 py-4 text-left text-yellow-400">Prep Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="order in filteredHistory" :key="order.id" class="border-t border-gray-800 hover:bg-[#1a1a1a]">
+                    <td class="px-6 py-4 font-mono text-sm">{{ order.id }}</td>
+                    <td class="px-6 py-4">
+                      <div>{{ formatDate(order.timestamp) }}</div>
+                      <div class="text-xs text-gray-400">{{ formatTime(order.timestamp) }}</div>
+                    </td>
+                    <td class="px-6 py-4">
+                      <div class="font-semibold">{{ order.customerName }}</div>
+                    </td>
+                    <td class="px-6 py-4">
+                      <span :class="['px-2 py-1 rounded text-xs font-semibold', 
+                                     order.type === 'delivery' ? 'bg-blue-900 text-blue-300' : 'bg-green-900 text-green-300']">
+                        {{ order.type ? order.type.toUpperCase() : 'N/A' }}
+                      </span>
+                    </td>
+                    <td class="px-6 py-4">
+                      <span class="text-yellow-400">{{ order.items.length }} items</span>
+                    </td>
+                    <td class="px-6 py-4 font-semibold">{{ settings.currency || 'Rs' }} {{ order.total }}</td>
+                    <td class="px-6 py-4">
+                      <span :class="['px-3 py-1 rounded text-xs font-bold', getStatusClass(order.status)]">
+                        {{ order.status }}
+                      </span>
+                    </td>
+                    <td class="px-6 py-4">
+                      <div v-if="order.kitchenTime && order.readyTime" class="text-sm">
+                        {{ calculatePreparationDuration(order.kitchenTime, order.readyTime) }}
+                      </div>
+                      <div v-else class="text-gray-500">-</div>
+                    </td>
+                  </tr>
+                  <tr v-if="filteredHistory.length === 0">
+                    <td colspan="8" class="px-6 py-12 text-center text-gray-500">
+                      <i class="fas fa-clipboard-list text-4xl mb-3 block"></i>
+                      No preparation history found
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { createApp } = Vue;
+
+    createApp({
+      data() {
+        return {
+          // Auth
+          isLoggedIn: false,
+          currentUser: null,
+          loginForm: {
+            username: '',
+            password: ''
+          },
+          loginError: '',
+          loggingIn: false,
+          
+          // UI State
+          activeTab: 'pending',
+          currentTime: '',
+          currentDate: '',
+          
+          // Data
+          orders: [],
+          orderHistory: [],
+          refreshInterval: null,
+          timeInterval: null,
+          
+          // History filters
+          historySearchQuery: '',
+          historyStatusFilter: 'all',
+          theme: 'dark',
+          settings: {
+            themeColor: '#EAB308',
+            currency: 'Rs'
+          }
+        }
+      },
+      computed: {
+        pendingOrders() {
+          return this.orders.filter(o => o.status === 'Confirmed');
+        },
+        preparingOrders() {
+          return this.orders.filter(o => o.status === 'Preparing');
+        },
+        pendingCount() {
+          return this.pendingOrders.length;
+        },
+        preparingCount() {
+          return this.preparingOrders.length;
+        },
+        filteredHistory() {
+          let filtered = [...this.orderHistory];
+          
+          // Apply search filter
+          if (this.historySearchQuery) {
+            const query = this.historySearchQuery.toLowerCase();
+            filtered = filtered.filter(order => 
+              order.id.toLowerCase().includes(query) ||
+              order.customerName.toLowerCase().includes(query)
+            );
+          }
+          
+          // Apply status filter
+          if (this.historyStatusFilter !== 'all') {
+            filtered = filtered.filter(order => 
+              order.status === this.historyStatusFilter
+            );
+          }
+          
+          return filtered;
+        }
+      },
+      methods: {
+        async handleLogin() {
+          this.loggingIn = true;
+          this.loginError = '';
+          
+          try {
+            const result = await new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .authenticateUser(this.loginForm.username, this.loginForm.password);
+            });
+            
+            if (result.success && result.user.role === 'kitchen') {
+              this.isLoggedIn = true;
+              this.currentUser = result.user;
+              sessionStorage.setItem('workshopUser', JSON.stringify(result.user));
+              await this.loadOrders();
+              this.startAutoRefresh();
+              this.startClock();
+            } else {
+              this.loginError = 'Invalid workshop staff credentials';
+            }
+          } catch (error) {
+            this.loginError = 'Login failed. Please try again.';
+          } finally {
+            this.loggingIn = false;
+          }
+        },
+        
+        logout() {
+          this.isLoggedIn = false;
+          this.currentUser = null;
+          sessionStorage.removeItem('workshopUser');
+          this.stopAutoRefresh();
+          this.stopClock();
+          this.loginForm = { username: '', password: '' };
+        },
+        
+        async loadOrders() {
+          try {
+            const [orders, history] = await Promise.all([
+              new Promise((resolve, reject) => {
+                google.script.run
+                  .withSuccessHandler(resolve)
+                  .withFailureHandler(reject)
+                  .getKitchenOrders();
+              }),
+              new Promise((resolve, reject) => {
+                google.script.run
+                  .withSuccessHandler(resolve)
+                  .withFailureHandler(reject)
+                  .getKitchenHistory(this.currentUser.username);
+              })
+            ]);
+            
+            this.orders = orders;
+            this.orderHistory = history;
+          } catch (error) {
+            console.error('Error loading orders:', error);
+          }
+        },
+        
+        async startPreparing(order) {
+          try {
+            const result = await new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .updateKitchenStatus(order.id, 'Preparing', this.currentUser.username);
+            });
+            
+            if (result.success) {
+              await this.loadOrders();
+              this.showToast('Started preparing order #' + order.id, 'success');
+            }
+          } catch (error) {
+            this.showToast('Failed to update order status', 'error');
+          }
+        },
+        
+        async markAsReady(order) {
+          try {
+            const result = await new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .updateKitchenStatus(order.id, 'Ready', this.currentUser.username);
+            });
+            
+            if (result.success) {
+              await this.loadOrders();
+              this.showToast('Order #' + order.id + ' is ready!', 'success');
+            }
+          } catch (error) {
+            this.showToast('Failed to update order status', 'error');
+          }
+        },
+        
+        startAutoRefresh() {
+          // Refresh orders every 2 seconds for real-time updates
+          this.refreshInterval = setInterval(() => {
+            this.loadOrders();
+          }, 2000);
+        },
+        
+        stopAutoRefresh() {
+          if (this.refreshInterval) {
+            clearInterval(this.refreshInterval);
+          }
+        },
+        
+        startClock() {
+          this.updateDateTime();
+          this.timeInterval = setInterval(() => {
+            this.updateDateTime();
+          }, 1000);
+        },
+        
+        stopClock() {
+          if (this.timeInterval) {
+            clearInterval(this.timeInterval);
+          }
+        },
+        
+        updateDateTime() {
+          const now = new Date();
+          this.currentTime = now.toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit' 
+          });
+          this.currentDate = now.toLocaleDateString('en-US', { 
+            weekday: 'long',
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          });
+        },
+        
+        getPreparationTime(order) {
+          if (!order.kitchenTime) return '0 min';
+          const start = new Date(order.kitchenTime);
+          const now = new Date();
+          const diff = Math.floor((now - start) / 60000);
+          return diff + ' min';
+        },
+        
+        formatDate(timestamp) {
+          return new Date(timestamp).toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric',
+            year: 'numeric'
+          });
+        },
+        
+        formatTime(timestamp) {
+          return new Date(timestamp).toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          });
+        },
+        
+        calculatePreparationDuration(startTime, endTime) {
+          if (!startTime || !endTime) return '-';
+          const start = new Date(startTime);
+          const end = new Date(endTime);
+          const diff = Math.floor((end - start) / 60000); // in minutes
+          
+          if (diff < 60) {
+            return diff + ' mins';
+          } else {
+            const hours = Math.floor(diff / 60);
+            const mins = diff % 60;
+            return hours + 'h ' + mins + 'm';
+          }
+        },
+        
+        getStatusClass(status) {
+          const classes = {
+            'Ready': 'bg-green-100 text-green-800',
+            'Delivered': 'bg-blue-100 text-blue-800',
+            'Cancelled': 'bg-red-100 text-red-800'
+          };
+          return classes[status] || 'bg-gray-100 text-gray-800';
+        },
+        
+        showToast(message, type = 'info') {
+          const colors = {
+            success: 'bg-green-500',
+            error: 'bg-red-500',
+            info: 'bg-blue-500'
+          };
+          
+          const toast = document.createElement('div');
+          toast.className = 'fixed bottom-4 right-4 ' + colors[type] + ' text-white px-6 py-3 rounded-lg shadow-lg z-50';
+          toast.textContent = message;
+          document.body.appendChild(toast);
+          
+          setTimeout(() => {
+            toast.remove();
+          }, 3000);
+        },
+
+        async fetchSettings() {
+          try {
+            const result = await new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .getSystemSettings();
+            });
+            this.settings = result;
+            this.applyDynamicColors(result.themeColor);
+          } catch (error) {
+            console.error('Error fetching settings:', error);
+          }
+        },
+
+        applyDynamicColors(color) {
+          if (!color) return;
+          let styleEl = document.getElementById('dynamic-theme-style');
+          if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = 'dynamic-theme-style';
+            document.head.appendChild(styleEl);
+          }
+          const hoverColor = this.adjustColorBrightness(color, -20);
+          styleEl.innerHTML = `
+            :root {
+              --primary-color: ${color};
+              --primary-color-hover: ${hoverColor};
+            }
+            .bg-yellow-400, .bg-yellow-500 { background-color: ${color} !important; }
+            .text-yellow-400, .text-yellow-500 { color: ${color} !important; }
+            .border-yellow-400, .border-yellow-500 { border-color: ${color} !important; }
+            .hover\\:bg-yellow-300:hover, .hover\\:bg-yellow-400:hover { background-color: ${hoverColor} !important; }
+            .hover\\:text-yellow-300:hover { color: ${hoverColor} !important; }
+          `;
+        },
+
+        adjustColorBrightness(hex, percent) {
+          let num = parseInt(hex.replace("#",""),16),
+          amt = Math.round(2.55 * percent),
+          R = (num >> 16) + amt,
+          G = (num >> 8 & 0x00FF) + amt,
+          B = (num & 0x0000FF) + amt;
+          return "#" + (0x1000000 + (R<255?R<0?0:R:255)*0x10000 + (G<255?G<0?0:G:255)*0x100 + (B<255?B<0?0:B:255)).toString(16).slice(1);
+        },
+
+        toggleTheme() {
+          this.theme = this.theme === 'dark' ? 'light' : 'dark';
+          localStorage.setItem('theme', this.theme);
+          this.applyTheme();
+        },
+
+        applyTheme() {
+          const body = document.body;
+          if (this.theme === 'light') {
+            body.classList.remove('bg-[#0d0d0d]', 'text-white');
+            body.classList.add('bg-gray-100', 'text-gray-900', 'light-mode');
+          } else {
+            body.classList.remove('bg-gray-100', 'text-gray-900', 'light-mode');
+            body.classList.add('bg-[#0d0d0d]', 'text-white');
+          }
+        }
+      },
+      mounted() {
+        // Load theme preferences
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {
+          this.theme = savedTheme;
+          this.applyTheme();
+        }
+        
+        // Fetch Settings
+        this.fetchSettings();
+
+        // Check for existing session
+        const savedUser = sessionStorage.getItem('workshopUser');
+        if (savedUser) {
+          this.currentUser = JSON.parse(savedUser);
+          this.isLoggedIn = true;
+          this.loadOrders();
+          this.startAutoRefresh();
+          this.startClock();
+        }
+      },
+      unmounted() {
+        this.stopAutoRefresh();
+        this.stopClock();
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>

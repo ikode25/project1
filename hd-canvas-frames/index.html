@@ -1,0 +1,2566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script>
+    window.onerror = function(msg, url, line, col, error) {
+      const container = document.createElement('div');
+      container.style.cssText = 'color:red; padding:30px; background:white; font-family:sans-serif; z-index:999999; position:fixed; top:10px; left:10px; right:10px; border:4px solid red; border-radius:8px; box-shadow: 0 0 20px rgba(0,0,0,0.5);';
+      container.innerHTML = '<h3 style="margin-top:0;font-size:18px;">JavaScript Runtime Error</h3>' +
+                            '<p style="margin:8px 0;"><strong>Error:</strong> ' + msg + '</p>' +
+                            '<p style="margin:8px 0;"><strong>Location:</strong> ' + url + ' (Line ' + line + ', Col ' + col + ')</p>';
+      if (document.documentElement) {
+        document.documentElement.appendChild(container);
+      }
+      return false;
+    };
+    window.addEventListener('unhandledrejection', function(event) {
+      const container = document.createElement('div');
+      container.style.cssText = 'color:red; padding:30px; background:white; font-family:sans-serif; z-index:999999; position:fixed; top:10px; left:10px; right:10px; border:4px solid red; border-radius:8px; box-shadow: 0 0 20px rgba(0,0,0,0.5);';
+      container.innerHTML = '<h3 style="margin-top:0;font-size:18px;">Unhandled Promise Rejection</h3>' +
+                            '<p style="margin:8px 0;"><strong>Reason:</strong> ' + event.reason + '</p>';
+      if (document.documentElement) {
+        document.documentElement.appendChild(container);
+      }
+    });
+  </script>
+  <title>HD Laminated Canvas Frames</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet"/>
+  <style>
+    /* Custom scrollbar for horizontal nav */
+    .scrollbar-hide::-webkit-scrollbar {
+      display: none;
+    }
+    .scrollbar-hide {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    [v-cloak] {
+      display: none;
+    }
+    html {
+      scroll-behavior: smooth;
+    }
+    .nav-sticky {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: #0d0d0d;
+    }
+    .slider-container {
+      overflow: hidden;
+      position: relative;
+    }
+    .slider-track {
+      display: flex;
+      transition: transform 0.5s ease-in-out;
+    }
+    .cart-badge {
+      position: absolute;
+      top: -8px;
+      right: -8px;
+      background: #ef4444;
+      color: white;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: bold;
+    }
+    
+    /* Print styles for receipt */
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+      #receipt-content, #receipt-content * {
+        visibility: visible;
+      }
+      #receipt-content {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 80mm;
+        font-family: 'Courier New', monospace;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+    
+    .receipt-paper {
+      background: white;
+      color: black;
+      font-family: 'Courier New', monospace;
+      width: 80mm;
+      margin: 0 auto;
+      padding: 10mm;
+      box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    }
+    
+    .receipt-line {
+      border-bottom: 1px dashed #000;
+      margin: 8px 0;
+    }
+    
+    .receipt-double-line {
+      border-bottom: 3px double #000;
+      margin: 8px 0;
+    }
+    /* Mobile responsive styles */
+    @media (max-width: 640px) {
+      .modal-content {
+        width: 95% !important;
+        margin: 10px;
+      }
+    }
+    
+    /* Dropdown styles */
+    .dropdown-enter-active, .dropdown-leave-active {
+      transition: opacity 0.3s, transform 0.3s;
+    }
+    .dropdown-enter-from, .dropdown-leave-to {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    
+    /* Animations for banner */
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+    
+    @keyframes slideUp {
+      from {
+        transform: translateY(30px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+    
+    .animate-slideUp {
+      animation: slideUp 0.8s ease-out forwards;
+    }
+    
+    .animation-delay-200 {
+      animation-delay: 200ms;
+    }
+    
+    .animation-delay-400 {
+      animation-delay: 400ms;
+    }
+    
+    @keyframes slideInLeft {
+      from {
+        transform: translateX(-50px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+    
+    @keyframes slideInUp {
+      from {
+        transform: translateY(30px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+    
+    .animate-slideInLeft {
+      animation: slideInLeft 0.8s ease-out forwards;
+    }
+    
+    .animate-slideInUp {
+      animation: slideInUp 0.8s ease-out forwards;
+    }
+    
+    /* Pulse animation */
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.5;
+      }
+    }
+    
+    .animate-pulse {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    /* Light Mode style translations */
+    body.light-mode {
+      background-color: #f9fafb !important;
+      color: #111827 !important;
+    }
+    /* NOTE: Tailwind arbitrary-value classes (e.g. bg-[#121212]) contain [ ] # characters
+       that MUST be escaped in a plain CSS selector, otherwise the browser treats the
+       whole comma-separated rule as invalid and silently drops ALL of it. That bug is
+       why light mode used to look broken/unreadable - none of these overrides were
+       ever actually applying. */
+    body.light-mode .bg-\[\#121212\],
+    body.light-mode .bg-\[\#1a1a1a\],
+    body.light-mode .bg-\[\#262626\],
+    body.light-mode .bg-\[\#2a2a2a\] {
+      background-color: #ffffff !important;
+      color: #1f2937 !important;
+      border-color: #e5e7eb !important;
+    }
+    body.light-mode .bg-\[\#0d0d0d\] {
+      background-color: #f3f4f6 !important;
+    }
+    body.light-mode .text-white {
+      color: #111827 !important;
+    }
+    body.light-mode .text-gray-100,
+    body.light-mode .text-gray-200,
+    body.light-mode .text-gray-300 {
+      color: #374151 !important;
+    }
+    body.light-mode .text-gray-400,
+    body.light-mode .text-gray-450,
+    body.light-mode .text-gray-500 {
+      color: #4b5563 !important;
+    }
+    body.light-mode .text-gray-600 {
+      color: #6b7280 !important;
+    }
+    body.light-mode .border-gray-700,
+    body.light-mode .border-gray-800 {
+      border-color: #e5e7eb !important;
+    }
+    body.light-mode .nav-sticky {
+      background: #f9fafb !important;
+      border-color: #e5e7eb !important;
+    }
+    body.light-mode input,
+    body.light-mode select,
+    body.light-mode textarea {
+      background-color: #ffffff !important;
+      color: #111827 !important;
+      border-color: #d1d5db !important;
+    }
+    body.light-mode input::placeholder,
+    body.light-mode textarea::placeholder {
+      color: #9ca3af !important;
+    }
+    body.light-mode .bg-gray-700,
+    body.light-mode .bg-gray-750,
+    body.light-mode .bg-gray-800 {
+      background-color: #e5e7eb !important;
+      color: #1f2937 !important;
+    }
+    body.light-mode .bg-gray-700:hover,
+    body.light-mode .bg-gray-750:hover,
+    body.light-mode .bg-gray-800:hover {
+      background-color: #d1d5db !important;
+    }
+    body.light-mode .bg-black,
+    body.light-mode .bg-black\/20,
+    body.light-mode .bg-black\/30,
+    body.light-mode .bg-black\/40,
+    body.light-mode .bg-black\/50,
+    body.light-mode .bg-black\/70 {
+      background-color: rgba(0, 0, 0, 0.5) !important;
+    }
+    body.light-mode .divide-gray-700 > *,
+    body.light-mode .divide-gray-800 > * {
+      border-color: #e5e7eb !important;
+    }
+    /* Keep buttons/badges that intentionally use dark text-on-color (e.g. bg-yellow-400 text-black) unaffected */
+    body.light-mode .bg-yellow-400,
+    body.light-mode .bg-yellow-500 {
+      color: #111827 !important;
+    }
+  </style>
+</head>
+<body class="bg-[#0d0d0d] text-white font-sans" @click="closeDropdowns">
+  
+  <div id="app" v-cloak>
+    <!-- Top Header Bar -->
+    <div class="bg-[#121212] border-b border-gray-800 px-2 sm:px-4 py-3">
+      <div class="flex justify-between items-center">
+        <!-- Brand Logo & Name -->
+        <div class="flex items-center gap-2">
+          <img v-if="settings.businessLogo" :src="settings.businessLogo" class="h-8 w-8 object-contain rounded">
+          <span class="text-base font-bold text-yellow-400 hidden md:inline-block">
+            {{ settings.businessName || 'HD Canvas' }}
+          </span>
+        </div>
+        
+        <!-- Order Type Selector -->
+        <div class="flex items-center gap-2 sm:gap-4">
+          <button 
+            @click="orderType = 'delivery'"
+            :class="['px-2 sm:px-4 py-2 rounded-lg transition-colors text-sm sm:text-base', orderType === 'delivery' ? 'bg-yellow-400 text-black' : 'bg-[#1a1a1a] text-white']">
+            <i class="fas fa-truck mr-1 sm:mr-2"></i><span class="hidden sm:inline">Delivery</span>
+          </button>
+          <button 
+            @click="orderType = 'pickup'"
+            :class="['px-2 sm:px-4 py-2 rounded-lg transition-colors text-sm sm:text-base', orderType === 'pickup' ? 'bg-yellow-400 text-black' : 'bg-[#1a1a1a] text-white']">
+            <i class="fas fa-store mr-1 sm:mr-2"></i><span class="hidden sm:inline">Pickup</span>
+          </button>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="flex items-center gap-2">
+          <!-- Track Order Button -->
+          <button 
+            @click="showTrackOrder = true"
+            class="bg-yellow-500 text-black px-2 sm:px-4 py-2 rounded-lg hover:bg-yellow-400 transition-colors text-sm sm:text-base font-semibold">
+            <i class="fas fa-search mr-1 sm:mr-2"></i><span class="hidden sm:inline">Track</span>
+          </button>
+          
+          <!-- Theme Toggle -->
+          <button 
+            @click="toggleTheme" 
+            class="w-10 h-10 rounded-lg flex items-center justify-center bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
+            title="Toggle Theme">
+            <i :class="['fas text-base', theme === 'dark' ? 'fa-sun text-yellow-400' : 'fa-moon text-blue-400']"></i>
+          </button>
+
+          <!-- Login Dropdown -->
+          <div class="relative">
+            <button 
+              @click="showLoginDropdown = !showLoginDropdown"
+              class="bg-gray-700 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors">
+              <i class="fas fa-user-circle text-lg"></i>
+            </button>
+            
+            <!-- Dropdown Menu -->
+            <div v-if="showLoginDropdown" 
+                 @click.stop
+                 class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl z-50">
+              <button 
+                 @click="openLoginPage('dashboard')"
+                 class="w-full text-left px-4 py-3 text-gray-800 hover:bg-gray-100 rounded-t-lg transition-colors">
+                <i class="fas fa-user-shield mr-2"></i>Admin Login
+              </button>
+              <button 
+                 @click="openLoginPage('workshop')"
+                 class="w-full text-left px-4 py-3 text-gray-800 hover:bg-gray-100 transition-colors">
+                <i class="fas fa-tools mr-2"></i>Workshop Login
+              </button>
+              <button 
+                 @click="openLoginPage('delivery')"
+                 class="w-full text-left px-4 py-3 text-gray-800 hover:bg-gray-100 rounded-b-lg transition-colors">
+                <i class="fas fa-shipping-fast mr-2"></i>Delivery Login
+              </button>
+            </div>
+          </div>
+          
+          <!-- Cart Button -->
+          <button 
+            @click="showCart = true"
+            class="relative bg-yellow-400 text-black px-2 sm:px-4 py-2 rounded-lg hover:bg-yellow-300 transition-colors text-sm sm:text-base">
+            <i class="fas fa-shopping-cart mr-1 sm:mr-2"></i><span class="hidden sm:inline">Cart</span>
+          <span v-if="cartItemsCount > 0" class="cart-badge">{{ cartItemsCount }}</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Banner Slider -->
+    <div class="slider-container h-72 sm:h-80 md:h-96 lg:h-[450px] relative bg-gradient-to-br from-[#1a1a1a] via-[#121212] to-[#0d0d0d] overflow-hidden shadow-2xl rounded-b-2xl">
+      <!-- Loading Skeleton -->
+      <div v-if="loading && banners.length === 0" class="absolute inset-0 flex items-center justify-center">
+        <div class="w-full h-full bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 animate-pulse">
+          <div class="absolute bottom-0 left-0 right-0 p-6 md:p-10">
+            <div class="h-10 md:h-14 bg-gray-600 rounded-lg mb-3 w-3/4 animate-pulse"></div>
+            <div class="h-5 md:h-7 bg-gray-600 rounded-lg w-1/2 animate-pulse"></div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Slider Content -->
+      <div v-if="banners.length > 0" class="slider-track h-full relative" :style="'transform: translateX(-' + (currentSlide * 100) + '%)'">
+        <div v-for="(banner, index) in banners" :key="banner.id" 
+             class="w-full h-full flex-shrink-0 relative"
+             :class="{'opacity-0': index !== currentSlide, 'opacity-100': index === currentSlide}">
+          <!-- Background Image with Parallax Effect -->
+          <div class="absolute inset-0 transform scale-110">
+            <img 
+              :src="banner.image" 
+              :alt="banner.title" 
+              class="w-full h-full object-cover transform transition-transform duration-[3000ms]"
+              :class="{'scale-100': index === currentSlide, 'scale-110': index !== currentSlide}"
+              @load="handleImageLoad">
+          </div>
+          
+          <!-- Gradient Overlays -->
+          <div class="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
+          <div class="absolute inset-0 bg-gradient-to-r from-black/70 via-transparent to-transparent"></div>
+          
+          <!-- Content Area -->
+          <div class="absolute bottom-0 left-0 right-0 p-8 md:p-12 lg:p-16">
+            <div class="max-w-3xl">
+              <h2 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-white mb-3 md:mb-4"
+                  :class="{'animate-slideInLeft': index === currentSlide}">
+                {{ banner.title }}
+              </h2>
+              <p class="text-lg sm:text-xl md:text-2xl text-gray-100 mb-6"
+                 :class="{'animate-slideInLeft animation-delay-200': index === currentSlide}">
+                {{ banner.subtitle }}
+              </p>
+              <button v-if="banner.link" 
+                      class="bg-yellow-400 text-black px-6 py-3 rounded-full font-bold hover:bg-yellow-300 transform hover:scale-105 transition-all shadow-lg"
+                      :class="{'animate-slideInUp animation-delay-400': index === currentSlide}">
+                <i class="fas fa-shopping-cart mr-2"></i>Order Now
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- No Banners Message -->
+      <div v-if="!loading && banners.length === 0" class="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-900 to-gray-800">
+        <div class="text-center">
+          <i class="fas fa-image text-6xl text-gray-600 mb-4"></i>
+          <p class="text-gray-400 text-lg">No banners available</p>
+        </div>
+      </div>
+      
+      <!-- Slider Controls (Only show if banners exist) -->
+      <button 
+        v-if="banners.length > 1"
+        @click="previousSlide"
+        class="absolute left-4 top-1/2 -translate-y-1/2 bg-gradient-to-r from-black/70 to-black/50 backdrop-blur-sm text-white p-3 rounded-full hover:from-black/90 hover:to-black/70 transition-all transform hover:scale-110 group">
+        <i class="fas fa-chevron-left group-hover:-translate-x-1 transition-transform"></i>
+      </button>
+      <button 
+        v-if="banners.length > 1"
+        @click="nextSlide"
+        class="absolute right-4 top-1/2 -translate-y-1/2 bg-gradient-to-r from-black/50 to-black/70 backdrop-blur-sm text-white p-3 rounded-full hover:from-black/70 hover:to-black/90 transition-all transform hover:scale-110 group">
+        <i class="fas fa-chevron-right group-hover:translate-x-1 transition-transform"></i>
+      </button>
+      
+      <!-- Slider Dots -->
+      <div v-if="banners.length > 1" class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 bg-black/30 backdrop-blur-sm px-3 py-2 rounded-full">
+        <button 
+          v-for="(banner, index) in banners" 
+          :key="index"
+          @click="currentSlide = index"
+          :class="['h-2 rounded-full transition-all duration-300 hover:bg-yellow-300', 
+                   currentSlide === index ? 'bg-yellow-400 w-8' : 'bg-white/50 w-2 hover:w-3']">
+        </button>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="nav-sticky flex space-x-3 overflow-x-auto scrollbar-hide p-4 border-b border-gray-800" ref="navContainer">
+      <button 
+        v-for="category in categories" 
+        :key="category"
+        @click="scrollToCategory(category)"
+        :ref="'navBtn-' + category"
+        :class="[
+          'flex-shrink-0 rounded-xl px-6 py-2 font-normal text-base whitespace-nowrap transition-colors',
+          activeCategory === category 
+            ? 'bg-yellow-400 text-black' 
+            : 'bg-[#121212] text-white hover:bg-[#1a1a1a]'
+        ]"
+        type="button">
+        {{ category }}
+      </button>
+    </nav>
+
+    <!-- Loading State -->
+    <div v-if="loading" class="flex justify-center items-center h-64">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-400"></div>
+    </div>
+
+    <!-- Error State -->
+    <div v-if="error" class="px-8 pt-6">
+      <div class="bg-red-900 text-red-200 p-4 rounded-lg">
+        <i class="fas fa-exclamation-triangle mr-2"></i>
+        {{ error }}
+      </div>
+    </div>
+
+    <!-- Content Sections -->
+    <div v-if="!loading && !error" class="px-8">
+      <!-- Category Section -->
+      <section 
+        v-for="category in categories" 
+        :key="category"
+        :ref="'section-' + category"
+        class="pt-6 mb-12">
+        
+        <h1 class="text-3xl font-extrabold mb-4">{{ category }}</h1>
+        
+        <!-- Empty State -->
+        <div v-if="getItemsByCategory(category).length === 0" class="text-gray-400 text-center py-12">
+          <i class="fas fa-inbox text-6xl mb-4"></i>
+          <p>No items available in {{ category }}</p>
+        </div>
+
+        <!-- Menu Grid -->
+        <div v-else class="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
+          <div 
+            v-for="item in getItemsByCategory(category)" 
+            :key="item.id"
+            class="bg-[#121212] rounded-xl shadow-[0_10px_15px_-3px_rgba(0,0,0,0.7)] p-3 flex flex-col">
+            
+            <!-- Item Image -->
+            <img 
+              :alt="item.name" 
+              :src="item.image"
+              @error="handleImageError"
+              class="rounded-xl mb-3 object-cover w-full aspect-square" 
+              height="400" 
+              width="400"/>
+            
+            <!-- Badges and Price Row -->
+            <div class="flex items-center justify-between mb-1 flex-wrap gap-1">
+              <!-- Discount Badge -->
+              <span 
+                v-if="item.discount" 
+                class="bg-yellow-400 text-black text-xs font-semibold rounded px-2 py-0.5">
+                Save <span class="font-normal">{{ item.discount }}%</span>
+              </span>
+              
+              <!-- New Badge -->
+              <span 
+                v-if="item.badge === 'New'" 
+                class="bg-green-700 text-green-300 text-xs font-semibold rounded px-2 py-0.5 flex items-center gap-1">
+                <i class="fas fa-star"></i>
+                New!
+                <span v-if="item.servings && item.badge" class="ml-1 text-yellow-300 text-[10px] font-normal">
+                  x {{ item.servings }}
+                </span>
+              </span>
+              
+              <!-- Price -->
+              <span class="text-gray-400 font-semibold text-sm flex items-center gap-1 ml-auto">
+                {{ settings.currency || 'Rs' }} {{ item.price }}
+                <span v-if="item.originalPrice" class="line-through text-gray-600 text-xs font-normal">
+                  {{ settings.currency || 'Rs' }} {{ item.originalPrice }}
+                </span>
+              </span>
+            </div>
+            
+            <!-- Item Name -->
+            <h2 class="text-lg font-semibold mb-1 flex items-center gap-2">
+              <span 
+                v-if="item.size" 
+                class="bg-[#2a2a2a] text-yellow-400 rounded px-2 py-0.5 text-xs flex items-center gap-1">
+                <i class="fas fa-ruler-combined"></i>
+                {{ item.size }}
+              </span>
+              {{ item.name }}
+            </h2>
+            
+            <!-- Add Button -->
+            <button 
+              @click="openCustomizationModal(item)"
+              :aria-label="'Customize ' + item.name" 
+              class="self-end mt-auto bg-yellow-400 text-black rounded-full w-12 h-12 flex items-center justify-center shadow-[0_10px_15px_-3px_rgba(0,0,0,0.7)] hover:bg-yellow-300 transition-colors">
+              <i class="fas fa-plus text-2xl"></i>
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Customization Modal -->
+    <div v-if="showCustomization" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
+      <div class="bg-[#121212] rounded-xl w-full max-w-xl max-h-[90vh] overflow-y-auto p-6 border border-gray-800 shadow-2xl">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-2xl font-bold text-yellow-400">Configure Canvas Frame</h2>
+          <button @click="showCustomization = false" class="text-gray-400 hover:text-white">
+            <i class="fas fa-times text-xl"></i>
+          </button>
+        </div>
+        
+        <div class="flex gap-4 mb-6">
+          <img :src="customizingItem.image" :alt="customizingItem.name" class="w-24 h-24 rounded-lg object-cover border border-gray-800">
+          <div>
+            <h3 class="text-xl font-bold text-white">{{ customizingItem.name }}</h3>
+            <p class="text-gray-400 mt-1">{{ settings.currency || 'Rs' }} {{ customizingItem.price }}</p>
+            <p v-if="customizingItem.size" class="text-xs bg-gray-800 text-gray-300 inline-block px-2 py-1 rounded mt-2">
+              <i class="fas fa-ruler-combined mr-1 text-yellow-400"></i>{{ customizingItem.size }}
+            </p>
+          </div>
+        </div>
+        
+        <!-- Photo Selection Method -->
+        <div class="mb-6">
+          <label class="block text-sm font-semibold text-gray-300 mb-3">Photo Submission Method *</label>
+          <div class="flex gap-4">
+            <button 
+              @click="customizationForm.photoOption = 'system'"
+              type="button"
+              :class="['flex-1 p-4 rounded-lg border-2 text-center transition-colors', 
+                       customizationForm.photoOption === 'system' ? 'border-yellow-400 bg-yellow-400/10 text-white' : 'border-gray-700 text-gray-400']">
+              <i class="fas fa-upload text-xl mb-2 text-yellow-400"></i>
+              <p class="font-semibold text-sm">Upload to App</p>
+            </button>
+            <button 
+              @click="customizationForm.photoOption = 'whatsapp'"
+              type="button"
+              :class="['flex-1 p-4 rounded-lg border-2 text-center transition-colors', 
+                       customizationForm.photoOption === 'whatsapp' ? 'border-yellow-400 bg-yellow-400/10 text-white' : 'border-gray-700 text-gray-400']">
+              <i class="fab fa-whatsapp text-xl mb-2 text-green-400"></i>
+              <p class="font-semibold text-sm">Send via WhatsApp</p>
+            </button>
+          </div>
+        </div>
+        
+        <!-- System Upload Field -->
+        <div v-if="customizationForm.photoOption === 'system'" class="mb-6">
+          <label class="block text-sm text-gray-400 mb-2">Choose your photo (JPG, PNG) *</label>
+          <div class="border-2 border-dashed border-gray-700 rounded-lg p-6 text-center hover:border-yellow-400 transition-colors relative">
+            <input 
+              type="file" 
+              accept="image/*"
+              @change="handlePhotoUpload"
+              class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+            <div v-if="!customizationForm.photoPreview">
+              <i class="fas fa-cloud-upload-alt text-3xl text-gray-500 mb-2"></i>
+              <p class="text-sm text-gray-400">Click or Drag & Drop photo here</p>
+            </div>
+            <div v-else class="flex flex-col items-center">
+              <div class="relative w-32 h-32 mb-2 border border-gray-800 rounded overflow-hidden">
+                <img :src="customizationForm.photoPreview" class="w-full h-full object-cover">
+              </div>
+              <p class="text-xs text-green-400 font-semibold mb-1"><i class="fas fa-check-circle mr-1"></i>Photo attached</p>
+              <p class="text-xs text-gray-500 truncate max-w-xs">{{ customizationForm.photoName }}</p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- WhatsApp Information -->
+        <div v-if="customizationForm.photoOption === 'whatsapp'" class="mb-6 p-4 bg-green-950/20 border border-green-500/20 rounded-lg">
+          <p class="text-sm text-green-400 flex items-start">
+            <i class="fab fa-whatsapp text-lg mr-2 mt-0.5"></i>
+            <span>You can complete your order now. An instant link will be provided on your receipt to message the shop and send your photo(s) on WhatsApp. Please remember to quote your Order ID!</span>
+          </p>
+        </div>
+        
+        <button 
+          @click="addCustomizedToCart"
+          type="button"
+          :disabled="customizationForm.photoOption === 'system' && !customizationForm.photoBase64"
+          class="w-full bg-yellow-400 text-black font-bold py-3 rounded-lg hover:bg-yellow-300 transition-colors disabled:opacity-50">
+          Add Frame to Cart
+        </button>
+      </div>
+    </div>
+
+    <!-- Cart Modal -->
+    <div v-if="showCart" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div class="bg-[#121212] rounded-xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <!-- Cart Header -->
+        <div class="p-4 border-b border-gray-800 flex justify-between items-center">
+          <h2 class="text-2xl font-bold text-yellow-400">Shopping Cart</h2>
+          <button @click="showCart = false" class="text-gray-400 hover:text-white">
+            <i class="fas fa-times text-xl"></i>
+          </button>
+        </div>
+        
+        <!-- Cart Items -->
+        <div class="flex-1 overflow-y-auto p-4">
+          <div v-if="cart.length === 0" class="text-center py-12 text-gray-400">
+            <i class="fas fa-shopping-cart text-6xl mb-4"></i>
+            <p>Your cart is empty</p>
+          </div>
+          
+          <div v-else class="space-y-4">
+            <div v-for="item in cart" :key="item.id" class="bg-[#1a1a1a] rounded-lg p-4 flex items-center gap-4">
+              <img :src="item.image" :alt="item.name" class="w-20 h-20 rounded-lg object-cover">
+              <div class="flex-1">
+                <h3 class="font-semibold">{{ item.name }}</h3>
+                <p class="text-gray-400">{{ settings.currency || 'Rs' }} {{ item.price }} each</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button @click="updateQuantity(item, -1)" class="bg-gray-700 w-8 h-8 rounded-full hover:bg-gray-600">
+                  <i class="fas fa-minus text-xs"></i>
+                </button>
+                <span class="w-8 text-center">{{ item.quantity }}</span>
+                <button @click="updateQuantity(item, 1)" class="bg-gray-700 w-8 h-8 rounded-full hover:bg-gray-600">
+                  <i class="fas fa-plus text-xs"></i>
+                </button>
+              </div>
+              <div class="text-right">
+                <p class="font-semibold">{{ settings.currency || 'Rs' }} {{ item.price * item.quantity }}</p>
+                <button @click="removeFromCart(item)" class="text-red-400 hover:text-red-300 text-sm">
+                  Remove
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Cart Footer -->
+        <div v-if="cart.length > 0" class="p-4 border-t border-gray-800">
+          <div class="flex justify-between mb-4">
+            <span class="text-lg">Subtotal:</span>
+            <span class="text-lg font-bold text-yellow-400">{{ settings.currency || 'Rs' }} {{ cartTotal }}</span>
+          </div>
+          <button 
+            @click="proceedToCheckout"
+            class="w-full bg-yellow-400 text-black font-bold py-3 rounded-lg hover:bg-yellow-300 transition-colors">
+            Proceed to Checkout
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Checkout Modal -->
+    <div v-if="showCheckout" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div class="bg-[#121212] rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6">
+        <h2 class="text-2xl font-bold text-yellow-400 mb-6">Checkout</h2>
+        
+        <!-- Order Type Selection -->
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold mb-3">Order Type</h3>
+          <div class="flex gap-4">
+            <button 
+              @click="checkoutForm.orderType = 'delivery'"
+              :class="['flex-1 p-4 rounded-lg border-2 transition-colors', 
+                       checkoutForm.orderType === 'delivery' ? 'border-yellow-400 bg-yellow-400/10' : 'border-gray-700']">
+              <i class="fas fa-truck text-2xl mb-2"></i>
+              <p class="font-semibold">Delivery</p>
+              <p class="text-sm text-gray-400">Get it delivered to your door</p>
+            </button>
+            <button 
+              @click="checkoutForm.orderType = 'pickup'"
+              :class="['flex-1 p-4 rounded-lg border-2 transition-colors', 
+                       checkoutForm.orderType === 'pickup' ? 'border-yellow-400 bg-yellow-400/10' : 'border-gray-700']">
+              <i class="fas fa-store text-2xl mb-2"></i>
+              <p class="font-semibold">Pickup</p>
+              <p class="text-sm text-gray-400">Pick it up from our branch</p>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Customer Info -->
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold mb-3">Customer Information</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-gray-400 text-sm mb-1">Name *</label>
+              <input 
+                v-model="checkoutForm.name"
+                type="text" 
+                required
+                class="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-gray-400 text-sm mb-1">Phone/WhatsApp *</label>
+              <input 
+                v-model="checkoutForm.phone"
+                type="tel" 
+                required
+                placeholder="+92 3XX XXXXXXX"
+                class="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none">
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-gray-400 text-sm mb-1">Email *</label>
+              <input 
+                v-model="checkoutForm.email"
+                type="email" 
+                required
+                class="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none">
+            </div>
+          </div>
+        </div>
+        
+        <!-- Delivery Address (if delivery selected) -->
+        <div v-if="checkoutForm.orderType === 'delivery'" class="mb-6">
+          <h3 class="text-lg font-semibold mb-3">Delivery Address</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-gray-400 text-sm mb-1">City *</label>
+              <select
+                v-model="checkoutForm.city"
+                @change="checkoutForm.area = ''"
+                required
+                class="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none">
+                <option value="">Select City/Region</option>
+                <option v-for="dc in deliveryCharges" :key="dc.location" :value="dc.location">
+                  {{ dc.location }} ({{ settings.currency || 'GH₵' }} {{ dc.charge }})
+                </option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-gray-400 text-sm mb-1">Area *</label>
+              <!-- If the admin priced specific areas for this city (e.g. Dansoman vs East Legon vs Pokuase,
+                   all in Accra), offer a dropdown so the right area-specific charge applies. Otherwise a
+                   free-text field is used and the flat city-wide charge applies. -->
+              <select
+                v-if="areasForSelectedCity.length > 0"
+                v-model="checkoutForm.area"
+                required
+                class="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none">
+                <option value="">Select your area</option>
+                <option v-for="ac in areasForSelectedCity" :key="ac.area" :value="ac.area">
+                  {{ ac.area }} ({{ settings.currency || 'GH₵' }} {{ ac.charge }})
+                </option>
+              </select>
+              <input
+                v-else
+                v-model="checkoutForm.area"
+                type="text"
+                required
+                placeholder="Enter your area"
+                class="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none">
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-gray-400 text-sm mb-1">Complete Address *</label>
+              <textarea
+                v-model="checkoutForm.address"
+                required
+                rows="3"
+                class="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none">
+              </textarea>
+            </div>
+          </div>
+
+          <!-- Preferred Delivery Service - tile cards -->
+          <div class="mt-4">
+            <label class="block text-gray-400 text-sm mb-2">Preferred Delivery Service *</label>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <button
+                v-for="app in deliveryApps"
+                :key="app.name"
+                type="button"
+                @click="checkoutForm.deliveryOption = app.name; checkoutForm.deliveryBookingMode = (app.name === 'Shop Rider') ? '' : checkoutForm.deliveryBookingMode"
+                :class="['p-3 rounded-lg border-2 text-center transition-colors',
+                         checkoutForm.deliveryOption === app.name ? 'border-yellow-400 bg-yellow-400/10 text-white' : 'border-gray-700 text-gray-400 hover:border-gray-500']">
+                <i :class="['mb-1 block text-xl', app.name === 'Shop Rider' ? 'fas fa-motorcycle text-yellow-400' : 'fas fa-shipping-fast text-blue-400']"></i>
+                <p class="font-semibold text-sm">{{ app.name }}</p>
+              </button>
+            </div>
+          </div>
+
+          <!-- Who books the ride? Only shown for 3rd-party services (Yango/Bolt/Uber/etc.) -->
+          <div v-if="isThirdPartyDelivery" class="mt-4 p-4 bg-[#1a1a1a] rounded-lg border border-gray-800">
+            <label class="block text-gray-300 text-sm font-semibold mb-2">
+              <i class="fas fa-question-circle text-yellow-400 mr-1"></i>
+              Who should book the {{ checkoutForm.deliveryOption }} ride? *
+            </label>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                @click="checkoutForm.deliveryBookingMode = 'admin'"
+                :class="['p-3 rounded-lg border-2 text-left transition-colors',
+                         checkoutForm.deliveryBookingMode === 'admin' ? 'border-yellow-400 bg-yellow-400/10 text-white' : 'border-gray-700 text-gray-400 hover:border-gray-500']">
+                <p class="font-semibold text-sm mb-1"><i class="fas fa-store mr-1"></i>We'll book & pay for it</p>
+                <p class="text-xs text-gray-400">We book your {{ checkoutForm.deliveryOption }} ride, pay the rider, then share the fee, rider bike number and tracking link with you.</p>
+              </button>
+              <button
+                type="button"
+                @click="checkoutForm.deliveryBookingMode = 'self'"
+                :class="['p-3 rounded-lg border-2 text-left transition-colors',
+                         checkoutForm.deliveryBookingMode === 'self' ? 'border-yellow-400 bg-yellow-400/10 text-white' : 'border-gray-700 text-gray-400 hover:border-gray-500']">
+                <p class="font-semibold text-sm mb-1"><i class="fas fa-user mr-1"></i>I'll book it myself</p>
+                <p class="text-xs text-gray-400">After checkout you'll be redirected to the {{ checkoutForm.deliveryOption }} app/website to book and pay for your own ride.</p>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pickup Branch (if pickup selected) -->
+        <div v-if="checkoutForm.orderType === 'pickup'" class="mb-6">
+          <h3 class="text-lg font-semibold mb-3">Select Pickup Branch</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-gray-400 text-sm mb-1">City *</label>
+              <select 
+                v-model="checkoutForm.city"
+                @change="checkoutForm.branch = ''"
+                required
+                class="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none">
+                <option value="">Select City</option>
+                <option v-for="city in availableCities" :key="city" :value="city">{{ city }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-gray-400 text-sm mb-1">Branch *</label>
+              <select 
+                v-model="checkoutForm.branch"
+                required
+                :disabled="!checkoutForm.city"
+                class="w-full px-4 py-2 rounded-lg bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none disabled:opacity-50">
+                <option value="">Select Branch</option>
+                <option v-for="branch in filteredBranches" :key="branch.name" :value="branch.name">
+                  {{ branch.name }} - {{ branch.area }}
+                </option>
+              </select>
+            </div>
+          </div>
+          <div v-if="selectedBranch" class="mt-4 p-4 bg-[#1a1a1a] rounded-lg">
+            <p class="font-semibold">{{ selectedBranch.name }}</p>
+            <p class="text-sm text-gray-400">{{ selectedBranch.address }}</p>
+            <p class="text-sm text-gray-400">{{ selectedBranch.timing }}</p>
+            <p class="text-sm text-gray-400">{{ selectedBranch.phone }}</p>
+          </div>
+        </div>
+        
+        <!-- Order Summary -->
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold mb-3">Order Summary</h3>
+          <div class="bg-[#1a1a1a] rounded-lg p-4">
+            <div class="space-y-2">
+              <div class="flex justify-between">
+                <span>Subtotal</span>
+                <span>{{ settings.currency || 'Rs' }} {{ cartTotal }}</span>
+              </div>
+              <div v-if="checkoutForm.orderType === 'delivery'" class="flex justify-between">
+                <span>Delivery Charge</span>
+                <span>{{ settings.currency || 'Rs' }} {{ deliveryCharge }}</span>
+              </div>
+              <div class="flex justify-between font-bold text-yellow-400 pt-2 border-t border-gray-700">
+                <span>Total</span>
+                <span>{{ settings.currency || 'Rs' }} {{ orderTotal }}</span>
+              </div>
+            </div>
+
+            <!-- Payment Method Selection & Instructions (enlarged for legibility) -->
+            <div class="mt-6 p-5 bg-[#1a1a1a] rounded-xl border border-gray-800">
+              <h4 class="text-lg font-bold text-yellow-400 mb-4 flex items-center gap-2">
+                <i class="fas fa-money-check-alt"></i> Payment Method
+              </h4>
+
+              <!-- Multiple active payment methods: pick one -->
+              <div v-if="activePaymentMethods.length > 0" class="space-y-3 mb-4">
+                <button
+                  v-for="(pm, idx) in activePaymentMethods"
+                  :key="pm.id"
+                  type="button"
+                  @click="checkoutForm.paymentMethodIndex = idx"
+                  :class="['w-full text-left p-4 rounded-lg border-2 transition-colors flex items-center gap-3',
+                           checkoutForm.paymentMethodIndex === idx ? 'border-yellow-400 bg-yellow-400/10' : 'border-gray-700 hover:border-gray-500']">
+                  <img v-if="pm.logo" :src="pm.logo" class="w-10 h-10 object-contain rounded flex-shrink-0" alt="Payment Logo">
+                  <i v-else class="fas fa-money-check-alt text-2xl text-yellow-400 flex-shrink-0"></i>
+                  <div class="min-w-0">
+                    <p class="text-base font-bold text-white">{{ pm.name }}</p>
+                    <p class="text-sm text-gray-300 truncate">{{ pm.details }}</p>
+                  </div>
+                  <i v-if="checkoutForm.paymentMethodIndex === idx" class="fas fa-check-circle text-yellow-400 text-xl ml-auto flex-shrink-0"></i>
+                </button>
+              </div>
+
+              <!-- Legacy single-payment-method fallback (before admin sets up the Payment Methods list) -->
+              <div v-else class="mb-4">
+                <p class="text-base font-bold text-white flex items-center gap-2 mb-2">
+                  <img v-if="settings.paymentMethodLogo" :src="settings.paymentMethodLogo" class="w-8 h-8 object-contain rounded" alt="Payment Logo">
+                  {{ settings.paymentMethodName || 'MTN Mobile Money' }}
+                </p>
+                <p class="text-sm text-gray-300">{{ settings.paymentDetails || 'MTN Mobile Money: 0244123456 (Manuel Frames)' }}</p>
+              </div>
+
+              <p class="text-sm text-gray-300 mb-2">
+                Please make payment to the account details shown above, then enter the transaction ID below:
+              </p>
+              <div v-if="selectedPaymentMethod" class="p-3 bg-[#0d0d0d] rounded-lg border border-gray-800 text-base font-mono text-yellow-200 select-all mb-4">
+                {{ selectedPaymentMethod.details }}
+              </div>
+
+              <!-- Transaction ID field -->
+              <div class="mb-2">
+                <label class="block text-gray-300 text-sm font-bold mb-1">Transaction ID *</label>
+                <input
+                  v-model="checkoutForm.transactionId"
+                  type="text"
+                  required
+                  placeholder="Enter Transaction ID"
+                  class="w-full px-4 py-3 rounded-lg bg-[#0d0d0d] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none text-base">
+              </div>
+              <p class="text-xs text-gray-400 mt-2">
+                * Note: The administrator will verify this transaction ID inside the portal to confirm your order.
+              </p>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="flex gap-4">
+          <button 
+            @click="showCheckout = false"
+            class="flex-1 px-6 py-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition-colors">
+            Back to Cart
+          </button>
+          <button 
+            @click="placeOrder"
+            :disabled="placingOrder"
+            class="flex-1 px-6 py-3 rounded-lg bg-yellow-400 text-black font-bold hover:bg-yellow-300 transition-colors disabled:opacity-50">
+            <span v-if="!placingOrder">Place Order</span>
+            <span v-else><i class="fas fa-spinner fa-spin mr-2"></i>Processing...</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Invoice/Receipt Modal -->
+    <div v-if="showInvoice && orderDetails" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div class="bg-[#121212] rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <!-- Modal Header -->
+        <div class="p-4 border-b border-gray-800 flex justify-between items-center no-print">
+          <h2 class="text-xl font-bold text-yellow-400">Order Invoice</h2>
+          <button @click="closeInvoice" class="text-gray-400 hover:text-white">
+            <i class="fas fa-times text-xl"></i>
+          </button>
+        </div>
+        
+        <!-- Receipt Content -->
+        <div id="receipt-content" class="receipt-paper">
+          <!-- Store Header -->
+          <div style="text-align: center; margin-bottom: 16px;">
+            <h1 style="font-size: 18px; font-weight: bold; margin: 0;">HD LAMINATED CANVAS FRAMES</h1>
+            <p style="font-size: 12px; margin: 4px 0;">Tel: +92 300 1234567</p>
+            <p style="font-size: 12px; margin: 4px 0;">Premium Canvas Lamination & Framing</p>
+          </div>
+          
+          <div class="receipt-double-line"></div>
+          
+          <!-- Order Info -->
+          <div style="font-size: 12px; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between;">
+              <span>Order #:</span>
+              <span style="font-weight: bold;">{{ orderDetails.orderId }}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span>Date:</span>
+              <span>{{ formatReceiptDate(orderDetails.timestamp) }}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span>Time:</span>
+              <span>{{ formatReceiptTime(orderDetails.timestamp) }}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between;">
+              <span>Type:</span>
+              <span style="text-transform: uppercase; font-weight: bold;">{{ orderDetails.type }}</span>
+            </div>
+          </div>
+          
+          <div class="receipt-line"></div>
+          
+          <!-- Customer Info -->
+          <div style="font-size: 12px; margin-bottom: 12px;">
+            <div style="font-weight: bold; margin-bottom: 4px;">CUSTOMER:</div>
+            <div>{{ orderDetails.customerName }}</div>
+            <div>{{ orderDetails.phone }}</div>
+            <div v-if="orderDetails.type === 'delivery'">
+              <div style="margin-top: 4px;">DELIVERY TO:</div>
+              <div>{{ orderDetails.address }}</div>
+              <div>{{ orderDetails.area }}, {{ orderDetails.city }}</div>
+            </div>
+            <div v-else>
+              <div style="margin-top: 4px;">PICKUP FROM:</div>
+              <div>{{ orderDetails.branch }}</div>
+            </div>
+          </div>
+          
+          <div class="receipt-double-line"></div>
+          
+          <!-- Items Header -->
+          <div style="font-size: 12px; font-weight: bold; margin-bottom: 8px;">
+            <div style="display: flex;">
+              <span style="flex: 2;">ITEM</span>
+              <span style="flex: 1; text-align: center;">QTY</span>
+              <span style="flex: 1; text-align: center;">PRICE</span>
+              <span style="flex: 1; text-align: right;">TOTAL</span>
+            </div>
+          </div>
+          
+          <div class="receipt-line"></div>
+          
+          <!-- Items List -->
+          <div style="font-size: 11px;">
+            <div v-for="item in orderDetails.items" :key="item.id" style="margin-bottom: 8px;">
+              <div style="display: flex;">
+                <span style="flex: 2; word-break: break-word;">{{ item.name }}</span>
+                <span style="flex: 1; text-align: center;">{{ item.quantity }}</span>
+                <span style="flex: 1; text-align: center;">{{ item.price }}</span>
+                <span style="flex: 1; text-align: right;">{{ item.price * item.quantity }}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div class="receipt-double-line"></div>
+          
+          <!-- Totals -->
+          <div style="font-size: 12px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <span>Subtotal:</span>
+              <span>{{ settings.currency || 'Rs' }} {{ orderDetails.subtotal }}</span>
+            </div>
+            <div v-if="orderDetails.deliveryCharge > 0" style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <span>Delivery:</span>
+              <span>{{ settings.currency || 'Rs' }} {{ orderDetails.deliveryCharge }}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; margin-top: 8px;">
+              <span>TOTAL:</span>
+              <span>{{ settings.currency || 'Rs' }} {{ orderDetails.total }}</span>
+            </div>
+          </div>
+          
+          <div class="receipt-double-line"></div>
+          
+          <!-- Footer -->
+          <div style="text-align: center; margin-top: 16px; font-size: 11px;">
+            <p style="margin: 4px 0;">Thank you for your order!</p>
+            <p style="margin: 4px 0;">Please keep this receipt for reference</p>
+            <p v-if="orderDetails.type === 'delivery'" style="margin: 8px 0; font-weight: bold;">
+              Estimated Delivery: 30-45 mins
+            </p>
+            <p v-else style="margin: 8px 0; font-weight: bold;">
+              Pickup Time: 20-30 mins
+            </p>
+          </div>
+          
+          <div style="text-align: center; margin-top: 16px; font-size: 10px;">
+            <p>Order ID: {{ orderDetails.orderId }}</p>
+            <p style="margin-top: 8px;">Powered by HD Canvas Frames</p>
+          </div>
+        </div>
+        
+        <!-- Action Buttons -->
+        <div class="p-4 border-t border-gray-800 flex gap-4 no-print">
+          <button 
+            @click="printInvoice"
+            class="flex-1 bg-yellow-400 text-black font-bold py-3 rounded-lg hover:bg-yellow-300 transition-colors">
+            <i class="fas fa-print mr-2"></i>Print Receipt
+          </button>
+          <button 
+            @click="downloadInvoice"
+            class="flex-1 bg-gray-700 text-white py-3 rounded-lg hover:bg-gray-600 transition-colors">
+            <i class="fas fa-download mr-2"></i>Download
+          </button>
+        </div>
+        
+        <!-- WhatsApp Dispatch Notification (Only if WhatsApp upload selected) -->
+        <div v-if="hasWhatsAppItems" :class="['p-4 bg-green-900/20 border-t border-green-500/25 text-center no-print flex flex-col items-center', { 'rounded-b-xl': !getDeliveryAppUrl }]">
+          <p class="text-sm text-green-300 mb-3 font-semibold">
+            <i class="fab fa-whatsapp mr-1 text-green-400"></i>Action Required: Send your photos via WhatsApp!
+          </p>
+          <a :href="getWhatsAppLink" target="_blank" class="w-full max-w-xs bg-green-500 text-black font-bold py-3 rounded-lg hover:bg-green-400 transition-colors inline-block text-center shadow-lg text-sm sm:text-base">
+            <i class="fab fa-whatsapp text-lg mr-2"></i>Send Photos Now
+          </a>
+        </div>
+
+        <!-- Third-party Delivery: customer books it themselves -->
+        <div v-if="getDeliveryAppUrl" class="p-4 bg-blue-900/20 border-t border-blue-500/25 rounded-b-xl text-center no-print flex flex-col items-center">
+          <p class="text-sm text-blue-300 mb-3 font-semibold">
+            <i class="fas fa-shipping-fast mr-1 text-blue-400"></i>Action Required: Book delivery with {{ orderDetails.deliveryOption }}!
+          </p>
+          <a :href="getDeliveryAppUrl" target="_blank" class="w-full max-w-xs bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-500 transition-colors inline-block text-center shadow-lg text-sm sm:text-base">
+            <i class="fas fa-external-link-alt mr-2"></i>Book Delivery (Open App)
+          </a>
+        </div>
+
+        <!-- Third-party Delivery: shop will book it for the customer -->
+        <div v-if="isAdminBookedDelivery" class="p-4 bg-purple-900/20 border-t border-purple-500/25 rounded-b-xl text-center no-print flex flex-col items-center">
+          <p class="text-sm text-purple-300 font-semibold">
+            <i class="fas fa-store mr-1 text-purple-400"></i>
+            Our shop will book your {{ orderDetails.deliveryOption }} ride and pay for it. We'll share the fee, rider bike number and a tracking link with you shortly &mdash; check "Track Order" for updates.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Order Tracking Modal -->
+    <div v-if="showTrackOrder" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div class="bg-[#121212] rounded-xl w-full max-w-4xl modal-content" style="width: 80%; max-height: 90vh; overflow-y: auto;">
+        <!-- Modal Header -->
+        <div class="p-4 border-b border-gray-800">
+          <div class="flex justify-between items-center">
+            <h2 class="text-xl font-bold text-yellow-400">
+              <i class="fas fa-search mr-2"></i>Track Your Order
+            </h2>
+            <button @click="closeTrackOrder" class="text-gray-400 hover:text-white">
+              <i class="fas fa-times text-xl"></i>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Modal Body -->
+        <div class="p-6">
+          <div v-if="!trackingOrder">
+            <p class="text-gray-300 mb-4">Enter your order number to track its status</p>
+            
+            <div class="mb-4">
+              <label class="block text-gray-400 text-sm mb-2">Order Number</label>
+              <input 
+                v-model="trackOrderId"
+                type="text"
+                placeholder="e.g., ORD1234567890"
+                class="w-full px-4 py-3 rounded-lg bg-[#1a1a1a] text-white border border-gray-700 focus:border-yellow-400 focus:outline-none"
+                @keyup.enter="trackOrder">
+            </div>
+            
+            <div v-if="trackError" class="mb-4 p-3 bg-red-900 text-red-200 rounded-lg text-sm">
+              <i class="fas fa-exclamation-circle mr-2"></i>{{ trackError }}
+            </div>
+            
+            <button 
+              @click="trackOrder"
+              :disabled="!trackOrderId || trackingLoading"
+              class="w-full bg-yellow-400 text-black font-bold py-3 rounded-lg hover:bg-yellow-300 transition-colors disabled:opacity-50">
+              <span v-if="!trackingLoading">
+                <i class="fas fa-search mr-2"></i>Track Order
+              </span>
+              <span v-else>
+                <i class="fas fa-spinner fa-spin mr-2"></i>Searching...
+              </span>
+            </button>
+          </div>
+          
+          <!-- Order Status Display -->
+          <div v-else>
+            <div class="bg-[#1a1a1a] rounded-lg p-4 mb-4">
+              <div class="flex justify-between items-start mb-3">
+                <div>
+                  <p class="text-xs text-gray-400">Order Number</p>
+                  <p class="font-mono font-bold text-yellow-400">{{ trackingOrder.id }}</p>
+                </div>
+                <span :class="['px-3 py-1 rounded-full text-xs font-bold', getTrackingStatusClass(trackingOrder.status)]">
+                  {{ trackingOrder.status }}
+                </span>
+              </div>
+              
+              <div class="mb-3">
+                <p class="text-xs text-gray-400">Customer Name</p>
+                <p class="font-semibold">{{ trackingOrder.customerName }}</p>
+              </div>
+              
+              <div class="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p class="text-xs text-gray-400">Order Date</p>
+                  <p>{{ formatTrackingDate(trackingOrder.timestamp) }}</p>
+                </div>
+                <div>
+                  <p class="text-xs text-gray-400">Total Amount</p>
+                  <p class="font-bold text-green-400">{{ settings.currency || 'Rs' }} {{ trackingOrder.total }}</p>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Status Timeline -->
+            <div class="mb-4">
+              <h3 class="text-sm font-semibold text-gray-400 mb-3">Order Progress</h3>
+              <div class="relative">
+                <div class="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-700"></div>
+                
+                <!-- Status Steps -->
+                <div class="space-y-3">
+                  <div v-for="step in getStatusSteps(trackingOrder)" :key="step.status" class="flex items-center">
+                    <div :class="['w-8 h-8 rounded-full flex items-center justify-center z-10', 
+                                  step.completed ? 'bg-green-500' : step.current ? 'bg-yellow-400' : 'bg-gray-700']">
+                      <i :class="['fas text-xs', step.icon, step.completed || step.current ? 'text-black' : 'text-gray-400']"></i>
+                    </div>
+                    <div class="ml-4 flex-1">
+                      <p :class="['font-semibold text-sm', step.completed || step.current ? 'text-white' : 'text-gray-500']">
+                        {{ step.label }}
+                      </p>
+                      <p v-if="step.time" class="text-xs text-gray-400">{{ formatTrackingTime(step.time) }}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Order Items -->
+            <div class="bg-[#1a1a1a] rounded-lg p-3 mb-4">
+              <p class="text-sm font-semibold mb-2">Order Items ({{ trackingOrder.items.length }})</p>
+              <div class="text-sm space-y-1 max-h-32 overflow-y-auto">
+                <div v-for="item in trackingOrder.items" :key="item.id" class="flex justify-between">
+                  <span>{{ item.quantity }}x {{ item.name }}</span>
+                  <span class="text-gray-400">{{ settings.currency || 'Rs' }} {{ item.price * item.quantity }}</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Additional Info -->
+            <div v-if="trackingOrder.type === 'delivery' && trackingOrder.rider" class="bg-blue-900/30 rounded-lg p-4 mb-4 border border-blue-900/50">
+              <p class="text-sm font-semibold text-blue-400 mb-2">
+                <i class="fas fa-motorcycle mr-2"></i>Delivery Rider Information
+              </p>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <p class="text-xs text-gray-400">Rider Name</p>
+                  <p class="text-sm font-semibold text-white">{{ trackingOrder.riderName || trackingOrder.rider }}</p>
+                </div>
+                <div v-if="trackingOrder.riderContact">
+                  <p class="text-xs text-gray-400">Contact Number</p>
+                  <a :href="'tel:' + trackingOrder.riderContact" class="text-sm font-semibold text-yellow-400 hover:text-yellow-300">
+                    <i class="fas fa-phone mr-1"></i>{{ trackingOrder.riderContact }}
+                  </a>
+                </div>
+              </div>
+              <div v-if="trackingOrder.status === 'Out for Delivery'" class="mt-3 pt-3 border-t border-blue-900/30">
+                <p class="text-xs text-gray-400 mb-1">Estimated Delivery Time</p>
+                <p class="text-sm font-semibold text-green-400">30-45 minutes</p>
+              </div>
+            </div>
+
+            <!-- Third-party ride booked by the shop: show fee, rider bike number & tracking link -->
+            <div v-if="trackingOrder.type === 'delivery' && trackingOrder.deliveryOption && trackingOrder.deliveryOption !== 'Shop Rider' && trackingOrder.deliveryBookingMode === 'admin'"
+                 class="bg-purple-900/30 rounded-lg p-4 mb-4 border border-purple-900/50">
+              <p class="text-sm font-semibold text-purple-400 mb-2">
+                <i class="fas fa-shipping-fast mr-2"></i>{{ trackingOrder.deliveryOption }} Ride Details (booked by us)
+              </p>
+              <div v-if="trackingOrder.riderBikeNumber || trackingOrder.deliveryFee" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
+                <div v-if="trackingOrder.deliveryFee">
+                  <p class="text-xs text-gray-400">Ride Fee Charged</p>
+                  <p class="text-sm font-semibold text-white">{{ settings.currency || 'Rs' }} {{ trackingOrder.deliveryFee }}</p>
+                </div>
+                <div v-if="trackingOrder.riderBikeNumber">
+                  <p class="text-xs text-gray-400">Rider Bike Number</p>
+                  <p class="text-sm font-semibold text-white">{{ trackingOrder.riderBikeNumber }}</p>
+                </div>
+              </div>
+              <a v-if="trackingOrder.riderTrackingUrl" :href="trackingOrder.riderTrackingUrl" target="_blank"
+                 class="mt-1 inline-block bg-purple-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-purple-500 transition-colors text-sm">
+                <i class="fas fa-map-marker-alt mr-1"></i>Track Your Ride
+              </a>
+              <p v-else class="text-xs text-gray-400">We'll share your tracking link here as soon as the ride is booked.</p>
+            </div>
+
+            <!-- Third-party ride the customer books/pays themselves -->
+            <div v-if="trackingOrder.type === 'delivery' && trackingOrder.deliveryOption && trackingOrder.deliveryOption !== 'Shop Rider' && trackingOrder.deliveryBookingMode === 'self'"
+                 class="bg-blue-900/30 rounded-lg p-4 mb-4 border border-blue-900/50">
+              <p class="text-sm font-semibold text-blue-400 mb-2">
+                <i class="fas fa-user mr-2"></i>You chose to book this {{ trackingOrder.deliveryOption }} ride yourself
+              </p>
+              <a v-if="getTrackingDeliveryAppUrl(trackingOrder)" :href="getTrackingDeliveryAppUrl(trackingOrder)" target="_blank"
+                 class="inline-block bg-blue-600 text-white font-bold px-4 py-2 rounded-lg hover:bg-blue-500 transition-colors text-sm">
+                <i class="fas fa-external-link-alt mr-1"></i>Open {{ trackingOrder.deliveryOption }}
+              </a>
+            </div>
+
+            <button
+              @click="resetTracking"
+              class="w-full bg-gray-700 text-white py-2 rounded-lg hover:bg-gray-600 transition-colors">
+              Track Another Order
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bouncing WhatsApp Icon -->
+    <div class="fixed bottom-24 right-6 z-50 no-print">
+      <a :href="'https://wa.me/' + String(settings.whatsappContact || '+233244123456').replace(/[^0-9]/g, '') + '?text=Hi, I am interested in ordering canvas picture frames!'" 
+         target="_blank" 
+         class="w-14 h-14 bg-green-500 rounded-full flex items-center justify-center shadow-2xl hover:bg-green-400 transition-colors animate-bounce cursor-pointer relative group"
+         title="Message us on WhatsApp">
+        <i class="fab fa-whatsapp text-white text-3xl"></i>
+        <!-- Ripple effect -->
+        <span class="absolute inset-0 rounded-full border-4 border-green-500 animate-ping opacity-75"></span>
+        <!-- Tooltip -->
+        <span class="absolute right-16 bg-[#121212] text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-gray-800 pointer-events-none">
+          Chat with Us
+        </span>
+      </a>
+    </div>
+
+    <!-- AI Chatbot Icon and Panel -->
+    <div class="fixed bottom-6 right-6 z-50 no-print">
+      <!-- Toggle Button -->
+      <button 
+        @click="showChatbot = !showChatbot" 
+        class="w-14 h-14 bg-blue-600 hover:bg-blue-500 text-white rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 relative group"
+        title="AI Assistant">
+        <i :class="['fas text-xl transition-transform duration-300', showChatbot ? 'fa-times rotate-90' : 'fa-comment-alt']"></i>
+        <span v-if="!showChatbot" class="absolute -top-1 -right-1 bg-red-500 w-3 h-3 rounded-full animate-ping"></span>
+        <span v-if="!showChatbot" class="absolute -top-1 -right-1 bg-red-500 w-3 h-3 rounded-full"></span>
+        <!-- Tooltip -->
+        <span class="absolute right-16 bg-[#121212] text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap border border-gray-800 pointer-events-none">
+          Canvas AI Assistant
+        </span>
+      </button>
+
+      <!-- Chat Window Panel -->
+      <div v-if="showChatbot" class="absolute bottom-16 right-0 w-80 sm:w-96 h-[480px] bg-[#121212] border border-gray-800 rounded-2xl flex flex-col shadow-2xl overflow-hidden animate-fade-in">
+        <!-- Header -->
+        <div class="bg-blue-600 p-4 text-white flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+            <i class="fas fa-robot text-lg"></i>
+          </div>
+          <div>
+            <h4 class="font-bold text-sm">Frame Shop Assistant</h4>
+            <span class="text-[10px] opacity-75 flex items-center gap-1">
+              <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span> Online AI Agent
+            </span>
+          </div>
+        </div>
+
+        <!-- Message Feed -->
+        <div ref="chatbotMessagesContainer" class="flex-1 overflow-y-auto p-4 space-y-3 bg-[#0d0d0d]">
+          <div v-for="(msg, idx) in chatbotMessages" :key="idx" 
+               :class="['flex flex-col max-w-[80%] rounded-2xl px-3 py-2 text-sm', 
+                        msg.sender === 'user' ? 'bg-blue-600 text-white ml-auto rounded-tr-none' : 'bg-[#1a1a1a] text-gray-200 mr-auto rounded-tl-none']">
+            <p class="whitespace-pre-line">{{ msg.text }}</p>
+            <span class="text-[9px] opacity-60 text-right mt-1">{{ msg.time }}</span>
+          </div>
+          
+          <!-- Typing indicator -->
+          <div v-if="chatbotTyping" class="bg-[#1a1a1a] text-gray-200 mr-auto rounded-2xl rounded-tl-none px-3 py-2 text-sm max-w-[50%] flex gap-1 items-center">
+            <span class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
+            <span class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-100"></span>
+            <span class="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce delay-200"></span>
+          </div>
+        </div>
+
+        <!-- Input Bar -->
+        <form @submit.prevent="sendChatbotMessage" class="p-3 border-t border-gray-800 bg-[#121212] flex gap-2">
+          <input 
+            v-model="chatbotInput"
+            type="text"
+            placeholder="Ask sizes, prices, track orders..."
+            class="flex-1 px-3 py-2 text-sm rounded-lg bg-[#1a1a1a] text-white border border-gray-700 focus:outline-none focus:border-blue-600">
+          <button 
+            type="submit" 
+            :disabled="!chatbotInput.trim()"
+            class="w-10 h-10 bg-blue-600 text-white rounded-lg flex items-center justify-center hover:bg-blue-500 transition-colors disabled:opacity-50">
+            <i class="fas fa-paper-plane"></i>
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { createApp } = Vue;
+
+    createApp({
+      data() {
+        return {
+          // Data
+          menuItems: [],
+          deliveryCharges: [],
+          areaDeliveryCharges: [],
+          paymentMethods: [],
+          categories: [],
+          banners: [],
+          branches: [],
+          cart: [],
+          deliveryApps: [],
+          scriptUrl: '',
+          theme: 'dark',
+          showChatbot: false,
+          chatbotInput: '',
+          chatbotTyping: false,
+          chatbotMessages: [],
+          settings: {
+            businessName: 'HD Laminated Canvas Frames',
+            businessInfo: '',
+            businessLogo: '',
+            whatsappContact: '+233244123456',
+            momoInfo: '',
+            currency: 'Rs',
+            themeColor: '#EAB308'
+          },
+          
+          // UI State
+          activeCategory: '',
+          loading: true,
+          error: null,
+          isScrolling: false,
+          scrollTimeout: null,
+          currentSlide: 0,
+          sliderInterval: null,
+          showCart: false,
+          showCheckout: false,
+          showInvoice: false,
+          showLoginDropdown: false,
+          showTrackOrder: false,
+          orderType: 'delivery',
+          placingOrder: false,
+          orderDetails: null,
+          
+          // Customization & Uploads
+          showCustomization: false,
+          customizingItem: {},
+          customizationForm: {
+            photoOption: 'system',
+            photoBase64: '',
+            photoPreview: '',
+            photoName: ''
+          },
+          
+          // Order Tracking
+          trackOrderId: '',
+          trackingOrder: null,
+          trackingLoading: false,
+          trackError: '',
+          
+          // Forms
+          checkoutForm: {
+            orderType: 'delivery',
+            name: '',
+            phone: '',
+            email: '',
+            city: '',
+            area: '',
+            address: '',
+            branch: '',
+            deliveryOption: 'Shop Rider',
+            // Who books/pays the ride when a 3rd-party service (Yango/Bolt/Uber/etc.) is chosen:
+            // 'admin' = shop books & pays, then shares fee/rider/tracking details with the customer
+            // 'self'  = customer books & pays the ride themselves via the delivery app
+            deliveryBookingMode: '',
+            notes: '',
+            transactionId: '',
+            paymentMethodIndex: 0
+          }
+        }
+      },
+      computed: {
+        cartItemsCount() {
+          return this.cart.reduce((total, item) => total + item.quantity, 0);
+        },
+        cartTotal() {
+          return this.cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+        },
+        deliveryCharge() {
+          if (this.checkoutForm.orderType !== 'delivery') return 0;
+          if (this.checkoutForm.deliveryOption !== 'Shop Rider') return 0;
+          
+          const selectedCity = this.checkoutForm.city;
+          const selectedArea = this.checkoutForm.area;
+          if (!selectedCity) return 0;
+          
+          // Area-specific charge takes priority over the flat city-wide charge, so the shop's
+          // own rider can charge differently for e.g. Dansoman vs East Legon vs Pokuase (all Accra).
+          if (selectedArea) {
+            const areaMatch = this.areaDeliveryCharges.find(ac => 
+              ac.city.trim().toLowerCase() === selectedCity.trim().toLowerCase() &&
+              ac.area.trim().toLowerCase() === selectedArea.trim().toLowerCase()
+            );
+            if (areaMatch) return Number(areaMatch.charge);
+          }
+          
+          const matchingRate = this.deliveryCharges.find(dc => dc.location === selectedCity);
+          return matchingRate ? Number(matchingRate.charge) : 0;
+        },
+        // Areas with a specific admin-configured rate for the selected city (used to offer
+        // a dropdown of priced areas instead of a free-text field when they exist).
+        areasForSelectedCity() {
+          if (!this.checkoutForm.city) return [];
+          return this.areaDeliveryCharges.filter(ac => 
+            ac.city.trim().toLowerCase() === this.checkoutForm.city.trim().toLowerCase()
+          );
+        },
+        // Whether the customer picked a 3rd-party ride-hailing service instead of the shop's own rider
+        isThirdPartyDelivery() {
+          return this.checkoutForm.orderType === 'delivery' && this.checkoutForm.deliveryOption && this.checkoutForm.deliveryOption !== 'Shop Rider';
+        },
+        activePaymentMethods() {
+          return this.paymentMethods.filter(pm => pm.active !== false);
+        },
+        selectedPaymentMethod() {
+          return this.activePaymentMethods[this.checkoutForm.paymentMethodIndex] || this.activePaymentMethods[0] || null;
+        },
+        orderTotal() {
+          return this.cartTotal + (this.checkoutForm.orderType === 'delivery' ? this.deliveryCharge : 0);
+        },
+        availableCities() {
+          return [...new Set(this.branches.map(b => b.city))];
+        },
+        filteredBranches() {
+          return this.branches.filter(b => b.city === this.checkoutForm.city);
+        },
+        selectedBranch() {
+          return this.branches.find(b => b.name === this.checkoutForm.branch);
+        },
+        hasWhatsAppItems() {
+          if (!this.orderDetails || !this.orderDetails.items) return false;
+          return this.orderDetails.items.some(item => item.photoOption === 'whatsapp');
+        },
+        getWhatsAppLink() {
+          if (!this.orderDetails) return '#';
+          const defaultPhone = '+923211234567';
+          // Find first active branch's phone if available
+          const activeBranch = this.branches.find(b => b.active);
+          const businessPhone = activeBranch ? activeBranch.phone : defaultPhone;
+          const itemsText = this.orderDetails.items
+            .map(function(item) {
+              return '- ' + item.quantity + 'x ' + item.name + ' (' + (item.photoOption === 'system' ? 'Uploaded' : 'Sending via WhatsApp') + ')';
+            })
+            .join('\n');
+          const text = 'Hi, I just placed an order (ID: ' + this.orderDetails.orderId + ') for canvas frames!\n\nCustomer Details:\n- Name: ' + this.orderDetails.customerName + '\n- Phone: ' + this.orderDetails.phone + '\n\nFrames Ordered:\n' + itemsText + '\n\nHere are my photos for framing:';
+          return 'https://wa.me/' + String(businessPhone).replace(/[^0-9]/g, '') + '?text=' + encodeURIComponent(text);
+        },
+        getDeliveryAppUrl() {
+          if (!this.orderDetails || !this.orderDetails.deliveryOption) return '';
+          // Only show the "book it yourself" redirect when the customer chose to book the ride themselves
+          if (this.orderDetails.deliveryBookingMode !== 'self') return '';
+          const app = this.deliveryApps.find(a => a.name === this.orderDetails.deliveryOption);
+          return app ? app.url : '';
+        },
+        isAdminBookedDelivery() {
+          return !!(this.orderDetails && this.orderDetails.deliveryOption && this.orderDetails.deliveryOption !== 'Shop Rider' && this.orderDetails.deliveryBookingMode === 'admin');
+        }
+      },
+      methods: {
+        handleImageLoad(event) {
+          event.target.classList.add('fade-in');
+        },
+
+        async fetchSettings() {
+          try {
+            const result = await new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .getSystemSettings();
+            });
+            this.settings = result;
+            this.applyDynamicColors(result.themeColor);
+            
+            // Add chatbot initial greeting
+            this.chatbotMessages = [
+              { 
+                sender: 'bot', 
+                text: 'Hello! Welcome to ' + (result.businessName || 'HD Canvas Frames') + '. How can I help you today? \n\nAsk me about:\n- Frame sizes 📐\n- Catalog prices 💰\n- Payment details 💳\n- Track your order (type your Order ID! 📦)',
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})
+              }
+            ];
+          } catch (error) {
+            console.error('Error fetching settings:', error);
+          }
+        },
+
+        sendChatbotMessage() {
+          if (!this.chatbotInput.trim()) return;
+          
+          const userMsg = this.chatbotInput.trim();
+          this.chatbotMessages.push({ sender: 'user', text: userMsg, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) });
+          this.chatbotInput = '';
+          
+          this.chatbotTyping = true;
+          this.scrollChatbotToBottom();
+          
+          setTimeout(() => {
+            const reply = this.generateChatbotReply(userMsg);
+            this.chatbotTyping = false;
+            this.chatbotMessages.push({ sender: 'bot', text: reply, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) });
+            this.scrollChatbotToBottom();
+          }, 1000);
+        },
+
+        generateChatbotReply(msg) {
+          const m = msg.toLowerCase();
+          const currency = this.settings.currency || 'Rs';
+          
+          // Order tracking
+          const orderMatch = m.match(/\b(ord[0-9a-f]+)\b/);
+          if (orderMatch || m.includes('track') || m.includes('status') || m.includes('order')) {
+            const orderId = orderMatch ? orderMatch[1].toUpperCase() : null;
+            if (orderId) {
+              google.script.run
+                .withSuccessHandler((result) => {
+                  if (result && result.status) {
+                    const text = 'Order ' + orderId + ' Status: ' + result.status + 
+                                 '\nCustomer: ' + result.customerName + 
+                                 '\nTotal: ' + currency + ' ' + result.total + 
+                                 '\nAssigned Agent: ' + (result.riderName || result.rider || 'Not assigned yet');
+                    this.chatbotMessages.push({ sender: 'bot', text: text, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) });
+                    this.scrollChatbotToBottom();
+                  } else {
+                    this.chatbotMessages.push({ sender: 'bot', text: 'I could not find an order with ID ' + orderId + '. Please check the spelling and try again.', time: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) });
+                    this.scrollChatbotToBottom();
+                  }
+                })
+                .withFailureHandler((err) => {
+                  this.chatbotMessages.push({ sender: 'bot', text: 'Sorry, I encountered an error checking your order status.', time: new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) });
+                  this.scrollChatbotToBottom();
+                })
+                .trackOrder(orderId);
+              return 'Let me check order status for ' + orderId + '...';
+            } else {
+              return 'To track your order, please type your Order ID (starts with ORD followed by numbers).';
+            }
+          }
+          
+          // Sizing queries
+          if (m.includes('size') || m.includes('dimension') || m.includes('inches') || m.includes('measurement')) {
+            return 'We offer various frame sizes to suit your needs: \n' +
+                   '- A4 Canvas: 8.3" x 11.7" (Single)\n' +
+                   '- A3 Premium: 11.7" x 16.5" (Single)\n' +
+                   '- 12" x 18" statement canvas\n' +
+                   '- 16" x 24" statement canvas\n' +
+                   '- Collage Grid set of 4 (10" x 10" each)\n' +
+                   '- Panoramic: 12" x 36"\n' +
+                   'Custom sizes are also available upon request!';
+          }
+          
+          // Price
+          if (m.includes('price') || m.includes('how much') || m.includes('cost') || m.includes('rate') || m.includes('fee')) {
+            return 'Our pricing for canvas framing starts from: \n' +
+                   '- A4 Canvas: ' + currency + ' 1,200\n' +
+                   '- A3 Premium: ' + currency + ' 2,200\n' +
+                   '- 12x18 HD Canvas: ' + currency + ' 2,800\n' +
+                   '- 16x24 Statement: ' + currency + ' 4,500\n' +
+                   '- 3-in-1 Collage: ' + currency + ' 3,500\n' +
+                   'For custom setups, please message our support directly!';
+          }
+          
+          // MoMo payment
+          if (m.includes('momo') || m.includes('payment') || m.includes('money') || m.includes('pay') || m.includes('mtn')) {
+            return 'We accept Mobile Money payment. Here are the transfer instructions:\n' + 
+                   (this.settings.momoInfo || 'MTN Mobile Money: 0244123456 (Manuel Frames)') + 
+                   '\n\nPlease send proof of payment via WhatsApp along with your order ID.';
+          }
+          
+          // Image upload / photo
+          if (m.includes('photo') || m.includes('image') || m.includes('upload') || m.includes('picture') || m.includes('whatsapp')) {
+            return 'You can submit your photos in two ways:\n' +
+                   '1. **System Upload**: Upload your file directly from your device during checkout.\n' +
+                   '2. **Send via WhatsApp**: Select the WhatsApp option, check out, and tap the WhatsApp button on the receipt page to send photos directly to us!';
+          }
+          
+          // Delivery options
+          if (m.includes('delivery') || m.includes('ship') || m.includes('location') || m.includes('yango') || m.includes('bolt') || m.includes('uber')) {
+            return 'We support internal shop riders or third-party delivery options (Yango, Bolt, Uber) depending on your preference. You can configure this during checkout.';
+          }
+          
+          // General greetings
+          if (m.includes('hi') || m.includes('hello') || m.includes('hey') || m.includes('greetings') || m.includes('how are you')) {
+            return 'Hello! I am your AI assistant for HD Laminated Canvas Frames. You can ask me about frame sizes, catalog prices, payment details, or track your order status!';
+          }
+          
+          return 'I am not sure I understand that query. You can ask me about sizes, prices, payments, or type your Order ID (e.g. ORD178...) to check tracking!';
+        },
+
+        scrollChatbotToBottom() {
+          this.$nextTick(() => {
+            const container = this.$refs.chatbotMessagesContainer;
+            if (container) {
+              container.scrollTop = container.scrollHeight;
+            }
+          });
+        },
+
+        applyDynamicColors(color) {
+          if (!color) return;
+          let styleEl = document.getElementById('dynamic-theme-style');
+          if (!styleEl) {
+            styleEl = document.createElement('style');
+            styleEl.id = 'dynamic-theme-style';
+            document.head.appendChild(styleEl);
+          }
+          const hoverColor = this.adjustColorBrightness(color, -20);
+          styleEl.innerHTML = `
+            :root {
+              --primary-color: ${color};
+              --primary-color-hover: ${hoverColor};
+            }
+            .bg-yellow-400, .bg-yellow-500 { background-color: ${color} !important; }
+            .text-yellow-400, .text-yellow-500 { color: ${color} !important; }
+            .border-yellow-400, .border-yellow-500 { border-color: ${color} !important; }
+            .hover\\:bg-yellow-300:hover, .hover\\:bg-yellow-400:hover { background-color: ${hoverColor} !important; }
+            .hover\\:text-yellow-300:hover { color: ${hoverColor} !important; }
+          `;
+        },
+
+        adjustColorBrightness(hex, percent) {
+          let num = parseInt(hex.replace("#",""),16),
+          amt = Math.round(2.55 * percent),
+          R = (num >> 16) + amt,
+          G = (num >> 8 & 0x00FF) + amt,
+          B = (num & 0x0000FF) + amt;
+          return "#" + (0x1000000 + (R<255?R<0?0:R:255)*0x10000 + (G<255?G<0?0:G:255)*0x100 + (B<255?B<0?0:B:255)).toString(16).slice(1);
+        },
+
+        toggleTheme() {
+          this.theme = this.theme === 'dark' ? 'light' : 'dark';
+          localStorage.setItem('theme', this.theme);
+          this.applyTheme();
+        },
+
+        applyTheme() {
+          const body = document.body;
+          if (this.theme === 'light') {
+            body.classList.remove('bg-[#0d0d0d]', 'text-white');
+            body.classList.add('bg-gray-50', 'text-gray-900', 'light-mode');
+          } else {
+            body.classList.remove('bg-gray-50', 'text-gray-900', 'light-mode');
+            body.classList.add('bg-[#0d0d0d]', 'text-white');
+          }
+        },
+
+        openLoginPage(page) {
+          // Get current window location as fallback, strip any query parameters
+          let baseUrl = this.scriptUrl;
+          if (!baseUrl) {
+            baseUrl = window.location.href.split('?')[0];
+          }
+          
+          // Construct the full URL with page parameter
+          const fullUrl = baseUrl + '?page=' + page;
+          
+          // Open in new window
+          window.open(fullUrl, '_blank', 'width=1200,height=800,menubar=yes,toolbar=yes,location=yes,status=yes,scrollbars=yes,resizable=yes');
+          
+          // Close the dropdown
+          this.showLoginDropdown = false;
+        },
+        
+        async fetchScriptUrl() {
+          try {
+            const url = await new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .getScriptUrl();
+            });
+            this.scriptUrl = url;
+          } catch (error) {
+            console.error('Error fetching script URL:', error);
+          }
+        },
+        
+        async fetchMenuItems() {
+          try {
+            this.loading = true;
+            this.error = null;
+            
+            const items = await new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .getMenuItems();
+            });
+            
+            this.menuItems = items;
+          } catch (error) {
+            console.error('Error fetching menu items:', error);
+            this.error = 'Failed to load menu items. Please try again.';
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        async fetchDeliveryCharges() {
+          try {
+            const charges = await new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .getDeliveryCharges();
+            });
+            this.deliveryCharges = charges;
+          } catch (error) {
+            console.error('Error fetching delivery charges:', error);
+          }
+        },
+
+        async fetchAreaDeliveryCharges() {
+          try {
+            const charges = await new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .getAreaDeliveryCharges();
+            });
+            this.areaDeliveryCharges = charges;
+          } catch (error) {
+            console.error('Error fetching area delivery charges:', error);
+          }
+        },
+
+        async fetchPaymentMethods() {
+          try {
+            const methods = await new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .getPaymentMethods();
+            });
+            this.paymentMethods = methods;
+          } catch (error) {
+            console.error('Error fetching payment methods:', error);
+          }
+        },
+
+        async fetchCategories() {
+          try {
+            const cats = await new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .getCategories();
+            });
+            
+            // Sort categories with "Popular!" first if it exists
+            const sortedCats = cats.sort((a, b) => {
+              if (a.toLowerCase().includes('popular')) return -1;
+              if (b.toLowerCase().includes('popular')) return 1;
+              return a.localeCompare(b);
+            });
+            
+            this.categories = sortedCats;
+            if (sortedCats.length > 0) {
+              this.activeCategory = sortedCats[0];
+            }
+          } catch (error) {
+            console.error('Error fetching categories:', error);
+            this.categories = ['Popular!'];
+            this.activeCategory = 'Popular!';
+          }
+        },
+        
+        async fetchBanners() {
+          try {
+            const banners = await new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .getBanners();
+            });
+            
+            this.banners = banners;
+            if (banners.length > 0) {
+              // Start auto-play after banners are loaded
+              this.$nextTick(() => {
+                this.startSliderAutoPlay();
+              });
+            }
+          } catch (error) {
+            console.error('Error fetching banners:', error);
+          }
+        },
+        
+        async fetchBranches() {
+          try {
+            const branches = await new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .getBranches();
+            });
+            
+            this.branches = branches;
+          } catch (error) {
+            console.error('Error fetching branches:', error);
+          }
+        },
+        
+        async fetchDeliveryApps() {
+          try {
+            const apps = await new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .getDeliveryApps();
+            });
+            this.deliveryApps = apps.filter(app => app.active);
+            if (this.deliveryApps.length > 0) {
+              const shopRider = this.deliveryApps.find(a => a.name === 'Shop Rider');
+              this.checkoutForm.deliveryOption = shopRider ? shopRider.name : this.deliveryApps[0].name;
+            }
+          } catch (error) {
+            console.error('Error fetching delivery apps:', error);
+            this.deliveryApps = [
+              { name: 'Shop Rider' },
+              { name: 'Yango' },
+              { name: 'Bolt' },
+              { name: 'Uber' }
+            ];
+          }
+        },
+        
+        getItemsByCategory(category) {
+          return this.menuItems.filter(item => item.category === category);
+        },
+        
+        // Slider Methods
+        nextSlide() {
+          this.currentSlide = (this.currentSlide + 1) % this.banners.length;
+          this.resetAutoPlay();
+        },
+        
+        previousSlide() {
+          this.currentSlide = this.currentSlide === 0 ? this.banners.length - 1 : this.currentSlide - 1;
+          this.resetAutoPlay();
+        },
+        
+        startSliderAutoPlay() {
+          if (this.banners.length > 1) {
+            this.sliderInterval = setInterval(() => {
+              this.currentSlide = (this.currentSlide + 1) % this.banners.length;
+            }, 4000);
+          }
+        },
+        
+        stopSliderAutoPlay() {
+          if (this.sliderInterval) {
+            clearInterval(this.sliderInterval);
+            this.sliderInterval = null;
+          }
+        },
+        
+        resetAutoPlay() {
+          this.stopSliderAutoPlay();
+          this.startSliderAutoPlay();
+        },
+        
+        // Cart Methods
+        openCustomizationModal(item) {
+          this.customizingItem = item;
+          this.customizationForm = {
+            photoOption: 'system',
+            photoBase64: '',
+            photoPreview: '',
+            photoName: ''
+          };
+          this.showCustomization = true;
+        },
+        handlePhotoUpload(event) {
+          const file = event.target.files[0];
+          if (file) {
+            this.customizationForm.photoName = file.name;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              this.customizationForm.photoPreview = e.target.result;
+              this.customizationForm.photoBase64 = e.target.result;
+            };
+            reader.readAsDataURL(file);
+          }
+        },
+        addCustomizedToCart() {
+          const item = this.customizingItem;
+          // Generate unique ID for this customized cart item
+          const cartId = 'CART_' + Date.now();
+          const customizedItem = {
+            id: cartId,
+            menuItemId: item.id,
+            name: item.name,
+            price: item.price,
+            image: item.image,
+            size: item.size || item.servings || '',
+            photoOption: this.customizationForm.photoOption,
+            photoBase64: this.customizationForm.photoOption === 'system' ? this.customizationForm.photoBase64 : null,
+            photoName: this.customizationForm.photoOption === 'system' ? this.customizationForm.photoName : null,
+            photoUrl: null,
+            quantity: 1
+          };
+          this.cart.push(customizedItem);
+          this.saveCart();
+          this.showCustomization = false;
+          this.showToast(item.name + ' added to cart!');
+        },
+        addToCart(item) {
+          // Fallback simple add
+          const existingItem = this.cart.find(cartItem => cartItem.menuItemId === item.id || cartItem.id === item.id);
+          if (existingItem) {
+            existingItem.quantity++;
+          } else {
+            this.cart.push({ 
+              id: 'CART_' + Date.now(), 
+              menuItemId: item.id, 
+              name: item.name, 
+              price: item.price, 
+              image: item.image, 
+              size: item.size || item.servings || '',
+              photoOption: 'whatsapp',
+              photoUrl: null,
+              quantity: 1 
+            });
+          }
+          this.saveCart();
+          this.showToast(item.name + ' added to cart!');
+        },
+        
+        updateQuantity(item, change) {
+          item.quantity += change;
+          if (item.quantity <= 0) {
+            this.removeFromCart(item);
+          } else {
+            this.saveCart();
+          }
+        },
+        
+        removeFromCart(item) {
+          const index = this.cart.findIndex(cartItem => cartItem.id === item.id);
+          if (index > -1) {
+            this.cart.splice(index, 1);
+            this.saveCart();
+          }
+        },
+        
+        saveCart() {
+          localStorage.setItem('cart', JSON.stringify(this.cart));
+        },
+        
+        loadCart() {
+          const savedCart = localStorage.getItem('cart');
+          if (savedCart) {
+            this.cart = JSON.parse(savedCart);
+          }
+        },
+        
+        proceedToCheckout() {
+          this.showCart = false;
+          this.showCheckout = true;
+          this.checkoutForm.orderType = this.orderType;
+        },
+        
+        async placeOrder() {
+          // Validate form
+          if (!this.validateCheckoutForm()) {
+            alert('Please fill all required fields');
+            return;
+          }
+          
+          this.placingOrder = true;
+          
+          try {
+            const paymentMethod = this.selectedPaymentMethod
+              ? this.selectedPaymentMethod.name + (this.selectedPaymentMethod.details ? ' - ' + this.selectedPaymentMethod.details : '')
+              : (this.settings.paymentMethodName || 'MTN Mobile Money');
+
+            const orderData = {
+              type: this.checkoutForm.orderType,
+              customerName: this.checkoutForm.name,
+              phone: this.checkoutForm.phone,
+              email: this.checkoutForm.email,
+              address: this.checkoutForm.address,
+              city: this.checkoutForm.city,
+              area: this.checkoutForm.area,
+              branch: this.checkoutForm.branch,
+              deliveryOption: this.checkoutForm.orderType === 'delivery' ? this.checkoutForm.deliveryOption : '',
+              deliveryBookingMode: (this.checkoutForm.orderType === 'delivery' && this.isThirdPartyDelivery) ? this.checkoutForm.deliveryBookingMode : (this.checkoutForm.orderType === 'delivery' ? 'shop' : ''),
+              items: this.cart,
+              subtotal: this.cartTotal,
+              deliveryCharge: this.checkoutForm.orderType === 'delivery' ? this.deliveryCharge : 0,
+              total: this.orderTotal,
+              notes: this.checkoutForm.notes,
+              transactionId: this.checkoutForm.transactionId || '',
+              paymentMethod: paymentMethod
+            };
+
+            const result = await new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .submitOrder(orderData);
+            });
+
+            if (result.success) {
+              // Store order details for invoice
+              this.orderDetails = {
+                orderId: result.orderId,
+                timestamp: new Date().toISOString(),
+                type: orderData.type,
+                customerName: orderData.customerName,
+                phone: orderData.phone,
+                email: orderData.email,
+                address: orderData.address,
+                city: orderData.city,
+                area: orderData.area,
+                branch: orderData.branch,
+                deliveryOption: orderData.deliveryOption,
+                deliveryBookingMode: orderData.deliveryBookingMode,
+                items: orderData.items,
+                subtotal: orderData.subtotal,
+                deliveryCharge: orderData.deliveryCharge,
+                total: orderData.total,
+                paymentMethod: orderData.paymentMethod
+              };
+
+              // Clear cart and show invoice
+              this.cart = [];
+              this.saveCart();
+              this.showCheckout = false;
+              this.showInvoice = true;
+              this.resetCheckoutForm();
+            } else {
+              alert(result.message || 'Failed to place order');
+            }
+          } catch (error) {
+            console.error('Error placing order:', error);
+            alert('Failed to place order. Please try again.');
+          } finally {
+            this.placingOrder = false;
+          }
+        },
+
+        validateCheckoutForm() {
+          const form = this.checkoutForm;
+
+          if (!form.name || !form.phone || !form.email || !form.transactionId) {
+            return false;
+          }
+
+          if (form.orderType === 'delivery') {
+            if (!form.city || !form.area || !form.address || !form.deliveryOption) {
+              return false;
+            }
+            if (this.isThirdPartyDelivery && !form.deliveryBookingMode) {
+              return false;
+            }
+          } else {
+            if (!form.city || !form.branch) {
+              return false;
+            }
+          }
+
+          return true;
+        },
+
+        resetCheckoutForm() {
+          const shopRider = this.deliveryApps.find(a => a.name === 'Shop Rider');
+          this.checkoutForm = {
+            orderType: 'delivery',
+            name: '',
+            phone: '',
+            email: '',
+            city: '',
+            area: '',
+            address: '',
+            branch: '',
+            deliveryOption: shopRider ? shopRider.name : (this.deliveryApps.length > 0 ? this.deliveryApps[0].name : 'Shop Rider'),
+            deliveryBookingMode: '',
+            notes: '',
+            transactionId: '',
+            paymentMethodIndex: 0
+          };
+        },
+        
+        showToast(message) {
+          // Simple toast notification
+          const toast = document.createElement('div');
+          toast.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg z-50';
+          toast.textContent = message;
+          document.body.appendChild(toast);
+          
+          setTimeout(() => {
+            toast.remove();
+          }, 3000);
+        },
+        
+        scrollToCategory(category) {
+          this.isScrolling = true;
+          this.activeCategory = category;
+          
+          if (this.scrollTimeout) {
+            clearTimeout(this.scrollTimeout);
+          }
+          
+          const sectionRef = 'section-' + category;
+          const sections = this.$refs[sectionRef];
+          if (sections && sections[0]) {
+            const section = sections[0];
+            const yOffset = -80;
+            const y = section.getBoundingClientRect().top + window.pageYOffset + yOffset;
+            
+            window.scrollTo({ top: y, behavior: 'smooth' });
+            
+            this.scrollTimeout = setTimeout(() => {
+              this.isScrolling = false;
+            }, 1000);
+          }
+          
+          this.scrollNavButtonIntoView(category);
+        },
+        
+        scrollNavButtonIntoView(category) {
+          const btnRef = 'navBtn-' + category;
+          const buttons = this.$refs[btnRef];
+          if (buttons && buttons[0]) {
+            const button = buttons[0];
+            const container = this.$refs.navContainer;
+            
+            const buttonLeft = button.offsetLeft;
+            const buttonWidth = button.offsetWidth;
+            const containerWidth = container.offsetWidth;
+            const scrollPosition = buttonLeft - (containerWidth / 2) + (buttonWidth / 2);
+            
+            container.scrollTo({
+              left: scrollPosition,
+              behavior: 'smooth'
+            });
+          }
+        },
+        
+        handleScroll() {
+          if (this.isScrolling) return;
+          
+          const sections = this.categories.map(category => {
+            const sectionRef = 'section-' + category;
+            const sectionElements = this.$refs[sectionRef];
+            if (sectionElements && sectionElements[0]) {
+              const rect = sectionElements[0].getBoundingClientRect();
+              return {
+                category: category,
+                top: rect.top,
+                bottom: rect.bottom
+              };
+            }
+            return null;
+          }).filter(s => s !== null);
+          
+          const viewportHeight = window.innerHeight;
+          const viewportCenter = viewportHeight / 2;
+          
+          let closestSection = null;
+          let closestDistance = Infinity;
+          
+          sections.forEach(section => {
+            if (section.top < viewportCenter && section.bottom > 100) {
+              const distance = Math.abs(section.top - 100);
+              if (distance < closestDistance) {
+                closestDistance = distance;
+                closestSection = section;
+              }
+            }
+          });
+          
+          if (closestSection && closestSection.category !== this.activeCategory) {
+            this.activeCategory = closestSection.category;
+            this.scrollNavButtonIntoView(closestSection.category);
+          }
+        },
+        
+        handleImageError(event) {
+          event.target.src = 'https://via.placeholder.com/400/121212/808080?text=No+Image';
+        },
+        
+        // Invoice methods
+        formatReceiptDate(timestamp) {
+          const date = new Date(timestamp);
+          return date.toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: '2-digit', 
+            day: '2-digit' 
+          });
+        },
+        
+        formatReceiptTime(timestamp) {
+          const date = new Date(timestamp);
+          return date.toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true
+          });
+        },
+        
+        printInvoice() {
+          window.print();
+        },
+        
+        downloadInvoice() {
+          // Create a blob from the receipt HTML
+          const receiptElement = document.getElementById('receipt-content');
+          const receiptHTML = receiptElement.outerHTML;
+          
+          // Create a complete HTML document
+          const fullHTML = '<!DOCTYPE html>\n' +
+            '<html>\n' +
+            '<head>\n' +
+            '  <meta charset="UTF-8">\n' +
+            '  <title>Invoice - ' + this.orderDetails.orderId + '</title>\n' +
+            '  <style>\n' +
+            '    body { margin: 0; padding: 20px; }\n' +
+            '    .receipt-paper {\n' +
+            '      background: white;\n' +
+            '      color: black;\n' +
+            '      font-family: \'Courier New\', monospace;\n' +
+            '      width: 80mm;\n' +
+            '      margin: 0 auto;\n' +
+            '      padding: 10mm;\n' +
+            '    }\n' +
+            '    .receipt-line {\n' +
+            '      border-bottom: 1px dashed #000;\n' +
+            '      margin: 8px 0;\n' +
+            '    }\n' +
+            '    .receipt-double-line {\n' +
+            '      border-bottom: 3px double #000;\n' +
+            '      margin: 8px 0;\n' +
+            '    }\n' +
+            '  </style>\n' +
+            '</head>\n' +
+            '<body>\n' +
+            '  ' + receiptHTML + '\n' +
+            '</body>\n' +
+            '</html>';
+          
+          // Create blob and download
+          const blob = new Blob([fullHTML], { type: 'text/html' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'invoice-' + this.orderDetails.orderId + '.html';
+          a.click();
+          URL.revokeObjectURL(url);
+        },
+        
+        closeInvoice() {
+          this.showInvoice = false;
+          this.orderDetails = null;
+        },
+        
+        // Order Tracking Methods
+        async trackOrder() {
+          if (!this.trackOrderId) {
+            this.trackError = 'Please enter an order number';
+            return;
+          }
+          
+          this.trackingLoading = true;
+          this.trackError = '';
+          
+          try {
+            const result = await new Promise((resolve, reject) => {
+              google.script.run
+                .withSuccessHandler(resolve)
+                .withFailureHandler(reject)
+                .getOrderStatus(this.trackOrderId);
+            });
+            
+            if (result.success) {
+              this.trackingOrder = result.order;
+            } else {
+              this.trackError = result.message || 'Order not found';
+            }
+          } catch (error) {
+            this.trackError = 'Failed to track order. Please try again.';
+          } finally {
+            this.trackingLoading = false;
+          }
+        },
+        
+        resetTracking() {
+          this.trackingOrder = null;
+          this.trackOrderId = '';
+          this.trackError = '';
+        },
+        
+        closeTrackOrder() {
+          this.showTrackOrder = false;
+          this.resetTracking();
+        },
+        
+        getStatusSteps(order) {
+          const steps = [
+            { status: 'Pending', label: 'Order Placed', icon: 'fa-check', time: order.timestamp },
+            { status: 'Confirmed', label: 'Order Confirmed', icon: 'fa-clipboard-check', time: null },
+            { status: 'Preparing', label: 'Framing Canvas', icon: 'fa-tools', time: order.workshopTime },
+            { status: 'Ready', label: 'Ready for Dispatch', icon: 'fa-box', time: null }
+          ];
+          
+          if (order.type === 'delivery') {
+            steps.push(
+              { status: 'Out for Delivery', label: 'Out for Delivery', icon: 'fa-shipping-fast', time: order.deliveryTime },
+              { status: 'Delivered', label: 'Delivered', icon: 'fa-check-circle', time: order.completedTime }
+            );
+          } else {
+            steps.push(
+              { status: 'Delivered', label: 'Picked Up', icon: 'fa-check-circle', time: order.completedTime }
+            );
+          }
+          
+          const currentIndex = steps.findIndex(s => s.status === order.status);
+          
+          return steps.map((step, index) => ({
+            ...step,
+            completed: index < currentIndex,
+            current: index === currentIndex
+          }));
+        },
+        
+        getTrackingStatusClass(status) {
+          const classes = {
+            'Pending': 'bg-yellow-500 text-black',
+            'Confirmed': 'bg-blue-500 text-white',
+            'Preparing': 'bg-orange-500 text-white',
+            'Ready': 'bg-green-500 text-white',
+            'Out for Delivery': 'bg-purple-500 text-white',
+            'Delivered': 'bg-gray-500 text-white',
+            'Cancelled': 'bg-red-500 text-white'
+          };
+          return classes[status] || 'bg-gray-500 text-white';
+        },
+
+        getTrackingDeliveryAppUrl(order) {
+          if (!order || !order.deliveryOption) return '';
+          const app = this.deliveryApps.find(a => a.name === order.deliveryOption);
+          return app ? app.url : '';
+        },
+
+        formatTrackingDate(timestamp) {
+          return new Date(timestamp).toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric',
+            year: 'numeric'
+          });
+        },
+        
+        formatTrackingTime(timestamp) {
+          if (!timestamp) return '';
+          return new Date(timestamp).toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          });
+        },
+        
+        closeDropdowns(event) {
+          // Close dropdown if clicking outside
+          if (!event.target.closest('.relative')) {
+            this.showLoginDropdown = false;
+          }
+        }
+      },
+      mounted() {
+        // Load theme preferences
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) {
+          this.theme = savedTheme;
+          this.applyTheme();
+        }
+        
+        // Fetch settings
+        this.fetchSettings();
+
+        // Load cart from localStorage
+        this.loadCart();
+        
+        // Fetch all data
+        Promise.all([
+          this.fetchCategories(),
+          this.fetchMenuItems(),
+          this.fetchBanners(),
+          this.fetchBranches(),
+          this.fetchDeliveryApps(),
+          this.fetchScriptUrl(),
+          this.fetchDeliveryCharges(),
+          this.fetchAreaDeliveryCharges(),
+          this.fetchPaymentMethods()
+        ]);
+        
+        // Add scroll listener
+        window.addEventListener('scroll', this.handleScroll);
+      },
+      unmounted() {
+        window.removeEventListener('scroll', this.handleScroll);
+        this.stopSliderAutoPlay();
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
