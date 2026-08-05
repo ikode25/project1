@@ -1579,6 +1579,7 @@
     .role-admin { background: #cce5ff; color: #004085; }
     .role-teacher { background: #d4edda; color: #155724; }
     .role-clerk { background: #ffe5d0; color: #8a4b00; }
+    .role-bursar { background: #d0f0e8; color: #00695c; }
     .role-supervisor { background: #e2d9f3; color: #432874; }
     .role-student { background: #d6f0fb; color: #015c8c; }
     .role-parent { background: #fbe0ec; color: #8a1e52; }
@@ -1621,6 +1622,7 @@
     body.dark-mode .user-cell-name { color: #4fc3f7; }
     body.dark-mode .user-cell-username { color: #b0bec5; }
     body.dark-mode .role-clerk { background: rgba(255,153,51,0.18); color: #ffb74d; }
+    body.dark-mode .role-bursar { background: rgba(0,150,136,0.20); color: #4db6ac; }
     body.dark-mode .role-admin { background: rgba(0,116,217,0.25); color: #4fc3f7; }
     body.dark-mode .role-teacher { background: rgba(52,168,83,0.18); color: #81c784; }
     body.dark-mode .role-supervisor { background: rgba(149,117,205,0.22); color: #b39ddb; }
@@ -4762,6 +4764,7 @@
       if (r === 'admin')      return <AdminDashboard      currentUser={currentUser} role={role} goto={goto} />;
       if (r === 'teacher')    return <TeacherDashboard    currentUser={currentUser} role={role} goto={goto} />;
       if (r === 'clerk')      return <ClerkDashboard      currentUser={currentUser} role={role} goto={goto} />;
+      if (r === 'bursar')     return <BursarDashboard     currentUser={currentUser} role={role} goto={goto} />;
       if (r === 'supervisor') return <SupervisorDashboard currentUser={currentUser} role={role} goto={goto} />;
       if (r === 'student')    return <StudentDashboard    currentUser={currentUser} role={role} goto={goto} />;
       if (r === 'parent')     return <ParentDashboard     currentUser={currentUser} role={role} goto={goto} />;
@@ -5691,6 +5694,88 @@
             <div className="dash-chart-card">
               <h4><i className="fas fa-chart-pie"></i> Collection by Mode</h4>
               <div className="dash-chart-body"><canvas ref={modeChartRef}></canvas></div>
+            </div>
+          </div>
+
+          <div className="dash-lists">
+            <div className="dash-list-card" style={{gridColumn:'1 / -1'}}>
+              <h4><i className="fas fa-history"></i> Recent Payments</h4>
+              {data.recentPayments.length === 0 ? (
+                <div className="dlc-empty">No recent payments</div>
+              ) : data.recentPayments.map((p) => {
+                const stCls = p.PaymentStatus === 'paid' ? 'status-active' : p.PaymentStatus === 'partial' ? 'role-clerk' : p.PaymentStatus === 'refunded' ? 'role-supervisor' : 'status-suspended';
+                return (
+                  <div key={p.ID} className="dlc-row">
+                    <span className="role-badge role-clerk" style={{fontFamily:'monospace',fontSize:'11px'}}>{p.ReceiptNumber}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:600,color:'var(--navy-primary)'}}>{p.StudentName} <span style={{fontSize:'11px',color:'#888'}}>{p.AdmissionNumber}</span></div>
+                      <div style={{fontSize:'11px',color:'#888'}}>{p.ClassLabel}</div>
+                    </div>
+                    <span style={{fontWeight:700,color:'#34a853'}}>{fmt(p.AmountPaid)}</span>
+                    {p.AmountDue > 0 && <span style={{fontSize:'11px',color:'#ea4335'}}>Due {fmt(p.AmountDue)}</span>}
+                    <span style={{textTransform:'uppercase',fontSize:'11px',fontWeight:600,color:'#555'}}>{(p.PaymentMode || '').replace('_',' ')}</span>
+                    <span className={`status-badge ${stCls}`} style={{textTransform:'capitalize',fontSize:'10px'}}>{p.PaymentStatus}</span>
+                    <div style={{fontSize:'11px',color:'#888',fontFamily:'monospace'}}>{p.PaymentDate}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ============== Bursar / Accountant Dashboard ==============
+    // finance-only portal — reuses the clerk fee-KPI data source (bursar has the same access level
+    // there) plus asset/stock counts, so the bursar's landing page shows exactly what their sidebar
+    // scopes them to: fees, accounts, payroll and inventory. No admissions/helpdesk/parents noise.
+    function BursarDashboard({ currentUser, role, goto }) {
+      const { data, isLoading: loading, isValidating: syncing } =
+        useSWR('getClerkDashboardData', () => swrFetcher('getClerkDashboardData', currentUser, role));
+      const { data: assets } = useSWR('getAllAssets', () => swrFetcher('getAllAssets', {}, currentUser, role));
+      const { data: stock } = useSWR('getAllStockItems', () => swrFetcher('getAllStockItems', {}, currentUser, role));
+
+      const collChartRef = useRef(null);
+      const collData = data && {
+        labels: data.collectionTrend.map(t => t.date.slice(5)),
+        datasets: [{ label: 'Collection', data: data.collectionTrend.map(t => t.amount), backgroundColor: '#34a853', borderRadius: 3 }]
+      };
+      useDashChart(collChartRef, 'bar', collData, { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } });
+
+      if (loading || !data) return <DashSkeleton />;
+      const k = data.kpis;
+      const fmt = (n) => Number(n || 0).toLocaleString();
+      const assetCount = (assets || []).length;
+      const lowStockCount = (stock || []).filter(s => s.CurrentStock <= s.ReorderLevel).length;
+
+      return (
+        <div>
+          <h2 style={{color:'var(--navy-primary)',marginBottom:'16px',fontSize:'20px'}}>
+            <i className="fas fa-coins"></i> Bursar Dashboard
+            {syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}
+          </h2>
+
+          <ActiveSessionBanner role={role} goto={goto} />
+
+          <div className="dash-kpi-grid">
+            <DashKpi icon="money-bill-wave" label="Today's Collection" value={fmt(k.todayCollection)} sub={`${k.todayReceipts} receipts`} color="green" onClick={() => goto('feePayments')} />
+            <DashKpi icon="exclamation-circle" label="Outstanding" value={fmt(k.totalOutstanding)} sub="total due" color="red" onClick={() => goto('feePayments')} />
+            <DashKpi icon="undo" label="Refunds Today" value={fmt(k.refundsToday)} sub={`${k.refundsTodayCount} refund(s)`} color="amber" onClick={() => goto('feePayments')} />
+            <DashKpi icon="list-alt" label="Active Fee Items" value={k.activeFeeItems} sub="fee structures" color="purple" onClick={() => goto('feeStructure')} />
+            <DashKpi icon="desktop" label="Assets on File" value={assetCount} color="navy" onClick={() => goto('assets')} />
+            <DashKpi icon="boxes" label="Stock Items" value={(stock || []).length} sub={lowStockCount ? `${lowStockCount} low stock` : 'all stocked'} color={lowStockCount ? 'red' : 'teal'} onClick={() => goto('inventory')} blink={lowStockCount > 0} />
+          </div>
+
+          {/* day-book snapshot */}
+          <TodayAccountsCard goto={goto} currentUser={currentUser} role={role} />
+
+          {/* fee types quick-reference */}
+          <FeeBreakdownCard goto={goto} currentUser={currentUser} role={role} />
+
+          <div className="dash-charts">
+            <div className="dash-chart-card" style={{gridColumn:'1 / -1'}}>
+              <h4><i className="fas fa-chart-bar"></i> Collection — Last 7 Days</h4>
+              <div className="dash-chart-body"><canvas ref={collChartRef}></canvas></div>
             </div>
           </div>
 
@@ -8071,7 +8156,7 @@
     const ADM_STATUS_FILTER_OPTS = [{value:'',label:'All'},{value:'pending_review',label:'Pending Review'},{value:'registered',label:'Registered'},{value:'admitted',label:'Admitted'},{value:'enrolled',label:'Enrolled'},{value:'rejected',label:'Rejected'},{value:'cancelled',label:'Cancelled'}];
     const ADM_TYPE_FILTER_OPTS = [{value:'',label:'All'},{value:'new',label:'New'},{value:'transfer',label:'Transfer'},{value:'re_admission',label:'Re-admission'}];
     const STU_STATUS_OPTS = [{value:'',label:'All'},{value:'active',label:'Active'},{value:'inactive',label:'Inactive'},{value:'transferred',label:'Transferred'},{value:'passed_out',label:'Passed Out'},{value:'suspended',label:'Suspended'}];
-    const ROLE_FILTER_OPTS = [{value:'',label:'All roles'},{value:'admin',label:'Admin'},{value:'clerk',label:'Clerk'},{value:'teacher',label:'Teacher'},{value:'supervisor',label:'Supervisor'}];
+    const ROLE_FILTER_OPTS = [{value:'',label:'All roles'},{value:'admin',label:'Admin'},{value:'clerk',label:'Clerk'},{value:'bursar',label:'Bursar / Accountant'},{value:'teacher',label:'Teacher'},{value:'supervisor',label:'Supervisor'}];
     const STAFF_STATUS_OPTS = [{value:'',label:'All'},{value:'active',label:'Active'},{value:'inactive',label:'Inactive'},{value:'suspended',label:'Suspended'}];
 
     const REPORT_GROUP_META = {
@@ -17240,9 +17325,9 @@
     // ============== Fee Structure ==============
     function FeeStructureView({ currentUser, role }) {
       const r = String(role).toLowerCase();
-      // clerk co-manages the fee schedule (set up fee heads) — treat like admin within this view
-      const isAdmin = r === 'admin' || r === 'clerk';
-      const isClerk = r === 'clerk';
+      // clerk/bursar co-manage the fee schedule (set up fee heads) — treat like admin within this view
+      const isAdmin = r === 'admin' || r === 'clerk' || r === 'bursar';
+      const isClerk = r === 'clerk' || r === 'bursar';
 
       // SWR: cached fee items render instantly; refetches silently in the background
       const { data: itemsData, error: loadError, isLoading: loading, isValidating: syncing, mutate: refreshFees } =
@@ -18384,7 +18469,8 @@
     // ============== Fee Payments ==============
     function FeePaymentsView({ currentUser, role }) {
       const r = String(role).toLowerCase();
-      const isAdmin = r === 'admin';
+      // bursar gets full parity here (refund/delete included) — finance is their whole job
+      const isAdmin = r === 'admin' || r === 'bursar';
       const isClerk = r === 'clerk';
       const todayStr = new Date().toISOString().split('T')[0];
 
@@ -23715,8 +23801,9 @@
       const r = String(role).toLowerCase();
       const isAdmin = r === 'admin';
       const isClerk = r === 'clerk';
-      const canManage = isAdmin;
-      const canSeeRegister = isAdmin || isClerk;
+      const isBursar = r === 'bursar';
+      const canManage = isAdmin || isBursar;
+      const canSeeRegister = isAdmin || isClerk || isBursar;
       const [tab, setTab] = useState('payslips'); // 'payslips' | 'ssnit'
 
       const { data: payslipsData, error: pError, isLoading: pLoading, mutate: loadPayslips } =
@@ -23724,7 +23811,7 @@
       const payslips = payslipsData || [];
 
       const { data: staffData } = useSWR(canManage ? 'getAllUsers' : null, () => swrFetcher('getAllUsers', currentUser, role));
-      const staff = (staffData || []).filter(u => ['teacher','admin','supervisor','clerk'].indexOf(u.Role) !== -1);
+      const staff = (staffData || []).filter(u => ['teacher','admin','supervisor','clerk','bursar'].indexOf(u.Role) !== -1);
 
       const { data: ssnitData, error: sError, isLoading: sLoading } =
         useSWR(canSeeRegister && tab === 'ssnit' ? 'getSsnitRegister' : null, () => swrFetcher('getSsnitRegister', currentUser, role));
@@ -28912,7 +28999,7 @@
     // ============== Asset Inventory ==============
     function AssetsView({ currentUser, role }) {
       const r = String(role).toLowerCase();
-      const isAdmin = r === 'admin';
+      const isAdmin = r === 'admin' || r === 'bursar';
       const isClerk = r === 'clerk';
       const isSupervisor = r === 'supervisor';
       const canManage = isAdmin || isClerk || isSupervisor;
@@ -29406,7 +29493,7 @@
     // ============== Stock / Inventory ==============
     function InventoryView({ currentUser, role }) {
       const r = String(role).toLowerCase();
-      const isAdmin = r === 'admin';
+      const isAdmin = r === 'admin' || r === 'bursar';
       const isClerk = r === 'clerk';
       const canManage = isAdmin || isClerk;
       // SWR: cached stock + reorder alerts render instantly; refetch silently in the background

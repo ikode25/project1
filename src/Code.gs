@@ -11510,7 +11510,7 @@ function getSsnitRegister(currentUser, currentRole) {
     for (var i = 1; i < udata.length; i++) {
       if (String(udata[i][16]) === '1') continue; // IsDeleted
       var role = String(udata[i][6] || '').toLowerCase();
-      if (role !== 'teacher' && role !== 'admin' && role !== 'supervisor' && role !== 'clerk') continue;
+      if (role !== 'teacher' && role !== 'admin' && role !== 'supervisor' && role !== 'clerk' && role !== 'bursar') continue;
       staff[udata[i][0]] = { FullName: udata[i][2], Role: role, EmployeeCode: udata[i][23] || '', SSNITNumber: udata[i][26] || '', TotalContributed: 0, PayslipCount: 0 };
     }
 
