@@ -10979,6 +10979,278 @@ function getHallTicketData(examId, studentId, currentUser, currentRole) {
   } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
 }
 
+// ============== Question Bank & Test Paper Generator ==============
+// Teachers/admin build a bank of questions per subject+class, then compile a subset into a
+// printable Test Paper (question sheet + separate answer key) for students to answer on paper.
+var QUESTION_BANK_SHEET = 'Question_Bank';
+var QUESTION_BANK_HEADERS = ['ID', 'SubjectID', 'ClassID', 'Topic', 'QuestionType', 'QuestionText', 'OptionA', 'OptionB', 'OptionC', 'OptionD', 'CorrectAnswer', 'Marks', 'Difficulty', 'CreatedBy', 'IsDeleted', 'CreatedAt', 'UpdatedAt'];
+var TEST_PAPERS_SHEET = 'Test_Papers';
+var TEST_PAPER_HEADERS = ['ID', 'Title', 'SubjectID', 'ClassID', 'Instructions', 'DurationMinutes', 'TotalMarks', 'QuestionIDs', 'CreatedBy', 'IsDeleted', 'CreatedAt', 'UpdatedAt'];
+var QUESTION_TYPES = ['mcq', 'true_false', 'short_answer', 'essay'];
+var QUESTION_DIFFICULTIES = ['easy', 'medium', 'hard'];
+
+function _ensureQuestionBankSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(QUESTION_BANK_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(QUESTION_BANK_SHEET);
+    sh.appendRow(QUESTION_BANK_HEADERS);
+    sh.getRange(1, 1, 1, QUESTION_BANK_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+function _ensureTestPapersSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(TEST_PAPERS_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(TEST_PAPERS_SHEET);
+    sh.appendRow(TEST_PAPER_HEADERS);
+    sh.getRange(1, 1, 1, TEST_PAPER_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function _rowToQuestion(row, smap, cmap, umap) {
+  var subId = row[1], clsId = row[2], cby = row[13];
+  return {
+    ID: row[0], SubjectID: subId, SubjectName: smap && smap[subId] ? smap[subId].subjectName : '',
+    ClassID: clsId, ClassLabel: cmap && cmap[clsId] ? cmap[clsId].label : '',
+    Topic: row[3] || '', QuestionType: row[4] || 'mcq', QuestionText: row[5] || '',
+    OptionA: row[6] || '', OptionB: row[7] || '', OptionC: row[8] || '', OptionD: row[9] || '',
+    CorrectAnswer: row[10] || '', Marks: parseFloat(row[11]) || 1, Difficulty: row[12] || 'medium',
+    CreatedBy: cby, CreatedByName: (cby && umap && umap[cby]) ? umap[cby].fullName : '',
+    CreatedAt: toIso(row[15]), UpdatedAt: toIso(row[16])
+  };
+}
+
+// teacher scoping helper — mirrors the class-teacher subject-visibility restriction (getAllSubjects
+// etc): a teacher only works with questions/papers for subjects they're actually assigned to teach.
+function _teacherOwnsSubjectClass(currentUser, currentRole, subjectId, classId) {
+  var role = String(currentRole || '').toLowerCase();
+  if (role !== 'teacher') return true; // admin — no restriction
+  var asgMap = getTeacherAssignmentsMap(getCurrentUserId(currentUser));
+  return !!asgMap[parseInt(classId, 10) + '|' + parseInt(subjectId, 10)];
+}
+
+// admin/teacher — teacher sees only questions for subject+class combos they're assigned to teach
+function getQuestionBank(currentUser, currentRole) {
+  try {
+    var role = String(currentRole || '').toLowerCase();
+    if (role !== 'admin' && role !== 'teacher') return { success: false, message: 'Forbidden — admin/teacher only' };
+    var sh = _ensureQuestionBankSheet();
+    var data = sh.getDataRange().getValues();
+    var smap = getSubjectsMap(), cmap = getClassesMap(), umap = getUsersMap();
+    var asgMap = role === 'teacher' ? getTeacherAssignmentsMap(getCurrentUserId(currentUser)) : null;
+    var out = [];
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][14]) === '1') continue;
+      if (asgMap && !asgMap[parseInt(data[i][2], 10) + '|' + parseInt(data[i][1], 10)]) continue;
+      out.push(_rowToQuestion(data[i], smap, cmap, umap));
+    }
+    out.sort(function (a, b) { return String(b.CreatedAt).localeCompare(String(a.CreatedAt)); });
+    return { success: true, data: out };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function addQuestion(d, currentUser, currentRole) {
+  try {
+    var role = String(currentRole || '').toLowerCase();
+    if (role !== 'admin' && role !== 'teacher') return { success: false, message: 'Forbidden — admin/teacher only' };
+    var subId = parseInt(d.SubjectID, 10), clsId = parseInt(d.ClassID, 10);
+    if (isNaN(subId) || isNaN(clsId)) return { success: false, message: 'Subject and Class are required' };
+    if (!_teacherOwnsSubjectClass(currentUser, currentRole, subId, clsId)) return { success: false, message: 'You are not assigned to this class+subject' };
+    var qType = QUESTION_TYPES.indexOf(String(d.QuestionType || '').toLowerCase()) !== -1 ? String(d.QuestionType).toLowerCase() : 'mcq';
+    var text = String(d.QuestionText || '').trim();
+    if (!text) return { success: false, message: 'Question text is required' };
+    if (qType === 'mcq' && (!String(d.OptionA || '').trim() || !String(d.OptionB || '').trim())) {
+      return { success: false, message: 'MCQ needs at least Option A and Option B' };
+    }
+    var difficulty = QUESTION_DIFFICULTIES.indexOf(String(d.Difficulty || '').toLowerCase()) !== -1 ? String(d.Difficulty).toLowerCase() : 'medium';
+    var marks = parseFloat(d.Marks);
+    if (isNaN(marks) || marks <= 0) marks = 1;
+
+    var sh = _ensureQuestionBankSheet();
+    var ts = nowIso(), id = nextRowId(sh);
+    sh.appendRow([
+      id, subId, clsId, String(d.Topic || '').trim(), qType, text,
+      String(d.OptionA || '').trim(), String(d.OptionB || '').trim(), String(d.OptionC || '').trim(), String(d.OptionD || '').trim(),
+      String(d.CorrectAnswer || '').trim(), marks, difficulty, getCurrentUserId(currentUser) || '', '0', ts, ts
+    ]);
+    addLog(currentUser, 'Question Added', text.slice(0, 60));
+    return { success: true, message: 'Question added', id: id };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function updateQuestion(id, d, currentUser, currentRole) {
+  try {
+    var role = String(currentRole || '').toLowerCase();
+    if (role !== 'admin' && role !== 'teacher') return { success: false, message: 'Forbidden — admin/teacher only' };
+    var idn = parseInt(id, 10);
+    var sh = _ensureQuestionBankSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] !== idn || String(data[i][14]) === '1') continue;
+      if (!_teacherOwnsSubjectClass(currentUser, currentRole, data[i][1], data[i][2])) return { success: false, message: 'You are not assigned to this class+subject' };
+      var row = i + 1;
+      if (d.Topic !== undefined) sh.getRange(row, 4).setValue(String(d.Topic || '').trim());
+      if (d.QuestionType !== undefined && QUESTION_TYPES.indexOf(String(d.QuestionType).toLowerCase()) !== -1) sh.getRange(row, 5).setValue(String(d.QuestionType).toLowerCase());
+      if (d.QuestionText !== undefined) sh.getRange(row, 6).setValue(String(d.QuestionText || '').trim());
+      if (d.OptionA !== undefined) sh.getRange(row, 7).setValue(String(d.OptionA || '').trim());
+      if (d.OptionB !== undefined) sh.getRange(row, 8).setValue(String(d.OptionB || '').trim());
+      if (d.OptionC !== undefined) sh.getRange(row, 9).setValue(String(d.OptionC || '').trim());
+      if (d.OptionD !== undefined) sh.getRange(row, 10).setValue(String(d.OptionD || '').trim());
+      if (d.CorrectAnswer !== undefined) sh.getRange(row, 11).setValue(String(d.CorrectAnswer || '').trim());
+      if (d.Marks !== undefined) { var m = parseFloat(d.Marks); sh.getRange(row, 12).setValue(isNaN(m) || m <= 0 ? 1 : m); }
+      if (d.Difficulty !== undefined && QUESTION_DIFFICULTIES.indexOf(String(d.Difficulty).toLowerCase()) !== -1) sh.getRange(row, 13).setValue(String(d.Difficulty).toLowerCase());
+      sh.getRange(row, 17).setValue(nowIso());
+      addLog(currentUser, 'Question Updated', '#' + idn);
+      return { success: true, message: 'Question updated' };
+    }
+    return { success: false, message: 'Question not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function deleteQuestion(id, currentUser, currentRole) {
+  try {
+    var role = String(currentRole || '').toLowerCase();
+    if (role !== 'admin' && role !== 'teacher') return { success: false, message: 'Forbidden — admin/teacher only' };
+    var idn = parseInt(id, 10);
+    var sh = _ensureQuestionBankSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] !== idn) continue;
+      if (!_teacherOwnsSubjectClass(currentUser, currentRole, data[i][1], data[i][2])) return { success: false, message: 'You are not assigned to this class+subject' };
+      sh.getRange(i + 1, 15).setValue('1');
+      sh.getRange(i + 1, 17).setValue(nowIso());
+      addLog(currentUser, 'Question Deleted', '#' + idn);
+      return { success: true, message: 'Question deleted' };
+    }
+    return { success: false, message: 'Question not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function _rowToTestPaper(row, smap, cmap, umap) {
+  var subId = row[2], clsId = row[3], cby = row[8];
+  return {
+    ID: row[0], Title: row[1] || '', SubjectID: subId, SubjectName: smap && smap[subId] ? smap[subId].subjectName : '',
+    ClassID: clsId, ClassLabel: cmap && cmap[clsId] ? cmap[clsId].label : '',
+    Instructions: row[4] || '', DurationMinutes: parseInt(row[5], 10) || 60, TotalMarks: parseFloat(row[6]) || 0,
+    QuestionIDs: String(row[7] || '').split(',').filter(Boolean).map(function (x) { return parseInt(x, 10); }),
+    CreatedBy: cby, CreatedByName: (cby && umap && umap[cby]) ? umap[cby].fullName : '',
+    CreatedAt: toIso(row[10]), UpdatedAt: toIso(row[11])
+  };
+}
+
+// admin/teacher — teacher sees only papers they created
+function getAllTestPapers(currentUser, currentRole) {
+  try {
+    var role = String(currentRole || '').toLowerCase();
+    if (role !== 'admin' && role !== 'teacher') return { success: false, message: 'Forbidden — admin/teacher only' };
+    var sh = _ensureTestPapersSheet();
+    var data = sh.getDataRange().getValues();
+    var smap = getSubjectsMap(), cmap = getClassesMap(), umap = getUsersMap();
+    var myId = role === 'teacher' ? getCurrentUserId(currentUser) : null;
+    var out = [];
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][9]) === '1') continue;
+      if (myId && parseInt(data[i][8], 10) !== myId) continue;
+      out.push(_rowToTestPaper(data[i], smap, cmap, umap));
+    }
+    out.sort(function (a, b) { return String(b.CreatedAt).localeCompare(String(a.CreatedAt)); });
+    return { success: true, data: out };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// full paper + resolved question objects, for the print view
+function getTestPaperDetail(id, currentUser, currentRole) {
+  try {
+    var role = String(currentRole || '').toLowerCase();
+    if (role !== 'admin' && role !== 'teacher') return { success: false, message: 'Forbidden — admin/teacher only' };
+    var idn = parseInt(id, 10);
+    var sh = _ensureTestPapersSheet();
+    var data = sh.getDataRange().getValues();
+    var smap = getSubjectsMap(), cmap = getClassesMap(), umap = getUsersMap();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] !== idn || String(data[i][9]) === '1') continue;
+      var paper = _rowToTestPaper(data[i], smap, cmap, umap);
+      if (role === 'teacher' && paper.CreatedBy !== getCurrentUserId(currentUser)) return { success: false, message: 'Forbidden — not your test paper' };
+      var qsh = _ensureQuestionBankSheet();
+      var qdata = qsh.getDataRange().getValues();
+      var qmap = {};
+      for (var q = 1; q < qdata.length; q++) qmap[qdata[q][0]] = _rowToQuestion(qdata[q], smap, cmap, umap);
+      paper.questions = paper.QuestionIDs.map(function (qid) { return qmap[qid]; }).filter(Boolean);
+      return { success: true, data: paper };
+    }
+    return { success: false, message: 'Test paper not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function generateTestPaper(d, currentUser, currentRole) {
+  try {
+    var role = String(currentRole || '').toLowerCase();
+    if (role !== 'admin' && role !== 'teacher') return { success: false, message: 'Forbidden — admin/teacher only' };
+    var title = String(d.Title || '').trim();
+    if (!title) return { success: false, message: 'Title is required' };
+    var subId = parseInt(d.SubjectID, 10), clsId = parseInt(d.ClassID, 10);
+    if (isNaN(subId) || isNaN(clsId)) return { success: false, message: 'Subject and Class are required' };
+    if (!_teacherOwnsSubjectClass(currentUser, currentRole, subId, clsId)) return { success: false, message: 'You are not assigned to this class+subject' };
+    var qIds = Array.isArray(d.QuestionIDs) ? d.QuestionIDs.map(function (x) { return parseInt(x, 10); }).filter(function (x) { return !isNaN(x); }) : [];
+    if (!qIds.length) return { success: false, message: 'Pick at least one question' };
+    var duration = parseInt(d.DurationMinutes, 10);
+    if (isNaN(duration) || duration <= 0) duration = 60;
+
+    var qsh = _ensureQuestionBankSheet();
+    var qdata = qsh.getDataRange().getValues();
+    var marksById = {};
+    for (var q = 1; q < qdata.length; q++) { if (String(qdata[q][14]) !== '1') marksById[qdata[q][0]] = parseFloat(qdata[q][11]) || 1; }
+    var totalMarks = 0;
+    qIds.forEach(function (qid) { totalMarks += marksById[qid] || 0; });
+
+    var sh = _ensureTestPapersSheet();
+    var ts = nowIso(), id = nextRowId(sh);
+    sh.appendRow([id, title, subId, clsId, String(d.Instructions || '').trim(), duration, totalMarks, qIds.join(','), getCurrentUserId(currentUser) || '', '0', ts, ts]);
+    addLog(currentUser, 'Test Paper Generated', title + ' (' + qIds.length + ' questions, ' + totalMarks + ' marks)');
+    return { success: true, message: 'Test paper generated — ' + qIds.length + ' questions, ' + totalMarks + ' marks', id: id };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function deleteTestPaper(id, currentUser, currentRole) {
+  try {
+    var role = String(currentRole || '').toLowerCase();
+    if (role !== 'admin' && role !== 'teacher') return { success: false, message: 'Forbidden — admin/teacher only' };
+    var idn = parseInt(id, 10);
+    var sh = _ensureTestPapersSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] !== idn) continue;
+      if (role === 'teacher' && parseInt(data[i][8], 10) !== getCurrentUserId(currentUser)) return { success: false, message: 'Forbidden — not your test paper' };
+      sh.getRange(i + 1, 10).setValue('1');
+      sh.getRange(i + 1, 12).setValue(nowIso());
+      addLog(currentUser, 'Test Paper Deleted', '#' + idn);
+      return { success: true, message: 'Test paper deleted' };
+    }
+    return { success: false, message: 'Test paper not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
 // ============== Setup Entrypoints ==============
 function setup() { return initializeSheets(); }
 

@@ -4069,6 +4069,7 @@
       exams:        { icon: 'file-alt',         label: 'Exams',              group: 'academic' },
       marks:        { icon: 'graduation-cap',   label: 'Results / Marks',    group: 'academic' },
       gradingSystem:{ icon: 'sliders-h',        label: 'Grading System',     group: 'academic' },
+      questionBank: { icon: 'question-circle',  label: 'Question Bank',      group: 'academic' },
       hallTickets:  { icon: 'id-card-alt',      label: 'Hall Tickets',       group: 'academic' },
       conduct:      { icon: 'award',            label: 'Conduct',            group: 'academic' },
       discipline:   { icon: 'gavel',            label: 'Discipline',         group: 'academic' },
@@ -4109,10 +4110,10 @@
     //  - student: timetable + attendance + marks + notices first
     //  - parent: notices + child's attendance/marks/fees first
     const MENU_PRIORITY = {
-      admin: ['dashboard','ownerPortal','reports','admissions','admissionReqs','inquiries','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','hallTickets','feePayments','accounts','feeStructure','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','account','settings','about'],
+      admin: ['dashboard','ownerPortal','reports','admissions','admissionReqs','inquiries','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','questionBank','hallTickets','feePayments','accounts','feeStructure','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','account','settings','about'],
       supervisor: ['dashboard','reports','attendance','substitutes','marks','hallTickets','exams','notices','ptm','calendar','discipline','conduct','helpdesk','complaints','lessonPlans','logbook','activities','students','parents','classes','subjects','assignments','documents','timetable','account','about'],
       clerk: ['admissions','admissionReqs','students','parents','feePayments','accounts','feeStructure','sms','reports','attendance','helpdesk','complaints','documents','assets','inventory','timetable','classes','notices','calendar','account','about'],
-      teacher: ['timetable','attendance','substitutes','marks','hallTickets','exams','lessonPlans','ptm','logbook','students','discipline','conduct','activities','notices','reports','calendar','documents','complaints','classes','subjects','account','about'],
+      teacher: ['timetable','attendance','substitutes','marks','questionBank','hallTickets','exams','lessonPlans','ptm','logbook','students','discipline','conduct','activities','notices','reports','calendar','documents','complaints','classes','subjects','account','about'],
       // student: dashboard → own-class academics → own records → support → profile. Read-only everywhere except helpdesk/complaints/account.
       student: ['dashboard','timetable','attendance','marks','hallTickets','exams','notices','calendar','feePayments','feeStructure','activities','conduct','discipline','documents','helpdesk','complaints','account','about'],
       // parent: like student + PTM booking with teachers
@@ -22558,6 +22559,444 @@
       );
     }
 
+    // ============== Question Bank & Test Paper Generator ==============
+    const QUESTION_TYPE_OPTS = [
+      { value: 'mcq', label: 'Multiple Choice' },
+      { value: 'true_false', label: 'True / False' },
+      { value: 'short_answer', label: 'Short Answer' },
+      { value: 'essay', label: 'Essay' }
+    ];
+    const QUESTION_DIFFICULTY_OPTS = [
+      { value: 'easy', label: 'Easy' }, { value: 'medium', label: 'Medium' }, { value: 'hard', label: 'Hard' }
+    ];
+
+    function QuestionModal({ question, currentUser, role, onClose, onSave, saving }) {
+      const [classes, setClasses] = useState([]);
+      const [subjects, setSubjects] = useState([]);
+      const [f, setF] = useState({
+        ClassID: question?.ClassID ? String(question.ClassID) : '',
+        SubjectID: question?.SubjectID ? String(question.SubjectID) : '',
+        Topic: question?.Topic || '',
+        QuestionType: question?.QuestionType || 'mcq',
+        QuestionText: question?.QuestionText || '',
+        OptionA: question?.OptionA || '', OptionB: question?.OptionB || '',
+        OptionC: question?.OptionC || '', OptionD: question?.OptionD || '',
+        CorrectAnswer: question?.CorrectAnswer || '',
+        Marks: question?.Marks != null ? String(question.Marks) : '1',
+        Difficulty: question?.Difficulty || 'medium'
+      });
+      const set = (k, v) => setF({ ...f, [k]: v });
+
+      useEffect(() => { google.script.run.withSuccessHandler((res) => { if (res.success) setClasses(res.data || []); }).getAllClasses(currentUser, role); }, []);
+      useEffect(() => {
+        if (!f.ClassID) { setSubjects([]); return; }
+        google.script.run.withSuccessHandler((res) => { if (res.success) setSubjects(res.data || []); }).getSubjectsForClass(f.ClassID, currentUser, role);
+      }, [f.ClassID]);
+
+      const isMcq = f.QuestionType === 'mcq';
+      const isTrueFalse = f.QuestionType === 'true_false';
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!f.ClassID || !f.SubjectID) { Swal.fire({ icon: 'error', title: 'Class and Subject are required' }); return; }
+        if (!f.QuestionText.trim()) { Swal.fire({ icon: 'error', title: 'Question text is required' }); return; }
+        onSave(f);
+      };
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'700px'}}>
+            <div className="modal-header"><h3><i className="fas fa-question-circle"></i> {question ? 'Edit' : 'Add'} Question</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
+            <div className="modal-body">
+              <form onSubmit={handleSubmit}>
+                <div className="form-grid">
+                  <SearchableDropdown label="Class" icon="fas fa-school" required
+                    options={classes.map(c => ({ value: String(c.ID), label: c.Label }))}
+                    value={f.ClassID} onChange={(v) => setF({ ...f, ClassID: v, SubjectID: '' })} placeholder="Select..." />
+                  <SearchableDropdown label="Subject" icon="fas fa-book" required
+                    options={subjects.map(s => ({ value: String(s.ID), label: s.SubjectName }))}
+                    value={f.SubjectID} onChange={(v) => set('SubjectID', v)} placeholder={f.ClassID ? 'Select subject...' : 'Pick a class first'} />
+                  <div className="form-group"><label>Topic</label><input type="text" value={f.Topic} onChange={(e) => set('Topic', e.target.value)} maxLength="100" placeholder="e.g. Fractions" /></div>
+                  <SearchableDropdown label="Type" icon="fas fa-list"
+                    options={QUESTION_TYPE_OPTS}
+                    value={f.QuestionType} onChange={(v) => set('QuestionType', v)} placeholder="Select..." />
+                  <SearchableDropdown label="Difficulty" icon="fas fa-signal"
+                    options={QUESTION_DIFFICULTY_OPTS}
+                    value={f.Difficulty} onChange={(v) => set('Difficulty', v)} placeholder="Select..." />
+                  <div className="form-group"><label>Marks</label><input type="number" min="0.5" step="0.5" value={f.Marks} onChange={(e) => set('Marks', e.target.value)} /></div>
+                </div>
+
+                <div className="form-group"><label>Question Text *</label><textarea value={f.QuestionText} onChange={(e) => set('QuestionText', e.target.value)} rows="3" required /></div>
+
+                {isMcq && (
+                  <div className="form-grid">
+                    <div className="form-group"><label>Option A</label><input type="text" value={f.OptionA} onChange={(e) => set('OptionA', e.target.value)} /></div>
+                    <div className="form-group"><label>Option B</label><input type="text" value={f.OptionB} onChange={(e) => set('OptionB', e.target.value)} /></div>
+                    <div className="form-group"><label>Option C</label><input type="text" value={f.OptionC} onChange={(e) => set('OptionC', e.target.value)} /></div>
+                    <div className="form-group"><label>Option D</label><input type="text" value={f.OptionD} onChange={(e) => set('OptionD', e.target.value)} /></div>
+                  </div>
+                )}
+
+                <div className="form-group">
+                  <label>Correct Answer {isMcq ? '(A / B / C / D)' : ''}</label>
+                  {isTrueFalse ? (
+                    <select value={f.CorrectAnswer} onChange={(e) => set('CorrectAnswer', e.target.value)} style={{width:'100%',padding:'10px 12px',border:'1px solid #ccc'}}>
+                      <option value="">— Not set —</option>
+                      <option value="True">True</option>
+                      <option value="False">False</option>
+                    </select>
+                  ) : (
+                    <input type="text" value={f.CorrectAnswer} onChange={(e) => set('CorrectAnswer', e.target.value)} placeholder={isMcq ? 'e.g. B' : 'Model answer (for the answer key)'} />
+                  )}
+                </div>
+
+                <div className="form-actions">
+                  <button type="submit" className="btn btn-primary" disabled={saving}><i className="fas fa-save"></i> {saving ? 'Saving…' : 'Save'}</button>
+                  <button type="button" className="btn btn-secondary" onClick={onClose}><i className="fas fa-times"></i> Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function TestPaperBuilderModal({ questions, currentUser, role, onClose, onSave, saving }) {
+      const [classes, setClasses] = useState([]);
+      const [subjects, setSubjects] = useState([]);
+      const [meta, setMeta] = useState({ Title: '', ClassID: '', SubjectID: '', Instructions: 'Answer all questions.', DurationMinutes: '60' });
+      const [selectedIds, setSelectedIds] = useState([]);
+      const setM = (k, v) => setMeta({ ...meta, [k]: v });
+
+      useEffect(() => { google.script.run.withSuccessHandler((res) => { if (res.success) setClasses(res.data || []); }).getAllClasses(currentUser, role); }, []);
+      useEffect(() => {
+        if (!meta.ClassID) { setSubjects([]); return; }
+        google.script.run.withSuccessHandler((res) => { if (res.success) setSubjects(res.data || []); }).getSubjectsForClass(meta.ClassID, currentUser, role);
+      }, [meta.ClassID]);
+
+      const eligible = questions.filter(q => (!meta.ClassID || String(q.ClassID) === String(meta.ClassID)) && (!meta.SubjectID || String(q.SubjectID) === String(meta.SubjectID)));
+      const toggle = (id) => setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+      const totalMarks = questions.filter(q => selectedIds.includes(q.ID)).reduce((s, q) => s + (parseFloat(q.Marks) || 0), 0);
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!meta.Title.trim()) { Swal.fire({ icon: 'error', title: 'Title is required' }); return; }
+        if (!meta.ClassID || !meta.SubjectID) { Swal.fire({ icon: 'error', title: 'Class and Subject are required' }); return; }
+        if (!selectedIds.length) { Swal.fire({ icon: 'error', title: 'Pick at least one question' }); return; }
+        onSave({ ...meta, QuestionIDs: selectedIds });
+      };
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'820px'}}>
+            <div className="modal-header"><h3><i className="fas fa-file-alt"></i> Build Test Paper</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
+            <div className="modal-body">
+              <form onSubmit={handleSubmit}>
+                <div className="form-grid">
+                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Title *</label><input type="text" value={meta.Title} onChange={(e) => setM('Title', e.target.value)} required placeholder="e.g. Mathematics Mid-Term Test" /></div>
+                  <SearchableDropdown label="Class" icon="fas fa-school" required
+                    options={classes.map(c => ({ value: String(c.ID), label: c.Label }))}
+                    value={meta.ClassID} onChange={(v) => { setMeta({ ...meta, ClassID: v, SubjectID: '' }); setSelectedIds([]); }} placeholder="Select..." />
+                  <SearchableDropdown label="Subject" icon="fas fa-book" required
+                    options={subjects.map(s => ({ value: String(s.ID), label: s.SubjectName }))}
+                    value={meta.SubjectID} onChange={(v) => { setM('SubjectID', v); setSelectedIds([]); }} placeholder={meta.ClassID ? 'Select subject...' : 'Pick a class first'} />
+                  <div className="form-group"><label>Duration (minutes)</label><input type="number" min="1" value={meta.DurationMinutes} onChange={(e) => setM('DurationMinutes', e.target.value)} /></div>
+                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Instructions</label><textarea value={meta.Instructions} onChange={(e) => setM('Instructions', e.target.value)} rows="2" /></div>
+                </div>
+
+                <h4 style={{margin:'14px 0 8px',color:'var(--navy-primary)',fontSize:'13px'}}>
+                  <i className="fas fa-list-check"></i> Pick Questions {selectedIds.length > 0 && <span style={{fontWeight:400,color:'#34a853'}}>({selectedIds.length} selected, {totalMarks} marks)</span>}
+                </h4>
+                {!meta.ClassID || !meta.SubjectID ? (
+                  <div style={{color:'#888',fontSize:'12px',padding:'10px'}}>Pick a class and subject above to see available questions.</div>
+                ) : eligible.length === 0 ? (
+                  <div style={{color:'#888',fontSize:'12px',padding:'10px'}}>No questions in the bank for this class+subject yet. Add some from the Questions tab first.</div>
+                ) : (
+                  <div style={{maxHeight:'260px',overflowY:'auto',border:'1px solid #e0e0e0',borderRadius:'6px'}}>
+                    {eligible.map(q => (
+                      <label key={q.ID} style={{display:'flex',alignItems:'flex-start',gap:'8px',padding:'8px 12px',borderBottom:'1px solid #f0f0f0',cursor:'pointer',fontSize:'12.5px'}}>
+                        <input type="checkbox" checked={selectedIds.includes(q.ID)} onChange={() => toggle(q.ID)} style={{marginTop:'3px'}} />
+                        <span style={{flex:1}}>
+                          {q.QuestionText}
+                          <span style={{color:'#888',marginLeft:'6px'}}>({q.Marks} mark{q.Marks === 1 ? '' : 's'} · {q.Difficulty} · {q.Topic || 'general'})</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                <div className="form-actions">
+                  <button type="submit" className="btn btn-primary" disabled={saving}><i className="fas fa-save"></i> {saving ? 'Generating…' : 'Generate Test Paper'}</button>
+                  <button type="button" className="btn btn-secondary" onClick={onClose}><i className="fas fa-times"></i> Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function TestPaperPrintModal({ paperId, currentUser, role, onClose }) {
+      const [paper, setPaper] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [showAnswers, setShowAnswers] = useState(false);
+      const sch = window.SMS_SCHOOL || {};
+
+      useEffect(() => {
+        google.script.run
+          .withSuccessHandler((res) => { setLoading(false); if (res.success) setPaper(res.data); else Swal.fire({ icon: 'error', text: res.message }); })
+          .withFailureHandler((err) => { setLoading(false); Swal.fire({ icon: 'error', text: err.message }); })
+          .getTestPaperDetail(paperId, currentUser, role);
+      }, [paperId]);
+
+      const handlePrint = () => {
+        document.body.classList.add('print-target');
+        setTimeout(() => { window.print(); setTimeout(() => document.body.classList.remove('print-target'), 250); }, 60);
+      };
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'820px'}}>
+            <div className="modal-header no-print"><h3><i className="fas fa-file-alt"></i> Test Paper</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
+            <div className="modal-body">
+              {loading ? <TableSkeleton rows={6} columns={2} /> : !paper ? null : (
+                <>
+                  <div className="no-print" style={{display:'flex',gap:'10px',marginBottom:'14px'}}>
+                    <button className="btn btn-primary" onClick={() => { setShowAnswers(false); setTimeout(handlePrint, 0); }}><i className="fas fa-print"></i> Print Question Paper</button>
+                    <button className="btn btn-secondary" onClick={() => { setShowAnswers(true); setTimeout(handlePrint, 0); }}><i className="fas fa-key"></i> Print Answer Key</button>
+                  </div>
+
+                  <div className="report-card" style={{maxWidth:'760px',margin:'0 auto'}}>
+                    <div className="rc-school-hdr">
+                      <img src={sch.SchoolLogo || DEFAULT_LOGO} alt="" onError={(e) => { e.target.style.display = 'none'; }} />
+                      <div style={{flex:1}}>
+                        <div className="rc-sname">{sch.SchoolName || 'School'}</div>
+                        <div className="rc-sline">{paper.ClassLabel} · {paper.SubjectName}</div>
+                      </div>
+                    </div>
+                    <div className="rc-title">{paper.Title}{showAnswers ? ' — ANSWER KEY' : ''}</div>
+                    <div className="rc-info">
+                      <div><b>Duration:</b> {paper.DurationMinutes} minutes</div>
+                      <div><b>Total Marks:</b> {paper.TotalMarks}</div>
+                      <div style={{gridColumn:'1 / -1'}}><b>Instructions:</b> {paper.Instructions || '—'}</div>
+                    </div>
+                    {!showAnswers && (
+                      <div className="rc-remarks" style={{marginBottom:'14px',display:'flex',gap:'20px'}}>
+                        <span><b>Name:</b> ____________________________</span>
+                        <span><b>Date:</b> ______________</span>
+                      </div>
+                    )}
+                    <ol style={{fontSize:'13.5px',lineHeight:1.8,padding:'0 0 0 22px'}}>
+                      {paper.questions.map((q) => (
+                        <li key={q.ID} style={{marginBottom:'12px'}}>
+                          <div>{q.QuestionText} <span style={{color:'#888',fontSize:'11px'}}>({q.Marks} mark{q.Marks === 1 ? '' : 's'})</span></div>
+                          {q.QuestionType === 'mcq' && (
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'2px 14px',marginTop:'4px',fontSize:'13px'}}>
+                              {['A','B','C','D'].map(letter => {
+                                const val = q['Option' + letter];
+                                if (!val) return null;
+                                const isCorrect = showAnswers && String(q.CorrectAnswer).trim().toUpperCase() === letter;
+                                return <div key={letter} style={isCorrect ? { fontWeight: 700, color: '#34a853' } : undefined}>{letter}. {val}{isCorrect ? ' ✓' : ''}</div>;
+                              })}
+                            </div>
+                          )}
+                          {q.QuestionType === 'true_false' && showAnswers && (
+                            <div style={{marginTop:'4px',fontWeight:700,color:'#34a853'}}>Answer: {q.CorrectAnswer || '—'}</div>
+                          )}
+                          {(q.QuestionType === 'short_answer' || q.QuestionType === 'essay') && (
+                            showAnswers
+                              ? <div style={{marginTop:'4px',fontWeight:700,color:'#34a853'}}>Model Answer: {q.CorrectAnswer || '—'}</div>
+                              : <div style={{marginTop:'6px',borderBottom:'1px solid #ccc',height: q.QuestionType === 'essay' ? '60px' : '24px'}}></div>
+                          )}
+                        </li>
+                      ))}
+                    </ol>
+                    <div className="rc-foot">{sch.SchoolName || 'School'} · Generated {new Date().toLocaleDateString('en-US',{day:'2-digit',month:'short',year:'numeric'})}</div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function QuestionBankView({ currentUser, role }) {
+      const [tab, setTab] = useState('questions'); // 'questions' | 'papers'
+
+      const { data: questionsData, error: qError, isLoading: qLoading, mutate: loadQuestions } =
+        useSWR('getQuestionBank', () => swrFetcher('getQuestionBank', currentUser, role));
+      const questions = questionsData || [];
+      const [showQModal, setShowQModal] = useState(false);
+      const [editingQ, setEditingQ] = useState(null);
+      const [qSaving, setQSaving] = useState(false);
+      const [qFilters, setQFilters] = useState({ classId: '', subjectId: '', type: '', difficulty: '' });
+
+      const { data: papersData, error: pError, isLoading: pLoading, mutate: loadPapers } =
+        useSWR('getAllTestPapers', () => swrFetcher('getAllTestPapers', currentUser, role));
+      const papers = papersData || [];
+      const [showBuilder, setShowBuilder] = useState(false);
+      const [builderSaving, setBuilderSaving] = useState(false);
+      const [printPaperId, setPrintPaperId] = useState(null);
+
+      const filteredQuestions = questions.filter(q =>
+        (!qFilters.classId || String(q.ClassID) === String(qFilters.classId)) &&
+        (!qFilters.subjectId || String(q.SubjectID) === String(qFilters.subjectId)) &&
+        (!qFilters.type || q.QuestionType === qFilters.type) &&
+        (!qFilters.difficulty || q.Difficulty === qFilters.difficulty)
+      );
+      const classOpts = [...new Map(questions.map(q => [q.ClassID, { value: String(q.ClassID), label: q.ClassLabel }])).values()];
+      const subjectOpts = [...new Map(questions.map(q => [q.SubjectID, { value: String(q.SubjectID), label: q.SubjectName }])).values()];
+
+      const handleSaveQ = (data) => {
+        setQSaving(true);
+        const action = editingQ ? 'updateQuestion' : 'addQuestion';
+        const params = editingQ ? [editingQ.ID, data, currentUser, role] : [data, currentUser, role];
+        google.script.run
+          .withSuccessHandler((res) => {
+            setQSaving(false);
+            if (res.success) { setShowQModal(false); setEditingQ(null); Swal.fire({ icon: 'success', text: res.message, timer: 1500, showConfirmButton: false }); loadQuestions(); }
+            else Swal.fire({ icon: 'error', text: res.message });
+          })
+          .withFailureHandler((err) => { setQSaving(false); Swal.fire({ icon: 'error', text: err.message }); })[action](...params);
+      };
+
+      const handleDeleteQ = (q) => {
+        Swal.fire({ icon: 'warning', title: 'Delete question?', text: q.QuestionText.slice(0, 60), showCancelButton: true, confirmButtonColor: '#ea4335' })
+          .then((rr) => {
+            if (rr.isConfirmed) {
+              google.script.run.withSuccessHandler((res) => {
+                Swal.fire({ icon: res.success ? 'success' : 'error', text: res.message, timer: 1500, showConfirmButton: false });
+                loadQuestions();
+              }).deleteQuestion(q.ID, currentUser, role);
+            }
+          });
+      };
+
+      const handleGeneratePaper = (data) => {
+        setBuilderSaving(true);
+        google.script.run
+          .withSuccessHandler((res) => {
+            setBuilderSaving(false);
+            if (res.success) { setShowBuilder(false); Swal.fire({ icon: 'success', text: res.message, timer: 2000, showConfirmButton: false }); loadPapers(); }
+            else Swal.fire({ icon: 'error', text: res.message });
+          })
+          .withFailureHandler((err) => { setBuilderSaving(false); Swal.fire({ icon: 'error', text: err.message }); })
+          .generateTestPaper(data, currentUser, role);
+      };
+
+      const handleDeletePaper = (p) => {
+        Swal.fire({ icon: 'warning', title: 'Delete test paper?', text: p.Title, showCancelButton: true, confirmButtonColor: '#ea4335' })
+          .then((rr) => {
+            if (rr.isConfirmed) {
+              google.script.run.withSuccessHandler((res) => {
+                Swal.fire({ icon: res.success ? 'success' : 'error', text: res.message, timer: 1500, showConfirmButton: false });
+                loadPapers();
+              }).deleteTestPaper(p.ID, currentUser, role);
+            }
+          });
+      };
+
+      return (
+        <div className="data-section">
+          <div className="section-header">
+            <h2><i className="fas fa-question-circle"></i> Question Bank &amp; Test Papers</h2>
+          </div>
+          <div style={{display:'flex',gap:'8px',marginBottom:'16px'}}>
+            <button className={`btn btn-sm ${tab === 'questions' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('questions')}><i className="fas fa-list"></i> Questions ({questions.length})</button>
+            <button className={`btn btn-sm ${tab === 'papers' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('papers')}><i className="fas fa-file-alt"></i> Test Papers ({papers.length})</button>
+          </div>
+
+          {tab === 'questions' && (
+            <>
+              <div className="section-header" style={{marginBottom:'12px'}}>
+                <div style={{display:'flex',gap:'10px',flexWrap:'wrap',flex:1}}>
+                  <SearchableDropdown options={classOpts} value={qFilters.classId} onChange={(v) => setQFilters({...qFilters, classId: v})} placeholder="All Classes" />
+                  <SearchableDropdown options={subjectOpts} value={qFilters.subjectId} onChange={(v) => setQFilters({...qFilters, subjectId: v})} placeholder="All Subjects" />
+                  <SearchableDropdown options={QUESTION_TYPE_OPTS} value={qFilters.type} onChange={(v) => setQFilters({...qFilters, type: v})} placeholder="All Types" />
+                  <SearchableDropdown options={QUESTION_DIFFICULTY_OPTS} value={qFilters.difficulty} onChange={(v) => setQFilters({...qFilters, difficulty: v})} placeholder="All Difficulties" />
+                </div>
+                <button className="btn btn-success" onClick={() => { setEditingQ(null); setShowQModal(true); }}><i className="fas fa-plus"></i> Add Question</button>
+              </div>
+              {qError && !qLoading && questions.length === 0 && (
+                <div className="settings-info-message" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>Couldn't load questions — {String((qError && qError.message) || qError)}.</div>
+              )}
+              {qLoading && <TableSkeleton rows={5} columns={5} />}
+              {!qLoading && questions.length === 0 && (
+                <div style={{textAlign:'center',padding:'40px',color:'#888',background:'#f8f9fa'}}>No questions yet. Click "Add Question" to build your question bank.</div>
+              )}
+              {!qLoading && filteredQuestions.length > 0 && (
+                <div style={{overflowX:'auto'}}>
+                  <table className="simple-table" style={{width:'100%'}}>
+                    <thead><tr><th>Question</th><th>Class</th><th>Subject</th><th>Type</th><th>Marks</th><th>Difficulty</th><th>Actions</th></tr></thead>
+                    <tbody>
+                      {filteredQuestions.map((q) => (
+                        <tr key={q.ID}>
+                          <td style={{maxWidth:'320px'}}>{q.QuestionText}{q.Topic && <div style={{fontSize:'11px',color:'#888'}}>{q.Topic}</div>}</td>
+                          <td style={{whiteSpace:'nowrap'}}>{q.ClassLabel}</td>
+                          <td style={{whiteSpace:'nowrap'}}>{q.SubjectName}</td>
+                          <td>{(QUESTION_TYPE_OPTS.find(o => o.value === q.QuestionType) || {}).label}</td>
+                          <td>{q.Marks}</td>
+                          <td style={{textTransform:'capitalize'}}>{q.Difficulty}</td>
+                          <td style={{whiteSpace:'nowrap'}}>
+                            <button className="action-icon edit-icon" title="Edit" onClick={() => { setEditingQ(q); setShowQModal(true); }}><i className="fas fa-edit"></i></button>
+                            <button className="action-icon delete-icon" title="Delete" onClick={() => handleDeleteQ(q)}><i className="fas fa-trash"></i></button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+
+          {tab === 'papers' && (
+            <>
+              <div className="section-header" style={{marginBottom:'12px'}}>
+                <div></div>
+                <button className="btn btn-success" onClick={() => setShowBuilder(true)}><i className="fas fa-plus"></i> Build Test Paper</button>
+              </div>
+              {pError && !pLoading && papers.length === 0 && (
+                <div className="settings-info-message" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>Couldn't load test papers — {String((pError && pError.message) || pError)}.</div>
+              )}
+              {pLoading && <TableSkeleton rows={5} columns={5} />}
+              {!pLoading && papers.length === 0 && (
+                <div style={{textAlign:'center',padding:'40px',color:'#888',background:'#f8f9fa'}}>No test papers yet. Add some questions, then click "Build Test Paper".</div>
+              )}
+              {!pLoading && papers.length > 0 && (
+                <div style={{overflowX:'auto'}}>
+                  <table className="simple-table" style={{width:'100%'}}>
+                    <thead><tr><th>Title</th><th>Class</th><th>Subject</th><th>Questions</th><th>Marks</th><th>Duration</th><th>Actions</th></tr></thead>
+                    <tbody>
+                      {papers.map((p) => (
+                        <tr key={p.ID}>
+                          <td style={{fontWeight:600}}>{p.Title}</td>
+                          <td>{p.ClassLabel}</td>
+                          <td>{p.SubjectName}</td>
+                          <td>{p.QuestionIDs.length}</td>
+                          <td>{p.TotalMarks}</td>
+                          <td>{p.DurationMinutes} min</td>
+                          <td style={{whiteSpace:'nowrap'}}>
+                            <button className="action-icon edit-icon" title="Print / Download" onClick={() => setPrintPaperId(p.ID)}><i className="fas fa-print"></i></button>
+                            <button className="action-icon delete-icon" title="Delete" onClick={() => handleDeletePaper(p)}><i className="fas fa-trash"></i></button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+
+          {showQModal && <QuestionModal question={editingQ} currentUser={currentUser} role={role} saving={qSaving} onClose={() => { setShowQModal(false); setEditingQ(null); }} onSave={handleSaveQ} />}
+          {showBuilder && <TestPaperBuilderModal questions={questions} currentUser={currentUser} role={role} saving={builderSaving} onClose={() => setShowBuilder(false)} onSave={handleGeneratePaper} />}
+          {printPaperId && <TestPaperPrintModal paperId={printPaperId} currentUser={currentUser} role={role} onClose={() => setPrintPaperId(null)} />}
+        </div>
+      );
+    }
+
     // ============== Helpdesk Tickets ==============
     function HelpdeskView({ currentUser, role }) {
       const r = String(role).toLowerCase();
@@ -28301,6 +28740,7 @@
       const canSeeSms = r === 'admin' || r === 'clerk';
       const canSeeFoodMenu = r === 'admin';
       const canSeeGradingSystem = r === 'admin';
+      const canSeeQuestionBank = r === 'admin' || r === 'teacher';
       const canSeeAdmissionReqs = r === 'admin' || r === 'clerk';
       const canSeeInquiries = r === 'admin';
       const canSeeOwnerPortal = r === 'admin' || r === 'owner';
@@ -28379,6 +28819,8 @@
           return canSeeFoodMenu ? <FoodMenuView currentUser={user} role={role} /> : denied('Food Menu');
         case 'gradingSystem':
           return canSeeGradingSystem ? <GradingSystemView currentUser={user} role={role} /> : denied('Grading System');
+        case 'questionBank':
+          return canSeeQuestionBank ? <QuestionBankView currentUser={user} role={role} /> : denied('Question Bank');
         case 'admissionReqs':
           return canSeeAdmissionReqs ? <AdmissionRequirementsView currentUser={user} role={role} schoolSettings={schoolSettings} /> : denied('Admission Requirements');
         case 'inquiries':
