@@ -6,25 +6,29 @@
   <title>Admin Dashboard - Canvas Frames shop</title>
   <script>
     // Surface any runtime error instead of leaving the page blank, so problems are diagnosable.
-    window.onerror = function(msg, url, line, col, error) {
+    // NOTE: window.onerror only catches truly global JS errors - Vue 3 catches errors thrown
+    // inside its own components/templates/methods internally and just console.errors them, so
+    // showJsError() is also wired into Vue's app.config.errorHandler below (see mount script) to
+    // catch those too. Without that second hook, a broken computed property or @click handler can
+    // silently fail (blank section, unresponsive button) with nothing visible here.
+    function showJsError(title, lines) {
       const container = document.createElement('div');
-      container.style.cssText = 'color:red; padding:30px; background:white; font-family:sans-serif; z-index:999999; position:fixed; top:10px; left:10px; right:10px; border:4px solid red; border-radius:8px; box-shadow: 0 0 20px rgba(0,0,0,0.5);';
-      container.innerHTML = '<h3 style="margin-top:0;font-size:18px;">JavaScript Runtime Error</h3>' +
-                            '<p style="margin:8px 0;"><strong>Error:</strong> ' + msg + '</p>' +
-                            '<p style="margin:8px 0;"><strong>Location:</strong> ' + url + ' (Line ' + line + ', Col ' + col + ')</p>';
+      container.style.cssText = 'color:red; padding:30px; background:white; font-family:sans-serif; z-index:999999; position:fixed; top:10px; left:10px; right:10px; max-height:80vh; overflow:auto; border:4px solid red; border-radius:8px; box-shadow: 0 0 20px rgba(0,0,0,0.5);';
+      container.innerHTML = '<h3 style="margin-top:0;font-size:18px;">' + title + '</h3>' +
+        lines.map(l => '<p style="margin:8px 0; white-space:pre-wrap;">' + l + '</p>').join('');
       if (document.documentElement) {
         document.documentElement.appendChild(container);
       }
+    }
+    window.onerror = function(msg, url, line, col, error) {
+      showJsError('JavaScript Runtime Error', [
+        '<strong>Error:</strong> ' + msg,
+        '<strong>Location:</strong> ' + url + ' (Line ' + line + ', Col ' + col + ')'
+      ]);
       return false;
     };
     window.addEventListener('unhandledrejection', function(event) {
-      const container = document.createElement('div');
-      container.style.cssText = 'color:red; padding:30px; background:white; font-family:sans-serif; z-index:999999; position:fixed; top:10px; left:10px; right:10px; border:4px solid red; border-radius:8px; box-shadow: 0 0 20px rgba(0,0,0,0.5);';
-      container.innerHTML = '<h3 style="margin-top:0;font-size:18px;">Unhandled Promise Rejection</h3>' +
-                            '<p style="margin:8px 0;"><strong>Reason:</strong> ' + event.reason + '</p>';
-      if (document.documentElement) {
-        document.documentElement.appendChild(container);
-      }
+      showJsError('Unhandled Promise Rejection', ['<strong>Reason:</strong> ' + event.reason]);
     });
   </script>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -2587,7 +2591,7 @@
   <script>
     const { createApp } = Vue;
 
-    createApp({
+    const app = createApp({
       data() {
         return {
           // Auth
@@ -4814,7 +4818,18 @@
         // Cleanup intervals when component is destroyed
         this.stopOrdersAutoRefresh();
       }
-    }).mount('#app');
+    });
+    // Vue catches errors inside components/templates itself; without this handler they only
+    // ever reach the browser console, never window.onerror, and a broken view just looks blank.
+    app.config.errorHandler = function(err, instance, info) {
+      console.error('Vue error:', err, info);
+      showJsError('Vue Component Error', [
+        '<strong>Error:</strong> ' + (err && err.message ? err.message : err),
+        '<strong>Info:</strong> ' + info,
+        '<pre style="font-size:11px;white-space:pre-wrap;">' + (err && err.stack ? err.stack : '') + '</pre>'
+      ]);
+    };
+    app.mount('#app');
   </script>
 </body>
 </html>
