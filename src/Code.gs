@@ -11440,6 +11440,220 @@ function getSsnitRegister(currentUser, currentRole) {
   }
 }
 
+// ============== Public Report Card Access ==============
+// Two independent no-login paths to a report card, for families without portal access:
+//  1) Self-service lookup: student enters their admission number, gets a 6-digit code shown
+//     on-screen (not SMS — not every student has a phone), re-enters it to view their report
+//     cards + fee bill. The code is a friction/confirmation step, not strong security.
+//  2) Admin-generated share link: admin SMSes a parent a link containing an unguessable token
+//     that opens the report card directly, no code needed.
+var REPORT_ACCESS_CODES_SHEET = 'ReportCard_Access_Codes';
+var REPORT_ACCESS_CODE_HEADERS = ['ID', 'AdmissionNumber', 'Code', 'ExpiresAt', 'CreatedAt'];
+var REPORT_SHARE_TOKENS_SHEET = 'ReportCard_Share_Tokens';
+var REPORT_SHARE_TOKEN_HEADERS = ['ID', 'Token', 'StudentID', 'ExamID', 'ExpiresAt', 'CreatedBy', 'CreatedAt'];
+
+function _ensureReportAccessCodesSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(REPORT_ACCESS_CODES_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(REPORT_ACCESS_CODES_SHEET);
+    sh.appendRow(REPORT_ACCESS_CODE_HEADERS);
+    sh.getRange(1, 1, 1, REPORT_ACCESS_CODE_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+function _ensureReportShareTokensSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(REPORT_SHARE_TOKENS_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(REPORT_SHARE_TOKENS_SHEET);
+    sh.appendRow(REPORT_SHARE_TOKEN_HEADERS);
+    sh.getRange(1, 1, 1, REPORT_SHARE_TOKEN_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+// prefers the admin-configured PublicAppBaseURL (School Settings > Public Links) over the live
+// deployment URL, mirroring the frontend's publicAppLink() helper
+function _publicAppLinkServer(queryString) {
+  var settingsRes = getSchoolSettings();
+  var base = (settingsRes.data && settingsRes.data.PublicAppBaseURL) || ScriptApp.getService().getUrl();
+  return String(base || '').replace(/\/+$/, '') + queryString;
+}
+
+function _findActiveStudentByAdmissionNumber(admNo) {
+  var ssh = getSheet(STUDENTS_SHEET);
+  if (!ssh) return null;
+  var sdata = ssh.getDataRange().getValues();
+  for (var i = 1; i < sdata.length; i++) {
+    if (String(sdata[i][36]) === '1') continue; // IsDeleted
+    if (String(sdata[i][1]).toLowerCase() === String(admNo).toLowerCase()) return sdata[i];
+  }
+  return null;
+}
+
+function _verifyReportAccessCode(admNo, code) {
+  var sh = _ensureReportAccessCodesSheet();
+  var data = sh.getDataRange().getValues();
+  var now = new Date();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][1]).toLowerCase() !== String(admNo).toLowerCase()) continue;
+    if (String(data[i][2]) !== String(code || '').trim()) continue;
+    var exp = new Date(data[i][3]);
+    return exp >= now;
+  }
+  return false;
+}
+
+// public — no auth. Student enters their admission number; a 6-digit code is generated and
+// returned directly in the response (shown on-screen), valid for 10 minutes.
+function requestReportCardAccess(admissionNumber) {
+  try {
+    var admNo = String(admissionNumber || '').trim();
+    if (!admNo) return { success: false, message: 'Enter your admission number' };
+    var srow = _findActiveStudentByAdmissionNumber(admNo);
+    if (!srow) return { success: false, message: 'No student found with that admission number. Check with the school office.' };
+
+    var sh = _ensureReportAccessCodesSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = data.length - 1; i >= 1; i--) {
+      if (String(data[i][1]).toLowerCase() === admNo.toLowerCase()) sh.deleteRow(i + 1);
+    }
+    var code = String(Math.floor(100000 + Math.random() * 900000));
+    var ts = nowIso(), id = nextRowId(sh);
+    var expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    sh.appendRow([id, admNo, code, expiresAt, ts]);
+
+    return { success: true, code: code, studentName: [srow[2], srow[4]].filter(function (x) { return x; }).join(' ') };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// public — after code verification: available (published) exams by type + a fee bill summary
+function getPublicStudentAccess(admissionNumber, code) {
+  try {
+    var admNo = String(admissionNumber || '').trim();
+    if (!_verifyReportAccessCode(admNo, code)) return { success: false, message: 'Invalid or expired code — request a new one.' };
+    var srow = _findActiveStudentByAdmissionNumber(admNo);
+    if (!srow) return { success: false, message: 'Student not found' };
+    var sid = srow[0], classId = parseInt(srow[25], 10);
+
+    var esh = getSheet(EXAMS_SHEET);
+    var exams = [];
+    if (esh) {
+      var edata = esh.getDataRange().getValues();
+      for (var e = 1; e < edata.length; e++) {
+        if (String(edata[e][11]) === '1') continue; // IsDeleted
+        if (parseInt(edata[e][3], 10) !== classId) continue;
+        if (String(edata[e][8]) !== '1') continue; // published only
+        exams.push({ ID: edata[e][0], ExamName: edata[e][1], ExamType: edata[e][2], Term: edata[e][14] || '', AcademicYear: edata[e][4] });
+      }
+    }
+    exams.sort(function (a, b) { return String(b.AcademicYear).localeCompare(String(a.AcademicYear)); });
+
+    var cmap = getClassesMap();
+    var fmap = getFeeStructuresLite();
+    var paidByFs = {};
+    var fpsh = getSheet(FEE_PAYMENTS_SHEET);
+    if (fpsh) {
+      var fpdata = fpsh.getDataRange().getValues();
+      for (var p = 1; p < fpdata.length; p++) {
+        if (String(fpdata[p][15]) === '1') continue;
+        if (parseInt(fpdata[p][1], 10) !== sid) continue;
+        var fsid = fpdata[p][2];
+        paidByFs[fsid] = (paidByFs[fsid] || 0) + (parseFloat(fpdata[p][3]) || 0);
+      }
+    }
+    var feeBill = [];
+    Object.keys(fmap).forEach(function (fsid) {
+      var f = fmap[fsid];
+      if (f.classId !== classId || !f.isActive) return;
+      var paid = paidByFs[fsid] || 0;
+      feeBill.push({ FeeCategory: f.category, Frequency: f.frequency, Amount: f.amount, Paid: paid, Due: Math.max(0, f.amount - paid) });
+    });
+
+    return {
+      success: true,
+      data: {
+        studentName: [srow[2], srow[3], srow[4]].filter(function (x) { return x; }).join(' '),
+        admissionNumber: srow[1],
+        classLabel: cmap[classId] ? cmap[classId].label : '',
+        exams: exams,
+        feeBill: feeBill
+      }
+    };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// public — the report card itself, gated by the same access code
+function getPublicReportCard(admissionNumber, code, examId) {
+  try {
+    var admNo = String(admissionNumber || '').trim();
+    if (!_verifyReportAccessCode(admNo, code)) return { success: false, message: 'Invalid or expired code — request a new one.' };
+    var srow = _findActiveStudentByAdmissionNumber(admNo);
+    if (!srow) return { success: false, message: 'Student not found' };
+    var examRow = getExamRow(parseInt(examId, 10));
+    if (!examRow || String(examRow[8]) !== '1') return { success: false, message: 'Report card not available' };
+    return getStudentReportCard(srow[0], examId, 'System', 'admin');
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// admin only — creates a public share link for one student's report card, optionally SMSing it
+function createReportCardShareLink(studentId, examId, phone, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var sid = parseInt(studentId, 10), eid = parseInt(examId, 10);
+    if (isNaN(sid) || isNaN(eid)) return { success: false, message: 'Invalid student/exam id' };
+    var check = getStudentReportCard(sid, eid, currentUser, currentRole);
+    if (!check.success) return { success: false, message: check.message };
+    if (!check.data.exam.IsPublished) return { success: false, message: 'Publish this exam before sharing its report cards' };
+
+    var token = Utilities.getUuid().replace(/-/g, '');
+    var sh = _ensureReportShareTokensSheet();
+    var ts = nowIso(), id = nextRowId(sh);
+    var expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days
+    sh.appendRow([id, token, sid, eid, expiresAt, getCurrentUserId(currentUser) || '', ts]);
+
+    var link = _publicAppLinkServer('?public=reportcard&token=' + token);
+
+    var smsResult = null;
+    if (phone) {
+      var msg = check.data.student.FullName + "'s report card is ready to view: " + link;
+      smsResult = sendSms(phone, msg, 'report_card', sid, currentUser, currentRole);
+    }
+
+    addLog(currentUser, 'Report Card Share Link Created', check.data.student.FullName + (phone ? ' — SMSed to ' + phone : ''));
+    return { success: true, message: phone ? 'Report card link sent via SMS' : 'Report card link created', link: link, smsResult: smsResult };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// public — resolves a share-link token straight to a report card, no login/code needed
+function getReportCardByToken(token) {
+  try {
+    var tok = String(token || '').trim();
+    if (!tok) return { success: false, message: 'Invalid link' };
+    var sh = _ensureReportShareTokensSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][1]) !== tok) continue;
+      if (new Date(data[i][4]) < new Date()) return { success: false, message: 'This link has expired. Ask the school for a new one.' };
+      return getStudentReportCard(data[i][2], data[i][3], 'System', 'admin');
+    }
+    return { success: false, message: 'Link not found or has expired' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
 // ============== Setup Entrypoints ==============
 function setup() { return initializeSheets(); }
 

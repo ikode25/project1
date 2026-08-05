@@ -4077,6 +4077,183 @@
       );
     }
 
+    // ============== Public Report Card Page (no login — ?public=reportcard[&token=...]) ==============
+    function PublicReportCardPage({ schoolSettings, shareToken }) {
+      const sch = schoolSettings || {};
+      const schoolName = sch.SchoolName || 'School';
+      const schoolLogo = sch.SchoolLogo || DEFAULT_LOGO;
+
+      // token flow — straight to the report card, no code needed
+      const [tokenCard, setTokenCard] = useState(null);
+      const [tokenError, setTokenError] = useState('');
+      const [tokenLoading, setTokenLoading] = useState(!!shareToken);
+      useEffect(() => {
+        if (!shareToken) return;
+        google.script.run
+          .withSuccessHandler((res) => { setTokenLoading(false); if (res && res.success) setTokenCard(res.data); else setTokenError((res && res.message) || 'Could not load report card'); })
+          .withFailureHandler((err) => { setTokenLoading(false); setTokenError((err && err.message) || 'Connection error'); })
+          .getReportCardByToken(shareToken);
+      }, [shareToken]);
+
+      // self-service flow — admission number -> on-screen code -> access
+      const [step, setStep] = useState('admno'); // 'admno' | 'code' | 'unlocked'
+      const [admissionNumber, setAdmissionNumber] = useState('');
+      const [shownCode, setShownCode] = useState('');
+      const [studentName, setStudentName] = useState('');
+      const [enteredCode, setEnteredCode] = useState('');
+      const [access, setAccess] = useState(null); // getPublicStudentAccess() payload
+      const [selectedExamId, setSelectedExamId] = useState('');
+      const [card, setCard] = useState(null);
+      const [loading, setLoading] = useState(false);
+      const [error, setError] = useState('');
+
+      const handleRequestCode = (e) => {
+        e.preventDefault();
+        setLoading(true); setError('');
+        google.script.run
+          .withSuccessHandler((res) => {
+            setLoading(false);
+            if (res && res.success) { setShownCode(res.code); setStudentName(res.studentName); setStep('code'); }
+            else setError((res && res.message) || 'Could not find that admission number');
+          })
+          .withFailureHandler((err) => { setLoading(false); setError((err && err.message) || 'Connection error'); })
+          .requestReportCardAccess(admissionNumber);
+      };
+
+      const handleVerifyCode = (e) => {
+        e.preventDefault();
+        setLoading(true); setError('');
+        google.script.run
+          .withSuccessHandler((res) => {
+            setLoading(false);
+            if (res && res.success) { setAccess(res.data); setStep('unlocked'); }
+            else setError((res && res.message) || 'Incorrect code');
+          })
+          .withFailureHandler((err) => { setLoading(false); setError((err && err.message) || 'Connection error'); })
+          .getPublicStudentAccess(admissionNumber, enteredCode);
+      };
+
+      const loadCard = (examId) => {
+        setSelectedExamId(examId); setCard(null); setLoading(true);
+        google.script.run
+          .withSuccessHandler((res) => { setLoading(false); if (res && res.success) setCard(res.data); else setError((res && res.message) || 'Could not load report card'); })
+          .withFailureHandler((err) => { setLoading(false); setError((err && err.message) || 'Connection error'); })
+          .getPublicReportCard(admissionNumber, enteredCode, examId);
+      };
+
+      const handlePrint = () => {
+        document.body.classList.add('print-target');
+        setTimeout(() => { window.print(); setTimeout(() => document.body.classList.remove('print-target'), 250); }, 60);
+      };
+
+      // ---- token flow rendering ----
+      if (shareToken) {
+        if (tokenLoading) return <div style={{padding:'60px',textAlign:'center',color:'#888'}}><i className="fas fa-spinner fa-spin"></i> Loading report card…</div>;
+        if (tokenError) return (
+          <div className="login-container"><div className="login-box"><div className="login-logo-ring"><img src={schoolLogo} alt="" className="login-logo" /></div><h2>{schoolName}</h2>
+            <div className="login-error-box" style={{marginTop:'16px'}}><i className="fas fa-exclamation-circle"></i> <span>{tokenError}</span></div>
+          </div></div>
+        );
+        return (
+          <div style={{maxWidth:'900px',margin:'0 auto',padding:'20px'}}>
+            <div className="no-print" style={{marginBottom:'14px',textAlign:'center'}}>
+              <button className="btn btn-primary" onClick={handlePrint}><i className="fas fa-print"></i> Print / Save as PDF</button>
+            </div>
+            <ReportCardStatic card={tokenCard} school={sch} />
+          </div>
+        );
+      }
+
+      // ---- self-service flow rendering ----
+      return (
+        <div className="login-container">
+          <div className="login-box" style={{maxWidth: step === 'unlocked' && card ? '820px' : '440px'}}>
+            <div className="login-logo-ring"><img src={schoolLogo} alt="Logo" className="login-logo" onError={(e) => e.currentTarget.style.display = 'none'} /></div>
+            <h2>{schoolName}</h2>
+            <p className="login-subtitle">Check My Report Card &amp; Fees</p>
+
+            {step === 'admno' && (
+              <form onSubmit={handleRequestCode} className="login-form">
+                <div className="form-group">
+                  <label><i className="fas fa-id-card"></i> Admission Number</label>
+                  <div className="login-input-wrap"><input type="text" value={admissionNumber} onChange={(e) => setAdmissionNumber(e.target.value)} required autoFocus /></div>
+                </div>
+                <button type="submit" className="login-submit" disabled={loading}>{loading ? <><i className="fas fa-spinner fa-spin"></i> Checking…</> : <><i className="fas fa-arrow-right"></i> Continue</>}</button>
+                {error && <div className="login-error-box"><i className="fas fa-exclamation-circle"></i> <span>{error}</span></div>}
+              </form>
+            )}
+
+            {step === 'code' && (
+              <form onSubmit={handleVerifyCode} className="login-form">
+                <div style={{textAlign:'center',padding:'16px',background:'#fff8e1',borderRadius:'6px',marginBottom:'16px'}}>
+                  <div style={{fontSize:'12px',color:'#7a5c00'}}>Hi {studentName || 'there'}! Your verification code is:</div>
+                  <div style={{fontSize:'32px',fontWeight:700,letterSpacing:'6px',color:'#5d4200',fontFamily:'monospace'}}>{shownCode}</div>
+                  <div style={{fontSize:'11px',color:'#7a5c00',marginTop:'4px'}}>Enter it below to continue. Valid for 10 minutes.</div>
+                </div>
+                <div className="form-group">
+                  <label><i className="fas fa-key"></i> Enter the code shown above</label>
+                  <div className="login-input-wrap"><input type="text" value={enteredCode} onChange={(e) => setEnteredCode(e.target.value)} required autoFocus maxLength="6" style={{textAlign:'center',letterSpacing:'4px',fontFamily:'monospace',fontSize:'18px'}} /></div>
+                </div>
+                <button type="submit" className="login-submit" disabled={loading}>{loading ? <><i className="fas fa-spinner fa-spin"></i> Verifying…</> : <><i className="fas fa-unlock"></i> View My Report Card</>}</button>
+                {error && <div className="login-error-box"><i className="fas fa-exclamation-circle"></i> <span>{error}</span></div>}
+                <button type="button" className="btn btn-secondary" style={{marginTop:'10px'}} onClick={() => { setStep('admno'); setError(''); }}><i className="fas fa-arrow-left"></i> Start over</button>
+              </form>
+            )}
+
+            {step === 'unlocked' && access && (
+              <div>
+                <div style={{textAlign:'left',marginBottom:'16px'}}>
+                  <div style={{fontWeight:700,color:'var(--navy-primary)'}}>{access.studentName}</div>
+                  <div style={{fontSize:'12px',color:'#888'}}>{access.admissionNumber} · {access.classLabel}</div>
+                </div>
+
+                {access.feeBill && access.feeBill.length > 0 && (
+                  <div className="no-print" style={{marginBottom:'18px'}}>
+                    <h4 style={{fontSize:'13px',color:'var(--navy-primary)',marginBottom:'8px'}}><i className="fas fa-money-bill-wave"></i> Fee Bill</h4>
+                    <table className="simple-table" style={{width:'100%'}}>
+                      <thead><tr><th>Fee</th><th>Amount</th><th>Paid</th><th>Due</th></tr></thead>
+                      <tbody>
+                        {access.feeBill.map((f, i) => (
+                          <tr key={i}><td style={{textTransform:'capitalize'}}>{f.FeeCategory}</td><td>GH₵{f.Amount.toFixed(2)}</td><td>GH₵{f.Paid.toFixed(2)}</td><td style={{fontWeight:700,color:f.Due > 0 ? '#ea4335' : '#34a853'}}>GH₵{f.Due.toFixed(2)}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <div className="no-print" style={{marginBottom:'16px'}}>
+                  <h4 style={{fontSize:'13px',color:'var(--navy-primary)',marginBottom:'8px'}}><i className="fas fa-graduation-cap"></i> Report Cards</h4>
+                  {access.exams.length === 0 ? (
+                    <div style={{color:'#888',fontSize:'13px'}}>No published report cards yet.</div>
+                  ) : (
+                    <div style={{display:'flex',flexWrap:'wrap',gap:'8px'}}>
+                      {access.exams.map(e => (
+                        <button key={e.ID} className={`btn btn-sm ${String(selectedExamId) === String(e.ID) ? 'btn-primary' : 'btn-secondary'}`} onClick={() => loadCard(e.ID)}>
+                          {e.ExamName}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {loading && <div style={{textAlign:'center',padding:'20px',color:'#888'}}><i className="fas fa-spinner fa-spin"></i> Loading…</div>}
+                {error && <div className="login-error-box"><i className="fas fa-exclamation-circle"></i> <span>{error}</span></div>}
+
+                {card && (
+                  <>
+                    <div className="no-print" style={{marginBottom:'12px'}}>
+                      <button className="btn btn-primary" onClick={handlePrint}><i className="fas fa-print"></i> Print / Save as PDF</button>
+                    </div>
+                    <ReportCardStatic card={card} school={sch} />
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
     // ============== Menu catalog (single source of truth for sidebar items) ==============
     // Priority key: lower = higher in list. Items with no entry for a role = hidden for that role.
     // Optional `group` lets us insert section headers (Daily / Academic / Records / Admin / Account).
@@ -12956,6 +13133,26 @@
         }, 60);
       };
 
+      const handleSendSms = () => {
+        const defaultPhone = student.FatherMobile || student.MotherMobile || student.GuardianMobile || student.Mobile || '';
+        Swal.fire({
+          icon: 'question', title: 'Send Report Card via SMS',
+          text: 'Sends a link the parent can open on any phone — no login needed.',
+          input: 'text', inputLabel: 'Parent phone number', inputValue: defaultPhone,
+          inputValidator: (v) => !v && 'Enter a phone number',
+          showCancelButton: true, confirmButtonText: 'Send'
+        }).then((res) => {
+          if (!res.isConfirmed) return;
+          google.script.run
+            .withSuccessHandler((r) => {
+              if (r && r.success) Swal.fire({ icon: 'success', text: r.message, timer: 2500, showConfirmButton: false });
+              else Swal.fire({ icon: 'error', title: 'Error', text: (r && r.message) || 'Failed' });
+            })
+            .withFailureHandler((err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }))
+            .createReportCardShareLink(student.ID, examId, res.value.trim(), currentUser, role);
+        });
+      };
+
       // each panel only sends the fields it owns — the backend preserves the other panel's stored values
       const saveRemarksPartial = (which, fields) => {
         setSavingWhich(which);
@@ -12994,6 +13191,11 @@
                 <button className="btn btn-primary" onClick={handlePrint} disabled={!card}>
                   <i className="fas fa-print"></i> Print A4
                 </button>
+                {r === 'admin' && (
+                  <button className="btn btn-secondary" onClick={handleSendSms} disabled={!card || !card.exam?.IsPublished} title={card && !card.exam?.IsPublished ? 'Publish this exam first' : 'SMS a link to the parent'}>
+                    <i className="fas fa-sms"></i> Send to Parent (SMS)
+                  </button>
+                )}
               </div>
 
               {loading ? <TableSkeleton rows={6} columns={5} /> : examOptions.length === 0 ? (
@@ -29614,9 +29816,11 @@
       // public (no-login) pages — reached via the app's own URL + a query param, e.g.
       // https://.../exec?public=inquiry — checked before the login gate so anyone with the link
       // can use them without an account.
-      const publicPage = new URLSearchParams(window.location.search).get('public');
+      const publicParams = new URLSearchParams(window.location.search);
+      const publicPage = publicParams.get('public');
       if (publicPage === 'inquiry') return <PublicInquiryForm schoolSettings={schoolSettings} />;
       if (publicPage === 'admission') return <PublicAdmissionForm schoolSettings={schoolSettings} />;
+      if (publicPage === 'reportcard') return <PublicReportCardPage schoolSettings={schoolSettings} shareToken={publicParams.get('token')} />;
 
       return (
         <div>
