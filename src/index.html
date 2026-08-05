@@ -16705,9 +16705,36 @@
       const items = itemsData || [];
       const [showModal, setShowModal] = useState(false);
       const [editing, setEditing] = useState(null);
+      const [showBulkModal, setShowBulkModal] = useState(false);
+      const [bulkSaving, setBulkSaving] = useState(false);
+      const [viewMode, setViewMode] = useState('grid');
+      const [expandedGroup, setExpandedGroup] = useState(null);
       const tableInstanceRef = useRef(null);
 
       const [filters, setFilters] = useState({ classId: '', category: '', frequency: '', search: '' });
+
+      // group the flat per-class rows by fee type (category+frequency+year) for the grid view —
+      // this is what turns "Basic 1 Tuition, Basic 2 Tuition, Basic 1 Exam, Basic 2 Exam..." into
+      // one "Tuition" card covering every class it's set up for.
+      const grouped = {};
+      items.forEach((f) => {
+        const key = f.FeeCategory + '|' + f.Frequency + '|' + f.AcademicYear;
+        if (!grouped[key]) grouped[key] = { FeeCategory: f.FeeCategory, Frequency: f.Frequency, AcademicYear: f.AcademicYear, rows: [] };
+        grouped[key].rows.push(f);
+      });
+      const groupList = Object.keys(grouped).map(k => grouped[k]).sort((a, b) => a.FeeCategory.localeCompare(b.FeeCategory));
+
+      const handleBulkSave = (data) => {
+        setBulkSaving(true);
+        google.script.run
+          .withSuccessHandler((res) => {
+            setBulkSaving(false);
+            if (res.success) { setShowBulkModal(false); Swal.fire({ icon: 'success', text: res.message, timer: 2500, showConfirmButton: false }); refreshFees(); }
+            else Swal.fire({ icon: 'error', text: res.message });
+          })
+          .withFailureHandler((err) => { setBulkSaving(false); Swal.fire({ icon: 'error', text: err.message }); })
+          .addFeeTypeBulk(data, currentUser, role);
+      };
 
       // destroy DataTable on unmount
       useEffect(() => {
@@ -16877,11 +16904,19 @@
         <div className="data-section">
           <div className="section-header">
             <h2><i className="fas fa-money-bill-wave"></i> {isAdmin ? 'Fee Structure' : 'Fee Structure (Read-only)'}{syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}</h2>
-            {isAdmin && (
-              <button className="btn btn-success" onClick={() => { setEditing(null); setShowModal(true); }}>
-                <i className="fas fa-plus"></i> Add Fee Item
-              </button>
-            )}
+            <div style={{display:'flex',gap:'10px'}}>
+              <ViewToggle mode={viewMode} onChange={setViewMode} />
+              {isAdmin && (
+                <>
+                  <button className="btn btn-success" onClick={() => setShowBulkModal(true)}>
+                    <i className="fas fa-plus"></i> Add Fee Type
+                  </button>
+                  <button className="btn btn-secondary" onClick={() => { setEditing(null); setShowModal(true); }} title="Add a single class+fee row directly">
+                    <i className="fas fa-plus"></i> Add Single Item
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
           {loadError && !loading && items.length === 0 && (
@@ -16970,9 +17005,61 @@
           )}
 
           {loading && <TableSkeleton rows={6} columns={isAdmin ? 10 : 9} />}
-          <div style={{ display: loading ? 'none' : 'block' }}>
+
+          <div style={{ display: (loading || viewMode !== 'table') ? 'none' : 'block' }}>
             <table id="feeStructureTable" className="display" style={{width: '100%'}}></table>
           </div>
+
+          {!loading && viewMode === 'grid' && (
+            groupList.length === 0 ? (
+              <div style={{textAlign:'center',padding:'40px',color:'#888',background:'#f8f9fa'}}>No fee items yet.</div>
+            ) : (
+              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:'14px'}}>
+                {groupList.map((g) => {
+                  const key = g.FeeCategory + '|' + g.Frequency + '|' + g.AcademicYear;
+                  const amounts = g.rows.map(r => r.Amount);
+                  const min = Math.min(...amounts), max = Math.max(...amounts);
+                  const activeCount = g.rows.filter(r => r.IsActive).length;
+                  const expanded = expandedGroup === key;
+                  return (
+                    <div key={key} style={{border:'1px solid #e0e0e0',borderRadius:'8px',padding:'14px',background:'#fff'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',cursor:'pointer'}} onClick={() => setExpandedGroup(expanded ? null : key)}>
+                        <div>
+                          <div style={{fontWeight:700,color:'var(--navy-primary)',fontSize:'16px',textTransform:'capitalize'}}>{g.FeeCategory}</div>
+                          <div style={{fontSize:'11px',color:'#888',textTransform:'capitalize'}}>{g.Frequency.replace('_',' ')} · {g.AcademicYear}</div>
+                        </div>
+                        <i className={`fas fa-chevron-${expanded ? 'up' : 'down'}`} style={{color:'#888'}}></i>
+                      </div>
+                      <div style={{margin:'10px 0',fontSize:15,fontWeight:700,color:'#34a853'}}>
+                        {min === max ? `GH₵${min.toFixed(2)}` : `GH₵${min.toFixed(2)} – GH₵${max.toFixed(2)}`}
+                      </div>
+                      <div style={{fontSize:12,color:'#888'}}>
+                        <i className="fas fa-school" style={{width:16,color:'var(--navy-accent)'}}></i> {g.rows.length} class{g.rows.length === 1 ? '' : 'es'} · {activeCount} active
+                      </div>
+                      {expanded && (
+                        <div style={{marginTop:12,borderTop:'1px solid #eee',paddingTop:10,display:'flex',flexDirection:'column',gap:6}}>
+                          {g.rows.sort((a,b) => a.ClassLabel.localeCompare(b.ClassLabel)).map((f) => (
+                            <div key={f.ID} style={{display:'flex',alignItems:'center',justifyContent:'space-between',fontSize:12.5}}>
+                              <span>{f.ClassLabel}{!f.IsActive && <span style={{color:'#999'}}> (inactive)</span>}</span>
+                              <span style={{display:'flex',alignItems:'center',gap:6}}>
+                                <b>GH₵{parseFloat(f.Amount).toFixed(2)}</b>
+                                {isAdmin && (
+                                  <>
+                                    <button className="action-icon edit-icon" style={{padding:'2px 4px'}} onClick={() => { setEditing(f); setShowModal(true); }} title="Edit"><i className="fas fa-edit"></i></button>
+                                    <button className="action-icon delete-icon" style={{padding:'2px 4px'}} onClick={() => handleDelete(f)} title="Delete"><i className="fas fa-trash"></i></button>
+                                  </>
+                                )}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          )}
 
           {showModal && (
             <FeeStructureModal
@@ -16982,6 +17069,130 @@
               onSave={handleSave}
             />
           )}
+          {showBulkModal && (
+            <FeeTypeBulkModal
+              currentUser={currentUser} role={role} saving={bulkSaving}
+              onClose={() => setShowBulkModal(false)}
+              onSave={handleBulkSave}
+            />
+          )}
+        </div>
+      );
+    }
+
+    // Bulk "Add Fee Type" — the primary add flow: pick a category once, choose whether it applies to
+    // every class or a hand-picked subset (e.g. Mock/BECE fee for JHS 3 only), set one shared amount
+    // or fine-tune per class, and it creates all the underlying per-class rows in one call.
+    function FeeTypeBulkModal({ currentUser, role, onClose, onSave, saving }) {
+      const defaultYear = (() => { const y = new Date().getFullYear(); return `${y}-${y + 1}`; })();
+      const [classes, setClasses] = useState([]);
+      const [scope, setScope] = useState('all'); // 'all' | 'specific'
+      const [selectedClassIds, setSelectedClassIds] = useState([]);
+      const [sameAmount, setSameAmount] = useState(true);
+      const [sharedAmount, setSharedAmount] = useState('');
+      const [perClassAmounts, setPerClassAmounts] = useState({}); // classId -> amount string
+      const [meta, setMeta] = useState({
+        FeeCategory: 'tuition', Frequency: 'monthly', AcademicYear: defaultYear,
+        DueDay: '10', LateFeePerDay: '0', InstallmentsAllowed: '0', InstallmentCount: '1',
+        TaxPercent: '0', Description: ''
+      });
+      const setM = (k, v) => setMeta({ ...meta, [k]: v });
+
+      useEffect(() => {
+        google.script.run.withSuccessHandler((res) => { if (res.success) setClasses(res.data || []); }).getAllClasses(currentUser, role);
+      }, []);
+
+      const applicableClassIds = scope === 'all' ? classes.map(c => c.ID) : selectedClassIds;
+      const toggleClass = (id) => setSelectedClassIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!applicableClassIds.length) { Swal.fire({ icon: 'error', title: 'Pick at least one class' }); return; }
+        const classAmounts = applicableClassIds.map(cid => ({
+          ClassID: cid,
+          Amount: sameAmount ? sharedAmount : (perClassAmounts[cid] != null ? perClassAmounts[cid] : sharedAmount)
+        }));
+        if (classAmounts.some(c => c.Amount === '' || c.Amount == null || isNaN(parseFloat(c.Amount)))) {
+          Swal.fire({ icon: 'error', title: 'Missing amount', text: 'Enter an amount for every selected class.' }); return;
+        }
+        onSave({ ...meta, ClassAmounts: classAmounts });
+      };
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'760px'}}>
+            <div className="modal-header"><h3><i className="fas fa-money-bill-wave"></i> Add Fee Type</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
+            <div className="modal-body">
+              <form onSubmit={handleSubmit}>
+                <div className="form-grid">
+                  <SearchableDropdown label="Fee Category" icon="fas fa-tag"
+                    options={[
+                      { value: 'tuition', label: 'Tuition' }, { value: 'admission', label: 'Admission' },
+                      { value: 'transport', label: 'Transport' }, { value: 'exam', label: 'Exam' },
+                      { value: 'library', label: 'Library' }, { value: 'sports', label: 'Sports' },
+                      { value: 'lab', label: 'Lab' }, { value: 'annual', label: 'Annual' },
+                      { value: 'arrears', label: 'Arrears (Carried Forward)' }, { value: 'other', label: 'Other' }
+                    ]}
+                    value={meta.FeeCategory} onChange={(v) => setM('FeeCategory', v)} placeholder="Select..." />
+                  <SearchableDropdown label="Frequency" icon="fas fa-redo"
+                    options={['monthly','quarterly','half_yearly','annual','one_time'].map(v => ({ value: v, label: v.replace('_',' ').replace(/\b\w/g, c => c.toUpperCase()) }))}
+                    value={meta.Frequency} onChange={(v) => setM('Frequency', v)} placeholder="Select..." />
+                  <div className="form-group"><label>Academic Year</label><input type="text" value={meta.AcademicYear} onChange={(e) => setM('AcademicYear', e.target.value)} placeholder="2026-2027" /></div>
+                  <div className="form-group"><label>Due Day</label><input type="number" min="1" max="31" value={meta.DueDay} onChange={(e) => setM('DueDay', e.target.value)} /></div>
+                  <div className="form-group"><label>Late Fee / Day</label><input type="number" min="0" step="0.01" value={meta.LateFeePerDay} onChange={(e) => setM('LateFeePerDay', e.target.value)} /></div>
+                  <div className="form-group"><label>Description</label><input type="text" value={meta.Description} onChange={(e) => setM('Description', e.target.value)} maxLength="200" /></div>
+                </div>
+
+                <h4 style={{margin:'16px 0 8px',color:'var(--navy-primary)',fontSize:'13px'}}><i className="fas fa-school"></i> Applies To</h4>
+                <div style={{display:'flex',gap:'18px',marginBottom:'12px'}}>
+                  <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px'}}>
+                    <input type="radio" checked={scope === 'all'} onChange={() => setScope('all')} /> All Classes ({classes.length})
+                  </label>
+                  <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px'}}>
+                    <input type="radio" checked={scope === 'specific'} onChange={() => setScope('specific')} /> Specific Classes
+                  </label>
+                </div>
+                {scope === 'specific' && (
+                  <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:'6px',marginBottom:'14px',maxHeight:'160px',overflowY:'auto',border:'1px solid #e0e0e0',borderRadius:'6px',padding:'10px'}}>
+                    {classes.map(c => (
+                      <label key={c.ID} style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'12.5px',cursor:'pointer'}}>
+                        <input type="checkbox" checked={selectedClassIds.includes(c.ID)} onChange={() => toggleClass(c.ID)} /> {c.Label}
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                <h4 style={{margin:'16px 0 8px',color:'var(--navy-primary)',fontSize:'13px'}}><i className="fas fa-money-bill-wave"></i> Amount</h4>
+                <label style={{display:'flex',alignItems:'center',gap:'8px',fontSize:'13px',marginBottom:'10px',cursor:'pointer'}}>
+                  <input type="checkbox" checked={sameAmount} onChange={(e) => setSameAmount(e.target.checked)} /> Same amount for every class
+                </label>
+                {sameAmount ? (
+                  <div className="form-group" style={{maxWidth:'220px'}}><label>Amount (GH₵)</label><input type="number" min="0" step="0.01" value={sharedAmount} onChange={(e) => setSharedAmount(e.target.value)} required /></div>
+                ) : (
+                  applicableClassIds.length === 0 ? (
+                    <div style={{color:'#888',fontSize:'12px'}}>Pick classes above first.</div>
+                  ) : (
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:'8px',marginBottom:'10px'}}>
+                      {applicableClassIds.map(cid => {
+                        const c = classes.find(x => x.ID === cid);
+                        return (
+                          <div key={cid} style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                            <span style={{fontSize:'12px',flex:1}}>{c ? c.Label : cid}</span>
+                            <input type="number" min="0" step="0.01" style={{width:'90px'}} value={perClassAmounts[cid] ?? ''} onChange={(e) => setPerClassAmounts({ ...perClassAmounts, [cid]: e.target.value })} placeholder="GH₵" required />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )
+                )}
+
+                <div className="form-actions">
+                  <button type="submit" className="btn btn-primary" disabled={saving}><i className="fas fa-save"></i> {saving ? 'Saving…' : 'Add Fee Type'}</button>
+                  <button type="button" className="btn btn-secondary" onClick={onClose}><i className="fas fa-times"></i> Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
         </div>
       );
     }

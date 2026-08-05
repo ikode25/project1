@@ -8211,6 +8211,64 @@ function addFeeStructure(data, currentUser, currentRole) {
   }
 }
 
+// admin/clerk — creates one fee type across many classes in a single call: "All Classes" (same
+// or per-class amount) or a hand-picked subset (e.g. Mock/BECE fee for JHS 3 only), instead of
+// the admin repeating the single-row Add flow once per class. Reuses the exact same per-row
+// validation/shape as addFeeStructure — just looped, so the two never drift apart.
+function addFeeTypeBulk(d, currentUser, currentRole) {
+  try {
+    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
+    var sh = getSheet(FEE_STRUCTURE_SHEET);
+    if (!sh) return { success: false, message: 'Fee_Structure sheet not found' };
+
+    var allowedCats = ['tuition','admission','transport','exam','library','sports','lab','annual','arrears','other'];
+    var cat = String(d.FeeCategory || '').toLowerCase();
+    if (allowedCats.indexOf(cat) === -1) return { success: false, message: 'Invalid fee category' };
+    var allowedFreq = ['monthly','quarterly','half_yearly','annual','one_time'];
+    var fr = String(d.Frequency || '').toLowerCase();
+    if (allowedFreq.indexOf(fr) === -1) return { success: false, message: 'Invalid frequency' };
+    if (!validAcademicYear(d.AcademicYear)) return { success: false, message: 'AcademicYear must be YYYY-YYYY' };
+
+    var classAmounts = Array.isArray(d.ClassAmounts) ? d.ClassAmounts : [];
+    if (!classAmounts.length) return { success: false, message: 'Pick at least one class' };
+
+    var dueDay = parseInt(d.DueDay, 10);
+    if (isNaN(dueDay) || dueDay < 1 || dueDay > 31) dueDay = 10;
+    var lateFee = parseFloat(d.LateFeePerDay);
+    if (isNaN(lateFee) || lateFee < 0) lateFee = 0;
+    var instAllowed = (d.InstallmentsAllowed === true || String(d.InstallmentsAllowed) === '1') ? '1' : '0';
+    var instCount = parseInt(d.InstallmentCount, 10);
+    if (isNaN(instCount) || instCount < 1) instCount = 1;
+    if (instCount > 12) instCount = 12;
+    var taxPct = parseFloat(d.TaxPercent);
+    if (isNaN(taxPct) || taxPct < 0) taxPct = 0;
+    if (taxPct > 100) return { success: false, message: 'TaxPercent must be 0..100' };
+    var desc = String(d.Description || '').trim().slice(0, 500);
+
+    var cmap = getClassesMap();
+    var ts = nowIso();
+    var added = 0, skipped = [];
+    for (var i = 0; i < classAmounts.length; i++) {
+      var cid = parseInt(classAmounts[i].ClassID, 10);
+      var amt = parseFloat(classAmounts[i].Amount);
+      if (isNaN(cid) || !cmap[cid]) continue; // silently skip a deleted/invalid class rather than fail the whole batch
+      if (isNaN(amt) || amt < 0) return { success: false, message: 'Invalid amount for ' + cmap[cid].label };
+      if (feeStructureExists(sh, cid, cat, fr, d.AcademicYear)) { skipped.push(cmap[cid].label); continue; }
+      var id = nextFeeStructureId(sh);
+      sh.appendRow([id, cid, cat, amt, fr, String(d.AcademicYear).trim(), dueDay, lateFee, '1', '0', ts, ts, instAllowed, instCount, taxPct, desc]);
+      added++;
+    }
+
+    if (!added) return { success: false, message: skipped.length ? 'All selected classes already have this fee item (' + skipped.join(', ') + ')' : 'Nothing to add' };
+    addLog(currentUser, 'Fee Type Bulk-Added', cat + ' (' + fr + ') for ' + added + ' class(es)');
+    var msg = 'Added ' + cat + ' fee to ' + added + ' class(es)';
+    if (skipped.length) msg += ' — skipped ' + skipped.length + ' that already had it (' + skipped.join(', ') + ')';
+    return { success: true, message: msg, added: added, skipped: skipped };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
 function updateFeeStructure(id, data, currentUser, currentRole) {
   try {
     if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
