@@ -3131,6 +3131,14 @@
     // neutral graduation-cap placeholder (mirrors Code.gs DEFAULT_LOGO) — used when a school/user hasn't set a photo yet
     const DEFAULT_LOGO = 'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2214%22%20fill%3D%22%23001f3f%22%2F%3E%3Cpath%20d%3D%22M50%2022%20L88%2038%20L50%2054%20L12%2038%20Z%22%20fill%3D%22%23ffd166%22%2F%3E%3Cpath%20d%3D%22M28%2046%20v18%20c0%206%2010%2012%2022%2012%20s22%20-6%2022%20-12%20v-18%20L50%2054%20Z%22%20fill%3D%22%23ffffff%22%2F%3E%3Ccircle%20cx%3D%2288%22%20cy%3D%2238%22%20r%3D%223%22%20fill%3D%22%23ffd166%22%2F%3E%3Cline%20x1%3D%2288%22%20y1%3D%2238%22%20x2%3D%2288%22%20y2%3D%2258%22%20stroke%3D%22%23ffd166%22%20stroke-width%3D%222%22%2F%3E%3C%2Fsvg%3E';
 
+    // builds a public (no-login) page link — prefers the admin-configured PublicAppBaseURL
+    // (School Settings > Public Links) over the browser's own address, since window.location can
+    // be wrong behind a custom domain/proxy in front of the Apps Script deployment.
+    function publicAppLink(queryString) {
+      const base = (window.SMS_SCHOOL && window.SMS_SCHOOL.PublicAppBaseURL) || (window.location.origin + window.location.pathname);
+      return base.replace(/\/+$/, '') + queryString;
+    }
+
     // reusable DataTables pdf button — landscape A4, navy header, auto-fit cols
     function dtPdfButton(title) {
       return {
@@ -6788,7 +6796,7 @@
       };
 
       const copyAdmissionLink = () => {
-        const url = window.location.origin + window.location.pathname + '?public=admission';
+        const url = publicAppLink('?public=admission');
         navigator.clipboard.writeText(url).then(() => {
           Swal.fire({ icon: 'success', text: 'Application link copied — share it with prospective parents', timer: 1800, showConfirmButton: false });
         }).catch(() => Swal.fire({ icon: 'info', title: 'Online Application Link', text: url }));
@@ -22240,7 +22248,7 @@
       const [saving, setSaving] = useState(false);
 
       const filtered = filter ? items.filter(i => i.Status === filter) : items;
-      const publicUrl = window.location.origin + window.location.pathname + '?public=inquiry';
+      const publicUrl = publicAppLink('?public=inquiry');
 
       const copyLink = () => {
         navigator.clipboard.writeText(publicUrl).then(() => {
@@ -26369,7 +26377,8 @@
         AdmissionNumberPrefix: '',
         ShowOverallPositionOnReportCard: true,
         ShowSubjectAverageOnReportCard: false,
-        SchoolStampURL: '', HeadteacherSignatureURL: '', AdminSignatureURL: ''
+        SchoolStampURL: '', HeadteacherSignatureURL: '', AdminSignatureURL: '',
+        PublicAppBaseURL: ''
       });
       const [saving, setSaving] = useState(false);
 
@@ -26397,7 +26406,8 @@
           ShowSubjectAverageOnReportCard: !!schoolSettings.ShowSubjectAverageOnReportCard,
           SchoolStampURL: schoolSettings.SchoolStampURL || '',
           HeadteacherSignatureURL: schoolSettings.HeadteacherSignatureURL || '',
-          AdminSignatureURL: schoolSettings.AdminSignatureURL || ''
+          AdminSignatureURL: schoolSettings.AdminSignatureURL || '',
+          PublicAppBaseURL: schoolSettings.PublicAppBaseURL || ''
         });
       }, [schoolSettings]);
 
@@ -26616,6 +26626,19 @@
             <PhotoPicker label="School Stamp" value={data.SchoolStampURL} onChange={(url) => set('SchoolStampURL', url)} currentUser={currentUser} shape="square" />
             <PhotoPicker label="Headteacher Signature" value={data.HeadteacherSignatureURL} onChange={(url) => set('HeadteacherSignatureURL', url)} currentUser={currentUser} shape="square" />
             <PhotoPicker label="Admin Signature" value={data.AdminSignatureURL} onChange={(url) => set('AdminSignatureURL', url)} currentUser={currentUser} shape="square" />
+          </div>
+
+          <h3 style={{marginTop: '22px', marginBottom: '6px', color: 'var(--navy-primary)', fontSize: '15px', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+            <i className="fas fa-link"></i> Public Links
+          </h3>
+          <p style={{color:'#777', fontSize:'13px', marginBottom:'12px'}}>
+            The web address prospective parents use to reach this system (the "Copy Link" buttons in Admissions/Inquiries build on this). Leave blank to use whatever address is currently open in the browser.
+          </p>
+          <div className="form-grid" style={{marginBottom:'10px'}}>
+            <div className="form-group" style={{gridColumn:'1 / -1'}}>
+              <label>Public Web App URL</label>
+              <input type="text" value={data.PublicAppBaseURL} onChange={(e) => set('PublicAppBaseURL', e.target.value.trim())} placeholder="https://script.google.com/macros/s/XXXXX/exec" />
+            </div>
           </div>
 
           <h3 style={{marginTop: '22px', marginBottom: '6px', color: 'var(--navy-primary)', fontSize: '15px', textTransform:'uppercase', letterSpacing:'0.5px'}}>

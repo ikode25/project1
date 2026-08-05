@@ -328,7 +328,10 @@ var PERIOD_HEADERS = ['ID','PeriodNumber','StartTime','EndTime','IsBreak','Label
 // 30=SmsBalanceCache (numeric, '' if never checked), 31=SmsBalanceCacheAt (ISO timestamp)
 // Official document images (34-36, uploaded via Drive like SchoolLogo — printed on report cards/documents):
 // 34=SchoolStampURL, 35=HeadteacherSignatureURL, 36=AdminSignatureURL
-var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt','ShowOverallPositionOnReportCard','ShowSubjectAverageOnReportCard','SchoolStampURL','HeadteacherSignatureURL','AdminSignatureURL'];
+// 37=PublicAppBaseURL (the deployed web app's public /exec URL — used to build the online
+// admission/inquiry links instead of trusting the browser's own window.location, which can be
+// wrong behind a custom domain/proxy)
+var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt','ShowOverallPositionOnReportCard','ShowSubjectAverageOnReportCard','SchoolStampURL','HeadteacherSignatureURL','AdminSignatureURL','PublicAppBaseURL'];
 
 // timetable cols (18):
 // 0=ID, 1=ClassID (FK), 2=DayOfWeek (lower: monday..sunday), 3=PeriodNumber,
@@ -11307,7 +11310,8 @@ function getSchoolSettings() {
             ShowSubjectAverageOnReportCard: String(data[i][33]) === '1',
             SchoolStampURL: data[i][34] || '',
             HeadteacherSignatureURL: data[i][35] || '',
-            AdminSignatureURL: data[i][36] || ''
+            AdminSignatureURL: data[i][36] || '',
+            PublicAppBaseURL: data[i][37] || ''
           }
         };
       }
@@ -11344,7 +11348,8 @@ function defaultSchoolSettings() {
     ShowSubjectAverageOnReportCard: false,
     SchoolStampURL: '',
     HeadteacherSignatureURL: '',
-    AdminSignatureURL: ''
+    AdminSignatureURL: '',
+    PublicAppBaseURL: ''
   };
 }
 
@@ -12302,6 +12307,7 @@ function updateSchoolSettings(d, currentUser, currentRole) {
     var schoolStampURL = String(d.SchoolStampURL || '').trim();
     var headteacherSigURL = String(d.HeadteacherSignatureURL || '').trim();
     var adminSigURL = String(d.AdminSignatureURL || '').trim();
+    var publicAppBaseURL = String(d.PublicAppBaseURL || '').trim().replace(/\/+$/, ''); // no trailing slash
 
     var values = [
       1,
@@ -12328,6 +12334,7 @@ function updateSchoolSettings(d, currentUser, currentRole) {
       newRow[34] = schoolStampURL;
       newRow[35] = headteacherSigURL;
       newRow[36] = adminSigURL;
+      newRow[37] = publicAppBaseURL;
       sh.appendRow(newRow);
     } else {
       sh.getRange(foundRow, 1, 1, values.length).setValues([values]);
@@ -12342,6 +12349,7 @@ function updateSchoolSettings(d, currentUser, currentRole) {
       sh.getRange(foundRow, 35).setValue(schoolStampURL);
       sh.getRange(foundRow, 36).setValue(headteacherSigURL);
       sh.getRange(foundRow, 37).setValue(adminSigURL);
+      sh.getRange(foundRow, 38).setValue(publicAppBaseURL);
     }
     addLog(currentUser, 'School Settings Updated', d.SchoolName || '');
     return { success: true, message: 'School settings saved successfully' };
