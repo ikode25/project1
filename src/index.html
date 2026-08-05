@@ -3843,6 +3843,7 @@
       logbook:      { icon: 'book-open',        label: 'Teaching Logbook',   group: 'daily' },
       exams:        { icon: 'file-alt',         label: 'Exams',              group: 'academic' },
       marks:        { icon: 'graduation-cap',   label: 'Results / Marks',    group: 'academic' },
+      gradingSystem:{ icon: 'sliders-h',        label: 'Grading System',     group: 'academic' },
       hallTickets:  { icon: 'id-card-alt',      label: 'Hall Tickets',       group: 'academic' },
       conduct:      { icon: 'award',            label: 'Conduct',            group: 'academic' },
       discipline:   { icon: 'gavel',            label: 'Discipline',         group: 'academic' },
@@ -3881,7 +3882,7 @@
     //  - student: timetable + attendance + marks + notices first
     //  - parent: notices + child's attendance/marks/fees first
     const MENU_PRIORITY = {
-      admin: ['dashboard','ownerPortal','reports','admissions','students','classes','timetable','attendance','substitutes','exams','marks','hallTickets','feePayments','accounts','feeStructure','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','account','settings','about'],
+      admin: ['dashboard','ownerPortal','reports','admissions','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','hallTickets','feePayments','accounts','feeStructure','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','account','settings','about'],
       supervisor: ['dashboard','reports','attendance','substitutes','marks','hallTickets','exams','notices','ptm','calendar','discipline','conduct','helpdesk','complaints','lessonPlans','logbook','activities','students','parents','classes','subjects','assignments','documents','timetable','account','about'],
       clerk: ['admissions','students','parents','feePayments','accounts','feeStructure','sms','reports','attendance','helpdesk','complaints','documents','assets','inventory','timetable','classes','notices','calendar','account','about'],
       teacher: ['timetable','attendance','substitutes','marks','hallTickets','exams','lessonPlans','ptm','logbook','students','discipline','conduct','activities','notices','reports','calendar','documents','complaints','classes','subjects','account','about'],
@@ -12317,10 +12318,14 @@
 
           <div className="rc-grade-key">
             <b>Grade Interpretation Key:</b>{' '}
-            {gradeTableFor(card.class.GradeBand).map((r, i, arr) => {
-              const max = i === 0 ? 100 : arr[i - 1].min - 1;
-              return <React.Fragment key={r.code}>{i > 0 && <>&nbsp;·&nbsp;</>}{r.code} = {r.label} ({r.min}–{max})</React.Fragment>;
-            })}
+            {/* server-computed to reflect the school's actual grading system (custom scale if the
+                admin set one on the Grading System page, else the automatic NaCCA/WAEC default) —
+                falls back to the hardcoded table only for older cached payloads without it */}
+            {(card.gradeKeyRows && card.gradeKeyRows.length ? card.gradeKeyRows.map(r => ({ min: r.MinPercent, code: r.Grade, label: r.Label })) : gradeTableFor(card.class.GradeBand))
+              .map((r, i, arr) => {
+                const max = i === 0 ? 100 : arr[i - 1].min - 1;
+                return <React.Fragment key={r.code}>{i > 0 && <>&nbsp;·&nbsp;</>}{r.code} = {r.label} ({r.min}–{max})</React.Fragment>;
+              })}
           </div>
 
           <div className="rc-foot">
@@ -21553,6 +21558,146 @@
       );
     }
 
+    // ============== Grading System (admin: automatic default, or a manual custom scale) ==============
+    const GRADING_BAND_LABELS = { basic: 'Basic (Creche – Basic 6)', jhs: 'JHS (Basic 7 – 9)' };
+
+    function GradingBandEditModal({ band, rows, currentUser, role, onClose, onSave, saving }) {
+      const blankRow = () => ({ MinPercent: '', Grade: '', Label: '' });
+      const [editRows, setEditRows] = useState(rows && rows.length ? rows.map(r => ({ ...r, MinPercent: String(r.MinPercent) })) : [blankRow()]);
+      const setRow = (i, k, v) => setEditRows(prev => prev.map((r, idx) => idx === i ? { ...r, [k]: v } : r));
+      const addRow = () => setEditRows(prev => [...prev, blankRow()]);
+      const removeRow = (i) => setEditRows(prev => prev.filter((_, idx) => idx !== i));
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        onSave(band, editRows);
+      };
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'560px'}}>
+            <div className="modal-header">
+              <h3><i className="fas fa-sliders-h"></i> {GRADING_BAND_LABELS[band]} — Custom Scale</h3>
+              <button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button>
+            </div>
+            <div className="modal-body">
+              <div className="settings-info-message" style={{marginBottom:'14px'}}>
+                <i className="fas fa-info-circle"></i> One row must start at Minimum % = 0 so every score maps to a grade. Rows are matched from highest minimum down.
+              </div>
+              <form onSubmit={handleSubmit}>
+                {editRows.map((r, i) => (
+                  <div key={i} style={{display:'flex',gap:'8px',alignItems:'flex-end',marginBottom:'10px'}}>
+                    <div className="form-group" style={{flex:'0 0 90px',margin:0}}>
+                      <label>Min %</label>
+                      <input type="number" min="0" max="100" value={r.MinPercent} onChange={(e) => setRow(i, 'MinPercent', e.target.value)} required />
+                    </div>
+                    <div className="form-group" style={{flex:'0 0 90px',margin:0}}>
+                      <label>Grade</label>
+                      <input type="text" value={r.Grade} onChange={(e) => setRow(i, 'Grade', e.target.value)} maxLength="6" required placeholder="e.g. A" />
+                    </div>
+                    <div className="form-group" style={{flex:1,margin:0}}>
+                      <label>Label</label>
+                      <input type="text" value={r.Label} onChange={(e) => setRow(i, 'Label', e.target.value)} maxLength="40" placeholder="e.g. Excellent" />
+                    </div>
+                    <button type="button" className="action-icon delete-icon" title="Remove row" onClick={() => removeRow(i)} disabled={editRows.length === 1}>
+                      <i className="fas fa-trash"></i>
+                    </button>
+                  </div>
+                ))}
+                <button type="button" className="btn btn-secondary btn-sm" onClick={addRow} style={{marginBottom:'16px'}}>
+                  <i className="fas fa-plus"></i> Add Row
+                </button>
+                <div className="form-actions">
+                  <button type="submit" className="btn btn-primary" disabled={saving}><i className="fas fa-save"></i> {saving ? 'Saving…' : 'Save Custom Scale'}</button>
+                  <button type="button" className="btn btn-secondary" onClick={onClose}><i className="fas fa-times"></i> Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function GradingSystemView({ currentUser, role }) {
+      const { data: bands, error: loadError, isLoading: loading, mutate: load } =
+        useSWR('getGradingBands', () => swrFetcher('getGradingBands', currentUser, role));
+      const [editingBand, setEditingBand] = useState(null); // 'basic' | 'jhs' | null
+      const [saving, setSaving] = useState(false);
+
+      const handleSave = (band, rows) => {
+        setSaving(true);
+        google.script.run
+          .withSuccessHandler((res) => {
+            setSaving(false);
+            if (res.success) { setEditingBand(null); Swal.fire({ icon: 'success', text: res.message, timer: 1800, showConfirmButton: false }); load(); }
+            else Swal.fire({ icon: 'error', text: res.message });
+          })
+          .withFailureHandler((err) => { setSaving(false); Swal.fire({ icon: 'error', text: err.message }); })
+          .saveGradingBands(band, rows, currentUser, role);
+      };
+
+      const handleReset = (band) => {
+        Swal.fire({ icon: 'warning', title: 'Reset to automatic?', text: 'Removes the custom ' + GRADING_BAND_LABELS[band] + ' scale and reverts to the built-in default.', showCancelButton: true })
+          .then((rr) => { if (rr.isConfirmed) handleSave(band, []); });
+      };
+
+      return (
+        <div className="data-section">
+          <div className="section-header">
+            <h2><i className="fas fa-sliders-h"></i> Grading System</h2>
+          </div>
+          <div className="settings-info-message" style={{marginBottom:'16px'}}>
+            <i className="fas fa-info-circle"></i> By default, marks are graded automatically using Ghana's NaCCA 5-band scale (Basic) and WAEC 9-grade scale (JHS). Set a custom scale below to override either one school-wide.
+          </div>
+          {loadError && (
+            <div className="settings-info-message" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>
+              <i className="fas fa-triangle-exclamation" style={{marginRight:'6px',color:'#ea4335'}}></i>
+              Couldn't load grading bands — {String((loadError && loadError.message) || loadError)}.
+            </div>
+          )}
+          {loading ? <TableSkeleton rows={5} columns={3} /> : (
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(320px,1fr))',gap:'18px'}}>
+              {['basic', 'jhs'].map((band) => {
+                const b = (bands && bands[band]) || { isCustom: false, rows: [] };
+                return (
+                  <div key={band} style={{border:'1px solid #e2e2e2',borderRadius:'6px',overflow:'hidden'}}>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'#f4f7fa'}}>
+                      <div style={{fontWeight:700,color:'var(--navy-primary)',fontSize:'13px'}}>{GRADING_BAND_LABELS[band]}</div>
+                      <span className={`role-badge ${b.isCustom ? 'role-clerk' : 'status-active'}`} style={{fontSize:'10px'}}>
+                        {b.isCustom ? 'Custom' : 'Automatic'}
+                      </span>
+                    </div>
+                    <table className="simple-table" style={{width:'100%'}}>
+                      <thead><tr><th>Min %</th><th>Grade</th><th>Label</th></tr></thead>
+                      <tbody>
+                        {b.rows.map((r, i) => (
+                          <tr key={i}><td>{r.MinPercent}</td><td style={{fontWeight:700}}>{r.Grade}</td><td>{r.Label}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div style={{display:'flex',gap:'8px',padding:'10px 14px'}}>
+                      <button className="btn btn-primary btn-sm" onClick={() => setEditingBand(band)}><i className="fas fa-edit"></i> Set Custom Scale</button>
+                      {b.isCustom && <button className="btn btn-secondary btn-sm" onClick={() => handleReset(band)}><i className="fas fa-undo"></i> Reset to Automatic</button>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {editingBand && (
+            <GradingBandEditModal
+              band={editingBand}
+              rows={(bands && bands[editingBand] && bands[editingBand].isCustom) ? bands[editingBand].rows : []}
+              currentUser={currentUser} role={role} saving={saving}
+              onClose={() => setEditingBand(null)}
+              onSave={handleSave}
+            />
+          )}
+        </div>
+      );
+    }
+
     // ============== Helpdesk Tickets ==============
     function HelpdeskView({ currentUser, role }) {
       const r = String(role).toLowerCase();
@@ -27295,6 +27440,7 @@
       const canSeeAccounts = r === 'admin' || r === 'clerk';
       const canSeeSms = r === 'admin' || r === 'clerk';
       const canSeeFoodMenu = r === 'admin';
+      const canSeeGradingSystem = r === 'admin';
       const canSeeOwnerPortal = r === 'admin' || r === 'owner';
       const canSeeDiscipline = r === 'admin' || r === 'teacher' || r === 'supervisor' || isStudent || isParent;
       const canSeeConduct = r === 'admin' || r === 'teacher' || r === 'supervisor' || isStudent || isParent;
@@ -27369,6 +27515,8 @@
           return canSeeSms ? <SmsView currentUser={user} role={role} schoolSettings={schoolSettings} /> : denied('SMS Center');
         case 'foodMenu':
           return canSeeFoodMenu ? <FoodMenuView currentUser={user} role={role} /> : denied('Food Menu');
+        case 'gradingSystem':
+          return canSeeGradingSystem ? <GradingSystemView currentUser={user} role={role} /> : denied('Grading System');
         case 'ownerPortal':
           return canSeeOwnerPortal ? <OwnerPortalView currentUser={user} role={role} /> : denied('Owner Portal');
         case 'discipline':

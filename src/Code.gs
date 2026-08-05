@@ -715,24 +715,149 @@ function jhsGradeInfo(pct) {
   return JHS_GRADE_TABLE[JHS_GRADE_TABLE.length - 1];
 }
 
+// ============== Grading System (admin: automatic default, or a manual custom scale) ==============
+// The built-in NaCCA 5-band (basic) / WAEC 9-grade (jhs) scales above are the "Automatic" option.
+// Admin can instead define a custom scale per band on the Grading System page — stored here and
+// consulted by computeGrade/sbaGradeDescriptor below in place of the hardcoded tables. BECE
+// aggregate scoring (computeBeceGrade/computeBeceAggregate) intentionally stays on the fixed WAEC
+// scale — that's a national exam standard, not something a school should be able to reconfigure.
+var GRADING_BANDS_SHEET = 'Grading_Bands';
+var GRADING_BANDS_HEADERS = ['ID', 'Band', 'MinPercent', 'Grade', 'Label', 'DisplayOrder', 'IsDeleted', 'CreatedAt', 'UpdatedAt'];
+
+function _ensureGradingBandsSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(GRADING_BANDS_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(GRADING_BANDS_SHEET);
+    sh.appendRow(GRADING_BANDS_HEADERS);
+    sh.getRange(1, 1, 1, GRADING_BANDS_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+// per-execution cache (Apps Script instances are short-lived; this just avoids re-reading the
+// sheet on every single computeGrade() call within one marks-entry/report-card request)
+var _customGradingBandsCache = null;
+function _getCustomGradingBands() {
+  if (_customGradingBandsCache !== null) return _customGradingBandsCache;
+  _customGradingBandsCache = { basic: [], jhs: [] };
+  try {
+    var sh = getSheet(GRADING_BANDS_SHEET);
+    if (sh) {
+      var data = sh.getDataRange().getValues();
+      for (var i = 1; i < data.length; i++) {
+        if (String(data[i][6]) === '1') continue; // IsDeleted
+        var band = String(data[i][1] || '').toLowerCase();
+        if (band !== 'basic' && band !== 'jhs') continue;
+        _customGradingBandsCache[band].push({ min: parseFloat(data[i][2]) || 0, grade: String(data[i][3] || ''), label: String(data[i][4] || '') });
+      }
+      _customGradingBandsCache.basic.sort(function (a, b) { return b.min - a.min; });
+      _customGradingBandsCache.jhs.sort(function (a, b) { return b.min - a.min; });
+    }
+  } catch (e) { Logger.log('_getCustomGradingBands failed: ' + e.toString()); }
+  return _customGradingBandsCache;
+}
+
 // obtained/max -> short grade code for the given band ('basic'|'jhs'); returns 'AB' for absent.
 function computeGrade(obtained, max, isAbsent, band) {
   if (isAbsent === true || String(isAbsent) === '1' || isAbsent === 1) return 'AB';
   var o = parseFloat(obtained), m = parseFloat(max);
   if (isNaN(o) || isNaN(m) || m <= 0) return '';
   var pct = (o / m) * 100;
-  return String(band).toLowerCase() === 'jhs' ? jhsGradeInfo(pct).letter : basicGradeFromPercent(pct);
+  var bandKey = String(band).toLowerCase() === 'jhs' ? 'jhs' : 'basic';
+  var custom = _getCustomGradingBands()[bandKey];
+  if (custom.length) {
+    for (var i = 0; i < custom.length; i++) { if (pct >= custom[i].min) return custom[i].grade; }
+    return custom[custom.length - 1].grade;
+  }
+  return bandKey === 'jhs' ? jhsGradeInfo(pct).letter : basicGradeFromPercent(pct);
 }
 
 // short grade code -> full descriptor (printed in the Remarks column of the report card)
 function sbaGradeDescriptor(grade, band) {
   var g = String(grade || '').toUpperCase();
   if (g === 'AB') return 'Absent';
-  if (String(band).toLowerCase() === 'jhs') {
+  var bandKey = String(band).toLowerCase() === 'jhs' ? 'jhs' : 'basic';
+  var custom = _getCustomGradingBands()[bandKey];
+  if (custom.length) {
+    var crow = custom.filter(function (r) { return String(r.grade).toUpperCase() === g; })[0];
+    if (crow) return crow.label;
+  }
+  if (bandKey === 'jhs') {
     var row = JHS_GRADE_TABLE.filter(function(r) { return r.letter === g; })[0];
     return row ? row.label : '';
   }
   return BASIC_GRADE_DESCRIPTORS[g] || '';
+}
+
+// any logged-in role — returns both bands, each flagged isCustom (false = using the automatic default)
+function getGradingBands(currentUser, currentRole) {
+  try {
+    var custom = _getCustomGradingBands();
+    var out = {};
+    ['basic', 'jhs'].forEach(function (band) {
+      if (custom[band].length) {
+        out[band] = { isCustom: true, rows: custom[band].map(function (r) { return { MinPercent: r.min, Grade: r.grade, Label: r.label }; }) };
+      } else {
+        var defaults = band === 'jhs' ? JHS_GRADE_TABLE.map(function (r) { return { MinPercent: r.min, Grade: r.letter, Label: r.label }; })
+          : [{ min: 80, code: 'HP' }, { min: 68, code: 'P' }, { min: 54, code: 'AP' }, { min: 40, code: 'D' }, { min: 0, code: 'E' }]
+              .map(function (r) { return { MinPercent: r.min, Grade: r.code, Label: BASIC_GRADE_DESCRIPTORS[r.code] }; });
+        out[band] = { isCustom: false, rows: defaults };
+      }
+    });
+    return { success: true, data: out };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// admin only — replaces the ENTIRE custom scale for one band in one call (simpler/safer than
+// per-row CRUD for a small fixed table the admin edits as a whole). Pass an empty rows array to
+// revert that band to the automatic default.
+function saveGradingBands(band, rows, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var bandKey = String(band || '').toLowerCase();
+    if (bandKey !== 'basic' && bandKey !== 'jhs') return { success: false, message: 'Band must be "basic" or "jhs"' };
+    rows = Array.isArray(rows) ? rows : [];
+
+    var clean = [];
+    for (var i = 0; i < rows.length; i++) {
+      var min = parseFloat(rows[i].MinPercent);
+      var grade = String(rows[i].Grade || '').trim();
+      var label = String(rows[i].Label || '').trim();
+      if (isNaN(min) || min < 0 || min > 100) return { success: false, message: 'Row ' + (i + 1) + ': Minimum % must be 0-100' };
+      if (!grade) return { success: false, message: 'Row ' + (i + 1) + ': Grade is required' };
+      clean.push({ min: min, grade: grade, label: label });
+    }
+    if (clean.length) {
+      var mins = clean.map(function (r) { return r.min; });
+      if (mins.indexOf(0) === -1) return { success: false, message: 'One row must start at Minimum % = 0 so every score is covered' };
+    }
+
+    var sh = _ensureGradingBandsSheet();
+    var data = sh.getDataRange().getValues();
+    var ts = nowIso();
+    // soft-delete every existing (non-deleted) row for this band, then append the new set
+    for (var r = 1; r < data.length; r++) {
+      if (String(data[r][6]) === '1') continue;
+      if (String(data[r][1] || '').toLowerCase() !== bandKey) continue;
+      sh.getRange(r + 1, 7).setValue('1');
+      sh.getRange(r + 1, 9).setValue(ts);
+    }
+    clean.sort(function (a, b) { return b.min - a.min; });
+    clean.forEach(function (row, idx) {
+      var id = nextRowId(sh);
+      sh.appendRow([id, bandKey, row.min, row.grade, row.label, idx, '0', ts, ts]);
+    });
+
+    _customGradingBandsCache = null; // invalidate — next computeGrade() call re-reads
+    addLog(currentUser, 'Grading Bands Saved', bandKey + ' (' + clean.length + ' band(s))' + (clean.length ? '' : ' — reverted to automatic'));
+    return { success: true, message: clean.length ? 'Custom ' + bandKey.toUpperCase() + ' grading scale saved' : bandKey.toUpperCase() + ' reverted to the automatic default scale' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
 }
 
 // BECE-style 1-9 grade number from raw percentage — same table as jhsGradeInfo, used for
@@ -17567,7 +17692,9 @@ function getStudentReportCard(studentId, examId, currentUser, currentRole) {
         displaySettings: {
           ShowOverallPosition: settingsRes.data ? settingsRes.data.ShowOverallPositionOnReportCard !== false : true,
           ShowSubjectAverage: settingsRes.data ? !!settingsRes.data.ShowSubjectAverageOnReportCard : false
-        }
+        },
+        // effective grade key for this class's band — custom scale if admin set one, else the automatic default
+        gradeKeyRows: (function () { var g = getGradingBands(currentUser, currentRole); return (g.success && g.data[gradeBand]) ? g.data[gradeBand].rows : []; })()
       }
     };
   } catch (err) {
