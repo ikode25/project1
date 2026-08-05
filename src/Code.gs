@@ -338,7 +338,7 @@ var PERIOD_HEADERS = ['ID','PeriodNumber','StartTime','EndTime','IsBreak','Label
 // matters (Exams, Fee_Structure, Admissions, LessonPlans, etc.) already carries its own
 // AcademicYear/Term columns, so old sessions stay fully queryable forever; this pair only drives
 // which session NEW records default into and what the dashboard banner shows.)
-var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt','ShowOverallPositionOnReportCard','ShowSubjectAverageOnReportCard','SchoolStampURL','HeadteacherSignatureURL','AdminSignatureURL','PublicAppBaseURL','ActiveTerm','DietaryOptions'];
+var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt','ShowOverallPositionOnReportCard','ShowSubjectAverageOnReportCard','SchoolStampURL','HeadteacherSignatureURL','AdminSignatureURL','PublicAppBaseURL','ActiveTerm','DietaryOptions','WebsiteConfig'];
 // col 40 = DietaryOptions — admin-editable CSV of "value|label" pairs shown as checkboxes on the
 // student form (Ghana-appropriate defaults; the old hardcoded Halal/Kosher/Pescatarian/etc. list
 // is now just the fallback seed, not a fixed enum — see defaultDietaryOptions()).
@@ -11903,6 +11903,26 @@ function getAllJobPostings(currentUser, currentRole) {
   }
 }
 
+// public — no auth. Every currently-open posting, bare fields only, for the public website's
+// "Careers" section — links each card to the existing ?public=job&postingId=... application page.
+function getPublicOpenJobPostings() {
+  try {
+    var sh = _ensureJobPostingsSheet();
+    var data = sh.getDataRange().getValues();
+    var out = [];
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][9]) === '1') continue;
+      var posting = _rowToJobPosting(data[i]);
+      if (posting.Status !== 'open') continue;
+      out.push(posting);
+    }
+    out.sort(function (a, b) { return String(b.CreatedAt).localeCompare(String(a.CreatedAt)); });
+    return { success: true, data: out };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
 // public — no auth. Bare details of one OPEN posting, for the public application page.
 function getPublicJobPosting(id) {
   try {
@@ -12092,6 +12112,233 @@ function deleteJobApplication(id, currentUser, currentRole) {
       return { success: true, message: 'Application deleted' };
     }
     return { success: false, message: 'Application not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// ============== School Website: Gallery ==============
+var GALLERY_ITEMS_SHEET = 'Gallery_Items';
+var GALLERY_ITEM_HEADERS = ['ID','Title','Type','MediaURL','ThumbnailURL','Category','Caption','DisplayOrder','IsPublished','CreatedBy','CreatedAt','UpdatedAt','IsDeleted'];
+var GALLERY_TYPES = ['photo','video'];
+var GALLERY_CATEGORIES = ['campus','events','sports','academics','graduation','facilities','other'];
+
+function _ensureGalleryItemsSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(GALLERY_ITEMS_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(GALLERY_ITEMS_SHEET);
+    sh.appendRow(GALLERY_ITEM_HEADERS);
+    sh.getRange(1, 1, 1, GALLERY_ITEM_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function _rowToGalleryItem(row) {
+  return {
+    ID: row[0], Title: row[1] || '', Type: row[2] || 'photo', MediaURL: row[3] || '',
+    ThumbnailURL: row[4] || '', Category: row[5] || 'other', Caption: row[6] || '',
+    DisplayOrder: parseInt(row[7], 10) || 0, IsPublished: String(row[8]) !== '0',
+    CreatedAt: toIso(row[10]), UpdatedAt: toIso(row[11])
+  };
+}
+
+// admin — full management list (published + unpublished)
+function getAllGalleryItems(currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var sh = _ensureGalleryItemsSheet();
+    var data = sh.getDataRange().getValues();
+    var out = [];
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][12]) === '1') continue;
+      out.push(_rowToGalleryItem(data[i]));
+    }
+    out.sort(function (a, b) { return (a.DisplayOrder - b.DisplayOrder) || String(b.CreatedAt).localeCompare(String(a.CreatedAt)); });
+    return { success: true, data: out };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// public — no auth. Published items only, for the public website's gallery section.
+function getPublicGalleryItems() {
+  try {
+    var sh = _ensureGalleryItemsSheet();
+    var data = sh.getDataRange().getValues();
+    var out = [];
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][12]) === '1') continue;
+      var item = _rowToGalleryItem(data[i]);
+      if (!item.IsPublished) continue;
+      out.push(item);
+    }
+    out.sort(function (a, b) { return (a.DisplayOrder - b.DisplayOrder) || String(b.CreatedAt).localeCompare(String(a.CreatedAt)); });
+    return { success: true, data: out };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function addGalleryItem(d, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var type = GALLERY_TYPES.indexOf(String(d.Type || '').toLowerCase()) !== -1 ? String(d.Type).toLowerCase() : 'photo';
+    var mediaUrl = String(d.MediaURL || '').trim();
+    if (!mediaUrl) return { success: false, message: type === 'video' ? 'Video URL is required' : 'Photo is required' };
+    var title = String(d.Title || '').trim();
+    var sh = _ensureGalleryItemsSheet();
+    var ts = nowIso(), id = nextRowId(sh);
+    sh.appendRow([
+      id, title, type, mediaUrl, String(d.ThumbnailURL || '').trim(),
+      String(d.Category || 'other').toLowerCase(), String(d.Caption || '').trim(),
+      parseInt(d.DisplayOrder, 10) || 0, d.IsPublished === false ? '0' : '1',
+      getCurrentUserId(currentUser) || '', ts, ts, '0'
+    ]);
+    addLog(currentUser, 'Gallery Item Added', title || mediaUrl);
+    return { success: true, message: 'Added to gallery', id: id };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function updateGalleryItem(id, d, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var idn = parseInt(id, 10);
+    var sh = _ensureGalleryItemsSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] !== idn) continue;
+      var row = i + 1;
+      sh.getRange(row, 2).setValue(String(d.Title || '').trim());
+      if (d.Type && GALLERY_TYPES.indexOf(String(d.Type).toLowerCase()) !== -1) sh.getRange(row, 3).setValue(String(d.Type).toLowerCase());
+      if (d.MediaURL != null) sh.getRange(row, 4).setValue(String(d.MediaURL).trim());
+      if (d.ThumbnailURL != null) sh.getRange(row, 5).setValue(String(d.ThumbnailURL).trim());
+      sh.getRange(row, 6).setValue(String(d.Category || 'other').toLowerCase());
+      sh.getRange(row, 7).setValue(String(d.Caption || '').trim());
+      sh.getRange(row, 8).setValue(parseInt(d.DisplayOrder, 10) || 0);
+      sh.getRange(row, 9).setValue(d.IsPublished === false ? '0' : '1');
+      sh.getRange(row, 12).setValue(nowIso());
+      addLog(currentUser, 'Gallery Item Updated', '#' + idn);
+      return { success: true, message: 'Gallery item updated' };
+    }
+    return { success: false, message: 'Item not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function deleteGalleryItem(id, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var idn = parseInt(id, 10);
+    var sh = _ensureGalleryItemsSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] !== idn) continue;
+      sh.getRange(i + 1, 13).setValue('1');
+      sh.getRange(i + 1, 12).setValue(nowIso());
+      addLog(currentUser, 'Gallery Item Deleted', '#' + idn);
+      return { success: true, message: 'Removed from gallery' };
+    }
+    return { success: false, message: 'Item not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// ============== School Website: Public Site Configuration ==============
+// col 41 = WebsiteConfig — one JSON blob (hero text + which public sections are switched on)
+// rather than a fresh Settings column per toggle, since this list of toggles will likely grow
+// (same rationale as DietaryOptions above).
+function defaultWebsiteConfig() {
+  return {
+    HeroText: 'Welcome to our school — nurturing excellence, one student at a time.',
+    EnableInquiries: true,
+    EnableAdmission: true,
+    EnableJobs: true,
+    EnableReportCardLookup: true,
+    EnableGallery: true
+  };
+}
+function parseWebsiteConfig(json) {
+  var raw = String(json || '').trim();
+  if (!raw) return defaultWebsiteConfig();
+  try {
+    return Object.assign(defaultWebsiteConfig(), JSON.parse(raw));
+  } catch (e) {
+    return defaultWebsiteConfig();
+  }
+}
+function getWebsiteConfig(currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var sh = getSheet(SETTINGS_SHEET);
+    if (!sh) return { success: true, data: defaultWebsiteConfig() };
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (parseInt(data[i][0], 10) === 1) return { success: true, data: parseWebsiteConfig(data[i][40]) };
+    }
+    return { success: true, data: defaultWebsiteConfig() };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString(), data: defaultWebsiteConfig() };
+  }
+}
+function updateWebsiteConfig(cfg, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var clean = Object.assign(defaultWebsiteConfig(), cfg || {});
+    clean.HeroText = String(clean.HeroText || '').trim().slice(0, 500);
+    ['EnableInquiries','EnableAdmission','EnableJobs','EnableReportCardLookup','EnableGallery'].forEach(function (k) {
+      clean[k] = clean[k] !== false;
+    });
+    var sh = getSheet(SETTINGS_SHEET);
+    if (!sh) return { success: false, message: 'Settings sheet not found. Run setup() first.' };
+    var data = sh.getDataRange().getValues();
+    var foundRow = -1;
+    for (var i = 1; i < data.length; i++) { if (parseInt(data[i][0], 10) === 1) { foundRow = i + 1; break; } }
+    var ts = nowIso();
+    if (foundRow === -1) {
+      var blank = new Array(SETTINGS_HEADERS.length).fill('');
+      blank[0] = 1; blank[14] = ts; blank[15] = ts;
+      sh.appendRow(blank);
+      foundRow = sh.getLastRow();
+    }
+    sh.getRange(foundRow, 41).setValue(JSON.stringify(clean));  // col 41 = WebsiteConfig
+    sh.getRange(foundRow, 16).setValue(ts);                     // col 16 = UpdatedAt
+    addLog(currentUser, 'Website Settings Updated', '');
+    return { success: true, message: 'Website settings updated', data: clean };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// public — no auth. Everything the public website page needs in one round trip: school info,
+// hero/section toggles, published gallery items, and currently-open job postings.
+function getPublicWebsiteData() {
+  try {
+    var settings = getSchoolSettings();
+    var cfg = defaultWebsiteConfig();
+    var sh = getSheet(SETTINGS_SHEET);
+    if (sh) {
+      var data = sh.getDataRange().getValues();
+      for (var i = 1; i < data.length; i++) {
+        if (parseInt(data[i][0], 10) === 1) { cfg = parseWebsiteConfig(data[i][40]); break; }
+      }
+    }
+    var gallery = cfg.EnableGallery ? getPublicGalleryItems() : { success: true, data: [] };
+    var jobs = cfg.EnableJobs ? getPublicOpenJobPostings() : { success: true, data: [] };
+    return {
+      success: true,
+      data: {
+        school: settings.data || {},
+        config: cfg,
+        gallery: gallery.success ? gallery.data : [],
+        jobs: jobs.success ? jobs.data : []
+      }
+    };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
