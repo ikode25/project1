@@ -500,7 +500,15 @@ function doGet(e) {
 }
 
 // ============== Helpers ==============
-function getSheet(name) { return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name); }
+// SpreadsheetApp.getActiveSpreadsheet() has real per-call overhead and getSheet() is called
+// dozens of times within a single request — cache the spreadsheet handle for the life of this
+// execution (a plain script-global, not CacheService; resets automatically on the next request,
+// so this can never go stale across requests, only saves repeat lookups within one).
+var _activeSpreadsheetHandle = null;
+function getSheet(name) {
+  if (!_activeSpreadsheetHandle) _activeSpreadsheetHandle = SpreadsheetApp.getActiveSpreadsheet();
+  return _activeSpreadsheetHandle.getSheetByName(name);
+}
 function nowIso() { return new Date().toISOString(); }
 // canonicalizes a Ghana phone number for matching regardless of formatting — strips everything
 // but digits, then keeps the last 9 (the local number, ignoring a leading 0 or +233/233 prefix)
@@ -533,8 +541,40 @@ function nextClassId(sh) {
   return max + 1;
 }
 
+// Short-lived cache for the "roster" lookup maps (users/classes/students/fee structures) that
+// dozens of list-view functions rebuild from a full sheet read on every single call — including
+// getAllPayments, which does FOUR such full-sheet reads back to back. Under the burst of parallel
+// calls a dashboard/list view fires on load, that made Fee Payments (the heaviest of these
+// call sites) the one most likely to lose the race against Apps Script's client-bridge fragility,
+// surfacing as the recurring "Couldn't load payments — No response from server" report. A short
+// TTL (90s) turns 3 of those 4 full-sheet reads into a cache hit on any request that isn't the
+// very first in that window, without meaningfully risking stale names (a student's name or a fee
+// item's amount essentially never changes second-to-second).
+function _cachedRosterMap(key, builder) {
+  var CACHE_TTL_SECONDS = 90;
+  try {
+    var cache = CacheService.getScriptCache();
+    var raw = cache.get(key);
+    if (raw) return JSON.parse(raw);
+  } catch (e) { /* cache unavailable or corrupt entry — fall through and rebuild */ }
+  var map = builder();
+  try {
+    var json = JSON.stringify(map);
+    if (json.length < 95000) CacheService.getScriptCache().put(key, json, CACHE_TTL_SECONDS); // CacheService caps a value at 100KB — skip caching silently if a big school's roster would exceed it
+  } catch (e) { /* non-critical — just means this call rebuilds instead of caching */ }
+  return map;
+}
+// invalidate a roster cache immediately after a write that changes it, so edits are never masked
+// by a stale cache entry for the rest of its TTL
+function _invalidateRosterCache(key) {
+  try { CacheService.getScriptCache().remove(key); } catch (e) {}
+}
+
 // id -> {fullName, role} map for join lookups
 function getUsersMap() {
+  return _cachedRosterMap('roster_users_v1', function() { return _buildUsersMap(); });
+}
+function _buildUsersMap() {
   var sh = getSheet(USERS_SHEET);
   if (!sh) return {};
   var data = sh.getDataRange().getValues(), map = {};
@@ -547,6 +587,9 @@ function getUsersMap() {
 
 // id -> {className, section, academicYear} map for join lookups
 function getClassesMap() {
+  return _cachedRosterMap('roster_classes_v1', function() { return _buildClassesMap(); });
+}
+function _buildClassesMap() {
   var sh = getSheet(CLASSES_SHEET);
   if (!sh) return {};
   var data = sh.getDataRange().getValues(), map = {};
@@ -8545,6 +8588,9 @@ function rowToPayment(row, students, fmap, umap) {
 }
 
 function getStudentsLite() {
+  return _cachedRosterMap('roster_students_lite_v1', function() { return _buildStudentsLite(); });
+}
+function _buildStudentsLite() {
   var ssh = getSheet(STUDENTS_SHEET);
   if (!ssh) return {};
   var data = ssh.getDataRange().getValues(), cmap = getClassesMap(), map = {};
@@ -8563,6 +8609,9 @@ function getStudentsLite() {
 }
 
 function getFeeStructuresLite() {
+  return _cachedRosterMap('roster_fee_structures_lite_v1', function() { return _buildFeeStructuresLite(); });
+}
+function _buildFeeStructuresLite() {
   var sh = getSheet(FEE_STRUCTURE_SHEET);
   if (!sh) return {};
   var data = sh.getDataRange().getValues(), map = {};

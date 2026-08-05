@@ -4523,6 +4523,13 @@
 
     // ids an admin can never hide — always present regardless of HiddenMenuIds
     const PROTECTED_MENU_IDS = ['dashboard', 'settings', 'account', 'about'];
+    // dashboards use this to skip fetching data for a widget whose menu the admin has hidden —
+    // reads window.SMS_SCHOOL directly (same pattern as ActiveSessionBanner/DashboardNotices)
+    // rather than threading schoolSettings through every dashboard's props
+    function isMenuHidden(id) {
+      const raw = (window.SMS_SCHOOL && window.SMS_SCHOOL.HiddenMenuIds) || '';
+      return raw.split(',').map(x => x.trim()).includes(id);
+    }
     function buildSidebarItems(role, hiddenMenuIds) {
       const r = String(role || '').toLowerCase();
       const order = MENU_PRIORITY[r] || MENU_PRIORITY.admin;
@@ -4811,7 +4818,9 @@
 
     // admin/clerk quick-reference: what each fee type costs, at a glance — for parent inquiries
     function FeeBreakdownCard({ currentUser, role, goto }) {
-      const { data: rows, isLoading: loading } = useSWR('getFeeTypeBreakdown', () => swrFetcher('getFeeTypeBreakdown', currentUser, role));
+      // skip the fetch entirely if admin hid Fee Structure from the sidebar — one less parallel
+      // call on every dashboard load for a widget nobody using this school can even click into
+      const { data: rows, isLoading: loading } = useSWR(isMenuHidden('feeStructure') ? null : 'getFeeTypeBreakdown', () => swrFetcher('getFeeTypeBreakdown', currentUser, role));
       const fmtGh = (n) => 'GH₵' + Number(n || 0).toLocaleString();
       const cap = (s) => { const v = String(s || '').replace(/_/g, ' '); return v ? v.charAt(0).toUpperCase() + v.slice(1) : ''; };
       if (loading || !rows || rows.length === 0) return null;
@@ -4835,8 +4844,9 @@
 
     // today's accounts widget — day-book income/expense/net, click → accounts page
     function TodayAccountsCard({ goto, currentUser, role }) {
+      // skip the fetch entirely if admin hid Daily Accounts from the sidebar
       // backend returns the obj directly (has .success but no .data wrapper) — keep raw, accept only on success
-      const { data: d } = useSWR('getAccountTodaySummary', () => new Promise((resolve, reject) => {
+      const { data: d } = useSWR(isMenuHidden('accounts') ? null : 'getAccountTodaySummary', () => new Promise((resolve, reject) => {
         google.script.run
           .withSuccessHandler((res) => { if (res && res.success) resolve(res); else reject(new Error((res && res.message) || 'Failed')); })
           .withFailureHandler(reject)
@@ -4908,10 +4918,12 @@
         useSWR('getAdminDashboardCharts', () => swrFetcher('getAdminDashboardCharts', currentUser, role));
       const { data: enrich, isValidating: syncE } =
         useSWR('getAdminDashboardEnrich', () => swrFetcher('getAdminDashboardEnrich', currentUser, role));
+      // skip these two entirely when admin has hidden the corresponding sidebar item — one less
+      // parallel call each on every dashboard load for a widget that just links to a hidden page
       const { data: smsStats } =
-        useSWR('getSmsDashboardStats', () => swrFetcher('getSmsDashboardStats', currentUser, role));
+        useSWR(isMenuHidden('sms') ? null : 'getSmsDashboardStats', () => swrFetcher('getSmsDashboardStats', currentUser, role));
       const { data: inquiries } =
-        useSWR('getAllInquiries', () => swrFetcher('getAllInquiries', currentUser, role));
+        useSWR(isMenuHidden('inquiries') ? null : 'getAllInquiries', () => swrFetcher('getAllInquiries', currentUser, role));
       const { data: onlineStats, refresh: refreshOnline } =
         useSWR('getOnlineUsersCount', () => swrFetcher('getOnlineUsersCount', currentUser, role));
       // live-ish — re-poll every 45s so the "Users Online" count doesn't need a manual refresh
@@ -5007,11 +5019,15 @@
             <DashKpi icon="calendar-check" label="Today Attendance" value={(extras?.todayAttPct || 0) + '%'} sub={`${stats.todayMarked} records`} color="orange" onClick={() => goto('attendance')} />
             <DashKpi icon="graduation-cap" label="Active Exams" value={stats.totalExams} sub={`${stats.publishedExams} published`} color="amber" onClick={() => goto('exams')} />
             <DashKpi icon="gavel" label="Open Incidents" value={stats.openIncidents} sub={`${stats.criticalIncidents} critical`} color="red" onClick={() => goto('discipline')} />
-            <DashKpi icon="sms" label="SMS Balance"
-              value={smsStats ? (smsStats.balance == null ? 'N/A' : fmt(smsStats.balance)) : '…'}
-              sub={smsStats ? `${fmt(smsStats.totalSent)} sent · ${fmt(smsStats.totalFailed)} failed` : 'loading…'}
-              color="teal" onClick={() => goto('sms')} blink />
-            <DashKpi icon="comment-dots" label="New Inquiries" value={newInquiriesCount} sub={`${(inquiries || []).length} total`} color="pink" onClick={() => goto('inquiries')} />
+            {!isMenuHidden('sms') && (
+              <DashKpi icon="sms" label="SMS Balance"
+                value={smsStats ? (smsStats.balance == null ? 'N/A' : fmt(smsStats.balance)) : '…'}
+                sub={smsStats ? `${fmt(smsStats.totalSent)} sent · ${fmt(smsStats.totalFailed)} failed` : 'loading…'}
+                color="teal" onClick={() => goto('sms')} blink />
+            )}
+            {!isMenuHidden('inquiries') && (
+              <DashKpi icon="comment-dots" label="New Inquiries" value={newInquiriesCount} sub={`${(inquiries || []).length} total`} color="pink" onClick={() => goto('inquiries')} />
+            )}
             <DashKpi icon="circle-nodes" label="Users Online" value={onlineStats ? onlineStats.count : '…'} sub="live · refreshes every 45s" color="green" blink />
           </div>
 
