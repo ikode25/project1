@@ -4437,6 +4437,15 @@
       );
     }
 
+    // Ghana schools call this role "Headteacher" — the internal role string stays 'supervisor'
+    // (matches every existing RBAC check and already-created users) but every user-facing label
+    // now reads "Headteacher" instead.
+    const ROLE_DISPLAY_LABEL = { supervisor: 'Headteacher' };
+    function roleDisplayLabel(role) {
+      const r = String(role || '').toLowerCase();
+      return ROLE_DISPLAY_LABEL[r] || (role ? role.charAt(0).toUpperCase() + role.slice(1) : '');
+    }
+
     // ============== Menu catalog (single source of truth for sidebar items) ==============
     // Priority key: lower = higher in list. Items with no entry for a role = hidden for that role.
     // Optional `group` lets us insert section headers (Daily / Academic / Records / Admin / Account).
@@ -4496,7 +4505,9 @@
     //  - parent: notices + child's attendance/marks/fees first
     const MENU_PRIORITY = {
       admin: ['dashboard','ownerPortal','reports','admissions','admissionReqs','inquiries','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','questionBank','hallTickets','feePayments','accounts','feeStructure','payroll','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','recruitment','account','settings','about'],
-      supervisor: ['dashboard','reports','attendance','substitutes','marks','hallTickets','exams','notices','ptm','calendar','discipline','conduct','helpdesk','complaints','lessonPlans','logbook','activities','students','parents','classes','subjects','assignments','documents','timetable','account','about'],
+      // headteacher (internal role id stays 'supervisor' — see ROLE_DISPLAY_LABEL) — system-wide
+      // oversight: academic operations plus Owner Portal's financial/activity monitoring
+      supervisor: ['dashboard','ownerPortal','reports','attendance','substitutes','marks','hallTickets','exams','notices','ptm','calendar','discipline','conduct','helpdesk','complaints','lessonPlans','logbook','activities','students','parents','classes','subjects','assignments','documents','timetable','account','about'],
       clerk: ['admissions','admissionReqs','students','parents','feePayments','accounts','feeStructure','sms','reports','attendance','helpdesk','complaints','documents','assets','inventory','timetable','classes','notices','calendar','account','about'],
       // bursar/accountant — finance + asset/stock inventory only, nothing else (per-role scoped portal)
       bursar: ['dashboard','feePayments','feeStructure','accounts','payroll','assets','inventory','account','about'],
@@ -4605,7 +4616,7 @@
                 <img src={profileImage || DEFAULT_LOGO} alt="Profile" />
               </div>
               <div className="sidebar-user-name">{displayName}</div>
-              <div className="sidebar-user-role">{role}</div>
+              <div className="sidebar-user-role">{roleDisplayLabel(role)}</div>
             </div>
 
             <div className="sidebar-menu-section">
@@ -5514,7 +5525,7 @@
       return (
         <div>
           <h2 style={{color:'var(--navy-primary)',marginBottom:'16px',fontSize:'20px'}}>
-            <i className="fas fa-user-tie"></i> Supervisor Dashboard
+            <i className="fas fa-user-tie"></i> Headteacher Dashboard
             {syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}
           </h2>
 
@@ -6250,7 +6261,7 @@
                         { value: 'clerk', label: 'Clerk' },
                         { value: 'bursar', label: 'Bursar / Accountant' },
                         { value: 'teacher', label: 'Teacher' },
-                        { value: 'supervisor', label: 'Supervisor' },
+                        { value: 'supervisor', label: 'Headteacher' },
                         { value: 'owner', label: 'School Owner' },
                         { value: 'student', label: 'Student' },
                         { value: 'parent', label: 'Parent' }
@@ -6814,7 +6825,7 @@
                       { value: 'clerk', label: 'Clerk' },
                       { value: 'bursar', label: 'Bursar / Accountant (finance & inventory only)' },
                       { value: 'teacher', label: 'Teacher' },
-                      { value: 'supervisor', label: 'Supervisor' },
+                      { value: 'supervisor', label: 'Headteacher (system-wide oversight)' },
                       { value: 'owner', label: 'School Owner (read-only monitoring)' },
                       { value: 'student', label: 'Student' },
                       { value: 'parent', label: 'Parent' }
@@ -7049,8 +7060,10 @@
       const [enrollTarget, setEnrollTarget] = useState(null);
       const [showPrintModal, setShowPrintModal] = useState(false);
       const [printTarget, setPrintTarget] = useState(null);
+      const [showDigestModal, setShowDigestModal] = useState(false);
       const [viewMode, setViewMode] = useState('table');
       const tableInstanceRef = useRef(null);
+      const isAdminRole = String(role).toLowerCase() === 'admin';
 
       const [filters, setFilters] = useState({
         status: '',
@@ -7351,6 +7364,7 @@
             <div style={{display:'flex',gap:'10px'}}>
               <ViewToggle mode={viewMode} onChange={setViewMode} />
               {canEdit && <button className="btn btn-secondary" onClick={copyAdmissionLink}><i className="fas fa-link"></i> Copy Online Application Link</button>}
+              {isAdminRole && <button className="btn btn-secondary" onClick={() => setShowDigestModal(true)}><i className="fas fa-file-pdf"></i> Send Today's Report</button>}
               <button className="btn btn-success" onClick={() => { setEditingReg(null); setShowRegModal(true); }}>
                 <i className="fas fa-plus"></i> New Registration
               </button>
@@ -7504,6 +7518,9 @@
           {showPrintModal && printTarget && (
             <AdmissionFormModal admission={printTarget} onClose={() => { setShowPrintModal(false); setPrintTarget(null); }} />
           )}
+          {showDigestModal && (
+            <AdmissionsDigestModal currentUser={currentUser} role={role} onClose={() => setShowDigestModal(false)} />
+          )}
         </div>
       );
     }
@@ -7591,6 +7608,160 @@
                   Printed on {new Date().toLocaleDateString('en-US', { day:'2-digit', month:'short', year:'numeric' })} · {schoolName}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ============== Admissions — Today's Report digest (PDF → email + WhatsApp link) ==============
+    function AdmissionsDigestModal({ currentUser, role, onClose }) {
+      const sch = window.SMS_SCHOOL || {};
+      const [students, setStudents] = useState(null);
+      const [loadError, setLoadError] = useState('');
+      const [recipients, setRecipients] = useState([
+        { Label: 'Bursar', Email: '', Phone: '' },
+        { Label: 'School Owner', Email: '', Phone: '' },
+        { Label: 'Headteacher', Email: '', Phone: '' }
+      ]);
+      const [sending, setSending] = useState(false);
+      const [result, setResult] = useState(null); // { message, waLinks }
+
+      useEffect(() => {
+        google.script.run
+          .withSuccessHandler((res) => { if (res.success) setStudents(res.data); else setLoadError(res.message || 'Could not load today\'s admissions'); })
+          .withFailureHandler((err) => setLoadError(err.message || 'Connection error'))
+          .getTodayAdmissionActivity(currentUser, role);
+
+        // pre-fill from School Settings if the admin has already configured contacts there
+        google.script.run
+          .withSuccessHandler((res) => {
+            if (!res || !res.success) return;
+            const d = res.data || {};
+            setRecipients([
+              { Label: 'Bursar', Email: d.BursarEmail || '', Phone: d.BursarPhone || '' },
+              { Label: 'School Owner', Email: d.OwnerEmail || '', Phone: d.OwnerPhone || '' },
+              { Label: 'Headteacher', Email: d.HeadteacherEmail || '', Phone: d.HeadteacherPhone || '' }
+            ]);
+          })
+          .withFailureHandler(() => {})
+          .getAdminExtendedSettings(currentUser, role);
+      }, []);
+
+      const setRecipient = (i, k, v) => setRecipients(recipients.map((r, idx) => idx === i ? { ...r, [k]: v } : r));
+
+      const typeLabel = (t) => t === 'transfer' ? 'Transfer' : t === 're_admission' ? 'Re-admission' : 'New Admission';
+
+      // builds and returns the pdfmake doc definition for today's admissions list
+      const buildDigestPdfDoc = () => {
+        const schoolName = sch.SchoolName || 'School';
+        const rows = [[
+          { text: 'Adm. No.', style: 'th' }, { text: 'Name', style: 'th' }, { text: 'Class', style: 'th' },
+          { text: 'Type', style: 'th' }, { text: 'Admission Date', style: 'th' }, { text: 'Guardian Mobile', style: 'th' }
+        ]];
+        (students || []).forEach((s) => {
+          rows.push([
+            { text: s.AdmissionNumber || '—', style: 'td' }, { text: s.FullName || '—', style: 'td' },
+            { text: s.ClassLabel || '—', style: 'td' }, { text: typeLabel(s.AdmissionType), style: 'td' },
+            { text: s.AdmissionDate || '—', style: 'td' }, { text: s.GuardianMobile || '—', style: 'td' }
+          ]);
+        });
+        return {
+          pageSize: 'A4', pageMargins: [30, 30, 30, 30],
+          content: [
+            { text: schoolName, style: 'schoolName' },
+            { text: "Today's Admissions / Re-admissions / Transfers — " + new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }), style: 'title', margin: [0, 2, 0, 12] },
+            (students || []).length === 0
+              ? { text: 'No students were admitted, re-admitted, or transferred in today.', style: 'td' }
+              : { table: { headerRows: 1, widths: ['auto', '*', 'auto', 'auto', 'auto', 'auto'], body: rows },
+                  layout: { fillColor: (r) => r === 0 ? '#001f3f' : (r % 2 === 0 ? '#f4f7fa' : null), hLineColor: () => '#cfd8e3', vLineColor: () => '#cfd8e3' } }
+          ],
+          styles: {
+            schoolName: { fontSize: 16, bold: true, color: '#001f3f' },
+            title: { fontSize: 12, bold: true, color: '#444' },
+            th: { fontSize: 10, bold: true, color: '#fff', fillColor: '#001f3f', margin: [4, 4, 4, 4] },
+            td: { fontSize: 9, margin: [4, 4, 4, 4] }
+          },
+          defaultStyle: { font: 'Roboto' }
+        };
+      };
+
+      const handleSend = () => {
+        const validRecipients = recipients.filter(r => (r.Email && r.Email.trim()) || (r.Phone && r.Phone.trim()));
+        if (!validRecipients.length) { Swal.fire({ icon: 'error', title: 'Add at least one email or phone number' }); return; }
+        setSending(true);
+        setResult(null);
+        pdfMake.createPdf(buildDigestPdfDoc()).getBase64((base64) => {
+          google.script.run
+            .withSuccessHandler((res) => {
+              setSending(false);
+              if (res.success) setResult(res);
+              else Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+            })
+            .withFailureHandler((err) => { setSending(false); Swal.fire({ icon: 'error', title: 'Error', text: err.message }); })
+            .sendDailyAdmissionsDigest(base64, validRecipients, currentUser, role);
+        });
+      };
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'620px'}}>
+            <div className="modal-header"><h3><i className="fas fa-file-pdf"></i> Send Today's Admissions Report</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
+            <div className="modal-body">
+              {loadError && <div className="settings-info-message" style={{marginBottom:'14px',borderLeftColor:'#ea4335'}}>{loadError}</div>}
+
+              {!loadError && (
+                <div className="settings-info-message" style={{marginBottom:'14px'}}>
+                  <i className="fas fa-info-circle"></i> {students == null ? 'Loading…' : students.length === 0
+                    ? "No new admissions, re-admissions, or transfers recorded today yet."
+                    : `${students.length} student${students.length === 1 ? '' : 's'} admitted / re-admitted / transferred today.`}
+                </div>
+              )}
+
+              {!result && (
+                <>
+                  <h4 style={{marginBottom:'10px',color:'var(--navy-primary)'}}>Recipients</h4>
+                  {recipients.map((r, i) => (
+                    <div key={i} className="form-grid" style={{marginBottom:'6px',alignItems:'flex-end'}}>
+                      <div className="form-group"><label>{r.Label}</label></div>
+                      <div className="form-group"><input type="email" placeholder="Email" value={r.Email} onChange={(e) => setRecipient(i, 'Email', e.target.value)} /></div>
+                      <div className="form-group"><input type="text" placeholder="Phone (WhatsApp)" value={r.Phone} onChange={(e) => setRecipient(i, 'Phone', e.target.value)} /></div>
+                    </div>
+                  ))}
+                  <div className="form-actions" style={{marginTop:'16px'}}>
+                    <button type="button" className="btn btn-primary" disabled={sending || students == null} onClick={handleSend}>
+                      {sending ? <><i className="fas fa-spinner fa-spin"></i> Generating & Sending…</> : <><i className="fas fa-paper-plane"></i> Generate PDF & Send</>}
+                    </button>
+                    <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+                  </div>
+                </>
+              )}
+
+              {result && (
+                <div>
+                  <div className="settings-info-message" style={{marginBottom:'14px',borderLeftColor:'#34a853'}}>
+                    <i className="fas fa-check-circle" style={{color:'#34a853'}}></i> {result.message}
+                  </div>
+                  {result.fileUrl && (
+                    <p style={{marginBottom:'12px'}}><a href={result.fileUrl} target="_blank" rel="noopener noreferrer"><i className="fas fa-file-pdf"></i> View the PDF</a></p>
+                  )}
+                  {result.waLinks && result.waLinks.length > 0 && (
+                    <div style={{marginBottom:'14px'}}>
+                      <div style={{fontSize:'12px',color:'#888',marginBottom:'8px'}}>Click each button below to finish sending via WhatsApp (opens WhatsApp with the message pre-filled):</div>
+                      <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                        {result.waLinks.map((w, i) => (
+                          <a key={i} className="btn btn-sm" style={{background:'#25d366',color:'#fff'}} href={w.url} target="_blank" rel="noopener noreferrer">
+                            <i className="fab fa-whatsapp"></i> {w.label || w.phone}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="form-actions">
+                    <button type="button" className="btn btn-secondary" onClick={onClose}>Close</button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -8098,7 +8269,7 @@
     const ADM_STATUS_FILTER_OPTS = [{value:'',label:'All'},{value:'pending_review',label:'Pending Review'},{value:'registered',label:'Registered'},{value:'admitted',label:'Admitted'},{value:'enrolled',label:'Enrolled'},{value:'rejected',label:'Rejected'},{value:'cancelled',label:'Cancelled'}];
     const ADM_TYPE_FILTER_OPTS = [{value:'',label:'All'},{value:'new',label:'New'},{value:'transfer',label:'Transfer'},{value:'re_admission',label:'Re-admission'}];
     const STU_STATUS_OPTS = [{value:'',label:'All'},{value:'active',label:'Active'},{value:'inactive',label:'Inactive'},{value:'transferred',label:'Transferred'},{value:'passed_out',label:'Passed Out'},{value:'suspended',label:'Suspended'}];
-    const ROLE_FILTER_OPTS = [{value:'',label:'All roles'},{value:'admin',label:'Admin'},{value:'clerk',label:'Clerk'},{value:'bursar',label:'Bursar / Accountant'},{value:'teacher',label:'Teacher'},{value:'supervisor',label:'Supervisor'}];
+    const ROLE_FILTER_OPTS = [{value:'',label:'All roles'},{value:'admin',label:'Admin'},{value:'clerk',label:'Clerk'},{value:'bursar',label:'Bursar / Accountant'},{value:'teacher',label:'Teacher'},{value:'supervisor',label:'Headteacher'}];
     const STAFF_STATUS_OPTS = [{value:'',label:'All'},{value:'active',label:'Active'},{value:'inactive',label:'Inactive'},{value:'suspended',label:'Suspended'}];
 
     const REPORT_GROUP_META = {
@@ -26968,6 +27139,32 @@
               <input type="time" value={data.DailyDigestTime} onChange={(e) => set('DailyDigestTime', e.target.value)} />
             </div>
 
+            <h3 style={{margin:'26px 0 12px',color:'var(--navy-primary)',fontSize:'17px'}}>
+              <i className="fas fa-user-plus"></i> Admissions Report Recipients
+            </h3>
+            <div className="settings-info-message" style={{marginBottom:'14px'}}>
+              <i className="fas fa-info-circle" style={{marginRight:'6px'}}></i>
+              Pre-fills the recipient list on Admissions → "Send Today's Report" — bursar and headteacher get a PDF of the day's new admissions, re-admissions and transfers by email + a WhatsApp link.
+            </div>
+            <div className="form-grid">
+              <div className="form-group">
+                <label><i className="fas fa-envelope"></i> Bursar Email</label>
+                <input type="email" value={data.BursarEmail} onChange={(e) => set('BursarEmail', e.target.value)} placeholder="bursar@example.com" />
+              </div>
+              <div className="form-group">
+                <label><i className="fas fa-phone"></i> Bursar Phone (WhatsApp)</label>
+                <input type="text" value={data.BursarPhone} onChange={(e) => set('BursarPhone', e.target.value)} placeholder="e.g. 0244000000" />
+              </div>
+              <div className="form-group">
+                <label><i className="fas fa-envelope"></i> Headteacher Email</label>
+                <input type="email" value={data.HeadteacherEmail} onChange={(e) => set('HeadteacherEmail', e.target.value)} placeholder="headteacher@example.com" />
+              </div>
+              <div className="form-group">
+                <label><i className="fas fa-phone"></i> Headteacher Phone (WhatsApp)</label>
+                <input type="text" value={data.HeadteacherPhone} onChange={(e) => set('HeadteacherPhone', e.target.value)} placeholder="e.g. 0244000000" />
+              </div>
+            </div>
+
             <div style={{display:'flex',gap:'10px',flexWrap:'wrap'}}>
               <button type="submit" className="btn btn-primary" disabled={saving}>
                 {saving ? <><i className="fas fa-spinner fa-spin"></i> Saving...</> : <><i className="fas fa-save"></i> Save SMS & Digest Settings</>}
@@ -29906,7 +30103,7 @@
       const ROLES = [
         { id:'admin',      label:'Admin',      badge:'role-admin',      blurb:'Full control — every module plus user/staff management, school settings and theme.',
           day:'Everything: students & staff, classes, exams, fees & accounts, reports, settings.' },
-        { id:'supervisor', label:'Supervisor', badge:'role-supervisor', blurb:'Academic oversight. Reads most records; runs discipline, conduct, substitutes, notices & helpdesk.',
+        { id:'supervisor', label:'Headteacher', badge:'role-supervisor', blurb:'System-wide oversight. Reads most records, monitors financials via Owner Portal; runs discipline, conduct, substitutes, notices & helpdesk.',
           day:'Attendance, exams & results, hall tickets, discipline/conduct, notices, PTM, reports.' },
         { id:'clerk',      label:'Clerk',      badge:'role-clerk',      blurb:'Front office. Handles admissions, student & parent records, fee collection and daily accounts.',
           day:'Admissions, students, parents, fee collection, daily accounts, attendance, assets/inventory, notices.' },
@@ -30078,7 +30275,7 @@
       const canSeeRecruitment = r === 'admin';
       const canSeeAdmissionReqs = r === 'admin' || r === 'clerk';
       const canSeeInquiries = r === 'admin';
-      const canSeeOwnerPortal = r === 'admin' || r === 'owner';
+      const canSeeOwnerPortal = r === 'admin' || r === 'owner' || r === 'supervisor';
       const canSeeDiscipline = r === 'admin' || r === 'teacher' || r === 'supervisor' || isStudent || isParent;
       const canSeeConduct = r === 'admin' || r === 'teacher' || r === 'supervisor' || isStudent || isParent;
       const canSeeActivities = r === 'admin' || r === 'teacher' || r === 'supervisor' || isStudent || isParent;

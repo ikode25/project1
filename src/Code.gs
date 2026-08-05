@@ -338,7 +338,7 @@ var PERIOD_HEADERS = ['ID','PeriodNumber','StartTime','EndTime','IsBreak','Label
 // matters (Exams, Fee_Structure, Admissions, LessonPlans, etc.) already carries its own
 // AcademicYear/Term columns, so old sessions stay fully queryable forever; this pair only drives
 // which session NEW records default into and what the dashboard banner shows.)
-var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt','ShowOverallPositionOnReportCard','ShowSubjectAverageOnReportCard','SchoolStampURL','HeadteacherSignatureURL','AdminSignatureURL','PublicAppBaseURL','ActiveTerm','DietaryOptions'];
+var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt','ShowOverallPositionOnReportCard','ShowSubjectAverageOnReportCard','SchoolStampURL','HeadteacherSignatureURL','AdminSignatureURL','PublicAppBaseURL','ActiveTerm','DietaryOptions','BursarEmail','BursarPhone','HeadteacherEmail','HeadteacherPhone'];
 // col 40 = DietaryOptions — admin-editable CSV of "value|label" pairs shown as checkboxes on the
 // student form (Ghana-appropriate defaults; the old hardcoded Halal/Kosher/Pescatarian/etc. list
 // is now just the fallback seed, not a fixed enum — see defaultDietaryOptions()).
@@ -4563,8 +4563,11 @@ function isFinanceStaff(role) {
 function canViewReports(role) {
   return ['admin', 'clerk', 'supervisor', 'owner'].indexOf(String(role || '').toLowerCase()) !== -1;
 }
+// headteacher ('supervisor' internally — see ROLE_DISPLAY_LABEL in index.html) gets the same
+// system-wide monitoring view as the owner, since "headteacher portal to monitor the system" is
+// exactly what Owner Portal already provides
 function isOwnerOrAdmin(role) {
-  return ['admin', 'owner'].indexOf(String(role || '').toLowerCase()) !== -1;
+  return ['admin', 'owner', 'supervisor'].indexOf(String(role || '').toLowerCase()) !== -1;
 }
 // own-class academic reports (Attendance Summary, Exam Result) — also open to teachers, scoped to their classes
 function canViewClassReports(role) {
@@ -5315,6 +5318,99 @@ function deleteAdmission(id, currentUser, currentRole) {
       return { success: true, message: 'Admission record deleted' };
     }
     return { success: false, message: 'Admission record not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// ============== Daily Admissions Digest ==============
+// Students admitted, transferred in, or re-admitted TODAY (CreatedAt, not the editable
+// AdmissionDate field) — feeds the admin's "Send Today's Admissions Report" action, which builds
+// a PDF client-side and hands it to sendDailyAdmissionsDigest() below to email/WhatsApp out.
+function getTodayAdmissionActivity(currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var sh = getSheet(STUDENTS_SHEET);
+    if (!sh) return { success: true, data: [] };
+    var data = sh.getDataRange().getValues();
+    var today = todayStr();
+    var cmap = getClassesMap();
+    var out = [];
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][36]) === '1') continue; // IsDeleted
+      var createdDate = toIso(data[i][37]).split('T')[0]; // CreatedAt
+      if (createdDate !== today) continue;
+      var clsId = parseInt(data[i][25], 10);
+      out.push({
+        ID: data[i][0],
+        AdmissionNumber: data[i][1],
+        FullName: [data[i][2], data[i][3], data[i][4]].filter(function(x) { return x; }).join(' '),
+        Gender: data[i][5] || '',
+        ClassLabel: cmap[clsId] ? cmap[clsId].label : '',
+        AdmissionType: String(data[i][60] || 'fresh').toLowerCase(), // fresh | transfer | re_admission
+        AdmissionDate: toIso(data[i][24]).split('T')[0],
+        GuardianMobile: data[i][23] || data[i][17] || data[i][20] || ''
+      });
+    }
+    out.sort(function(a, b) { return String(a.AdmissionNumber).localeCompare(String(b.AdmissionNumber)); });
+    return { success: true, data: out };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// admin builds the PDF client-side (pdfmake, matching the app's other printed documents) and
+// sends the base64 here. We email it as a real attachment (Apps Script's MailApp supports this
+// natively); WhatsApp has no equivalent server-side send without a paid Business API this school
+// hasn't configured, so instead we upload the PDF to Drive and hand back a wa.me "click to chat"
+// link per recipient with the Drive link pre-filled — one click on our side, one click on theirs.
+function sendDailyAdmissionsDigest(base64Pdf, recipients, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    if (!Array.isArray(recipients) || !recipients.length) return { success: false, message: 'Add at least one recipient' };
+    var b64 = String(base64Pdf || '');
+    if (!b64) return { success: false, message: 'PDF is required' };
+    b64 = b64.split(',')[1] || b64;
+
+    var folder = getAssetsFolder();
+    if (!folder) return { success: false, message: 'Could not access storage folder' };
+    var todayLabel = todayStr();
+    var blob = Utilities.newBlob(Utilities.base64Decode(b64), 'application/pdf', 'Admissions_' + todayLabel + '.pdf');
+    var file = folder.createFile(blob);
+    file.setName('Admissions Report ' + todayLabel + ' — ' + new Date().getTime() + '.pdf');
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    var fileUrl = 'https://drive.google.com/file/d/' + file.getId() + '/view';
+
+    var settingsRes = getSchoolSettings();
+    var schoolName = (settingsRes.data && settingsRes.data.SchoolName) || 'School';
+    var subject = schoolName + ' — Admissions Report (' + todayLabel + ')';
+    var bodyText = "Attached is today's admissions / re-admissions / transfers report from " + schoolName + '.\n\nView online: ' + fileUrl;
+
+    var emailsSent = 0, waLinks = [];
+    recipients.forEach(function(r) {
+      var email = String((r && r.Email) || '').trim();
+      var phone = String((r && r.Phone) || '').trim();
+      var label = String((r && r.Label) || '').trim();
+      if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        try {
+          MailApp.sendEmail({ to: email, subject: subject, body: bodyText, attachments: [blob] });
+          emailsSent++;
+        } catch (e) { /* one bad address shouldn't block the rest */ }
+      }
+      if (phone) {
+        var waNumber = phone.replace(/[^0-9]/g, '');
+        var waText = encodeURIComponent(schoolName + ' — Admissions Report (' + todayLabel + '): ' + fileUrl);
+        waLinks.push({ label: label, phone: phone, url: 'https://wa.me/' + waNumber + '?text=' + waText });
+      }
+    });
+
+    addLog(currentUser, 'Daily Admissions Digest Sent', emailsSent + ' email(s), ' + waLinks.length + ' WhatsApp link(s) prepared');
+    return {
+      success: true,
+      message: 'Emailed to ' + emailsSent + ' recipient(s)' + (waLinks.length ? '. Click each WhatsApp button to finish sending there.' : '.'),
+      fileUrl: fileUrl,
+      waLinks: waLinks
+    };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
@@ -12265,7 +12361,8 @@ function getAdminExtendedSettings(currentUser, currentRole) {
       return {
         success: true,
         data: { SmsProvider: '', SmsApiKey: '', SmsApiSecret: '', SmsSenderId: '', SmsCustomEndpoint: '', SmsCustomConfig: '',
-                OwnerEmail: '', OwnerPhone: '', DailyDigestTime: '18:00', SmsBalanceCache: '', SmsBalanceCacheAt: '' }
+                OwnerEmail: '', OwnerPhone: '', DailyDigestTime: '18:00', SmsBalanceCache: '', SmsBalanceCacheAt: '',
+                BursarEmail: '', BursarPhone: '', HeadteacherEmail: '', HeadteacherPhone: '' }
       };
     }
     return {
@@ -12275,7 +12372,9 @@ function getAdminExtendedSettings(currentUser, currentRole) {
         SmsSenderId: row[24] || '', SmsCustomEndpoint: row[25] || '', SmsCustomConfig: row[26] || '',
         OwnerEmail: row[27] || '', OwnerPhone: row[28] || '', DailyDigestTime: row[29] || '18:00',
         SmsBalanceCache: row[30] === '' || row[30] == null ? '' : parseFloat(row[30]),
-        SmsBalanceCacheAt: row[31] ? toIso(row[31]) : ''
+        SmsBalanceCacheAt: row[31] ? toIso(row[31]) : '',
+        BursarEmail: row[40] || '', BursarPhone: row[41] || '',
+        HeadteacherEmail: row[42] || '', HeadteacherPhone: row[43] || ''
       }
     };
   } catch (err) {
@@ -12328,6 +12427,10 @@ function updateSmsSettings(d, currentUser, currentRole) {
     sh.getRange(foundRow, 28).setValue(ownerEmail);
     sh.getRange(foundRow, 29).setValue(String(d.OwnerPhone || '').trim());
     sh.getRange(foundRow, 30).setValue(digestTime);
+    sh.getRange(foundRow, 41).setValue(String(d.BursarEmail || '').trim());
+    sh.getRange(foundRow, 42).setValue(String(d.BursarPhone || '').trim());
+    sh.getRange(foundRow, 43).setValue(String(d.HeadteacherEmail || '').trim());
+    sh.getRange(foundRow, 44).setValue(String(d.HeadteacherPhone || '').trim());
     sh.getRange(foundRow, 16).setValue(ts);
 
     // keep the daily-digest trigger in sync with whatever time the admin just set
