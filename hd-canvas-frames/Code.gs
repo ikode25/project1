@@ -59,7 +59,7 @@ function doGet(e) {
   return template
     .evaluate()
     .setTitle(title)
-    .setSandboxMode(HtmlService.SandboxMode.IFRAME)
+    .setSandboxMode(HtmlService.SandboxMode.NATIVE)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
