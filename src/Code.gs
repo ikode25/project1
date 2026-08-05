@@ -4837,6 +4837,73 @@ function addRegistration(d, currentUser, currentRole) {
   }
 }
 
+// public — no auth. Bare id+label list only (no capacity/teacher/other sensitive data) so the
+// public admission form's "Applying for class" dropdown can be populated.
+function getPublicClassList() {
+  try {
+    var cmap = getClassesMap();
+    var out = Object.keys(cmap).map(function (id) { return { ID: parseInt(id, 10), Label: cmap[id].label }; });
+    out.sort(function (a, b) { return a.Label.localeCompare(b.Label); });
+    return { success: true, data: out };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// public — no auth. Anyone who can load the web app can submit a prospective admission
+// application; it lands as 'pending_review' so admin must check/correct/approve it before it
+// flows into the normal registered -> admitted -> enrolled pipeline (see approveAdmissionRegistration).
+function submitPublicAdmissionForm(d) {
+  try {
+    var sh = getSheet(ADMISSIONS_SHEET);
+    if (!sh) return { success: false, message: 'Admissions sheet not found' };
+    d = d || {};
+    // public submitters never set a registration fee themselves — that's collected in person
+    d.RegistrationFee = 0;
+    var v = _validateRegistrationFields(d, {});
+    if (!v.ok) return { success: false, message: v.error };
+
+    var ts = nowIso(), id = nextAdmissionId(sh), regNo = generateRegistrationNumber(sh);
+    var fld = v.fields;
+    var rowArr = [
+      id, regNo, fld[2], fld[3], fld[4], fld[5], fld[6], fld[7], fld[8], fld[9], fld[10], fld[11], fld[12],
+      fld[13], fld[14], fld[15], fld[16], fld[17], fld[18], fld[19], fld[20], fld[21], fld[22], fld[23],
+      fld[24], fld[25], fld[26], toIso(todayStr()), 0, '', '', 'pending_review',
+      '', '', '', '', 0, '', '', '', '', '', '', '', '', '0', '', '', '', '', fld[50], '', '0', ts, ts,
+      String(d.PhotoURL || '').trim()
+    ];
+    sh.appendRow(rowArr);
+    return { success: true, message: 'Application submitted — reference ' + regNo + '. The school will review it and contact you.', registrationNumber: regNo };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// admin/clerk — moves a public online submission from pending_review into the normal
+// registered pipeline (same state a staff-entered registration starts in) once checked over.
+function approveAdmissionRegistration(id, currentUser, currentRole) {
+  try {
+    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
+    var sh = getSheet(ADMISSIONS_SHEET);
+    if (!sh) return { success: false, message: 'Admissions sheet not found' };
+    var idn = parseInt(id, 10);
+    if (isNaN(idn)) return { success: false, message: 'Invalid id' };
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] !== idn || String(data[i][52]) === '1') continue;
+      var status = String(data[i][31] || '').toLowerCase();
+      if (status !== 'pending_review') return { success: false, message: 'Cannot approve — admission is already ' + status };
+      sh.getRange(i + 1, 32).setValue('registered');
+      sh.getRange(i + 1, 55).setValue(nowIso());
+      addLog(currentUser, 'Online Admission Application Approved', data[i][1] || ('id ' + idn));
+      return { success: true, message: 'Application approved — now a registered admission' };
+    }
+    return { success: false, message: 'Admission record not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
 function updateRegistration(id, d, currentUser, currentRole) {
   try {
     if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
@@ -4853,7 +4920,7 @@ function updateRegistration(id, d, currentUser, currentRole) {
     for (var i = 1; i < data.length; i++) {
       if (data[i][0] !== idn || String(data[i][52]) === '1') continue;
       var status = String(data[i][31] || '').toLowerCase();
-      if (status !== 'registered' && status !== 'admitted') {
+      if (status !== 'registered' && status !== 'admitted' && status !== 'pending_review') {
         return { success: false, message: 'Cannot edit — admission already ' + status };
       }
       var row = i + 1, ts = nowIso();

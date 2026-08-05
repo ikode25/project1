@@ -3924,6 +3924,136 @@
       );
     }
 
+    // ============== Public Admission Application Form (no login — reached via ?public=admission) ==============
+    function PublicAdmissionForm({ schoolSettings }) {
+      const sch = schoolSettings || {};
+      const schoolName = sch.SchoolName || 'School';
+      const schoolLogo = sch.SchoolLogo || DEFAULT_LOGO;
+      const [classes, setClasses] = useState([]);
+      const [f, setF] = useState({
+        FirstName: '', MiddleName: '', LastName: '', Gender: 'male', DateOfBirth: '',
+        AppliedForClassID: '', AdmissionType: 'new', PreviousSchool: '',
+        FatherName: '', FatherMobile: '', MotherName: '', MotherMobile: '',
+        GuardianName: '', GuardianRelation: '', GuardianMobile: '',
+        Email: '', Mobile: '', AddressLine: '', City: '', Region: '', Remarks: ''
+      });
+      const set = (k, v) => setF({ ...f, [k]: v });
+      const [submitting, setSubmitting] = useState(false);
+      const [done, setDone] = useState(null); // holds { registrationNumber } on success
+      const [error, setError] = useState('');
+
+      useEffect(() => {
+        google.script.run.withSuccessHandler((res) => { if (res && res.success) setClasses(res.data || []); }).withFailureHandler(() => {}).getPublicClassList();
+      }, []);
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!f.FirstName.trim() || !f.LastName.trim()) { setError('First Name and Last Name are required.'); return; }
+        setSubmitting(true);
+        setError('');
+        google.script.run
+          .withSuccessHandler((res) => {
+            setSubmitting(false);
+            if (!res) { setError('No response from server — please try again.'); return; }
+            if (res.success) setDone({ registrationNumber: res.registrationNumber });
+            else setError(res.message || 'Could not submit — please try again.');
+          })
+          .withFailureHandler((err) => { setSubmitting(false); setError((err && err.message) || 'Connection error'); })
+          .submitPublicAdmissionForm(f);
+      };
+
+      const isTransfer = f.AdmissionType === 'transfer';
+
+      return (
+        <div className="login-container">
+          <div className="login-box" style={{maxWidth:'560px'}}>
+            <div className="login-logo-ring">
+              <img src={schoolLogo} alt="Logo" className="login-logo" onError={(e) => e.currentTarget.style.display = 'none'} />
+            </div>
+            <h2>{schoolName}</h2>
+            <p className="login-subtitle">Online Admission Application</p>
+
+            {done ? (
+              <div style={{textAlign:'center',padding:'20px 10px'}}>
+                <i className="fas fa-check-circle" style={{fontSize:'40px',color:'#34a853',marginBottom:'12px',display:'block'}}></i>
+                <p style={{fontSize:'14px',color:'#333'}}>Thank you! Your application has been submitted.</p>
+                <p style={{fontSize:'13px',color:'#666'}}>Reference number: <strong style={{fontFamily:'monospace'}}>{done.registrationNumber}</strong></p>
+                <p style={{fontSize:'12px',color:'#888',marginTop:'8px'}}>The school will review your application and contact you. Please keep your reference number for follow-up.</p>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="login-form">
+                <div className="form-grid">
+                  <div className="form-group"><label>First Name *</label><input type="text" value={f.FirstName} onChange={(e) => set('FirstName', e.target.value)} required autoFocus maxLength="60" /></div>
+                  <div className="form-group"><label>Middle Name</label><input type="text" value={f.MiddleName} onChange={(e) => set('MiddleName', e.target.value)} maxLength="60" /></div>
+                  <div className="form-group"><label>Last Name *</label><input type="text" value={f.LastName} onChange={(e) => set('LastName', e.target.value)} required maxLength="60" /></div>
+                  <div className="form-group"><label>Gender</label>
+                    <select value={f.Gender} onChange={(e) => set('Gender', e.target.value)} style={{width:'100%',padding:'10px 12px',border:'1px solid #ccc'}}>
+                      <option value="male">Male</option><option value="female">Female</option>
+                    </select>
+                  </div>
+                  <div className="form-group"><label>Date of Birth</label><input type="date" value={f.DateOfBirth} onChange={(e) => set('DateOfBirth', e.target.value)} /></div>
+                  <div className="form-group"><label>Applying For</label>
+                    <select value={f.AppliedForClassID} onChange={(e) => set('AppliedForClassID', e.target.value)} style={{width:'100%',padding:'10px 12px',border:'1px solid #ccc'}}>
+                      <option value="">Not sure / let school decide</option>
+                      {classes.map(c => <option key={c.ID} value={c.ID}>{c.Label}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group"><label>Admission Type</label>
+                    <select value={f.AdmissionType} onChange={(e) => set('AdmissionType', e.target.value)} style={{width:'100%',padding:'10px 12px',border:'1px solid #ccc'}}>
+                      <option value="new">New Admission</option>
+                      <option value="transfer">Transfer (from another school)</option>
+                      <option value="re_admission">Re-admission</option>
+                    </select>
+                  </div>
+                  {isTransfer && (
+                    <div className="form-group"><label>Previous School *</label><input type="text" value={f.PreviousSchool} onChange={(e) => set('PreviousSchool', e.target.value)} required maxLength="100" /></div>
+                  )}
+                </div>
+
+                <h4 style={{margin:'16px 0 8px',color:'var(--navy-primary)',fontSize:'13px'}}><i className="fas fa-users"></i> Parent / Guardian Contact</h4>
+                <div className="form-grid">
+                  <div className="form-group"><label>Father's Name</label><input type="text" value={f.FatherName} onChange={(e) => set('FatherName', e.target.value)} maxLength="80" /></div>
+                  <div className="form-group"><label>Father's Mobile</label><input type="text" value={f.FatherMobile} onChange={(e) => set('FatherMobile', e.target.value)} maxLength="20" /></div>
+                  <div className="form-group"><label>Mother's Name</label><input type="text" value={f.MotherName} onChange={(e) => set('MotherName', e.target.value)} maxLength="80" /></div>
+                  <div className="form-group"><label>Mother's Mobile</label><input type="text" value={f.MotherMobile} onChange={(e) => set('MotherMobile', e.target.value)} maxLength="20" /></div>
+                  <div className="form-group"><label>Guardian's Name</label><input type="text" value={f.GuardianName} onChange={(e) => set('GuardianName', e.target.value)} maxLength="80" /></div>
+                  <div className="form-group"><label>Guardian's Mobile</label><input type="text" value={f.GuardianMobile} onChange={(e) => set('GuardianMobile', e.target.value)} maxLength="20" /></div>
+                  <div className="form-group"><label>Email</label><input type="email" value={f.Email} onChange={(e) => set('Email', e.target.value)} maxLength="120" /></div>
+                  <div className="form-group"><label>Best Contact Mobile</label><input type="text" value={f.Mobile} onChange={(e) => set('Mobile', e.target.value)} maxLength="20" /></div>
+                </div>
+
+                <h4 style={{margin:'16px 0 8px',color:'var(--navy-primary)',fontSize:'13px'}}><i className="fas fa-map-marker-alt"></i> Address</h4>
+                <div className="form-grid">
+                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Address</label><input type="text" value={f.AddressLine} onChange={(e) => set('AddressLine', e.target.value)} maxLength="150" /></div>
+                  <div className="form-group"><label>City / Town</label><input type="text" value={f.City} onChange={(e) => set('City', e.target.value)} maxLength="60" /></div>
+                  <div className="form-group"><label>Region</label><input type="text" value={f.Region} onChange={(e) => set('Region', e.target.value)} maxLength="60" /></div>
+                </div>
+                <div className="form-group">
+                  <label>Anything else you'd like the school to know?</label>
+                  <textarea value={f.Remarks} onChange={(e) => set('Remarks', e.target.value)} rows="3" maxLength="500" style={{width:'100%',padding:'10px 12px',border:'1px solid #ccc'}}></textarea>
+                </div>
+
+                <button type="submit" className="login-submit" disabled={submitting}>
+                  {submitting ? <><i className="fas fa-spinner fa-spin"></i> Submitting…</> : <><i className="fas fa-paper-plane"></i> Submit Application</>}
+                </button>
+
+                {error && (
+                  <div className="login-error-box">
+                    <i className="fas fa-exclamation-circle"></i>
+                    <span>{error}</span>
+                  </div>
+                )}
+              </form>
+            )}
+
+            <div className="login-footer">
+              <div>{sch.SchoolEmail && <span><i className="fas fa-envelope"></i> {sch.SchoolEmail}</span>}{sch.SchoolEmail && sch.SchoolContact && ' · '}{sch.SchoolContact && <span><i className="fas fa-phone"></i> {sch.SchoolContact}</span>}</div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     // ============== Menu catalog (single source of truth for sidebar items) ==============
     // Priority key: lower = higher in list. Items with no entry for a role = hidden for that role.
     // Optional `group` lets us insert section headers (Daily / Academic / Records / Admin / Account).
@@ -6320,6 +6450,7 @@
 
     // ============== Admissions (Registration → Confirm → Enroll) ==============
     const ADM_STATUS_OPTS = [
+      { value: 'pending_review', label: 'Pending Review', color: '#d81b60' },
       { value: 'registered', label: 'Registered', color: '#0074D9' },
       { value: 'admitted',   label: 'Admitted',   color: '#fb8c00' },
       { value: 'enrolled',   label: 'Enrolled',   color: '#34a853' },
@@ -6478,6 +6609,12 @@
                 data: null, title: 'Actions', orderable: false,
                 render: (d, t, row) => {
                   const st = row.Status;
+                  if (st === 'pending_review') {
+                    return `<button class="action-icon edit-icon" data-action="edit" title="Review / Correct"><i class="fas fa-edit"></i></button>`
+                      + `<button class="action-icon edit-icon" data-action="approve" title="Approve" style="color:#34a853"><i class="fas fa-check"></i></button>`
+                      + `<button class="action-icon edit-icon" data-action="reject" title="Reject" style="color:#ea4335"><i class="fas fa-ban"></i></button>`
+                      + `<button class="action-icon delete-icon" data-action="delete" title="Delete"><i class="fas fa-trash"></i></button>`;
+                  }
                   if (st === 'registered') {
                     return `<button class="action-icon edit-icon" data-action="edit" title="Edit Registration"><i class="fas fa-edit"></i></button>`
                       + `<button class="action-icon edit-icon" data-action="confirm" title="Confirm Admission" style="color:#34a853"><i class="fas fa-check-double"></i></button>`
@@ -6523,6 +6660,7 @@
               const row = table.row($(this).parents('tr')).data();
               if (!row) return;
               if (action === 'edit') { setEditingReg(row); setShowRegModal(true); }
+              else if (action === 'approve') handleApprove(row);
               else if (action === 'confirm') { setConfirmTarget(row); setShowConfirmModal(true); }
               else if (action === 'enroll') { setEnrollTarget(row); setShowEnrollModal(true); }
               else if (action === 'reject') handleReject(row);
@@ -6610,6 +6748,27 @@
         } else { initTable(admissionsData); }
       }, [admissionsData]);
 
+      const handleApprove = (row) => {
+        Swal.fire({ icon: 'question', title: 'Approve this application?', text: (row.ApplicantName || '') + ' — moves it into the normal registered admissions pipeline.', showCancelButton: true, confirmButtonColor: '#34a853', confirmButtonText: 'Approve' })
+          .then((res) => {
+            if (!res.isConfirmed) return;
+            google.script.run
+              .withSuccessHandler((r) => {
+                if (r && r.success) { Swal.fire({ icon: 'success', text: r.message, timer: 2000, showConfirmButton: false }); refreshAdmissions(); }
+                else Swal.fire({ icon: 'error', title: 'Error', text: (r && r.message) || 'Failed' });
+              })
+              .withFailureHandler((err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }))
+              .approveAdmissionRegistration(row.ID, currentUser, role);
+          });
+      };
+
+      const copyAdmissionLink = () => {
+        const url = window.location.origin + window.location.pathname + '?public=admission';
+        navigator.clipboard.writeText(url).then(() => {
+          Swal.fire({ icon: 'success', text: 'Application link copied — share it with prospective parents', timer: 1800, showConfirmButton: false });
+        }).catch(() => Swal.fire({ icon: 'info', title: 'Online Application Link', text: url }));
+      };
+
       const handleReject = (row) => {
         Swal.fire({
           icon: 'warning',
@@ -6663,6 +6822,7 @@
             <h2><i className="fas fa-file-signature"></i> Admissions{syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}</h2>
             <div style={{display:'flex',gap:'10px'}}>
               <ViewToggle mode={viewMode} onChange={setViewMode} />
+              {canEdit && <button className="btn btn-secondary" onClick={copyAdmissionLink}><i className="fas fa-link"></i> Copy Online Application Link</button>}
               <button className="btn btn-success" onClick={() => { setEditingReg(null); setShowRegModal(true); }}>
                 <i className="fas fa-plus"></i> New Registration
               </button>
@@ -6768,6 +6928,7 @@
                     {canEdit && (
                       <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
                         <button className="action-icon edit-icon" onClick={() => { setEditingReg(a); setShowRegModal(true); }} title="Edit"><i className="fas fa-edit"></i></button>
+                        {a.Status === 'pending_review' && <button className="action-icon" onClick={() => handleApprove(a)} title="Approve" style={{color:'#34a853'}}><i className="fas fa-check"></i></button>}
                         {a.Status === 'registered' && <button className="action-icon" onClick={() => { setConfirmTarget(a); setShowConfirmModal(true); }} title="Confirm"><i className="fas fa-check"></i></button>}
                         {a.Status === 'admitted' && <button className="action-icon" onClick={() => { setEnrollTarget(a); setShowEnrollModal(true); }} title="Enroll"><i className="fas fa-user-graduate"></i></button>}
                         <button className="action-icon delete-icon" onClick={() => handleDelete(a)} title="Delete"><i className="fas fa-trash"></i></button>
@@ -7313,7 +7474,7 @@
     // ============== Reports Hub ==============
     // inline filter option lists
     const FEE_CAT_OPTS = [{value:'',label:'All categories'},{value:'tuition',label:'Tuition'},{value:'admission',label:'Admission'},{value:'transport',label:'Transport'},{value:'exam',label:'Exam'},{value:'library',label:'Library'},{value:'sports',label:'Sports'},{value:'lab',label:'Lab'},{value:'annual',label:'Annual'},{value:'arrears',label:'Arrears (Carried Forward)'},{value:'other',label:'Other'}];
-    const ADM_STATUS_FILTER_OPTS = [{value:'',label:'All'},{value:'registered',label:'Registered'},{value:'admitted',label:'Admitted'},{value:'enrolled',label:'Enrolled'},{value:'rejected',label:'Rejected'},{value:'cancelled',label:'Cancelled'}];
+    const ADM_STATUS_FILTER_OPTS = [{value:'',label:'All'},{value:'pending_review',label:'Pending Review'},{value:'registered',label:'Registered'},{value:'admitted',label:'Admitted'},{value:'enrolled',label:'Enrolled'},{value:'rejected',label:'Rejected'},{value:'cancelled',label:'Cancelled'}];
     const ADM_TYPE_FILTER_OPTS = [{value:'',label:'All'},{value:'new',label:'New'},{value:'transfer',label:'Transfer'},{value:'re_admission',label:'Re-admission'}];
     const STU_STATUS_OPTS = [{value:'',label:'All'},{value:'active',label:'Active'},{value:'inactive',label:'Inactive'},{value:'transferred',label:'Transferred'},{value:'passed_out',label:'Passed Out'},{value:'suspended',label:'Suspended'}];
     const ROLE_FILTER_OPTS = [{value:'',label:'All roles'},{value:'admin',label:'Admin'},{value:'clerk',label:'Clerk'},{value:'teacher',label:'Teacher'},{value:'supervisor',label:'Supervisor'}];
@@ -28338,6 +28499,7 @@
       // can use them without an account.
       const publicPage = new URLSearchParams(window.location.search).get('public');
       if (publicPage === 'inquiry') return <PublicInquiryForm schoolSettings={schoolSettings} />;
+      if (publicPage === 'admission') return <PublicAdmissionForm schoolSettings={schoolSettings} />;
 
       return (
         <div>
