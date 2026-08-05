@@ -11256,6 +11256,64 @@ function addFoodMenu(d, currentUser, currentRole) {
   }
 }
 
+// admin sets the whole week (Monday-Friday) in one go — upserts each weekday's row individually
+// so getTodayFoodMenu/getAllFoodMenus (per-day reads) keep working unchanged.
+function addWeeklyFoodMenu(d, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var weekStart = String(d.WeekStartDate || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart)) return { success: false, message: 'WeekStartDate must be YYYY-MM-DD' };
+    var startDt = new Date(weekStart + 'T00:00:00');
+    if (isNaN(startDt.getTime())) return { success: false, message: 'Invalid WeekStartDate' };
+    // normalize to the Monday of that week, so admin can pick any day and still get Mon-Fri
+    var dow = startDt.getDay(); // 0=Sun..6=Sat
+    var mondayOffset = dow === 0 ? -6 : (1 - dow);
+    startDt.setDate(startDt.getDate() + mondayOffset);
+
+    var days = Array.isArray(d.days) ? d.days : [];
+    if (days.length !== 5) return { success: false, message: 'Expected 5 days (Monday-Friday)' };
+
+    var sh = _ensureFoodMenuSheet();
+    var data = sh.getDataRange().getValues();
+    var dateIndex = {}; // 'YYYY-MM-DD' -> sheet row number (1-based)
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][7]) === '1') continue;
+      dateIndex[toIso(data[i][1]).split('T')[0]] = i + 1;
+    }
+
+    var ts = nowIso(), saved = [];
+    for (var w = 0; w < 5; w++) {
+      var dt = new Date(startDt.getTime());
+      dt.setDate(dt.getDate() + w);
+      var dateStr = dt.toISOString().split('T')[0];
+      var day = days[w] || {};
+      var bf = String(day.Breakfast || '').trim(), ln = String(day.Lunch || '').trim(), sn = String(day.Snack || '').trim(), nt = String(day.Notes || '').trim();
+      if (!bf && !ln && !sn) continue; // nothing entered for this day — skip it, don't blank out an existing one
+
+      if (dateIndex[dateStr]) {
+        var row = dateIndex[dateStr];
+        sh.getRange(row, 3).setValue(bf);
+        sh.getRange(row, 4).setValue(ln);
+        sh.getRange(row, 5).setValue(sn);
+        sh.getRange(row, 6).setValue(nt);
+        sh.getRange(row, 10).setValue(ts);
+      } else {
+        var id = nextRowId(sh);
+        sh.appendRow([id, toIso(dateStr), bf, ln, sn, nt, currentUser || '', '0', ts, ts]);
+        dateIndex[dateStr] = sh.getLastRow();
+      }
+      _postFoodMenuNotice(dateStr, bf, ln, sn, currentUser);
+      saved.push(dateStr);
+    }
+
+    if (!saved.length) return { success: false, message: 'Enter at least one meal on at least one day' };
+    addLog(currentUser, 'Weekly Food Menu Saved', 'Week of ' + startDt.toISOString().split('T')[0] + ' (' + saved.length + ' day(s))');
+    return { success: true, message: 'Weekly menu saved for ' + saved.length + ' day(s)' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
 function updateFoodMenu(id, d, currentUser, currentRole) {
   try {
     if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };

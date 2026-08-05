@@ -21323,32 +21323,77 @@
       );
     }
 
-    // ============== Food Menu (admin) ==============
-    function FoodMenuModal({ menu, currentUser, role, onClose, onSave }) {
-      const dStr = (v) => v ? String(v).split('T')[0] : '';
-      const [formData, setFormData] = useState({
-        MenuDate: dStr(menu?.MenuDate) || new Date().toISOString().split('T')[0],
-        Breakfast: menu?.Breakfast || '',
-        Lunch: menu?.Lunch || '',
-        Snack: menu?.Snack || '',
-        Notes: menu?.Notes || ''
+    // ============== Food Menu (admin) — set as a full Monday-Friday week at once ==============
+    const FOOD_MENU_DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+    // returns the Monday (YYYY-MM-DD) of the week containing dateStr
+    function mondayOfWeek(dateStr) {
+      const dt = new Date((dateStr || new Date().toISOString().split('T')[0]) + 'T00:00:00');
+      const dow = dt.getDay(); // 0=Sun..6=Sat
+      const offset = dow === 0 ? -6 : (1 - dow);
+      dt.setDate(dt.getDate() + offset);
+      return dt.toISOString().split('T')[0];
+    }
+    function addDaysIso(dateStr, n) {
+      const dt = new Date(dateStr + 'T00:00:00');
+      dt.setDate(dt.getDate() + n);
+      return dt.toISOString().split('T')[0];
+    }
+
+    function WeeklyFoodMenuModal({ weekStartDate, existingDays, currentUser, role, onClose, onSave, saving }) {
+      const [weekStart, setWeekStart] = useState(mondayOfWeek(weekStartDate));
+      const blankDay = { Breakfast: '', Lunch: '', Snack: '', Notes: '' };
+      const [days, setDays] = useState(() => {
+        const monday = mondayOfWeek(weekStartDate);
+        return FOOD_MENU_DAY_NAMES.map((_, i) => {
+          const dateStr = addDaysIso(monday, i);
+          const existing = (existingDays || []).find((d) => d.MenuDate === dateStr);
+          return existing ? { Breakfast: existing.Breakfast || '', Lunch: existing.Lunch || '', Snack: existing.Snack || '', Notes: existing.Notes || '' } : { ...blankDay };
+        });
       });
-      const set = (k, v) => setFormData({ ...formData, [k]: v });
+      const setDay = (i, k, v) => setDays((prev) => prev.map((d, idx) => idx === i ? { ...d, [k]: v } : d));
+
+      const handleWeekStartChange = (v) => {
+        const monday = mondayOfWeek(v);
+        setWeekStart(monday);
+        // re-pull any existing data for the newly selected week; otherwise blank
+        setDays(FOOD_MENU_DAY_NAMES.map((_, i) => {
+          const dateStr = addDaysIso(monday, i);
+          const existing = (existingDays || []).find((d) => d.MenuDate === dateStr);
+          return existing ? { Breakfast: existing.Breakfast || '', Lunch: existing.Lunch || '', Snack: existing.Snack || '', Notes: existing.Notes || '' } : { ...blankDay };
+        }));
+      };
+
       return (
         <div className="modal-overlay" onClick={onClose}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header"><h3><i className="fas fa-utensils"></i> {menu ? 'Edit' : 'Add'} Food Menu</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'760px'}}>
+            <div className="modal-header"><h3><i className="fas fa-utensils"></i> Weekly Food Menu</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
             <div className="modal-body">
-              <form onSubmit={(e) => { e.preventDefault(); onSave(formData); }}>
-                <div className="form-grid">
-                  <div className="form-group"><label>Date *</label><input type="date" value={formData.MenuDate} onChange={(e) => set('MenuDate', e.target.value)} required disabled={!!menu} /></div>
-                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Breakfast</label><input type="text" value={formData.Breakfast} onChange={(e) => set('Breakfast', e.target.value)} placeholder="e.g. Koko & bread" maxLength="200" /></div>
-                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Lunch</label><input type="text" value={formData.Lunch} onChange={(e) => set('Lunch', e.target.value)} placeholder="e.g. Jollof rice & chicken" maxLength="200" /></div>
-                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Snack</label><input type="text" value={formData.Snack} onChange={(e) => set('Snack', e.target.value)} placeholder="e.g. Fruit & biscuits" maxLength="200" /></div>
-                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Notes</label><textarea value={formData.Notes} onChange={(e) => set('Notes', e.target.value)} rows="2" placeholder="Allergy info, special instructions..." /></div>
+              <form onSubmit={(e) => { e.preventDefault(); onSave(weekStart, days); }}>
+                <div className="form-group" style={{marginBottom:'16px'}}>
+                  <label>Any day in the week *</label>
+                  <input type="date" value={weekStart} onChange={(e) => handleWeekStartChange(e.target.value)} required />
+                  <small style={{color:'#777'}}>Automatically snaps to that week's Monday — Friday.</small>
                 </div>
+                {FOOD_MENU_DAY_NAMES.map((name, i) => {
+                  const dateStr = addDaysIso(weekStart, i);
+                  const dt = new Date(dateStr + 'T00:00:00');
+                  return (
+                    <div key={name} style={{border:'1px solid #e2e2e2',borderRadius:'6px',padding:'12px 14px',marginBottom:'10px',background:'#fafbfc'}}>
+                      <div style={{fontWeight:700,color:'var(--navy-primary)',fontSize:'13px',marginBottom:'8px'}}>
+                        <i className="fas fa-calendar-day"></i> {name} <span style={{fontWeight:400,color:'#888'}}>({dt.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})})</span>
+                      </div>
+                      <div className="form-grid">
+                        <div className="form-group"><label>Breakfast</label><input type="text" value={days[i].Breakfast} onChange={(e) => setDay(i, 'Breakfast', e.target.value)} placeholder="e.g. Koko & bread" maxLength="200" /></div>
+                        <div className="form-group"><label>Lunch</label><input type="text" value={days[i].Lunch} onChange={(e) => setDay(i, 'Lunch', e.target.value)} placeholder="e.g. Jollof rice & chicken" maxLength="200" /></div>
+                        <div className="form-group"><label>Snack</label><input type="text" value={days[i].Snack} onChange={(e) => setDay(i, 'Snack', e.target.value)} placeholder="e.g. Fruit & biscuits" maxLength="200" /></div>
+                        <div className="form-group"><label>Notes</label><input type="text" value={days[i].Notes} onChange={(e) => setDay(i, 'Notes', e.target.value)} placeholder="Allergy info..." maxLength="200" /></div>
+                      </div>
+                    </div>
+                  );
+                })}
                 <div className="form-actions">
-                  <button type="submit" className="btn btn-primary"><i className="fas fa-save"></i> Save</button>
+                  <button type="submit" className="btn btn-primary" disabled={saving}><i className="fas fa-save"></i> {saving ? 'Saving…' : 'Save Week'}</button>
                   <button type="button" className="btn btn-secondary" onClick={onClose}><i className="fas fa-times"></i> Cancel</button>
                 </div>
               </form>
@@ -21361,36 +21406,55 @@
     function FoodMenuView({ currentUser, role }) {
       const { data: menusData, error: loadError, isLoading: loading, mutate: load } =
         useSWR('getAllFoodMenus', () => swrFetcher('getAllFoodMenus', currentUser, role));
-      const items = (menusData || []).slice().sort((a, b) => String(b.MenuDate).localeCompare(String(a.MenuDate)));
+      const items = menusData || [];
       const [showModal, setShowModal] = useState(false);
-      const [editing, setEditing] = useState(null);
+      const [editingWeekStart, setEditingWeekStart] = useState(null);
+      const [saving, setSaving] = useState(false);
       const todayStr = new Date().toISOString().split('T')[0];
 
-      const handleSave = (data) => {
-        const action = editing ? 'updateFoodMenu' : 'addFoodMenu';
-        const params = editing ? [editing.ID, data, currentUser, role] : [data, currentUser, role];
-        google.script.run.withSuccessHandler((res) => { if (res.success) { setShowModal(false); setEditing(null); Swal.fire({ icon: 'success', text: res.message, timer: 1500, showConfirmButton: false }); load(); } else Swal.fire({ icon: 'error', text: res.message }); })[action](...params);
+      // group the flat per-day rows into weeks (keyed by that week's Monday)
+      const weeks = {};
+      items.forEach((m) => {
+        const wk = mondayOfWeek(m.MenuDate);
+        if (!weeks[wk]) weeks[wk] = [];
+        weeks[wk].push(m);
+      });
+      const weekKeys = Object.keys(weeks).sort((a, b) => b.localeCompare(a));
+      const thisWeekStart = mondayOfWeek(todayStr);
+
+      const openAdd = () => { setEditingWeekStart(mondayOfWeek(todayStr)); setShowModal(true); };
+      const openEdit = (wk) => { setEditingWeekStart(wk); setShowModal(true); };
+
+      const handleSave = (weekStart, days) => {
+        setSaving(true);
+        google.script.run
+          .withSuccessHandler((res) => {
+            setSaving(false);
+            if (res.success) { setShowModal(false); setEditingWeekStart(null); Swal.fire({ icon: 'success', text: res.message, timer: 1500, showConfirmButton: false }); load(); }
+            else Swal.fire({ icon: 'error', text: res.message });
+          })
+          .withFailureHandler((err) => { setSaving(false); Swal.fire({ icon: 'error', text: err.message }); })
+          .addWeeklyFoodMenu({ WeekStartDate: weekStart, days: days }, currentUser, role);
       };
 
-      const handleDelete = (m) => {
-        Swal.fire({ icon: 'warning', title: 'Delete menu?', text: m.MenuDate, showCancelButton: true, confirmButtonColor: '#ea4335' })
+      const handleDeleteWeek = (wk) => {
+        const dayRows = weeks[wk];
+        Swal.fire({ icon: 'warning', title: 'Delete this week\'s menu?', text: 'Removes all ' + dayRows.length + ' day(s) entered for this week.', showCancelButton: true, confirmButtonColor: '#ea4335' })
           .then((rr) => {
-            if (rr.isConfirmed) {
-              google.script.run.withSuccessHandler((res) => {
-                Swal.fire({ icon: res.success ? 'success' : 'error', text: res.message, timer: 1500, showConfirmButton: false });
-                load();
-              }).deleteFoodMenu(m.ID, currentUser, role);
-            }
+            if (!rr.isConfirmed) return;
+            Promise.all(dayRows.map((m) => new Promise((resolve) => {
+              google.script.run.withSuccessHandler(resolve).withFailureHandler(resolve).deleteFoodMenu(m.ID, currentUser, role);
+            }))).then(() => { Swal.fire({ icon: 'success', text: 'Week deleted', timer: 1500, showConfirmButton: false }); load(); });
           });
       };
 
-      const fmtDate = (d) => { const dt = new Date(d); return isNaN(dt.getTime()) ? d : dt.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }); };
+      const fmtDay = (d) => { const dt = new Date(d); return isNaN(dt.getTime()) ? d : dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }); };
 
       return (
         <div className="data-section">
           <div className="section-header">
             <h2><i className="fas fa-utensils"></i> Food Menu</h2>
-            <button className="btn btn-success" onClick={() => { setEditing(null); setShowModal(true); }}><i className="fas fa-plus"></i> Add Menu</button>
+            <button className="btn btn-success" onClick={openAdd}><i className="fas fa-plus"></i> Add / Edit This Week</button>
           </div>
           {loadError && !loading && items.length === 0 && (
             <div className="settings-info-message" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>
@@ -21398,38 +21462,65 @@
               Couldn't load food menus — {String((loadError && loadError.message) || loadError)}. Use the <i className="fas fa-arrows-rotate"></i> refresh button to retry.
             </div>
           )}
-          {loading && <TableSkeleton rows={5} columns={5} />}
-          {!loading && items.length === 0 && (
-            <div style={{textAlign:'center',padding:'40px',color:'#888',background:'#f8f9fa'}}>No food menus yet. Click "Add Menu" to create today's menu.</div>
+          {loading && <TableSkeleton rows={5} columns={6} />}
+          {!loading && weekKeys.length === 0 && (
+            <div style={{textAlign:'center',padding:'40px',color:'#888',background:'#f8f9fa'}}>No food menus yet. Click "Add / Edit This Week" to set Monday–Friday's menu.</div>
           )}
-          {!loading && items.length > 0 && (
-            <div style={{overflowX:'auto'}}>
-              <table className="simple-table" style={{width:'100%'}}>
-                <thead>
-                  <tr><th>Date</th><th>Breakfast</th><th>Lunch</th><th>Snack</th><th>Notes</th><th>Actions</th></tr>
-                </thead>
-                <tbody>
-                  {items.map((m) => (
-                    <tr key={m.ID} style={m.MenuDate === todayStr ? { background: '#fff8e1' } : undefined}>
-                      <td style={{fontWeight:600,color:'var(--navy-primary)',whiteSpace:'nowrap'}}>
-                        {fmtDate(m.MenuDate)}{m.MenuDate === todayStr && <span className="role-badge role-clerk" style={{marginLeft:'6px',fontSize:'10px'}}>Today</span>}
-                      </td>
-                      <td>{m.Breakfast || <span style={{color:'#bbb'}}>—</span>}</td>
-                      <td>{m.Lunch || <span style={{color:'#bbb'}}>—</span>}</td>
-                      <td>{m.Snack || <span style={{color:'#bbb'}}>—</span>}</td>
-                      <td style={{fontSize:'12px',color:'#888'}}>{m.Notes || <span style={{color:'#bbb'}}>—</span>}</td>
-                      <td style={{whiteSpace:'nowrap'}}>
-                        <button className="action-icon edit-icon" title="Edit" onClick={() => { setEditing(m); setShowModal(true); }}><i className="fas fa-edit"></i></button>
-                        <button className="action-icon delete-icon" title="Delete" onClick={() => handleDelete(m)}><i className="fas fa-trash"></i></button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          {!loading && weekKeys.map((wk) => {
+            const dayRows = weeks[wk];
+            const byDate = {};
+            dayRows.forEach((m) => { byDate[m.MenuDate] = m; });
+            const isThisWeek = wk === thisWeekStart;
+            return (
+              <div key={wk} style={{border:'1px solid #e2e2e2',borderRadius:'6px',marginBottom:'14px',overflow:'hidden'}}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background: isThisWeek ? '#fff8e1' : '#f4f7fa'}}>
+                  <div style={{fontWeight:700,color:'var(--navy-primary)',fontSize:'13px'}}>
+                    <i className="fas fa-calendar-week"></i> Week of {fmtDay(wk)} – {fmtDay(addDaysIso(wk, 4))}
+                    {isThisWeek && <span className="role-badge role-clerk" style={{marginLeft:'8px',fontSize:'10px'}}>This Week</span>}
+                  </div>
+                  <div>
+                    <button className="action-icon edit-icon" title="Edit Week" onClick={() => openEdit(wk)}><i className="fas fa-edit"></i></button>
+                    <button className="action-icon delete-icon" title="Delete Week" onClick={() => handleDeleteWeek(wk)}><i className="fas fa-trash"></i></button>
+                  </div>
+                </div>
+                <div style={{overflowX:'auto'}}>
+                  <table className="simple-table" style={{width:'100%'}}>
+                    <thead>
+                      <tr><th>Day</th><th>Breakfast</th><th>Lunch</th><th>Snack</th><th>Notes</th></tr>
+                    </thead>
+                    <tbody>
+                      {FOOD_MENU_DAY_NAMES.map((name, i) => {
+                        const dateStr = addDaysIso(wk, i);
+                        const m = byDate[dateStr];
+                        return (
+                          <tr key={name} style={dateStr === todayStr ? { background: '#fff8e1' } : undefined}>
+                            <td style={{fontWeight:600,color:'var(--navy-primary)',whiteSpace:'nowrap'}}>
+                              {name} <span style={{fontSize:'11px',color:'#888',fontWeight:400}}>{fmtDay(dateStr)}</span>
+                              {dateStr === todayStr && <span className="role-badge role-clerk" style={{marginLeft:'6px',fontSize:'10px'}}>Today</span>}
+                            </td>
+                            <td>{m?.Breakfast || <span style={{color:'#bbb'}}>—</span>}</td>
+                            <td>{m?.Lunch || <span style={{color:'#bbb'}}>—</span>}</td>
+                            <td>{m?.Snack || <span style={{color:'#bbb'}}>—</span>}</td>
+                            <td style={{fontSize:'12px',color:'#888'}}>{m?.Notes || <span style={{color:'#bbb'}}>—</span>}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })}
 
-          {showModal && <FoodMenuModal menu={editing} currentUser={currentUser} role={role} onClose={() => { setShowModal(false); setEditing(null); }} onSave={handleSave} />}
+          {showModal && (
+            <WeeklyFoodMenuModal
+              weekStartDate={editingWeekStart}
+              existingDays={weeks[editingWeekStart] || []}
+              currentUser={currentUser} role={role} saving={saving}
+              onClose={() => { setShowModal(false); setEditingWeekStart(null); }}
+              onSave={handleSave}
+            />
+          )}
         </div>
       );
     }
