@@ -697,6 +697,7 @@ var BASIC_GRADE_DESCRIPTORS = { HP: 'Highly Proficient', P: 'Proficient', AP: 'A
 // JHS (Basic 7-9) 9-grade scale — used for class tests, mid-terms, end-of-term exams and
 // BECE mocks. Number is the WAEC-style grade (1=best..9=weakest); letter/label are what
 // gets printed on the report card's Grade and Remarks columns.
+// exact boundaries + remarks per the official WAEC BECE grading system
 var JHS_GRADE_TABLE = [
   { min: 90, number: 1, letter: 'A+', label: 'Highest' },
   { min: 80, number: 2, letter: 'A',  label: 'Higher' },
@@ -706,13 +707,20 @@ var JHS_GRADE_TABLE = [
   { min: 50, number: 6, letter: 'C',  label: 'Low Average' },
   { min: 40, number: 7, letter: 'D+', label: 'Low' },
   { min: 35, number: 8, letter: 'E',  label: 'Lower' },
-  { min: 0,  number: 9, letter: 'F',  label: 'Low' }
+  { min: 0,  number: 9, letter: 'F',  label: 'Lowest' }
 ];
 function jhsGradeInfo(pct) {
   for (var i = 0; i < JHS_GRADE_TABLE.length; i++) {
     if (pct >= JHS_GRADE_TABLE[i].min) return JHS_GRADE_TABLE[i];
   }
   return JHS_GRADE_TABLE[JHS_GRADE_TABLE.length - 1];
+}
+// stored JHS grades from before the numeric-grade switch may still be the old letter form
+// (A+, A, B+...) — normalize either form to the WAEC number so lookups/histograms match either.
+function _normalizeJhsGrade(g) {
+  var gg = String(g || '').toUpperCase();
+  var row = JHS_GRADE_TABLE.filter(function (r) { return r.letter === gg || String(r.number) === gg; })[0];
+  return row ? String(row.number) : gg;
 }
 
 // ============== Grading System (admin: automatic default, or a manual custom scale) ==============
@@ -771,7 +779,9 @@ function computeGrade(obtained, max, isAbsent, band) {
     for (var i = 0; i < custom.length; i++) { if (pct >= custom[i].min) return custom[i].grade; }
     return custom[custom.length - 1].grade;
   }
-  return bandKey === 'jhs' ? jhsGradeInfo(pct).letter : basicGradeFromPercent(pct);
+  // JHS/BECE uses the official WAEC numeric grade (1=best..9=weakest) as the printed "Grade",
+  // not a letter — matches the actual BECE results slip format.
+  return bandKey === 'jhs' ? String(jhsGradeInfo(pct).number) : basicGradeFromPercent(pct);
 }
 
 // short grade code -> full descriptor (printed in the Remarks column of the report card)
@@ -785,10 +795,16 @@ function sbaGradeDescriptor(grade, band) {
     if (crow) return crow.label;
   }
   if (bandKey === 'jhs') {
-    var row = JHS_GRADE_TABLE.filter(function(r) { return r.letter === g; })[0];
+    var row = JHS_GRADE_TABLE.filter(function(r) { return String(r.number) === _normalizeJhsGrade(g); })[0];
     return row ? row.label : '';
   }
   return BASIC_GRADE_DESCRIPTORS[g] || '';
+}
+
+// derives each row's MaxPercent from the next-highest row's MinPercent (rows must already be
+// sorted descending by MinPercent) — e.g. Min 90/Min 80 next-down means the 90 row covers 90-100.
+function _withMaxPercent(rows) {
+  return rows.map(function (r, i) { return { MinPercent: r.MinPercent, MaxPercent: i === 0 ? 100 : rows[i - 1].MinPercent - 1, Grade: r.Grade, Label: r.Label }; });
 }
 
 // any logged-in role — returns both bands, each flagged isCustom (false = using the automatic default)
@@ -798,12 +814,12 @@ function getGradingBands(currentUser, currentRole) {
     var out = {};
     ['basic', 'jhs'].forEach(function (band) {
       if (custom[band].length) {
-        out[band] = { isCustom: true, rows: custom[band].map(function (r) { return { MinPercent: r.min, Grade: r.grade, Label: r.label }; }) };
+        out[band] = { isCustom: true, rows: _withMaxPercent(custom[band].map(function (r) { return { MinPercent: r.min, Grade: r.grade, Label: r.label }; })) };
       } else {
-        var defaults = band === 'jhs' ? JHS_GRADE_TABLE.map(function (r) { return { MinPercent: r.min, Grade: r.letter, Label: r.label }; })
+        var defaults = band === 'jhs' ? JHS_GRADE_TABLE.map(function (r) { return { MinPercent: r.min, Grade: String(r.number), Label: r.label }; })
           : [{ min: 80, code: 'HP' }, { min: 68, code: 'P' }, { min: 54, code: 'AP' }, { min: 40, code: 'D' }, { min: 0, code: 'E' }]
               .map(function (r) { return { MinPercent: r.min, Grade: r.code, Label: BASIC_GRADE_DESCRIPTORS[r.code] }; });
-        out[band] = { isCustom: false, rows: defaults };
+        out[band] = { isCustom: false, rows: _withMaxPercent(defaults) };
       }
     });
     return { success: true, data: out };
@@ -17641,7 +17657,7 @@ function getExamDistribution(examId, currentUser, currentRole) {
     var subjectStats = {};
     var byStudent = {};
     var grades = gradeBand === 'jhs'
-      ? { 'A+':0, 'A':0, 'B+':0, 'B':0, 'C+':0, 'C':0, 'D+':0, 'E':0, 'F':0 }
+      ? { '1':0, '2':0, '3':0, '4':0, '5':0, '6':0, '7':0, '8':0, '9':0 }
       : { 'HP':0, 'P':0, 'AP':0, 'D':0, 'E':0 };
     var totalCount = 0, absentCount = 0;
 
@@ -17656,6 +17672,7 @@ function getExamDistribution(examId, currentUser, currentRole) {
         var maxM = parseFloat(data[i][5]) || 0;
         var isAbsent = String(data[i][7]) === '1';
         var grade = String(data[i][6] || (isAbsent ? 'AB' : computeGrade(obtained, maxM, isAbsent, gradeBand))).toUpperCase();
+        if (gradeBand === 'jhs' && grade !== 'AB') grade = _normalizeJhsGrade(grade);
 
         totalCount++;
         if (isAbsent) absentCount++;

@@ -12531,16 +12531,18 @@
       { min: 40, code: 'D',  label: 'Developing',         color: '#d49500' },
       { min: 0,  code: 'E',  label: 'Emerging',            color: '#b71c1c' }
     ];
+    // WAEC BECE grading — the printed "Grade" is the official numeric grade (1=best..9=weakest),
+    // not a letter, matching the actual BECE results slip and the backend's computeGrade().
     const JHS_GRADE_TABLE = [
-      { min: 90, code: 'A+', label: 'Highest',      color: '#0a7a32' },
-      { min: 80, code: 'A',  label: 'Higher',       color: '#1e7e34' },
-      { min: 70, code: 'B+', label: 'High',         color: '#0074D9' },
-      { min: 60, code: 'B',  label: 'High Average', color: '#0a5db5' },
-      { min: 55, code: 'C+', label: 'Average',      color: '#6a1b9a' },
-      { min: 50, code: 'C',  label: 'Low Average',  color: '#8e24aa' },
-      { min: 40, code: 'D+', label: 'Low',          color: '#d49500' },
-      { min: 35, code: 'E',  label: 'Lower',        color: '#e65100' },
-      { min: 0,  code: 'F',  label: 'Low',          color: '#b71c1c' }
+      { min: 90, code: '1', label: 'Highest',      color: '#0a7a32' },
+      { min: 80, code: '2', label: 'Higher',       color: '#1e7e34' },
+      { min: 70, code: '3', label: 'High',         color: '#0074D9' },
+      { min: 60, code: '4', label: 'High Average', color: '#0a5db5' },
+      { min: 55, code: '5', label: 'Average',      color: '#6a1b9a' },
+      { min: 50, code: '6', label: 'Low Average',  color: '#8e24aa' },
+      { min: 40, code: '7', label: 'Low',          color: '#d49500' },
+      { min: 35, code: '8', label: 'Lower',        color: '#e65100' },
+      { min: 0,  code: '9', label: 'Lowest',        color: '#b71c1c' }
     ];
     function gradeTableFor(band) { return band === 'jhs' ? JHS_GRADE_TABLE : BASIC_GRADE_TABLE; }
     function gradeInfoFromPercent(pct, band) {
@@ -22544,10 +22546,10 @@
                       </span>
                     </div>
                     <table className="simple-table" style={{width:'100%'}}>
-                      <thead><tr><th>Min %</th><th>Grade</th><th>Label</th></tr></thead>
+                      <thead><tr><th>Marks</th><th>Grade</th><th>Label</th></tr></thead>
                       <tbody>
                         {b.rows.map((r, i) => (
-                          <tr key={i}><td>{r.MinPercent}</td><td style={{fontWeight:700}}>{r.Grade}</td><td>{r.Label}</td></tr>
+                          <tr key={i}><td>{r.MinPercent}–{r.MaxPercent}%</td><td style={{fontWeight:700}}>{r.Grade}</td><td>{r.Label}</td></tr>
                         ))}
                       </tbody>
                     </table>
