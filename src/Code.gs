@@ -4605,6 +4605,113 @@ function deleteAdmissionRequirement(id, currentUser, currentRole) {
   }
 }
 
+// ============== Parent / Prospective-Parent Inquiries ==============
+// Submitted from the public (no-login) inquiry page — the app's own web app URL with
+// ?public=inquiry — as well as by logged-in parents from inside the app. Anyone who can load the
+// deployment can call submitInquiry(); it does its own light validation instead of an RBAC check.
+var INQUIRIES_SHEET = 'Inquiries';
+var INQUIRY_HEADERS = ['ID', 'FullName', 'Phone', 'Email', 'InquiryType', 'Message', 'Status', 'AdminNotes', 'IsDeleted', 'CreatedAt', 'UpdatedAt'];
+
+function _ensureInquiriesSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(INQUIRIES_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(INQUIRIES_SHEET);
+    sh.appendRow(INQUIRY_HEADERS);
+    sh.getRange(1, 1, 1, INQUIRY_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function _rowToInquiry(row) {
+  return {
+    ID: row[0], FullName: row[1] || '', Phone: row[2] || '', Email: row[3] || '',
+    InquiryType: row[4] || 'general', Message: row[5] || '', Status: row[6] || 'new',
+    AdminNotes: row[7] || '', CreatedAt: toIso(row[9]), UpdatedAt: toIso(row[10])
+  };
+}
+
+// public — no auth. Anyone who can load the web app (logged in or not) can submit.
+function submitInquiry(d) {
+  try {
+    var fullName = String((d && d.FullName) || '').trim();
+    var phone = String((d && d.Phone) || '').trim();
+    var message = String((d && d.Message) || '').trim();
+    if (!fullName) return { success: false, message: 'Name is required' };
+    if (!phone && !String((d && d.Email) || '').trim()) return { success: false, message: 'A phone number or email is required so the school can reach you' };
+    if (!message) return { success: false, message: 'Please enter your inquiry' };
+
+    var types = ['admission', 'fees', 'general', 'other'];
+    var type = types.indexOf(String((d && d.InquiryType) || '').toLowerCase()) !== -1 ? String(d.InquiryType).toLowerCase() : 'general';
+
+    var sh = _ensureInquiriesSheet();
+    var ts = nowIso(), id = nextRowId(sh);
+    sh.appendRow([id, fullName, phone, String((d && d.Email) || '').trim(), type, message, 'new', '', '0', ts, ts]);
+    return { success: true, message: 'Thank you — your inquiry has been received. The school will contact you soon.' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// admin only — all inquiries, newest first
+function getAllInquiries(currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var sh = _ensureInquiriesSheet();
+    var data = sh.getDataRange().getValues(), out = [];
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][8]) === '1') continue;
+      out.push(_rowToInquiry(data[i]));
+    }
+    out.sort(function (a, b) { return String(b.CreatedAt).localeCompare(String(a.CreatedAt)); });
+    return { success: true, data: out };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function updateInquiry(id, d, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var idn = parseInt(id, 10);
+    var sh = _ensureInquiriesSheet();
+    var data = sh.getDataRange().getValues();
+    var allowedStatuses = ['new', 'contacted', 'resolved'];
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] !== idn || String(data[i][8]) === '1') continue;
+      var row = i + 1;
+      if (d.Status !== undefined && allowedStatuses.indexOf(String(d.Status).toLowerCase()) !== -1) sh.getRange(row, 7).setValue(String(d.Status).toLowerCase());
+      if (d.AdminNotes !== undefined) sh.getRange(row, 8).setValue(String(d.AdminNotes || '').trim());
+      sh.getRange(row, 11).setValue(nowIso());
+      addLog(currentUser, 'Inquiry Updated', '#' + idn);
+      return { success: true, message: 'Inquiry updated' };
+    }
+    return { success: false, message: 'Inquiry not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function deleteInquiry(id, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var idn = parseInt(id, 10);
+    var sh = _ensureInquiriesSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] !== idn) continue;
+      sh.getRange(i + 1, 9).setValue('1');
+      sh.getRange(i + 1, 11).setValue(nowIso());
+      addLog(currentUser, 'Inquiry Deleted', '#' + idn);
+      return { success: true, message: 'Inquiry deleted' };
+    }
+    return { success: false, message: 'Inquiry not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
 function getAllAdmissions(currentUser, currentRole) {
   try {
     if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };

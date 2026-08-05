@@ -3832,6 +3832,98 @@
       );
     }
 
+    // ============== Public Inquiry Form (no login — reached via ?public=inquiry) ==============
+    function PublicInquiryForm({ schoolSettings }) {
+      const sch = schoolSettings || {};
+      const schoolName = sch.SchoolName || 'School';
+      const schoolLogo = sch.SchoolLogo || DEFAULT_LOGO;
+      const [formData, setFormData] = useState({ FullName: '', Phone: '', Email: '', InquiryType: 'admission', Message: '' });
+      const [submitting, setSubmitting] = useState(false);
+      const [done, setDone] = useState(false);
+      const [error, setError] = useState('');
+      const set = (k, v) => setFormData({ ...formData, [k]: v });
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        setSubmitting(true);
+        setError('');
+        google.script.run
+          .withSuccessHandler((res) => {
+            setSubmitting(false);
+            if (!res) { setError('No response from server — please try again.'); return; }
+            if (res.success) setDone(true);
+            else setError(res.message || 'Could not submit — please try again.');
+          })
+          .withFailureHandler((err) => { setSubmitting(false); setError((err && err.message) || 'Connection error'); })
+          .submitInquiry(formData);
+      };
+
+      return (
+        <div className="login-container">
+          <div className="login-box">
+            <div className="login-logo-ring">
+              <img src={schoolLogo} alt="Logo" className="login-logo" onError={(e) => e.currentTarget.style.display = 'none'} />
+            </div>
+            <h2>{schoolName}</h2>
+            <p className="login-subtitle">Admission &amp; General Inquiries</p>
+
+            {done ? (
+              <div style={{textAlign:'center',padding:'20px 10px'}}>
+                <i className="fas fa-check-circle" style={{fontSize:'40px',color:'#34a853',marginBottom:'12px',display:'block'}}></i>
+                <p style={{fontSize:'14px',color:'#333'}}>Thank you! Your inquiry has been received. The school will get back to you soon.</p>
+                <button className="btn btn-secondary" style={{marginTop:'10px'}} onClick={() => { setDone(false); setFormData({ FullName: '', Phone: '', Email: '', InquiryType: 'admission', Message: '' }); }}>
+                  <i className="fas fa-plus"></i> Submit another inquiry
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmit} className="login-form">
+                <div className="form-group">
+                  <label><i className="fas fa-user"></i> Full Name *</label>
+                  <div className="login-input-wrap"><input type="text" value={formData.FullName} onChange={(e) => set('FullName', e.target.value)} required autoFocus maxLength="100" /></div>
+                </div>
+                <div className="form-group">
+                  <label><i className="fas fa-phone"></i> Phone Number</label>
+                  <div className="login-input-wrap"><input type="text" value={formData.Phone} onChange={(e) => set('Phone', e.target.value)} placeholder="e.g. 0244000000" maxLength="20" /></div>
+                </div>
+                <div className="form-group">
+                  <label><i className="fas fa-envelope"></i> Email</label>
+                  <div className="login-input-wrap"><input type="email" value={formData.Email} onChange={(e) => set('Email', e.target.value)} maxLength="120" /></div>
+                </div>
+                <div className="form-group">
+                  <label><i className="fas fa-tag"></i> What is this about?</label>
+                  <select value={formData.InquiryType} onChange={(e) => set('InquiryType', e.target.value)} style={{width:'100%',padding:'10px 12px',border:'1px solid #ccc',fontSize:'14px'}}>
+                    <option value="admission">Admission</option>
+                    <option value="fees">Fees</option>
+                    <option value="general">General</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label><i className="fas fa-comment-dots"></i> Your Message *</label>
+                  <textarea value={formData.Message} onChange={(e) => set('Message', e.target.value)} rows="4" required maxLength="1000" style={{width:'100%',padding:'10px 12px',border:'1px solid #ccc',fontSize:'14px'}}></textarea>
+                </div>
+
+                <button type="submit" className="login-submit" disabled={submitting}>
+                  {submitting ? <><i className="fas fa-spinner fa-spin"></i> Submitting…</> : <><i className="fas fa-paper-plane"></i> Submit Inquiry</>}
+                </button>
+
+                {error && (
+                  <div className="login-error-box">
+                    <i className="fas fa-exclamation-circle"></i>
+                    <span>{error}</span>
+                  </div>
+                )}
+              </form>
+            )}
+
+            <div className="login-footer">
+              <div>{sch.SchoolEmail && <span><i className="fas fa-envelope"></i> {sch.SchoolEmail}</span>}{sch.SchoolEmail && sch.SchoolContact && ' · '}{sch.SchoolContact && <span><i className="fas fa-phone"></i> {sch.SchoolContact}</span>}</div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     // ============== Menu catalog (single source of truth for sidebar items) ==============
     // Priority key: lower = higher in list. Items with no entry for a role = hidden for that role.
     // Optional `group` lets us insert section headers (Daily / Academic / Records / Admin / Account).
@@ -3853,6 +3945,7 @@
       activities:   { icon: 'trophy',           label: 'Activities',         group: 'academic' },
       admissions:   { icon: 'file-signature',   label: 'Admissions',         group: 'records' },
       admissionReqs:{ icon: 'clipboard-check',  label: 'Admission Requirements', group: 'records' },
+      inquiries:    { icon: 'comment-dots',     label: 'Parent Inquiries',   group: 'records' },
       students:     { icon: 'user-graduate',    label: 'Students',           group: 'records' },
       parents:      { icon: 'users',            label: 'Parents',            group: 'records' },
       classes:      { icon: 'school',           label: 'Classes & Sections', group: 'records' },
@@ -3886,7 +3979,7 @@
     //  - student: timetable + attendance + marks + notices first
     //  - parent: notices + child's attendance/marks/fees first
     const MENU_PRIORITY = {
-      admin: ['dashboard','ownerPortal','reports','admissions','admissionReqs','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','hallTickets','feePayments','accounts','feeStructure','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','account','settings','about'],
+      admin: ['dashboard','ownerPortal','reports','admissions','admissionReqs','inquiries','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','hallTickets','feePayments','accounts','feeStructure','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','account','settings','about'],
       supervisor: ['dashboard','reports','attendance','substitutes','marks','hallTickets','exams','notices','ptm','calendar','discipline','conduct','helpdesk','complaints','lessonPlans','logbook','activities','students','parents','classes','subjects','assignments','documents','timetable','account','about'],
       clerk: ['admissions','admissionReqs','students','parents','feePayments','accounts','feeStructure','sms','reports','attendance','helpdesk','complaints','documents','assets','inventory','timetable','classes','notices','calendar','account','about'],
       teacher: ['timetable','attendance','substitutes','marks','hallTickets','exams','lessonPlans','ptm','logbook','students','discipline','conduct','activities','notices','reports','calendar','documents','complaints','classes','subjects','account','about'],
@@ -4289,6 +4382,9 @@
         useSWR('getAdminDashboardEnrich', () => swrFetcher('getAdminDashboardEnrich', currentUser, role));
       const { data: smsStats } =
         useSWR('getSmsDashboardStats', () => swrFetcher('getSmsDashboardStats', currentUser, role));
+      const { data: inquiries } =
+        useSWR('getAllInquiries', () => swrFetcher('getAllInquiries', currentUser, role));
+      const newInquiriesCount = (inquiries || []).filter(i => i.Status === 'new').length;
       const syncing = syncS || syncC || syncE;
 
       // chart refs
@@ -4381,6 +4477,7 @@
               value={smsStats ? (smsStats.balance == null ? 'N/A' : fmt(smsStats.balance)) : '…'}
               sub={smsStats ? `${fmt(smsStats.totalSent)} sent · ${fmt(smsStats.totalFailed)} failed` : 'loading…'}
               color="teal" onClick={() => goto('sms')} />
+            <DashKpi icon="comment-dots" label="New Inquiries" value={newInquiriesCount} sub={`${(inquiries || []).length} total`} color="pink" onClick={() => goto('inquiries')} />
           </div>
 
           {/* day-book snapshot */}
@@ -21589,6 +21686,151 @@
       );
     }
 
+    // ============== Parent / Prospective-Parent Inquiries (admin) ==============
+    const INQUIRY_STATUS_COLORS = { new: '#ea4335', contacted: '#fb8c00', resolved: '#34a853' };
+    const INQUIRY_TYPE_ICONS = { admission: 'user-graduate', fees: 'money-bill-wave', general: 'comment', other: 'question-circle' };
+
+    function InquiryDetailModal({ inquiry, currentUser, role, onClose, onSave, saving }) {
+      const [status, setStatus] = useState(inquiry.Status || 'new');
+      const [notes, setNotes] = useState(inquiry.AdminNotes || '');
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header"><h3><i className={`fas fa-${INQUIRY_TYPE_ICONS[inquiry.InquiryType] || 'comment'}`}></i> Inquiry from {inquiry.FullName}</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
+            <div className="modal-body">
+              <div className="rc-info" style={{marginBottom:'14px'}}>
+                <div><b>Name:</b> {inquiry.FullName}</div>
+                <div><b>Type:</b> <span style={{textTransform:'capitalize'}}>{inquiry.InquiryType}</span></div>
+                {inquiry.Phone && <div><b>Phone:</b> {inquiry.Phone}</div>}
+                {inquiry.Email && <div><b>Email:</b> {inquiry.Email}</div>}
+                <div style={{gridColumn:'1 / -1'}}><b>Received:</b> {new Date(inquiry.CreatedAt).toLocaleString()}</div>
+              </div>
+              <div className="rc-remarks" style={{marginBottom:'14px'}}><b>Message:</b><br />{inquiry.Message}</div>
+
+              <div className="form-group">
+                <label>Status</label>
+                <select value={status} onChange={(e) => setStatus(e.target.value)} style={{width:'100%',padding:'10px 12px',border:'1px solid #ccc'}}>
+                  <option value="new">New</option>
+                  <option value="contacted">Contacted</option>
+                  <option value="resolved">Resolved</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Admin Notes</label>
+                <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows="3" placeholder="Internal notes — not visible to the parent" />
+              </div>
+              <div className="form-actions">
+                <button className="btn btn-primary" disabled={saving} onClick={() => onSave(inquiry.ID, { Status: status, AdminNotes: notes })}>
+                  <i className="fas fa-save"></i> {saving ? 'Saving…' : 'Save'}
+                </button>
+                <button className="btn btn-secondary" onClick={onClose}><i className="fas fa-times"></i> Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function InquiriesView({ currentUser, role }) {
+      const { data: itemsData, error: loadError, isLoading: loading, mutate: load } =
+        useSWR('getAllInquiries', () => swrFetcher('getAllInquiries', currentUser, role));
+      const items = itemsData || [];
+      const [filter, setFilter] = useState('');
+      const [selected, setSelected] = useState(null);
+      const [saving, setSaving] = useState(false);
+
+      const filtered = filter ? items.filter(i => i.Status === filter) : items;
+      const publicUrl = window.location.origin + window.location.pathname + '?public=inquiry';
+
+      const copyLink = () => {
+        navigator.clipboard.writeText(publicUrl).then(() => {
+          Swal.fire({ icon: 'success', text: 'Inquiry link copied — share it with prospective parents', timer: 1800, showConfirmButton: false });
+        }).catch(() => Swal.fire({ icon: 'info', title: 'Inquiry Link', text: publicUrl }));
+      };
+
+      const handleSave = (id, data) => {
+        setSaving(true);
+        google.script.run
+          .withSuccessHandler((res) => {
+            setSaving(false);
+            if (res.success) { setSelected(null); Swal.fire({ icon: 'success', text: res.message, timer: 1500, showConfirmButton: false }); load(); }
+            else Swal.fire({ icon: 'error', text: res.message });
+          })
+          .withFailureHandler((err) => { setSaving(false); Swal.fire({ icon: 'error', text: err.message }); })
+          .updateInquiry(id, data, currentUser, role);
+      };
+
+      const handleDelete = (i) => {
+        Swal.fire({ icon: 'warning', title: 'Delete inquiry?', text: i.FullName, showCancelButton: true, confirmButtonColor: '#ea4335' })
+          .then((rr) => {
+            if (rr.isConfirmed) {
+              google.script.run.withSuccessHandler((res) => {
+                Swal.fire({ icon: res.success ? 'success' : 'error', text: res.message, timer: 1500, showConfirmButton: false });
+                load();
+              }).deleteInquiry(i.ID, currentUser, role);
+            }
+          });
+      };
+
+      return (
+        <div className="data-section">
+          <div className="section-header">
+            <h2><i className="fas fa-comment-dots"></i> Parent Inquiries</h2>
+            <button className="btn btn-secondary" onClick={copyLink}><i className="fas fa-link"></i> Copy Public Inquiry Link</button>
+          </div>
+          <div className="settings-info-message" style={{marginBottom:'15px'}}>
+            <i className="fas fa-info-circle"></i> Share the public inquiry link with prospective parents (on your website, WhatsApp, flyers) — no login needed to submit.
+          </div>
+          {loadError && !loading && items.length === 0 && (
+            <div className="settings-info-message" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>
+              <i className="fas fa-triangle-exclamation" style={{marginRight:'6px',color:'#ea4335'}}></i>
+              Couldn't load inquiries — {String((loadError && loadError.message) || loadError)}.
+            </div>
+          )}
+
+          {!loading && items.length > 0 && (
+            <div style={{display:'flex',gap:'8px',marginBottom:'14px'}}>
+              {['', 'new', 'contacted', 'resolved'].map(s => (
+                <button key={s || 'all'} className={`btn btn-sm ${filter === s ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setFilter(s)}>
+                  {s ? s.charAt(0).toUpperCase() + s.slice(1) : 'All'} ({s ? items.filter(i => i.Status === s).length : items.length})
+                </button>
+              ))}
+            </div>
+          )}
+
+          {loading && <TableSkeleton rows={5} columns={5} />}
+          {!loading && items.length === 0 && (
+            <div style={{textAlign:'center',padding:'40px',color:'#888',background:'#f8f9fa'}}>No inquiries yet.</div>
+          )}
+          {!loading && filtered.length > 0 && (
+            <div style={{overflowX:'auto'}}>
+              <table className="simple-table" style={{width:'100%'}}>
+                <thead><tr><th>Date</th><th>Name</th><th>Type</th><th>Contact</th><th>Message</th><th>Status</th><th>Actions</th></tr></thead>
+                <tbody>
+                  {filtered.map((i) => (
+                    <tr key={i.ID}>
+                      <td style={{whiteSpace:'nowrap',fontSize:'12px',color:'#888'}}>{new Date(i.CreatedAt).toLocaleDateString()}</td>
+                      <td style={{fontWeight:600}}>{i.FullName}</td>
+                      <td><i className={`fas fa-${INQUIRY_TYPE_ICONS[i.InquiryType] || 'comment'}`}></i> <span style={{textTransform:'capitalize'}}>{i.InquiryType}</span></td>
+                      <td style={{fontSize:'12px'}}>{i.Phone}{i.Phone && i.Email && <br />}{i.Email}</td>
+                      <td style={{fontSize:'12px',maxWidth:'260px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{i.Message}</td>
+                      <td><span className="role-badge" style={{background:INQUIRY_STATUS_COLORS[i.Status],color:'#fff',textTransform:'capitalize'}}>{i.Status}</span></td>
+                      <td style={{whiteSpace:'nowrap'}}>
+                        <button className="action-icon edit-icon" title="View / Respond" onClick={() => setSelected(i)}><i className="fas fa-eye"></i></button>
+                        <button className="action-icon delete-icon" title="Delete" onClick={() => handleDelete(i)}><i className="fas fa-trash"></i></button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {selected && <InquiryDetailModal inquiry={selected} currentUser={currentUser} role={role} saving={saving} onClose={() => setSelected(null)} onSave={handleSave} />}
+        </div>
+      );
+    }
+
     // ============== Admission Requirements ==============
     function AdmissionRequirementModal({ item, currentUser, role, onClose, onSave, saving }) {
       const [formData, setFormData] = useState({ Title: item?.Title || '', Description: item?.Description || '' });
@@ -27586,6 +27828,7 @@
       const canSeeFoodMenu = r === 'admin';
       const canSeeGradingSystem = r === 'admin';
       const canSeeAdmissionReqs = r === 'admin' || r === 'clerk';
+      const canSeeInquiries = r === 'admin';
       const canSeeOwnerPortal = r === 'admin' || r === 'owner';
       const canSeeDiscipline = r === 'admin' || r === 'teacher' || r === 'supervisor' || isStudent || isParent;
       const canSeeConduct = r === 'admin' || r === 'teacher' || r === 'supervisor' || isStudent || isParent;
@@ -27664,6 +27907,8 @@
           return canSeeGradingSystem ? <GradingSystemView currentUser={user} role={role} /> : denied('Grading System');
         case 'admissionReqs':
           return canSeeAdmissionReqs ? <AdmissionRequirementsView currentUser={user} role={role} schoolSettings={schoolSettings} /> : denied('Admission Requirements');
+        case 'inquiries':
+          return canSeeInquiries ? <InquiriesView currentUser={user} role={role} /> : denied('Parent Inquiries');
         case 'ownerPortal':
           return canSeeOwnerPortal ? <OwnerPortalView currentUser={user} role={role} /> : denied('Owner Portal');
         case 'discipline':
@@ -28087,6 +28332,12 @@
           }
         });
       };
+
+      // public (no-login) pages — reached via the app's own URL + a query param, e.g.
+      // https://.../exec?public=inquiry — checked before the login gate so anyone with the link
+      // can use them without an account.
+      const publicPage = new URLSearchParams(window.location.search).get('public');
+      if (publicPage === 'inquiry') return <PublicInquiryForm schoolSettings={schoolSettings} />;
 
       return (
         <div>
