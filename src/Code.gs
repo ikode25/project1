@@ -420,6 +420,13 @@ function doGet(e) {
 // ============== Helpers ==============
 function getSheet(name) { return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name); }
 function nowIso() { return new Date().toISOString(); }
+// canonicalizes a Ghana phone number for matching regardless of formatting — strips everything
+// but digits, then keeps the last 9 (the local number, ignoring a leading 0 or +233/233 prefix)
+// so "0244000001", "+233244000001" and "233244000001" all compare equal.
+function _normalizePhone(v) {
+  var digits = String(v || '').replace(/\D/g, '');
+  return digits.length >= 9 ? digits.slice(-9) : digits;
+}
 function todayStr() { return new Date().toISOString().split('T')[0]; }
 function isAdmin(role) { return role && String(role).toLowerCase() === 'admin'; }
 
@@ -6247,24 +6254,11 @@ function getParentStudentLinks(parentId, currentUser, currentRole) {
     }
 
     var cmap = getClassesMap();
-
-    var data = sh.getDataRange().getValues(), out = [];
-    for (var i = 1; i < data.length; i++) {
-      if (parseInt(data[i][1], 10) !== pid) continue;
-      var sid = parseInt(data[i][2], 10);
-      var srow = sMap[sid];
-      if (!srow) continue;  // student deleted/missing — hide link
-
+    var joinStudent = function (sid, srow, extra) {
       var clsId = parseInt(srow[25], 10);
       var cls = cmap[clsId];
-
-      out.push({
-        ID: data[i][0],
-        ParentID: data[i][1],
+      return Object.assign({
         StudentID: sid,
-        IsPrimaryContact: String(data[i][3]) === '1' || data[i][3] === 1 || data[i][3] === true,
-        CreatedAt: toIso(data[i][4]),
-        // joined student info
         StudentFullName: [srow[2], srow[3], srow[4]].filter(function(x){ return x; }).join(' '),
         AdmissionNumber: srow[1],
         ClassLabel: cls ? cls.label : '— deleted class —',
@@ -6273,8 +6267,46 @@ function getParentStudentLinks(parentId, currentUser, currentRole) {
         Gender: String(srow[5] || '').toLowerCase(),
         PhotoURL: srow[33] || '',
         Status: String(srow[35] || '').toLowerCase()
-      });
+      }, extra);
+    };
+
+    var data = sh.getDataRange().getValues(), out = [], seen = {};
+    for (var i = 1; i < data.length; i++) {
+      if (parseInt(data[i][1], 10) !== pid) continue;
+      var sid = parseInt(data[i][2], 10);
+      var srow = sMap[sid];
+      if (!srow) continue;  // student deleted/missing — hide link
+      seen[sid] = true;
+      out.push(joinStudent(sid, srow, {
+        ID: data[i][0],
+        ParentID: data[i][1],
+        IsPrimaryContact: String(data[i][3]) === '1' || data[i][3] === 1 || data[i][3] === true,
+        CreatedAt: toIso(data[i][4]),
+        AutoLinked: false
+      }));
     }
+
+    // auto-link fallback: any student sharing this parent's phone number on
+    // Father/Mother/GuardianMobile, not already linked via the formal junction above —
+    // covers wards whose admission form never got a matching Parent_Students row.
+    var psh = getSheet(PARENTS_SHEET);
+    var pdata = psh ? psh.getDataRange().getValues() : [];
+    var parentMobile = '';
+    for (var p = 1; p < pdata.length; p++) {
+      if (parseInt(pdata[p][0], 10) === pid) { parentMobile = pdata[p][3]; break; }
+    }
+    var phoneToMatch = _normalizePhone(parentMobile);
+    if (phoneToMatch) {
+      for (var k2 in sMap) {
+        var sid2 = parseInt(k2, 10);
+        if (seen[sid2]) continue;
+        var srow2 = sMap[k2];
+        if (phoneToMatch === _normalizePhone(srow2[17]) || phoneToMatch === _normalizePhone(srow2[20]) || phoneToMatch === _normalizePhone(srow2[23])) {
+          out.push(joinStudent(sid2, srow2, { ID: 'auto-' + sid2, ParentID: pid, IsPrimaryContact: false, CreatedAt: '', AutoLinked: true }));
+        }
+      }
+    }
+
     return { success: true, data: out };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
@@ -10369,24 +10401,9 @@ function getHallTicketData(examId, studentId, currentUser, currentRole) {
       // username matches admission number
       if (String(srow[1]) !== String(currentUser)) return { success: false, message: 'Forbidden — students can view only their own hall ticket' };
     } else if (role === 'parent') {
-      // verify parent ↔ student link
-      var psh = getSheet(PARENT_STUDENTS_SHEET);
-      if (!psh) return { success: false, message: 'Parent_Students sheet not found' };
-      var psdata = psh.getDataRange().getValues();
-      var parentRow = null, psh2 = getSheet(PARENTS_SHEET);
-      var pdata = psh2 ? psh2.getDataRange().getValues() : [];
-      for (var p = 1; p < pdata.length; p++) {
-        // parent login = mobile or email; match either
-        if (String(pdata[p][3]) === String(currentUser) || String(pdata[p][2]) === String(currentUser)) {
-          if (String(pdata[p][10]) === '0') { parentRow = pdata[p]; break; }
-        }
-      }
-      if (!parentRow) return { success: false, message: 'Forbidden — parent record not found' };
-      var ok = false;
-      for (var j = 1; j < psdata.length; j++) {
-        if (parseInt(psdata[j][1], 10) === parentRow[0] && parseInt(psdata[j][2], 10) === studIdn) { ok = true; break; }
-      }
-      if (!ok) return { success: false, message: 'Forbidden — student not linked to this parent' };
+      // verify parent ↔ student link — formal junction + auto-linked-by-phone fallback
+      var parentChildIds = _resolveParentChildrenIds(currentUser);
+      if (parentChildIds.indexOf(studIdn) === -1) return { success: false, message: 'Forbidden — student not linked to this parent' };
     } else if (role !== 'admin' && role !== 'supervisor' && role !== 'clerk') {
       return { success: false, message: 'Forbidden' };
     }
@@ -15589,15 +15606,8 @@ function getParentDashboardData(currentUser, currentRole) {
     var today = new Date();
     var todayStr_ = today.toISOString().split('T')[0];
 
-    // linked children
-    var lsh = getSheet(PARENT_STUDENTS_SHEET);
-    var childIds = [];
-    if (lsh) {
-      var ld = lsh.getDataRange().getValues();
-      for (var l = 1; l < ld.length; l++) {
-        if (parseInt(ld[l][1], 10) === pid) childIds.push(parseInt(ld[l][2], 10));
-      }
-    }
+    // linked children — formal Parent_Students junction + auto-linked-by-phone fallback
+    var childIds = _resolveParentChildrenIds(currentUser);
 
     var students = getStudentsLite();
     var cmap = getClassesMap();
@@ -17961,27 +17971,58 @@ function _resolveSelfStudentId(currentUser) {
   return null;
 }
 
+// Resolves every student ("ward") linked to a logged-in parent. Two sources, unioned:
+//  1) the formal Parent_Students junction (set up via the admission form / admin UI)
+//  2) an automatic phone-number match against Students' Father/Mother/GuardianMobile —
+//     covers schools where full parent info wasn't captured for every child, or a parent
+//     account exists but nobody got around to linking it: if the same phone number that
+//     the parent logs in with also appears on 2+ student records, those students are
+//     treated as this parent's wards without any manual linking step.
 function _resolveParentChildrenIds(currentUser) {
   var key = String(currentUser || '').trim().toLowerCase();
+  var ids = {};
+  var parentMobile = '';
+
   var psh = getSheet(PARENTS_SHEET);
-  if (!psh) return [];
-  var pdata = psh.getDataRange().getValues();
-  var pid = null;
-  for (var i = 1; i < pdata.length; i++) {
-    if (String(pdata[i][10]) === '1') continue;
-    var mob = String(pdata[i][3] || '').toLowerCase();
-    var email = String(pdata[i][2] || '').toLowerCase();
-    if (mob === key || email === key) { pid = pdata[i][0]; break; }
+  if (psh) {
+    var pdata = psh.getDataRange().getValues();
+    var pid = null;
+    for (var i = 1; i < pdata.length; i++) {
+      if (String(pdata[i][10]) === '1') continue;
+      var mob = String(pdata[i][3] || '').toLowerCase();
+      var email = String(pdata[i][2] || '').toLowerCase();
+      if (mob === key || email === key) { pid = pdata[i][0]; parentMobile = pdata[i][3]; break; }
+    }
+    if (pid) {
+      var lsh = getSheet(PARENT_STUDENTS_SHEET);
+      if (lsh) {
+        var ld = lsh.getDataRange().getValues();
+        for (var j = 1; j < ld.length; j++) {
+          if (parseInt(ld[j][1], 10) === pid) ids[parseInt(ld[j][2], 10)] = true;
+        }
+      }
+    }
   }
-  if (!pid) return [];
-  var lsh = getSheet(PARENT_STUDENTS_SHEET);
-  if (!lsh) return [];
-  var ld = lsh.getDataRange().getValues();
-  var ids = [];
-  for (var j = 1; j < ld.length; j++) {
-    if (parseInt(ld[j][1], 10) === pid) ids.push(parseInt(ld[j][2], 10));
+
+  // phone to match against Students: the parent's own on-file mobile if we found their
+  // account, else fall back to the login value itself (parents often log in with their phone)
+  var phoneToMatch = _normalizePhone(parentMobile) || _normalizePhone(currentUser);
+  if (phoneToMatch) {
+    var ssh = getSheet(STUDENTS_SHEET);
+    if (ssh) {
+      var sdata = ssh.getDataRange().getValues();
+      for (var s = 1; s < sdata.length; s++) {
+        if (String(sdata[s][36]) === '1') continue; // IsDeleted
+        if (phoneToMatch === _normalizePhone(sdata[s][17]) ||  // FatherMobile
+            phoneToMatch === _normalizePhone(sdata[s][20]) ||  // MotherMobile
+            phoneToMatch === _normalizePhone(sdata[s][23])) {  // GuardianMobile
+          ids[parseInt(sdata[s][0], 10)] = true;
+        }
+      }
+    }
   }
-  return ids;
+
+  return Object.keys(ids).map(function (x) { return parseInt(x, 10); });
 }
 
 // One-stop visibility scope for the logged-in user.
