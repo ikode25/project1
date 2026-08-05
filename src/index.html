@@ -6528,6 +6528,8 @@
       const [confirmTarget, setConfirmTarget] = useState(null);
       const [showEnrollModal, setShowEnrollModal] = useState(false);
       const [enrollTarget, setEnrollTarget] = useState(null);
+      const [showPrintModal, setShowPrintModal] = useState(false);
+      const [printTarget, setPrintTarget] = useState(null);
       const [viewMode, setViewMode] = useState('table');
       const tableInstanceRef = useRef(null);
 
@@ -6609,30 +6611,36 @@
                 data: null, title: 'Actions', orderable: false,
                 render: (d, t, row) => {
                   const st = row.Status;
+                  const printBtn = `<button class="action-icon edit-icon" data-action="print" title="Print / Download Form"><i class="fas fa-print"></i></button>`;
                   if (st === 'pending_review') {
                     return `<button class="action-icon edit-icon" data-action="edit" title="Review / Correct"><i class="fas fa-edit"></i></button>`
                       + `<button class="action-icon edit-icon" data-action="approve" title="Approve" style="color:#34a853"><i class="fas fa-check"></i></button>`
                       + `<button class="action-icon edit-icon" data-action="reject" title="Reject" style="color:#ea4335"><i class="fas fa-ban"></i></button>`
+                      + printBtn
                       + `<button class="action-icon delete-icon" data-action="delete" title="Delete"><i class="fas fa-trash"></i></button>`;
                   }
                   if (st === 'registered') {
                     return `<button class="action-icon edit-icon" data-action="edit" title="Edit Registration"><i class="fas fa-edit"></i></button>`
                       + `<button class="action-icon edit-icon" data-action="confirm" title="Confirm Admission" style="color:#34a853"><i class="fas fa-check-double"></i></button>`
                       + `<button class="action-icon edit-icon" data-action="reject" title="Reject" style="color:#ea4335"><i class="fas fa-ban"></i></button>`
+                      + printBtn
                       + `<button class="action-icon delete-icon" data-action="delete" title="Delete"><i class="fas fa-trash"></i></button>`;
                   }
                   if (st === 'admitted') {
                     return `<button class="action-icon edit-icon" data-action="edit" title="Edit Registration"><i class="fas fa-edit"></i></button>`
                       + `<button class="action-icon edit-icon" data-action="enroll" title="Enroll to Class" style="color:#0074D9"><i class="fas fa-user-graduate"></i></button>`
                       + `<button class="action-icon edit-icon" data-action="reject" title="Reject" style="color:#ea4335"><i class="fas fa-ban"></i></button>`
+                      + printBtn
                       + `<button class="action-icon delete-icon" data-action="delete" title="Delete"><i class="fas fa-trash"></i></button>`;
                   }
                   if (st === 'enrolled') {
                     return `<button class="action-icon edit-icon" data-action="viewStudent" title="View Student"><i class="fas fa-eye"></i></button>`
+                      + printBtn
                       + `<button class="action-icon delete-icon" data-action="delete" title="Delete"><i class="fas fa-trash"></i></button>`;
                   }
                   // rejected / cancelled
                   return `<button class="action-icon edit-icon" data-action="viewReason" title="View Reason"><i class="fas fa-eye"></i></button>`
+                    + printBtn
                     + `<button class="action-icon delete-icon" data-action="delete" title="Delete"><i class="fas fa-trash"></i></button>`;
                 }
               }
@@ -6661,6 +6669,7 @@
               if (!row) return;
               if (action === 'edit') { setEditingReg(row); setShowRegModal(true); }
               else if (action === 'approve') handleApprove(row);
+              else if (action === 'print') { setPrintTarget(row); setShowPrintModal(true); }
               else if (action === 'confirm') { setConfirmTarget(row); setShowConfirmModal(true); }
               else if (action === 'enroll') { setEnrollTarget(row); setShowEnrollModal(true); }
               else if (action === 'reject') handleReject(row);
@@ -6931,6 +6940,7 @@
                         {a.Status === 'pending_review' && <button className="action-icon" onClick={() => handleApprove(a)} title="Approve" style={{color:'#34a853'}}><i className="fas fa-check"></i></button>}
                         {a.Status === 'registered' && <button className="action-icon" onClick={() => { setConfirmTarget(a); setShowConfirmModal(true); }} title="Confirm"><i className="fas fa-check"></i></button>}
                         {a.Status === 'admitted' && <button className="action-icon" onClick={() => { setEnrollTarget(a); setShowEnrollModal(true); }} title="Enroll"><i className="fas fa-user-graduate"></i></button>}
+                        <button className="action-icon" onClick={() => { setPrintTarget(a); setShowPrintModal(true); }} title="Print / Download Form"><i className="fas fa-print"></i></button>
                         <button className="action-icon delete-icon" onClick={() => handleDelete(a)} title="Delete"><i className="fas fa-trash"></i></button>
                       </div>
                     )}
@@ -6972,6 +6982,98 @@
               role={role}
             />
           )}
+          {showPrintModal && printTarget && (
+            <AdmissionFormModal admission={printTarget} onClose={() => { setShowPrintModal(false); setPrintTarget(null); }} />
+          )}
+        </div>
+      );
+    }
+
+    // ============== Admission Application Form — printable/downloadable ==============
+    function AdmissionFormModal({ admission, onClose }) {
+      const a = admission;
+      const sch = window.SMS_SCHOOL || {};
+      const schoolName = sch.SchoolName || 'School';
+      const schoolLogo = sch.SchoolLogo || DEFAULT_LOGO;
+      const fmtDate = (d) => { if (!d) return '—'; const dt = new Date(d); return isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }); };
+      const statusLabel = (ADM_STATUS_OPTS.find(o => o.value === a.Status) || {}).label || a.Status;
+
+      const handlePrint = () => {
+        document.body.classList.add('print-target');
+        setTimeout(() => {
+          window.print();
+          setTimeout(() => document.body.classList.remove('print-target'), 250);
+        }, 60);
+      };
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'820px'}}>
+            <div className="modal-header no-print">
+              <h3><i className="fas fa-file-signature"></i> Admission Application Form</h3>
+              <button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button>
+            </div>
+            <div className="modal-body">
+              <div className="no-print" style={{marginBottom:'14px'}}>
+                <button className="btn btn-primary" onClick={handlePrint}><i className="fas fa-print"></i> Print / Save as PDF</button>
+              </div>
+
+              <div className="report-card" style={{maxWidth:'760px',margin:'0 auto'}}>
+                <div className="rc-school-hdr">
+                  <img src={schoolLogo} alt="" onError={(e) => { e.target.style.display = 'none'; }} />
+                  <div style={{flex:1}}>
+                    <div className="rc-sname">{schoolName}</div>
+                    {sch.SchoolAddress && <div className="rc-sline"><i className="fas fa-map-marker-alt"></i> {sch.SchoolAddress}</div>}
+                    {sch.SchoolContact && <div className="rc-sline"><i className="fas fa-phone"></i> {sch.SchoolContact}</div>}
+                  </div>
+                </div>
+
+                <div className="rc-title">Admission Application — {a.RegistrationNumber || '—'}</div>
+
+                <div className="rc-info">
+                  <div><b>Applicant:</b> {a.ApplicantName}</div>
+                  <div><b>Status:</b> {statusLabel}</div>
+                  <div><b>Gender:</b> <span style={{textTransform:'capitalize'}}>{a.Gender || '—'}</span></div>
+                  <div><b>Date of Birth:</b> {fmtDate(a.DateOfBirth)}</div>
+                  <div><b>Applying For:</b> {a.AllottedClassLabel || a.AppliedForClassLabel || (a.AppliedForGrade ? 'Grade ' + a.AppliedForGrade : '—')}</div>
+                  <div><b>Admission Type:</b> <span style={{textTransform:'capitalize'}}>{(a.AdmissionType || '').replace('_',' ')}</span></div>
+                  <div><b>Academic Year:</b> {a.AcademicYear || '—'}</div>
+                  <div><b>Registration Date:</b> {fmtDate(a.RegistrationDate)}</div>
+                  {a.PreviousSchool && <div><b>Previous School:</b> {a.PreviousSchool}</div>}
+                  {a.AdmissionNumber && <div><b>Admission Number:</b> {a.AdmissionNumber}</div>}
+                  {a.RollNumber && <div><b>Roll Number:</b> {a.RollNumber}</div>}
+                </div>
+
+                <div className="rc-remarks-block">
+                  <div className="rc-remarks-hdr">Parent / Guardian Contact</div>
+                  <div className="rc-remarks-grid">
+                    <div><b>Father:</b> {a.FatherName || '—'} {a.FatherMobile && `(${a.FatherMobile})`}</div>
+                    <div><b>Mother:</b> {a.MotherName || '—'} {a.MotherMobile && `(${a.MotherMobile})`}</div>
+                    <div><b>Guardian:</b> {a.GuardianName || '—'} {a.GuardianMobile && `(${a.GuardianMobile})`}</div>
+                    <div><b>Contact:</b> {a.Mobile || a.Email || '—'}</div>
+                  </div>
+                </div>
+
+                {(a.AddressLine || a.City || a.Region) && (
+                  <div className="rc-remarks" style={{marginBottom:'14px'}}>
+                    <b>Address:</b> {[a.AddressLine, a.City, a.Region].filter(Boolean).join(', ') || '—'}
+                  </div>
+                )}
+
+                {a.Remarks && <div className="rc-remarks" style={{marginBottom:'14px'}}><b>Remarks:</b> {a.Remarks}</div>}
+                {a.RejectionReason && <div className="rc-remarks" style={{marginBottom:'14px',borderColor:'#ea4335',color:'#b71c1c'}}><b>Rejection Reason:</b> {a.RejectionReason}</div>}
+
+                <div className="rc-sign">
+                  <div>Applicant / Parent Signature</div>
+                  <div>School Representative Signature</div>
+                </div>
+
+                <div className="rc-foot">
+                  Printed on {new Date().toLocaleDateString('en-US', { day:'2-digit', month:'short', year:'numeric' })} · {schoolName}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       );
     }
