@@ -1,7 +1,7 @@
 /**
- * Developed by Mohammad Rameez Imdad (Rameez Scripts)
- * WhatsApp: https://wa.me/923224083545 (For Custom Projects)
- * YouTube: https://www.youtube.com/@rameezimdad (Subscribe for more!)
+ * Developed by Quecci Manuel (Manuel Scripts)
+ * WhatsApp: https://wa.me/233547359015 (For Custom Projects)
+ * YouTube: https://www.youtube.com/@manuelspctips (Subscribe for more!)
  */
 
 // ============== Config ==============
@@ -10300,6 +10300,37 @@ function deleteCalendarEvent(id, currentUser, currentRole) {
 }
 
 // ============== Hall Ticket ==============
+// pdfMake (the client-side PDF library) only accepts an `image` as a base64 data URI — it does
+// NOT fetch remote URLs and does NOT support SVG. School logos/photos are stored as Drive share
+// links, and the school-logo fallback (DEFAULT_LOGO) is an SVG data URI — both would silently
+// break every hall-ticket PDF. This converts any of those into a raster base64 data URI pdfMake
+// can actually render; returns '' on failure so the caller can just omit the image.
+function _imageUrlToDataUri(url) {
+  try {
+    if (!url) return '';
+    var s = String(url);
+    if (s.indexOf('data:image/svg') === 0) return ''; // pdfMake can't render SVG — drop it
+    if (s.indexOf('data:') === 0) return s; // already a usable raster data URI
+    var fileId = null;
+    var m = s.match(/\/d\/([a-zA-Z0-9_-]{15,})/) || s.match(/[?&]id=([a-zA-Z0-9_-]{15,})/);
+    if (m) fileId = m[1];
+    var blob;
+    if (fileId) {
+      blob = DriveApp.getFileById(fileId).getBlob();
+    } else {
+      var resp = UrlFetchApp.fetch(s, { muteHttpExceptions: true });
+      if (resp.getResponseCode() !== 200) return '';
+      blob = resp.getBlob();
+    }
+    var mime = blob.getContentType() || 'image/png';
+    if (mime.indexOf('svg') !== -1) return ''; // pdfMake can't render SVG
+    return 'data:' + mime + ';base64,' + Utilities.base64Encode(blob.getBytes());
+  } catch (e) {
+    Logger.log('_imageUrlToDataUri failed for ' + url + ': ' + e.toString());
+    return '';
+  }
+}
+
 // returns full payload for client-side PDF generation. PDF/QR rendered in the browser.
 function getHallTicketData(examId, studentId, currentUser, currentRole) {
   try {
@@ -10389,10 +10420,17 @@ function getHallTicketData(examId, studentId, currentUser, currentRole) {
     // build student name from first/middle/last
     var fullName = [srow[2], srow[3], srow[4]].filter(function(x){ return x; }).join(' ');
 
+    // pdfMake needs real base64 raster data URIs, not Drive links or SVG — convert server-side
+    // (best-effort: an image that fails to convert is just omitted, never blocks the ticket)
+    var schoolLogoDataUri = _imageUrlToDataUri(sd.SchoolLogo);
+    var studentPhotoDataUri = _imageUrlToDataUri(srow[33]);
+    var qrPayloadStr = 'EXAM:' + exam[0] + '|STUDENT:' + srow[0] + '|ADM:' + srow[1] + '|YEAR:' + (sd.AcademicYear || formatAcademicYear(exam[4])) + '|TS:' + nowIso();
+    var qrDataUri = _imageUrlToDataUri('https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' + encodeURIComponent(qrPayloadStr));
+
     var payload = {
       school: {
         name: sd.SchoolName || '',
-        logo: sd.SchoolLogo || DEFAULT_LOGO,
+        logo: schoolLogoDataUri,
         address: sd.SchoolAddress || '',
         contact: sd.SchoolContact || '',
         email: sd.SchoolEmail || '',
@@ -10406,7 +10444,7 @@ function getHallTicketData(examId, studentId, currentUser, currentRole) {
         motherName: srow[18] || '',
         classLabel: classLabel,
         rollNumber: srow[26] || '',
-        photoURL: srow[33] || '',
+        photoURL: studentPhotoDataUri,
         dateOfBirth: toIso(srow[6])
       },
       exam: {
@@ -10420,7 +10458,7 @@ function getHallTicketData(examId, studentId, currentUser, currentRole) {
         term: exam[14] || ''
       },
       subjects: subjects,
-      qrPayload: 'EXAM:' + exam[0] + '|STUDENT:' + srow[0] + '|ADM:' + srow[1] + '|YEAR:' + (sd.AcademicYear || formatAcademicYear(exam[4])) + '|TS:' + nowIso(),
+      qrDataUri: qrDataUri,
       issuedAt: nowIso(),
       issuedBy: currentUser
     };

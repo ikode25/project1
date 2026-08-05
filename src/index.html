@@ -8,9 +8,9 @@
   <title>Admin & User Dashboard</title>
 
   <!--
-  Developed by Rameez Scripts
-  WhatsApp: https://wa.me/923224083545 (For Custom Projects)
-  YouTube: https://www.youtube.com/@rameezimdad (Subscribe for more!)
+  Developed by Manuel Scripts
+  WhatsApp: https://wa.me/233547359015 (For Custom Projects)
+  YouTube: https://www.youtube.com/@manuelspctips (Subscribe for more!)
   -->
 
   <!-- CDN Dependencies -->
@@ -3160,11 +3160,35 @@
       if (subs) subs.forEach((cb) => { try { cb(); } catch (e) {} });
     }
 
+    // Apps Script's google.script.run bridge runs every call through a single hidden iframe +
+    // postMessage channel. Firing a burst of calls at once (e.g. a dashboard mounting a dozen
+    // useSWR hooks simultaneously) can make that bridge silently drop a response — the success
+    // handler just never fires, which is what previously surfaced as "No response from server"
+    // even after retrying. Capping how many run concurrently and queueing the rest keeps every
+    // call within a load the bridge reliably handles.
+    const _gsrQueue = [];
+    let _gsrActive = 0;
+    const _GSR_MAX_CONCURRENT = 4;
+
+    function _gsrPump() {
+      while (_gsrActive < _GSR_MAX_CONCURRENT && _gsrQueue.length) {
+        const job = _gsrQueue.shift();
+        _gsrActive++;
+        job();
+      }
+    }
+
     // promisify a single google.script.run.<fn>(...args) call
     function gsrCall(fnName, args) {
       return new Promise((resolve, reject) => {
-        const runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
-        runner[fnName].apply(runner, args || []);
+        _gsrQueue.push(() => {
+          const done = (settle, val) => { _gsrActive--; _gsrPump(); settle(val); };
+          const runner = google.script.run
+            .withSuccessHandler((res) => done(resolve, res))
+            .withFailureHandler((err) => done(reject, err));
+          runner[fnName].apply(runner, args || []);
+        });
+        _gsrPump();
       });
     }
 
@@ -20506,8 +20530,9 @@
       const examName = pick(exam.examName, exam.ExamName);
       const examCode = pick(exam.examCode, exam.ExamCode);
       const examTerm = pick(exam.term, exam.Term);
-      const qrPayload = encodeURIComponent(payload.qrPayload || JSON.stringify({ admNo: stuAdm, examCode: examCode, ts: issuedAt }));
-      const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=' + qrPayload;
+      // pdfMake only renders base64 data URIs, never remote URLs — the QR is pre-fetched and
+      // base64-encoded server-side (see getHallTicketData); no image at all if that failed.
+      const qrDataUri = payload.qrDataUri || '';
 
       const fmtDate = (d) => {
         if (!d) return '—';
@@ -20562,7 +20587,7 @@
             { text: "Father's Name: " + (stuFather || '—'), style: 'small' },
             { text: 'DOB: ' + fmtDate(stuDOB), style: 'small' }
           ], width: '*', margin: [10, 0, 0, 0] },
-          { image: qrUrl, width: 100, height: 100, alignment: 'right' }
+          qrDataUri ? { image: qrDataUri, width: 100, height: 100, alignment: 'right' } : { text: '', width: 100 }
         ],
         margin: [0, 8, 0, 8]
       };
@@ -27101,9 +27126,9 @@
             <i className="fas fa-code"></i> Developer
           </h3>
           <div className="about-dev-card">
-            <p><i className="fas fa-user" style={{marginRight:'6px'}}></i> Developed by <strong>Mohammad Rameez Imdad</strong> (Rameez Scripts)</p>
-            <p><i className="fab fa-whatsapp" style={{marginRight:'6px',color:'#25d366'}}></i> <a href="https://wa.me/923224083545" target="_blank" rel="noopener noreferrer">wa.me/923224083545</a> — for custom projects</p>
-            <p><i className="fab fa-youtube" style={{marginRight:'6px',color:'#ff0000'}}></i> <a href="https://www.youtube.com/@rameezimdad" target="_blank" rel="noopener noreferrer">youtube.com/@rameezimdad</a> — subscribe for more</p>
+            <p><i className="fas fa-user" style={{marginRight:'6px'}}></i> Developed by <strong>Quecci Manuel</strong> (Manuel Scripts)</p>
+            <p><i className="fab fa-whatsapp" style={{marginRight:'6px',color:'#25d366'}}></i> <a href="https://wa.me/233547359015" target="_blank" rel="noopener noreferrer">wa.me/233547359015</a> — for custom projects</p>
+            <p><i className="fab fa-youtube" style={{marginRight:'6px',color:'#ff0000'}}></i> <a href="https://www.youtube.com/@manuelspctips" target="_blank" rel="noopener noreferrer">youtube.com/@manuelspctips</a> — subscribe for more</p>
           </div>
         </div>
       );
