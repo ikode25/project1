@@ -7921,6 +7921,46 @@ function getAllFeeStructures(currentUser, currentRole) {
   }
 }
 
+// admin/clerk — groups active fee items by category so the dashboard can show "how much is X"
+// at a glance during a parent inquiry, even when the amount varies by class.
+function getFeeTypeBreakdown(currentUser, currentRole) {
+  try {
+    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
+    var sh = getSheet(FEE_STRUCTURE_SHEET);
+    if (!sh) return { success: true, data: [] };
+    var data = sh.getDataRange().getValues();
+    var cmap = getClassesMap();
+    var groups = {};
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][9]) === '1') continue; // IsDeleted
+      if (String(data[i][8]) !== '1') continue; // only active fee items
+      var cat = String(data[i][2] || '').toLowerCase();
+      var freq = String(data[i][4] || '').toLowerCase();
+      var key = cat + '|' + freq;
+      if (!groups[key]) groups[key] = { category: cat, frequency: freq, amounts: [], classes: [] };
+      var amt = parseFloat(data[i][3]) || 0;
+      var clsId = data[i][1];
+      groups[key].amounts.push(amt);
+      groups[key].classes.push({ ClassLabel: cmap[clsId] ? cmap[clsId].label : '— deleted class —', Amount: amt });
+    }
+    var out = Object.keys(groups).map(function (k) {
+      var g = groups[k];
+      return {
+        FeeCategory: g.category,
+        Frequency: g.frequency,
+        MinAmount: Math.min.apply(null, g.amounts),
+        MaxAmount: Math.max.apply(null, g.amounts),
+        ClassCount: g.classes.length,
+        Classes: g.classes.sort(function (a, b) { return a.ClassLabel.localeCompare(b.ClassLabel); })
+      };
+    });
+    out.sort(function (a, b) { return a.FeeCategory.localeCompare(b.FeeCategory); });
+    return { success: true, data: out };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
 function feeStructureExists(sh, classId, category, frequency, academicYear, excludeId) {
   var data = sh.getDataRange().getValues();
   var c = parseInt(classId, 10);

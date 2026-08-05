@@ -4188,6 +4188,30 @@
       );
     }
 
+    // admin/clerk quick-reference: what each fee type costs, at a glance — for parent inquiries
+    function FeeBreakdownCard({ currentUser, role, goto }) {
+      const { data: rows, isLoading: loading } = useSWR('getFeeTypeBreakdown', () => swrFetcher('getFeeTypeBreakdown', currentUser, role));
+      const fmtGh = (n) => 'GH₵' + Number(n || 0).toLocaleString();
+      const cap = (s) => { const v = String(s || '').replace(/_/g, ' '); return v ? v.charAt(0).toUpperCase() + v.slice(1) : ''; };
+      if (loading || !rows || rows.length === 0) return null;
+      return (
+        <div className="dash-list-card" style={{marginBottom:'18px',cursor:'pointer'}} onClick={() => goto && goto('feeStructure')}>
+          <h4><i className="fas fa-money-check-alt"></i> Fee Types at a Glance</h4>
+          <div style={{display:'flex',flexWrap:'wrap',gap:'10px'}}>
+            {rows.map((r, i) => (
+              <div key={i} style={{flex:'1 1 160px',minWidth:'160px',border:'1px solid #e2e2e2',borderRadius:'6px',padding:'10px 12px',background:'#fafbfc'}}>
+                <div style={{fontWeight:700,color:'var(--navy-primary)',fontSize:'13px'}}>{cap(r.FeeCategory)}</div>
+                <div style={{fontSize:'11px',color:'#888',textTransform:'capitalize',marginBottom:'4px'}}>{cap(r.Frequency)} · {r.ClassCount} class{r.ClassCount === 1 ? '' : 'es'}</div>
+                <div style={{fontSize:'15px',fontWeight:700,color:'#34a853'}}>
+                  {r.MinAmount === r.MaxAmount ? fmtGh(r.MinAmount) : `${fmtGh(r.MinAmount)} – ${fmtGh(r.MaxAmount)}`}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
     // today's accounts widget — day-book income/expense/net, click → accounts page
     function TodayAccountsCard({ goto, currentUser, role }) {
       // backend returns the obj directly (has .success but no .data wrapper) — keep raw, accept only on success
@@ -4361,6 +4385,9 @@
 
           {/* day-book snapshot */}
           <TodayAccountsCard goto={goto} currentUser={currentUser} role={role} />
+
+          {/* fee types quick-reference — for parent inquiries at the front desk */}
+          <FeeBreakdownCard goto={goto} currentUser={currentUser} role={role} />
 
           {/* Critical Alerts — drives daily admin attention */}
           {enrich && (
