@@ -289,33 +289,6 @@
       text-transform: uppercase;
       letter-spacing: 0.4px;
     }
-    .login-role-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-      gap: 8px;
-      margin-top: 10px;
-      text-align: left;
-    }
-    .login-role-card {
-      background: #f8f9fb;
-      border: 1px solid #eef0f3;
-      border-radius: 8px;
-      padding: 8px 9px;
-    }
-    .login-role-card .lrc-hdr {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 11px;
-      font-weight: 700;
-      color: #444;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-      margin-bottom: 3px;
-    }
-    .login-role-card .lrc-hdr i { color: var(--navy-accent, #0074D9); font-size: 12px; }
-    .login-role-card .lrc-desc { font-size: 10.5px; color: #888; line-height: 1.35; }
-
     @media (max-width: 480px) {
       .login-box { padding: 28px 22px 24px; border-radius: 14px; max-width: 95%; }
       .login-logo-ring { width: 84px; height: 84px; margin: -52px auto 20px; padding: 3px; }
@@ -631,26 +604,6 @@
       font-size: 9px;
       border: 1.5px solid var(--navy-primary);
     }
-
-    /* collapsible sidebar submenu (e.g. School Website) — a single parent row that expands to
-       reveal its sub-pages, keeping the top-level sidebar from growing one row per public page */
-    .sidebar-submenu-caret { margin-left: auto; font-size: 10px; opacity: 0.7; flex-shrink: 0; }
-    .sidebar-submenu {
-      list-style: none;
-      margin: 2px 0 2px 14px;
-      padding-left: 14px;
-      border-left: 2px solid rgba(255,255,255,0.12);
-    }
-    .sidebar-submenu li { margin-bottom: 2px; }
-    .sidebar-submenu button {
-      width: 100%; text-align: left; padding: 9px 12px;
-      background: transparent; border: none; color: rgba(255,255,255,0.75);
-      cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 10px; font-weight: 500;
-    }
-    .sidebar-submenu button:hover { background: rgba(255,255,255,0.08); color: white; }
-    .sidebar-submenu button.active { background: var(--navy-accent); color: white; }
-    .sidebar-submenu i { width: 15px; text-align: center; font-size: 13px; flex-shrink: 0; }
-    .sidebar.collapsed .sidebar-submenu { display: none; }
 
     /* Sidebar Theme Toggle */
     .sidebar-theme-toggle {
@@ -3984,13 +3937,9 @@
 
             <div className="login-footer">
               <div>{sch.SchoolEmail && <span><i className="fas fa-envelope"></i> {sch.SchoolEmail}</span>}{sch.SchoolEmail && sch.SchoolContact && ' · '}{sch.SchoolContact && <span><i className="fas fa-phone"></i> {sch.SchoolContact}</span>}</div>
-              <div style={{fontSize:'10px',color:'#aaa',textTransform:'uppercase',letterSpacing:'0.5px',marginTop:'12px',textAlign:'center'}}>Portals available on this system</div>
-              <div className="login-role-grid">
+              <div className="login-roles">
                 {LOGIN_ROLE_DESCRIPTIONS.map((r) => (
-                  <div className="login-role-card" key={r.role} title={r.desc}>
-                    <div className="lrc-hdr"><i className={`fas fa-${r.icon}`}></i> {r.role}</div>
-                    <div className="lrc-desc">{r.desc}</div>
-                  </div>
+                  <span key={r.role}><i className={`fas fa-${r.icon}`}></i> {r.role}</span>
                 ))}
               </div>
             </div>
@@ -4488,130 +4437,6 @@
       );
     }
 
-    // ============== Public School Website (no login — reached via ?public=website) ==============
-    // Consolidates the existing standalone public pages (inquiry, admission, jobs, report card
-    // lookup) plus the admin-managed gallery into one landing page. Section visibility and hero
-    // text are controlled from Settings → Website Settings (admin, WebsiteSettingsView above).
-    function PublicWebsiteView({ schoolSettings }) {
-      const [data, setData] = useState(null);
-      const [loading, setLoading] = useState(true);
-      const [error, setError] = useState('');
-      const [lightbox, setLightbox] = useState(null);
-
-      useEffect(() => {
-        google.script.run
-          .withSuccessHandler((res) => {
-            setLoading(false);
-            if (res && res.success) setData(res.data);
-            else setError((res && res.message) || 'Could not load this page');
-          })
-          .withFailureHandler((err) => { setLoading(false); setError((err && err.message) || 'Connection error'); })
-          .getPublicWebsiteData();
-      }, []);
-
-      const sch = (data && data.school) || schoolSettings || {};
-      const cfg = (data && data.config) || {};
-      const schoolName = sch.SchoolName || 'School';
-      const schoolLogo = sch.SchoolLogo || DEFAULT_LOGO;
-
-      if (loading) {
-        return <div style={{textAlign:'center',padding:'80px 20px',color:'#888'}}><i className="fas fa-spinner fa-spin" style={{fontSize:'32px'}}></i></div>;
-      }
-      if (error) {
-        return <div style={{textAlign:'center',padding:'80px 20px',color:'#ea4335'}}><i className="fas fa-exclamation-circle" style={{fontSize:'32px',display:'block',marginBottom:'10px'}}></i>{error}</div>;
-      }
-
-      const cards = [
-        cfg.EnableInquiries && { icon: 'comment-dots', title: 'Admission & General Inquiries', text: 'Ask a question or request more information — we\'ll get back to you.', href: publicAppLink('?public=inquiry'), color: '#0074D9' },
-        cfg.EnableAdmission && { icon: 'file-signature', title: 'Apply for Admission', text: 'Fill our online admission form from home — no visit required to start.', href: publicAppLink('?public=admission'), color: '#34a853' },
-        cfg.EnableReportCardLookup && { icon: 'graduation-cap', title: 'Report Card Lookup', text: 'Parents & students: view a report card with your admission number.', href: publicAppLink('?public=reportcard'), color: '#6a1b9a' },
-        cfg.EnableJobs && { icon: 'briefcase', title: 'Careers', text: 'See current teaching & non-teaching job openings and apply online.', href: '#careers', color: '#fb8c00' }
-      ].filter(Boolean);
-
-      const gallery = data.gallery || [];
-      const jobs = data.jobs || [];
-
-      return (
-        <div style={{minHeight:'100vh',background:'#f4f6f8'}}>
-          {/* header */}
-          <div style={{background:'linear-gradient(135deg,#001f3f,#0074D9)',color:'#fff',padding:'40px 20px 60px',textAlign:'center'}}>
-            <img src={schoolLogo} alt="" style={{width:'72px',height:'72px',borderRadius:'50%',objectFit:'cover',border:'3px solid rgba(255,255,255,0.4)',marginBottom:'14px'}} onError={(e) => e.currentTarget.style.display='none'} />
-            <h1 style={{fontSize:'28px',margin:'0 0 8px'}}>{schoolName}</h1>
-            <p style={{fontSize:'15px',opacity:0.92,maxWidth:'620px',margin:'0 auto',lineHeight:1.5}}>{cfg.HeroText}</p>
-          </div>
-
-          {/* section cards */}
-          {cards.length > 0 && (
-            <div style={{maxWidth:'1000px',margin:'-34px auto 0',padding:'0 20px',display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:'16px'}}>
-              {cards.map((c, i) => (
-                <a key={i} href={c.href} target={c.href.startsWith('#') ? undefined : '_blank'} rel="noopener noreferrer"
-                  style={{background:'#fff',borderRadius:'10px',padding:'20px 18px',textDecoration:'none',boxShadow:'0 4px 14px rgba(0,0,0,0.08)',display:'block',borderTop:`4px solid ${c.color}`}}>
-                  <i className={`fas fa-${c.icon}`} style={{fontSize:'26px',color:c.color,marginBottom:'10px',display:'block'}}></i>
-                  <div style={{fontWeight:700,color:'var(--navy-primary)',fontSize:'15px',marginBottom:'4px'}}>{c.title}</div>
-                  <div style={{fontSize:'12.5px',color:'#666',lineHeight:1.4}}>{c.text}</div>
-                </a>
-              ))}
-            </div>
-          )}
-
-          {/* gallery */}
-          {cfg.EnableGallery && gallery.length > 0 && (
-            <div style={{maxWidth:'1000px',margin:'44px auto 0',padding:'0 20px'}}>
-              <h2 style={{color:'var(--navy-primary)',fontSize:'20px',marginBottom:'16px'}}><i className="fas fa-images"></i> Gallery</h2>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:'12px'}}>
-                {gallery.map(item => (
-                  <div key={item.ID} onClick={() => setLightbox(item)} style={{cursor:'pointer',borderRadius:'8px',overflow:'hidden',height:'130px',position:'relative',background:'#e0e0e0'}}>
-                    {item.Type === 'photo'
-                      ? <img src={item.MediaURL} alt={item.Title} style={{width:'100%',height:'100%',objectFit:'cover'}} />
-                      : <div style={{width:'100%',height:'100%',display:'flex',alignItems:'center',justifyContent:'center',background:'#001f3f'}}><i className="fas fa-play-circle" style={{fontSize:'34px',color:'#fff'}}></i></div>}
-                    {item.Title && <div style={{position:'absolute',bottom:0,left:0,right:0,background:'rgba(0,0,0,0.55)',color:'#fff',fontSize:'11px',padding:'4px 8px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{item.Title}</div>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* careers */}
-          {cfg.EnableJobs && jobs.length > 0 && (
-            <div id="careers" style={{maxWidth:'1000px',margin:'44px auto 0',padding:'0 20px'}}>
-              <h2 style={{color:'var(--navy-primary)',fontSize:'20px',marginBottom:'16px'}}><i className="fas fa-briefcase"></i> Careers</h2>
-              <div style={{display:'flex',flexDirection:'column',gap:'10px'}}>
-                {jobs.map(j => (
-                  <div key={j.ID} style={{background:'#fff',borderRadius:'8px',padding:'16px 18px',boxShadow:'0 2px 8px rgba(0,0,0,0.06)',display:'flex',alignItems:'center',gap:'14px',flexWrap:'wrap'}}>
-                    <div style={{flex:1,minWidth:'200px'}}>
-                      <div style={{fontWeight:700,color:'var(--navy-primary)'}}>{j.Title}</div>
-                      <div style={{fontSize:'12px',color:'#888',textTransform:'capitalize'}}>{j.StaffType.replace('_',' ')}{j.Department ? ' · ' + j.Department : ''}{j.ClosingDate ? ' · closes ' + j.ClosingDate : ''}</div>
-                    </div>
-                    <a className="btn btn-primary btn-sm" href={publicAppLink('?public=job&postingId=' + j.ID)} target="_blank" rel="noopener noreferrer">Apply</a>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* footer */}
-          <div style={{maxWidth:'1000px',margin:'50px auto 0',padding:'20px',textAlign:'center',fontSize:'12px',color:'#888',borderTop:'1px solid #e0e0e0'}}>
-            {sch.SchoolAddress && <div>{sch.SchoolAddress}</div>}
-            <div>{sch.SchoolContact && <span><i className="fas fa-phone"></i> {sch.SchoolContact}</span>}{sch.SchoolContact && sch.SchoolEmail && ' · '}{sch.SchoolEmail && <span><i className="fas fa-envelope"></i> {sch.SchoolEmail}</span>}</div>
-          </div>
-
-          {lightbox && (
-            <div className="modal-overlay" onClick={() => setLightbox(null)} style={{zIndex:9999}}>
-              <div onClick={(e) => e.stopPropagation()} style={{maxWidth:'90vw',maxHeight:'90vh'}}>
-                {lightbox.Type === 'photo'
-                  ? <img src={lightbox.MediaURL} alt={lightbox.Title} style={{maxWidth:'90vw',maxHeight:'80vh',borderRadius:'6px'}} />
-                  : <div style={{background:'#fff',padding:'24px',borderRadius:'8px',textAlign:'center'}}>
-                      <p style={{marginBottom:'14px'}}>{lightbox.Title}</p>
-                      <a className="btn btn-primary" href={lightbox.MediaURL} target="_blank" rel="noopener noreferrer"><i className="fas fa-external-link-alt"></i> Watch Video</a>
-                    </div>}
-                {lightbox.Caption && <p style={{color:'#fff',textAlign:'center',marginTop:'10px',fontSize:'13px'}}>{lightbox.Caption}</p>}
-              </div>
-            </div>
-          )}
-        </div>
-      );
-    }
-
     // ============== Menu catalog (single source of truth for sidebar items) ==============
     // Priority key: lower = higher in list. Items with no entry for a role = hidden for that role.
     // Optional `group` lets us insert section headers (Daily / Academic / Records / Admin / Account).
@@ -4633,11 +4458,8 @@
       discipline:   { icon: 'gavel',            label: 'Discipline',         group: 'academic' },
       activities:   { icon: 'trophy',           label: 'Activities',         group: 'academic' },
       admissions:   { icon: 'file-signature',   label: 'Admissions',         group: 'records' },
-      website:      { icon: 'globe',            label: 'School Website',     group: 'records' },
       admissionReqs:{ icon: 'clipboard-check',  label: 'Admission Requirements', group: 'records' },
       inquiries:    { icon: 'comment-dots',     label: 'Parent Inquiries',   group: 'records' },
-      gallery:      { icon: 'images',           label: 'Gallery',            group: 'records' },
-      websiteSettings: { icon: 'sliders-h',     label: 'Website Settings',   group: 'records' },
       students:     { icon: 'user-graduate',    label: 'Students',           group: 'records' },
       parents:      { icon: 'users',            label: 'Parents',            group: 'records' },
       classes:      { icon: 'school',           label: 'Classes & Sections', group: 'records' },
@@ -4673,7 +4495,7 @@
     //  - student: timetable + attendance + marks + notices first
     //  - parent: notices + child's attendance/marks/fees first
     const MENU_PRIORITY = {
-      admin: ['dashboard','ownerPortal','reports','admissions','website','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','questionBank','hallTickets','feePayments','accounts','feeStructure','payroll','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','account','settings','about'],
+      admin: ['dashboard','ownerPortal','reports','admissions','admissionReqs','inquiries','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','questionBank','hallTickets','feePayments','accounts','feeStructure','payroll','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','recruitment','account','settings','about'],
       supervisor: ['dashboard','reports','attendance','substitutes','marks','hallTickets','exams','notices','ptm','calendar','discipline','conduct','helpdesk','complaints','lessonPlans','logbook','activities','students','parents','classes','subjects','assignments','documents','timetable','account','about'],
       clerk: ['admissions','admissionReqs','students','parents','feePayments','accounts','feeStructure','sms','reports','attendance','helpdesk','complaints','documents','assets','inventory','timetable','classes','notices','calendar','account','about'],
       // bursar/accountant — finance + asset/stock inventory only, nothing else (per-role scoped portal)
@@ -4701,24 +4523,14 @@
 
     // ids an admin can never hide — always present regardless of HiddenMenuIds
     const PROTECTED_MENU_IDS = ['dashboard', 'settings', 'account', 'about'];
-    // pages folded under the collapsible "School Website" sidebar entry instead of each getting
-    // their own top-level row — the whole point being one row that expands/collapses, not five
-    // permanent ones ("I dont want the side bar to be many for admin")
-    const WEBSITE_SUBMENU_IDS = ['inquiries', 'admissionReqs', 'recruitment', 'gallery', 'websiteSettings'];
     function buildSidebarItems(role, hiddenMenuIds) {
       const r = String(role || '').toLowerCase();
       const order = MENU_PRIORITY[r] || MENU_PRIORITY.admin;
       const hidden = new Set(String(hiddenMenuIds || '').split(',').map(x => x.trim()).filter(Boolean));
-      const visible = (id) => MENU_CATALOG[id] && (PROTECTED_MENU_IDS.includes(id) || !hidden.has(id));
-      const items = order
-        .filter(visible)
+      return order
+        .filter(id => MENU_CATALOG[id])
+        .filter(id => PROTECTED_MENU_IDS.includes(id) || !hidden.has(id))
         .map(id => ({ id: id, ...MENU_CATALOG[id] }));
-      const websiteIdx = items.findIndex(it => it.id === 'website');
-      if (websiteIdx !== -1) {
-        const children = WEBSITE_SUBMENU_IDS.filter(visible).map(id => ({ id: id, ...MENU_CATALOG[id] }));
-        items[websiteIdx] = { ...items[websiteIdx], children };
-      }
-      return items;
     }
 
     // ============== Sidebar Component ==============
@@ -4752,27 +4564,12 @@
       const [closedGroups, setClosedGroups] = useState(() => {
         try { return new Set(JSON.parse(localStorage.getItem('sms_closed_sidebar_groups') || '[]')); } catch (e) { return new Set(); }
       });
-      const flatWithChildren = items.flatMap(it => it.children ? [it, ...it.children] : [it]);
-      const activeGroup = (flatWithChildren.find(it => it.id === activeMenu) || {}).group;
+      const activeGroup = (items.find(it => it.id === activeMenu) || {}).group;
       const toggleGroup = (g) => {
         setClosedGroups(prev => {
           const next = new Set(prev);
           if (next.has(g)) next.delete(g); else next.add(g);
           try { localStorage.setItem('sms_closed_sidebar_groups', JSON.stringify([...next])); } catch (e) {}
-          return next;
-        });
-      };
-
-      // collapsible sidebar sub-navigation (e.g. School Website) — a parent row that expands to
-      // reveal its own sub-pages instead of each one getting a permanent top-level row
-      const [openParents, setOpenParents] = useState(() => {
-        try { return new Set(JSON.parse(localStorage.getItem('sms_open_sidebar_parents') || '[]')); } catch (e) { return new Set(); }
-      });
-      const toggleParent = (id) => {
-        setOpenParents(prev => {
-          const next = new Set(prev);
-          if (next.has(id)) next.delete(id); else next.add(id);
-          try { localStorage.setItem('sms_open_sidebar_parents', JSON.stringify([...next])); } catch (e) {}
           return next;
         });
       };
@@ -4818,44 +4615,6 @@
                     {(collapsed || isOpen) && (
                       <ul className="sidebar-menu">
                         {g.items.map(m => {
-                          if (m.children) {
-                            const childActive = m.children.some(c => c.id === activeMenu);
-                            const open = openParents.has(m.id) || childActive;
-                            return (
-                              <li key={m.id} className="sidebar-parent-item">
-                                <button
-                                  className={childActive ? 'active' : ''}
-                                  onClick={() => toggleParent(m.id)}
-                                  title={collapsed ? m.label : undefined}
-                                >
-                                  <i className={'fas fa-' + m.icon}></i>
-                                  <span>{m.label}</span>
-                                  {!collapsed && <i className={`fas fa-chevron-${open ? 'up' : 'down'} sidebar-submenu-caret`}></i>}
-                                </button>
-                                {(open && !collapsed) && (
-                                  <ul className="sidebar-submenu">
-                                    {m.children.map(c => {
-                                      const bv = b[c.id] || 0;
-                                      const bs = SIDEBAR_BADGE_STYLE[c.id] || {};
-                                      const bcls = 'sidebar-badge' + (bs.color ? ' sb-' + bs.color : '') + (bs.pulse ? ' sb-pulse' : '');
-                                      return (
-                                        <li key={c.id}>
-                                          <button
-                                            className={activeMenu === c.id ? 'active' : ''}
-                                            onClick={() => { setActiveMenu(c.id); setShowMobile(false); }}
-                                          >
-                                            <i className={'fas fa-' + c.icon}></i>
-                                            <span>{c.label}</span>
-                                            {bv > 0 && <span className={bcls}>{bv > 99 ? '99+' : bv}</span>}
-                                          </button>
-                                        </li>
-                                      );
-                                    })}
-                                  </ul>
-                                )}
-                              </li>
-                            );
-                          }
                           const bv = b[m.id] || 0;
                           const bs = SIDEBAR_BADGE_STYLE[m.id] || {};
                           const bcls = 'sidebar-badge' + (bs.color ? ' sb-' + bs.color : '') + (bs.pulse ? ' sb-pulse' : '');
@@ -7208,14 +6967,15 @@
     ];
     const GHANA_REGION_OPTS = ['Ahafo','Ashanti','Bono','Bono East','Central','Eastern','Greater Accra','North East','Northern','Oti','Savannah','Upper East','Upper West','Volta','Western','Western North'].map(r => ({ value: r, label: r }));
 
-    // shown on the login page footer so everyone knows which portal they'll land in
+    // shown on the login page footer — just the role names, no descriptions
     const LOGIN_ROLE_DESCRIPTIONS = [
-      { role: 'Admin', icon: 'user-shield', desc: 'Full control — students, staff, fees, exams, website & settings' },
-      { role: 'Clerk', icon: 'clipboard', desc: 'Front office — admissions, records & fee collection' },
-      { role: 'Bursar', icon: 'coins', desc: 'Finance only — fees, payroll, expenses & stock/asset inventory' },
-      { role: 'Teacher', icon: 'chalkboard-teacher', desc: 'Class & subject teacher — marks, attendance & lesson plans' },
-      { role: 'Student', icon: 'user-graduate', desc: 'View your own timetable, results, fees & report card' },
-      { role: 'Parent', icon: 'users', desc: "Track your ward's attendance, fees, results & school updates" }
+      { role: 'Admin', icon: 'user-shield' },
+      { role: 'Clerk', icon: 'clipboard' },
+      { role: 'Bursar', icon: 'coins' },
+      { role: 'Headteacher', icon: 'user-tie' },
+      { role: 'Teacher', icon: 'chalkboard-teacher' },
+      { role: 'Student', icon: 'user-graduate' },
+      { role: 'Parent', icon: 'users' }
     ];
 
     // report-card remark dropdown vocabularies — Ghana GES style
@@ -24381,243 +24141,6 @@
       );
     }
 
-    // ============== School Website: Gallery ==============
-    const GALLERY_CATEGORY_OPTS = ['campus','events','sports','academics','graduation','facilities','other'].map(v => ({ value: v, label: v.charAt(0).toUpperCase() + v.slice(1) }));
-
-    function GalleryItemModal({ item, currentUser, role, saving, onClose, onSave }) {
-      const [f, setF] = useState({
-        Title: item?.Title || '', Type: item?.Type || 'photo', MediaURL: item?.MediaURL || '',
-        Category: item?.Category || 'campus', Caption: item?.Caption || '',
-        DisplayOrder: item?.DisplayOrder ?? 0, IsPublished: item ? item.IsPublished : true
-      });
-      const set = (k, v) => setF({ ...f, [k]: v });
-
-      const handleSubmit = (e) => {
-        e.preventDefault();
-        if (!f.MediaURL) { Swal.fire({ icon: 'error', title: f.Type === 'video' ? 'Add a video URL' : 'Add a photo' }); return; }
-        onSave(f);
-      };
-
-      return (
-        <div className="modal-overlay" onClick={onClose}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'560px'}}>
-            <div className="modal-header"><h3><i className="fas fa-images"></i> {item ? 'Edit' : 'Add'} Gallery Item</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
-            <div className="modal-body">
-              <form onSubmit={handleSubmit}>
-                <div className="form-grid" style={{marginBottom:'10px'}}>
-                  <div className="form-group">
-                    <label>Type</label>
-                    <div style={{display:'flex',gap:'8px'}}>
-                      <button type="button" className={`btn btn-sm ${f.Type === 'photo' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => set('Type', 'photo')}><i className="fas fa-image"></i> Photo</button>
-                      <button type="button" className={`btn btn-sm ${f.Type === 'video' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => set('Type', 'video')}><i className="fas fa-video"></i> Video</button>
-                    </div>
-                  </div>
-                  <SearchableDropdown label="Category" icon="fas fa-tag" options={GALLERY_CATEGORY_OPTS} value={f.Category} onChange={(v) => set('Category', v)} placeholder="Select..." />
-                </div>
-
-                {f.Type === 'photo' ? (
-                  <PhotoPicker value={f.MediaURL} onChange={(url) => set('MediaURL', url)} currentUser={currentUser} label="Photo *" shape="square" size={140} />
-                ) : (
-                  <div className="form-group">
-                    <label>Video URL (YouTube / Vimeo link) *</label>
-                    <input type="text" value={f.MediaURL} onChange={(e) => set('MediaURL', e.target.value)} placeholder="https://youtube.com/watch?v=..." />
-                  </div>
-                )}
-
-                <div className="form-group"><label>Title</label><input type="text" value={f.Title} onChange={(e) => set('Title', e.target.value)} maxLength="100" placeholder="e.g. Speech & Prize-Giving Day 2026" /></div>
-                <div className="form-group"><label>Caption</label><textarea value={f.Caption} onChange={(e) => set('Caption', e.target.value)} rows="2" maxLength="300"></textarea></div>
-                <div className="form-grid">
-                  <div className="form-group"><label>Display Order</label><input type="number" value={f.DisplayOrder} onChange={(e) => set('DisplayOrder', e.target.value)} /></div>
-                  <div className="form-group">
-                    <label>Visible on public website</label>
-                    <label className="toggle-switch" style={{marginTop:'4px'}}>
-                      <input type="checkbox" checked={!!f.IsPublished} onChange={(e) => set('IsPublished', e.target.checked)} />
-                      <span className="toggle-slider"></span>
-                    </label>
-                  </div>
-                </div>
-
-                <div className="form-actions">
-                  <button type="submit" className="btn btn-primary" disabled={saving}><i className="fas fa-save"></i> {saving ? 'Saving…' : 'Save'}</button>
-                  <button type="button" className="btn btn-secondary" onClick={onClose}><i className="fas fa-times"></i> Cancel</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    function GalleryView({ currentUser, role }) {
-      const { data, isLoading: loading, isValidating: syncing, mutate: refresh } =
-        useSWR('getAllGalleryItems', () => swrFetcher('getAllGalleryItems', currentUser, role));
-      const items = data || [];
-      const [showModal, setShowModal] = useState(false);
-      const [editing, setEditing] = useState(null);
-      const [saving, setSaving] = useState(false);
-      const [filterCat, setFilterCat] = useState('');
-
-      const filtered = filterCat ? items.filter(i => i.Category === filterCat) : items;
-
-      const handleSave = (f) => {
-        setSaving(true);
-        const done = (res) => {
-          setSaving(false);
-          if (res.success) { setShowModal(false); setEditing(null); Swal.fire({ icon: 'success', text: res.message, timer: 1800, showConfirmButton: false }); refresh(); }
-          else Swal.fire({ icon: 'error', text: res.message });
-        };
-        const fail = (err) => { setSaving(false); Swal.fire({ icon: 'error', text: err.message }); };
-        if (editing) google.script.run.withSuccessHandler(done).withFailureHandler(fail).updateGalleryItem(editing.ID, f, currentUser, role);
-        else google.script.run.withSuccessHandler(done).withFailureHandler(fail).addGalleryItem(f, currentUser, role);
-      };
-
-      const handleDelete = (item) => {
-        Swal.fire({ icon: 'warning', title: 'Remove from gallery?', text: item.Title || 'This item', showCancelButton: true, confirmButtonText: 'Remove' }).then((r) => {
-          if (!r.isConfirmed) return;
-          google.script.run
-            .withSuccessHandler((res) => { if (res.success) refresh(); else Swal.fire({ icon: 'error', text: res.message }); })
-            .withFailureHandler((err) => Swal.fire({ icon: 'error', text: err.message }))
-            .deleteGalleryItem(item.ID, currentUser, role);
-        });
-      };
-
-      const togglePublish = (item) => {
-        google.script.run
-          .withSuccessHandler((res) => { if (res.success) refresh(); else Swal.fire({ icon: 'error', text: res.message }); })
-          .withFailureHandler((err) => Swal.fire({ icon: 'error', text: err.message }))
-          .updateGalleryItem(item.ID, { ...item, IsPublished: !item.IsPublished }, currentUser, role);
-      };
-
-      return (
-        <div className="data-section">
-          <div className="section-header">
-            <h2><i className="fas fa-images"></i> Gallery{syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}</h2>
-            <div style={{display:'flex',gap:'10px'}}>
-              <SearchableDropdown options={[{value:'',label:'All categories'}, ...GALLERY_CATEGORY_OPTS]} value={filterCat} onChange={setFilterCat} placeholder="Filter category..." />
-              <button className="btn btn-success" onClick={() => { setEditing(null); setShowModal(true); }}><i className="fas fa-plus"></i> Add Item</button>
-            </div>
-          </div>
-
-          <div className="settings-info-message" style={{marginBottom:'15px'}}>
-            <i className="fas fa-info-circle"></i> Photos and videos here show on the public school website's gallery section. Toggle visibility on any item without deleting it.
-          </div>
-
-          {loading ? <TableSkeleton rows={4} columns={4} /> : filtered.length === 0 ? (
-            <div style={{textAlign:'center',padding:'34px',background:'#f8f9fa',color:'#888',border:'1px dashed #ccc'}}>
-              <i className="fas fa-images" style={{fontSize:'40px',color:'#ccc',marginBottom:'10px',display:'block'}}></i>
-              No gallery items yet.
-            </div>
-          ) : (
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:'14px'}}>
-              {filtered.map(item => (
-                <div key={item.ID} style={{border:'1px solid #e0e0e0',borderRadius:'8px',overflow:'hidden',background:'#fff',opacity:item.IsPublished?1:0.55}}>
-                  <div style={{height:'120px',background:'#f0f0f0',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden'}}>
-                    {item.Type === 'photo'
-                      ? <img src={item.MediaURL} alt={item.Title} style={{width:'100%',height:'100%',objectFit:'cover'}} />
-                      : <i className="fas fa-video" style={{fontSize:'36px',color:'#999'}}></i>}
-                  </div>
-                  <div style={{padding:'8px 10px'}}>
-                    <div style={{fontWeight:600,fontSize:'12px',color:'var(--navy-primary)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{item.Title || '(untitled)'}</div>
-                    <div style={{fontSize:'10px',color:'#888',textTransform:'capitalize',marginBottom:'6px'}}>{item.Category} · {item.Type}</div>
-                    <div style={{display:'flex',gap:'6px'}}>
-                      <button className="action-icon edit-icon" onClick={() => { setEditing(item); setShowModal(true); }} title="Edit"><i className="fas fa-edit"></i></button>
-                      <button className="action-icon" onClick={() => togglePublish(item)} title={item.IsPublished ? 'Hide from website' : 'Show on website'}><i className={`fas fa-eye${item.IsPublished ? '' : '-slash'}`}></i></button>
-                      <button className="action-icon delete-icon" onClick={() => handleDelete(item)} title="Delete"><i className="fas fa-trash"></i></button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {showModal && <GalleryItemModal item={editing} currentUser={currentUser} role={role} saving={saving} onClose={() => { setShowModal(false); setEditing(null); }} onSave={handleSave} />}
-        </div>
-      );
-    }
-
-    // ============== School Website: Settings ==============
-    function WebsiteSettingsView({ currentUser, role, schoolSettings }) {
-      const [cfg, setCfg] = useState(null);
-      const [saving, setSaving] = useState(false);
-
-      useEffect(() => {
-        google.script.run
-          .withSuccessHandler((res) => { if (res.success) setCfg(res.data); else Swal.fire({ icon: 'error', text: res.message }); })
-          .withFailureHandler((err) => Swal.fire({ icon: 'error', text: err.message }))
-          .getWebsiteConfig(currentUser, role);
-      }, []);
-
-      const set = (k, v) => setCfg({ ...cfg, [k]: v });
-      const websiteUrl = publicAppLink('?public=website');
-
-      const handleSave = () => {
-        setSaving(true);
-        google.script.run
-          .withSuccessHandler((res) => {
-            setSaving(false);
-            if (res.success) { setCfg(res.data); Swal.fire({ icon: 'success', text: res.message, timer: 2000, showConfirmButton: false }); }
-            else Swal.fire({ icon: 'error', text: res.message });
-          })
-          .withFailureHandler((err) => { setSaving(false); Swal.fire({ icon: 'error', text: err.message }); })
-          .updateWebsiteConfig(cfg, currentUser, role);
-      };
-
-      const copyLink = () => {
-        navigator.clipboard.writeText(websiteUrl).then(() => Swal.fire({ icon: 'success', text: 'Website link copied', timer: 1500, showConfirmButton: false }));
-      };
-
-      if (!cfg) return <TableSkeleton rows={4} columns={2} />;
-
-      const toggles = [
-        { key: 'EnableInquiries', label: 'Admission & General Inquiries', icon: 'comment-dots' },
-        { key: 'EnableAdmission', label: 'Online Admission Form', icon: 'file-signature' },
-        { key: 'EnableJobs', label: 'Careers / Job Postings', icon: 'briefcase' },
-        { key: 'EnableReportCardLookup', label: 'Report Card Lookup', icon: 'graduation-cap' },
-        { key: 'EnableGallery', label: 'Photo & Video Gallery', icon: 'images' }
-      ];
-
-      return (
-        <div className="data-section">
-          <h2><i className="fas fa-sliders-h"></i> Website Settings</h2>
-
-          <div className="settings-info-message" style={{marginBottom:'18px'}}>
-            <i className="fas fa-globe"></i> This is the public page parents, applicants and the community see — no login required. Share the link below anywhere (school signboard, Facebook, WhatsApp).
-          </div>
-
-          <div style={{display:'flex',gap:'10px',alignItems:'center',marginBottom:'22px',flexWrap:'wrap',background:'#f8f9fa',border:'1px solid #e0e0e0',borderRadius:'6px',padding:'12px 14px'}}>
-            <i className="fas fa-link" style={{color:'var(--navy-accent)'}}></i>
-            <code style={{flex:1,minWidth:'220px',fontSize:'12px',wordBreak:'break-all'}}>{websiteUrl}</code>
-            <button className="btn btn-sm btn-secondary" onClick={copyLink}><i className="fas fa-copy"></i> Copy</button>
-            <a className="btn btn-sm btn-secondary" href={websiteUrl} target="_blank" rel="noopener noreferrer"><i className="fas fa-external-link-alt"></i> Open</a>
-          </div>
-
-          <h3 style={{marginBottom:'12px',color:'var(--navy-primary)',fontSize:'15px',textTransform:'uppercase',letterSpacing:'0.5px'}}>
-            <i className="fas fa-heading"></i> Hero Banner Text
-          </h3>
-          <div className="form-group" style={{maxWidth:'600px',marginBottom:'22px'}}>
-            <textarea value={cfg.HeroText} onChange={(e) => set('HeroText', e.target.value)} rows="3" maxLength="500" placeholder="A welcoming line shown at the top of the public website" />
-          </div>
-
-          <h3 style={{marginBottom:'12px',color:'var(--navy-primary)',fontSize:'15px',textTransform:'uppercase',letterSpacing:'0.5px'}}>
-            <i className="fas fa-toggle-on"></i> Sections Shown on the Public Website
-          </h3>
-          <div style={{display:'flex',flexDirection:'column',gap:'10px',maxWidth:'500px',marginBottom:'22px'}}>
-            {toggles.map(t => (
-              <div key={t.key} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 14px',background:'#f8f9fa',border:'1px solid #e0e0e0',borderRadius:'6px'}}>
-                <span><i className={`fas fa-${t.icon}`} style={{marginRight:'8px',color:'var(--navy-accent)'}}></i>{t.label}</span>
-                <label className="toggle-switch">
-                  <input type="checkbox" checked={!!cfg[t.key]} onChange={(e) => set(t.key, e.target.checked)} />
-                  <span className="toggle-slider"></span>
-                </label>
-              </div>
-            ))}
-          </div>
-
-          <button className="btn btn-primary" onClick={handleSave} disabled={saving}><i className="fas fa-save"></i> {saving ? 'Saving…' : 'Save Website Settings'}</button>
-        </div>
-      );
-    }
-
     // ============== Helpdesk Tickets ==============
     function HelpdeskView({ currentUser, role }) {
       const r = String(role).toLowerCase();
@@ -30398,13 +29921,7 @@
       // listed in the sidebar but the view currently blocks these roles (known mismatch)
       const BLOCKED = { 'clerk|attendance':true, 'clerk|helpdesk':true, 'clerk|complaints':true };
 
-      const hasModule = (roleId, id) => {
-        const order = MENU_PRIORITY[roleId] || [];
-        // folded under a collapsible sidebar submenu (e.g. School Website) rather than a flat
-        // top-level id — still reachable for this role if the parent entry is
-        const reachable = order.indexOf(id) !== -1 || (order.indexOf('website') !== -1 && WEBSITE_SUBMENU_IDS.indexOf(id) !== -1);
-        return reachable && !BLOCKED[roleId + '|' + id];
-      };
+      const hasModule = (roleId, id) => (MENU_PRIORITY[roleId] || []).indexOf(id) !== -1 && !BLOCKED[roleId + '|' + id];
 
       const cell = (roleId, id) => {
         const k = roleId + '|' + id;
@@ -30631,10 +30148,6 @@
           return canSeeAdmissionReqs ? <AdmissionRequirementsView currentUser={user} role={role} schoolSettings={schoolSettings} /> : denied('Admission Requirements');
         case 'inquiries':
           return canSeeInquiries ? <InquiriesView currentUser={user} role={role} /> : denied('Parent Inquiries');
-        case 'gallery':
-          return isAdmin ? <GalleryView currentUser={user} role={role} /> : denied('Gallery');
-        case 'websiteSettings':
-          return isAdmin ? <WebsiteSettingsView currentUser={user} role={role} schoolSettings={schoolSettings} /> : denied('Website Settings');
         case 'ownerPortal':
           return canSeeOwnerPortal ? <OwnerPortalView currentUser={user} role={role} /> : denied('Owner Portal');
         case 'discipline':
@@ -31079,7 +30592,6 @@
       if (publicPage === 'admission') return <PublicAdmissionForm schoolSettings={schoolSettings} />;
       if (publicPage === 'reportcard') return <PublicReportCardPage schoolSettings={schoolSettings} shareToken={publicParams.get('token')} />;
       if (publicPage === 'job') return <PublicJobApplicationForm schoolSettings={schoolSettings} postingId={publicParams.get('postingId')} />;
-      if (publicPage === 'website') return <PublicWebsiteView schoolSettings={schoolSettings} />;
 
       return (
         <div>
