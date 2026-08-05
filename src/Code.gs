@@ -4510,6 +4510,101 @@ function rowToAdmission(row, cmap, umap) {
   };
 }
 
+// ============== Admission Requirements (documents/items a family must bring for admission) ==============
+var ADMISSION_REQUIREMENTS_SHEET = 'Admission_Requirements';
+var ADMISSION_REQUIREMENTS_HEADERS = ['ID', 'Title', 'Description', 'DisplayOrder', 'IsDeleted', 'CreatedAt', 'UpdatedAt', 'CreatedBy'];
+
+function _ensureAdmissionRequirementsSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(ADMISSION_REQUIREMENTS_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(ADMISSION_REQUIREMENTS_SHEET);
+    sh.appendRow(ADMISSION_REQUIREMENTS_HEADERS);
+    sh.getRange(1, 1, 1, ADMISSION_REQUIREMENTS_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function _rowToAdmissionRequirement(row) {
+  return { ID: row[0], Title: row[1] || '', Description: row[2] || '', DisplayOrder: parseInt(row[3], 10) || 0, CreatedAt: toIso(row[5]), UpdatedAt: toIso(row[6]) };
+}
+
+// any role — shown on the admin dashboard and printable for prospective-parent inquiries
+function getAdmissionRequirements(currentUser, currentRole) {
+  try {
+    var sh = _ensureAdmissionRequirementsSheet();
+    var data = sh.getDataRange().getValues(), out = [];
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][4]) === '1') continue;
+      out.push(_rowToAdmissionRequirement(data[i]));
+    }
+    out.sort(function (a, b) { return a.DisplayOrder - b.DisplayOrder || a.ID - b.ID; });
+    return { success: true, data: out };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function addAdmissionRequirement(d, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var title = String(d.Title || '').trim();
+    if (!title) return { success: false, message: 'Title is required' };
+    var sh = _ensureAdmissionRequirementsSheet();
+    var data = sh.getDataRange().getValues();
+    var maxOrder = 0;
+    for (var i = 1; i < data.length; i++) { if (String(data[i][4]) !== '1') maxOrder = Math.max(maxOrder, parseInt(data[i][3], 10) || 0); }
+    var ts = nowIso(), id = nextRowId(sh);
+    sh.appendRow([id, title, String(d.Description || '').trim(), maxOrder + 1, '0', ts, ts, currentUser || '']);
+    addLog(currentUser, 'Admission Requirement Added', title);
+    return { success: true, message: 'Requirement added', id: id };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function updateAdmissionRequirement(id, d, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var idn = parseInt(id, 10);
+    var sh = _ensureAdmissionRequirementsSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] !== idn || String(data[i][4]) === '1') continue;
+      var row = i + 1;
+      if (d.Title !== undefined) sh.getRange(row, 2).setValue(String(d.Title || '').trim());
+      if (d.Description !== undefined) sh.getRange(row, 3).setValue(String(d.Description || '').trim());
+      if (d.DisplayOrder !== undefined) sh.getRange(row, 4).setValue(parseInt(d.DisplayOrder, 10) || 0);
+      sh.getRange(row, 7).setValue(nowIso());
+      addLog(currentUser, 'Admission Requirement Updated', '#' + idn);
+      return { success: true, message: 'Requirement updated' };
+    }
+    return { success: false, message: 'Requirement not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function deleteAdmissionRequirement(id, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var idn = parseInt(id, 10);
+    var sh = _ensureAdmissionRequirementsSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] !== idn) continue;
+      sh.getRange(i + 1, 5).setValue('1');
+      sh.getRange(i + 1, 7).setValue(nowIso());
+      addLog(currentUser, 'Admission Requirement Deleted', '#' + idn);
+      return { success: true, message: 'Requirement deleted' };
+    }
+    return { success: false, message: 'Requirement not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
 function getAllAdmissions(currentUser, currentRole) {
   try {
     if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };

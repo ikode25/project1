@@ -3059,6 +3059,9 @@
       body.print-target * { visibility: hidden !important; }
       body.print-target .report-card, body.print-target .report-card *,
       body.print-target .tt-wrap, body.print-target .tt-wrap * { visibility: visible !important; }
+      /* explicit opt-out for controls nested INSIDE a visible .report-card/.tt-wrap (e.g. inline
+         edit/delete icons on the Admission Requirements print view) that shouldn't print */
+      body.print-target .no-print { display: none !important; }
       html, body { width: 100%; height: auto; margin: 0 !important; padding: 0 !important; }
       /* the report card is almost always rendered inside a modal (position:fixed, flex-centered,
          padded/max-width'd) — position:absolute would anchor to that modal's box, not the page,
@@ -3849,6 +3852,7 @@
       discipline:   { icon: 'gavel',            label: 'Discipline',         group: 'academic' },
       activities:   { icon: 'trophy',           label: 'Activities',         group: 'academic' },
       admissions:   { icon: 'file-signature',   label: 'Admissions',         group: 'records' },
+      admissionReqs:{ icon: 'clipboard-check',  label: 'Admission Requirements', group: 'records' },
       students:     { icon: 'user-graduate',    label: 'Students',           group: 'records' },
       parents:      { icon: 'users',            label: 'Parents',            group: 'records' },
       classes:      { icon: 'school',           label: 'Classes & Sections', group: 'records' },
@@ -3882,9 +3886,9 @@
     //  - student: timetable + attendance + marks + notices first
     //  - parent: notices + child's attendance/marks/fees first
     const MENU_PRIORITY = {
-      admin: ['dashboard','ownerPortal','reports','admissions','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','hallTickets','feePayments','accounts','feeStructure','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','account','settings','about'],
+      admin: ['dashboard','ownerPortal','reports','admissions','admissionReqs','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','hallTickets','feePayments','accounts','feeStructure','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','account','settings','about'],
       supervisor: ['dashboard','reports','attendance','substitutes','marks','hallTickets','exams','notices','ptm','calendar','discipline','conduct','helpdesk','complaints','lessonPlans','logbook','activities','students','parents','classes','subjects','assignments','documents','timetable','account','about'],
-      clerk: ['admissions','students','parents','feePayments','accounts','feeStructure','sms','reports','attendance','helpdesk','complaints','documents','assets','inventory','timetable','classes','notices','calendar','account','about'],
+      clerk: ['admissions','admissionReqs','students','parents','feePayments','accounts','feeStructure','sms','reports','attendance','helpdesk','complaints','documents','assets','inventory','timetable','classes','notices','calendar','account','about'],
       teacher: ['timetable','attendance','substitutes','marks','hallTickets','exams','lessonPlans','ptm','logbook','students','discipline','conduct','activities','notices','reports','calendar','documents','complaints','classes','subjects','account','about'],
       // student: dashboard → own-class academics → own records → support → profile. Read-only everywhere except helpdesk/complaints/account.
       student: ['dashboard','timetable','attendance','marks','hallTickets','exams','notices','calendar','feePayments','feeStructure','activities','conduct','discipline','documents','helpdesk','complaints','account','about'],
@@ -21558,6 +21562,119 @@
       );
     }
 
+    // ============== Admission Requirements ==============
+    function AdmissionRequirementModal({ item, currentUser, role, onClose, onSave, saving }) {
+      const [formData, setFormData] = useState({ Title: item?.Title || '', Description: item?.Description || '' });
+      const set = (k, v) => setFormData({ ...formData, [k]: v });
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header"><h3><i className="fas fa-clipboard-check"></i> {item ? 'Edit' : 'Add'} Requirement</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
+            <div className="modal-body">
+              <form onSubmit={(e) => { e.preventDefault(); onSave(formData); }}>
+                <div className="form-grid">
+                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Title *</label><input type="text" value={formData.Title} onChange={(e) => set('Title', e.target.value)} required maxLength="150" placeholder="e.g. Birth Certificate (original + copy)" /></div>
+                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Description</label><textarea value={formData.Description} onChange={(e) => set('Description', e.target.value)} rows="2" placeholder="Optional extra detail..." /></div>
+                </div>
+                <div className="form-actions">
+                  <button type="submit" className="btn btn-primary" disabled={saving}><i className="fas fa-save"></i> {saving ? 'Saving…' : 'Save'}</button>
+                  <button type="button" className="btn btn-secondary" onClick={onClose}><i className="fas fa-times"></i> Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function AdmissionRequirementsView({ currentUser, role, schoolSettings }) {
+      const { data: itemsData, error: loadError, isLoading: loading, mutate: load } =
+        useSWR('getAdmissionRequirements', () => swrFetcher('getAdmissionRequirements', currentUser, role));
+      const items = itemsData || [];
+      const [showModal, setShowModal] = useState(false);
+      const [editing, setEditing] = useState(null);
+      const [saving, setSaving] = useState(false);
+
+      const handleSave = (data) => {
+        setSaving(true);
+        const action = editing ? 'updateAdmissionRequirement' : 'addAdmissionRequirement';
+        const params = editing ? [editing.ID, data, currentUser, role] : [data, currentUser, role];
+        google.script.run
+          .withSuccessHandler((res) => {
+            setSaving(false);
+            if (res.success) { setShowModal(false); setEditing(null); Swal.fire({ icon: 'success', text: res.message, timer: 1500, showConfirmButton: false }); load(); }
+            else Swal.fire({ icon: 'error', text: res.message });
+          })
+          .withFailureHandler((err) => { setSaving(false); Swal.fire({ icon: 'error', text: err.message }); })[action](...params);
+      };
+
+      const handleDelete = (r) => {
+        Swal.fire({ icon: 'warning', title: 'Delete requirement?', text: r.Title, showCancelButton: true, confirmButtonColor: '#ea4335' })
+          .then((rr) => {
+            if (rr.isConfirmed) {
+              google.script.run.withSuccessHandler((res) => {
+                Swal.fire({ icon: res.success ? 'success' : 'error', text: res.message, timer: 1500, showConfirmButton: false });
+                load();
+              }).deleteAdmissionRequirement(r.ID, currentUser, role);
+            }
+          });
+      };
+
+      const handlePrint = () => {
+        document.body.classList.add('print-target');
+        setTimeout(() => {
+          window.print();
+          setTimeout(() => document.body.classList.remove('print-target'), 250);
+        }, 60);
+      };
+
+      const schoolName = (schoolSettings && schoolSettings.SchoolName) || 'School';
+
+      return (
+        <div className="data-section">
+          <div className="section-header no-print">
+            <h2><i className="fas fa-clipboard-check"></i> Admission Requirements</h2>
+            <div style={{display:'flex',gap:'8px'}}>
+              <button className="btn btn-secondary" onClick={handlePrint} disabled={items.length === 0}><i className="fas fa-print"></i> Print / Download</button>
+              <button className="btn btn-success" onClick={() => { setEditing(null); setShowModal(true); }}><i className="fas fa-plus"></i> Add Requirement</button>
+            </div>
+          </div>
+          {loadError && !loading && items.length === 0 && (
+            <div className="settings-info-message no-print" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>
+              <i className="fas fa-triangle-exclamation" style={{marginRight:'6px',color:'#ea4335'}}></i>
+              Couldn't load requirements — {String((loadError && loadError.message) || loadError)}.
+            </div>
+          )}
+          {loading && <TableSkeleton rows={5} columns={2} />}
+          {!loading && items.length === 0 && (
+            <div className="no-print" style={{textAlign:'center',padding:'40px',color:'#888',background:'#f8f9fa'}}>
+              No admission requirements yet. Click "Add Requirement" to list what parents must bring.
+            </div>
+          )}
+
+          {!loading && items.length > 0 && (
+            <div className="report-card" style={{maxWidth:'760px',margin:'0 auto'}}>
+              <div className="rc-title" style={{background:'transparent',color:'var(--navy-primary)',border:'2px solid var(--navy-primary)'}}>{schoolName} — Admission Requirements</div>
+              <ol style={{fontSize:'14px',lineHeight:1.9,padding:'6px 26px'}}>
+                {items.map((r) => (
+                  <li key={r.ID} style={{marginBottom:'6px'}}>
+                    <strong>{r.Title}</strong>
+                    {r.Description && <div style={{fontSize:'12.5px',color:'#666',marginTop:'2px'}}>{r.Description}</div>}
+                    <span className="no-print" style={{marginLeft:'10px'}}>
+                      <button className="action-icon edit-icon" title="Edit" onClick={() => { setEditing(r); setShowModal(true); }}><i className="fas fa-edit"></i></button>
+                      <button className="action-icon delete-icon" title="Delete" onClick={() => handleDelete(r)}><i className="fas fa-trash"></i></button>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+
+          {showModal && <AdmissionRequirementModal item={editing} currentUser={currentUser} role={role} saving={saving} onClose={() => { setShowModal(false); setEditing(null); }} onSave={handleSave} />}
+        </div>
+      );
+    }
+
     // ============== Grading System (admin: automatic default, or a manual custom scale) ==============
     const GRADING_BAND_LABELS = { basic: 'Basic (Creche – Basic 6)', jhs: 'JHS (Basic 7 – 9)' };
 
@@ -27441,6 +27558,7 @@
       const canSeeSms = r === 'admin' || r === 'clerk';
       const canSeeFoodMenu = r === 'admin';
       const canSeeGradingSystem = r === 'admin';
+      const canSeeAdmissionReqs = r === 'admin' || r === 'clerk';
       const canSeeOwnerPortal = r === 'admin' || r === 'owner';
       const canSeeDiscipline = r === 'admin' || r === 'teacher' || r === 'supervisor' || isStudent || isParent;
       const canSeeConduct = r === 'admin' || r === 'teacher' || r === 'supervisor' || isStudent || isParent;
@@ -27517,6 +27635,8 @@
           return canSeeFoodMenu ? <FoodMenuView currentUser={user} role={role} /> : denied('Food Menu');
         case 'gradingSystem':
           return canSeeGradingSystem ? <GradingSystemView currentUser={user} role={role} /> : denied('Grading System');
+        case 'admissionReqs':
+          return canSeeAdmissionReqs ? <AdmissionRequirementsView currentUser={user} role={role} schoolSettings={schoolSettings} /> : denied('Admission Requirements');
         case 'ownerPortal':
           return canSeeOwnerPortal ? <OwnerPortalView currentUser={user} role={role} /> : denied('Owner Portal');
         case 'discipline':
