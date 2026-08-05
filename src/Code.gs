@@ -11002,7 +11002,7 @@ function getHallTicketData(examId, studentId, currentUser, currentRole) {
 // Teachers/admin build a bank of questions per subject+class, then compile a subset into a
 // printable Test Paper (question sheet + separate answer key) for students to answer on paper.
 var QUESTION_BANK_SHEET = 'Question_Bank';
-var QUESTION_BANK_HEADERS = ['ID', 'SubjectID', 'ClassID', 'Topic', 'QuestionType', 'QuestionText', 'OptionA', 'OptionB', 'OptionC', 'OptionD', 'CorrectAnswer', 'Marks', 'Difficulty', 'CreatedBy', 'IsDeleted', 'CreatedAt', 'UpdatedAt'];
+var QUESTION_BANK_HEADERS = ['ID', 'SubjectID', 'ClassID', 'Topic', 'QuestionType', 'QuestionText', 'OptionA', 'OptionB', 'OptionC', 'OptionD', 'CorrectAnswer', 'Marks', 'Difficulty', 'CreatedBy', 'IsDeleted', 'CreatedAt', 'UpdatedAt', 'PhotoURL', 'VideoURL'];
 var TEST_PAPERS_SHEET = 'Test_Papers';
 var TEST_PAPER_HEADERS = ['ID', 'Title', 'SubjectID', 'ClassID', 'Instructions', 'DurationMinutes', 'TotalMarks', 'QuestionIDs', 'CreatedBy', 'IsDeleted', 'CreatedAt', 'UpdatedAt'];
 var QUESTION_TYPES = ['mcq', 'true_false', 'short_answer', 'essay'];
@@ -11040,7 +11040,8 @@ function _rowToQuestion(row, smap, cmap, umap) {
     OptionA: row[6] || '', OptionB: row[7] || '', OptionC: row[8] || '', OptionD: row[9] || '',
     CorrectAnswer: row[10] || '', Marks: parseFloat(row[11]) || 1, Difficulty: row[12] || 'medium',
     CreatedBy: cby, CreatedByName: (cby && umap && umap[cby]) ? umap[cby].fullName : '',
-    CreatedAt: toIso(row[15]), UpdatedAt: toIso(row[16])
+    CreatedAt: toIso(row[15]), UpdatedAt: toIso(row[16]),
+    PhotoURL: row[17] || '', VideoURL: row[18] || ''
   };
 }
 
@@ -11097,7 +11098,8 @@ function addQuestion(d, currentUser, currentRole) {
     sh.appendRow([
       id, subId, clsId, String(d.Topic || '').trim(), qType, text,
       String(d.OptionA || '').trim(), String(d.OptionB || '').trim(), String(d.OptionC || '').trim(), String(d.OptionD || '').trim(),
-      String(d.CorrectAnswer || '').trim(), marks, difficulty, getCurrentUserId(currentUser) || '', '0', ts, ts
+      String(d.CorrectAnswer || '').trim(), marks, difficulty, getCurrentUserId(currentUser) || '', '0', ts, ts,
+      String(d.PhotoURL || '').trim(), String(d.VideoURL || '').trim()
     ]);
     addLog(currentUser, 'Question Added', text.slice(0, 60));
     return { success: true, message: 'Question added', id: id };
@@ -11127,6 +11129,8 @@ function updateQuestion(id, d, currentUser, currentRole) {
       if (d.CorrectAnswer !== undefined) sh.getRange(row, 11).setValue(String(d.CorrectAnswer || '').trim());
       if (d.Marks !== undefined) { var m = parseFloat(d.Marks); sh.getRange(row, 12).setValue(isNaN(m) || m <= 0 ? 1 : m); }
       if (d.Difficulty !== undefined && QUESTION_DIFFICULTIES.indexOf(String(d.Difficulty).toLowerCase()) !== -1) sh.getRange(row, 13).setValue(String(d.Difficulty).toLowerCase());
+      if (d.PhotoURL !== undefined) sh.getRange(row, 18).setValue(String(d.PhotoURL || '').trim());
+      if (d.VideoURL !== undefined) sh.getRange(row, 19).setValue(String(d.VideoURL || '').trim());
       sh.getRange(row, 17).setValue(nowIso());
       addLog(currentUser, 'Question Updated', '#' + idn);
       return { success: true, message: 'Question updated' };

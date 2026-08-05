@@ -22616,7 +22616,8 @@
         OptionC: question?.OptionC || '', OptionD: question?.OptionD || '',
         CorrectAnswer: question?.CorrectAnswer || '',
         Marks: question?.Marks != null ? String(question.Marks) : '1',
-        Difficulty: question?.Difficulty || 'medium'
+        Difficulty: question?.Difficulty || 'medium',
+        PhotoURL: question?.PhotoURL || '', VideoURL: question?.VideoURL || ''
       });
       const set = (k, v) => setF({ ...f, [k]: v });
 
@@ -22681,6 +22682,18 @@
                   ) : (
                     <input type="text" value={f.CorrectAnswer} onChange={(e) => set('CorrectAnswer', e.target.value)} placeholder={isMcq ? 'e.g. B' : 'Model answer (for the answer key)'} />
                   )}
+                </div>
+
+                <div className="form-grid">
+                  <div className="form-group" style={{gridColumn:'1 / -1'}}>
+                    <FileDropzone label="Attach Photo (optional)" fileName={f.PhotoURL ? 'Photo attached' : ''} currentUser={currentUser} accept="image/*"
+                      onUploaded={(res) => set('PhotoURL', res.fileUrl)} />
+                    {f.PhotoURL && <button type="button" className="btn btn-secondary btn-sm" style={{marginTop:'6px'}} onClick={() => set('PhotoURL', '')}><i className="fas fa-times"></i> Remove Photo</button>}
+                  </div>
+                  <div className="form-group" style={{gridColumn:'1 / -1'}}>
+                    <label>Video URL (optional)</label>
+                    <input type="text" value={f.VideoURL} onChange={(e) => set('VideoURL', e.target.value)} placeholder="e.g. a YouTube link explaining the question" />
+                  </div>
                 </div>
 
                 <div className="form-actions">
@@ -22823,6 +22836,8 @@
                       {paper.questions.map((q) => (
                         <li key={q.ID} style={{marginBottom:'12px'}}>
                           <div>{q.QuestionText} <span style={{color:'#888',fontSize:'11px'}}>({q.Marks} mark{q.Marks === 1 ? '' : 's'})</span></div>
+                          {q.PhotoURL && <img src={q.PhotoURL} alt="" style={{maxWidth:'260px',maxHeight:'180px',display:'block',margin:'6px 0',border:'1px solid #ddd'}} onError={(e) => { e.target.style.display = 'none'; }} />}
+                          {q.VideoURL && <div style={{fontSize:'11px',color:'#0074D9',marginTop:'2px'}}><i className="fas fa-video"></i> Video: {q.VideoURL}</div>}
                           {q.QuestionType === 'mcq' && (
                             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'2px 14px',marginTop:'4px',fontSize:'13px'}}>
                               {['A','B','C','D'].map(letter => {
@@ -22965,7 +22980,16 @@
                     <tbody>
                       {filteredQuestions.map((q) => (
                         <tr key={q.ID}>
-                          <td style={{maxWidth:'320px'}}>{q.QuestionText}{q.Topic && <div style={{fontSize:'11px',color:'#888'}}>{q.Topic}</div>}</td>
+                          <td style={{maxWidth:'320px'}}>
+                            {q.QuestionText}
+                            {(q.PhotoURL || q.VideoURL) && (
+                              <span style={{marginLeft:'6px'}}>
+                                {q.PhotoURL && <i className="fas fa-image" title="Has photo" style={{color:'#888',fontSize:'11px',marginRight:'4px'}}></i>}
+                                {q.VideoURL && <i className="fas fa-video" title="Has video" style={{color:'#888',fontSize:'11px'}}></i>}
+                              </span>
+                            )}
+                            {q.Topic && <div style={{fontSize:'11px',color:'#888'}}>{q.Topic}</div>}
+                          </td>
                           <td style={{whiteSpace:'nowrap'}}>{q.ClassLabel}</td>
                           <td style={{whiteSpace:'nowrap'}}>{q.SubjectName}</td>
                           <td>{(QUESTION_TYPE_OPTS.find(o => o.value === q.QuestionType) || {}).label}</td>
