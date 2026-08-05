@@ -3164,10 +3164,99 @@
       .tt-row-break .tt-cell { padding: 6px !important; font-size: 10px !important; letter-spacing: 1px !important; }
       .tt-today-pill { display: none !important; }
     }
+
+    /* top-of-page save/load progress bar — YouTube/GitHub style thin continuous line */
+    #global-loading-bar {
+      position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 99999;
+      pointer-events: none; opacity: 0; transition: opacity 0.2s ease;
+    }
+    #global-loading-bar.active { opacity: 1; }
+    #global-loading-bar-fill {
+      height: 100%; width: 40%;
+      background: linear-gradient(90deg, var(--navy-accent, #0074D9), #34a853, var(--navy-accent, #0074D9));
+      background-size: 200% 100%;
+      box-shadow: 0 0 8px rgba(0,116,217,0.6);
+    }
+    #global-loading-bar.active #global-loading-bar-fill {
+      animation: global-loading-slide 1.1s ease-in-out infinite, global-loading-shimmer 1.6s linear infinite;
+    }
+    @keyframes global-loading-slide {
+      0% { margin-left: -40%; }
+      100% { margin-left: 100%; }
+    }
+    @keyframes global-loading-shimmer {
+      0% { background-position: 0% 0; }
+      100% { background-position: 200% 0; }
+    }
+    @media print {
+      #global-loading-bar { display: none !important; }
+    }
   </style>
 </head>
 <body>
+  <div id="global-loading-bar"><div id="global-loading-bar-fill"></div></div>
   <div id="root"></div>
+
+  <script>
+    // Global save/load progress bar — wraps google.script.run once, here, so every call site in
+    // the app (hundreds of them, mostly calling google.script.run directly rather than through
+    // gsrCall/swrFetcher) shows the thin top-of-page bar with zero per-call-site changes needed.
+    // A Proxy intercepts .withSuccessHandler()/.withFailureHandler() to wrap whatever handler the
+    // caller passes (tracked via a shared state object threaded through the chain), and intercepts
+    // the final dynamic method call (the actual RPC name) to bump the in-flight counter. A 20s
+    // safety timeout guards call sites that register no failure handler at all, so a dropped
+    // response can never leave the bar stuck on screen forever.
+    (function () {
+      var pending = 0;
+      var bar = null;
+      function barEl() { return bar || (bar = document.getElementById('global-loading-bar')); }
+      function show() { var el = barEl(); if (el) el.classList.add('active'); }
+      function hide() { var el = barEl(); if (el) el.classList.remove('active'); }
+      function dec() { pending = Math.max(0, pending - 1); if (pending === 0) hide(); }
+
+      function wrapRunner(target) {
+        return new Proxy(target, {
+          get: function (obj, prop) {
+            if (prop === 'withSuccessHandler' || prop === 'withFailureHandler') {
+              return function (handler) {
+                var state = obj.__gsrState || (obj.__gsrState = { done: false });
+                var wrapped = function () {
+                  if (state.done) return;
+                  state.done = true;
+                  dec();
+                  if (typeof handler === 'function') return handler.apply(this, arguments);
+                };
+                var next = obj[prop](wrapped);
+                next.__gsrState = state;
+                return wrapRunner(next);
+              };
+            }
+            var v = obj[prop];
+            if (typeof v === 'function') {
+              return function () {
+                pending++;
+                show();
+                var state = obj.__gsrState || { done: false };
+                setTimeout(function () { if (!state.done) { state.done = true; dec(); } }, 20000);
+                return v.apply(obj, arguments);
+              };
+            }
+            return v;
+          }
+        });
+      }
+
+      try {
+        if (window.google && window.google.script && window.google.script.run) {
+          var original = window.google.script.run;
+          Object.defineProperty(window.google.script, 'run', {
+            configurable: true,
+            get: function () { return wrapRunner(original); }
+          });
+        }
+      } catch (e) { /* if the host forbids redefining google.script.run, the bar just never shows — no functional impact */ }
+    })();
+  </script>
 
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
@@ -4451,6 +4540,8 @@
       admin: ['dashboard','ownerPortal','reports','admissions','admissionReqs','inquiries','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','questionBank','hallTickets','feePayments','accounts','feeStructure','payroll','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','recruitment','account','settings','about'],
       supervisor: ['dashboard','reports','attendance','substitutes','marks','hallTickets','exams','notices','ptm','calendar','discipline','conduct','helpdesk','complaints','lessonPlans','logbook','activities','students','parents','classes','subjects','assignments','documents','timetable','account','about'],
       clerk: ['admissions','admissionReqs','students','parents','feePayments','accounts','feeStructure','sms','reports','attendance','helpdesk','complaints','documents','assets','inventory','timetable','classes','notices','calendar','account','about'],
+      // bursar/accountant — finance + asset/stock inventory only, nothing else (per-role scoped portal)
+      bursar: ['dashboard','feePayments','feeStructure','accounts','payroll','assets','inventory','account','about'],
       teacher: ['timetable','attendance','substitutes','marks','questionBank','payroll','hallTickets','exams','lessonPlans','ptm','logbook','students','discipline','conduct','activities','notices','reports','calendar','documents','complaints','classes','subjects','account','about'],
       // student: dashboard → own-class academics → own records → support → profile. Read-only everywhere except helpdesk/complaints/account.
       student: ['dashboard','timetable','attendance','marks','hallTickets','exams','notices','calendar','feePayments','feeStructure','activities','conduct','discipline','documents','helpdesk','complaints','account','about'],
@@ -6131,6 +6222,7 @@
                       options={[
                         { value: 'admin', label: 'Admin' },
                         { value: 'clerk', label: 'Clerk' },
+                        { value: 'bursar', label: 'Bursar / Accountant' },
                         { value: 'teacher', label: 'Teacher' },
                         { value: 'supervisor', label: 'Supervisor' },
                         { value: 'owner', label: 'School Owner' },
@@ -6694,6 +6786,7 @@
                     options={[
                       { value: 'admin', label: 'Admin' },
                       { value: 'clerk', label: 'Clerk' },
+                      { value: 'bursar', label: 'Bursar / Accountant (finance & inventory only)' },
                       { value: 'teacher', label: 'Teacher' },
                       { value: 'supervisor', label: 'Supervisor' },
                       { value: 'owner', label: 'School Owner (read-only monitoring)' },
@@ -23483,9 +23576,11 @@
       });
       const set = (k, v) => setF({ ...f, [k]: v });
       const selected = staff.find(s => String(s.ID) === String(f.TeacherID));
+      const hasSsnit = !!(selected && selected.SSNITNumber);
       const basic = parseFloat(f.BasicSalary) || 0;
       const allowances = parseFloat(f.Allowances) || 0;
-      const ssnit = Math.round(basic * 0.055 * 100) / 100;
+      // no SSNIT number on file → staff has no SSNIT account, so no SSNIT deduction applies
+      const ssnit = hasSsnit ? Math.round(basic * 0.055 * 100) / 100 : 0;
       const incomeTax = parseFloat(f.IncomeTax) || 0;
       const otherDed = parseFloat(f.OtherDeductions) || 0;
       const gross = basic + allowances;
@@ -23495,7 +23590,6 @@
       const handleSubmit = (e) => {
         e.preventDefault();
         if (!f.TeacherID) { Swal.fire({ icon: 'error', title: 'Pick a staff member' }); return; }
-        if (selected && !selected.SSNITNumber) { Swal.fire({ icon: 'error', title: 'No SSNIT number on file', text: 'Add an SSNIT number for ' + selected.FullName + ' in Users / Staff first.' }); return; }
         if (basic <= 0) { Swal.fire({ icon: 'error', title: 'Enter a Basic Salary' }); return; }
         onSave(f);
       };
@@ -23522,14 +23616,14 @@
                 <div className="form-group"><label>Notes</label><input type="text" value={f.Notes} onChange={(e) => set('Notes', e.target.value)} maxLength="200" /></div>
 
                 {selected && !selected.SSNITNumber && (
-                  <div className="settings-info-message" style={{marginBottom:'12px',borderLeftColor:'#ea4335'}}>
-                    <i className="fas fa-triangle-exclamation" style={{color:'#ea4335'}}></i> {selected.FullName} has no SSNIT number on file — add one in Users / Staff before generating this payslip.
+                  <div className="settings-info-message" style={{marginBottom:'12px'}}>
+                    <i className="fas fa-info-circle"></i> {selected.FullName} has no SSNIT number on file — treated as not having an SSNIT account, so this payslip's SSNIT deduction will be GH₵0.00.
                   </div>
                 )}
 
                 <div style={{background:'#f8f9fa',border:'1px solid #e0e0e0',borderRadius:'6px',padding:'12px 14px',fontSize:'13px',marginBottom:'14px'}}>
                   <div style={{display:'flex',justifyContent:'space-between'}}><span>Gross Pay</span><b>GH₵{gross.toFixed(2)}</b></div>
-                  <div style={{display:'flex',justifyContent:'space-between',color:'#888',fontSize:'12px'}}><span>SSNIT (5.5% of basic, auto)</span><span>GH₵{ssnit.toFixed(2)}</span></div>
+                  <div style={{display:'flex',justifyContent:'space-between',color:'#888',fontSize:'12px'}}><span>SSNIT (5.5% of basic{hasSsnit ? ', auto' : ' — no SSNIT account'})</span><span>GH₵{ssnit.toFixed(2)}</span></div>
                   <div style={{display:'flex',justifyContent:'space-between',color:'#888',fontSize:'12px'}}><span>Total Deductions</span><span>GH₵{totalDed.toFixed(2)}</span></div>
                   <div style={{display:'flex',justifyContent:'space-between',borderTop:'1px solid #ddd',marginTop:'6px',paddingTop:'6px'}}><span>Net Pay</span><b style={{color:'#34a853'}}>GH₵{net.toFixed(2)}</b></div>
                 </div>
@@ -29787,6 +29881,8 @@
           day:'Attendance, exams & results, hall tickets, discipline/conduct, notices, PTM, reports.' },
         { id:'clerk',      label:'Clerk',      badge:'role-clerk',      blurb:'Front office. Handles admissions, student & parent records, fee collection and daily accounts.',
           day:'Admissions, students, parents, fee collection, daily accounts, attendance, assets/inventory, notices.' },
+        { id:'bursar',     label:'Bursar / Accountant', badge:'role-clerk', blurb:'Finance-only portal. Fee collection & structure, daily accounts, payroll/SSNIT, and asset/stock inventory — nothing else.',
+          day:'Fee collection & structure, daily accounts, payroll & SSNIT register, assets & stock inventory.' },
         { id:'teacher',    label:'Teacher',    badge:'role-teacher',    blurb:'Classroom work, scoped to assigned classes. Marks attendance, enters results, plans lessons.',
           day:'Timetable, attendance, marks/exams, lesson plans, logbook, discipline/conduct, activities, own-class students.' },
         { id:'student',    label:'Student',    badge:'role-student',    blurb:'Read-only view of own academic life. Can raise helpdesk tickets & complaints and edit own profile.',
@@ -29932,6 +30028,7 @@
       const isAdmin = r === 'admin';
       const isStudent = r === 'student';
       const isParent = r === 'parent';
+      const isBursar = r === 'bursar';
       const canSeeSubjects = r === 'admin' || r === 'teacher' || r === 'supervisor' || isStudent || isParent;
       const canSeeAssignments = r === 'admin' || r === 'supervisor';
       const canSeeAdmissions = r === 'admin' || r === 'clerk';
@@ -29941,14 +30038,14 @@
       const canSeeExams = r === 'admin' || r === 'teacher' || r === 'supervisor' || isStudent || isParent;
       const canSeeMarks = r === 'admin' || r === 'teacher' || r === 'supervisor' || isStudent || isParent;
       const canSeeAttendance = r === 'admin' || r === 'teacher' || r === 'supervisor' || isStudent || isParent;
-      const canSeeFeeStructure = r === 'admin' || r === 'clerk' || isStudent || isParent;
-      const canSeeFeePayments = r === 'admin' || r === 'clerk' || isStudent || isParent;
-      const canSeeAccounts = r === 'admin' || r === 'clerk';
+      const canSeeFeeStructure = r === 'admin' || r === 'clerk' || isBursar || isStudent || isParent;
+      const canSeeFeePayments = r === 'admin' || r === 'clerk' || isBursar || isStudent || isParent;
+      const canSeeAccounts = r === 'admin' || r === 'clerk' || isBursar;
       const canSeeSms = r === 'admin' || r === 'clerk';
       const canSeeFoodMenu = r === 'admin';
       const canSeeGradingSystem = r === 'admin';
       const canSeeQuestionBank = r === 'admin' || r === 'teacher';
-      const canSeePayroll = r === 'admin' || r === 'teacher';
+      const canSeePayroll = r === 'admin' || r === 'teacher' || isBursar;
       const canSeeRecruitment = r === 'admin';
       const canSeeAdmissionReqs = r === 'admin' || r === 'clerk';
       const canSeeInquiries = r === 'admin';
@@ -29966,8 +30063,8 @@
       const canSeeHallTickets = r === 'admin' || r === 'clerk' || r === 'teacher' || r === 'supervisor' || isStudent || isParent;
       const canSeePtm = true; // all roles
       const canSeeSubstitutes = r === 'admin' || r === 'clerk' || r === 'teacher' || r === 'supervisor';
-      const canSeeAssets = r === 'admin' || r === 'clerk' || r === 'teacher' || r === 'supervisor';
-      const canSeeInventory = r === 'admin' || r === 'clerk' || r === 'teacher';
+      const canSeeAssets = r === 'admin' || r === 'clerk' || r === 'teacher' || r === 'supervisor' || isBursar;
+      const canSeeInventory = r === 'admin' || r === 'clerk' || r === 'teacher' || isBursar;
       const canSeeReports = r === 'admin' || r === 'clerk' || r === 'supervisor' || r === 'teacher';
 
       const denied = (label) => (

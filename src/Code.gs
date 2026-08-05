@@ -1025,12 +1025,12 @@ function canReadAttendance(role) {
 
 function canReadFeeStructure(role) {
   var r = String(role || '').toLowerCase();
-  return r === 'admin' || r === 'clerk' || r === 'student' || r === 'parent';
+  return r === 'admin' || r === 'clerk' || r === 'bursar' || r === 'student' || r === 'parent';
 }
 
 function canReadPayments(role) {
   var r = String(role || '').toLowerCase();
-  return r === 'admin' || r === 'clerk' || r === 'student' || r === 'parent';
+  return r === 'admin' || r === 'clerk' || r === 'bursar' || r === 'student' || r === 'parent';
 }
 
 function nextAttendanceId(sh) {
@@ -4502,6 +4502,20 @@ function isAdminOrClerk(role) {
   return r === 'admin' || r === 'clerk';
 }
 
+// bursar — the finance/accountant portal role. Full admin-equivalent control, but scoped only to
+// fee payments, fee structure, daily accounts, payroll/SSNIT and asset/stock inventory (enforced
+// per-function below and by the sidebar's MENU_PRIORITY.bursar list in index.html — bursar never
+// gets isAdmin() true, so every non-finance admin-only function stays out of reach automatically).
+function isAdminOrBursar(role) {
+  var r = String(role || '').toLowerCase();
+  return r === 'admin' || r === 'bursar';
+}
+// finance modules where clerk already co-manages alongside admin — bursar joins at the same level
+function isFinanceStaff(role) {
+  var r = String(role || '').toLowerCase();
+  return r === 'admin' || r === 'clerk' || r === 'bursar';
+}
+
 // reports hub — full set is admin/clerk/supervisor only
 function canViewReports(role) {
   return ['admin', 'clerk', 'supervisor', 'owner'].indexOf(String(role || '').toLowerCase()) !== -1;
@@ -5304,7 +5318,7 @@ function rowToTransaction(row, umap) {
 
 function getAllTransactions(currentUser, currentRole) {
   try {
-    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
+    if (!isFinanceStaff(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
     var sh = getSheet(ACCOUNT_TXN_SHEET);
     if (!sh) return { success: false, message: 'Account_Transactions sheet not found' };
     var data = sh.getDataRange().getValues();
@@ -5359,7 +5373,7 @@ function _validateTransactionFields(d) {
 
 function addTransaction(d, currentUser, currentRole) {
   try {
-    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
+    if (!isFinanceStaff(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
     var sh = getSheet(ACCOUNT_TXN_SHEET);
     if (!sh) return { success: false, message: 'Account_Transactions sheet not found' };
     var v = _validateTransactionFields(d);
@@ -5377,7 +5391,7 @@ function addTransaction(d, currentUser, currentRole) {
 
 function updateTransaction(id, d, currentUser, currentRole) {
   try {
-    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
+    if (!isFinanceStaff(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
     var sh = getSheet(ACCOUNT_TXN_SHEET);
     if (!sh) return { success: false, message: 'Account_Transactions sheet not found' };
     var idn = parseInt(id, 10);
@@ -5408,7 +5422,7 @@ function updateTransaction(id, d, currentUser, currentRole) {
 
 function deleteTransaction(id, currentUser, currentRole) {
   try {
-    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
+    if (!isFinanceStaff(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
     var sh = getSheet(ACCOUNT_TXN_SHEET);
     if (!sh) return { success: false, message: 'Account_Transactions sheet not found' };
     var idn = parseInt(id, 10);
@@ -5431,7 +5445,7 @@ function deleteTransaction(id, currentUser, currentRole) {
 // "Today's Accounts" KPI tile — income/expense/net for today + current month. admin/clerk only
 function getAccountTodaySummary(currentUser, currentRole) {
   try {
-    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
+    if (!isFinanceStaff(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
     var tStr = todayStr(), mStr = tStr.slice(0, 7); // today, current YYYY-MM
     var t = { income: 0, expense: 0 }, m = { income: 0, expense: 0 };
     // fee payments → income (cols: 3=AmountPaid, 7=PaymentDate, 15=IsDeleted)
@@ -8200,7 +8214,7 @@ function getAllFeeStructures(currentUser, currentRole) {
 // at a glance during a parent inquiry, even when the amount varies by class.
 function getFeeTypeBreakdown(currentUser, currentRole) {
   try {
-    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
+    if (!isFinanceStaff(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
     var sh = getSheet(FEE_STRUCTURE_SHEET);
     if (!sh) return { success: true, data: [] };
     var data = sh.getDataRange().getValues();
@@ -8255,7 +8269,7 @@ function feeStructureExists(sh, classId, category, frequency, academicYear, excl
 
 function addFeeStructure(data, currentUser, currentRole) {
   try {
-    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
+    if (!isFinanceStaff(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
 
     var sh = getSheet(FEE_STRUCTURE_SHEET);
     if (!sh) return { success: false, message: 'Fee_Structure sheet not found' };
@@ -8318,7 +8332,7 @@ function addFeeStructure(data, currentUser, currentRole) {
 // validation/shape as addFeeStructure — just looped, so the two never drift apart.
 function addFeeTypeBulk(d, currentUser, currentRole) {
   try {
-    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
+    if (!isFinanceStaff(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
     var sh = getSheet(FEE_STRUCTURE_SHEET);
     if (!sh) return { success: false, message: 'Fee_Structure sheet not found' };
 
@@ -8372,7 +8386,7 @@ function addFeeTypeBulk(d, currentUser, currentRole) {
 
 function updateFeeStructure(id, data, currentUser, currentRole) {
   try {
-    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
+    if (!isFinanceStaff(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
     var sh = getSheet(FEE_STRUCTURE_SHEET);
     if (!sh) return { success: false, message: 'Fee_Structure sheet not found' };
     var idn = parseInt(id, 10);
@@ -8445,7 +8459,7 @@ function updateFeeStructure(id, data, currentUser, currentRole) {
 
 function deleteFeeStructure(id, currentUser, currentRole) {
   try {
-    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
+    if (!isFinanceStaff(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
     var sh = getSheet(FEE_STRUCTURE_SHEET);
     if (!sh) return { success: false, message: 'Fee_Structure sheet not found' };
     var idn = parseInt(id, 10);
@@ -8604,7 +8618,7 @@ function receiptNumberExists(sh, receiptNo, excludeId) {
 function addPayment(p, currentUser, currentRole) {
   try {
     var role = String(currentRole).toLowerCase();
-    if (role !== 'admin' && role !== 'clerk') return { success: false, message: 'Forbidden — admin or clerk only' };
+    if (role !== 'admin' && role !== 'clerk' && role !== 'bursar') return { success: false, message: 'Forbidden — admin, clerk or bursar only' };
 
     var sh = getSheet(FEE_PAYMENTS_SHEET);
     if (!sh) return { success: false, message: 'Fee_Payments sheet not found' };
@@ -8697,7 +8711,7 @@ function addPayment(p, currentUser, currentRole) {
 function addPaymentsBulk(payments, currentUser, currentRole) {
   try {
     var role = String(currentRole).toLowerCase();
-    if (role !== 'admin' && role !== 'clerk') return { success: false, message: 'Forbidden — admin or clerk only' };
+    if (role !== 'admin' && role !== 'clerk' && role !== 'bursar') return { success: false, message: 'Forbidden — admin, clerk or bursar only' };
     if (!Array.isArray(payments) || payments.length === 0) return { success: false, message: 'No payments provided' };
     if (payments.length > 50) return { success: false, message: 'Bulk limit is 50 rows per call' };
 
@@ -8797,7 +8811,7 @@ function addPaymentsBulk(payments, currentUser, currentRole) {
 function updatePayment(id, p, currentUser, currentRole) {
   try {
     var role = String(currentRole).toLowerCase();
-    if (role !== 'admin' && role !== 'clerk') return { success: false, message: 'Forbidden — admin or clerk only' };
+    if (role !== 'admin' && role !== 'clerk' && role !== 'bursar') return { success: false, message: 'Forbidden — admin, clerk or bursar only' };
 
     var sh = getSheet(FEE_PAYMENTS_SHEET);
     if (!sh) return { success: false, message: 'Fee_Payments sheet not found' };
@@ -8904,7 +8918,7 @@ function updatePayment(id, p, currentUser, currentRole) {
 
 function deletePayment(id, currentUser, currentRole) {
   try {
-    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    if (!isAdminOrBursar(currentRole)) return { success: false, message: 'Forbidden — admin or bursar only' };
     var sh = getSheet(FEE_PAYMENTS_SHEET);
     if (!sh) return { success: false, message: 'Fee_Payments sheet not found' };
     var idn = parseInt(id, 10);
@@ -11396,7 +11410,7 @@ function _rowToPayslip(row, umap) {
 function getAllPayslips(currentUser, currentRole) {
   try {
     var role = String(currentRole || '').toLowerCase();
-    if (role !== 'admin' && role !== 'clerk' && role !== 'teacher') return { success: false, message: 'Forbidden' };
+    if (role !== 'admin' && role !== 'clerk' && role !== 'teacher' && role !== 'bursar') return { success: false, message: 'Forbidden' };
     var sh = _ensurePayslipsSheet();
     var data = sh.getDataRange().getValues();
     var umap = getUsersMap();
@@ -11417,13 +11431,15 @@ function getAllPayslips(currentUser, currentRole) {
 // admin only — Basic + Allowances + admin-entered IncomeTax/OtherDeductions; SSNIT auto-computed
 function generatePayslip(d, currentUser, currentRole) {
   try {
-    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    if (!isAdminOrBursar(currentRole)) return { success: false, message: 'Forbidden — admin or bursar only' };
     var tid = parseInt(d.TeacherID, 10);
     if (isNaN(tid)) return { success: false, message: 'Staff member is required' };
     var umap = getUsersMap();
     var teacher = umap[tid];
     if (!teacher) return { success: false, message: 'Staff member not found' };
-    if (!teacher.ssnitNumber) return { success: false, message: 'This staff member has no SSNIT number on file. Add it via Users / Staff before generating a payslip.' };
+    // no SSNIT number on file → staff has no SSNIT account, so no SSNIT deduction applies (not a
+    // block on generating the payslip; it just generates with a zero SSNIT line)
+    var hasSsnit = !!teacher.ssnitNumber;
 
     var month = parseInt(d.PayPeriodMonth, 10);
     var year = parseInt(d.PayPeriodYear, 10);
@@ -11445,7 +11461,7 @@ function generatePayslip(d, currentUser, currentRole) {
       }
     }
 
-    var ssnit = Math.round(basic * SSNIT_EMPLOYEE_RATE * 100) / 100;
+    var ssnit = hasSsnit ? Math.round(basic * SSNIT_EMPLOYEE_RATE * 100) / 100 : 0;
     var gross = basic + allowances;
     var totalDeductions = ssnit + incomeTax + otherDeductions;
     var net = gross - totalDeductions;
@@ -11464,7 +11480,7 @@ function generatePayslip(d, currentUser, currentRole) {
 
 function deletePayslip(id, currentUser, currentRole) {
   try {
-    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    if (!isAdminOrBursar(currentRole)) return { success: false, message: 'Forbidden — admin or bursar only' };
     var idn = parseInt(id, 10);
     var sh = _ensurePayslipsSheet();
     var data = sh.getDataRange().getValues();
@@ -11486,7 +11502,7 @@ function deletePayslip(id, currentUser, currentRole) {
 // parallel data model — Payslips.SSNITContribution stays the single source of truth.
 function getSsnitRegister(currentUser, currentRole) {
   try {
-    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
+    if (!isFinanceStaff(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
     var ush = getSheet(USERS_SHEET);
     if (!ush) return { success: true, data: [] };
     var udata = ush.getDataRange().getValues();
@@ -12652,7 +12668,7 @@ function getOnlineUsersCount(currentUser, currentRole) {
 function sendFeeReminderSms(studentId, amountDue, currentUser, currentRole) {
   try {
     var role = String(currentRole || '').toLowerCase();
-    if (role !== 'admin' && role !== 'clerk') return { success: false, message: 'Forbidden — admin or clerk only' };
+    if (role !== 'admin' && role !== 'clerk' && role !== 'bursar') return { success: false, message: 'Forbidden — admin, clerk or bursar only' };
     var sid = parseInt(studentId, 10);
     if (isNaN(sid)) return { success: false, message: 'Invalid student id' };
 
@@ -16099,12 +16115,12 @@ function getAvailableTeachersForSlot(date, periodNumber, classId, currentUser, c
 // RBAC
 function canReadAssets(role) {
   var r = String(role || '').toLowerCase();
-  return r === 'admin' || r === 'clerk' || r === 'teacher' || r === 'supervisor';
+  return r === 'admin' || r === 'clerk' || r === 'teacher' || r === 'supervisor' || r === 'bursar';
 }
-function canWriteAssets(role) { return String(role || '').toLowerCase() === 'admin'; }
+function canWriteAssets(role) { return isAdminOrBursar(role); }
 function canMaintainAsset(role) {
   var r = String(role || '').toLowerCase();
-  return r === 'admin' || r === 'clerk';
+  return r === 'admin' || r === 'clerk' || r === 'bursar';
 }
 
 var ASSET_CATEGORIES = ['computer','projector','furniture','lab_equipment','sports_equipment','av_equipment','office_equipment','other'];
@@ -16447,16 +16463,16 @@ function deleteMaintenanceRecord(id, currentUser, currentRole) {
 // RBAC
 function canReadStock(role) {
   var r = String(role || '').toLowerCase();
-  // supervisor = read-only (ops oversight); write/issue stays admin/clerk
-  return r === 'admin' || r === 'clerk' || r === 'teacher' || r === 'supervisor';
+  // supervisor = read-only (ops oversight); write/issue stays admin/clerk/bursar
+  return r === 'admin' || r === 'clerk' || r === 'teacher' || r === 'supervisor' || r === 'bursar';
 }
 function canWriteStock(role) {
   var r = String(role || '').toLowerCase();
-  return r === 'admin' || r === 'clerk';
+  return r === 'admin' || r === 'clerk' || r === 'bursar';
 }
 function canIssueStock(role) {
   var r = String(role || '').toLowerCase();
-  return r === 'admin' || r === 'clerk';
+  return r === 'admin' || r === 'clerk' || r === 'bursar';
 }
 
 var STOCK_CATEGORIES = ['stationery','cleaning','kitchen','lab','medical','sports','other'];
@@ -17570,7 +17586,7 @@ function getSupervisorDashboardData(currentUser, currentRole) {
 function getClerkDashboardData(currentUser, currentRole) {
   try {
     var role = String(currentRole || '').toLowerCase();
-    if (role !== 'admin' && role !== 'clerk') return { success: false, message: 'Forbidden' };
+    if (role !== 'admin' && role !== 'clerk' && role !== 'bursar') return { success: false, message: 'Forbidden' };
 
     var today = new Date();
     var todayStr_ = today.toISOString().split('T')[0];
@@ -18349,7 +18365,7 @@ function toggleDisciplineParentNotified(disciplineId, currentUser, currentRole) 
 function emailFeeReceipt(paymentId, currentUser, currentRole) {
   try {
     var role = String(currentRole || '').toLowerCase();
-    if (role !== 'admin' && role !== 'clerk') return { success: false, message: 'Forbidden — admin/clerk only' };
+    if (role !== 'admin' && role !== 'clerk' && role !== 'bursar') return { success: false, message: 'Forbidden — admin/clerk/bursar only' };
     var pid = parseInt(paymentId, 10);
     if (isNaN(pid)) return { success: false, message: 'Invalid payment id' };
 
@@ -18431,7 +18447,7 @@ function emailFeeReceipt(paymentId, currentUser, currentRole) {
 // refund a payment (admin only) — sets RefundAmount/Date/Reason and flips status to 'refunded'
 function refundPayment(paymentId, refundAmount, refundReason, currentUser, currentRole) {
   try {
-    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    if (!isAdminOrBursar(currentRole)) return { success: false, message: 'Forbidden — admin or bursar only' };
     var pid = parseInt(paymentId, 10);
     if (isNaN(pid)) return { success: false, message: 'Invalid payment id' };
     var amt = parseFloat(refundAmount);
@@ -19334,7 +19350,7 @@ function upsertReportRemarks(d, currentUser, currentRole) {
 function getParentFeesSummary(parentId, currentUser, currentRole) {
   try {
     var role = String(currentRole || '').toLowerCase();
-    if (role !== 'admin' && role !== 'clerk') return { success: false, message: 'Forbidden — admin/clerk only' };
+    if (role !== 'admin' && role !== 'clerk' && role !== 'bursar') return { success: false, message: 'Forbidden — admin/clerk/bursar only' };
 
     var pid = parseInt(parentId, 10);
     if (isNaN(pid)) return { success: false, message: 'Invalid parent id' };
@@ -19723,12 +19739,12 @@ function getStudentMonthlyDues(studentId, currentUser, currentRole) {
     } else if (role === 'parent') {
       var kids = _resolveParentChildrenIds(currentUser);
       if (kids.indexOf(sid) === -1) return { success: false, message: 'Forbidden — not your child' };
-    } else if (role !== 'admin' && role !== 'clerk') {
-      return { success: false, message: 'Forbidden — admin/clerk/student/parent only' };
+    } else if (role !== 'admin' && role !== 'clerk' && role !== 'bursar') {
+      return { success: false, message: 'Forbidden — admin/clerk/bursar/student/parent only' };
     }
 
-    // ensure latest month is generated before reading (admin/clerk only — others see what exists)
-    if (role === 'admin' || role === 'clerk') generateStudentDues(sid, null);
+    // ensure latest month is generated before reading (admin/clerk/bursar only — others see what exists)
+    if (role === 'admin' || role === 'clerk' || role === 'bursar') generateStudentDues(sid, null);
 
     var dsh = _ensureFeeDuesSheet();
     var data = dsh.getDataRange().getValues();
@@ -19765,7 +19781,7 @@ function getStudentMonthlyDues(studentId, currentUser, currentRole) {
 function payMonthlyDues(payload, currentUser, currentRole) {
   try {
     var role = String(currentRole || '').toLowerCase();
-    if (role !== 'admin' && role !== 'clerk') return { success: false, message: 'Forbidden — admin/clerk only' };
+    if (role !== 'admin' && role !== 'clerk' && role !== 'bursar') return { success: false, message: 'Forbidden — admin/clerk/bursar only' };
 
     var sid = parseInt(payload.StudentID, 10);
     if (isNaN(sid)) return { success: false, message: 'Invalid student id' };
