@@ -3246,68 +3246,28 @@
   <div id="global-loading-bar"><div id="global-loading-bar-fill"></div></div>
   <div id="root"></div>
 
-  <script>
-    // Global save/load progress bar — wraps google.script.run once, here, so every call site in
-    // the app (hundreds of them, mostly calling google.script.run directly rather than through
-    // gsrCall/swrFetcher) shows the thin top-of-page bar with zero per-call-site changes needed.
-    // A Proxy intercepts .withSuccessHandler()/.withFailureHandler() to wrap whatever handler the
-    // caller passes (tracked via a shared state object threaded through the chain), and intercepts
-    // the final dynamic method call (the actual RPC name) to bump the in-flight counter. A 20s
-    // safety timeout guards call sites that register no failure handler at all, so a dropped
-    // response can never leave the bar stuck on screen forever.
-    (function () {
-      var pending = 0;
-      var bar = null;
-      function barEl() { return bar || (bar = document.getElementById('global-loading-bar')); }
-      function show() { var el = barEl(); if (el) el.classList.add('active'); }
-      function hide() { var el = barEl(); if (el) el.classList.remove('active'); }
-      function dec() { pending = Math.max(0, pending - 1); if (pending === 0) hide(); }
-
-      function wrapRunner(target) {
-        return new Proxy(target, {
-          get: function (obj, prop) {
-            if (prop === 'withSuccessHandler' || prop === 'withFailureHandler') {
-              return function (handler) {
-                var state = obj.__gsrState || (obj.__gsrState = { done: false });
-                var wrapped = function () {
-                  if (state.done) return;
-                  state.done = true;
-                  dec();
-                  if (typeof handler === 'function') return handler.apply(this, arguments);
-                };
-                var next = obj[prop](wrapped);
-                next.__gsrState = state;
-                return wrapRunner(next);
-              };
-            }
-            var v = obj[prop];
-            if (typeof v === 'function') {
-              return function () {
-                pending++;
-                show();
-                var state = obj.__gsrState || { done: false };
-                setTimeout(function () { if (!state.done) { state.done = true; dec(); } }, 20000);
-                return v.apply(obj, arguments);
-              };
-            }
-            return v;
-          }
-        });
-      }
-
-      try {
-        if (window.google && window.google.script && window.google.script.run) {
-          var original = window.google.script.run;
-          Object.defineProperty(window.google.script, 'run', {
-            configurable: true,
-            get: function () { return wrapRunner(original); }
-          });
-        }
-      } catch (e) { /* if the host forbids redefining google.script.run, the bar just never shows — no functional impact */ }
-    })();
-  </script>
-
   <script type="text/babel">
+    // Global save/load progress bar — driven from inside gsrCall()/_gsrCallRaw() below (our own
+    // promise wrappers), NOT by monkey-patching google.script.run itself. An earlier version used
+    // a Proxy to intercept google.script.run directly so every call site would light the bar with
+    // zero per-call-site changes — but Apps Script's real client bridge does not behave like a
+    // plain chainable object under that kind of interception (handlers stopped firing entirely,
+    // hanging every request — "Signing in…" forever). Wrapping our own already-promisified helpers
+    // is the safe version of the same idea: it can never affect how google.script.run itself
+    // dispatches or resolves a call.
+    var _globalLoadingPending = 0;
+    var _globalLoadingBarEl = null;
+    function _globalLoadingBar() { return _globalLoadingBarEl || (_globalLoadingBarEl = document.getElementById('global-loading-bar')); }
+    function _globalLoadingShow() { var el = _globalLoadingBar(); if (el) el.classList.add('active'); }
+    function _globalLoadingHide() { var el = _globalLoadingBar(); if (el) el.classList.remove('active'); }
+    function _globalLoadingTrack(promise) {
+      _globalLoadingPending++;
+      _globalLoadingShow();
+      var done = function () { _globalLoadingPending = Math.max(0, _globalLoadingPending - 1); if (_globalLoadingPending === 0) _globalLoadingHide(); };
+      promise.then(done, done);
+      return promise;
+    }
+
     const { useState, useEffect, useRef } = React;
 
     // neutral graduation-cap placeholder (mirrors Code.gs DEFAULT_LOGO) — used when a school/user hasn't set a photo yet
@@ -3379,7 +3339,7 @@
 
     // promisify a single google.script.run.<fn>(...args) call
     function gsrCall(fnName, args) {
-      return new Promise((resolve, reject) => {
+      return _globalLoadingTrack(new Promise((resolve, reject) => {
         _gsrQueue.push(() => {
           const done = (settle, val) => { _gsrActive--; _gsrPump(); settle(val); };
           const runner = google.script.run
@@ -3388,7 +3348,7 @@
           runner[fnName].apply(runner, args || []);
         });
         _gsrPump();
-      });
+      }));
     }
 
     // standard fetcher — calls a backend fn returning {success,data,message} and unwraps it
@@ -3398,10 +3358,10 @@
     // as swrFetcher's last-resort attempt, so a stuck/misbehaving queue can never itself be the
     // reason every retry fails the same way.
     function _gsrCallRaw(fnName, args) {
-      return new Promise((resolve, reject) => {
+      return _globalLoadingTrack(new Promise((resolve, reject) => {
         const runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
         runner[fnName].apply(runner, args || []);
-      });
+      }));
     }
 
     // google.script.run occasionally resolves with a null/undefined payload under load (a known
