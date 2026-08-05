@@ -18183,7 +18183,11 @@ function getStudentReportCard(studentId, examId, currentUser, currentRole) {
         });
       }
     }
-    subjects.sort(function(a, b) { return String(a.SubjectName).localeCompare(String(b.SubjectName)); });
+    // core subjects first, then electives — within each group, alphabetical
+    subjects.sort(function(a, b) {
+      if (a.IsOptional !== b.IsOptional) return a.IsOptional ? 1 : -1;
+      return String(a.SubjectName).localeCompare(String(b.SubjectName));
+    });
 
     // all marks for this exam (every student, every subject) — needed for per-subject positions + class totals
     var msh = getSheet(MARKS_SHEET);
@@ -18328,7 +18332,8 @@ function getStudentReportCard(studentId, examId, currentUser, currentRole) {
           AdmissionNumber: studentRow[1],
           FullName: [studentRow[2], studentRow[3], studentRow[4]].filter(function(x) { return x; }).join(' '),
           Gender: studentRow[5],
-          RollNumber: studentRow[26]
+          RollNumber: studentRow[26],
+          PhotoURL: studentRow[33] || ''
         },
         class: { ID: classId, Label: classLabel, Size: classSize, CurriculumStage: curriculumStage, IsJhs: isJhs, GradeBand: gradeBand },
         exam: {

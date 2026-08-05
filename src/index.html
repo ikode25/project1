@@ -12602,15 +12602,23 @@
 
           <div className="rc-title">Student ID: <b>{card.student.AdmissionNumber || '—'}</b></div>
 
-          <div className="rc-info">
-            <div><b>Name:</b> {card.student.FullName || ''}</div>
-            <div><b>Class:</b> {card.class.Label || '—'}</div>
-            <div><b>Gender:</b> {String(card.student.Gender || '').replace(/^./, c => c.toUpperCase()) || '—'}</div>
-            <div><b>Term:</b> {termLabel(card.exam.Term)}</div>
-            <div><b>Class Size:</b> {card.class.Size}</div>
-            <div><b>Year:</b> {card.exam.AcademicYear || '—'}</div>
-            <div><b>Vacation:</b> {fmtDate(card.exam.VacationDate) || '—'}</div>
-            <div><b>Reopening:</b> {fmtDate(card.exam.ReopeningDate) || '—'}</div>
+          <div style={{display:'flex',gap:'14px',alignItems:'stretch'}}>
+            <div className="rc-info" style={{flex:1}}>
+              <div><b>Name:</b> {card.student.FullName || ''}</div>
+              <div><b>Class:</b> {card.class.Label || '—'}</div>
+              <div><b>Gender:</b> {String(card.student.Gender || '').replace(/^./, c => c.toUpperCase()) || '—'}</div>
+              <div><b>Term:</b> {termLabel(card.exam.Term)}</div>
+              <div><b>Class Size:</b> {card.class.Size}</div>
+              <div><b>Year:</b> {card.exam.AcademicYear || '—'}</div>
+              <div><b>Vacation:</b> {fmtDate(card.exam.VacationDate) || '—'}</div>
+              <div><b>Reopening:</b> {fmtDate(card.exam.ReopeningDate) || '—'}</div>
+            </div>
+            {card.student.PhotoURL && (
+              <div style={{flex:'0 0 90px'}}>
+                <img src={card.student.PhotoURL} alt="" onError={(e) => { e.target.style.display = 'none'; }}
+                  style={{width:'90px',height:'104px',objectFit:'cover',border:'1px solid #d0d0d0',background:'#fafafa'}} />
+              </div>
+            )}
           </div>
 
           <table className="rc-mtable">
