@@ -3204,19 +3204,34 @@
     // standard fetcher — calls a backend fn returning {success,data,message} and unwraps it
     function _delay(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
+    // raw, unqueued google.script.run call — bypasses the concurrency queue entirely. Used only
+    // as swrFetcher's last-resort attempt, so a stuck/misbehaving queue can never itself be the
+    // reason every retry fails the same way.
+    function _gsrCallRaw(fnName, args) {
+      return new Promise((resolve, reject) => {
+        const runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+        runner[fnName].apply(runner, args || []);
+      });
+    }
+
     // google.script.run occasionally resolves with a null/undefined payload under load (a known
-    // Apps Script client-bridge quirk, not a real server error) — retry a couple of times with
-    // backoff before surfacing it as a failure, so the UI self-heals instead of showing a false error.
+    // Apps Script client-bridge quirk, not a real server error) — retry several times with
+    // backoff before surfacing it as a failure, so the UI self-heals instead of showing a false
+    // error. The final attempt bypasses the queue entirely as an independent fallback path.
     function swrFetcher(fnName /*, ...args */) {
       const args = Array.prototype.slice.call(arguments, 1);
-      const attempt = (n) => gsrCall(fnName, args).then((res) => {
-        if (res == null) {
-          if (n < 2) return _delay(400 * (n + 1)).then(() => attempt(n + 1));
-          throw new Error('No response from server — please use the refresh button to retry.');
-        }
-        if (res.success === false) throw new Error(res.message || 'Request failed');
-        return Object.prototype.hasOwnProperty.call(res, 'data') ? res.data : res;
-      });
+      const MAX_RETRIES = 4;
+      const attempt = (n) => {
+        const call = n === MAX_RETRIES ? _gsrCallRaw(fnName, args) : gsrCall(fnName, args);
+        return call.then((res) => {
+          if (res == null) {
+            if (n < MAX_RETRIES) return _delay(400 * (n + 1)).then(() => attempt(n + 1));
+            throw new Error('No response from server — please use the refresh button to retry.');
+          }
+          if (res.success === false) throw new Error(res.message || 'Request failed');
+          return Object.prototype.hasOwnProperty.call(res, 'data') ? res.data : res;
+        });
+      };
       return attempt(0);
     }
 
@@ -18222,7 +18237,7 @@
             <table id="paymentsTable" className="display" style={{width: '100%'}}></table>
           </div>
 
-          {!loading && viewMode === 'grid' && (
+          {!loading && viewMode === 'grid' && !(loadError && items.length === 0) && (
             <GridCards
               items={items}
               emptyText="No payments found."
