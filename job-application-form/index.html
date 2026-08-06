@@ -1394,7 +1394,7 @@
             }
 
             .dashboard-content {
-                padding: 20px;
+                padding: 20px 14px;
             }
 
             .search-box input {
@@ -1415,6 +1415,97 @@
             .hide-mobile {
                 display: none;
             }
+
+            /* Tabs scroll horizontally instead of wrapping/overflowing */
+            .tabs-container {
+                padding: 0 10px;
+            }
+
+            .tabs {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+            }
+
+            .tabs::-webkit-scrollbar {
+                display: none;
+            }
+
+            .tab-btn {
+                padding: 14px 16px;
+                white-space: nowrap;
+                flex-shrink: 0;
+            }
+
+            .bulk-actions {
+                flex-wrap: wrap;
+                padding: 12px 14px;
+            }
+
+            .table-header {
+                flex-wrap: wrap;
+                gap: 12px;
+            }
+
+            .table-header-actions {
+                flex-wrap: wrap;
+                width: 100%;
+            }
+
+            .search-box {
+                flex: 1;
+                min-width: 140px;
+            }
+
+            .search-box input {
+                width: 100%;
+            }
+
+            .candidate-header {
+                flex-wrap: wrap;
+                gap: 12px;
+            }
+
+            .candidate-actions {
+                width: 100%;
+                flex-wrap: wrap;
+            }
+
+            .filters-container {
+                padding: 12px;
+            }
+
+            .filter-select,
+            .filter-input {
+                min-width: 0;
+                width: 100%;
+            }
+
+            .modal-content {
+                width: 94%;
+                max-height: 88vh;
+            }
+
+            .modal-footer {
+                flex-wrap: wrap;
+            }
+
+            .toast-container {
+                left: 12px;
+                right: 12px;
+                bottom: 12px;
+            }
+
+            .toast-card {
+                min-width: 0;
+                max-width: none;
+                width: 100%;
+            }
+
+            .sms-balance-badge {
+                font-size: 12px;
+                padding: 5px 10px;
+            }
         }
 
         @media (max-width: 768px) {
@@ -1426,8 +1517,40 @@
                 padding: 20px;
             }
 
+            .header {
+                padding: 22px 18px;
+            }
+
             .header h1 {
-                font-size: 24px;
+                font-size: 22px;
+            }
+
+            .header p {
+                font-size: 13px;
+            }
+
+            .admin-btn {
+                top: 12px;
+                right: 12px;
+            }
+
+            .login-modal-body,
+            .login-modal-header {
+                padding: 20px;
+            }
+        }
+
+        @media (max-width: 420px) {
+            .header h1 {
+                font-size: 19px;
+            }
+
+            .section-title {
+                font-size: 17px;
+            }
+
+            .file-upload {
+                padding: 20px 14px;
             }
         }
 
@@ -4146,7 +4269,7 @@ HR Team`
                                                 }}
                                             />
                                         </div>
-                                        <div style={{ display: 'flex', gap: '15px', marginTop: '15px' }}>
+                                        <div style={{ display: 'flex', gap: '15px', marginTop: '15px', flexWrap: 'wrap' }}>
                                             <button
                                                 className="action-btn"
                                                 onClick={() => {
@@ -4297,7 +4420,7 @@ HR Team`
                                         </div>
 
                                         {/* Save/Reset Buttons */}
-                                        <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', marginTop: '10px' }}>
+                                        <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', marginTop: '10px', flexWrap: 'wrap' }}>
                                             <button
                                                 className="action-btn"
                                                 onClick={() => {
@@ -4477,7 +4600,7 @@ HR Team`
                                             </div>
                                         </div>
 
-                                        <div style={{ display: 'flex', gap: '15px', marginBottom: '10px' }}>
+                                        <div style={{ display: 'flex', gap: '15px', marginBottom: '10px', flexWrap: 'wrap' }}>
                                             <button className="action-btn" onClick={handleSaveTheme} style={{ backgroundColor: '#6a1b9a', color: '#fff', padding: '10px 25px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>
                                                 <i className="fas fa-save"></i> Save Theme
                                             </button>
@@ -4504,7 +4627,7 @@ HR Team`
                                                 </div>
                                             )}
                                             <input type="file" accept="image/*,.gif" onChange={handleBannerFileChange} style={{ marginBottom: '15px' }} />
-                                            <div style={{ display: 'flex', gap: '15px' }}>
+                                            <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
                                                 <button className="action-btn" onClick={handleUploadBanner} style={{ backgroundColor: '#00838f', color: '#fff', padding: '10px 25px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>
                                                     <i className="fas fa-upload"></i> Upload Banner
                                                 </button>
@@ -4604,8 +4727,8 @@ HR Team`
 
                                             {smsConfig.provider === 'custom' && (
                                                 <div style={{ display: 'grid', gap: '15px', marginBottom: '10px' }}>
-                                                    <div style={{ display: 'flex', gap: '15px' }}>
-                                                        <div style={{ flex: 1 }}>
+                                                    <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                                                        <div style={{ flex: 1, minWidth: '200px' }}>
                                                             <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Endpoint URL</label>
                                                             <input type="text" value={smsConfig.custom.url} onChange={(e) => setSmsConfig({ ...smsConfig, custom: { ...smsConfig.custom, url: e.target.value } })} placeholder="https://api.yourprovider.com/send" style={{ width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }} />
                                                         </div>
@@ -4706,7 +4829,7 @@ HR Team`
                                             <p style={{ fontSize: '12px', color: '#999', marginTop: '6px' }}>{(smsTemplates.rejection || '').length} characters</p>
                                         </div>
 
-                                        <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', marginTop: '10px' }}>
+                                        <div style={{ display: 'flex', gap: '15px', justifyContent: 'center', marginTop: '10px', flexWrap: 'wrap' }}>
                                             <button className="action-btn" onClick={handleSaveSmsTemplates} style={{ backgroundColor: '#1976d2', color: '#fff', padding: '12px 30px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>
                                                 <i className="fas fa-save"></i> Save SMS Templates
                                             </button>
