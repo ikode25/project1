@@ -100,7 +100,10 @@ function submitJobApplication(formData, fileName, fileData, coverLetterFileName,
       formData.hndMajor || '',
       formData.hndGrade || '',
       // Cover Letter URL
-      coverLetterUrl
+      coverLetterUrl,
+      // Custom field values (admin-defined fields), stored as a JSON blob
+      // keyed by field id since the set of fields is admin-configurable
+      formData.customFieldValues ? JSON.stringify(formData.customFieldValues) : ''
     ];
 
     // Append to sheet
@@ -164,7 +167,7 @@ function getSpreadsheetId() {
         'Years of Experience', 'Last Organisation', 'Last Designation',
         'Joining Date', 'End Date', 'Currently Working', 'CV URL',
         'HND Programme', 'HND Institute', 'HND Major', 'HND Grade',
-        'Cover Letter URL'
+        'Cover Letter URL', 'Custom Field Values'
       ];
       appSheet.appendRow(headers);
 
@@ -259,7 +262,14 @@ function getAllApplications() {
       hndInstitute: row[39],
       hndMajor: row[40],
       hndGrade: row[41],
-      coverLetterUrl: row[42]
+      coverLetterUrl: row[42],
+      customFieldValues: (() => {
+        try {
+          return row[43] ? JSON.parse(row[43]) : {};
+        } catch (e) {
+          return {};
+        }
+      })()
     }));
 
     // Sort by timestamp (newest first)
@@ -1345,7 +1355,7 @@ function setupDemoData() {
         'Years of Experience', 'Last Organisation', 'Last Designation',
         'Joining Date', 'End Date', 'Currently Working', 'CV URL',
         'HND Programme', 'HND Institute', 'HND Major', 'HND Grade',
-        'Cover Letter URL'
+        'Cover Letter URL', 'Custom Field Values'
       ];
       sheet.appendRow(headers);
 
@@ -1708,6 +1718,8 @@ function setupDemoData() {
         // HND (Higher National Diploma) - not used by demo data
         '', '', '', '',
         // Cover Letter URL - not used by demo data
+        '',
+        // Custom Field Values - not used by demo data
         ''
       ];
       sheet.appendRow(row);
@@ -2550,5 +2562,53 @@ function getSmsBalance() {
   } catch (error) {
     Logger.log('Error getting SMS balance: ' + error.toString());
     return { success: false, message: error.message };
+  }
+}
+
+/* ============================================================
+ * Admin-controlled form fields (show/hide built-in field groups,
+ * define custom fields)
+ * ============================================================ */
+
+function getDefaultFormFieldsConfig() {
+  return {
+    hiddenFields: [],
+    customFields: []
+  };
+}
+
+/**
+ * Gets the saved form fields configuration
+ * @returns {Object} { hiddenFields: string[], customFields: Object[] }
+ */
+function getFormFieldsConfig() {
+  try {
+    const raw = getSetting('FORM_FIELDS_CONFIG', '');
+    const defaults = getDefaultFormFieldsConfig();
+    if (!raw) return defaults;
+
+    const parsed = JSON.parse(raw);
+    return {
+      hiddenFields: Array.isArray(parsed.hiddenFields) ? parsed.hiddenFields : defaults.hiddenFields,
+      customFields: Array.isArray(parsed.customFields) ? parsed.customFields : defaults.customFields
+    };
+  } catch (error) {
+    Logger.log('Error getting form fields config: ' + error.toString());
+    return getDefaultFormFieldsConfig();
+  }
+}
+
+/**
+ * Saves the form fields configuration
+ * @param {Object} config - { hiddenFields: string[], customFields: Object[] }
+ * @returns {Object} Response object
+ */
+function saveFormFieldsConfig(config) {
+  try {
+    setSetting('FORM_FIELDS_CONFIG', JSON.stringify(config));
+    return { status: 'success', message: 'Form fields saved successfully' };
+  } catch (error) {
+    Logger.log('Error saving form fields config: ' + error.toString());
+    return { status: 'error', message: 'Failed to save form fields: ' + error.message };
   }
 }

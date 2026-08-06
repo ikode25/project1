@@ -1817,6 +1817,96 @@
         }
 
         /* ============================================================
+         * Admin-controlled form fields
+         * Built-in fields are grouped at the level admins actually think
+         * about (whole subsections like "HND", not each individual input).
+         * A locked field can't be hidden - it's load-bearing elsewhere
+         * (dedup by email, CV requirement, position tracking, etc.).
+         * ============================================================ */
+
+        const BUILT_IN_FIELDS = [
+            { id: 'applyingFor', label: 'Applying For', section: 'personal', locked: true },
+            { id: 'firstName', label: 'First Name', section: 'personal', locked: true },
+            { id: 'lastName', label: 'Last Name', section: 'personal', locked: true },
+            { id: 'email', label: 'Email', section: 'personal', locked: true },
+            { id: 'mobile', label: 'Mobile Number', section: 'personal', locked: true },
+            { id: 'dob', label: 'Date of Birth', section: 'personal' },
+            { id: 'religion', label: 'Religion', section: 'personal' },
+            { id: 'maritalStatus', label: 'Marital Status', section: 'personal' },
+            { id: 'gender', label: 'Gender', section: 'personal' },
+            { id: 'nationality', label: 'Nationality', section: 'personal' },
+            { id: 'currentAddress', label: 'Current Address', section: 'personal' },
+            { id: 'permanentAddress', label: 'Permanent Address', section: 'personal' },
+            { id: 'ssc', label: 'SSC (Secondary School Certificate)', section: 'education' },
+            { id: 'hsc', label: 'HSC (Higher Secondary Certificate)', section: 'education' },
+            { id: 'bachelor', label: "Bachelor/Undergraduate", section: 'education' },
+            { id: 'hnd', label: 'HND (Higher National Diploma)', section: 'education' },
+            { id: 'postgraduate', label: 'Postgraduate', section: 'education' },
+            { id: 'experience', label: 'Work Experience Details', section: 'experience' },
+            { id: 'coverLetter', label: 'Cover Letter Upload', section: 'documents' }
+        ];
+
+        const CUSTOM_FIELD_TYPES = [
+            { id: 'text', label: 'Short Text' },
+            { id: 'textarea', label: 'Long Text' },
+            { id: 'number', label: 'Number' },
+            { id: 'date', label: 'Date' },
+            { id: 'email', label: 'Email' },
+            { id: 'tel', label: 'Phone' },
+            { id: 'select', label: 'Dropdown' }
+        ];
+
+        const FORM_SECTIONS = [
+            { id: 'personal', label: 'Personal Information' },
+            { id: 'education', label: 'Education' },
+            { id: 'experience', label: 'Experience' }
+        ];
+
+        function getDefaultFormFieldsConfigClient() {
+            return { hiddenFields: [], customFields: [] };
+        }
+
+        // Renders one admin-defined custom field using the same Input/Select
+        // building blocks the built-in fields use, so it looks native.
+        const CustomFieldInput = ({ field, value, onChange }) => {
+            if (field.type === 'textarea') {
+                return (
+                    <TextArea
+                        label={field.label}
+                        name={field.id}
+                        value={value || ''}
+                        onChange={(e) => onChange(field.id, e.target.value)}
+                        required={!!field.required}
+                    />
+                );
+            }
+            if (field.type === 'select') {
+                const options = (field.options || '').split('\n').map(o => o.trim()).filter(Boolean);
+                return (
+                    <Select
+                        label={field.label}
+                        name={field.id}
+                        value={value || ''}
+                        onChange={(e) => onChange(field.id, e.target.value)}
+                        options={options}
+                        required={!!field.required}
+                    />
+                );
+            }
+            return (
+                <Input
+                    label={field.label}
+                    type={field.type || 'text'}
+                    name={field.id}
+                    value={value || ''}
+                    onChange={(e) => onChange(field.id, e.target.value)}
+                    required={!!field.required}
+                    placeholder={field.placeholder || ''}
+                />
+            );
+        };
+
+        /* ============================================================
          * Toast notifications
          * ============================================================ */
 
@@ -2429,7 +2519,7 @@
         };
 
         // Applicant Detail Expanded View Component
-        const ApplicantExpandedView = ({ applicant }) => {
+        const ApplicantExpandedView = ({ applicant, customFieldsConfig }) => {
             const formatDate = (dateStr) => {
                 if (!dateStr) return 'Not provided';
                 try {
@@ -2706,6 +2796,29 @@
                             )}
                         </div>
                     </div>
+
+                    {/* Custom (admin-defined) fields */}
+                    {(customFieldsConfig || []).length > 0 && (
+                        <div className="detail-section">
+                            <div className="detail-section-title">
+                                <i className="fas fa-list-check"></i>
+                                Additional Information
+                            </div>
+                            <div className="detail-grid">
+                                {customFieldsConfig.map(field => {
+                                    const value = applicant.customFieldValues && applicant.customFieldValues[field.id];
+                                    return (
+                                        <div className="detail-item" key={field.id}>
+                                            <span className="detail-label">{field.label}</span>
+                                            <span className={`detail-value ${!value ? 'empty' : ''}`}>
+                                                {value || 'Not provided'}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         };
@@ -3376,6 +3489,12 @@ HR Team`
             const [testSmsPhone, setTestSmsPhone] = useState('');
             const [smsBalance, setSmsBalance] = useState(null); // { success, balance, currency }
 
+            // Form fields configuration (show/hide built-in fields, custom fields)
+            const [formFieldsConfig, setFormFieldsConfig] = useState(getDefaultFormFieldsConfigClient());
+            const [newFieldDraft, setNewFieldDraft] = useState({
+                label: '', type: 'text', required: false, section: 'personal', options: ''
+            });
+
             // Fetch applications on mount
             React.useEffect(() => {
                 fetchApplications();
@@ -3388,6 +3507,7 @@ HR Team`
                 loadSmsConfig();
                 loadSmsTemplates();
                 loadSmsBalance();
+                loadFormFieldsConfig();
             }, []);
 
             // Load job description from Google Sheets
@@ -3482,6 +3602,15 @@ HR Team`
                         .withSuccessHandler((balance) => setSmsBalance(balance))
                         .withFailureHandler((error) => console.error('Failed to load SMS balance:', error))
                         .getSmsBalance();
+                }
+            };
+
+            const loadFormFieldsConfig = () => {
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run
+                        .withSuccessHandler((config) => setFormFieldsConfig(config || getDefaultFormFieldsConfigClient()))
+                        .withFailureHandler((error) => console.error('Failed to load form fields config:', error))
+                        .getFormFieldsConfig();
                 }
             };
 
@@ -3842,6 +3971,65 @@ HR Team`
                         .saveSmsTemplates(smsTemplates);
                 } else {
                     showToast('SMS templates saved (demo mode)!', 'success');
+                }
+            };
+
+            const handleToggleFieldVisibility = (fieldId) => {
+                setFormFieldsConfig(prev => {
+                    const hidden = new Set(prev.hiddenFields || []);
+                    if (hidden.has(fieldId)) {
+                        hidden.delete(fieldId);
+                    } else {
+                        hidden.add(fieldId);
+                    }
+                    return { ...prev, hiddenFields: Array.from(hidden) };
+                });
+            };
+
+            const handleAddCustomField = () => {
+                const label = newFieldDraft.label.trim();
+                if (!label) {
+                    showToast('Give the new field a label first.', 'warning');
+                    return;
+                }
+                if (newFieldDraft.type === 'select' && !newFieldDraft.options.trim()) {
+                    showToast('Add at least one option for a dropdown field (one per line).', 'warning');
+                    return;
+                }
+
+                const newField = {
+                    id: 'custom_' + Date.now(),
+                    label,
+                    type: newFieldDraft.type,
+                    required: !!newFieldDraft.required,
+                    section: newFieldDraft.section,
+                    options: newFieldDraft.type === 'select' ? newFieldDraft.options.trim() : ''
+                };
+
+                setFormFieldsConfig(prev => ({
+                    ...prev,
+                    customFields: [...(prev.customFields || []), newField]
+                }));
+                setNewFieldDraft({ label: '', type: 'text', required: false, section: 'personal', options: '' });
+                showToast('Field added - click "Save Form Fields" to publish it.', 'info');
+            };
+
+            const handleRemoveCustomField = (fieldId) => {
+                if (!confirm('Remove this custom field? Already-submitted answers for it are kept in the sheet, just no longer shown on the form.')) return;
+                setFormFieldsConfig(prev => ({
+                    ...prev,
+                    customFields: (prev.customFields || []).filter(f => f.id !== fieldId)
+                }));
+            };
+
+            const handleSaveFormFields = () => {
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run
+                        .withSuccessHandler(() => showToast('Form fields saved successfully!', 'success'))
+                        .withFailureHandler((error) => showToast('Failed to save form fields: ' + error.message, 'error'))
+                        .saveFormFieldsConfig(formFieldsConfig);
+                } else {
+                    showToast('Form fields saved (demo mode)!', 'success');
                 }
             };
 
@@ -4911,6 +5099,172 @@ HR Team`
                                             </button>
                                         </div>
                                     </div>
+
+                                    {/* Form Fields */}
+                                    <div style={{ marginTop: '40px', paddingTop: '30px', borderTop: '2px solid #e0e0e0' }}>
+                                        <h3 style={{ color: '#00695c', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <i className="fas fa-list-check"></i> Form Fields
+                                        </h3>
+                                        <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#e0f2f1', borderRadius: '8px', border: '1px solid #4db6ac' }}>
+                                            <p style={{ margin: 0, color: '#00695c', fontSize: '14px' }}>
+                                                <i className="fas fa-info-circle"></i> Turn built-in field groups on or off, or add your own custom fields. A few core fields (name, email, mobile, position, CV) can't be removed.
+                                            </p>
+                                        </div>
+
+                                        <div className="template-card" style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', marginBottom: '20px' }}>
+                                            <h4 style={{ marginTop: 0, marginBottom: '15px', color: '#333' }}>Built-in Fields</h4>
+                                            {FORM_SECTIONS.concat([{ id: 'documents', label: 'Documents' }]).map(section => {
+                                                const fields = BUILT_IN_FIELDS.filter(f => f.section === section.id);
+                                                if (fields.length === 0) return null;
+                                                return (
+                                                    <div key={section.id} style={{ marginBottom: '18px' }}>
+                                                        <div style={{ fontSize: '13px', fontWeight: 600, color: '#666', textTransform: 'uppercase', marginBottom: '8px' }}>
+                                                            {section.label}
+                                                        </div>
+                                                        <div style={{ display: 'grid', gap: '8px' }}>
+                                                            {fields.map(field => {
+                                                                const isFieldHidden = (formFieldsConfig.hiddenFields || []).includes(field.id);
+                                                                return (
+                                                                    <div
+                                                                        key={field.id}
+                                                                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#fafafa', borderRadius: '6px', flexWrap: 'wrap', gap: '8px' }}
+                                                                    >
+                                                                        <span style={{ fontSize: '14px', color: '#333' }}>{field.label}</span>
+                                                                        {field.locked ? (
+                                                                            <span style={{ color: '#999', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }} title="Always shown - required for the system to work">
+                                                                                <i className="fas fa-lock"></i> Always shown
+                                                                            </span>
+                                                                        ) : (
+                                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: isFieldHidden ? '#c62828' : '#2e7d32' }}>
+                                                                                {isFieldHidden ? 'Hidden' : 'Visible'}
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    checked={!isFieldHidden}
+                                                                                    onChange={() => handleToggleFieldVisibility(field.id)}
+                                                                                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                                                                />
+                                                                            </label>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+
+                                        <div className="template-card" style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', marginBottom: '20px' }}>
+                                            <h4 style={{ marginTop: 0, marginBottom: '15px', color: '#333' }}>Custom Fields</h4>
+                                            {(formFieldsConfig.customFields || []).length === 0 ? (
+                                                <p style={{ color: '#999', fontSize: '14px', marginBottom: '15px' }}>No custom fields yet.</p>
+                                            ) : (
+                                                <div style={{ display: 'grid', gap: '8px', marginBottom: '20px' }}>
+                                                    {formFieldsConfig.customFields.map(field => {
+                                                        const typeLabel = (CUSTOM_FIELD_TYPES.find(t => t.id === field.type) || {}).label || field.type;
+                                                        const sectionLabel = (FORM_SECTIONS.find(s => s.id === field.section) || {}).label || field.section;
+                                                        return (
+                                                            <div
+                                                                key={field.id}
+                                                                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#fafafa', borderRadius: '6px', flexWrap: 'wrap', gap: '8px' }}
+                                                            >
+                                                                <div>
+                                                                    <strong style={{ fontSize: '14px' }}>{field.label}</strong>
+                                                                    <span style={{ marginLeft: '10px', fontSize: '12px', color: '#666' }}>
+                                                                        {typeLabel} · {sectionLabel}{field.required ? ' · Required' : ''}
+                                                                    </span>
+                                                                </div>
+                                                                <button
+                                                                    className="action-btn btn-reject"
+                                                                    onClick={() => handleRemoveCustomField(field.id)}
+                                                                    style={{ padding: '6px 12px', fontSize: '12px' }}
+                                                                >
+                                                                    <i className="fas fa-trash"></i> Remove
+                                                                </button>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+
+                                            <div style={{ padding: '15px', background: '#fafafa', borderRadius: '8px' }}>
+                                                <h4 style={{ marginTop: 0, marginBottom: '12px', color: '#333', fontSize: '14px' }}>Add a Custom Field</h4>
+                                                <div style={{ display: 'grid', gap: '12px', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', marginBottom: '12px' }}>
+                                                    <div>
+                                                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: '500' }}>Field Label</label>
+                                                        <input
+                                                            type="text"
+                                                            value={newFieldDraft.label}
+                                                            onChange={(e) => setNewFieldDraft({ ...newFieldDraft, label: e.target.value })}
+                                                            placeholder="e.g., LinkedIn Profile"
+                                                            style={{ width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: '500' }}>Field Type</label>
+                                                        <select
+                                                            value={newFieldDraft.type}
+                                                            onChange={(e) => setNewFieldDraft({ ...newFieldDraft, type: e.target.value })}
+                                                            style={{ width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
+                                                        >
+                                                            {CUSTOM_FIELD_TYPES.map(t => (
+                                                                <option key={t.id} value={t.id}>{t.label}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div>
+                                                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: '500' }}>Section</label>
+                                                        <select
+                                                            value={newFieldDraft.section}
+                                                            onChange={(e) => setNewFieldDraft({ ...newFieldDraft, section: e.target.value })}
+                                                            style={{ width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
+                                                        >
+                                                            {FORM_SECTIONS.map(s => (
+                                                                <option key={s.id} value={s.id}>{s.label}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                                                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', cursor: 'pointer' }}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={newFieldDraft.required}
+                                                                onChange={(e) => setNewFieldDraft({ ...newFieldDraft, required: e.target.checked })}
+                                                                style={{ width: '18px', height: '18px' }}
+                                                            />
+                                                            Required
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                                {newFieldDraft.type === 'select' && (
+                                                    <div style={{ marginBottom: '12px' }}>
+                                                        <label style={{ display: 'block', marginBottom: '5px', fontSize: '13px', fontWeight: '500' }}>Options (one per line)</label>
+                                                        <textarea
+                                                            value={newFieldDraft.options}
+                                                            onChange={(e) => setNewFieldDraft({ ...newFieldDraft, options: e.target.value })}
+                                                            placeholder={'Option A\nOption B\nOption C'}
+                                                            style={{ width: '100%', minHeight: '70px', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
+                                                        />
+                                                    </div>
+                                                )}
+                                                <button
+                                                    className="action-btn"
+                                                    onClick={handleAddCustomField}
+                                                    style={{ backgroundColor: '#00695c', color: '#fff', padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+                                                >
+                                                    <i className="fas fa-plus"></i> Add Field
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            className="action-btn"
+                                            onClick={handleSaveFormFields}
+                                            style={{ backgroundColor: '#00695c', color: '#fff', padding: '10px 25px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
+                                        >
+                                            <i className="fas fa-save"></i> Save Form Fields
+                                        </button>
+                                    </div>
                                 </div>
                             ) : activeTab === 'interviews' ? (
                                 // Interviews View
@@ -5297,7 +5651,7 @@ HR Team`
                                                         {expandedRows.has(app.email) && (
                                                             <tr>
                                                                 <td colSpan="9" style={{ padding: 0 }}>
-                                                                    <ApplicantExpandedView applicant={app} />
+                                                                    <ApplicantExpandedView applicant={app} customFieldsConfig={formFieldsConfig.customFields} />
                                                                 </td>
                                                             </tr>
                                                         )}
@@ -5740,330 +6094,391 @@ HR Team`
         };
 
         // Personal Info Section
-        const PersonalInfoSection = ({ formData, handleChange }) => (
-            <div className="section">
-                <div className="section-header">
-                    <div className="section-number">2</div>
-                    <h2 className="section-title">Personal Information</h2>
-                </div>
+        const PersonalInfoSection = ({ formData, handleChange, hiddenFields, customFields, customFieldValues, onCustomFieldChange }) => {
+            const hidden = hiddenFields || new Set();
+            const isHidden = (id) => hidden.has(id);
 
-                <Input
-                    label="Applying For"
-                    name="applyingFor"
-                    value={formData.applyingFor}
-                    onChange={handleChange}
-                    required={true}
-                    placeholder="Enter Position From the JD"
-                />
+            return (
+                <div className="section">
+                    <div className="section-header">
+                        <div className="section-number">2</div>
+                        <h2 className="section-title">Personal Information</h2>
+                    </div>
 
-                <div className="form-row">
                     <Input
-                        label="First Name"
-                        name="firstName"
-                        value={formData.firstName}
+                        label="Applying For"
+                        name="applyingFor"
+                        value={formData.applyingFor}
                         onChange={handleChange}
                         required={true}
-                        placeholder="Enter first name"
+                        placeholder="Enter Position From the JD"
                     />
-                    <Input
-                        label="Last Name"
-                        name="lastName"
-                        value={formData.lastName}
-                        onChange={handleChange}
-                        required={true}
-                        placeholder="Enter last name"
-                    />
+
+                    <div className="form-row">
+                        <Input
+                            label="First Name"
+                            name="firstName"
+                            value={formData.firstName}
+                            onChange={handleChange}
+                            required={true}
+                            placeholder="Enter first name"
+                        />
+                        <Input
+                            label="Last Name"
+                            name="lastName"
+                            value={formData.lastName}
+                            onChange={handleChange}
+                            required={true}
+                            placeholder="Enter last name"
+                        />
+                    </div>
+
+                    <div className="form-row">
+                        <Input
+                            label="Email"
+                            type="email"
+                            name="email"
+                            value={formData.email}
+                            onChange={handleChange}
+                            required={true}
+                            placeholder="your.email@example.com"
+                        />
+                        <Input
+                            label="Mobile Number"
+                            type="tel"
+                            name="mobile"
+                            value={formData.mobile}
+                            onChange={handleChange}
+                            required={true}
+                            placeholder="+1234567890"
+                        />
+                    </div>
+
+                    {(!isHidden('dob') || !isHidden('religion')) && (
+                        <div className="form-row">
+                            {!isHidden('dob') && (
+                                <Input
+                                    label="Date of Birth"
+                                    type="date"
+                                    name="dob"
+                                    value={formData.dob}
+                                    onChange={handleChange}
+                                    required={true}
+                                />
+                            )}
+                            {!isHidden('religion') && (
+                                <Select
+                                    label="Religion"
+                                    name="religion"
+                                    value={formData.religion}
+                                    onChange={handleChange}
+                                    options={['Islam', 'Christianity', 'Hinduism', 'Buddhism', 'Other', 'Prefer not to say']}
+                                />
+                            )}
+                        </div>
+                    )}
+
+                    {(!isHidden('maritalStatus') || !isHidden('gender')) && (
+                        <div className="form-row">
+                            {!isHidden('maritalStatus') && (
+                                <Select
+                                    label="Marital Status"
+                                    name="maritalStatus"
+                                    value={formData.maritalStatus}
+                                    onChange={handleChange}
+                                    required={true}
+                                    options={['Married', 'Unmarried', 'Divorced']}
+                                />
+                            )}
+                            {!isHidden('gender') && (
+                                <Select
+                                    label="Gender"
+                                    name="gender"
+                                    value={formData.gender}
+                                    onChange={handleChange}
+                                    required={true}
+                                    options={['Male', 'Female', 'Other']}
+                                />
+                            )}
+                        </div>
+                    )}
+
+                    {!isHidden('nationality') && (
+                        <Input
+                            label="Nationality"
+                            name="nationality"
+                            value={formData.nationality}
+                            onChange={handleChange}
+                            required={true}
+                            placeholder="Enter nationality"
+                        />
+                    )}
+
+                    {!isHidden('currentAddress') && (
+                        <TextArea
+                            label="Current Address"
+                            name="currentAddress"
+                            value={formData.currentAddress}
+                            onChange={handleChange}
+                            required={true}
+                        />
+                    )}
+
+                    {!isHidden('permanentAddress') && (
+                        <TextArea
+                            label="Permanent Address"
+                            name="permanentAddress"
+                            value={formData.permanentAddress}
+                            onChange={handleChange}
+                            required={true}
+                        />
+                    )}
+
+                    {(customFields || []).map(field => (
+                        <CustomFieldInput
+                            key={field.id}
+                            field={field}
+                            value={customFieldValues && customFieldValues[field.id]}
+                            onChange={onCustomFieldChange}
+                        />
+                    ))}
                 </div>
-
-                <div className="form-row">
-                    <Input
-                        label="Email"
-                        type="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleChange}
-                        required={true}
-                        placeholder="your.email@example.com"
-                    />
-                    <Input
-                        label="Mobile Number"
-                        type="tel"
-                        name="mobile"
-                        value={formData.mobile}
-                        onChange={handleChange}
-                        required={true}
-                        placeholder="+1234567890"
-                    />
-                </div>
-
-                <div className="form-row">
-                    <Input
-                        label="Date of Birth"
-                        type="date"
-                        name="dob"
-                        value={formData.dob}
-                        onChange={handleChange}
-                        required={true}
-                    />
-                    <Select
-                        label="Religion"
-                        name="religion"
-                        value={formData.religion}
-                        onChange={handleChange}
-                        options={['Islam', 'Christianity', 'Hinduism', 'Buddhism', 'Other', 'Prefer not to say']}
-                    />
-                </div>
-
-                <div className="form-row">
-                    <Select
-                        label="Marital Status"
-                        name="maritalStatus"
-                        value={formData.maritalStatus}
-                        onChange={handleChange}
-                        required={true}
-                        options={['Married', 'Unmarried', 'Divorced']}
-                    />
-                    <Select
-                        label="Gender"
-                        name="gender"
-                        value={formData.gender}
-                        onChange={handleChange}
-                        required={true}
-                        options={['Male', 'Female', 'Other']}
-                    />
-                </div>
-
-                <Input
-                    label="Nationality"
-                    name="nationality"
-                    value={formData.nationality}
-                    onChange={handleChange}
-                    required={true}
-                    placeholder="Enter nationality"
-                />
-
-                <TextArea
-                    label="Current Address"
-                    name="currentAddress"
-                    value={formData.currentAddress}
-                    onChange={handleChange}
-                    required={true}
-                />
-
-                <TextArea
-                    label="Permanent Address"
-                    name="permanentAddress"
-                    value={formData.permanentAddress}
-                    onChange={handleChange}
-                    required={true}
-                />
-            </div>
-        );
+            );
+        };
 
         // Education Section
-        const EducationSection = ({ formData, handleChange }) => (
-            <div className="section">
-                <div className="section-header">
-                    <div className="section-number">3</div>
-                    <h2 className="section-title">Education</h2>
-                </div>
+        const EducationSection = ({ formData, handleChange, hiddenFields, customFields, customFieldValues, onCustomFieldChange }) => {
+            const hidden = hiddenFields || new Set();
+            const isHidden = (id) => hidden.has(id);
 
-                {/* SSC */}
-                <div className="education-subsection">
-                    <h4>SSC (Secondary School Certificate)</h4>
-                    <div className="form-row">
-                        <Input
-                            label="Institute Name"
-                            name="sscInstitute"
-                            value={formData.sscInstitute}
-                            onChange={handleChange}
-                            placeholder="Enter institute name"
-                        />
-                        <Input
-                            label="Major Subject"
-                            name="sscMajor"
-                            value={formData.sscMajor}
-                            onChange={handleChange}
-                            placeholder="e.g., Science"
-                        />
-                        <Input
-                            label="Passing Year"
-                            type="number"
-                            name="sscYear"
-                            value={formData.sscYear}
-                            onChange={handleChange}
-                            placeholder="e.g., 2015"
-                        />
+            return (
+                <div className="section">
+                    <div className="section-header">
+                        <div className="section-number">3</div>
+                        <h2 className="section-title">Education</h2>
                     </div>
-                    <Input
-                        label="GPA/GRADE/CLASS"
-                        name="sscGrade"
-                        value={formData.sscGrade}
-                        onChange={handleChange}
-                        placeholder="e.g., 5.00 or A+"
-                    />
-                </div>
 
-                {/* HSC */}
-                <div className="education-subsection">
-                    <h4>HSC (Higher Secondary Certificate)</h4>
-                    <div className="form-row">
-                        <Input
-                            label="Institute Name"
-                            name="hscInstitute"
-                            value={formData.hscInstitute}
-                            onChange={handleChange}
-                            placeholder="Enter institute name"
-                        />
-                        <Input
-                            label="Major Subject"
-                            name="hscMajor"
-                            value={formData.hscMajor}
-                            onChange={handleChange}
-                            placeholder="e.g., Science"
-                        />
-                        <Input
-                            label="Passing Year"
-                            type="number"
-                            name="hscYear"
-                            value={formData.hscYear}
-                            onChange={handleChange}
-                            placeholder="e.g., 2017"
-                        />
-                    </div>
-                    <Input
-                        label="GPA/GRADE/CLASS"
-                        name="hscGrade"
-                        value={formData.hscGrade}
-                        onChange={handleChange}
-                        placeholder="e.g., 5.00 or A+"
-                    />
-                </div>
+                    {/* SSC */}
+                    {!isHidden('ssc') && (
+                        <div className="education-subsection">
+                            <h4>SSC (Secondary School Certificate)</h4>
+                            <div className="form-row">
+                                <Input
+                                    label="Institute Name"
+                                    name="sscInstitute"
+                                    value={formData.sscInstitute}
+                                    onChange={handleChange}
+                                    placeholder="Enter institute name"
+                                />
+                                <Input
+                                    label="Major Subject"
+                                    name="sscMajor"
+                                    value={formData.sscMajor}
+                                    onChange={handleChange}
+                                    placeholder="e.g., Science"
+                                />
+                                <Input
+                                    label="Passing Year"
+                                    type="number"
+                                    name="sscYear"
+                                    value={formData.sscYear}
+                                    onChange={handleChange}
+                                    placeholder="e.g., 2015"
+                                />
+                            </div>
+                            <Input
+                                label="GPA/GRADE/CLASS"
+                                name="sscGrade"
+                                value={formData.sscGrade}
+                                onChange={handleChange}
+                                placeholder="e.g., 5.00 or A+"
+                            />
+                        </div>
+                    )}
 
-                {/* Bachelor/Undergraduate */}
-                <div className="education-subsection">
-                    <h4>Bachelor/Undergraduate</h4>
-                    <div className="form-row">
-                        <Input
-                            label="Degree Name"
-                            name="bachelorDegree"
-                            value={formData.bachelorDegree}
-                            onChange={handleChange}
-                            placeholder="e.g., B.Sc. in Computer Science or N/A"
-                        />
-                        <Input
-                            label="Institute Name"
-                            name="bachelorInstitute"
-                            value={formData.bachelorInstitute}
-                            onChange={handleChange}
-                            placeholder="Enter university name or N/A"
-                        />
-                    </div>
-                    <div className="form-row">
-                        <Input
-                            label="Major Subject"
-                            name="bachelorMajor"
-                            value={formData.bachelorMajor}
-                            onChange={handleChange}
-                            placeholder="e.g., Computer Science or N/A"
-                        />
-                        <Input
-                            label="CGPA/GRADE/CLASS"
-                            name="bachelorGrade"
-                            value={formData.bachelorGrade}
-                            onChange={handleChange}
-                            placeholder="e.g., 3.85/4.00 or N/A"
-                        />
-                    </div>
-                    <p style={{ fontSize: '13px', color: '#666', marginTop: '8px', fontStyle: 'italic' }}>
-                        Note: Optional if you hold an HND or a Postgraduate degree instead. Write N/A if not applicable.
-                    </p>
-                </div>
+                    {/* HSC */}
+                    {!isHidden('hsc') && (
+                        <div className="education-subsection">
+                            <h4>HSC (Higher Secondary Certificate)</h4>
+                            <div className="form-row">
+                                <Input
+                                    label="Institute Name"
+                                    name="hscInstitute"
+                                    value={formData.hscInstitute}
+                                    onChange={handleChange}
+                                    placeholder="Enter institute name"
+                                />
+                                <Input
+                                    label="Major Subject"
+                                    name="hscMajor"
+                                    value={formData.hscMajor}
+                                    onChange={handleChange}
+                                    placeholder="e.g., Science"
+                                />
+                                <Input
+                                    label="Passing Year"
+                                    type="number"
+                                    name="hscYear"
+                                    value={formData.hscYear}
+                                    onChange={handleChange}
+                                    placeholder="e.g., 2017"
+                                />
+                            </div>
+                            <Input
+                                label="GPA/GRADE/CLASS"
+                                name="hscGrade"
+                                value={formData.hscGrade}
+                                onChange={handleChange}
+                                placeholder="e.g., 5.00 or A+"
+                            />
+                        </div>
+                    )}
 
-                {/* HND (Higher National Diploma) */}
-                <div className="education-subsection">
-                    <h4>HND (Higher National Diploma) - Optional</h4>
-                    <p style={{ fontSize: '13px', color: '#666', marginBottom: '12px', fontStyle: 'italic' }}>
-                        Fill this in if HND is your entry qualification instead of a Bachelor's degree
-                    </p>
-                    <div className="form-row">
-                        <Input
-                            label="Programme Name"
-                            name="hndProgramme"
-                            value={formData.hndProgramme}
-                            onChange={handleChange}
-                            placeholder="e.g., HND in Accountancy"
-                        />
-                        <Input
-                            label="Institute Name"
-                            name="hndInstitute"
-                            value={formData.hndInstitute}
-                            onChange={handleChange}
-                            placeholder="Enter institute name"
-                        />
-                    </div>
-                    <div className="form-row">
-                        <Input
-                            label="Major Subject"
-                            name="hndMajor"
-                            value={formData.hndMajor}
-                            onChange={handleChange}
-                            placeholder="e.g., Accountancy"
-                        />
-                        <Input
-                            label="CGPA/GRADE/CLASS"
-                            name="hndGrade"
-                            value={formData.hndGrade}
-                            onChange={handleChange}
-                            placeholder="e.g., 3.50/4.00"
-                        />
-                    </div>
-                </div>
+                    {/* Bachelor/Undergraduate */}
+                    {!isHidden('bachelor') && (
+                        <div className="education-subsection">
+                            <h4>Bachelor/Undergraduate</h4>
+                            <div className="form-row">
+                                <Input
+                                    label="Degree Name"
+                                    name="bachelorDegree"
+                                    value={formData.bachelorDegree}
+                                    onChange={handleChange}
+                                    placeholder="e.g., B.Sc. in Computer Science or N/A"
+                                />
+                                <Input
+                                    label="Institute Name"
+                                    name="bachelorInstitute"
+                                    value={formData.bachelorInstitute}
+                                    onChange={handleChange}
+                                    placeholder="Enter university name or N/A"
+                                />
+                            </div>
+                            <div className="form-row">
+                                <Input
+                                    label="Major Subject"
+                                    name="bachelorMajor"
+                                    value={formData.bachelorMajor}
+                                    onChange={handleChange}
+                                    placeholder="e.g., Computer Science or N/A"
+                                />
+                                <Input
+                                    label="CGPA/GRADE/CLASS"
+                                    name="bachelorGrade"
+                                    value={formData.bachelorGrade}
+                                    onChange={handleChange}
+                                    placeholder="e.g., 3.85/4.00 or N/A"
+                                />
+                            </div>
+                            <p style={{ fontSize: '13px', color: '#666', marginTop: '8px', fontStyle: 'italic' }}>
+                                Note: Optional if you hold an HND or a Postgraduate degree instead. Write N/A if not applicable.
+                            </p>
+                        </div>
+                    )}
 
-                {/* Postgraduate */}
-                <div className="education-subsection">
-                    <h4>Postgraduate (Optional)</h4>
-                    <p style={{ fontSize: '13px', color: '#666', marginBottom: '12px', fontStyle: 'italic' }}>
-                        Write N/A if None
-                    </p>
-                    <div className="form-row">
-                        <Input
-                            label="Degree Name"
-                            name="postgraduateDegree"
-                            value={formData.postgraduateDegree}
-                            onChange={handleChange}
-                            placeholder="e.g., M.Sc. in Data Science"
-                        />
-                        <Input
-                            label="Institute Name"
-                            name="postgraduateInstitute"
-                            value={formData.postgraduateInstitute}
-                            onChange={handleChange}
-                            placeholder="Enter university name"
-                        />
-                    </div>
-                    <div className="form-row">
-                        <Input
-                            label="Major Subject"
-                            name="postgraduateMajor"
-                            value={formData.postgraduateMajor}
-                            onChange={handleChange}
-                            placeholder="e.g., Data Science"
-                        />
-                        <Input
-                            label="CGPA/GRADE/CLASS"
-                            name="postgraduateGrade"
-                            value={formData.postgraduateGrade}
-                            onChange={handleChange}
-                            placeholder="e.g., 3.90/4.00"
-                        />
-                    </div>
+                    {/* HND (Higher National Diploma) */}
+                    {!isHidden('hnd') && (
+                        <div className="education-subsection">
+                            <h4>HND (Higher National Diploma) - Optional</h4>
+                            <p style={{ fontSize: '13px', color: '#666', marginBottom: '12px', fontStyle: 'italic' }}>
+                                Fill this in if HND is your entry qualification instead of a Bachelor's degree
+                            </p>
+                            <div className="form-row">
+                                <Input
+                                    label="Programme Name"
+                                    name="hndProgramme"
+                                    value={formData.hndProgramme}
+                                    onChange={handleChange}
+                                    placeholder="e.g., HND in Accountancy"
+                                />
+                                <Input
+                                    label="Institute Name"
+                                    name="hndInstitute"
+                                    value={formData.hndInstitute}
+                                    onChange={handleChange}
+                                    placeholder="Enter institute name"
+                                />
+                            </div>
+                            <div className="form-row">
+                                <Input
+                                    label="Major Subject"
+                                    name="hndMajor"
+                                    value={formData.hndMajor}
+                                    onChange={handleChange}
+                                    placeholder="e.g., Accountancy"
+                                />
+                                <Input
+                                    label="CGPA/GRADE/CLASS"
+                                    name="hndGrade"
+                                    value={formData.hndGrade}
+                                    onChange={handleChange}
+                                    placeholder="e.g., 3.50/4.00"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Postgraduate */}
+                    {!isHidden('postgraduate') && (
+                        <div className="education-subsection">
+                            <h4>Postgraduate (Optional)</h4>
+                            <p style={{ fontSize: '13px', color: '#666', marginBottom: '12px', fontStyle: 'italic' }}>
+                                Write N/A if None
+                            </p>
+                            <div className="form-row">
+                                <Input
+                                    label="Degree Name"
+                                    name="postgraduateDegree"
+                                    value={formData.postgraduateDegree}
+                                    onChange={handleChange}
+                                    placeholder="e.g., M.Sc. in Data Science"
+                                />
+                                <Input
+                                    label="Institute Name"
+                                    name="postgraduateInstitute"
+                                    value={formData.postgraduateInstitute}
+                                    onChange={handleChange}
+                                    placeholder="Enter university name"
+                                />
+                            </div>
+                            <div className="form-row">
+                                <Input
+                                    label="Major Subject"
+                                    name="postgraduateMajor"
+                                    value={formData.postgraduateMajor}
+                                    onChange={handleChange}
+                                    placeholder="e.g., Data Science"
+                                />
+                                <Input
+                                    label="CGPA/GRADE/CLASS"
+                                    name="postgraduateGrade"
+                                    value={formData.postgraduateGrade}
+                                    onChange={handleChange}
+                                    placeholder="e.g., 3.90/4.00"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {(customFields || []).length > 0 && (
+                        <div className="education-subsection">
+                            <h4>Additional Information</h4>
+                            {customFields.map(field => (
+                                <CustomFieldInput
+                                    key={field.id}
+                                    field={field}
+                                    value={customFieldValues && customFieldValues[field.id]}
+                                    onChange={onCustomFieldChange}
+                                />
+                            ))}
+                        </div>
+                    )}
                 </div>
-            </div>
-        );
+            );
+        };
 
         // Experience Section
-        const ExperienceSection = ({ formData, handleChange, currentlyWorking, setCurrentlyWorking, isFresher, setIsFresher }) => (
+        const ExperienceSection = ({ formData, handleChange, currentlyWorking, setCurrentlyWorking, isFresher, setIsFresher, customFields, customFieldValues, onCustomFieldChange }) => (
             <div className="section">
                 <div className="section-header">
                     <div className="section-number">4</div>
@@ -6153,11 +6568,20 @@ HR Team`
                         </div>
                     </>
                 )}
+
+                {(customFields || []).map(field => (
+                    <CustomFieldInput
+                        key={field.id}
+                        field={field}
+                        value={customFieldValues && customFieldValues[field.id]}
+                        onChange={onCustomFieldChange}
+                    />
+                ))}
             </div>
         );
 
         // CV Upload Section
-        const CVUploadSection = ({ fileName, handleFileChange, coverLetterFileName, handleCoverLetterFileChange }) => (
+        const CVUploadSection = ({ fileName, handleFileChange, coverLetterFileName, handleCoverLetterFileChange, showCoverLetter = true }) => (
             <div className="section">
                 <div className="section-header">
                     <div className="section-number">5</div>
@@ -6191,28 +6615,30 @@ HR Team`
                     </div>
                 </div>
 
-                <div className="form-group" style={{ marginTop: '20px' }}>
-                    <label>Cover Letter (Optional)</label>
-                    <div className="file-upload">
-                        <label htmlFor="coverLetterUpload" className="file-upload-label">
-                            <div className="file-upload-icon">
-                                <i className="fas fa-file-alt"></i>
-                            </div>
-                            <h3 style={{ color: '#2e7d32', marginBottom: '8px' }}>
-                                {coverLetterFileName || 'Click to upload a cover letter (Optional)'}
-                            </h3>
-                            <p style={{ color: '#66bb6a', fontSize: '14px' }}>
-                                Supported format: PDF only (Max 5MB)
-                            </p>
-                        </label>
-                        <input
-                            type="file"
-                            id="coverLetterUpload"
-                            accept=".pdf"
-                            onChange={handleCoverLetterFileChange}
-                        />
+                {showCoverLetter && (
+                    <div className="form-group" style={{ marginTop: '20px' }}>
+                        <label>Cover Letter (Optional)</label>
+                        <div className="file-upload">
+                            <label htmlFor="coverLetterUpload" className="file-upload-label">
+                                <div className="file-upload-icon">
+                                    <i className="fas fa-file-alt"></i>
+                                </div>
+                                <h3 style={{ color: '#2e7d32', marginBottom: '8px' }}>
+                                    {coverLetterFileName || 'Click to upload a cover letter (Optional)'}
+                                </h3>
+                                <p style={{ color: '#66bb6a', fontSize: '14px' }}>
+                                    Supported format: PDF only (Max 5MB)
+                                </p>
+                            </label>
+                            <input
+                                type="file"
+                                id="coverLetterUpload"
+                                accept=".pdf"
+                                onChange={handleCoverLetterFileChange}
+                            />
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
         );
 
@@ -6233,6 +6659,14 @@ HR Team`
             const [jobDescription, setJobDescription] = useState('We are looking for a talented professional to join our team. The ideal candidate should have excellent skills and a passion for excellence.');
             const [bannerUrl, setBannerUrl] = useState('');
             const [socialLinks, setSocialLinks] = useState({ facebook: '', twitter: '', instagram: '', linkedin: '' });
+            // Starts null (unresolved) so the form waits for the real config
+            // instead of briefly showing fields the admin removed.
+            const [formFieldsConfig, setFormFieldsConfig] = useState(null);
+            const [customFieldValues, setCustomFieldValues] = useState({});
+
+            const handleCustomFieldChange = (fieldId, value) => {
+                setCustomFieldValues(prev => ({ ...prev, [fieldId]: value }));
+            };
 
             // Load job description, appearance theme, banner and social links on mount
             React.useEffect(() => {
@@ -6272,9 +6706,20 @@ HR Team`
                             console.error('Failed to load social links:', error);
                         })
                         .getSocialLinks();
+
+                    google.script.run
+                        .withSuccessHandler((config) => {
+                            setFormFieldsConfig(config || getDefaultFormFieldsConfigClient());
+                        })
+                        .withFailureHandler((error) => {
+                            console.error('Failed to load form fields config:', error);
+                            setFormFieldsConfig(getDefaultFormFieldsConfigClient());
+                        })
+                        .getFormFieldsConfig();
                 } else {
                     // Standalone preview: apply the default theme
                     applyTheme(getDefaultThemeConfig());
+                    setFormFieldsConfig(getDefaultFormFieldsConfigClient());
                 }
                 // Re-fetch whenever admin logs out too, so the public form picks up
                 // job description/theme/banner/social edits made in the same session
@@ -6465,7 +6910,8 @@ HR Team`
                         dob: formatDateToISO(formData.dob),
                         joiningDate: formatDateToISO(formData.joiningDate),
                         endDate: formatDateToISO(formData.endDate),
-                        currentlyWorking: currentlyWorking
+                        currentlyWorking: currentlyWorking,
+                        customFieldValues: customFieldValues
                     };
 
                     // Check if google.script.run is available (running in GAS environment)
@@ -6524,6 +6970,23 @@ HR Team`
                     />
                 );
             }
+
+            // Wait for the form fields config before rendering the form, so
+            // fields the admin removed never briefly flash into view.
+            if (!formFieldsConfig) {
+                return (
+                    <div className="loading-overlay">
+                        <div className="loading-spinner">
+                            <div className="spinner"></div>
+                            <h3 style={{ color: '#2e7d32' }}>Loading application form...</h3>
+                        </div>
+                    </div>
+                );
+            }
+
+            const hiddenFieldSet = new Set(formFieldsConfig.hiddenFields || []);
+            const customFieldsForSection = (sectionId) =>
+                (formFieldsConfig.customFields || []).filter(f => f.section === sectionId);
 
             // Otherwise, show the application form
             return (
@@ -6609,21 +7072,43 @@ HR Team`
                             )}
 
                             <JobDescriptionSection jobDescription={jobDescription} />
-                            <PersonalInfoSection formData={formData} handleChange={handleChange} />
-                            <EducationSection formData={formData} handleChange={handleChange} />
-                            <ExperienceSection
+                            <PersonalInfoSection
                                 formData={formData}
                                 handleChange={handleChange}
-                                currentlyWorking={currentlyWorking}
-                                setCurrentlyWorking={setCurrentlyWorking}
-                                isFresher={isFresher}
-                                setIsFresher={setIsFresher}
+                                hiddenFields={hiddenFieldSet}
+                                customFields={customFieldsForSection('personal')}
+                                customFieldValues={customFieldValues}
+                                onCustomFieldChange={handleCustomFieldChange}
                             />
+                            {!hiddenFieldSet.has('ssc') || !hiddenFieldSet.has('hsc') || !hiddenFieldSet.has('bachelor') || !hiddenFieldSet.has('hnd') || !hiddenFieldSet.has('postgraduate') || customFieldsForSection('education').length > 0 ? (
+                                <EducationSection
+                                    formData={formData}
+                                    handleChange={handleChange}
+                                    hiddenFields={hiddenFieldSet}
+                                    customFields={customFieldsForSection('education')}
+                                    customFieldValues={customFieldValues}
+                                    onCustomFieldChange={handleCustomFieldChange}
+                                />
+                            ) : null}
+                            {!hiddenFieldSet.has('experience') && (
+                                <ExperienceSection
+                                    formData={formData}
+                                    handleChange={handleChange}
+                                    currentlyWorking={currentlyWorking}
+                                    setCurrentlyWorking={setCurrentlyWorking}
+                                    isFresher={isFresher}
+                                    setIsFresher={setIsFresher}
+                                    customFields={customFieldsForSection('experience')}
+                                    customFieldValues={customFieldValues}
+                                    onCustomFieldChange={handleCustomFieldChange}
+                                />
+                            )}
                             <CVUploadSection
                                 fileName={fileName}
                                 handleFileChange={handleFileChange}
                                 coverLetterFileName={coverLetterFileName}
                                 handleCoverLetterFileChange={handleCoverLetterFileChange}
+                                showCoverLetter={!hiddenFieldSet.has('coverLetter')}
                             />
 
                             <button type="submit" className="submit-btn" disabled={isSubmitting}>
