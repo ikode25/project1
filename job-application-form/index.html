@@ -2206,7 +2206,7 @@
         };
 
         // Candidate Card Component
-        const CandidateCard = ({ candidate, onStatusChange, onViewCV, onInterview, onSendEmail, selected, onSelect }) => {
+        const CandidateCard = ({ candidate, onStatusChange, onViewCV, onInterview, onSendEmail, onSendSms, selected, onSelect }) => {
             return (
                 <div className="candidate-card">
                     <div className="candidate-header">
@@ -2233,6 +2233,16 @@
                             {candidate.cvUrl && (
                                 <button className="action-btn btn-view-cv" onClick={() => onViewCV(candidate)}>
                                     <i className="fas fa-file-pdf"></i> CV
+                                </button>
+                            )}
+                            {onSendEmail && (
+                                <button className="action-btn btn-interview" onClick={() => onSendEmail(candidate)}>
+                                    <i className="fas fa-envelope"></i> Email
+                                </button>
+                            )}
+                            {onSendSms && (
+                                <button className="action-btn btn-interview" onClick={() => onSendSms(candidate)}>
+                                    <i className="fas fa-sms"></i> SMS
                                 </button>
                             )}
                             {candidate.status !== 'shortlisted' && (
@@ -5077,6 +5087,23 @@ HR Team`
                                                                     >
                                                                         <i className="fas fa-envelope"></i>
                                                                     </button>
+                                                                    <button
+                                                                        className="action-btn"
+                                                                        onClick={() => {
+                                                                            setSmsModal({
+                                                                                isOpen: true,
+                                                                                template: app.status === 'shortlisted' ? smsTemplates.shortlist
+                                                                                    : app.status === 'rejected' ? smsTemplates.rejection
+                                                                                    : smsTemplates.confirmation,
+                                                                                title: `Send SMS to ${app.firstName} ${app.lastName}`,
+                                                                                candidates: [app]
+                                                                            });
+                                                                        }}
+                                                                        style={{ fontSize: '14px', padding: '8px 10px', background: '#6a1b9a', minWidth: '38px' }}
+                                                                        title="Send SMS"
+                                                                    >
+                                                                        <i className="fas fa-sms"></i>
+                                                                    </button>
                                                                 </div>
                                                             </td>
                                                         </tr>
@@ -5185,10 +5212,22 @@ HR Team`
                                         onSendEmail={(candidate) => {
                                             setEmailModal({
                                                 isOpen: true,
-                                                template: emailTemplates.confirmation,
+                                                template: candidate.status === 'shortlisted' ? emailTemplates.shortlist
+                                                    : candidate.status === 'rejected' ? emailTemplates.rejection
+                                                    : emailTemplates.confirmation,
                                                 title: `Send Email to ${candidate.firstName} ${candidate.lastName}`,
                                                 candidates: [candidate],
                                                 subject: 'Application Received - Confirmation'
+                                            });
+                                        }}
+                                        onSendSms={(candidate) => {
+                                            setSmsModal({
+                                                isOpen: true,
+                                                template: candidate.status === 'shortlisted' ? smsTemplates.shortlist
+                                                    : candidate.status === 'rejected' ? smsTemplates.rejection
+                                                    : smsTemplates.confirmation,
+                                                title: `Send SMS to ${candidate.firstName} ${candidate.lastName}`,
+                                                candidates: [candidate]
                                             });
                                         }}
                                     />
@@ -6005,7 +6044,10 @@ HR Team`
                     // Standalone preview: apply the default theme
                     applyTheme(getDefaultThemeConfig());
                 }
-            }, []);
+                // Re-fetch whenever admin logs out too, so the public form picks up
+                // job description/theme/banner/social edits made in the same session
+                // instead of showing whatever was loaded at the very first page load.
+            }, [isAdminLoggedIn]);
 
             // Add/remove dashboard-active class on body when admin is logged in
             React.useEffect(() => {
