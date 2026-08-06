@@ -111,12 +111,12 @@
             background-size: 140px;
             opacity: var(--doodle-opacity);
             pointer-events: none;
-            animation: doodle-drift 22s linear infinite;
+            animation: doodle-drift 14s linear infinite;
         }
 
         @keyframes doodle-drift {
             0% { background-position: 0 0; }
-            100% { background-position: 140px 140px; }
+            100% { background-position: 280px 280px; }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -496,6 +496,90 @@
             margin-bottom: 10px;
         }
 
+        /* Passport photo: a real photo-shaped frame instead of the wide
+           document drop-zone, so it reads as "put your photo here" and
+           previews the actual picture once one's chosen. */
+        .passport-photo-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 18px;
+            flex-wrap: wrap;
+        }
+
+        .passport-photo-frame {
+            width: 150px;
+            height: 190px;
+            flex-shrink: 0;
+            border: 2px dashed var(--c-light);
+            border-radius: 10px;
+            background: var(--c-tint);
+            cursor: pointer;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-align: center;
+            color: var(--c-dark);
+            transition: all 0.3s ease;
+        }
+
+        .passport-photo-frame:hover {
+            background: var(--c-faint);
+            border-color: var(--c-mid);
+        }
+
+        .passport-photo-frame.has-photo {
+            border-style: solid;
+            padding: 0;
+        }
+
+        .passport-photo-frame img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .passport-photo-frame i {
+            font-size: 34px;
+            color: var(--c-light);
+        }
+
+        .passport-photo-frame span {
+            font-size: 12px;
+            padding: 0 10px;
+            line-height: 1.4;
+        }
+
+        .passport-photo-hint {
+            flex: 1;
+            min-width: 200px;
+            font-size: 13px;
+            color: #666;
+            line-height: 1.6;
+            padding-top: 6px;
+        }
+
+        .passport-photo-hint .change-photo-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 10px;
+            padding: 7px 14px;
+            border-radius: 6px;
+            border: 1px solid var(--c-light);
+            background: white;
+            color: var(--c-dark);
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .passport-photo-hint .change-photo-btn:hover {
+            background: var(--c-faint);
+        }
+
         .checkbox-group {
             display: flex;
             align-items: center;
@@ -818,7 +902,7 @@
             background-size: 140px;
             opacity: var(--doodle-opacity);
             pointer-events: none;
-            animation: doodle-drift 22s linear infinite;
+            animation: doodle-drift 14s linear infinite;
         }
 
         .dashboard-header > * {
@@ -2558,7 +2642,25 @@
                             <i className="fas fa-user"></i>
                             Personal Information
                         </div>
-                        <div className="detail-grid">
+                        <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                            {applicant.passportPhotoUrl && !applicant.passportPhotoUrl.startsWith('Upload Failed') && (
+                                <div style={{
+                                    width: '110px',
+                                    height: '140px',
+                                    flexShrink: 0,
+                                    borderRadius: '8px',
+                                    overflow: 'hidden',
+                                    border: '2px solid #e0e0e0',
+                                    boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+                                }}>
+                                    <img
+                                        src={applicant.passportPhotoUrl}
+                                        alt={`${applicant.firstName} ${applicant.lastName}`}
+                                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                    />
+                                </div>
+                            )}
+                            <div className="detail-grid" style={{ flex: 1, minWidth: '260px' }}>
                             <div className="detail-item">
                                 <span className="detail-label">Date of Birth</span>
                                 <span className="detail-value">{formatDate(applicant.dob)}</span>
@@ -2588,6 +2690,7 @@
                             <div className="detail-item" style={{ gridColumn: '1 / -1' }}>
                                 <span className="detail-label">Permanent Address</span>
                                 <span className="detail-value">{applicant.permanentAddress || 'Not provided'}</span>
+                            </div>
                             </div>
                         </div>
                     </div>
@@ -5150,6 +5253,27 @@ HR Team`
                                                 </div>
                                             )}
 
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginTop: '10px', marginBottom: '15px', padding: '12px 16px', background: '#f5f5f5', borderRadius: '8px' }}>
+                                                {smsBalance && smsBalance.success ? (
+                                                    <div className="sms-balance-badge" style={{ background: '#2e7d32', color: '#fff' }}>
+                                                        <span className={`sms-balance-dot ${smsBalance.balance <= 20 ? 'low' : ''}`}></span>
+                                                        <i className="fas fa-sms"></i>
+                                                        SMS Balance: {smsBalance.balance}{smsBalance.currency ? ` ${smsBalance.currency}` : ''}
+                                                    </div>
+                                                ) : (
+                                                    <span style={{ fontSize: '13px', color: '#999' }}>
+                                                        <i className="fas fa-info-circle"></i> Balance not available{smsBalance && smsBalance.message ? ` (${smsBalance.message})` : ' for this provider'}
+                                                    </span>
+                                                )}
+                                                <button
+                                                    className="action-btn"
+                                                    onClick={loadSmsBalance}
+                                                    style={{ backgroundColor: '#757575', color: '#fff', padding: '6px 14px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '500' }}
+                                                >
+                                                    <i className="fas fa-sync-alt"></i> Refresh Balance
+                                                </button>
+                                            </div>
+
                                             <div style={{ display: 'flex', gap: '15px', marginTop: '15px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
                                                 <button className="action-btn" onClick={handleSaveSmsConfig} style={{ backgroundColor: '#2e7d32', color: '#fff', padding: '10px 25px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>
                                                     <i className="fas fa-save"></i> Save SMS Settings
@@ -6765,7 +6889,7 @@ HR Team`
         );
 
         // CV Upload Section
-        const CVUploadSection = ({ fileName, handleFileChange, coverLetterFileName, handleCoverLetterFileChange, showCoverLetter = true, passportPhotoFileName, handlePassportPhotoChange, showPassportPhoto = true }) => (
+        const CVUploadSection = ({ fileName, handleFileChange, coverLetterFileName, handleCoverLetterFileChange, showCoverLetter = true, passportPhotoFileName, passportPhotoPreview, handlePassportPhotoChange, showPassportPhoto = true }) => (
             <div className="section">
                 <div className="section-header">
                     <div className="section-number">5</div>
@@ -6827,25 +6951,42 @@ HR Team`
                 {showPassportPhoto && (
                     <div className="form-group" style={{ marginTop: '20px' }}>
                         <label>Passport Size Photo</label>
-                        <div className="file-upload">
-                            <label htmlFor="passportPhotoUpload" className="file-upload-label">
-                                <div className="file-upload-icon">
-                                    <i className="fas fa-camera-retro"></i>
-                                </div>
-                                <h3 style={{ color: '#2e7d32', marginBottom: '8px' }}>
-                                    {passportPhotoFileName || 'Click to upload or take a photo'}
-                                </h3>
-                                <p style={{ color: '#66bb6a', fontSize: '14px' }}>
-                                    JPG or PNG (Max 5MB). On your phone you can either pick an existing
-                                    photo or take one with the camera - use good lighting, face the
-                                    camera, and a plain background.
-                                </p>
+                        <div className="passport-photo-row">
+                            <label
+                                htmlFor="passportPhotoUpload"
+                                className={`passport-photo-frame ${passportPhotoPreview ? 'has-photo' : ''}`}
+                            >
+                                {passportPhotoPreview ? (
+                                    <img src={passportPhotoPreview} alt="Passport photo preview" />
+                                ) : (
+                                    <>
+                                        <i className="fas fa-camera-retro"></i>
+                                        <span>Tap to upload<br />or take a photo</span>
+                                    </>
+                                )}
                             </label>
+                            <div className="passport-photo-hint">
+                                JPG or PNG, max 5MB. On your phone the picker lets you either choose
+                                an existing photo or take one with the camera - use good lighting,
+                                face the camera, and a plain background.
+                                {passportPhotoFileName && (
+                                    <div style={{ marginTop: '6px', color: 'var(--c-dark)', fontWeight: 500 }}>
+                                        {passportPhotoFileName}
+                                    </div>
+                                )}
+                                <div>
+                                    <label htmlFor="passportPhotoUpload" className="change-photo-btn">
+                                        <i className="fas fa-camera"></i>
+                                        {passportPhotoPreview ? 'Change Photo' : 'Choose Photo'}
+                                    </label>
+                                </div>
+                            </div>
                             <input
                                 type="file"
                                 id="passportPhotoUpload"
                                 accept="image/*"
                                 onChange={handlePassportPhotoChange}
+                                style={{ display: 'none' }}
                             />
                         </div>
                     </div>
@@ -6929,9 +7070,11 @@ HR Team`
             const [jobDescription, setJobDescription] = useState('We are looking for a talented professional to join our team. The ideal candidate should have excellent skills and a passion for excellence.');
             const [bannerUrl, setBannerUrl] = useState('');
             const [socialLinks, setSocialLinks] = useState({ facebook: '', twitter: '', instagram: '', linkedin: '' });
-            // Starts null (unresolved) so the form waits for the real config
-            // instead of briefly showing fields the admin removed.
-            const [formFieldsConfig, setFormFieldsConfig] = useState(null);
+            // Starts with the all-fields-visible default so the form renders
+            // immediately; re-renders once the real config arrives (usually
+            // near-instant, and admins rarely hide fields, so this trades a
+            // small chance of a brief flash for a faster perceived load).
+            const [formFieldsConfig, setFormFieldsConfig] = useState(getDefaultFormFieldsConfigClient());
             const [customFieldValues, setCustomFieldValues] = useState({});
 
             const handleCustomFieldChange = (fieldId, value) => {
@@ -7234,19 +7377,6 @@ HR Team`
                 );
             }
 
-            // Wait for the form fields config before rendering the form, so
-            // fields the admin removed never briefly flash into view.
-            if (!formFieldsConfig) {
-                return (
-                    <div className="loading-overlay">
-                        <div className="loading-spinner">
-                            <div className="spinner"></div>
-                            <h3 style={{ color: '#2e7d32' }}>Loading application form...</h3>
-                        </div>
-                    </div>
-                );
-            }
-
             const hiddenFieldSet = new Set(formFieldsConfig.hiddenFields || []);
             const customFieldsForSection = (sectionId) =>
                 (formFieldsConfig.customFields || []).filter(f => f.section === sectionId);
@@ -7373,6 +7503,7 @@ HR Team`
                                 handleCoverLetterFileChange={handleCoverLetterFileChange}
                                 showCoverLetter={!hiddenFieldSet.has('coverLetter')}
                                 passportPhotoFileName={passportPhotoFileName}
+                                passportPhotoPreview={passportPhotoFile}
                                 handlePassportPhotoChange={handlePassportPhotoChange}
                                 showPassportPhoto={!hiddenFieldSet.has('passportPhoto')}
                             />

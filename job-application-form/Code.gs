@@ -54,7 +54,7 @@ function submitJobApplication(formData, fileName, fileData, coverLetterFileName,
     let passportPhotoUrl = '';
     if (passportPhotoFileData && passportPhotoFileName) {
       try {
-        passportPhotoUrl = uploadCVToDrive(passportPhotoFileData, passportPhotoFileName, formData.email + '_photo');
+        passportPhotoUrl = uploadPassportPhoto(passportPhotoFileData, passportPhotoFileName, formData.email);
         Logger.log(`Passport photo uploaded successfully: ${passportPhotoUrl}`);
       } catch (uploadError) {
         Logger.log(`Error uploading passport photo: ${uploadError.toString()}`);
@@ -415,6 +415,46 @@ function uploadCVToDrive(fileData, fileName, applicantEmail) {
 
   } catch (error) {
     Logger.log('Error uploading CV: ' + error.toString());
+    throw error;
+  }
+}
+
+/**
+ * Uploads a passport-size photo to Drive. Unlike CVs/cover letters
+ * (viewed one-off in a modal), photos need to render inline as
+ * thumbnails wherever an applicant's info shows - so this explicitly
+ * makes the file link-viewable and returns a direct thumbnail URL
+ * (usable straight as an <img src>) instead of Drive's generic file
+ * view page.
+ * @param {string} fileData - base64 data URL
+ * @param {string} fileName
+ * @param {string} applicantEmail
+ * @returns {string} Thumbnail URL
+ */
+function uploadPassportPhoto(fileData, fileName, applicantEmail) {
+  try {
+    const folder = getCVFolder();
+
+    const blob = Utilities.newBlob(
+      Utilities.base64Decode(fileData.split(',')[1]),
+      fileData.split(';')[0].split(':')[1],
+      fileName
+    );
+
+    const sanitizedEmail = applicantEmail.replace(/[^a-zA-Z0-9]/g, '_');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const newFileName = `${timestamp}_${sanitizedEmail}_${fileName}`;
+    const file = folder.createFile(blob.setName(newFileName));
+
+    file.setDescription(`Passport photo uploaded by ${applicantEmail} on ${new Date().toISOString()}`);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    Logger.log(`Passport photo uploaded to ASSETS folder: ${newFileName}`);
+
+    return `https://drive.google.com/thumbnail?id=${file.getId()}&sz=w800`;
+
+  } catch (error) {
+    Logger.log('Error uploading passport photo: ' + error.toString());
     throw error;
   }
 }
