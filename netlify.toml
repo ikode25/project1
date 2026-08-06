@@ -1,0 +1,27 @@
+# Deploys the installable app shell (index.html, manifest.json, sw.js,
+# icons/) at the repo root to Netlify. No build step - it's static.
+# This does NOT touch job-application-form/ - that's the Google Apps
+# Script source, edited/deployed separately via the Apps Script editor.
+
+[build]
+  publish = "."
+
+# Service workers must be re-fetched on every load so updates (e.g. a new
+# cache version bump) actually reach visitors instead of being stuck behind
+# a long-lived cached copy of the old worker.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+    Service-Worker-Allowed = "/"
+
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Content-Type = "application/manifest+json"
+    Cache-Control = "public, max-age=3600"
+
+[[headers]]
+  for = "/icons/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

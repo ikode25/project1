@@ -1,0 +1,55 @@
+name: Deploy PWA wrapper to GitHub Pages
+
+# Publishes the installable app shell (index.html, manifest.json, sw.js,
+# icons/) at the repo root to GitHub Pages, so "Add to Home Screen" on a
+# phone gives the real standalone app experience instead of a plain browser
+# tab. This does NOT touch the Google Apps Script app itself - that's still
+# edited/deployed separately from job-application-form/.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "index.html"
+      - "manifest.json"
+      - "sw.js"
+      - "icons/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Stage Pages site (root wrapper files only)
+        run: |
+          mkdir -p _site
+          cp index.html manifest.json sw.js _site/
+          cp -r icons _site/icons
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

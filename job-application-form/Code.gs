@@ -1,6 +1,12 @@
 
 function doGet() {
-  return HtmlService.createHtmlOutputFromFile('index')
+  // Use a template (not a plain HTML file) so the admin's saved color theme
+  // can be baked into the very first paint. Without this, the page always
+  // renders the default green for a moment before the async getThemeConfig()
+  // call resolves client-side and repaints it - a visible flash on load.
+  const template = HtmlService.createTemplateFromFile('index');
+  template.serverThemeColors = getThemeConfig().colors;
+  return template.evaluate()
     .setTitle('Job Application Form')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
