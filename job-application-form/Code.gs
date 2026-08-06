@@ -11,7 +11,7 @@ function doGet() {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-function submitJobApplication(formData, fileName, fileData, coverLetterFileName, coverLetterFileData) {
+function submitJobApplication(formData, fileName, fileData, coverLetterFileName, coverLetterFileData, passportPhotoFileName, passportPhotoFileData) {
   try {
     const spreadsheetId = getSpreadsheetId();
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -48,6 +48,17 @@ function submitJobApplication(formData, fileName, fileData, coverLetterFileName,
       } catch (uploadError) {
         Logger.log(`Error uploading cover letter: ${uploadError.toString()}`);
         coverLetterUrl = 'Upload Failed: ' + uploadError.message;
+      }
+    }
+
+    let passportPhotoUrl = '';
+    if (passportPhotoFileData && passportPhotoFileName) {
+      try {
+        passportPhotoUrl = uploadCVToDrive(passportPhotoFileData, passportPhotoFileName, formData.email + '_photo');
+        Logger.log(`Passport photo uploaded successfully: ${passportPhotoUrl}`);
+      } catch (uploadError) {
+        Logger.log(`Error uploading passport photo: ${uploadError.toString()}`);
+        passportPhotoUrl = 'Upload Failed: ' + uploadError.message;
       }
     }
     const timestamp = new Date().toISOString();
@@ -103,7 +114,9 @@ function submitJobApplication(formData, fileName, fileData, coverLetterFileName,
       coverLetterUrl,
       // Custom field values (admin-defined fields), stored as a JSON blob
       // keyed by field id since the set of fields is admin-configurable
-      formData.customFieldValues ? JSON.stringify(formData.customFieldValues) : ''
+      formData.customFieldValues ? JSON.stringify(formData.customFieldValues) : '',
+      // Passport Photo URL
+      passportPhotoUrl
     ];
 
     // Append to sheet
@@ -167,7 +180,7 @@ function getSpreadsheetId() {
         'Years of Experience', 'Last Organisation', 'Last Designation',
         'Joining Date', 'End Date', 'Currently Working', 'CV URL',
         'HND Programme', 'HND Institute', 'HND Major', 'HND Grade',
-        'Cover Letter URL', 'Custom Field Values'
+        'Cover Letter URL', 'Custom Field Values', 'Passport Photo URL'
       ];
       appSheet.appendRow(headers);
 
@@ -269,7 +282,8 @@ function getAllApplications() {
         } catch (e) {
           return {};
         }
-      })()
+      })(),
+      passportPhotoUrl: row[44]
     }));
 
     // Sort by timestamp (newest first)
@@ -361,7 +375,7 @@ Best regards,
 HR Team
     `;
 
-    MailApp.sendEmail(email, subject, body);
+    sendBrandedEmail(email, subject, body);
   } catch (error) {
     console.error('Error sending confirmation email:', error);
   }
@@ -726,7 +740,7 @@ function updateCandidateStatus(email, newStatus) {
  */
 function sendEmailToCandidate(candidateEmail, subject, body) {
   try {
-    MailApp.sendEmail(candidateEmail, subject, body);
+    sendBrandedEmail(candidateEmail, subject, body);
 
     // Log email in EmailLog sheet
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -818,7 +832,7 @@ Please confirm your availability for the scheduled time.
 Best regards,
 HR Team`;
 
-    MailApp.sendEmail(interviewData.candidateEmail, subject, body);
+    sendBrandedEmail(interviewData.candidateEmail, subject, body);
 
     // Send interview invitation SMS if SMS is enabled in Admin > Settings
     maybeSendAutoSms('interview', interviewData.candidatePhone, {
@@ -929,7 +943,7 @@ We apologize for any inconvenience. Please confirm your availability for the res
 Best regards,
 HR Team`;
 
-    MailApp.sendEmail(interviewData.candidateEmail, subject, body);
+    sendBrandedEmail(interviewData.candidateEmail, subject, body);
 
     // Send rescheduled interview SMS if SMS is enabled in Admin > Settings
     maybeSendAutoSms('interview', interviewData.candidatePhone, {
@@ -1042,7 +1056,7 @@ function sendBulkEmails(emails, subject, bodyTemplate) {
 
     emails.forEach(email => {
       try {
-        MailApp.sendEmail(email, subject, bodyTemplate);
+        sendBrandedEmail(email, subject, bodyTemplate);
         logSheet.appendRow([timestamp, email, subject, bodyTemplate, 'Admin - Bulk']);
         successCount++;
       } catch (err) {
@@ -1355,7 +1369,7 @@ function setupDemoData() {
         'Years of Experience', 'Last Organisation', 'Last Designation',
         'Joining Date', 'End Date', 'Currently Working', 'CV URL',
         'HND Programme', 'HND Institute', 'HND Major', 'HND Grade',
-        'Cover Letter URL', 'Custom Field Values'
+        'Cover Letter URL', 'Custom Field Values', 'Passport Photo URL'
       ];
       sheet.appendRow(headers);
 
@@ -1720,6 +1734,8 @@ function setupDemoData() {
         // Cover Letter URL - not used by demo data
         '',
         // Custom Field Values - not used by demo data
+        '',
+        // Passport Photo URL - not used by demo data
         ''
       ];
       sheet.appendRow(row);
@@ -2611,4 +2627,124 @@ function saveFormFieldsConfig(config) {
     Logger.log('Error saving form fields config: ' + error.toString());
     return { status: 'error', message: 'Failed to save form fields: ' + error.message };
   }
+}
+
+/* ============================================================
+ * Company info (used to brand outgoing emails)
+ * ============================================================ */
+
+function getDefaultCompanyInfo() {
+  return { name: '', description: '', website: '', address: '' };
+}
+
+/**
+ * Gets the saved company info
+ * @returns {Object} { name, description, website, address }
+ */
+function getCompanyInfo() {
+  try {
+    const raw = getSetting('COMPANY_INFO', '');
+    const defaults = getDefaultCompanyInfo();
+    if (!raw) return defaults;
+    return Object.assign({}, defaults, JSON.parse(raw));
+  } catch (error) {
+    Logger.log('Error getting company info: ' + error.toString());
+    return getDefaultCompanyInfo();
+  }
+}
+
+/**
+ * Saves company info
+ * @param {Object} info - { name, description, website, address }
+ * @returns {Object} Response object
+ */
+function saveCompanyInfo(info) {
+  try {
+    setSetting('COMPANY_INFO', JSON.stringify(info));
+    return { status: 'success', message: 'Company info saved successfully' };
+  } catch (error) {
+    Logger.log('Error saving company info: ' + error.toString());
+    return { status: 'error', message: 'Failed to save company info: ' + error.message };
+  }
+}
+
+/* ============================================================
+ * Branded HTML emails
+ * Wraps a plain-text email body in a styled HTML shell using the
+ * saved company info and the current appearance theme's colors, so
+ * outgoing mail looks like it came from a real company rather than a
+ * bare-text script.
+ * ============================================================ */
+
+function escapeHtmlForEmail(str) {
+  return (str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Builds a branded HTML version of a plain-text email body
+ * @param {string} plainBody - The plain-text email body
+ * @returns {string} HTML email body
+ */
+function buildEmailHtml(plainBody) {
+  const company = getCompanyInfo();
+  let theme;
+  try {
+    theme = getThemeConfig().colors;
+  } catch (e) {
+    theme = getDefaultThemeConfig().colors;
+  }
+
+  const companyName = company.name || 'HR Team';
+  const bodyHtml = escapeHtmlForEmail(plainBody).replace(/\n/g, '<br>');
+
+  const descriptionRow = company.description
+    ? `<div style="color:rgba(255,255,255,0.9);font-size:13px;margin-top:6px;">${escapeHtmlForEmail(company.description)}</div>`
+    : '';
+
+  const addressRow = company.address
+    ? `${escapeHtmlForEmail(company.address)}<br>`
+    : '';
+
+  const websiteRow = company.website
+    ? `<a href="${escapeHtmlForEmail(company.website)}" style="color:${theme.dark};text-decoration:none;">${escapeHtmlForEmail(company.website)}</a>`
+    : '';
+
+  return `
+<div style="font-family: 'Segoe UI', Arial, sans-serif; background:#f4f6f5; padding:30px 16px;">
+  <div style="max-width:600px; margin:0 auto; background:#ffffff; border-radius:12px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,0.08);">
+    <div style="background:linear-gradient(135deg, ${theme.dark} 0%, ${theme.mid} 100%); padding:28px 30px; text-align:center;">
+      <div style="color:#ffffff; font-size:22px; font-weight:700; letter-spacing:0.3px;">${escapeHtmlForEmail(companyName)}</div>
+      ${descriptionRow}
+    </div>
+    <div style="padding:32px 30px; color:#2b2b2b; font-size:15px; line-height:1.7;">
+      ${bodyHtml}
+    </div>
+    <div style="padding:18px 30px; background:#fafafa; border-top:1px solid #eee; font-size:12px; color:#888; text-align:center;">
+      ${addressRow}${websiteRow}
+    </div>
+  </div>
+</div>`;
+}
+
+/**
+ * Sends a branded email (plain-text body + matching HTML version).
+ * Centralizes the MailApp call so every outgoing email looks consistent.
+ * @param {string} to
+ * @param {string} subject
+ * @param {string} plainBody
+ */
+function sendBrandedEmail(to, subject, plainBody) {
+  const company = getCompanyInfo();
+  MailApp.sendEmail({
+    to: to,
+    subject: subject,
+    body: plainBody,
+    htmlBody: buildEmailHtml(plainBody),
+    name: company.name || 'HR Team'
+  });
 }

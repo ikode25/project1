@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, shrink-to-fit=no">
     <title>Job Application Form</title>
     <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABqElEQVR4nMWXzU7CQBDH/9P0zNXHIKRBilA1xkfh7EWM8SIJxpMgxouJr6KJmoiCHwcfxguXemi3truzdGnp8j802+20v+nOzH4QGNUHXggCKLoAAIikNgDWRvQzNh8nbySzMh31gRdqP1wSnraZ96cJ17ENBwH+uBtmHLAJF/3+JHIiGQGb8KQNgKpKuFw4iRBsEE5EcDYJBwC3KPzz9B2yWqPOSnBQnITrgAPAvD9dCU4gUGPYDIvAt692FJvZ8SsAoH0dGMGjESgSc2hs/h+a5QUAalw0Q93Dr7MZO9RF1Lnd01SBBTgATI9e2HJ3OLgypOsSU3FuGXj93EvaP8NvMx+kiiPvssVWweJ3YeyIqWpbNeVH+SqwEYL43pE7KoMLH6Skd3Vze15M0/EXyntn9+4gA89WgVyOOZJhpkkoJ73Lwg2jYAzVwJdORFWIK/fNTUTxPb8jqlBy0qs7opSnVcOBJctxexKsFb5/f6jAk39vjTrqucB0PS+xj3zuPRJ/LrAAT84Fgu+Pu6FN+FPvgTIOANFxySZccUCofRNot2llYy6z/gC7qVLd0AHh5gAAAABJRU5ErkJggg==">
 
@@ -396,6 +396,13 @@
 
         .form-group {
             margin-bottom: 20px;
+            /* Grid/flex items default to min-width:auto, which stops them
+               shrinking below their content's intrinsic width (date inputs
+               are the worst offender - their native calendar control has a
+               wide minimum). That's what was pushing the whole page wider
+               than the phone screen and forcing the browser to zoom out to
+               fit it - not a viewport meta problem, an overflow problem. */
+            min-width: 0;
         }
 
         .form-row {
@@ -422,6 +429,8 @@
         select,
         textarea {
             width: 100%;
+            min-width: 0;
+            max-width: 100%;
             padding: 12px 16px;
             border: 2px solid var(--c-pale);
             border-radius: 8px;
@@ -1843,7 +1852,8 @@
             { id: 'hnd', label: 'HND (Higher National Diploma)', section: 'education' },
             { id: 'postgraduate', label: 'Postgraduate', section: 'education' },
             { id: 'experience', label: 'Work Experience Details', section: 'experience' },
-            { id: 'coverLetter', label: 'Cover Letter Upload', section: 'documents' }
+            { id: 'coverLetter', label: 'Cover Letter Upload', section: 'documents' },
+            { id: 'passportPhoto', label: 'Passport Photo Upload', section: 'documents' }
         ];
 
         const CUSTOM_FIELD_TYPES = [
@@ -2453,7 +2463,7 @@
         };
 
         // Candidate Card Component
-        const CandidateCard = ({ candidate, onStatusChange, onViewCV, onViewCoverLetter, onInterview, onSendEmail, onSendSms, selected, onSelect }) => {
+        const CandidateCard = ({ candidate, onStatusChange, onViewCV, onViewCoverLetter, onViewPassportPhoto, onInterview, onSendEmail, onSendSms, selected, onSelect }) => {
             return (
                 <div className="candidate-card">
                     <div className="candidate-header">
@@ -2485,6 +2495,11 @@
                             {candidate.coverLetterUrl && onViewCoverLetter && (
                                 <button className="action-btn btn-view-cv" onClick={() => onViewCoverLetter(candidate)}>
                                     <i className="fas fa-file-alt"></i> Cover Letter
+                                </button>
+                            )}
+                            {candidate.passportPhotoUrl && onViewPassportPhoto && (
+                                <button className="action-btn btn-view-cv" onClick={() => onViewPassportPhoto(candidate)}>
+                                    <i className="fas fa-camera-retro"></i> Photo
                                 </button>
                             )}
                             {onSendEmail && (
@@ -3495,6 +3510,12 @@ HR Team`
                 label: '', type: 'text', required: false, section: 'personal', options: ''
             });
 
+            // Company info (used to brand outgoing emails)
+            const [companyInfo, setCompanyInfo] = useState({ name: '', description: '', website: '', address: '' });
+
+            // Settings sub-tabs
+            const [settingsSubTab, setSettingsSubTab] = useState('general');
+
             // Fetch applications on mount
             React.useEffect(() => {
                 fetchApplications();
@@ -3508,6 +3529,7 @@ HR Team`
                 loadSmsTemplates();
                 loadSmsBalance();
                 loadFormFieldsConfig();
+                loadCompanyInfo();
             }, []);
 
             // Load job description from Google Sheets
@@ -3611,6 +3633,26 @@ HR Team`
                         .withSuccessHandler((config) => setFormFieldsConfig(config || getDefaultFormFieldsConfigClient()))
                         .withFailureHandler((error) => console.error('Failed to load form fields config:', error))
                         .getFormFieldsConfig();
+                }
+            };
+
+            const loadCompanyInfo = () => {
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run
+                        .withSuccessHandler((info) => setCompanyInfo(info || { name: '', description: '', website: '', address: '' }))
+                        .withFailureHandler((error) => console.error('Failed to load company info:', error))
+                        .getCompanyInfo();
+                }
+            };
+
+            const handleSaveCompanyInfo = () => {
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run
+                        .withSuccessHandler(() => showToast('Company info saved successfully!', 'success'))
+                        .withFailureHandler((error) => showToast('Failed to save company info: ' + error.message, 'error'))
+                        .saveCompanyInfo(companyInfo);
+                } else {
+                    showToast('Company info saved (demo mode)!', 'success');
                 }
             };
 
@@ -4116,6 +4158,18 @@ HR Team`
                 }
             };
 
+            const handleViewPassportPhoto = (candidate) => {
+                if (candidate.passportPhotoUrl && candidate.passportPhotoUrl !== '' && !candidate.passportPhotoUrl.startsWith('Upload Failed')) {
+                    setCvModal({
+                        isOpen: true,
+                        cvUrl: candidate.passportPhotoUrl,
+                        candidateName: `${candidate.firstName} ${candidate.lastName} - Passport Photo`
+                    });
+                } else {
+                    showToast('Passport photo not available for this candidate', 'warning');
+                }
+            };
+
             const handleScheduleInterview = (interviewData) => {
                 const isReschedule = interviewData.isReschedule || false;
                 const successMessage = isReschedule
@@ -4480,6 +4534,39 @@ HR Team`
                             ) : activeTab === 'settings' ? (
                                 // Settings View
                                 <div className="settings-container" style={{ maxWidth: '1000px', margin: '0 auto' }}>
+                                    {/* Settings sub-tabs */}
+                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '30px', borderBottom: '2px solid #e0e0e0', paddingBottom: '2px' }}>
+                                        {[
+                                            { id: 'general', label: 'General', icon: 'fa-building' },
+                                            { id: 'email', label: 'Email', icon: 'fa-envelope' },
+                                            { id: 'sms', label: 'SMS', icon: 'fa-sms' },
+                                            { id: 'appearance', label: 'Appearance', icon: 'fa-palette' },
+                                            { id: 'fields', label: 'Form Fields', icon: 'fa-list-check' }
+                                        ].map(tab => (
+                                            <button
+                                                key={tab.id}
+                                                onClick={() => setSettingsSubTab(tab.id)}
+                                                style={{
+                                                    padding: '10px 18px',
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    borderBottom: settingsSubTab === tab.id ? '3px solid #2e7d32' : '3px solid transparent',
+                                                    color: settingsSubTab === tab.id ? '#2e7d32' : '#666',
+                                                    fontWeight: settingsSubTab === tab.id ? '600' : '500',
+                                                    fontSize: '14px',
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px'
+                                                }}
+                                            >
+                                                <i className={`fas ${tab.icon}`}></i> {tab.label}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {settingsSubTab === 'general' && (
+                                    <>
                                     {/* Job Description Editor */}
                                     <div style={{ marginBottom: '30px' }}>
                                         <h3 style={{ color: '#2e7d32', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -4561,6 +4648,68 @@ HR Team`
                                         </div>
                                     </div>
 
+                                    {/* Company Info */}
+                                    <div style={{ marginTop: '40px', paddingTop: '30px', borderTop: '2px solid #e0e0e0' }}>
+                                        <h3 style={{ color: '#455a64', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <i className="fas fa-building"></i> Company Info
+                                        </h3>
+                                        <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#eceff1', borderRadius: '8px', border: '1px solid #b0bec5' }}>
+                                            <p style={{ margin: 0, color: '#455a64', fontSize: '14px' }}>
+                                                <i className="fas fa-info-circle"></i> Shown on every email sent to applicants (confirmation, shortlist, interview, rejection) so mail looks like it's from a real company, not a bare script.
+                                            </p>
+                                        </div>
+                                        <div className="template-card" style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', display: 'grid', gap: '15px' }}>
+                                            <div>
+                                                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Company Name</label>
+                                                <input
+                                                    type="text"
+                                                    value={companyInfo.name}
+                                                    onChange={(e) => setCompanyInfo({ ...companyInfo, name: e.target.value })}
+                                                    placeholder="e.g., MySchool Ltd."
+                                                    style={{ width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Tagline / Description</label>
+                                                <input
+                                                    type="text"
+                                                    value={companyInfo.description}
+                                                    onChange={(e) => setCompanyInfo({ ...companyInfo, description: e.target.value })}
+                                                    placeholder="e.g., Empowering learners since 2010"
+                                                    style={{ width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Website</label>
+                                                <input
+                                                    type="text"
+                                                    value={companyInfo.website}
+                                                    onChange={(e) => setCompanyInfo({ ...companyInfo, website: e.target.value })}
+                                                    placeholder="https://yourcompany.com"
+                                                    style={{ width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Address</label>
+                                                <textarea
+                                                    value={companyInfo.address}
+                                                    onChange={(e) => setCompanyInfo({ ...companyInfo, address: e.target.value })}
+                                                    placeholder="Street, City, Country"
+                                                    style={{ width: '100%', minHeight: '60px', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div style={{ marginTop: '15px' }}>
+                                            <button className="action-btn" onClick={handleSaveCompanyInfo} style={{ backgroundColor: '#455a64', color: '#fff', padding: '10px 25px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>
+                                                <i className="fas fa-save"></i> Save Company Info
+                                            </button>
+                                        </div>
+                                    </div>
+                                    </>
+                                    )}
+
+                                    {settingsSubTab === 'email' && (
+                                    <>
                                     {/* Email Templates Section */}
                                     <div style={{ marginTop: '40px', paddingTop: '30px', borderTop: '2px solid #e0e0e0' }}>
                                         <h3 style={{ color: '#1976d2', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -4733,9 +4882,13 @@ HR Team`
                                             </button>
                                         </div>
                                     </div>
+                                    </>
+                                    )}
 
+                                    {settingsSubTab === 'appearance' && (
+                                    <>
                                     {/* Appearance / Theme Settings */}
-                                    <div style={{ marginTop: '40px', paddingTop: '30px', borderTop: '2px solid #e0e0e0' }}>
+                                    <div style={{ marginTop: '10px' }}>
                                         <h3 style={{ color: '#6a1b9a', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                                             <i className="fas fa-palette"></i> Appearance
                                         </h3>
@@ -4913,9 +5066,13 @@ HR Team`
                                             </button>
                                         </div>
                                     </div>
+                                    </>
+                                    )}
 
+                                    {settingsSubTab === 'sms' && (
+                                    <>
                                     {/* SMS Settings */}
-                                    <div style={{ marginTop: '40px', paddingTop: '30px', borderTop: '2px solid #e0e0e0' }}>
+                                    <div style={{ marginTop: '10px' }}>
                                         <h3 style={{ color: '#2e7d32', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                                             <i className="fas fa-sms"></i> SMS Settings
                                         </h3>
@@ -5099,9 +5256,13 @@ HR Team`
                                             </button>
                                         </div>
                                     </div>
+                                    </>
+                                    )}
 
+                                    {settingsSubTab === 'fields' && (
+                                    <>
                                     {/* Form Fields */}
-                                    <div style={{ marginTop: '40px', paddingTop: '30px', borderTop: '2px solid #e0e0e0' }}>
+                                    <div style={{ marginTop: '10px' }}>
                                         <h3 style={{ color: '#00695c', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                                             <i className="fas fa-list-check"></i> Form Fields
                                         </h3>
@@ -5265,6 +5426,8 @@ HR Team`
                                             <i className="fas fa-save"></i> Save Form Fields
                                         </button>
                                     </div>
+                                    </>
+                                    )}
                                 </div>
                             ) : activeTab === 'interviews' ? (
                                 // Interviews View
@@ -5545,6 +5708,16 @@ HR Team`
                                                                             <i className="fas fa-file-alt"></i>
                                                                         </button>
                                                                     )}
+                                                                    {app.passportPhotoUrl && (
+                                                                        <button
+                                                                            className="action-btn btn-view-cv"
+                                                                            onClick={() => handleViewPassportPhoto(app)}
+                                                                            style={{ fontSize: '12px', padding: '6px 12px' }}
+                                                                            title="View Passport Photo"
+                                                                        >
+                                                                            <i className="fas fa-camera-retro"></i>
+                                                                        </button>
+                                                                    )}
                                                                 </div>
                                                             </td>
                                                             <td>
@@ -5738,6 +5911,16 @@ HR Team`
                                                                         <i className="fas fa-file-alt"></i>
                                                                     </button>
                                                                 )}
+                                                                {app.passportPhotoUrl && (
+                                                                    <button
+                                                                        className="action-btn btn-view-cv"
+                                                                        onClick={() => handleViewPassportPhoto(app)}
+                                                                        style={{ fontSize: '12px', padding: '6px 12px' }}
+                                                                        title="View Passport Photo"
+                                                                    >
+                                                                        <i className="fas fa-camera-retro"></i>
+                                                                    </button>
+                                                                )}
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -5763,6 +5946,7 @@ HR Team`
                                         onStatusChange={handleStatusChange}
                                         onViewCV={handleViewCV}
                                         onViewCoverLetter={handleViewCoverLetter}
+                                        onViewPassportPhoto={handleViewPassportPhoto}
                                         onInterview={(candidate) => setInterviewModal({ isOpen: true, candidate })}
                                         onSendEmail={(candidate) => {
                                             setEmailModal({
@@ -6581,7 +6765,7 @@ HR Team`
         );
 
         // CV Upload Section
-        const CVUploadSection = ({ fileName, handleFileChange, coverLetterFileName, handleCoverLetterFileChange, showCoverLetter = true }) => (
+        const CVUploadSection = ({ fileName, handleFileChange, coverLetterFileName, handleCoverLetterFileChange, showCoverLetter = true, passportPhotoFileName, handlePassportPhotoChange, showPassportPhoto = true }) => (
             <div className="section">
                 <div className="section-header">
                     <div className="section-number">5</div>
@@ -6639,8 +6823,92 @@ HR Team`
                         </div>
                     </div>
                 )}
+
+                {showPassportPhoto && (
+                    <div className="form-group" style={{ marginTop: '20px' }}>
+                        <label>Passport Size Photo</label>
+                        <div className="file-upload">
+                            <label htmlFor="passportPhotoUpload" className="file-upload-label">
+                                <div className="file-upload-icon">
+                                    <i className="fas fa-camera-retro"></i>
+                                </div>
+                                <h3 style={{ color: '#2e7d32', marginBottom: '8px' }}>
+                                    {passportPhotoFileName || 'Click to upload or take a photo'}
+                                </h3>
+                                <p style={{ color: '#66bb6a', fontSize: '14px' }}>
+                                    JPG or PNG (Max 5MB). On your phone you can either pick an existing
+                                    photo or take one with the camera - use good lighting, face the
+                                    camera, and a plain background.
+                                </p>
+                            </label>
+                            <input
+                                type="file"
+                                id="passportPhotoUpload"
+                                accept="image/*"
+                                onChange={handlePassportPhotoChange}
+                            />
+                        </div>
+                    </div>
+                )}
             </div>
         );
+
+        function getInitialFormData() {
+            return {
+                // Position Applying For
+                applyingFor: '',
+
+                // Personal Info
+                firstName: '',
+                lastName: '',
+                email: '',
+                mobile: '',
+                dob: '',
+                religion: '',
+                maritalStatus: '',
+                gender: '',
+                nationality: '',
+                currentAddress: '',
+                permanentAddress: '',
+
+                // SSC
+                sscInstitute: '',
+                sscMajor: '',
+                sscYear: '',
+                sscGrade: '',
+
+                // HSC
+                hscInstitute: '',
+                hscMajor: '',
+                hscYear: '',
+                hscGrade: '',
+
+                // Bachelor
+                bachelorDegree: '',
+                bachelorInstitute: '',
+                bachelorMajor: '',
+                bachelorGrade: '',
+
+                // HND (Higher National Diploma)
+                hndProgramme: '',
+                hndInstitute: '',
+                hndMajor: '',
+                hndGrade: '',
+
+                // Postgraduate
+                postgraduateDegree: '',
+                postgraduateInstitute: '',
+                postgraduateMajor: '',
+                postgraduateGrade: '',
+
+                // Experience
+                yearsOfExperience: '',
+                lastOrganisation: '',
+                lastDesignation: '',
+                joiningDate: '',
+                endDate: ''
+            };
+        }
 
         // Main App Component
         const JobApplicationForm = () => {
@@ -6650,6 +6918,8 @@ HR Team`
             const [cvFile, setCvFile] = useState(null);
             const [coverLetterFileName, setCoverLetterFileName] = useState('');
             const [coverLetterFile, setCoverLetterFile] = useState(null);
+            const [passportPhotoFileName, setPassportPhotoFileName] = useState('');
+            const [passportPhotoFile, setPassportPhotoFile] = useState(null);
             const [isSubmitting, setIsSubmitting] = useState(false);
             const [submitMessage, setSubmitMessage] = useState(null);
             const [showCongratsModal, setShowCongratsModal] = useState(false);
@@ -6741,60 +7011,7 @@ HR Team`
                 };
             }, [isAdminLoggedIn]);
 
-            const [formData, setFormData] = useState({
-                // Position Applying For
-                applyingFor: '',
-
-                // Personal Info
-                firstName: '',
-                lastName: '',
-                email: '',
-                mobile: '',
-                dob: '',
-                religion: '',
-                maritalStatus: '',
-                gender: '',
-                nationality: '',
-                currentAddress: '',
-                permanentAddress: '',
-
-                // SSC
-                sscInstitute: '',
-                sscMajor: '',
-                sscYear: '',
-                sscGrade: '',
-
-                // HSC
-                hscInstitute: '',
-                hscMajor: '',
-                hscYear: '',
-                hscGrade: '',
-
-                // Bachelor
-                bachelorDegree: '',
-                bachelorInstitute: '',
-                bachelorMajor: '',
-                bachelorGrade: '',
-
-                // HND (Higher National Diploma)
-                hndProgramme: '',
-                hndInstitute: '',
-                hndMajor: '',
-                hndGrade: '',
-
-                // Postgraduate
-                postgraduateDegree: '',
-                postgraduateInstitute: '',
-                postgraduateMajor: '',
-                postgraduateGrade: '',
-
-                // Experience
-                yearsOfExperience: '',
-                lastOrganisation: '',
-                lastDesignation: '',
-                joiningDate: '',
-                endDate: ''
-            });
+            const [formData, setFormData] = useState(getInitialFormData());
 
             const handleChange = (e) => {
                 const { name, value } = e.target;
@@ -6861,6 +7078,33 @@ HR Team`
                 }
             };
 
+            const handlePassportPhotoChange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    if (!file.type.startsWith('image/')) {
+                        alert('Please select an image file (JPG, PNG, etc.).');
+                        e.target.value = '';
+                        return;
+                    }
+                    if (file.size > 5 * 1024 * 1024) {
+                        alert('File size must be less than 5MB');
+                        e.target.value = '';
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        setPassportPhotoFileName(file.name);
+                        setPassportPhotoFile(event.target.result);
+                    };
+                    reader.onerror = (error) => {
+                        console.error('Error reading passport photo:', error);
+                        alert('Failed to read the file. Please try again.');
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
             const handleAdminLogin = (user) => {
                 setIsAdminLoggedIn(true);
                 setAdminUser(user);
@@ -6872,6 +7116,25 @@ HR Team`
                 setIsAdminLoggedIn(false);
                 setAdminUser(null);
                 // Clear any admin-related data
+            };
+
+            // Resets the form in place instead of window.location.reload() -
+            // reloading an Apps Script web app URL can land on a blank page
+            // (it's served through a sandboxed redirect, not a plain static
+            // file), so this avoids that entirely.
+            const resetForm = () => {
+                setFormData(getInitialFormData());
+                setCurrentlyWorking(false);
+                setIsFresher(false);
+                setFileName('');
+                setCvFile(null);
+                setCoverLetterFileName('');
+                setCoverLetterFile(null);
+                setPassportPhotoFileName('');
+                setPassportPhotoFile(null);
+                setCustomFieldValues({});
+                setSubmitMessage(null);
+                window.scrollTo(0, 0);
             };
 
             const handleSubmit = async (e) => {
@@ -6937,7 +7200,7 @@ HR Team`
                                     text: 'An error occurred: ' + error.message
                                 });
                             })
-                            .submitJobApplication(submissionData, fileName, cvFile, coverLetterFileName, coverLetterFile);
+                            .submitJobApplication(submissionData, fileName, cvFile, coverLetterFileName, coverLetterFile, passportPhotoFileName, passportPhotoFile);
                     } else {
                         // Running standalone (for testing)
                         setTimeout(() => {
@@ -7005,7 +7268,7 @@ HR Team`
                         isOpen={showCongratsModal}
                         onClose={() => {
                             setShowCongratsModal(false);
-                            window.location.reload(); // Reload to reset the form
+                            resetForm();
                         }}
                         applicantName={formData.firstName}
                         applicantEmail={formData.email}
@@ -7109,6 +7372,9 @@ HR Team`
                                 coverLetterFileName={coverLetterFileName}
                                 handleCoverLetterFileChange={handleCoverLetterFileChange}
                                 showCoverLetter={!hiddenFieldSet.has('coverLetter')}
+                                passportPhotoFileName={passportPhotoFileName}
+                                handlePassportPhotoChange={handlePassportPhotoChange}
+                                showPassportPhoto={!hiddenFieldSet.has('passportPhoto')}
                             />
 
                             <button type="submit" className="submit-btn" disabled={isSubmitting}>
