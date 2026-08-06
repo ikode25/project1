@@ -20,8 +20,41 @@ change made here:
    Sheet that backs the form).
 2. Copy the contents of `Code.gs` and `index.html` into the corresponding files
    in the Apps Script editor (or push with [`clasp`](https://github.com/google/clasp)
-   if the project is clasp-linked).
+   if the project is clasp-linked - `appsscript.json` is included here too so
+   `clasp push` carries the OAuth scopes below along with it).
 3. Deploy a new version (Deploy > Manage deployments > Edit > New version).
+
+### Fixing "You do not have permission to call UrlFetchApp.fetch"
+
+SMS sending is the first feature in this project to call an external HTTP API
+(`UrlFetchApp`), so the script needs a new OAuth scope
+(`.../auth/script.external_request`) that it never needed before. Apps Script
+computes the scope set at **authorization time**, not automatically on every
+save, so adding this code doesn't retroactively grant it - you'll see exactly
+the error in the screenshot until you do this once:
+
+1. In the Apps Script editor, open `Code.gs`, pick any function from the
+   function dropdown (e.g. `getSmsBalance`), and click **Run**.
+2. You'll get an **"Authorization required"** prompt - click **Review
+   permissions**, choose your account, click **Advanced** > **Go to
+   [project] (unsafe)** if Google shows the unverified-app warning (expected
+   for a script you own that hasn't been submitted for verification), then
+   **Allow**.
+3. Go to **Deploy > Manage deployments**, click the pencil icon on the active
+   deployment, and choose **New version** > **Deploy**. (Re-authorizing alone
+   isn't enough - the live web app keeps running the old authorized version
+   until you deploy a new one.)
+
+If `appsscript.json` above is present in the project (paste it in via the
+editor's gear icon > "Show `appsscript.json`"), Apps Script lists the scopes
+up front instead of inferring them, which makes this consent screen show up
+more reliably the first time.
+
+One more thing to check while you're in there: **Deploy > Manage deployments
+> Edit > Execute as** should be **"Me"**, not "User accessing the web app".
+Since applicants and SMS never authenticate, "User accessing the web app"
+has no identity to authorize against and every restricted call (UrlFetchApp,
+MailApp, etc.) fails the same way for anonymous visitors.
 
 ## What's new in this update
 
@@ -49,6 +82,18 @@ change made here:
 - **Admin entry point**: the header "Admin" button is now icon-only (no label,
   no box) and still opens the same login modal.
 - **Login**: the password field has a show/hide (eye) toggle.
+- **Toast notifications**: saving/updating/deleting records (theme, banner,
+  social links, SMS settings/templates, job description, email templates,
+  applications, interviews, bulk email/SMS) now shows an animated toast card
+  in the corner instead of a blocking `alert()`.
+- **SMS balance badge**: when SMS is enabled, the dashboard header shows a
+  blinking balance badge (Arkesel is fully supported; Hubtel is best-effort
+  since its balance API/response shape varies by account; it's hidden
+  automatically for custom providers or if the balance can't be read).
+- **Animated doodles**: the header/dashboard-header doodle pattern now drifts
+  slowly instead of sitting static (respects `prefers-reduced-motion`).
+- **Experience**: the "End Date" field is no longer required, even when
+  "Currently working here" isn't checked.
 
 All of the above is additive and stored in the same spreadsheet used today
 (new rows in `Settings`, and new `SmsTemplates`/`SmsLog` sheets are created

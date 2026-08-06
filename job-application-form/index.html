@@ -99,6 +99,19 @@
             background-size: 140px;
             opacity: var(--doodle-opacity);
             pointer-events: none;
+            animation: doodle-drift 22s linear infinite;
+        }
+
+        @keyframes doodle-drift {
+            0% { background-position: 0 0; }
+            100% { background-position: 140px 140px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .header::before,
+            .dashboard-header::before {
+                animation: none;
+            }
         }
 
         .header > * {
@@ -199,6 +212,134 @@
 
         .password-toggle-btn:hover {
             color: var(--c-dark);
+        }
+
+        /* Toast notifications */
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 6000;
+            display: flex;
+            flex-direction: column-reverse;
+            gap: 12px;
+            pointer-events: none;
+        }
+
+        .toast-card {
+            pointer-events: auto;
+            min-width: 280px;
+            max-width: 380px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.2);
+            padding: 14px 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            border-left: 5px solid #2e7d32;
+            animation: toast-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        .toast-card.toast-leaving {
+            animation: toast-out 0.28s ease forwards;
+        }
+
+        .toast-card.toast-success { border-left-color: #2e7d32; }
+        .toast-card.toast-error { border-left-color: #c62828; }
+        .toast-card.toast-info { border-left-color: #1976d2; }
+        .toast-card.toast-warning { border-left-color: #f57c00; }
+
+        .toast-icon {
+            font-size: 20px;
+            margin-top: 1px;
+            flex-shrink: 0;
+        }
+
+        .toast-card.toast-success .toast-icon { color: #2e7d32; }
+        .toast-card.toast-error .toast-icon { color: #c62828; }
+        .toast-card.toast-info .toast-icon { color: #1976d2; }
+        .toast-card.toast-warning .toast-icon { color: #f57c00; }
+
+        .toast-message {
+            flex: 1;
+            font-size: 13.5px;
+            color: #333;
+            line-height: 1.45;
+        }
+
+        .toast-close {
+            background: none;
+            border: none;
+            color: #bbb;
+            cursor: pointer;
+            font-size: 13px;
+            padding: 2px;
+            flex-shrink: 0;
+        }
+
+        .toast-close:hover {
+            color: #666;
+        }
+
+        @keyframes toast-in {
+            from { transform: translateX(40px) scale(0.95); opacity: 0; }
+            to { transform: translateX(0) scale(1); opacity: 1; }
+        }
+
+        @keyframes toast-out {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(40px); opacity: 0; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .toast-card {
+                animation: none;
+            }
+        }
+
+        /* Blinking SMS balance badge */
+        .sms-balance-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.15);
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .sms-balance-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: #ffca28;
+            box-shadow: 0 0 0 rgba(255, 202, 40, 0.6);
+            animation: sms-balance-blink 1.4s ease-in-out infinite;
+        }
+
+        .sms-balance-dot.low {
+            background: #ff5252;
+            box-shadow: 0 0 0 rgba(255, 82, 82, 0.6);
+            animation: sms-balance-blink-red 1.1s ease-in-out infinite;
+        }
+
+        @keyframes sms-balance-blink {
+            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255, 202, 40, 0.55); }
+            50% { opacity: 0.35; box-shadow: 0 0 0 6px rgba(255, 202, 40, 0); }
+        }
+
+        @keyframes sms-balance-blink-red {
+            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255, 82, 82, 0.55); }
+            50% { opacity: 0.3; box-shadow: 0 0 0 6px rgba(255, 82, 82, 0); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .sms-balance-dot,
+            .sms-balance-dot.low {
+                animation: none;
+            }
         }
 
         .form-content {
@@ -656,6 +797,7 @@
             background-size: 140px;
             opacity: var(--doodle-opacity);
             pointer-events: none;
+            animation: doodle-drift 22s linear infinite;
         }
 
         .dashboard-header > * {
@@ -1516,6 +1658,38 @@
             root.style.setProperty('--c-tint', c.tint);
             root.style.setProperty('--doodle-pattern', getDoodleBackgroundImage(themeConfig.doodle));
         }
+
+        /* ============================================================
+         * Toast notifications
+         * ============================================================ */
+
+        const TOAST_ICONS = {
+            success: 'fa-circle-check',
+            error: 'fa-circle-exclamation',
+            info: 'fa-circle-info',
+            warning: 'fa-triangle-exclamation'
+        };
+
+        const Toast = ({ toast, onClose }) => (
+            <div className={`toast-card toast-${toast.type} ${toast.leaving ? 'toast-leaving' : ''}`}>
+                <i className={`fas ${TOAST_ICONS[toast.type] || TOAST_ICONS.success} toast-icon`}></i>
+                <div className="toast-message">{toast.message}</div>
+                <button className="toast-close" onClick={onClose} aria-label="Dismiss">
+                    <i className="fas fa-times"></i>
+                </button>
+            </div>
+        );
+
+        const ToastContainer = ({ toasts, onClose }) => {
+            if (!toasts || toasts.length === 0) return null;
+            return (
+                <div className="toast-container">
+                    {toasts.map(t => (
+                        <Toast key={t.id} toast={t} onClose={() => onClose(t.id)} />
+                    ))}
+                </div>
+            );
+        };
 
         // Input Component
         const Input = ({ label, type = "text", name, value, onChange, required = false, placeholder = "" }) => (
@@ -2932,6 +3106,20 @@
             const [cvModal, setCvModal] = useState({ isOpen: false, cvUrl: '', candidateName: '' });
             const [editModal, setEditModal] = useState({ isOpen: false, applicant: null });
 
+            // Toast notifications
+            const [toasts, setToasts] = useState([]);
+            const showToast = (message, type = 'success') => {
+                const id = Date.now() + Math.random();
+                setToasts(prev => [...prev, { id, message, type, leaving: false }]);
+                setTimeout(() => {
+                    setToasts(prev => prev.map(t => (t.id === id ? { ...t, leaving: true } : t)));
+                    setTimeout(() => {
+                        setToasts(prev => prev.filter(t => t.id !== id));
+                    }, 280);
+                }, 3200);
+            };
+            const closeToast = (id) => setToasts(prev => prev.filter(t => t.id !== id));
+
             // Filters for All Applicants view
             const [statusFilter, setStatusFilter] = useState('all');
             const [positionFilter, setPositionFilter] = useState('all');
@@ -3014,6 +3202,7 @@ HR Team`
                 confirmation: '', shortlist: '', interview: '', rejection: ''
             });
             const [testSmsPhone, setTestSmsPhone] = useState('');
+            const [smsBalance, setSmsBalance] = useState(null); // { success, balance, currency }
 
             // Fetch applications on mount
             React.useEffect(() => {
@@ -3026,6 +3215,7 @@ HR Team`
                 loadSocialLinks();
                 loadSmsConfig();
                 loadSmsTemplates();
+                loadSmsBalance();
             }, []);
 
             // Load job description from Google Sheets
@@ -3110,6 +3300,16 @@ HR Team`
                         .withSuccessHandler((templates) => setSmsTemplates(templates))
                         .withFailureHandler((error) => console.error('Failed to load SMS templates:', error))
                         .getSmsTemplates();
+                }
+            };
+
+            // Load SMS balance (badge is hidden if the provider doesn't support this)
+            const loadSmsBalance = () => {
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run
+                        .withSuccessHandler((balance) => setSmsBalance(balance))
+                        .withFailureHandler((error) => console.error('Failed to load SMS balance:', error))
+                        .getSmsBalance();
                 }
             };
 
@@ -3303,7 +3503,7 @@ HR Team`
                 if (typeof google !== 'undefined' && google.script && google.script.run) {
                     google.script.run
                         .withSuccessHandler(() => {
-                            alert(`Email sent to ${candidate.email}`);
+                            showToast(`Email sent to ${candidate.email}`, 'success');
                         })
                         .withFailureHandler((error) => {
                             console.error('Failed to send email:', error);
@@ -3318,16 +3518,16 @@ HR Team`
                 if (typeof google !== 'undefined' && google.script && google.script.run) {
                     google.script.run
                         .withSuccessHandler(() => {
-                            alert('Application updated successfully');
+                            showToast('Application updated successfully', 'success');
                             fetchApplications(true); // Refresh applications list
                         })
                         .withFailureHandler((error) => {
                             console.error('Failed to update application:', error);
-                            alert('Failed to update application. Please try again.');
+                            showToast('Failed to update application. Please try again.', 'error');
                         })
                         .updateApplication(updateData);
                 } else {
-                    alert(`Demo: Would update application for ${updateData.email}`);
+                    showToast(`Demo: Would update application for ${updateData.email}`, 'info');
                     // In demo mode, update local state
                     setApplications(apps =>
                         apps.map(app =>
@@ -3346,11 +3546,11 @@ HR Team`
             const handleSaveTheme = () => {
                 if (typeof google !== 'undefined' && google.script && google.script.run) {
                     google.script.run
-                        .withSuccessHandler(() => alert('Theme saved successfully!'))
-                        .withFailureHandler((error) => alert('Failed to save theme: ' + error.message))
+                        .withSuccessHandler(() => showToast('Theme saved successfully!', 'success'))
+                        .withFailureHandler((error) => showToast('Failed to save theme: ' + error.message, 'error'))
                         .saveThemeConfig(themeConfig);
                 } else {
-                    alert('Theme saved (demo mode)!');
+                    showToast('Theme saved (demo mode)!', 'success');
                 }
             };
 
@@ -3389,16 +3589,16 @@ HR Team`
                                 setBannerUrl(response.url);
                                 setBannerFile(null);
                                 setBannerFileName('');
-                                alert('Banner uploaded successfully!');
+                                showToast('Banner uploaded successfully!', 'success');
                             } else {
-                                alert('Failed to upload banner: ' + response.message);
+                                showToast('Failed to upload banner: ' + response.message, 'error');
                             }
                         })
-                        .withFailureHandler((error) => alert('Failed to upload banner: ' + error.message))
+                        .withFailureHandler((error) => showToast('Failed to upload banner: ' + error.message, 'error'))
                         .uploadBanner(bannerFile, bannerFileName);
                 } else {
                     setBannerUrl(bannerFile);
-                    alert('Banner uploaded (demo mode)!');
+                    showToast('Banner uploaded (demo mode)!', 'success');
                 }
             };
 
@@ -3408,9 +3608,9 @@ HR Team`
                     google.script.run
                         .withSuccessHandler(() => {
                             setBannerUrl('');
-                            alert('Banner removed.');
+                            showToast('Banner removed.', 'success');
                         })
-                        .withFailureHandler((error) => alert('Failed to remove banner: ' + error.message))
+                        .withFailureHandler((error) => showToast('Failed to remove banner: ' + error.message, 'error'))
                         .removeBanner();
                 } else {
                     setBannerUrl('');
@@ -3420,56 +3620,62 @@ HR Team`
             const handleSaveSocialLinks = () => {
                 if (typeof google !== 'undefined' && google.script && google.script.run) {
                     google.script.run
-                        .withSuccessHandler(() => alert('Social links saved successfully!'))
-                        .withFailureHandler((error) => alert('Failed to save social links: ' + error.message))
+                        .withSuccessHandler(() => showToast('Social links saved successfully!', 'success'))
+                        .withFailureHandler((error) => showToast('Failed to save social links: ' + error.message, 'error'))
                         .saveSocialLinks(socialLinks);
                 } else {
-                    alert('Social links saved (demo mode)!');
+                    showToast('Social links saved (demo mode)!', 'success');
                 }
             };
 
             const handleSaveSmsConfig = () => {
                 if (typeof google !== 'undefined' && google.script && google.script.run) {
                     google.script.run
-                        .withSuccessHandler(() => alert('SMS settings saved successfully!'))
-                        .withFailureHandler((error) => alert('Failed to save SMS settings: ' + error.message))
+                        .withSuccessHandler(() => {
+                            showToast('SMS settings saved successfully!', 'success');
+                            loadSmsBalance();
+                        })
+                        .withFailureHandler((error) => showToast('Failed to save SMS settings: ' + error.message, 'error'))
                         .saveSmsConfig(smsConfig);
                 } else {
-                    alert('SMS settings saved (demo mode)!');
+                    showToast('SMS settings saved (demo mode)!', 'success');
                 }
             };
 
             const handleSendTestSms = () => {
                 if (!testSmsPhone) {
-                    alert('Enter a phone number to send the test SMS to.');
+                    showToast('Enter a phone number to send the test SMS to.', 'warning');
                     return;
                 }
                 if (typeof google !== 'undefined' && google.script && google.script.run) {
                     google.script.run
                         .withSuccessHandler((response) => {
-                            alert(response.success ? 'Test SMS sent successfully!' : 'Test SMS failed: ' + response.message);
+                            showToast(
+                                response.success ? 'Test SMS sent successfully!' : 'Test SMS failed: ' + response.message,
+                                response.success ? 'success' : 'error'
+                            );
                         })
-                        .withFailureHandler((error) => alert('Test SMS failed: ' + error.message))
+                        .withFailureHandler((error) => showToast('Test SMS failed: ' + error.message, 'error'))
                         .sendTestSms(testSmsPhone);
                 } else {
-                    alert('Test SMS sent (demo mode)!');
+                    showToast('Test SMS sent (demo mode)!', 'success');
                 }
             };
 
             const handleSaveSmsTemplates = () => {
                 if (typeof google !== 'undefined' && google.script && google.script.run) {
                     google.script.run
-                        .withSuccessHandler(() => alert('SMS templates saved successfully!'))
-                        .withFailureHandler((error) => alert('Failed to save SMS templates: ' + error.message))
+                        .withSuccessHandler(() => showToast('SMS templates saved successfully!', 'success'))
+                        .withFailureHandler((error) => showToast('Failed to save SMS templates: ' + error.message, 'error'))
                         .saveSmsTemplates(smsTemplates);
                 } else {
-                    alert('SMS templates saved (demo mode)!');
+                    showToast('SMS templates saved (demo mode)!', 'success');
                 }
             };
 
             const handleBulkAction = (action) => {
                 if (selectedCandidates.length === 0) {
-                    alert('Please select at least one candidate');
+                    showToast('Please select at least one candidate', 'warning');
                     return;
                 }
 
@@ -3548,16 +3754,16 @@ HR Team`
                     const backendFunction = isReschedule ? 'rescheduleInterview' : 'scheduleInterview';
                     google.script.run
                         .withSuccessHandler(() => {
-                            alert(successMessage);
+                            showToast(successMessage, 'success');
                             fetchInterviews(); // Refresh interviews list
                         })
                         .withFailureHandler((error) => {
                             console.error(`Failed to ${isReschedule ? 'reschedule' : 'schedule'} interview:`, error);
-                            alert(`Failed to ${isReschedule ? 'reschedule' : 'schedule'} interview. Please try again.`);
+                            showToast(`Failed to ${isReschedule ? 'reschedule' : 'schedule'} interview. Please try again.`, 'error');
                         })
                         [backendFunction](interviewData);
                 } else {
-                    alert(`Interview ${isReschedule ? 'rescheduled' : 'scheduled'} for ${interviewData.candidateEmail}`);
+                    showToast(`Interview ${isReschedule ? 'rescheduled' : 'scheduled'} for ${interviewData.candidateEmail}`, 'success');
                     fetchInterviews(); // Refresh interviews list
                 }
             };
@@ -3705,6 +3911,7 @@ HR Team`
 
             return (
                 <div className="dashboard-container">
+                    <ToastContainer toasts={toasts} onClose={closeToast} />
                     <div className="dashboard-header">
                         <div className="dashboard-title">
                             <i className="fas fa-users-cog" style={{ fontSize: '28px' }}></i>
@@ -3715,6 +3922,18 @@ HR Team`
                                 <i className="fas fa-user-circle"></i>
                                 <span>Welcome, {adminUser.username}</span>
                             </div>
+                            {smsBalance && smsBalance.success && (
+                                <div
+                                    className="sms-balance-badge"
+                                    onClick={loadSmsBalance}
+                                    title="SMS credit balance - click to refresh"
+                                    style={{ cursor: 'pointer' }}
+                                >
+                                    <span className={`sms-balance-dot ${smsBalance.balance <= 20 ? 'low' : ''}`}></span>
+                                    <i className="fas fa-sms"></i>
+                                    SMS Balance: {smsBalance.balance}{smsBalance.currency ? ` ${smsBalance.currency}` : ''}
+                                </div>
+                            )}
                             <button className="logout-btn" onClick={onLogout}>
                                 <i className="fas fa-sign-out-alt"></i>
                                 Logout
@@ -3924,15 +4143,15 @@ HR Team`
                                                     if (typeof google !== 'undefined' && google.script && google.script.run) {
                                                         google.script.run
                                                             .withSuccessHandler(() => {
-                                                                alert('Job description saved successfully!');
+                                                                showToast('Job description saved successfully!', 'success');
                                                             })
                                                             .withFailureHandler((error) => {
                                                                 console.error('Failed to save job description:', error);
-                                                                alert('Failed to save job description: ' + error.message);
+                                                                showToast('Failed to save job description: ' + error.message, 'error');
                                                             })
                                                             .updateJobDescription(jobDescription);
                                                     } else {
-                                                        alert('Job description updated successfully!');
+                                                        showToast('Job description updated successfully!', 'success');
                                                     }
                                                 }}
                                                 style={{
@@ -3952,7 +4171,7 @@ HR Team`
                                                 className="action-btn"
                                                 onClick={() => {
                                                     loadJobDescription();
-                                                    alert('Job description reloaded from server!');
+                                                    showToast('Job description reloaded from server!', 'info');
                                                 }}
                                                 style={{
                                                     backgroundColor: '#757575',
@@ -4075,15 +4294,15 @@ HR Team`
                                                     if (typeof google !== 'undefined' && google.script && google.script.run) {
                                                         google.script.run
                                                             .withSuccessHandler(() => {
-                                                                alert('Email templates saved successfully to Google Sheets!');
+                                                                showToast('Email templates saved successfully!', 'success');
                                                             })
                                                             .withFailureHandler((error) => {
                                                                 console.error('Failed to save templates:', error);
-                                                                alert('Failed to save templates: ' + error.message);
+                                                                showToast('Failed to save templates: ' + error.message, 'error');
                                                             })
                                                             .saveEmailTemplates(emailTemplates);
                                                     } else {
-                                                        alert('Email templates updated successfully!');
+                                                        showToast('Email templates updated successfully!', 'success');
                                                     }
                                                 }}
                                                 style={{
@@ -4115,15 +4334,15 @@ HR Team`
                                                         if (typeof google !== 'undefined' && google.script && google.script.run) {
                                                             google.script.run
                                                                 .withSuccessHandler(() => {
-                                                                    alert('Templates reset to default and saved to Google Sheets!');
+                                                                    showToast('Templates reset to default and saved to Google Sheets!', 'success');
                                                                 })
                                                                 .withFailureHandler((error) => {
                                                                     console.error('Failed to save default templates:', error);
-                                                                    alert('Templates reset locally, but failed to save to Google Sheets');
+                                                                    showToast('Templates reset locally, but failed to save to Google Sheets', 'warning');
                                                                 })
                                                                 .saveEmailTemplates(defaultTemplates);
                                                         } else {
-                                                            alert('Templates reset to default!');
+                                                            showToast('Templates reset to default!', 'success');
                                                         }
                                                     }
                                                 }}
@@ -4494,11 +4713,11 @@ HR Team`
                                                         setSmsTemplates(defaultSmsTemplates);
                                                         if (typeof google !== 'undefined' && google.script && google.script.run) {
                                                             google.script.run
-                                                                .withSuccessHandler(() => alert('SMS templates reset to default and saved!'))
-                                                                .withFailureHandler((error) => alert('Reset locally, but failed to save: ' + error.message))
+                                                                .withSuccessHandler(() => showToast('SMS templates reset to default and saved!', 'success'))
+                                                                .withFailureHandler((error) => showToast('Reset locally, but failed to save: ' + error.message, 'warning'))
                                                                 .saveSmsTemplates(defaultSmsTemplates);
                                                         } else {
-                                                            alert('SMS templates reset to default!');
+                                                            showToast('SMS templates reset to default!', 'success');
                                                         }
                                                     }
                                                 }}
@@ -4794,16 +5013,16 @@ HR Team`
                                                                                 if (typeof google !== 'undefined' && google.script && google.script.run) {
                                                                                     google.script.run
                                                                                         .withSuccessHandler(() => {
-                                                                                            alert('Application deleted successfully');
+                                                                                            showToast('Application deleted successfully', 'success');
                                                                                             fetchApplications(true); // Refresh applications list
                                                                                         })
                                                                                         .withFailureHandler((error) => {
                                                                                             console.error('Failed to delete application:', error);
-                                                                                            alert('Failed to delete application. Please try again.');
+                                                                                            showToast('Failed to delete application. Please try again.', 'error');
                                                                                         })
                                                                                         .deleteApplication(app.email);
                                                                                 } else {
-                                                                                    alert(`Demo: Would delete application from ${app.email}`);
+                                                                                    showToast(`Demo: Would delete application from ${app.email}`, 'info');
                                                                                     // In demo mode, just remove from local state
                                                                                     setApplications(apps => apps.filter(a => a.email !== app.email));
                                                                                 }
@@ -5018,9 +5237,9 @@ HR Team`
                                 // Show success message after a brief delay
                                 setTimeout(() => {
                                     if (typeof google !== 'undefined' && google.script && google.script.run) {
-                                        alert(`Email sending initiated for ${emailModal.candidates.length} candidate(s)`);
+                                        showToast(`Email sending initiated for ${emailModal.candidates.length} candidate(s)`, 'success');
                                     } else {
-                                        alert(`Demo: Emails sent to ${successCount} candidate(s)`);
+                                        showToast(`Demo: Emails sent to ${successCount} candidate(s)`, 'success');
                                     }
                                 }, 500);
 
@@ -5065,9 +5284,9 @@ HR Team`
 
                                 setTimeout(() => {
                                     if (typeof google !== 'undefined' && google.script && google.script.run) {
-                                        alert(`SMS sending initiated for ${smsModal.candidates.length} candidate(s). Check Admin > Settings > SMS is enabled and configured if messages don't arrive.`);
+                                        showToast(`SMS sending initiated for ${smsModal.candidates.length} candidate(s). Check Admin > Settings > SMS if messages don't arrive.`, 'success');
                                     } else {
-                                        alert(`Demo: SMS sent to ${successCount} candidate(s)`);
+                                        showToast(`Demo: SMS sent to ${successCount} candidate(s)`, 'success');
                                     }
                                 }, 500);
 
@@ -5678,7 +5897,6 @@ HR Team`
                                 name="endDate"
                                 value={formData.endDate}
                                 onChange={handleChange}
-                                required={!currentlyWorking}
                             />
                         </div>
 

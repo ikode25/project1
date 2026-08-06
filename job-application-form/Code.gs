@@ -2460,3 +2460,71 @@ function maybeSendAutoSms(templateType, phone, replacements) {
     Logger.log('Auto SMS (' + templateType + ') failed: ' + error.toString());
   }
 }
+
+/* ============================================================
+ * SMS: balance check
+ * ============================================================ */
+
+/**
+ * Fetches the current SMS credit balance from the configured provider,
+ * for display on the admin dashboard. Not every provider exposes a
+ * standard balance API, so this fails gracefully when it can't.
+ * @returns {Object} { success, balance, currency, message }
+ */
+function getSmsBalance() {
+  try {
+    const config = getSmsConfig();
+    if (!config.enabled) {
+      return { success: false, message: 'SMS is disabled' };
+    }
+
+    if (config.provider === 'arkesel') {
+      if (!config.arkesel.apiKey) {
+        return { success: false, message: 'Arkesel API key not set' };
+      }
+      const response = UrlFetchApp.fetch('https://sms.arkesel.com/api/v2/clients/balance-details', {
+        method: 'get',
+        headers: { 'api-key': config.arkesel.apiKey },
+        muteHttpExceptions: true
+      });
+      if (response.getResponseCode() >= 300) {
+        return { success: false, message: 'Arkesel balance request failed (' + response.getResponseCode() + ')' };
+      }
+      const data = JSON.parse(response.getContentText());
+      const info = data.data || data;
+      const balance = info.sms_balance !== undefined ? info.sms_balance
+        : (info.balance !== undefined ? info.balance : info.main_balance);
+      if (balance === undefined) {
+        return { success: false, message: 'Unexpected Arkesel balance response format' };
+      }
+      return { success: true, balance: Number(balance), currency: info.currency || '' };
+    }
+
+    if (config.provider === 'hubtel') {
+      if (!config.hubtel.clientId || !config.hubtel.clientSecret) {
+        return { success: false, message: 'Hubtel credentials not set' };
+      }
+      // Hubtel's balance endpoint/response can vary by account type; this is
+      // best-effort and fails gracefully (hides the badge) if the shape
+      // doesn't match. Verify against your Hubtel dashboard if this is off.
+      const url = 'https://smsc.hubtel.com/v1/messages/balance'
+        + '?clientid=' + encodeURIComponent(config.hubtel.clientId)
+        + '&clientsecret=' + encodeURIComponent(config.hubtel.clientSecret);
+      const response = UrlFetchApp.fetch(url, { method: 'get', muteHttpExceptions: true });
+      if (response.getResponseCode() >= 300) {
+        return { success: false, message: 'Hubtel balance request failed (' + response.getResponseCode() + ')' };
+      }
+      const data = JSON.parse(response.getContentText());
+      const balance = data.balance !== undefined ? data.balance : (data.Balance !== undefined ? data.Balance : undefined);
+      if (balance === undefined) {
+        return { success: false, message: 'Unexpected Hubtel balance response format' };
+      }
+      return { success: true, balance: Number(balance), currency: data.currency || data.Currency || '' };
+    }
+
+    return { success: false, message: 'Balance check not available for custom providers' };
+  } catch (error) {
+    Logger.log('Error getting SMS balance: ' + error.toString());
+    return { success: false, message: error.message };
+  }
+}
