@@ -11,14 +11,14 @@ function doGet() {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-function submitJobApplication(formData, fileName, fileData) {
+function submitJobApplication(formData, fileName, fileData, coverLetterFileName, coverLetterFileData) {
   try {
     const spreadsheetId = getSpreadsheetId();
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('Applications') || ss.insertSheet('Applications');
     const lastRow = sheet.getLastRow();
     if (lastRow > 1) {
-      const emailColumn = 5; 
+      const emailColumn = 5;
       const existingEmails = sheet.getRange(2, emailColumn, lastRow - 1, 1).getValues();
       const emailExists = existingEmails.some(row => row[0] === formData.email);
 
@@ -37,6 +37,17 @@ function submitJobApplication(formData, fileName, fileData) {
       } catch (uploadError) {
         Logger.log(`Error uploading CV: ${uploadError.toString()}`);
         cvUrl = 'Upload Failed: ' + uploadError.message;
+      }
+    }
+
+    let coverLetterUrl = '';
+    if (coverLetterFileData && coverLetterFileName) {
+      try {
+        coverLetterUrl = uploadCVToDrive(coverLetterFileData, coverLetterFileName, formData.email + '_coverletter');
+        Logger.log(`Cover letter uploaded successfully: ${coverLetterUrl}`);
+      } catch (uploadError) {
+        Logger.log(`Error uploading cover letter: ${uploadError.toString()}`);
+        coverLetterUrl = 'Upload Failed: ' + uploadError.message;
       }
     }
     const timestamp = new Date().toISOString();
@@ -87,7 +98,9 @@ function submitJobApplication(formData, fileName, fileData) {
       formData.hndProgramme || '',
       formData.hndInstitute || '',
       formData.hndMajor || '',
-      formData.hndGrade || ''
+      formData.hndGrade || '',
+      // Cover Letter URL
+      coverLetterUrl
     ];
 
     // Append to sheet
@@ -150,7 +163,8 @@ function getSpreadsheetId() {
         'Postgraduate Degree', 'Postgraduate Institute', 'Postgraduate Major', 'Postgraduate Grade',
         'Years of Experience', 'Last Organisation', 'Last Designation',
         'Joining Date', 'End Date', 'Currently Working', 'CV URL',
-        'HND Programme', 'HND Institute', 'HND Major', 'HND Grade'
+        'HND Programme', 'HND Institute', 'HND Major', 'HND Grade',
+        'Cover Letter URL'
       ];
       appSheet.appendRow(headers);
 
@@ -244,7 +258,8 @@ function getAllApplications() {
       hndProgramme: row[38],
       hndInstitute: row[39],
       hndMajor: row[40],
-      hndGrade: row[41]
+      hndGrade: row[41],
+      coverLetterUrl: row[42]
     }));
 
     // Sort by timestamp (newest first)
@@ -1329,7 +1344,8 @@ function setupDemoData() {
         'Postgraduate Degree', 'Postgraduate Institute', 'Postgraduate Major', 'Postgraduate Grade',
         'Years of Experience', 'Last Organisation', 'Last Designation',
         'Joining Date', 'End Date', 'Currently Working', 'CV URL',
-        'HND Programme', 'HND Institute', 'HND Major', 'HND Grade'
+        'HND Programme', 'HND Institute', 'HND Major', 'HND Grade',
+        'Cover Letter URL'
       ];
       sheet.appendRow(headers);
 
@@ -1690,7 +1706,9 @@ function setupDemoData() {
         applicant.currentlyWorking,
         `${applicant.firstName}_${applicant.lastName}_CV.pdf`,
         // HND (Higher National Diploma) - not used by demo data
-        '', '', '', ''
+        '', '', '', '',
+        // Cover Letter URL - not used by demo data
+        ''
       ];
       sheet.appendRow(row);
       added++;

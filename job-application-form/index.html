@@ -2363,7 +2363,7 @@
         };
 
         // Candidate Card Component
-        const CandidateCard = ({ candidate, onStatusChange, onViewCV, onInterview, onSendEmail, onSendSms, selected, onSelect }) => {
+        const CandidateCard = ({ candidate, onStatusChange, onViewCV, onViewCoverLetter, onInterview, onSendEmail, onSendSms, selected, onSelect }) => {
             return (
                 <div className="candidate-card">
                     <div className="candidate-header">
@@ -2390,6 +2390,11 @@
                             {candidate.cvUrl && (
                                 <button className="action-btn btn-view-cv" onClick={() => onViewCV(candidate)}>
                                     <i className="fas fa-file-pdf"></i> CV
+                                </button>
+                            )}
+                            {candidate.coverLetterUrl && onViewCoverLetter && (
+                                <button className="action-btn btn-view-cv" onClick={() => onViewCoverLetter(candidate)}>
+                                    <i className="fas fa-file-alt"></i> Cover Letter
                                 </button>
                             )}
                             {onSendEmail && (
@@ -3907,7 +3912,19 @@ HR Team`
                         candidateName: `${candidate.firstName} ${candidate.lastName}`
                     });
                 } else {
-                    alert('CV not available or upload failed');
+                    showToast('CV not available or upload failed', 'warning');
+                }
+            };
+
+            const handleViewCoverLetter = (candidate) => {
+                if (candidate.coverLetterUrl && candidate.coverLetterUrl !== '' && !candidate.coverLetterUrl.startsWith('Upload Failed')) {
+                    setCvModal({
+                        isOpen: true,
+                        cvUrl: candidate.coverLetterUrl,
+                        candidateName: `${candidate.firstName} ${candidate.lastName} - Cover Letter`
+                    });
+                } else {
+                    showToast('Cover letter not available for this candidate', 'warning');
                 }
             };
 
@@ -5153,15 +5170,28 @@ HR Team`
                                                                 </span>
                                                             </td>
                                                             <td>
-                                                                {app.cvUrl ? (
-                                                                    <button
-                                                                        className="action-btn btn-view-cv"
-                                                                        onClick={() => handleViewCV(app)}
-                                                                        style={{ fontSize: '12px', padding: '6px 12px' }}
-                                                                    >
-                                                                        <i className="fas fa-file-pdf"></i> View
-                                                                    </button>
-                                                                ) : '-'}
+                                                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                                                    {app.cvUrl ? (
+                                                                        <button
+                                                                            className="action-btn btn-view-cv"
+                                                                            onClick={() => handleViewCV(app)}
+                                                                            style={{ fontSize: '12px', padding: '6px 12px' }}
+                                                                            title="View CV"
+                                                                        >
+                                                                            <i className="fas fa-file-pdf"></i> CV
+                                                                        </button>
+                                                                    ) : '-'}
+                                                                    {app.coverLetterUrl && (
+                                                                        <button
+                                                                            className="action-btn btn-view-cv"
+                                                                            onClick={() => handleViewCoverLetter(app)}
+                                                                            style={{ fontSize: '12px', padding: '6px 12px' }}
+                                                                            title="View Cover Letter"
+                                                                        >
+                                                                            <i className="fas fa-file-alt"></i>
+                                                                        </button>
+                                                                    )}
+                                                                </div>
                                                             </td>
                                                             <td>
                                                                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -5333,15 +5363,28 @@ HR Team`
                                                             </span>
                                                         </td>
                                                         <td>
-                                                            {app.cvUrl ? (
-                                                                <button
-                                                                    className="action-btn btn-view-cv"
-                                                                    onClick={() => handleViewCV(app)}
-                                                                    style={{ fontSize: '12px', padding: '6px 12px' }}
-                                                                >
-                                                                    <i className="fas fa-file-pdf"></i> View
-                                                                </button>
-                                                            ) : '-'}
+                                                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                                                {app.cvUrl ? (
+                                                                    <button
+                                                                        className="action-btn btn-view-cv"
+                                                                        onClick={() => handleViewCV(app)}
+                                                                        style={{ fontSize: '12px', padding: '6px 12px' }}
+                                                                        title="View CV"
+                                                                    >
+                                                                        <i className="fas fa-file-pdf"></i> CV
+                                                                    </button>
+                                                                ) : '-'}
+                                                                {app.coverLetterUrl && (
+                                                                    <button
+                                                                        className="action-btn btn-view-cv"
+                                                                        onClick={() => handleViewCoverLetter(app)}
+                                                                        style={{ fontSize: '12px', padding: '6px 12px' }}
+                                                                        title="View Cover Letter"
+                                                                    >
+                                                                        <i className="fas fa-file-alt"></i>
+                                                                    </button>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 ))}
@@ -5365,6 +5408,7 @@ HR Team`
                                         }}
                                         onStatusChange={handleStatusChange}
                                         onViewCV={handleViewCV}
+                                        onViewCoverLetter={handleViewCoverLetter}
                                         onInterview={(candidate) => setInterviewModal({ isOpen: true, candidate })}
                                         onSendEmail={(candidate) => {
                                             setEmailModal({
@@ -6113,32 +6157,61 @@ HR Team`
         );
 
         // CV Upload Section
-        const CVUploadSection = ({ fileName, handleFileChange }) => (
+        const CVUploadSection = ({ fileName, handleFileChange, coverLetterFileName, handleCoverLetterFileChange }) => (
             <div className="section">
                 <div className="section-header">
                     <div className="section-number">5</div>
-                    <h2 className="section-title">Upload Your CV <span style={{ color: '#d32f2f' }}>*</span></h2>
+                    <h2 className="section-title">Documents</h2>
                 </div>
 
-                <div className="file-upload">
-                    <label htmlFor="cvUpload" className="file-upload-label">
-                        <div className="file-upload-icon">
-                            <i className="fas fa-file-upload"></i>
-                        </div>
-                        <h3 style={{ color: '#2e7d32', marginBottom: '8px' }}>
-                            {fileName || 'Click to upload your CV (Required)'}
-                        </h3>
-                        <p style={{ color: '#66bb6a', fontSize: '14px' }}>
-                            Supported format: PDF only (Max 5MB)
-                        </p>
+                <div className="form-group">
+                    <label>
+                        Upload Your CV
+                        <span className="required">*</span>
                     </label>
-                    <input
-                        type="file"
-                        id="cvUpload"
-                        accept=".pdf"
-                        onChange={handleFileChange}
-                        required={true}
-                    />
+                    <div className="file-upload">
+                        <label htmlFor="cvUpload" className="file-upload-label">
+                            <div className="file-upload-icon">
+                                <i className="fas fa-file-upload"></i>
+                            </div>
+                            <h3 style={{ color: '#2e7d32', marginBottom: '8px' }}>
+                                {fileName || 'Click to upload your CV (Required)'}
+                            </h3>
+                            <p style={{ color: '#66bb6a', fontSize: '14px' }}>
+                                Supported format: PDF only (Max 5MB)
+                            </p>
+                        </label>
+                        <input
+                            type="file"
+                            id="cvUpload"
+                            accept=".pdf"
+                            onChange={handleFileChange}
+                            required={true}
+                        />
+                    </div>
+                </div>
+
+                <div className="form-group" style={{ marginTop: '20px' }}>
+                    <label>Cover Letter (Optional)</label>
+                    <div className="file-upload">
+                        <label htmlFor="coverLetterUpload" className="file-upload-label">
+                            <div className="file-upload-icon">
+                                <i className="fas fa-file-alt"></i>
+                            </div>
+                            <h3 style={{ color: '#2e7d32', marginBottom: '8px' }}>
+                                {coverLetterFileName || 'Click to upload a cover letter (Optional)'}
+                            </h3>
+                            <p style={{ color: '#66bb6a', fontSize: '14px' }}>
+                                Supported format: PDF only (Max 5MB)
+                            </p>
+                        </label>
+                        <input
+                            type="file"
+                            id="coverLetterUpload"
+                            accept=".pdf"
+                            onChange={handleCoverLetterFileChange}
+                        />
+                    </div>
                 </div>
             </div>
         );
@@ -6149,6 +6222,8 @@ HR Team`
             const [isFresher, setIsFresher] = useState(false);
             const [fileName, setFileName] = useState('');
             const [cvFile, setCvFile] = useState(null);
+            const [coverLetterFileName, setCoverLetterFileName] = useState('');
+            const [coverLetterFile, setCoverLetterFile] = useState(null);
             const [isSubmitting, setIsSubmitting] = useState(false);
             const [submitMessage, setSubmitMessage] = useState(null);
             const [showCongratsModal, setShowCongratsModal] = useState(false);
@@ -6314,6 +6389,33 @@ HR Team`
                 }
             };
 
+            const handleCoverLetterFileChange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    if (!file.name.toLowerCase().endsWith('.pdf')) {
+                        alert('Only PDF files are allowed. Please upload a PDF file.');
+                        e.target.value = '';
+                        return;
+                    }
+                    if (file.size > 5 * 1024 * 1024) {
+                        alert('File size must be less than 5MB');
+                        e.target.value = '';
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        setCoverLetterFileName(file.name);
+                        setCoverLetterFile(event.target.result);
+                    };
+                    reader.onerror = (error) => {
+                        console.error('Error reading cover letter file:', error);
+                        alert('Failed to read the file. Please try again.');
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
             const handleAdminLogin = (user) => {
                 setIsAdminLoggedIn(true);
                 setAdminUser(user);
@@ -6389,7 +6491,7 @@ HR Team`
                                     text: 'An error occurred: ' + error.message
                                 });
                             })
-                            .submitJobApplication(submissionData, fileName, cvFile);
+                            .submitJobApplication(submissionData, fileName, cvFile, coverLetterFileName, coverLetterFile);
                     } else {
                         // Running standalone (for testing)
                         setTimeout(() => {
@@ -6517,7 +6619,12 @@ HR Team`
                                 isFresher={isFresher}
                                 setIsFresher={setIsFresher}
                             />
-                            <CVUploadSection fileName={fileName} handleFileChange={handleFileChange} />
+                            <CVUploadSection
+                                fileName={fileName}
+                                handleFileChange={handleFileChange}
+                                coverLetterFileName={coverLetterFileName}
+                                handleCoverLetterFileChange={handleCoverLetterFileChange}
+                            />
 
                             <button type="submit" className="submit-btn" disabled={isSubmitting}>
                                 {isSubmitting ? 'Submitting...' : 'Submit Application'}
