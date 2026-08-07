@@ -1931,10 +1931,15 @@
             { id: 'currentAddress', label: 'Current Address', section: 'personal' },
             { id: 'permanentAddress', label: 'Permanent Address', section: 'personal' },
             { id: 'ssc', label: 'SSC (Secondary School Certificate)', section: 'education' },
+            { id: 'sscCertificate', label: 'SSC Certificate Upload (Required if shown)', section: 'education' },
             { id: 'hsc', label: 'HSC (Higher Secondary Certificate)', section: 'education' },
+            { id: 'hscCertificate', label: 'HSC Certificate Upload (Required if shown)', section: 'education' },
             { id: 'bachelor', label: "Bachelor/Undergraduate", section: 'education' },
+            { id: 'bachelorCertificate', label: 'Bachelor Certificate Upload (Required if shown)', section: 'education' },
             { id: 'hnd', label: 'HND (Higher National Diploma)', section: 'education' },
+            { id: 'hndCertificate', label: 'HND Certificate Upload (Required if shown)', section: 'education' },
             { id: 'postgraduate', label: 'Postgraduate', section: 'education' },
+            { id: 'postgraduateCertificate', label: 'Postgraduate Certificate Upload (Required if shown)', section: 'education' },
             { id: 'experience', label: 'Work Experience Details', section: 'experience' },
             { id: 'coverLetter', label: 'Cover Letter Upload', section: 'documents' },
             { id: 'passportPhoto', label: 'Passport Photo Upload', section: 'documents' }
@@ -2618,6 +2623,32 @@
         };
 
         // Applicant Detail Expanded View Component
+        const CertificateLink = ({ url }) => (
+            (url && !url.startsWith('Upload Failed')) ? (
+                <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                        marginLeft: 'auto',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: 'var(--c-dark)',
+                        background: 'var(--c-faint)',
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        textDecoration: 'none',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        whiteSpace: 'nowrap'
+                    }}
+                >
+                    <i className="fas fa-certificate"></i> View Certificate
+                </a>
+            ) : null
+        );
+
         const ApplicantExpandedView = ({ applicant, customFieldsConfig }) => {
             const formatDate = (dateStr) => {
                 if (!dateStr) return 'Not provided';
@@ -2700,6 +2731,7 @@
                         <div className="detail-section-title">
                             <i className="fas fa-graduation-cap"></i>
                             SSC (Secondary School Certificate)
+                            <CertificateLink url={applicant.sscCertificateUrl} />
                         </div>
                         <div className="detail-grid">
                             <div className="detail-item">
@@ -2734,6 +2766,7 @@
                         <div className="detail-section-title">
                             <i className="fas fa-graduation-cap"></i>
                             HSC (Higher Secondary Certificate)
+                            <CertificateLink url={applicant.hscCertificateUrl} />
                         </div>
                         <div className="detail-grid">
                             <div className="detail-item">
@@ -2768,6 +2801,7 @@
                         <div className="detail-section-title">
                             <i className="fas fa-user-graduate"></i>
                             Bachelor/Undergraduate
+                            <CertificateLink url={applicant.bachelorCertificateUrl} />
                         </div>
                         <div className="detail-grid">
                             <div className="detail-item">
@@ -2803,6 +2837,7 @@
                             <div className="detail-section-title">
                                 <i className="fas fa-book-reader"></i>
                                 HND (Higher National Diploma)
+                                <CertificateLink url={applicant.hndCertificateUrl} />
                             </div>
                             <div className="detail-grid">
                                 <div className="detail-item">
@@ -2839,6 +2874,7 @@
                             <div className="detail-section-title">
                                 <i className="fas fa-book-reader"></i>
                                 Postgraduate
+                                <CertificateLink url={applicant.postgraduateCertificateUrl} />
                             </div>
                             <div className="detail-grid">
                                 <div className="detail-item">
@@ -3614,7 +3650,7 @@ HR Team`
             });
 
             // Company info (used to brand outgoing emails)
-            const [companyInfo, setCompanyInfo] = useState({ name: '', description: '', website: '', address: '' });
+            const [companyInfo, setCompanyInfo] = useState({ name: '', description: '', website: '', address: '', phone: '', email: '', dashboardTitle: '' });
 
             // Settings sub-tabs
             const [settingsSubTab, setSettingsSubTab] = useState('general');
@@ -3742,7 +3778,7 @@ HR Team`
             const loadCompanyInfo = () => {
                 if (typeof google !== 'undefined' && google.script && google.script.run) {
                     google.script.run
-                        .withSuccessHandler((info) => setCompanyInfo(info || { name: '', description: '', website: '', address: '' }))
+                        .withSuccessHandler((info) => setCompanyInfo(info || { name: '', description: '', website: '', address: '', phone: '', email: '', dashboardTitle: '' }))
                         .withFailureHandler((error) => console.error('Failed to load company info:', error))
                         .getCompanyInfo();
                 }
@@ -4444,7 +4480,7 @@ HR Team`
                     <div className="dashboard-header">
                         <div className="dashboard-title">
                             <i className="fas fa-users-cog" style={{ fontSize: '28px' }}></i>
-                            <h1>Candidate Management System</h1>
+                            <h1>{companyInfo.dashboardTitle || 'Candidate Management System'}</h1>
                         </div>
                         <div className="admin-info">
                             <div className="admin-name">
@@ -4792,6 +4828,28 @@ HR Team`
                                                     style={{ width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
                                                 />
                                             </div>
+                                            <div style={{ display: 'grid', gap: '15px', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+                                                <div>
+                                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Contact Phone</label>
+                                                    <input
+                                                        type="text"
+                                                        value={companyInfo.phone}
+                                                        onChange={(e) => setCompanyInfo({ ...companyInfo, phone: e.target.value })}
+                                                        placeholder="e.g., +233 XX XXX XXXX"
+                                                        style={{ width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Contact Email</label>
+                                                    <input
+                                                        type="email"
+                                                        value={companyInfo.email}
+                                                        onChange={(e) => setCompanyInfo({ ...companyInfo, email: e.target.value })}
+                                                        placeholder="hr@yourcompany.com"
+                                                        style={{ width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
+                                                    />
+                                                </div>
+                                            </div>
                                             <div>
                                                 <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Address</label>
                                                 <textarea
@@ -4802,9 +4860,38 @@ HR Team`
                                                 />
                                             </div>
                                         </div>
+                                        <p style={{ fontSize: '12px', color: '#666', marginTop: '10px' }}>
+                                            Phone, email, address, website and your social media links (set under Appearance) all show in the footer of every applicant email.
+                                        </p>
                                         <div style={{ marginTop: '15px' }}>
                                             <button className="action-btn" onClick={handleSaveCompanyInfo} style={{ backgroundColor: '#455a64', color: '#fff', padding: '10px 25px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>
                                                 <i className="fas fa-save"></i> Save Company Info
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Dashboard Title */}
+                                    <div style={{ marginTop: '40px', paddingTop: '30px', borderTop: '2px solid #e0e0e0' }}>
+                                        <h3 style={{ color: '#455a64', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <i className="fas fa-heading"></i> Dashboard Title
+                                        </h3>
+                                        <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#eceff1', borderRadius: '8px', border: '1px solid #b0bec5' }}>
+                                            <p style={{ margin: 0, color: '#455a64', fontSize: '14px' }}>
+                                                <i className="fas fa-info-circle"></i> The heading shown at the top of this admin dashboard, next to the icon.
+                                            </p>
+                                        </div>
+                                        <div className="template-card" style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                                            <input
+                                                type="text"
+                                                value={companyInfo.dashboardTitle}
+                                                onChange={(e) => setCompanyInfo({ ...companyInfo, dashboardTitle: e.target.value })}
+                                                placeholder="Candidate Management System"
+                                                style={{ width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }}
+                                            />
+                                        </div>
+                                        <div style={{ marginTop: '15px' }}>
+                                            <button className="action-btn" onClick={handleSaveCompanyInfo} style={{ backgroundColor: '#455a64', color: '#fff', padding: '10px 25px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>
+                                                <i className="fas fa-save"></i> Save
                                             </button>
                                         </div>
                                     </div>
@@ -6555,9 +6642,41 @@ HR Team`
         };
 
         // Education Section
-        const EducationSection = ({ formData, handleChange, hiddenFields, customFields, customFieldValues, onCustomFieldChange }) => {
+        const EducationSection = ({ formData, handleChange, hiddenFields, customFields, customFieldValues, onCustomFieldChange, certificateFiles, onCertificateChange }) => {
             const hidden = hiddenFields || new Set();
             const isHidden = (id) => hidden.has(id);
+            const certFiles = certificateFiles || {};
+
+            const CertificateUpload = ({ level, label }) => (
+                !isHidden(`${level}Certificate`) && (
+                    <div className="form-group" style={{ marginTop: '12px' }}>
+                        <label>
+                            {label}
+                            <span className="required">*</span>
+                        </label>
+                        <div className="file-upload">
+                            <label htmlFor={`${level}CertificateUpload`} className="file-upload-label">
+                                <div className="file-upload-icon">
+                                    <i className="fas fa-certificate"></i>
+                                </div>
+                                <h3 style={{ color: '#2e7d32', marginBottom: '8px' }}>
+                                    {(certFiles[level] && certFiles[level].fileName) || 'Click to upload certificate (Required)'}
+                                </h3>
+                                <p style={{ color: '#66bb6a', fontSize: '14px' }}>
+                                    Supported formats: PDF or image (Max 5MB)
+                                </p>
+                            </label>
+                            <input
+                                type="file"
+                                id={`${level}CertificateUpload`}
+                                accept=".pdf,image/*"
+                                onChange={(e) => onCertificateChange(level, e)}
+                                required={true}
+                            />
+                        </div>
+                    </div>
+                )
+            );
 
             return (
                 <div className="section">
@@ -6601,6 +6720,7 @@ HR Team`
                                 onChange={handleChange}
                                 placeholder="e.g., 5.00 or A+"
                             />
+                            <CertificateUpload level="ssc" label="SSC Certificate" />
                         </div>
                     )}
 
@@ -6639,6 +6759,7 @@ HR Team`
                                 onChange={handleChange}
                                 placeholder="e.g., 5.00 or A+"
                             />
+                            <CertificateUpload level="hsc" label="HSC Certificate" />
                         </div>
                     )}
 
@@ -6681,6 +6802,7 @@ HR Team`
                             <p style={{ fontSize: '13px', color: '#666', marginTop: '8px', fontStyle: 'italic' }}>
                                 Note: Optional if you hold an HND or a Postgraduate degree instead. Write N/A if not applicable.
                             </p>
+                            <CertificateUpload level="bachelor" label="Bachelor Certificate" />
                         </div>
                     )}
 
@@ -6723,6 +6845,7 @@ HR Team`
                                     placeholder="e.g., 3.50/4.00"
                                 />
                             </div>
+                            <CertificateUpload level="hnd" label="HND Certificate" />
                         </div>
                     )}
 
@@ -6765,6 +6888,7 @@ HR Team`
                                     placeholder="e.g., 3.90/4.00"
                                 />
                             </div>
+                            <CertificateUpload level="postgraduate" label="Postgraduate Certificate" />
                         </div>
                     )}
 
@@ -7061,6 +7185,9 @@ HR Team`
             const [coverLetterFile, setCoverLetterFile] = useState(null);
             const [passportPhotoFileName, setPassportPhotoFileName] = useState('');
             const [passportPhotoFile, setPassportPhotoFile] = useState(null);
+            // One optional-but-admin-toggleable certificate upload per education
+            // level, keyed by level id: { ssc: { fileName, data }, hsc: {...}, ... }
+            const [certificateFiles, setCertificateFiles] = useState({});
             const [isSubmitting, setIsSubmitting] = useState(false);
             const [submitMessage, setSubmitMessage] = useState(null);
             const [showCongratsModal, setShowCongratsModal] = useState(false);
@@ -7248,6 +7375,37 @@ HR Team`
                 }
             };
 
+            const handleCertificateChange = (level, e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const isPdf = file.name.toLowerCase().endsWith('.pdf');
+                    const isImage = file.type.startsWith('image/');
+                    if (!isPdf && !isImage) {
+                        alert('Only PDF or image files are allowed for certificates.');
+                        e.target.value = '';
+                        return;
+                    }
+                    if (file.size > 5 * 1024 * 1024) {
+                        alert('File size must be less than 5MB');
+                        e.target.value = '';
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        setCertificateFiles(prev => ({
+                            ...prev,
+                            [level]: { fileName: file.name, data: event.target.result }
+                        }));
+                    };
+                    reader.onerror = (error) => {
+                        console.error(`Error reading ${level} certificate:`, error);
+                        alert('Failed to read the file. Please try again.');
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
             const handleAdminLogin = (user) => {
                 setIsAdminLoggedIn(true);
                 setAdminUser(user);
@@ -7275,6 +7433,7 @@ HR Team`
                 setCoverLetterFile(null);
                 setPassportPhotoFileName('');
                 setPassportPhotoFile(null);
+                setCertificateFiles({});
                 setCustomFieldValues({});
                 setSubmitMessage(null);
                 window.scrollTo(0, 0);
@@ -7320,6 +7479,14 @@ HR Team`
                         customFieldValues: customFieldValues
                     };
 
+                    // Only send data for certificates that were actually uploaded
+                    const certificateData = {};
+                    ['ssc', 'hsc', 'bachelor', 'hnd', 'postgraduate'].forEach((level) => {
+                        if (certificateFiles[level] && certificateFiles[level].fileName && certificateFiles[level].data) {
+                            certificateData[level] = certificateFiles[level];
+                        }
+                    });
+
                     // Check if google.script.run is available (running in GAS environment)
                     if (typeof google !== 'undefined' && google.script && google.script.run) {
                         // Running in Google Apps Script environment
@@ -7343,7 +7510,7 @@ HR Team`
                                     text: 'An error occurred: ' + error.message
                                 });
                             })
-                            .submitJobApplication(submissionData, fileName, cvFile, coverLetterFileName, coverLetterFile, passportPhotoFileName, passportPhotoFile);
+                            .submitJobApplication(submissionData, fileName, cvFile, coverLetterFileName, coverLetterFile, passportPhotoFileName, passportPhotoFile, certificateData);
                     } else {
                         // Running standalone (for testing)
                         setTimeout(() => {
@@ -7481,6 +7648,8 @@ HR Team`
                                     customFields={customFieldsForSection('education')}
                                     customFieldValues={customFieldValues}
                                     onCustomFieldChange={handleCustomFieldChange}
+                                    certificateFiles={certificateFiles}
+                                    onCertificateChange={handleCertificateChange}
                                 />
                             ) : null}
                             {!hiddenFieldSet.has('experience') && (

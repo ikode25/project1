@@ -11,7 +11,7 @@ function doGet() {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-function submitJobApplication(formData, fileName, fileData, coverLetterFileName, coverLetterFileData, passportPhotoFileName, passportPhotoFileData) {
+function submitJobApplication(formData, fileName, fileData, coverLetterFileName, coverLetterFileData, passportPhotoFileName, passportPhotoFileData, certificateData) {
   try {
     const spreadsheetId = getSpreadsheetId();
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -61,6 +61,28 @@ function submitJobApplication(formData, fileName, fileData, coverLetterFileName,
         passportPhotoUrl = 'Upload Failed: ' + uploadError.message;
       }
     }
+
+    // Education certificate uploads - one optional file per education level
+    // (SSC/HSC/Bachelor/HND/Postgraduate). Admin controls, per level, whether
+    // the certificate upload shows on the form at all; when shown, the
+    // client marks it required, so this is a best-effort upload keyed by
+    // whatever levels the client actually sent data for.
+    const certificateUrls = { ssc: '', hsc: '', bachelor: '', hnd: '', postgraduate: '' };
+    if (certificateData) {
+      ['ssc', 'hsc', 'bachelor', 'hnd', 'postgraduate'].forEach((level) => {
+        const cert = certificateData[level];
+        if (cert && cert.data && cert.fileName) {
+          try {
+            certificateUrls[level] = uploadCVToDrive(cert.data, cert.fileName, formData.email + '_' + level + '_certificate');
+            Logger.log(`${level} certificate uploaded successfully: ${certificateUrls[level]}`);
+          } catch (uploadError) {
+            Logger.log(`Error uploading ${level} certificate: ${uploadError.toString()}`);
+            certificateUrls[level] = 'Upload Failed: ' + uploadError.message;
+          }
+        }
+      });
+    }
+
     const timestamp = new Date().toISOString();
     const row = [
       timestamp,
@@ -116,14 +138,21 @@ function submitJobApplication(formData, fileName, fileData, coverLetterFileName,
       // keyed by field id since the set of fields is admin-configurable
       formData.customFieldValues ? JSON.stringify(formData.customFieldValues) : '',
       // Passport Photo URL
-      passportPhotoUrl
+      passportPhotoUrl,
+      // Education certificate URLs - appended at the end to keep existing
+      // column offsets unchanged, same convention as HND/Cover Letter above
+      certificateUrls.ssc,
+      certificateUrls.hsc,
+      certificateUrls.bachelor,
+      certificateUrls.hnd,
+      certificateUrls.postgraduate
     ];
 
     // Append to sheet
     sheet.appendRow(row);
 
     // Send confirmation email (optional)
-    sendConfirmationEmail(formData.email, formData.firstName);
+    sendConfirmationEmail(formData.email, formData.firstName, formData);
 
     // Send confirmation SMS if SMS is enabled in Admin > Settings
     maybeSendAutoSms('confirmation', formData.mobile, {
@@ -180,7 +209,9 @@ function getSpreadsheetId() {
         'Years of Experience', 'Last Organisation', 'Last Designation',
         'Joining Date', 'End Date', 'Currently Working', 'CV URL',
         'HND Programme', 'HND Institute', 'HND Major', 'HND Grade',
-        'Cover Letter URL', 'Custom Field Values', 'Passport Photo URL'
+        'Cover Letter URL', 'Custom Field Values', 'Passport Photo URL',
+        'SSC Certificate URL', 'HSC Certificate URL', 'Bachelor Certificate URL',
+        'HND Certificate URL', 'Postgraduate Certificate URL'
       ];
       appSheet.appendRow(headers);
 
@@ -283,7 +314,13 @@ function getAllApplications() {
           return {};
         }
       })(),
-      passportPhotoUrl: row[44]
+      passportPhotoUrl: row[44],
+      // Education certificate URLs
+      sscCertificateUrl: row[45],
+      hscCertificateUrl: row[46],
+      bachelorCertificateUrl: row[47],
+      hndCertificateUrl: row[48],
+      postgraduateCertificateUrl: row[49]
     }));
 
     // Sort by timestamp (newest first)
@@ -355,7 +392,7 @@ function getAllApplicationsWithStatus() {
  * @param {string} email - Applicant's email address
  * @param {string} firstName - Applicant's first name
  */
-function sendConfirmationEmail(email, firstName) {
+function sendConfirmationEmail(email, firstName, formData) {
   try {
     const submissionTimeISO = new Date().toISOString();
     const submissionTimeReadable = formatISODate(submissionTimeISO);
@@ -369,13 +406,25 @@ Application Details:
 - Submitted on: ${submissionTimeReadable}
 - Reference: ${submissionTimeISO}
 
+A copy of your submitted application is attached to this email for your records.
+
 We will contact you if your profile matches our requirements. Please keep this email for your records.
 
 Best regards,
 HR Team
     `;
 
-    sendBrandedEmail(email, subject, body);
+    let attachments = [];
+    if (formData) {
+      try {
+        attachments = [buildApplicationPdf(formData)];
+      } catch (pdfError) {
+        // Never let a PDF-generation hiccup block the confirmation email itself
+        Logger.log('Failed to generate application PDF: ' + pdfError.toString());
+      }
+    }
+
+    sendBrandedEmail(email, subject, body, attachments);
   } catch (error) {
     console.error('Error sending confirmation email:', error);
   }
@@ -1409,7 +1458,9 @@ function setupDemoData() {
         'Years of Experience', 'Last Organisation', 'Last Designation',
         'Joining Date', 'End Date', 'Currently Working', 'CV URL',
         'HND Programme', 'HND Institute', 'HND Major', 'HND Grade',
-        'Cover Letter URL', 'Custom Field Values', 'Passport Photo URL'
+        'Cover Letter URL', 'Custom Field Values', 'Passport Photo URL',
+        'SSC Certificate URL', 'HSC Certificate URL', 'Bachelor Certificate URL',
+        'HND Certificate URL', 'Postgraduate Certificate URL'
       ];
       sheet.appendRow(headers);
 
@@ -2114,8 +2165,12 @@ function uploadBanner(fileData, fileName) {
     file.setDescription('Application form header banner');
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
-    // Direct-render URL so it can be used straight in an <img>/CSS background
-    const directUrl = `https://drive.google.com/uc?export=view&id=${file.getId()}`;
+    // Direct-render URL so it can be used straight in an <img>/CSS background.
+    // Drive's uc?export=view endpoint has become unreliable for hotlinked
+    // images (it can return a confirmation/warning page instead of the raw
+    // bytes); the thumbnail endpoint is the one Google actually intends for
+    // inline embedding and works consistently.
+    const directUrl = `https://drive.google.com/thumbnail?id=${file.getId()}&sz=w1600`;
     setSetting('BANNER_URL', directUrl);
 
     Logger.log('Banner uploaded: ' + newFileName);
@@ -2674,7 +2729,17 @@ function saveFormFieldsConfig(config) {
  * ============================================================ */
 
 function getDefaultCompanyInfo() {
-  return { name: '', description: '', website: '', address: '' };
+  return {
+    name: '',
+    description: '',
+    website: '',
+    address: '',
+    phone: '',
+    email: '',
+    // Heading shown at the top of the admin dashboard (defaults to the
+    // original "Candidate Management System" if never customized)
+    dashboardTitle: ''
+  };
 }
 
 /**
@@ -2751,7 +2816,34 @@ function buildEmailHtml(plainBody) {
     : '';
 
   const websiteRow = company.website
-    ? `<a href="${escapeHtmlForEmail(company.website)}" style="color:${theme.dark};text-decoration:none;">${escapeHtmlForEmail(company.website)}</a>`
+    ? `<a href="${escapeHtmlForEmail(company.website)}" style="color:${theme.dark};text-decoration:none;">${escapeHtmlForEmail(company.website)}</a><br>`
+    : '';
+
+  const contactBits = [];
+  if (company.phone) contactBits.push(escapeHtmlForEmail(company.phone));
+  if (company.email) {
+    contactBits.push(`<a href="mailto:${escapeHtmlForEmail(company.email)}" style="color:${theme.dark};text-decoration:none;">${escapeHtmlForEmail(company.email)}</a>`);
+  }
+  const contactRow = contactBits.length
+    ? `<div style="margin-top:6px;">${contactBits.join(' &nbsp;|&nbsp; ')}</div>`
+    : '';
+
+  let social = {};
+  try {
+    social = getSocialLinks();
+  } catch (e) {
+    social = {};
+  }
+  const socialEntries = [
+    social.facebook ? { label: 'Facebook', url: social.facebook } : null,
+    social.twitter ? { label: 'Twitter / X', url: social.twitter } : null,
+    social.instagram ? { label: 'Instagram', url: social.instagram } : null,
+    social.linkedin ? { label: 'LinkedIn', url: social.linkedin } : null
+  ].filter(Boolean);
+  const socialRow = socialEntries.length
+    ? `<div style="margin-top:12px;">${socialEntries.map(s =>
+        `<a href="${escapeHtmlForEmail(s.url)}" style="display:inline-block;margin:0 8px;color:${theme.dark};text-decoration:none;font-weight:600;">${escapeHtmlForEmail(s.label)}</a>`
+      ).join('')}</div>`
     : '';
 
   return `
@@ -2765,7 +2857,7 @@ function buildEmailHtml(plainBody) {
       ${bodyHtml}
     </div>
     <div style="padding:18px 30px; background:#fafafa; border-top:1px solid #eee; font-size:12px; color:#888; text-align:center;">
-      ${addressRow}${websiteRow}
+      ${addressRow}${websiteRow}${contactRow}${socialRow}
     </div>
   </div>
 </div>`;
@@ -2778,13 +2870,172 @@ function buildEmailHtml(plainBody) {
  * @param {string} subject
  * @param {string} plainBody
  */
-function sendBrandedEmail(to, subject, plainBody) {
+function sendBrandedEmail(to, subject, plainBody, attachments) {
   const company = getCompanyInfo();
-  MailApp.sendEmail({
+  const options = {
     to: to,
     subject: subject,
     body: plainBody,
     htmlBody: buildEmailHtml(plainBody),
     name: company.name || 'HR Team'
-  });
+  };
+  if (attachments && attachments.length) {
+    options.attachments = attachments;
+  }
+  MailApp.sendEmail(options);
+}
+
+/* ============================================================
+ * Application summary PDF (attached to the confirmation email)
+ * ============================================================ */
+
+function summaryRow(label, value) {
+  const display = (value === undefined || value === null || value === '') ? 'Not provided' : String(value);
+  return `<tr>
+    <td style="padding:6px 12px;color:#666;font-size:11px;width:170px;vertical-align:top;border-bottom:1px solid #f0f0f0;">${escapeHtmlForEmail(label)}</td>
+    <td style="padding:6px 12px;font-size:13px;color:#222;vertical-align:top;border-bottom:1px solid #f0f0f0;">${escapeHtmlForEmail(display)}</td>
+  </tr>`;
+}
+
+function summarySectionTitle(title) {
+  return `<h3 style="margin:22px 0 8px 0;color:#2e7d32;font-size:14px;border-bottom:2px solid #e8f5e9;padding-bottom:6px;">${escapeHtmlForEmail(title)}</h3>`;
+}
+
+function summaryTable(rows) {
+  return `<table style="width:100%;border-collapse:collapse;">${rows.join('')}</table>`;
+}
+
+/**
+ * Builds a printable HTML summary of everything the applicant submitted,
+ * used to generate the PDF attached to their confirmation email. Sections
+ * with no data at all (e.g. an education group the applicant skipped) are
+ * left out rather than showing a wall of "Not provided".
+ * @param {Object} formData
+ * @returns {string} HTML
+ */
+function buildApplicationSummaryHtml(formData) {
+  const company = getCompanyInfo();
+  const hasAny = (fields) => fields.some(f => formData[f]);
+
+  let html = `<html><head><meta charset="utf-8"></head><body style="font-family:Arial, Helvetica, sans-serif; color:#222; padding:10px 6px;">`;
+
+  html += `<div style="border-bottom:3px solid #2e7d32; padding-bottom:12px; margin-bottom:8px;">
+    <div style="font-size:19px; font-weight:bold; color:#2e7d32;">${escapeHtmlForEmail(company.name || 'Job Application')}</div>
+    <div style="font-size:12px; color:#888; margin-top:2px;">Application Summary - ${escapeHtmlForEmail(new Date().toLocaleString())}</div>
+  </div>`;
+
+  html += summarySectionTitle('Position');
+  html += summaryTable([summaryRow('Applying For', formData.applyingFor)]);
+
+  html += summarySectionTitle('Personal Information');
+  html += summaryTable([
+    summaryRow('First Name', formData.firstName),
+    summaryRow('Last Name', formData.lastName),
+    summaryRow('Email', formData.email),
+    summaryRow('Mobile', formData.mobile),
+    summaryRow('Date of Birth', formData.dob ? formatISODate(formData.dob) : ''),
+    summaryRow('Religion', formData.religion),
+    summaryRow('Marital Status', formData.maritalStatus),
+    summaryRow('Gender', formData.gender),
+    summaryRow('Nationality', formData.nationality),
+    summaryRow('Current Address', formData.currentAddress),
+    summaryRow('Permanent Address', formData.permanentAddress)
+  ]);
+
+  if (hasAny(['sscInstitute', 'sscMajor', 'sscYear', 'sscGrade'])) {
+    html += summarySectionTitle('SSC (Secondary School Certificate)');
+    html += summaryTable([
+      summaryRow('Institute', formData.sscInstitute),
+      summaryRow('Major Subject', formData.sscMajor),
+      summaryRow('Passing Year', formData.sscYear),
+      summaryRow('GPA/Grade', formData.sscGrade)
+    ]);
+  }
+
+  if (hasAny(['hscInstitute', 'hscMajor', 'hscYear', 'hscGrade'])) {
+    html += summarySectionTitle('HSC (Higher Secondary Certificate)');
+    html += summaryTable([
+      summaryRow('Institute', formData.hscInstitute),
+      summaryRow('Major Subject', formData.hscMajor),
+      summaryRow('Passing Year', formData.hscYear),
+      summaryRow('GPA/Grade', formData.hscGrade)
+    ]);
+  }
+
+  if (hasAny(['bachelorDegree', 'bachelorInstitute', 'bachelorMajor', 'bachelorGrade'])) {
+    html += summarySectionTitle('Bachelor/Undergraduate');
+    html += summaryTable([
+      summaryRow('Degree Name', formData.bachelorDegree),
+      summaryRow('Institute', formData.bachelorInstitute),
+      summaryRow('Major Subject', formData.bachelorMajor),
+      summaryRow('CGPA/Grade', formData.bachelorGrade)
+    ]);
+  }
+
+  if (hasAny(['hndProgramme', 'hndInstitute', 'hndMajor', 'hndGrade'])) {
+    html += summarySectionTitle('HND (Higher National Diploma)');
+    html += summaryTable([
+      summaryRow('Programme Name', formData.hndProgramme),
+      summaryRow('Institute', formData.hndInstitute),
+      summaryRow('Major Subject', formData.hndMajor),
+      summaryRow('CGPA/Grade', formData.hndGrade)
+    ]);
+  }
+
+  if (hasAny(['postgraduateDegree', 'postgraduateInstitute', 'postgraduateMajor', 'postgraduateGrade'])) {
+    html += summarySectionTitle('Postgraduate');
+    html += summaryTable([
+      summaryRow('Degree Name', formData.postgraduateDegree),
+      summaryRow('Institute', formData.postgraduateInstitute),
+      summaryRow('Major Subject', formData.postgraduateMajor),
+      summaryRow('CGPA/Grade', formData.postgraduateGrade)
+    ]);
+  }
+
+  if (hasAny(['yearsOfExperience', 'lastOrganisation', 'lastDesignation'])) {
+    html += summarySectionTitle('Experience');
+    html += summaryTable([
+      summaryRow('Years of Experience', formData.yearsOfExperience),
+      summaryRow('Last Organisation', formData.lastOrganisation),
+      summaryRow('Last Designation', formData.lastDesignation),
+      summaryRow('Joining Date', formData.joiningDate ? formatISODate(formData.joiningDate) : ''),
+      summaryRow('Currently Working', formData.currentlyWorking ? 'Yes' : 'No'),
+      summaryRow('End Date', (!formData.currentlyWorking && formData.endDate) ? formatISODate(formData.endDate) : '')
+    ]);
+  }
+
+  if (formData.customFieldValues && Object.keys(formData.customFieldValues).length > 0) {
+    try {
+      const fieldsConfig = getFormFieldsConfig();
+      const rows = fieldsConfig.customFields
+        .filter(f => formData.customFieldValues[f.id])
+        .map(f => summaryRow(f.label, formData.customFieldValues[f.id]));
+      if (rows.length > 0) {
+        html += summarySectionTitle('Additional Information');
+        html += summaryTable(rows);
+      }
+    } catch (e) {
+      Logger.log('Could not render custom fields in PDF: ' + e.toString());
+    }
+  }
+
+  html += `<div style="margin-top:24px; padding-top:10px; border-top:1px solid #eee; font-size:10px; color:#999; text-align:center;">
+    Generated automatically upon submission${company.website ? ' - ' + escapeHtmlForEmail(company.website) : ''}
+  </div>`;
+
+  html += `</body></html>`;
+  return html;
+}
+
+/**
+ * Converts the application summary to a PDF blob for emailing.
+ * @param {Object} formData
+ * @returns {Blob}
+ */
+function buildApplicationPdf(formData) {
+  const html = buildApplicationSummaryHtml(formData);
+  const blob = HtmlService.createHtmlOutput(html).getAs('application/pdf');
+  const safeName = `${formData.firstName || 'Applicant'}_${formData.lastName || ''}`.replace(/[^a-zA-Z0-9_]/g, '_');
+  blob.setName(`Application_${safeName}.pdf`);
+  return blob;
 }
