@@ -81,9 +81,11 @@ setup once:
    added under API Setup until the WhatsApp Business Account is verified for
    production use.
 
-Every WhatsApp message - automatic confirmation/interview invites and
-admin-triggered shortlist/rejection/ad-hoc messages alike - is delivered as
-a one-page branded PDF (company name, colors, address, phone, email, social
+Unlike SMS, WhatsApp is **admin-triggered only** - nothing sends
+automatically on submission or interview scheduling. Message a candidate
+from the bulk actions bar (Confirmation/Shortlist/Interview/Rejection
+templates) or their own "WhatsApp" button. Every message is delivered as a
+one-page branded PDF (company name, colors, address, phone, email, social
 links) rather than plain text, so it reads as a professional notice even
 though it's arriving outside the SMS system. Delivery attempts are logged to
 a new `WhatsappLog` sheet, same pattern as `SmsLog`.
@@ -140,11 +142,11 @@ a new `WhatsappLog` sheet, same pattern as `SmsLog`.
   Settings > General > Dashboard Title (defaults to "Candidate Management
   System" if left blank).
 - **WhatsApp**: a fallback channel to SMS via the Meta WhatsApp Business
-  Cloud API (Admin > Settings > WhatsApp) - see setup steps above. Sends the
-  same four template types as SMS (Confirmation/Shortlist/Interview/
-  Rejection), automatically for Confirmation/Interview and from the bulk
-  actions bar or a candidate's own "WhatsApp" button for the rest, always as
-  a professionally branded PDF rather than plain text.
+  Cloud API (Admin > Settings > WhatsApp) - see setup steps above. Admin-
+  triggered only (no automatic sending), from the bulk actions bar or a
+  candidate's own "WhatsApp" button, using the same four template types as
+  SMS (Confirmation/Shortlist/Interview/Rejection), always delivered as a
+  professionally branded PDF rather than plain text.
 
 All of the above is additive and stored in the same spreadsheet used today
 (new rows in `Settings`, and new `SmsTemplates`/`SmsLog`/`WhatsappTemplates`/

@@ -4734,7 +4734,7 @@ HR Team`
                             </button>
                         </div>
 
-                        {/* CV Bank Button */}
+                        {/* Document Bank Button */}
                         <div style={{ padding: '0 24px', marginTop: '16px' }}>
                             <button
                                 className={`tab-btn ${activeTab === 'all' ? 'active' : ''}`}
@@ -4747,7 +4747,7 @@ HR Team`
                                     borderLeft: activeTab === 'all' ? '4px solid #1b5e20' : '4px solid transparent'
                                 }}
                             >
-                                <span><i className="fas fa-database"></i> CV Bank</span>
+                                <span><i className="fas fa-database"></i> Document Bank</span>
                                 <span className="tab-badge">{tabCounts.all}</span>
                             </button>
                         </div>
@@ -4840,7 +4840,7 @@ HR Team`
                         <div className="table-header">
                             <h2>
                                 {activeTab === 'dashboard' && 'Analytics Dashboard'}
-                                {activeTab === 'all' && 'CV Bank'}
+                                {activeTab === 'all' && 'Document Bank'}
                                 {activeTab === 'applicants' && 'All Applicants - Detailed View'}
                                 {activeTab === 'shortlisted' && 'Shortlisted Candidates'}
                                 {activeTab === 'interviews' && 'Scheduled Interviews'}
@@ -5715,7 +5715,7 @@ HR Team`
                                         </h3>
                                         <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#e8f5e9', borderRadius: '8px', border: '1px solid #66bb6a' }}>
                                             <p style={{ margin: 0, color: '#2e7d32', fontSize: '14px' }}>
-                                                <i className="fas fa-info-circle"></i> Connect the Meta WhatsApp Business Cloud API so applicants can be messaged on WhatsApp - useful as a fallback when SMS isn't reachable. Every message is delivered as a professionally branded PDF (your company name, colors, contact info and social links) rather than plain text. Confirmation and Interview Invitation messages send automatically; Shortlist and Rejection send from the bulk actions bar, and you can message any single candidate from their card.
+                                                <i className="fas fa-info-circle"></i> Connect the Meta WhatsApp Business Cloud API so applicants can be messaged on WhatsApp - useful as a fallback when SMS isn't reachable. Every message is delivered as a professionally branded PDF (your company name, colors, contact info and social links) rather than plain text. WhatsApp is admin-triggered only (no automatic sending) - message a candidate from the bulk actions bar or their own "WhatsApp" button.
                                             </p>
                                         </div>
                                         <div className="template-card" style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
@@ -6425,7 +6425,7 @@ HR Team`
                                     </div>
                                 </div>
                             ) : activeTab === 'all' ? (
-                                // Simplified CV Bank Table View
+                                // Simplified Document Bank Table View
                                 <div className="table-container">
                                     <div className="data-table">
                                         <table>
@@ -6798,6 +6798,134 @@ HR Team`
             );
         };
 
+        // Lets the applicant double-check everything before it's actually
+        // submitted. Purely a read-back of current form state - no
+        // validation happens here, that already ran (in handleSubmit)
+        // before this was opened.
+        const ApplicationPreviewModal = ({
+            isOpen, onClose, onConfirm, formData, fileName, coverLetterFileName,
+            passportPhotoFileName, passportPhotoPreview, certificateFiles,
+            currentlyWorking, isFresher, hiddenFieldSet, customFieldValues, customFields
+        }) => {
+            if (!isOpen) return null;
+
+            const hidden = hiddenFieldSet || new Set();
+            const isHidden = (id) => hidden.has(id);
+
+            const Row = ({ label, value }) => (
+                value ? (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', padding: '6px 0', borderBottom: '1px solid #f0f0f0', fontSize: '13px' }}>
+                        <span style={{ color: '#777', flexShrink: 0 }}>{label}</span>
+                        <span style={{ color: '#222', fontWeight: 500, textAlign: 'right' }}>{value}</span>
+                    </div>
+                ) : null
+            );
+
+            const SectionTitle = ({ children }) => (
+                <h4 style={{ margin: '22px 0 8px 0', color: '#2e7d32', fontSize: '14px', borderBottom: '2px solid #e8f5e9', paddingBottom: '6px' }}>{children}</h4>
+            );
+
+            const educationLevels = [
+                { id: 'ssc', title: 'SSC (Secondary School Certificate)', rows: [['Institute', formData.sscInstitute], ['Major Subject', formData.sscMajor], ['Passing Year', formData.sscYear], ['GPA/Grade', formData.sscGrade]] },
+                { id: 'hsc', title: 'HSC (Higher Secondary Certificate)', rows: [['Institute', formData.hscInstitute], ['Major Subject', formData.hscMajor], ['Passing Year', formData.hscYear], ['GPA/Grade', formData.hscGrade]] },
+                { id: 'bachelor', title: 'Bachelor/Undergraduate', rows: [['Degree', formData.bachelorDegree], ['Institute', formData.bachelorInstitute], ['Major Subject', formData.bachelorMajor], ['CGPA/Grade', formData.bachelorGrade]] },
+                { id: 'hnd', title: 'HND (Higher National Diploma)', rows: [['Programme', formData.hndProgramme], ['Institute', formData.hndInstitute], ['Major Subject', formData.hndMajor], ['CGPA/Grade', formData.hndGrade]] },
+                { id: 'postgraduate', title: 'Postgraduate', rows: [['Degree', formData.postgraduateDegree], ['Institute', formData.postgraduateInstitute], ['Major Subject', formData.postgraduateMajor], ['CGPA/Grade', formData.postgraduateGrade]] }
+            ];
+
+            const visibleCustomFields = (customFields || []).filter(f => customFieldValues && customFieldValues[f.id]);
+
+            return (
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ maxWidth: '700px' }}>
+                        <div className="modal-header">
+                            <h3><i className="fas fa-eye" style={{ marginRight: '8px' }}></i> Review Your Application</h3>
+                            <button className="close-btn" onClick={onClose}>
+                                <i className="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div className="modal-body">
+                            <div style={{ marginBottom: '14px', padding: '10px 14px', background: '#e8f5e9', borderRadius: '8px', fontSize: '13px', color: '#2e7d32' }}>
+                                <i className="fas fa-info-circle"></i> Please check everything below is correct. You can go back and edit, or confirm to submit.
+                            </div>
+
+                            <SectionTitle>Position</SectionTitle>
+                            <Row label="Applying For" value={formData.applyingFor} />
+
+                            <SectionTitle>Personal Information</SectionTitle>
+                            <Row label="Name" value={`${formData.firstName} ${formData.lastName}`} />
+                            <Row label="Email" value={formData.email} />
+                            <Row label="Mobile" value={formData.mobile} />
+                            {!isHidden('dob') && <Row label="Date of Birth" value={formData.dob} />}
+                            {!isHidden('religion') && <Row label="Religion" value={formData.religion} />}
+                            {!isHidden('maritalStatus') && <Row label="Marital Status" value={formData.maritalStatus} />}
+                            {!isHidden('gender') && <Row label="Gender" value={formData.gender} />}
+                            {!isHidden('nationality') && <Row label="Nationality" value={formData.nationality} />}
+                            {!isHidden('currentAddress') && <Row label="Current Address" value={formData.currentAddress} />}
+                            {!isHidden('permanentAddress') && <Row label="Permanent Address" value={formData.permanentAddress} />}
+
+                            {educationLevels.map(level => (
+                                (!isHidden(level.id) && level.rows.some(([, v]) => v)) ? (
+                                    <React.Fragment key={level.id}>
+                                        <SectionTitle>{level.title}</SectionTitle>
+                                        {level.rows.map(([label, value]) => <Row key={label} label={label} value={value} />)}
+                                        {certificateFiles && certificateFiles[level.id] && certificateFiles[level.id].fileName && (
+                                            <Row label="Certificate" value={certificateFiles[level.id].fileName} />
+                                        )}
+                                    </React.Fragment>
+                                ) : null
+                            ))}
+
+                            {!isHidden('experience') && (
+                                <>
+                                    <SectionTitle>Experience</SectionTitle>
+                                    {isFresher ? (
+                                        <Row label="Status" value="Fresher (No work experience)" />
+                                    ) : (
+                                        <>
+                                            <Row label="Years of Experience" value={formData.yearsOfExperience} />
+                                            <Row label="Last Organisation" value={formData.lastOrganisation} />
+                                            <Row label="Last Designation" value={formData.lastDesignation} />
+                                            <Row label="Joining Date" value={formData.joiningDate} />
+                                            <Row label="Currently Working" value={currentlyWorking ? 'Yes' : ''} />
+                                            {!currentlyWorking && <Row label="End Date" value={formData.endDate} />}
+                                        </>
+                                    )}
+                                </>
+                            )}
+
+                            {visibleCustomFields.length > 0 && (
+                                <>
+                                    <SectionTitle>Additional Information</SectionTitle>
+                                    {visibleCustomFields.map(f => (
+                                        <Row key={f.id} label={f.label} value={customFieldValues[f.id]} />
+                                    ))}
+                                </>
+                            )}
+
+                            <SectionTitle>Documents</SectionTitle>
+                            <Row label="CV" value={fileName} />
+                            {coverLetterFileName && <Row label="Cover Letter" value={coverLetterFileName} />}
+                            {passportPhotoFileName && <Row label="Passport Photo" value={passportPhotoFileName} />}
+                            {passportPhotoPreview && (
+                                <div style={{ marginTop: '10px' }}>
+                                    <img src={passportPhotoPreview} alt="Passport photo preview" style={{ width: '90px', height: '110px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e0e0e0' }} />
+                                </div>
+                            )}
+                        </div>
+                        <div className="modal-footer">
+                            <button className="action-btn" onClick={onClose} style={{ background: '#9e9e9e' }}>
+                                <i className="fas fa-arrow-left"></i> Edit Application
+                            </button>
+                            <button className="action-btn btn-shortlist" onClick={onConfirm}>
+                                <i className="fas fa-check"></i> Confirm & Submit
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         const AdminLoginModal = ({ isOpen, onClose, onLoginSuccess }) => {
             const [username, setUsername] = useState('');
             const [password, setPassword] = useState('');
@@ -7111,7 +7239,6 @@ HR Team`
                                 id={`${level}CertificateUpload`}
                                 accept=".pdf,image/*"
                                 onChange={(e) => onCertificateChange(level, e)}
-                                required={true}
                             />
                         </div>
                     </div>
@@ -7482,7 +7609,6 @@ HR Team`
                             id="cvUpload"
                             accept=".pdf"
                             onChange={handleFileChange}
-                            required={true}
                         />
                     </div>
                 </div>
@@ -7631,6 +7757,7 @@ HR Team`
             const [isSubmitting, setIsSubmitting] = useState(false);
             const [submitMessage, setSubmitMessage] = useState(null);
             const [showCongratsModal, setShowCongratsModal] = useState(false);
+            const [showPreviewModal, setShowPreviewModal] = useState(false);
             const [showLoginModal, setShowLoginModal] = useState(false);
             const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
             const [adminUser, setAdminUser] = useState(null);
@@ -7876,6 +8003,7 @@ HR Team`
                 setCertificateFiles({});
                 setCustomFieldValues({});
                 setSubmitMessage(null);
+                setShowPreviewModal(false);
                 window.scrollTo(0, 0);
             };
 
@@ -7888,6 +8016,34 @@ HR Team`
                     return;
                 }
 
+                // Validate education certificate uploads. These live inside
+                // hidden file inputs (triggered via a styled label/button),
+                // so the browser's native `required` validation can't show
+                // its usual popup for them and just silently blocks
+                // submission with no visible feedback - hence this explicit
+                // check instead, with a clear alert naming what's missing.
+                const hiddenFields = formFieldsConfig.hiddenFields || [];
+                const certificateLabels = { ssc: 'SSC', hsc: 'HSC', bachelor: 'Bachelor', hnd: 'HND', postgraduate: 'Postgraduate' };
+                const missingCertificateLevel = ['ssc', 'hsc', 'bachelor', 'hnd', 'postgraduate'].find((level) => {
+                    const sectionHidden = hiddenFields.includes(level);
+                    const certificateHidden = hiddenFields.includes(`${level}Certificate`);
+                    if (sectionHidden || certificateHidden) return false;
+                    return !(certificateFiles[level] && certificateFiles[level].fileName && certificateFiles[level].data);
+                });
+                if (missingCertificateLevel) {
+                    alert(`Please upload your ${certificateLabels[missingCertificateLevel]} certificate.`);
+                    return;
+                }
+
+                // Everything required is present - let the applicant review
+                // what they entered before it actually goes anywhere.
+                // performActualSubmit() (below) does the real submission,
+                // triggered from the preview modal's "Confirm & Submit".
+                setShowPreviewModal(true);
+            };
+
+            const performActualSubmit = async () => {
+                setShowPreviewModal(false);
                 setIsSubmitting(true);
                 setSubmitMessage(null);
 
@@ -8017,6 +8173,23 @@ HR Team`
                         onLoginSuccess={handleAdminLogin}
                     />
 
+                    <ApplicationPreviewModal
+                        isOpen={showPreviewModal}
+                        onClose={() => setShowPreviewModal(false)}
+                        onConfirm={performActualSubmit}
+                        formData={formData}
+                        fileName={fileName}
+                        coverLetterFileName={coverLetterFileName}
+                        passportPhotoFileName={passportPhotoFileName}
+                        passportPhotoPreview={passportPhotoFile}
+                        certificateFiles={certificateFiles}
+                        currentlyWorking={currentlyWorking}
+                        isFresher={isFresher}
+                        hiddenFieldSet={hiddenFieldSet}
+                        customFieldValues={customFieldValues}
+                        customFields={formFieldsConfig.customFields}
+                    />
+
                     <div className="container">
                         <div
                             className="header"
@@ -8118,7 +8291,7 @@ HR Team`
                             />
 
                             <button type="submit" className="submit-btn" disabled={isSubmitting}>
-                                {isSubmitting ? 'Submitting...' : 'Submit Application'}
+                                {isSubmitting ? 'Submitting...' : 'Review & Submit Application'}
                             </button>
                         </form>
                     </div>

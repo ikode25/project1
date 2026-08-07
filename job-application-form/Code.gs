@@ -160,11 +160,8 @@ function submitJobApplication(formData, fileName, fileData, coverLetterFileName,
       '[Position]': formData.applyingFor || 'the position'
     });
 
-    // Send confirmation WhatsApp message (branded PDF) if WhatsApp is enabled
-    maybeSendAutoWhatsapp('confirmation', formData.mobile, formData.firstName, {
-      '[Candidate Name]': formData.firstName,
-      '[Position]': formData.applyingFor || 'the position'
-    });
+    // WhatsApp is admin-triggered only (bulk actions bar / per-candidate
+    // button) - see sendWhatsappToCandidate. No automatic send here.
 
     return {
       status: 'success',
@@ -940,16 +937,7 @@ HR Team`;
       '[Interviewer Name]': interviewData.interviewer
     });
 
-    // Send interview invitation WhatsApp message (branded PDF) if enabled
-    maybeSendAutoWhatsapp('interview', interviewData.candidatePhone, interviewData.candidateName, {
-      '[Candidate Name]': interviewData.candidateName || '',
-      '[Position]': interviewData.position || '',
-      '[Date]': interviewDateDisplay,
-      '[Time]': interviewTime,
-      '[Location]': interviewData.location,
-      '[Location/Meeting Link]': interviewData.location,
-      '[Interviewer Name]': interviewData.interviewer
-    });
+    // WhatsApp is admin-triggered only - see sendWhatsappToCandidate.
 
     Logger.log(`Interview scheduled for ${interviewData.candidateEmail} on ${interviewData.dateTime}`);
     return {
@@ -1062,16 +1050,7 @@ HR Team`;
       '[Interviewer Name]': interviewData.interviewer
     });
 
-    // Send interview invitation WhatsApp message (branded PDF) if enabled
-    maybeSendAutoWhatsapp('interview', interviewData.candidatePhone, interviewData.candidateName, {
-      '[Candidate Name]': interviewData.candidateName || '',
-      '[Position]': interviewData.position || '',
-      '[Date]': interviewDateDisplay,
-      '[Time]': interviewTime,
-      '[Location]': interviewData.location,
-      '[Location/Meeting Link]': interviewData.location,
-      '[Interviewer Name]': interviewData.interviewer
-    });
+    // WhatsApp is admin-triggered only - see sendWhatsappToCandidate.
 
     Logger.log(`Interview rescheduled for ${interviewData.candidateEmail} to ${interviewData.dateTime}`);
     return {
@@ -3112,32 +3091,6 @@ function sendBulkWhatsapp(recipients, message) {
   } catch (error) {
     Logger.log('Error sending bulk WhatsApp: ' + error.toString());
     return { success: false, message: error.message };
-  }
-}
-
-/**
- * Sends an automatic WhatsApp message for a given template type if
- * WhatsApp is enabled in settings. Never throws - failures are logged
- * only, so they never block email/SMS/sheet writes.
- * @param {string} templateType - 'confirmation' | 'interview'
- * @param {string} phone
- * @param {string} candidateName
- * @param {Object} replacements - map of placeholder -> value
- */
-function maybeSendAutoWhatsapp(templateType, phone, candidateName, replacements) {
-  try {
-    const config = getWhatsappConfig();
-    if (!config.enabled || !phone) return;
-
-    const templates = getWhatsappTemplates();
-    let message = templates[templateType] || '';
-    Object.keys(replacements || {}).forEach(placeholder => {
-      message = message.split(placeholder).join(replacements[placeholder] || '');
-    });
-
-    sendWhatsappToCandidate(phone, candidateName, message);
-  } catch (error) {
-    Logger.log('Auto WhatsApp (' + templateType + ') failed: ' + error.toString());
   }
 }
 
