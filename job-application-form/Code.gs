@@ -11,7 +11,7 @@ function doGet() {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-function submitJobApplication(formData, fileName, fileData, coverLetterFileName, coverLetterFileData, passportPhotoFileName, passportPhotoFileData, certificateData) {
+function submitJobApplication(formData, fileName, fileData, coverLetterFileName, coverLetterFileData, passportPhotoFileName, passportPhotoFileData, certificateData, customFileData) {
   try {
     const spreadsheetId = getSpreadsheetId();
     const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -78,6 +78,38 @@ function submitJobApplication(formData, fileName, fileData, coverLetterFileName,
           } catch (uploadError) {
             Logger.log(`Error uploading ${level} certificate: ${uploadError.toString()}`);
             certificateUrls[level] = 'Upload Failed: ' + uploadError.message;
+          }
+        }
+      });
+    }
+
+    // Custom image/document fields (admin-defined). Same pattern as
+    // certificates above: upload each to Drive and drop the resulting URL
+    // into formData.customFieldValues in place of the raw file data, so
+    // the JSON blob stored for that column stays small and the URL is what
+    // admin views actually render (a link/thumbnail, not a wall of base64).
+    // Image-type fields go through uploadPassportPhoto() instead of
+    // uploadCVToDrive() so the stored URL is a direct-embeddable thumbnail
+    // link (usable straight in an <img src>), same as passport photos.
+    if (customFileData && formData.customFieldValues) {
+      let customFieldTypes = {};
+      try {
+        (getFormFieldsConfig().customFields || []).forEach(f => { customFieldTypes[f.id] = f.type; });
+      } catch (e) {
+        Logger.log('Could not load custom field types for upload routing: ' + e.toString());
+      }
+
+      Object.keys(customFileData).forEach((fieldId) => {
+        const file = customFileData[fieldId];
+        if (file && file.data && file.fileName) {
+          try {
+            formData.customFieldValues[fieldId] = customFieldTypes[fieldId] === 'image'
+              ? uploadPassportPhoto(file.data, file.fileName, formData.email + '_' + fieldId)
+              : uploadCVToDrive(file.data, file.fileName, formData.email + '_' + fieldId);
+            Logger.log(`Custom field "${fieldId}" file uploaded successfully: ${formData.customFieldValues[fieldId]}`);
+          } catch (uploadError) {
+            Logger.log(`Error uploading custom field "${fieldId}" file: ${uploadError.toString()}`);
+            formData.customFieldValues[fieldId] = 'Upload Failed: ' + uploadError.message;
           }
         }
       });
@@ -2826,13 +2858,17 @@ function getWhatsappTemplates() {
 function getDefaultFormFieldsConfig() {
   return {
     hiddenFields: [],
-    customFields: []
+    customFields: [],
+    // Per-field required/optional overrides, keyed by built-in field id
+    // (e.g. { dob: false, religion: true }). A field with no entry here
+    // falls back to its normal default required-ness on the form.
+    fieldRequirements: {}
   };
 }
 
 /**
  * Gets the saved form fields configuration
- * @returns {Object} { hiddenFields: string[], customFields: Object[] }
+ * @returns {Object} { hiddenFields: string[], customFields: Object[], fieldRequirements: Object }
  */
 function getFormFieldsConfig() {
   try {
@@ -2843,7 +2879,8 @@ function getFormFieldsConfig() {
     const parsed = JSON.parse(raw);
     return {
       hiddenFields: Array.isArray(parsed.hiddenFields) ? parsed.hiddenFields : defaults.hiddenFields,
-      customFields: Array.isArray(parsed.customFields) ? parsed.customFields : defaults.customFields
+      customFields: Array.isArray(parsed.customFields) ? parsed.customFields : defaults.customFields,
+      fieldRequirements: (parsed.fieldRequirements && typeof parsed.fieldRequirements === 'object') ? parsed.fieldRequirements : defaults.fieldRequirements
     };
   } catch (error) {
     Logger.log('Error getting form fields config: ' + error.toString());

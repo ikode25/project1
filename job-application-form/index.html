@@ -1025,6 +1025,21 @@
             margin: 0;
         }
 
+        .dashboard-greeting {
+            margin: 4px 0 0 0;
+            font-size: 13px;
+            font-weight: 400;
+            opacity: 0.85;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .dashboard-greeting .dot-sep {
+            opacity: 0.6;
+        }
+
         .admin-info {
             display: flex;
             align-items: center;
@@ -1570,6 +1585,259 @@
             display: flex;
             justify-content: flex-end;
             gap: 10px;
+        }
+
+        /* Application review modal - uses the same theme variables as the
+           rest of the form, so it picks up whatever colors the admin has
+           set instead of a fixed palette. */
+        .preview-modal-content {
+            max-width: 720px;
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .preview-modal-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 26px 28px;
+            background: linear-gradient(135deg, var(--c-dark) 0%, var(--c-mid) 100%);
+            color: #fff;
+            position: relative;
+        }
+
+        .preview-modal-header-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.18);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            flex-shrink: 0;
+        }
+
+        .preview-modal-header h3 {
+            margin: 0 0 3px 0;
+            font-size: 19px;
+            font-weight: 700;
+        }
+
+        .preview-modal-header p {
+            margin: 0;
+            font-size: 13px;
+            opacity: 0.9;
+        }
+
+        .preview-modal-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: rgba(255, 255, 255, 0.18);
+            color: #fff;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s ease;
+        }
+
+        .preview-modal-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .preview-modal-body {
+            background: var(--c-tint);
+            padding: 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .preview-section {
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid var(--c-faint);
+            border-left: 4px solid var(--c-mid);
+            overflow: hidden;
+        }
+
+        .preview-section-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--c-darkest);
+            background: var(--c-faint);
+        }
+
+        .preview-section-icon {
+            width: 26px;
+            height: 26px;
+            border-radius: 7px;
+            background: var(--c-mid);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+
+        .preview-section-body {
+            padding: 6px 16px 10px 16px;
+        }
+
+        .preview-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 16px;
+            padding: 9px 0;
+            border-bottom: 1px solid var(--c-faint);
+            font-size: 13px;
+        }
+
+        .preview-row:last-child {
+            border-bottom: none;
+        }
+
+        .preview-row-label {
+            color: #888;
+            flex-shrink: 0;
+        }
+
+        .preview-row-value {
+            color: #222;
+            font-weight: 600;
+            text-align: right;
+            word-break: break-word;
+        }
+
+        .preview-doc-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 8px 0 10px 0;
+        }
+
+        .preview-doc-chip {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            background: var(--c-tint);
+            border: 1px solid var(--c-pale);
+            border-radius: 10px;
+            min-width: 150px;
+        }
+
+        .preview-doc-chip-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            background: var(--c-faint);
+            color: var(--c-dark);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .preview-doc-chip-thumb {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+
+        .preview-doc-chip-text {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .preview-doc-chip-label {
+            font-size: 11px;
+            color: #888;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .preview-doc-chip-name {
+            font-size: 12px;
+            color: #222;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 130px;
+        }
+
+        .preview-modal-footer {
+            background: #fff;
+            border-top: 1px solid var(--c-faint);
+        }
+
+        .preview-btn-edit {
+            padding: 11px 22px;
+            border-radius: 8px;
+            border: 2px solid var(--c-pale);
+            background: #fff;
+            color: var(--c-dark);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .preview-btn-edit:hover {
+            background: var(--c-tint);
+        }
+
+        .preview-btn-confirm {
+            padding: 11px 26px;
+            border-radius: 8px;
+            border: none;
+            background: linear-gradient(135deg, var(--c-dark) 0%, var(--c-mid) 100%);
+            color: #fff;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        .preview-btn-confirm:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 5px 14px rgba(0, 0, 0, 0.2);
+        }
+
+        @media (max-width: 600px) {
+            .preview-modal-header {
+                padding: 20px 20px 20px 20px;
+            }
+
+            .preview-doc-chip {
+                min-width: 130px;
+                flex: 1 1 130px;
+            }
         }
 
         .email-editor {
@@ -2121,8 +2389,15 @@
             { id: 'date', label: 'Date' },
             { id: 'email', label: 'Email' },
             { id: 'tel', label: 'Phone' },
-            { id: 'select', label: 'Dropdown' }
+            { id: 'select', label: 'Dropdown' },
+            { id: 'image', label: 'Image Upload' },
+            { id: 'file', label: 'Document Upload' }
         ];
+
+        // Custom field types whose value is a file, not text - handled the
+        // same way as certificates (uploaded to Drive at submit time, URL
+        // stored in place of the raw file data).
+        const CUSTOM_FILE_FIELD_TYPES = ['image', 'file'];
 
         const FORM_SECTIONS = [
             { id: 'personal', label: 'Personal Information' },
@@ -2131,12 +2406,89 @@
         ];
 
         function getDefaultFormFieldsConfigClient() {
-            return { hiddenFields: [], customFields: [] };
+            return { hiddenFields: [], customFields: [], fieldRequirements: {} };
+        }
+
+        // Fields whose required-ness admin can override, mapped to their
+        // normal default (used whenever there's no override saved yet).
+        // Locked fields (name/email/mobile/position) and fields with no
+        // single required attribute to toggle (education subsections,
+        // documents) aren't included - see EducationSection/CVUploadSection
+        // for why those work differently (whole-group visibility, or
+        // required-when-shown file uploads validated in JS).
+        const FIELD_DEFAULT_REQUIRED = {
+            dob: true,
+            religion: false,
+            maritalStatus: true,
+            gender: true,
+            nationality: true,
+            currentAddress: true,
+            permanentAddress: true,
+            experience: true
+        };
+
+        function isFieldRequired(fieldRequirements, fieldId, defaultValue) {
+            const overrides = fieldRequirements || {};
+            return overrides.hasOwnProperty(fieldId) ? !!overrides[fieldId] : defaultValue;
         }
 
         // Renders one admin-defined custom field using the same Input/Select
         // building blocks the built-in fields use, so it looks native.
         const CustomFieldInput = ({ field, value, onChange }) => {
+            if (field.type === 'image' || field.type === 'file') {
+                const isImage = field.type === 'image';
+                const fileName = value && value.fileName;
+
+                const handleFileSelect = (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    if (isImage && !file.type.startsWith('image/')) {
+                        alert('Please select an image file.');
+                        e.target.value = '';
+                        return;
+                    }
+                    if (file.size > 5 * 1024 * 1024) {
+                        alert('File size must be less than 5MB');
+                        e.target.value = '';
+                        return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        onChange(field.id, { fileName: file.name, data: event.target.result });
+                    };
+                    reader.onerror = () => alert('Failed to read the file. Please try again.');
+                    reader.readAsDataURL(file);
+                };
+
+                return (
+                    <div className="form-group">
+                        <label>
+                            {field.label}
+                            {field.required && <span className="required">*</span>}
+                        </label>
+                        <div className="certificate-upload-row">
+                            <div className="certificate-upload-icon">
+                                <i className={`fas ${isImage ? 'fa-image' : 'fa-file-upload'}`}></i>
+                            </div>
+                            <div className="certificate-upload-info">
+                                <span className={`certificate-upload-name ${fileName ? '' : 'placeholder'}`}>
+                                    {fileName || 'No file selected'}
+                                </span>
+                                <span className="certificate-upload-hint">{isImage ? 'Image, max 5MB' : 'PDF or image, max 5MB'}</span>
+                            </div>
+                            <label htmlFor={`customField_${field.id}`} className="certificate-upload-btn">
+                                <i className="fas fa-upload"></i> {fileName ? 'Change' : 'Upload'}
+                            </label>
+                            <input
+                                type="file"
+                                id={`customField_${field.id}`}
+                                accept={isImage ? 'image/*' : '.pdf,image/*'}
+                                onChange={handleFileSelect}
+                            />
+                        </div>
+                    </div>
+                );
+            }
             if (field.type === 'textarea') {
                 return (
                     <TextArea
@@ -2329,12 +2681,30 @@
             );
         };
 
-        // SMS Template Modal Component
-        const SmsTemplateModal = ({ isOpen, onClose, template, onChange, onSend, title, channel = 'sms' }) => {
+        // SMS Template Modal Component. For WhatsApp, "sending" is really
+        // just opening a wa.me link - browsers (and the sandboxed iframe
+        // Apps Script serves this app through) are unreliable about letting
+        // window.open() through from a script call, but a real <a target
+        // ="_blank"> click always gets through since it's native browser
+        // navigation. So when there's exactly one recipient (the common
+        // case - a single candidate's button), the button IS that anchor;
+        // for bulk sends to several candidates at once there's no single
+        // href to point an anchor at, so that case falls back to a
+        // best-effort window.open() loop instead.
+        const SmsTemplateModal = ({ isOpen, onClose, template, onChange, onSend, title, channel = 'sms', whatsappCandidates, whatsappCountryCode }) => {
             if (!isOpen) return null;
 
             const isWhatsapp = channel === 'whatsapp';
             const charCount = (template || '').length;
+            const singleWhatsappLink = (isWhatsapp && whatsappCandidates && whatsappCandidates.length === 1)
+                ? buildWhatsappLink(
+                    whatsappCandidates[0].mobile,
+                    template
+                        .replace(/\[Candidate Name\]/g, `${whatsappCandidates[0].firstName} ${whatsappCandidates[0].lastName}`)
+                        .replace(/\[Position\]/g, whatsappCandidates[0].applyingFor || 'the position'),
+                    whatsappCountryCode
+                )
+                : null;
 
             return (
                 <div className="modal-overlay">
@@ -2376,9 +2746,22 @@
                             <button className="action-btn" onClick={onClose} style={{ background: '#9e9e9e' }}>
                                 Cancel
                             </button>
-                            <button className="action-btn btn-shortlist" onClick={onSend} style={isWhatsapp ? { background: '#25D366' } : {}}>
-                                <i className={isWhatsapp ? 'fab fa-whatsapp' : 'fas fa-paper-plane'}></i> {isWhatsapp ? 'Send WhatsApp' : 'Send SMS'}
-                            </button>
+                            {singleWhatsappLink ? (
+                                <a
+                                    href={singleWhatsappLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="action-btn btn-shortlist"
+                                    style={{ background: '#25D366', textDecoration: 'none' }}
+                                    onClick={onSend}
+                                >
+                                    <i className="fab fa-whatsapp"></i> Send WhatsApp
+                                </a>
+                            ) : (
+                                <button className="action-btn btn-shortlist" onClick={onSend} style={isWhatsapp ? { background: '#25D366' } : {}}>
+                                    <i className={isWhatsapp ? 'fab fa-whatsapp' : 'fas fa-paper-plane'}></i> {isWhatsapp ? 'Send WhatsApp' : 'Send SMS'}
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -2723,7 +3106,7 @@
         };
 
         // Candidate Card Component
-        const CandidateCard = ({ candidate, onStatusChange, onViewCV, onViewCoverLetter, onViewPassportPhoto, onViewCertificate, onInterview, onSendEmail, onSendSms, onSendWhatsapp, selected, onSelect }) => {
+        const CandidateCard = ({ candidate, onStatusChange, onViewCV, onViewCoverLetter, onViewPassportPhoto, onViewCertificate, onViewCustomFile, customFileFields, onInterview, onSendEmail, onSendSms, onSendWhatsapp, selected, onSelect }) => {
             return (
                 <div className="candidate-card">
                     <div className="candidate-header">
@@ -2767,6 +3150,14 @@
                                 return (url && !url.startsWith('Upload Failed')) ? (
                                     <button key={level.id} className="action-btn btn-view-cv" onClick={() => onViewCertificate(candidate, level.id, level.label)}>
                                         <i className="fas fa-certificate"></i> {level.label}
+                                    </button>
+                                ) : null;
+                            })}
+                            {onViewCustomFile && (customFileFields || []).map(field => {
+                                const url = candidate.customFieldValues && candidate.customFieldValues[field.id];
+                                return (url && !url.startsWith('Upload Failed')) ? (
+                                    <button key={field.id} className="action-btn btn-view-cv" onClick={() => onViewCustomFile(candidate, field)}>
+                                        <i className={field.type === 'image' ? 'fas fa-image' : 'fas fa-file-upload'}></i> {field.label}
                                     </button>
                                 ) : null;
                             })}
@@ -2833,6 +3224,42 @@
             ) : null
         );
 
+        // One tile in the consolidated "All Documents" grid - a document
+        // thumbnail for images, a plain icon tile for everything else.
+        const DocumentPill = ({ icon, label, url, thumbnail }) => {
+            if (!url || url.startsWith('Upload Failed')) return null;
+            return (
+                <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '6px',
+                        width: '90px',
+                        textDecoration: 'none',
+                        color: 'var(--c-darkest)'
+                    }}
+                >
+                    {thumbnail ? (
+                        <img src={url} alt={label} style={{ width: '64px', height: '64px', objectFit: 'cover', borderRadius: '8px', border: '2px solid var(--c-pale)' }} />
+                    ) : (
+                        <div style={{
+                            width: '64px', height: '64px', borderRadius: '8px',
+                            background: 'var(--c-faint)', border: '2px solid var(--c-pale)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: 'var(--c-dark)', fontSize: '22px'
+                        }}>
+                            <i className={icon}></i>
+                        </div>
+                    )}
+                    <span style={{ fontSize: '11px', fontWeight: 600, textAlign: 'center', lineHeight: 1.2 }}>{label}</span>
+                </a>
+            );
+        };
+
         const ApplicantExpandedView = ({ applicant, customFieldsConfig }) => {
             const formatDate = (dateStr) => {
                 if (!dateStr) return 'Not provided';
@@ -2849,8 +3276,48 @@
                 }
             };
 
+            const customFileFields = (customFieldsConfig || []).filter(f => CUSTOM_FILE_FIELD_TYPES.includes(f.type));
+            const customFileValues = applicant.customFieldValues || {};
+            const hasAnyDocument = applicant.cvUrl || applicant.coverLetterUrl || applicant.passportPhotoUrl
+                || CERTIFICATE_LEVELS.some(l => applicant[`${l.id}CertificateUrl`])
+                || customFileFields.some(f => customFileValues[f.id]);
+
             return (
                 <div className="expanded-details">
+                    {/* All Documents - everything uploaded for this applicant,
+                        gathered in one place instead of scattered across
+                        buttons/sections elsewhere. */}
+                    {hasAnyDocument && (
+                        <div className="detail-section">
+                            <div className="detail-section-title">
+                                <i className="fas fa-folder-open"></i>
+                                All Documents
+                            </div>
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+                                <DocumentPill icon="fas fa-file-pdf" label="CV" url={applicant.cvUrl} />
+                                <DocumentPill icon="fas fa-file-alt" label="Cover Letter" url={applicant.coverLetterUrl} />
+                                <DocumentPill icon="fas fa-camera-retro" label="Passport Photo" url={applicant.passportPhotoUrl} thumbnail />
+                                {CERTIFICATE_LEVELS.map(level => (
+                                    <DocumentPill
+                                        key={level.id}
+                                        icon="fas fa-certificate"
+                                        label={`${level.label} Certificate`}
+                                        url={applicant[`${level.id}CertificateUrl`]}
+                                    />
+                                ))}
+                                {customFileFields.map(field => (
+                                    <DocumentPill
+                                        key={field.id}
+                                        icon={field.type === 'image' ? 'fas fa-image' : 'fas fa-file-upload'}
+                                        label={field.label}
+                                        url={customFileValues[field.id]}
+                                        thumbnail={field.type === 'image'}
+                                    />
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Personal Information */}
                     <div className="detail-section">
                         <div className="detail-section-title">
@@ -3145,12 +3612,26 @@
                             <div className="detail-grid">
                                 {customFieldsConfig.map(field => {
                                     const value = applicant.customFieldValues && applicant.customFieldValues[field.id];
+                                    const isFileField = CUSTOM_FILE_FIELD_TYPES.includes(field.type);
+                                    const uploadFailed = typeof value === 'string' && value.startsWith('Upload Failed');
                                     return (
                                         <div className="detail-item" key={field.id}>
                                             <span className="detail-label">{field.label}</span>
-                                            <span className={`detail-value ${!value ? 'empty' : ''}`}>
-                                                {value || 'Not provided'}
-                                            </span>
+                                            {isFileField && value && !uploadFailed ? (
+                                                field.type === 'image' ? (
+                                                    <a href={value} target="_blank" rel="noopener noreferrer">
+                                                        <img src={value} alt={field.label} style={{ width: '70px', height: '70px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e0e0e0', display: 'block', marginTop: '4px' }} />
+                                                    </a>
+                                                ) : (
+                                                    <a href={value} target="_blank" rel="noopener noreferrer" className="detail-value" style={{ color: 'var(--c-dark)', fontWeight: 600, textDecoration: 'none' }}>
+                                                        <i className="fas fa-file-arrow-up"></i> View Document
+                                                    </a>
+                                                )
+                                            ) : (
+                                                <span className={`detail-value ${!value ? 'empty' : ''}`}>
+                                                    {value || 'Not provided'}
+                                                </span>
+                                            )}
                                         </div>
                                     );
                                 })}
@@ -3729,6 +4210,21 @@
             const [interviewModal, setInterviewModal] = useState({ isOpen: false, candidate: null });
             const [cvModal, setCvModal] = useState({ isOpen: false, cvUrl: '', candidateName: '' });
             const [editModal, setEditModal] = useState({ isOpen: false, applicant: null });
+            const [currentDateTime, setCurrentDateTime] = useState(new Date());
+
+            // Live clock for the dashboard greeting - ticks once a minute,
+            // no need for per-second precision here.
+            React.useEffect(() => {
+                const timer = setInterval(() => setCurrentDateTime(new Date()), 60000);
+                return () => clearInterval(timer);
+            }, []);
+
+            const getGreeting = (date) => {
+                const hour = date.getHours();
+                if (hour < 12) return 'Good morning';
+                if (hour < 17) return 'Good afternoon';
+                return 'Good evening';
+            };
 
             // Toast notifications
             const [toasts, setToasts] = useState([]);
@@ -4385,17 +4881,20 @@ HR Team`
                 }
             };
 
-            const handleSendTestWhatsapp = () => {
-                if (!testWhatsappPhone) {
-                    showToast('Enter a phone number to test with.', 'warning');
-                    return;
-                }
-                const link = buildWhatsappLink(
+            const testWhatsappLink = testWhatsappPhone
+                ? buildWhatsappLink(
                     testWhatsappPhone,
                     'This is a test message from your Job Application System. WhatsApp is set up correctly!',
                     whatsappConfig.defaultCountryCode
-                );
-                window.open(link, '_blank');
+                )
+                : null;
+
+            const handleSendTestWhatsapp = (e) => {
+                if (!testWhatsappPhone) {
+                    e.preventDefault();
+                    showToast('Enter a phone number to test with.', 'warning');
+                    return;
+                }
                 showToast('Opening WhatsApp - press Send there to complete the test.', 'success');
             };
 
@@ -4419,6 +4918,15 @@ HR Team`
                         hidden.add(fieldId);
                     }
                     return { ...prev, hiddenFields: Array.from(hidden) };
+                });
+            };
+
+            const handleToggleFieldRequired = (fieldId, defaultValue) => {
+                setFormFieldsConfig(prev => {
+                    const overrides = { ...(prev.fieldRequirements || {}) };
+                    const current = overrides.hasOwnProperty(fieldId) ? overrides[fieldId] : defaultValue;
+                    overrides[fieldId] = !current;
+                    return { ...prev, fieldRequirements: overrides };
                 });
             };
 
@@ -4593,6 +5101,19 @@ HR Team`
                 }
             };
 
+            const handleViewCustomFile = (candidate, field) => {
+                const url = candidate.customFieldValues && candidate.customFieldValues[field.id];
+                if (url && !url.startsWith('Upload Failed')) {
+                    setCvModal({
+                        isOpen: true,
+                        cvUrl: url,
+                        candidateName: `${candidate.firstName} ${candidate.lastName} - ${field.label}`
+                    });
+                } else {
+                    showToast(`${field.label} not available for this candidate`, 'warning');
+                }
+            };
+
             const handleScheduleInterview = (interviewData) => {
                 const isReschedule = interviewData.isReschedule || false;
                 const successMessage = isReschedule
@@ -4764,7 +5285,19 @@ HR Team`
                     <div className="dashboard-header">
                         <div className="dashboard-title">
                             <i className="fas fa-users-cog" style={{ fontSize: '28px' }}></i>
-                            <h1>{companyInfo.dashboardTitle || 'Candidate Management System'}</h1>
+                            <div>
+                                <h1>{companyInfo.dashboardTitle || 'Candidate Management System'}</h1>
+                                <p className="dashboard-greeting">
+                                    <i className="fas fa-hand-sparkles"></i>
+                                    {getGreeting(currentDateTime)}, {adminUser.username}
+                                    <span className="dot-sep">•</span>
+                                    <i className="far fa-calendar"></i>
+                                    {currentDateTime.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                                    <span className="dot-sep">•</span>
+                                    <i className="far fa-clock"></i>
+                                    {currentDateTime.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                            </div>
                         </div>
                         <div className="admin-info">
                             <div className="admin-name">
@@ -5793,9 +6326,16 @@ HR Team`
                                                 </button>
                                                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                                                     <input type="tel" value={testWhatsappPhone} onChange={(e) => setTestWhatsappPhone(e.target.value)} placeholder="+233 XX XXX XXXX" style={{ padding: '10px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }} />
-                                                    <button className="action-btn" onClick={handleSendTestWhatsapp} style={{ backgroundColor: '#1976d2', color: '#fff', padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>
+                                                    <a
+                                                        href={testWhatsappLink || '#'}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="action-btn"
+                                                        onClick={handleSendTestWhatsapp}
+                                                        style={{ backgroundColor: '#1976d2', color: '#fff', padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '500', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                                                    >
                                                         <i className="fas fa-paper-plane"></i> Test with a Number
-                                                    </button>
+                                                    </a>
                                                 </div>
                                             </div>
                                         </div>
@@ -5880,7 +6420,7 @@ HR Team`
                                         </h3>
                                         <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#e0f2f1', borderRadius: '8px', border: '1px solid #4db6ac' }}>
                                             <p style={{ margin: 0, color: '#00695c', fontSize: '14px' }}>
-                                                <i className="fas fa-info-circle"></i> Turn built-in field groups on or off, or add your own custom fields. A few core fields (name, email, mobile, position, CV) can't be removed.
+                                                <i className="fas fa-info-circle"></i> Turn built-in field groups on or off, mark some as optional instead of required, or add your own custom fields. A few core fields (name, email, mobile, position, CV) can't be removed or made optional.
                                             </p>
                                         </div>
 
@@ -5897,27 +6437,42 @@ HR Team`
                                                         <div style={{ display: 'grid', gap: '8px' }}>
                                                             {fields.map(field => {
                                                                 const isFieldHidden = (formFieldsConfig.hiddenFields || []).includes(field.id);
+                                                                const canToggleRequired = !field.locked && FIELD_DEFAULT_REQUIRED.hasOwnProperty(field.id);
+                                                                const fieldIsRequired = canToggleRequired && isFieldRequired(formFieldsConfig.fieldRequirements, field.id, FIELD_DEFAULT_REQUIRED[field.id]);
                                                                 return (
                                                                     <div
                                                                         key={field.id}
                                                                         style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#fafafa', borderRadius: '6px', flexWrap: 'wrap', gap: '8px' }}
                                                                     >
                                                                         <span style={{ fontSize: '14px', color: '#333' }}>{field.label}</span>
-                                                                        {field.locked ? (
-                                                                            <span style={{ color: '#999', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }} title="Always shown - required for the system to work">
-                                                                                <i className="fas fa-lock"></i> Always shown
-                                                                            </span>
-                                                                        ) : (
-                                                                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: isFieldHidden ? '#c62828' : '#2e7d32' }}>
-                                                                                {isFieldHidden ? 'Hidden' : 'Visible'}
-                                                                                <input
-                                                                                    type="checkbox"
-                                                                                    checked={!isFieldHidden}
-                                                                                    onChange={() => handleToggleFieldVisibility(field.id)}
-                                                                                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                                                                                />
-                                                                            </label>
-                                                                        )}
+                                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                                                                            {canToggleRequired && !isFieldHidden && (
+                                                                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: fieldIsRequired ? '#e65100' : '#666' }}>
+                                                                                    {fieldIsRequired ? 'Required' : 'Optional'}
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        checked={fieldIsRequired}
+                                                                                        onChange={() => handleToggleFieldRequired(field.id, FIELD_DEFAULT_REQUIRED[field.id])}
+                                                                                        style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                                                                    />
+                                                                                </label>
+                                                                            )}
+                                                                            {field.locked ? (
+                                                                                <span style={{ color: '#999', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }} title="Always shown - required for the system to work">
+                                                                                    <i className="fas fa-lock"></i> Always shown
+                                                                                </span>
+                                                                            ) : (
+                                                                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: isFieldHidden ? '#c62828' : '#2e7d32' }}>
+                                                                                    {isFieldHidden ? 'Hidden' : 'Visible'}
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        checked={!isFieldHidden}
+                                                                                        onChange={() => handleToggleFieldVisibility(field.id)}
+                                                                                        style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                                                                                    />
+                                                                                </label>
+                                                                            )}
+                                                                        </div>
                                                                     </div>
                                                                 );
                                                             })}
@@ -6564,6 +7119,20 @@ HR Team`
                                                                         </button>
                                                                     ) : null;
                                                                 })}
+                                                                {(formFieldsConfig.customFields || []).filter(f => CUSTOM_FILE_FIELD_TYPES.includes(f.type)).map(field => {
+                                                                    const url = app.customFieldValues && app.customFieldValues[field.id];
+                                                                    return (url && !url.startsWith('Upload Failed')) ? (
+                                                                        <button
+                                                                            key={field.id}
+                                                                            className="action-btn btn-view-cv"
+                                                                            onClick={() => handleViewCustomFile(app, field)}
+                                                                            style={{ fontSize: '12px', padding: '6px 12px' }}
+                                                                            title={`View ${field.label}`}
+                                                                        >
+                                                                            <i className={field.type === 'image' ? 'fas fa-image' : 'fas fa-file-upload'}></i> {field.label}
+                                                                        </button>
+                                                                    ) : null;
+                                                                })}
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -6591,6 +7160,8 @@ HR Team`
                                         onViewCoverLetter={handleViewCoverLetter}
                                         onViewPassportPhoto={handleViewPassportPhoto}
                                         onViewCertificate={handleViewCertificate}
+                                        onViewCustomFile={handleViewCustomFile}
+                                        customFileFields={(formFieldsConfig.customFields || []).filter(f => CUSTOM_FILE_FIELD_TYPES.includes(f.type))}
                                         onInterview={(candidate) => setInterviewModal({ isOpen: true, candidate })}
                                         onSendEmail={(candidate) => {
                                             setEmailModal({
@@ -6737,32 +7308,40 @@ HR Team`
                         onChange={(template) => setWhatsappModal({ ...whatsappModal, template })}
                         onSend={() => {
                             // No API involved - just opens a wa.me click-to-chat
-                            // link per candidate in a new tab, pre-filled with
-                            // their number and the personalized message. The
-                            // admin still presses Send themselves in WhatsApp.
+                            // link, pre-filled with the recipient's number and
+                            // the personalized message. When there's exactly
+                            // one candidate the Send button itself IS the
+                            // <a target="_blank"> that opens it (see
+                            // SmsTemplateModal) - real anchor clicks aren't
+                            // blocked the way window.open() calls sometimes
+                            // are inside this app's iframe. This handler just
+                            // does the bookkeeping for that case, and for
+                            // multiple candidates it also does the (best-
+                            // effort) opening itself, since one anchor can't
+                            // point at more than one link.
                             if (whatsappModal.candidates && whatsappModal.candidates.length > 0) {
-                                whatsappModal.candidates.forEach(candidate => {
-                                    const candidateName = `${candidate.firstName} ${candidate.lastName}`;
-                                    const personalizedMessage = whatsappModal.template
-                                        .replace(/\[Candidate Name\]/g, candidateName)
-                                        .replace(/\[Position\]/g, candidate.applyingFor || 'the position');
+                                if (whatsappModal.candidates.length > 1) {
+                                    whatsappModal.candidates.forEach(candidate => {
+                                        const candidateName = `${candidate.firstName} ${candidate.lastName}`;
+                                        const personalizedMessage = whatsappModal.template
+                                            .replace(/\[Candidate Name\]/g, candidateName)
+                                            .replace(/\[Position\]/g, candidate.applyingFor || 'the position');
 
-                                    const link = buildWhatsappLink(candidate.mobile, personalizedMessage, whatsappConfig.defaultCountryCode);
-                                    window.open(link, '_blank');
-                                });
-
-                                showToast(
-                                    whatsappModal.candidates.length > 1
-                                        ? `Opening WhatsApp for ${whatsappModal.candidates.length} candidates - allow pop-ups for this site if any tabs were blocked.`
-                                        : 'Opening WhatsApp - press Send there to deliver the message.',
-                                    'success'
-                                );
+                                        const link = buildWhatsappLink(candidate.mobile, personalizedMessage, whatsappConfig.defaultCountryCode);
+                                        window.open(link, '_blank');
+                                    });
+                                    showToast(`Opening WhatsApp for ${whatsappModal.candidates.length} candidates - allow pop-ups for this site if any tabs were blocked.`, 'success');
+                                } else {
+                                    showToast('Opening WhatsApp - press Send there to deliver the message.', 'success');
+                                }
 
                                 setSelectedCandidates([]);
                             }
                             setWhatsappModal({ isOpen: false, template: '', title: '', candidates: [] });
                         }}
                         title={whatsappModal.title}
+                        whatsappCandidates={whatsappModal.candidates}
+                        whatsappCountryCode={whatsappConfig.defaultCountryCode}
                     />
 
                     <InterviewModal
@@ -6856,71 +7435,86 @@ HR Team`
 
             const Row = ({ label, value }) => (
                 value ? (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', padding: '6px 0', borderBottom: '1px solid #f0f0f0', fontSize: '13px' }}>
-                        <span style={{ color: '#777', flexShrink: 0 }}>{label}</span>
-                        <span style={{ color: '#222', fontWeight: 500, textAlign: 'right' }}>{value}</span>
+                    <div className="preview-row">
+                        <span className="preview-row-label">{label}</span>
+                        <span className="preview-row-value">{value}</span>
                     </div>
                 ) : null
             );
 
-            const SectionTitle = ({ children }) => (
-                <h4 style={{ margin: '22px 0 8px 0', color: '#2e7d32', fontSize: '14px', borderBottom: '2px solid #e8f5e9', paddingBottom: '6px' }}>{children}</h4>
+            const PreviewSection = ({ icon, title, children }) => (
+                <div className="preview-section">
+                    <div className="preview-section-title">
+                        <span className="preview-section-icon"><i className={icon}></i></span>
+                        {title}
+                    </div>
+                    <div className="preview-section-body">{children}</div>
+                </div>
             );
 
             const educationLevels = [
-                { id: 'ssc', title: 'SSC (Secondary School Certificate)', rows: [['Institute', formData.sscInstitute], ['Major Subject', formData.sscMajor], ['Passing Year', formData.sscYear], ['GPA/Grade', formData.sscGrade]] },
-                { id: 'hsc', title: 'HSC (Higher Secondary Certificate)', rows: [['Institute', formData.hscInstitute], ['Major Subject', formData.hscMajor], ['Passing Year', formData.hscYear], ['GPA/Grade', formData.hscGrade]] },
-                { id: 'bachelor', title: 'Bachelor/Undergraduate', rows: [['Degree', formData.bachelorDegree], ['Institute', formData.bachelorInstitute], ['Major Subject', formData.bachelorMajor], ['CGPA/Grade', formData.bachelorGrade]] },
-                { id: 'hnd', title: 'HND (Higher National Diploma)', rows: [['Programme', formData.hndProgramme], ['Institute', formData.hndInstitute], ['Major Subject', formData.hndMajor], ['CGPA/Grade', formData.hndGrade]] },
-                { id: 'postgraduate', title: 'Postgraduate', rows: [['Degree', formData.postgraduateDegree], ['Institute', formData.postgraduateInstitute], ['Major Subject', formData.postgraduateMajor], ['CGPA/Grade', formData.postgraduateGrade]] }
+                { id: 'ssc', title: 'SSC (Secondary School Certificate)', icon: 'fas fa-graduation-cap', rows: [['Institute', formData.sscInstitute], ['Major Subject', formData.sscMajor], ['Passing Year', formData.sscYear], ['GPA/Grade', formData.sscGrade]] },
+                { id: 'hsc', title: 'HSC (Higher Secondary Certificate)', icon: 'fas fa-graduation-cap', rows: [['Institute', formData.hscInstitute], ['Major Subject', formData.hscMajor], ['Passing Year', formData.hscYear], ['GPA/Grade', formData.hscGrade]] },
+                { id: 'bachelor', title: 'Bachelor/Undergraduate', icon: 'fas fa-user-graduate', rows: [['Degree', formData.bachelorDegree], ['Institute', formData.bachelorInstitute], ['Major Subject', formData.bachelorMajor], ['CGPA/Grade', formData.bachelorGrade]] },
+                { id: 'hnd', title: 'HND (Higher National Diploma)', icon: 'fas fa-book-reader', rows: [['Programme', formData.hndProgramme], ['Institute', formData.hndInstitute], ['Major Subject', formData.hndMajor], ['CGPA/Grade', formData.hndGrade]] },
+                { id: 'postgraduate', title: 'Postgraduate', icon: 'fas fa-book-reader', rows: [['Degree', formData.postgraduateDegree], ['Institute', formData.postgraduateInstitute], ['Major Subject', formData.postgraduateMajor], ['CGPA/Grade', formData.postgraduateGrade]] }
             ];
 
             const visibleCustomFields = (customFields || []).filter(f => customFieldValues && customFieldValues[f.id]);
 
+            const documentChips = [
+                fileName ? { icon: 'fas fa-file-pdf', label: 'CV', name: fileName } : null,
+                coverLetterFileName ? { icon: 'fas fa-file-alt', label: 'Cover Letter', name: coverLetterFileName } : null,
+                passportPhotoFileName ? { icon: 'fas fa-camera-retro', label: 'Passport Photo', name: passportPhotoFileName, thumbnail: passportPhotoPreview } : null,
+                ...educationLevels
+                    .filter(level => certificateFiles && certificateFiles[level.id] && certificateFiles[level.id].fileName)
+                    .map(level => ({ icon: 'fas fa-certificate', label: `${level.title.split(' ')[0]} Certificate`, name: certificateFiles[level.id].fileName }))
+            ].filter(Boolean);
+
             return (
                 <div className="modal-overlay">
-                    <div className="modal-content" style={{ maxWidth: '700px' }}>
-                        <div className="modal-header">
-                            <h3><i className="fas fa-eye" style={{ marginRight: '8px' }}></i> Review Your Application</h3>
-                            <button className="close-btn" onClick={onClose}>
+                    <div className="modal-content preview-modal-content">
+                        <div className="preview-modal-header">
+                            <div className="preview-modal-header-icon"><i className="fas fa-clipboard-check"></i></div>
+                            <div>
+                                <h3>Review Your Application</h3>
+                                <p>Take a moment to check everything below before it's sent.</p>
+                            </div>
+                            <button className="close-btn preview-modal-close" onClick={onClose}>
                                 <i className="fas fa-times"></i>
                             </button>
                         </div>
-                        <div className="modal-body">
-                            <div style={{ marginBottom: '14px', padding: '10px 14px', background: '#e8f5e9', borderRadius: '8px', fontSize: '13px', color: '#2e7d32' }}>
-                                <i className="fas fa-info-circle"></i> Please check everything below is correct. You can go back and edit, or confirm to submit.
-                            </div>
+                        <div className="modal-body preview-modal-body">
+                            <PreviewSection icon="fas fa-briefcase" title="Position">
+                                <Row label="Applying For" value={formData.applyingFor} />
+                            </PreviewSection>
 
-                            <SectionTitle>Position</SectionTitle>
-                            <Row label="Applying For" value={formData.applyingFor} />
-
-                            <SectionTitle>Personal Information</SectionTitle>
-                            <Row label="Name" value={`${formData.firstName} ${formData.lastName}`} />
-                            <Row label="Email" value={formData.email} />
-                            <Row label="Mobile" value={formData.mobile} />
-                            {!isHidden('dob') && <Row label="Date of Birth" value={formData.dob} />}
-                            {!isHidden('religion') && <Row label="Religion" value={formData.religion} />}
-                            {!isHidden('maritalStatus') && <Row label="Marital Status" value={formData.maritalStatus} />}
-                            {!isHidden('gender') && <Row label="Gender" value={formData.gender} />}
-                            {!isHidden('nationality') && <Row label="Nationality" value={formData.nationality} />}
-                            {!isHidden('currentAddress') && <Row label="Current Address" value={formData.currentAddress} />}
-                            {!isHidden('permanentAddress') && <Row label="Permanent Address" value={formData.permanentAddress} />}
+                            <PreviewSection icon="fas fa-user" title="Personal Information">
+                                <Row label="Name" value={`${formData.firstName} ${formData.lastName}`} />
+                                <Row label="Email" value={formData.email} />
+                                <Row label="Mobile" value={formData.mobile} />
+                                {!isHidden('dob') && <Row label="Date of Birth" value={formData.dob} />}
+                                {!isHidden('religion') && <Row label="Religion" value={formData.religion} />}
+                                {!isHidden('maritalStatus') && <Row label="Marital Status" value={formData.maritalStatus} />}
+                                {!isHidden('gender') && <Row label="Gender" value={formData.gender} />}
+                                {!isHidden('nationality') && <Row label="Nationality" value={formData.nationality} />}
+                                {!isHidden('currentAddress') && <Row label="Current Address" value={formData.currentAddress} />}
+                                {!isHidden('permanentAddress') && <Row label="Permanent Address" value={formData.permanentAddress} />}
+                            </PreviewSection>
 
                             {educationLevels.map(level => (
                                 (!isHidden(level.id) && level.rows.some(([, v]) => v)) ? (
-                                    <React.Fragment key={level.id}>
-                                        <SectionTitle>{level.title}</SectionTitle>
+                                    <PreviewSection key={level.id} icon={level.icon} title={level.title}>
                                         {level.rows.map(([label, value]) => <Row key={label} label={label} value={value} />)}
                                         {certificateFiles && certificateFiles[level.id] && certificateFiles[level.id].fileName && (
                                             <Row label="Certificate" value={certificateFiles[level.id].fileName} />
                                         )}
-                                    </React.Fragment>
+                                    </PreviewSection>
                                 ) : null
                             ))}
 
                             {!isHidden('experience') && (
-                                <>
-                                    <SectionTitle>Experience</SectionTitle>
+                                <PreviewSection icon="fas fa-building" title="Experience">
                                     {isFresher ? (
                                         <Row label="Status" value="Fresher (No work experience)" />
                                     ) : (
@@ -6933,34 +7527,47 @@ HR Team`
                                             {!currentlyWorking && <Row label="End Date" value={formData.endDate} />}
                                         </>
                                     )}
-                                </>
+                                </PreviewSection>
                             )}
 
                             {visibleCustomFields.length > 0 && (
-                                <>
-                                    <SectionTitle>Additional Information</SectionTitle>
+                                <PreviewSection icon="fas fa-list-check" title="Additional Information">
                                     {visibleCustomFields.map(f => (
-                                        <Row key={f.id} label={f.label} value={customFieldValues[f.id]} />
+                                        <Row
+                                            key={f.id}
+                                            label={f.label}
+                                            value={CUSTOM_FILE_FIELD_TYPES.includes(f.type) ? (customFieldValues[f.id] && customFieldValues[f.id].fileName) : customFieldValues[f.id]}
+                                        />
                                     ))}
-                                </>
+                                </PreviewSection>
                             )}
 
-                            <SectionTitle>Documents</SectionTitle>
-                            <Row label="CV" value={fileName} />
-                            {coverLetterFileName && <Row label="Cover Letter" value={coverLetterFileName} />}
-                            {passportPhotoFileName && <Row label="Passport Photo" value={passportPhotoFileName} />}
-                            {passportPhotoPreview && (
-                                <div style={{ marginTop: '10px' }}>
-                                    <img src={passportPhotoPreview} alt="Passport photo preview" style={{ width: '90px', height: '110px', objectFit: 'cover', borderRadius: '6px', border: '1px solid #e0e0e0' }} />
-                                </div>
+                            {documentChips.length > 0 && (
+                                <PreviewSection icon="fas fa-folder-open" title="Documents">
+                                    <div className="preview-doc-chips">
+                                        {documentChips.map((doc, i) => (
+                                            <div className="preview-doc-chip" key={i}>
+                                                {doc.thumbnail ? (
+                                                    <img src={doc.thumbnail} alt={doc.label} className="preview-doc-chip-thumb" />
+                                                ) : (
+                                                    <span className="preview-doc-chip-icon"><i className={doc.icon}></i></span>
+                                                )}
+                                                <div className="preview-doc-chip-text">
+                                                    <span className="preview-doc-chip-label">{doc.label}</span>
+                                                    <span className="preview-doc-chip-name">{doc.name}</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </PreviewSection>
                             )}
                         </div>
-                        <div className="modal-footer">
-                            <button className="action-btn" onClick={onClose} style={{ background: '#9e9e9e' }}>
+                        <div className="modal-footer preview-modal-footer">
+                            <button className="preview-btn-edit" onClick={onClose}>
                                 <i className="fas fa-arrow-left"></i> Edit Application
                             </button>
-                            <button className="action-btn btn-shortlist" onClick={onConfirm}>
-                                <i className="fas fa-check"></i> Confirm & Submit
+                            <button className="preview-btn-confirm" onClick={onConfirm}>
+                                <i className="fas fa-check"></i> Confirm &amp; Submit
                             </button>
                         </div>
                     </div>
@@ -7096,9 +7703,10 @@ HR Team`
         };
 
         // Personal Info Section
-        const PersonalInfoSection = ({ formData, handleChange, hiddenFields, customFields, customFieldValues, onCustomFieldChange }) => {
+        const PersonalInfoSection = ({ formData, handleChange, hiddenFields, customFields, customFieldValues, onCustomFieldChange, fieldRequirements }) => {
             const hidden = hiddenFields || new Set();
             const isHidden = (id) => hidden.has(id);
+            const isRequired = (id, defaultValue) => isFieldRequired(fieldRequirements, id, defaultValue);
 
             return (
                 <div className="section">
@@ -7165,7 +7773,7 @@ HR Team`
                                     name="dob"
                                     value={formData.dob}
                                     onChange={handleChange}
-                                    required={true}
+                                    required={isRequired('dob', true)}
                                 />
                             )}
                             {!isHidden('religion') && (
@@ -7174,6 +7782,7 @@ HR Team`
                                     name="religion"
                                     value={formData.religion}
                                     onChange={handleChange}
+                                    required={isRequired('religion', false)}
                                     options={['Islam', 'Christianity', 'Hinduism', 'Buddhism', 'Other', 'Prefer not to say']}
                                 />
                             )}
@@ -7188,7 +7797,7 @@ HR Team`
                                     name="maritalStatus"
                                     value={formData.maritalStatus}
                                     onChange={handleChange}
-                                    required={true}
+                                    required={isRequired('maritalStatus', true)}
                                     options={['Married', 'Unmarried', 'Divorced']}
                                 />
                             )}
@@ -7198,7 +7807,7 @@ HR Team`
                                     name="gender"
                                     value={formData.gender}
                                     onChange={handleChange}
-                                    required={true}
+                                    required={isRequired('gender', true)}
                                     options={['Male', 'Female', 'Other']}
                                 />
                             )}
@@ -7211,7 +7820,7 @@ HR Team`
                             name="nationality"
                             value={formData.nationality}
                             onChange={handleChange}
-                            required={true}
+                            required={isRequired('nationality', true)}
                             placeholder="Enter nationality"
                         />
                     )}
@@ -7222,7 +7831,7 @@ HR Team`
                             name="currentAddress"
                             value={formData.currentAddress}
                             onChange={handleChange}
-                            required={true}
+                            required={isRequired('currentAddress', true)}
                         />
                     )}
 
@@ -7232,7 +7841,7 @@ HR Team`
                             name="permanentAddress"
                             value={formData.permanentAddress}
                             onChange={handleChange}
-                            required={true}
+                            required={isRequired('permanentAddress', true)}
                         />
                     )}
 
@@ -7519,7 +8128,7 @@ HR Team`
         };
 
         // Experience Section
-        const ExperienceSection = ({ formData, handleChange, currentlyWorking, setCurrentlyWorking, isFresher, setIsFresher, customFields, customFieldValues, onCustomFieldChange }) => (
+        const ExperienceSection = ({ formData, handleChange, currentlyWorking, setCurrentlyWorking, isFresher, setIsFresher, customFields, customFieldValues, onCustomFieldChange, fieldRequirements }) => (
             <div className="section">
                 <div className="section-header">
                     <div className="section-number">4</div>
@@ -7560,7 +8169,7 @@ HR Team`
                             value={formData.yearsOfExperience}
                             onChange={handleChange}
                             placeholder="e.g., 3"
-                            required={true}
+                            required={isFieldRequired(fieldRequirements, 'experience', true)}
                         />
 
                         <Input
@@ -8077,6 +8686,20 @@ HR Team`
                     return;
                 }
 
+                // Same story for required custom image/document fields -
+                // their file inputs are hidden the same way, so this can't
+                // rely on native `required` validation either.
+                const missingCustomFile = (formFieldsConfig.customFields || []).find(f =>
+                    CUSTOM_FILE_FIELD_TYPES.includes(f.type) &&
+                    f.required &&
+                    !hiddenFields.includes(f.id) &&
+                    !(customFieldValues[f.id] && customFieldValues[f.id].fileName && customFieldValues[f.id].data)
+                );
+                if (missingCustomFile) {
+                    alert(`Please upload ${missingCustomFile.label}.`);
+                    return;
+                }
+
                 // Everything required is present - let the applicant review
                 // what they entered before it actually goes anywhere.
                 // performActualSubmit() (below) does the real submission,
@@ -8107,6 +8730,28 @@ HR Team`
                         }
                     };
 
+                    // Custom image/document fields carry file data ({fileName,
+                    // data}) the same way certificates do - split those out
+                    // of customFieldValues (which gets JSON.stringify'd into
+                    // a single sheet cell) into their own payload so the
+                    // backend can upload them to Drive and store just the
+                    // resulting URL, instead of stuffing raw base64 into
+                    // that cell.
+                    const fileCustomFieldIds = (formFieldsConfig.customFields || [])
+                        .filter(f => CUSTOM_FILE_FIELD_TYPES.includes(f.type))
+                        .map(f => f.id);
+                    const customFileData = {};
+                    const scalarCustomFieldValues = {};
+                    Object.keys(customFieldValues).forEach(fieldId => {
+                        if (fileCustomFieldIds.includes(fieldId)) {
+                            if (customFieldValues[fieldId] && customFieldValues[fieldId].fileName && customFieldValues[fieldId].data) {
+                                customFileData[fieldId] = customFieldValues[fieldId];
+                            }
+                        } else {
+                            scalarCustomFieldValues[fieldId] = customFieldValues[fieldId];
+                        }
+                    });
+
                     // Prepare submission data with ISO formatted dates
                     const submissionData = {
                         ...formData,
@@ -8114,7 +8759,7 @@ HR Team`
                         joiningDate: formatDateToISO(formData.joiningDate),
                         endDate: formatDateToISO(formData.endDate),
                         currentlyWorking: currentlyWorking,
-                        customFieldValues: customFieldValues
+                        customFieldValues: scalarCustomFieldValues
                     };
 
                     // Only send data for certificates that were actually uploaded
@@ -8148,7 +8793,7 @@ HR Team`
                                     text: 'An error occurred: ' + error.message
                                 });
                             })
-                            .submitJobApplication(submissionData, fileName, cvFile, coverLetterFileName, coverLetterFile, passportPhotoFileName, passportPhotoFile, certificateData);
+                            .submitJobApplication(submissionData, fileName, cvFile, coverLetterFileName, coverLetterFile, passportPhotoFileName, passportPhotoFile, certificateData, customFileData);
                     } else {
                         // Running standalone (for testing)
                         setTimeout(() => {
@@ -8294,6 +8939,7 @@ HR Team`
                                 customFields={customFieldsForSection('personal')}
                                 customFieldValues={customFieldValues}
                                 onCustomFieldChange={handleCustomFieldChange}
+                                fieldRequirements={formFieldsConfig.fieldRequirements}
                             />
                             {!hiddenFieldSet.has('ssc') || !hiddenFieldSet.has('hsc') || !hiddenFieldSet.has('bachelor') || !hiddenFieldSet.has('hnd') || !hiddenFieldSet.has('postgraduate') || customFieldsForSection('education').length > 0 ? (
                                 <EducationSection
@@ -8318,6 +8964,7 @@ HR Team`
                                     customFields={customFieldsForSection('experience')}
                                     customFieldValues={customFieldValues}
                                     onCustomFieldChange={handleCustomFieldChange}
+                                    fieldRequirements={formFieldsConfig.fieldRequirements}
                                 />
                             )}
                             <CVUploadSection
