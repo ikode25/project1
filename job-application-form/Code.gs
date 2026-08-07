@@ -160,6 +160,12 @@ function submitJobApplication(formData, fileName, fileData, coverLetterFileName,
       '[Position]': formData.applyingFor || 'the position'
     });
 
+    // Send confirmation WhatsApp message (branded PDF) if WhatsApp is enabled
+    maybeSendAutoWhatsapp('confirmation', formData.mobile, formData.firstName, {
+      '[Candidate Name]': formData.firstName,
+      '[Position]': formData.applyingFor || 'the position'
+    });
+
     return {
       status: 'success',
       message: 'Application submitted successfully!'
@@ -934,6 +940,17 @@ HR Team`;
       '[Interviewer Name]': interviewData.interviewer
     });
 
+    // Send interview invitation WhatsApp message (branded PDF) if enabled
+    maybeSendAutoWhatsapp('interview', interviewData.candidatePhone, interviewData.candidateName, {
+      '[Candidate Name]': interviewData.candidateName || '',
+      '[Position]': interviewData.position || '',
+      '[Date]': interviewDateDisplay,
+      '[Time]': interviewTime,
+      '[Location]': interviewData.location,
+      '[Location/Meeting Link]': interviewData.location,
+      '[Interviewer Name]': interviewData.interviewer
+    });
+
     Logger.log(`Interview scheduled for ${interviewData.candidateEmail} on ${interviewData.dateTime}`);
     return {
       success: true,
@@ -1036,6 +1053,17 @@ HR Team`;
 
     // Send rescheduled interview SMS if SMS is enabled in Admin > Settings
     maybeSendAutoSms('interview', interviewData.candidatePhone, {
+      '[Candidate Name]': interviewData.candidateName || '',
+      '[Position]': interviewData.position || '',
+      '[Date]': interviewDateDisplay,
+      '[Time]': interviewTime,
+      '[Location]': interviewData.location,
+      '[Location/Meeting Link]': interviewData.location,
+      '[Interviewer Name]': interviewData.interviewer
+    });
+
+    // Send interview invitation WhatsApp message (branded PDF) if enabled
+    maybeSendAutoWhatsapp('interview', interviewData.candidatePhone, interviewData.candidateName, {
       '[Candidate Name]': interviewData.candidateName || '',
       '[Position]': interviewData.position || '',
       '[Date]': interviewDateDisplay,
@@ -2673,6 +2701,443 @@ function getSmsBalance() {
   } catch (error) {
     Logger.log('Error getting SMS balance: ' + error.toString());
     return { success: false, message: error.message };
+  }
+}
+
+/* ============================================================
+ * WhatsApp (Meta WhatsApp Cloud API): config, templates, branded PDF,
+ * sending, logging. Serves as a fallback channel to SMS - messages are
+ * delivered as a professionally branded PDF document (company letterhead,
+ * contact info, social links) rather than plain text, mirroring the
+ * confirmation-email PDF attachment.
+ * ============================================================ */
+
+function getDefaultWhatsappConfig() {
+  return {
+    enabled: false,
+    phoneNumberId: '',
+    accessToken: '',
+    apiVersion: 'v21.0',
+    // Digits-only country code (no +) used to normalize local numbers that
+    // start with a trunk "0" (e.g. "0244123456" + "233" -> "233244123456").
+    defaultCountryCode: ''
+  };
+}
+
+/**
+ * Gets the saved WhatsApp provider configuration
+ * @returns {Object} WhatsApp config
+ */
+function getWhatsappConfig() {
+  try {
+    const raw = getSetting('WHATSAPP_CONFIG', '');
+    const defaults = getDefaultWhatsappConfig();
+    if (!raw) return defaults;
+
+    const parsed = JSON.parse(raw);
+    return {
+      enabled: !!parsed.enabled,
+      phoneNumberId: parsed.phoneNumberId || '',
+      accessToken: parsed.accessToken || '',
+      apiVersion: parsed.apiVersion || defaults.apiVersion,
+      defaultCountryCode: parsed.defaultCountryCode || ''
+    };
+  } catch (error) {
+    Logger.log('Error getting WhatsApp config: ' + error.toString());
+    return getDefaultWhatsappConfig();
+  }
+}
+
+/**
+ * Saves the WhatsApp provider configuration
+ * @param {Object} config
+ * @returns {Object} Response object
+ */
+function saveWhatsappConfig(config) {
+  try {
+    setSetting('WHATSAPP_CONFIG', JSON.stringify(config));
+    return { status: 'success', message: 'WhatsApp settings saved successfully' };
+  } catch (error) {
+    Logger.log('Error saving WhatsApp config: ' + error.toString());
+    return { status: 'error', message: 'Failed to save WhatsApp settings: ' + error.message };
+  }
+}
+
+/* ============================================================
+ * WhatsApp: templates (Confirmation / Shortlist / Interview / Rejection)
+ * Mirrors the SmsTemplates sheet pattern above - same placeholders.
+ * ============================================================ */
+
+function getDefaultWhatsappTemplates() {
+  return {
+    confirmation: `Hi [Candidate Name], thank you for applying for [Position]. We've received your application and will be in touch soon. Your full application summary is attached as a PDF. - HR Team`,
+    shortlist: `Hi [Candidate Name], great news! You've been shortlisted for [Position]. Our HR team will contact you shortly to schedule an interview. - HR Team`,
+    interview: `Hi [Candidate Name], your interview for [Position] is on [Date] at [Time], [Location]. Interviewer: [Interviewer Name]. - HR Team`,
+    rejection: `Hi [Candidate Name], thank you for applying for [Position]. After careful review we've decided to move forward with other candidates. We'll keep your profile on file. - HR Team`
+  };
+}
+
+function saveWhatsappTemplates(templates) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let templatesSheet = ss.getSheetByName('WhatsappTemplates');
+    if (!templatesSheet) {
+      templatesSheet = ss.insertSheet('WhatsappTemplates');
+      templatesSheet.getRange(1, 1, 1, 2).setValues([['Template Name', 'Template Content']]);
+      templatesSheet.getRange(1, 1, 1, 2)
+        .setBackground('#2e7d32')
+        .setFontColor('#ffffff')
+        .setFontWeight('bold');
+      templatesSheet.setFrozenRows(1);
+    }
+
+    const lastRow = templatesSheet.getLastRow();
+    if (lastRow > 1) {
+      templatesSheet.getRange(2, 1, lastRow - 1, 2).clear();
+    }
+
+    const templateData = [
+      ['confirmation', templates.confirmation],
+      ['shortlist', templates.shortlist],
+      ['interview', templates.interview],
+      ['rejection', templates.rejection]
+    ];
+
+    templatesSheet.getRange(2, 1, templateData.length, 2).setValues(templateData);
+
+    Logger.log('WhatsApp templates saved successfully');
+    return { status: 'success', message: 'WhatsApp templates saved successfully' };
+  } catch (error) {
+    Logger.log('Error saving WhatsApp templates: ' + error.toString());
+    return { status: 'error', message: error.message };
+  }
+}
+
+function getWhatsappTemplates() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const templatesSheet = ss.getSheetByName('WhatsappTemplates');
+    if (!templatesSheet) return getDefaultWhatsappTemplates();
+
+    const lastRow = templatesSheet.getLastRow();
+    if (lastRow <= 1) return getDefaultWhatsappTemplates();
+
+    const data = templatesSheet.getRange(2, 1, lastRow - 1, 2).getValues();
+    const templates = {};
+    data.forEach(row => {
+      if (row[0]) templates[row[0]] = row[1];
+    });
+
+    const defaults = getDefaultWhatsappTemplates();
+    return {
+      confirmation: templates.confirmation || defaults.confirmation,
+      shortlist: templates.shortlist || defaults.shortlist,
+      interview: templates.interview || defaults.interview,
+      rejection: templates.rejection || defaults.rejection
+    };
+  } catch (error) {
+    Logger.log('Error getting WhatsApp templates: ' + error.toString());
+    return getDefaultWhatsappTemplates();
+  }
+}
+
+/* ============================================================
+ * WhatsApp: branded PDF notice
+ * ============================================================ */
+
+/**
+ * Builds a short, professionally branded one-page PDF carrying a message
+ * to an applicant (confirmation/shortlist/interview/rejection/ad-hoc),
+ * used as the WhatsApp document attachment. Reuses the same company
+ * branding (name, colors, address, contact, social links) as the email
+ * footer so the look is consistent across channels.
+ * @param {string} candidateName
+ * @param {string} messageText - plain text; blank lines become paragraph breaks
+ * @returns {Blob}
+ */
+function buildWhatsappNoticePdf(candidateName, messageText) {
+  const company = getCompanyInfo();
+  const theme = getThemeConfig().colors;
+
+  const paragraphs = (messageText || '')
+    .split(/\n+/)
+    .map(p => p.trim())
+    .filter(Boolean)
+    .map(p => `<p style="margin:0 0 12px 0; font-size:14px; line-height:1.6; color:#333;">${escapeHtmlForEmail(p)}</p>`)
+    .join('');
+
+  const addressLine = company.address ? escapeHtmlForEmail(company.address) : '';
+  const contactBits = [];
+  if (company.phone) contactBits.push(escapeHtmlForEmail(company.phone));
+  if (company.email) contactBits.push(escapeHtmlForEmail(company.email));
+  if (company.website) contactBits.push(escapeHtmlForEmail(company.website));
+
+  let social = {};
+  try {
+    social = getSocialLinks();
+  } catch (e) {
+    social = {};
+  }
+  const socialLine = ['facebook', 'twitter', 'instagram', 'linkedin']
+    .filter(key => social[key])
+    .map(key => escapeHtmlForEmail(social[key]))
+    .join('  |  ');
+
+  const html = `<html><head><meta charset="utf-8"></head><body style="font-family:Arial, Helvetica, sans-serif; color:#222; padding:0; margin:0;">
+    <div style="max-width:600px; margin:0 auto; padding:24px;">
+      <div style="border-bottom:4px solid ${theme.dark}; padding-bottom:16px; margin-bottom:24px;">
+        <div style="font-size:22px; font-weight:bold; color:${theme.dark};">${escapeHtmlForEmail(company.name || 'HR Team')}</div>
+        ${company.description ? `<div style="font-size:12px; color:#888; margin-top:4px;">${escapeHtmlForEmail(company.description)}</div>` : ''}
+      </div>
+      <p style="font-size:14px; color:#333; margin:0 0 14px 0;">Dear ${escapeHtmlForEmail(candidateName || 'Applicant')},</p>
+      ${paragraphs}
+      <div style="margin-top:28px; padding-top:16px; border-top:1px solid #eee; font-size:11px; color:#999;">
+        ${addressLine ? `<div style="margin-bottom:4px;">${addressLine}</div>` : ''}
+        ${contactBits.length ? `<div style="margin-bottom:4px;">${contactBits.join('  |  ')}</div>` : ''}
+        ${socialLine ? `<div>${socialLine}</div>` : ''}
+        <div style="margin-top:10px;">Sent via WhatsApp on ${escapeHtmlForEmail(new Date().toLocaleString())}</div>
+      </div>
+    </div>
+  </body></html>`;
+
+  const blob = HtmlService.createHtmlOutput(html).getAs('application/pdf');
+  const safeName = (candidateName || 'Applicant').replace(/[^a-zA-Z0-9_]/g, '_');
+  blob.setName(`Message_${safeName}.pdf`);
+  return blob;
+}
+
+/* ============================================================
+ * WhatsApp: sending (Meta WhatsApp Cloud API)
+ * ============================================================ */
+
+/**
+ * Normalizes a phone number for the WhatsApp Cloud API, which expects
+ * digits only (no "+", spaces, or dashes) with the country code included.
+ * @param {string} phone
+ * @param {string} defaultCountryCode - digits only, e.g. "233"
+ * @returns {string}
+ */
+function normalizeWhatsappNumber(phone, defaultCountryCode) {
+  let digits = (phone || '').replace(/[^\d+]/g, '');
+  if (digits.startsWith('+')) {
+    digits = digits.substring(1);
+  } else if (digits.startsWith('00')) {
+    digits = digits.substring(2);
+  } else if (digits.startsWith('0') && defaultCountryCode) {
+    digits = defaultCountryCode.replace(/\D/g, '') + digits.substring(1);
+  }
+  return digits;
+}
+
+/**
+ * Uploads a PDF blob to WhatsApp as media, returning its media id.
+ * @param {Blob} pdfBlob
+ * @param {Object} config - WhatsApp config (from getWhatsappConfig)
+ * @returns {string} media id
+ */
+function uploadWhatsappMedia(pdfBlob, config) {
+  const url = `https://graph.facebook.com/${config.apiVersion}/${config.phoneNumberId}/media`;
+  const response = UrlFetchApp.fetch(url, {
+    method: 'post',
+    headers: { Authorization: 'Bearer ' + config.accessToken },
+    payload: {
+      messaging_product: 'whatsapp',
+      file: pdfBlob,
+      type: 'application/pdf'
+    },
+    muteHttpExceptions: true
+  });
+
+  if (response.getResponseCode() >= 300) {
+    throw new Error('Media upload failed: ' + response.getContentText());
+  }
+  const data = JSON.parse(response.getContentText());
+  if (!data.id) {
+    throw new Error('Media upload did not return an id: ' + response.getContentText());
+  }
+  return data.id;
+}
+
+/**
+ * Sends a branded PDF document to a candidate's WhatsApp number.
+ * @param {string} phone
+ * @param {Blob} pdfBlob
+ * @param {string} caption
+ * @param {Object} config
+ * @returns {Object} { success, response }
+ */
+function sendWhatsappDocument(phone, pdfBlob, caption, config) {
+  try {
+    const toNumber = normalizeWhatsappNumber(phone, config.defaultCountryCode);
+    if (!toNumber) {
+      return { success: false, response: 'Invalid phone number' };
+    }
+
+    const mediaId = uploadWhatsappMedia(pdfBlob, config);
+
+    const url = `https://graph.facebook.com/${config.apiVersion}/${config.phoneNumberId}/messages`;
+    const payload = {
+      messaging_product: 'whatsapp',
+      to: toNumber,
+      type: 'document',
+      document: {
+        id: mediaId,
+        filename: pdfBlob.getName(),
+        caption: caption || ''
+      }
+    };
+    const response = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { Authorization: 'Bearer ' + config.accessToken },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+
+    return { success: response.getResponseCode() < 300, response: response.getContentText() };
+  } catch (error) {
+    return { success: false, response: error.message };
+  }
+}
+
+/**
+ * Logs a WhatsApp send attempt to the WhatsappLog sheet
+ */
+function logWhatsapp(phone, message, result, sentBy) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let logSheet = ss.getSheetByName('WhatsappLog');
+    if (!logSheet) {
+      logSheet = ss.insertSheet('WhatsappLog');
+      logSheet.getRange(1, 1, 1, 6).setValues([['Timestamp', 'Recipient', 'Message', 'Success', 'Response', 'Sent By']]);
+      logSheet.getRange(1, 1, 1, 6)
+        .setBackground('#2e7d32')
+        .setFontColor('#ffffff')
+        .setFontWeight('bold');
+      logSheet.setFrozenRows(1);
+    }
+    logSheet.appendRow([
+      new Date().toISOString(),
+      phone,
+      message,
+      result.success ? 'Yes' : 'No',
+      (result.response || '').toString().substring(0, 500),
+      sentBy || 'System'
+    ]);
+  } catch (error) {
+    Logger.log('Error logging WhatsApp message: ' + error.toString());
+  }
+}
+
+/**
+ * Sends a branded PDF WhatsApp message to a single candidate. Fails
+ * gracefully (success:false with a clear message) if WhatsApp is
+ * disabled/unconfigured.
+ * @param {string} phone
+ * @param {string} candidateName
+ * @param {string} messageText - becomes both the PDF body and the document caption
+ * @returns {Object} Response object
+ */
+function sendWhatsappToCandidate(phone, candidateName, messageText) {
+  try {
+    if (!phone) {
+      return { success: false, message: 'No phone number provided' };
+    }
+
+    const config = getWhatsappConfig();
+    if (!config.enabled) {
+      return { success: false, message: 'WhatsApp is disabled. Enable it in Admin > Settings > WhatsApp.' };
+    }
+    if (!config.phoneNumberId || !config.accessToken) {
+      return { success: false, message: 'WhatsApp Phone Number ID / Access Token not set.' };
+    }
+
+    const company = getCompanyInfo();
+    const pdfBlob = buildWhatsappNoticePdf(candidateName, messageText);
+    const caption = `${company.name || 'HR Team'} - Message for ${candidateName || 'you'}`;
+    const result = sendWhatsappDocument(phone, pdfBlob, caption, config);
+    logWhatsapp(phone, messageText, result, 'Admin');
+
+    if (!result.success) {
+      Logger.log('WhatsApp send failed for ' + phone + ': ' + result.response);
+      return { success: false, message: 'WhatsApp provider error: ' + result.response };
+    }
+
+    return { success: true, message: 'WhatsApp message sent successfully' };
+  } catch (error) {
+    Logger.log('Error sending WhatsApp message: ' + error.toString());
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * Sends a test WhatsApp message to verify the current configuration
+ * @param {string} phone
+ * @returns {Object} Response object
+ */
+function sendTestWhatsapp(phone) {
+  return sendWhatsappToCandidate(phone, 'Test', 'This is a test message from your Job Application System. WhatsApp is configured correctly!');
+}
+
+/**
+ * Sends the same message (as individually branded PDFs) to multiple candidates
+ * @param {Array} recipients - [{ phone, name }]
+ * @param {string} message
+ * @returns {Object} Response object
+ */
+function sendBulkWhatsapp(recipients, message) {
+  try {
+    const config = getWhatsappConfig();
+    if (!config.enabled) {
+      return { success: false, message: 'WhatsApp is disabled. Enable it in Admin > Settings > WhatsApp.' };
+    }
+
+    let successCount = 0;
+    const failedNumbers = [];
+
+    recipients.forEach(recipient => {
+      const result = sendWhatsappToCandidate(recipient.phone, recipient.name, message);
+      if (result.success) {
+        successCount++;
+      } else {
+        failedNumbers.push(recipient.phone);
+      }
+    });
+
+    return {
+      success: true,
+      message: `WhatsApp sent: ${successCount}/${recipients.length}`,
+      failedNumbers: failedNumbers
+    };
+  } catch (error) {
+    Logger.log('Error sending bulk WhatsApp: ' + error.toString());
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * Sends an automatic WhatsApp message for a given template type if
+ * WhatsApp is enabled in settings. Never throws - failures are logged
+ * only, so they never block email/SMS/sheet writes.
+ * @param {string} templateType - 'confirmation' | 'interview'
+ * @param {string} phone
+ * @param {string} candidateName
+ * @param {Object} replacements - map of placeholder -> value
+ */
+function maybeSendAutoWhatsapp(templateType, phone, candidateName, replacements) {
+  try {
+    const config = getWhatsappConfig();
+    if (!config.enabled || !phone) return;
+
+    const templates = getWhatsappTemplates();
+    let message = templates[templateType] || '';
+    Object.keys(replacements || {}).forEach(placeholder => {
+      message = message.split(placeholder).join(replacements[placeholder] || '');
+    });
+
+    sendWhatsappToCandidate(phone, candidateName, message);
+  } catch (error) {
+    Logger.log('Auto WhatsApp (' + templateType + ') failed: ' + error.toString());
   }
 }
 

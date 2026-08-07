@@ -56,6 +56,38 @@ Since applicants and SMS never authenticate, "User accessing the web app"
 has no identity to authorize against and every restricted call (UrlFetchApp,
 MailApp, etc.) fails the same way for anonymous visitors.
 
+### Setting up WhatsApp (Admin > Settings > WhatsApp)
+
+WhatsApp messages send through Meta's official **WhatsApp Business Cloud
+API**, using the same `UrlFetchApp` scope as SMS above - if SMS works,
+WhatsApp needs no extra authorization. You do need a Meta/WhatsApp Business
+setup once:
+
+1. Create (or use an existing) app at
+   [developers.facebook.com](https://developers.facebook.com/apps) and add
+   the **WhatsApp** product to it.
+2. Under **WhatsApp > API Setup** you'll see a test phone number, its
+   **Phone Number ID**, and a short-lived access token. For anything beyond
+   quick testing, create a **System User** (Business Settings > Users >
+   System Users), generate a **permanent token** for it scoped to
+   `whatsapp_business_messaging`, and use that instead - the short-lived
+   token from API Setup expires in 24 hours.
+3. Paste the **Phone Number ID** and **Access Token** into Admin > Settings >
+   WhatsApp, enable it, and optionally set a **Default Country Code**
+   (digits only, e.g. `233`) so numbers applicants typed with a leading `0`
+   normalize correctly.
+4. Send a **Test WhatsApp** to your own WhatsApp number to confirm it's wired
+   up. Note Meta's test numbers only message pre-approved recipients you've
+   added under API Setup until the WhatsApp Business Account is verified for
+   production use.
+
+Every WhatsApp message - automatic confirmation/interview invites and
+admin-triggered shortlist/rejection/ad-hoc messages alike - is delivered as
+a one-page branded PDF (company name, colors, address, phone, email, social
+links) rather than plain text, so it reads as a professional notice even
+though it's arriving outside the SMS system. Delivery attempts are logged to
+a new `WhatsappLog` sheet, same pattern as `SmsLog`.
+
 ## What's new in this update
 
 - **Appearance settings** (Admin > Settings > Appearance): pick one of six
@@ -94,7 +126,27 @@ MailApp, etc.) fails the same way for anonymous visitors.
   slowly instead of sitting static (respects `prefers-reduced-motion`).
 - **Experience**: the "End Date" field is no longer required, even when
   "Currently working here" isn't checked.
+- **Passport photo, cover letter, and per-education certificates**: applicants
+  can upload a passport-style photo (camera or file picker), an optional
+  cover letter, and a certificate for each education level they fill in
+  (SSC/HSC/Bachelor/HND/Postgraduate) - required whenever that certificate
+  field is visible. Admin controls which of these show on the form under
+  Settings > Form Fields, same as any other field group.
+- **Company Info + branded emails**: set your company name, description,
+  website, address, phone, and email under Settings > General; all of it
+  (plus your social links) now shows in the footer of every outgoing email,
+  and a PDF summary of the application is attached to the confirmation email.
+- **Dashboard title**: the admin dashboard heading is editable under
+  Settings > General > Dashboard Title (defaults to "Candidate Management
+  System" if left blank).
+- **WhatsApp**: a fallback channel to SMS via the Meta WhatsApp Business
+  Cloud API (Admin > Settings > WhatsApp) - see setup steps above. Sends the
+  same four template types as SMS (Confirmation/Shortlist/Interview/
+  Rejection), automatically for Confirmation/Interview and from the bulk
+  actions bar or a candidate's own "WhatsApp" button for the rest, always as
+  a professionally branded PDF rather than plain text.
 
 All of the above is additive and stored in the same spreadsheet used today
-(new rows in `Settings`, and new `SmsTemplates`/`SmsLog` sheets are created
-automatically the first time they're needed) - no manual sheet setup required.
+(new rows in `Settings`, and new `SmsTemplates`/`SmsLog`/`WhatsappTemplates`/
+`WhatsappLog` sheets are created automatically the first time they're
+needed) - no manual sheet setup required.
