@@ -2076,6 +2076,44 @@
             { id: 'passportPhoto', label: 'Passport Photo Upload', section: 'documents' }
         ];
 
+        // Shared by every place that lists an applicant's uploaded
+        // documents (Document Bank table, candidate cards) so the "View
+        // Certificate" buttons stay in sync with the 5 education levels.
+        const CERTIFICATE_LEVELS = [
+            { id: 'ssc', label: 'SSC' },
+            { id: 'hsc', label: 'HSC' },
+            { id: 'bachelor', label: 'Bachelor' },
+            { id: 'hnd', label: 'HND' },
+            { id: 'postgraduate', label: 'PG' }
+        ];
+
+        /* ============================================================
+         * WhatsApp - no API, no credentials. "Sending" a WhatsApp message
+         * just opens a wa.me click-to-chat link in a new tab, pre-filled
+         * with the applicant's number and message; the admin presses Send
+         * themselves inside WhatsApp Web/App. Everything happens client
+         * side, so this normalization logic lives here rather than Code.gs.
+         * ============================================================ */
+
+        // wa.me expects digits only (no "+", spaces, or dashes), with the
+        // country code included.
+        function normalizeWhatsappNumber(phone, defaultCountryCode) {
+            let digits = (phone || '').replace(/[^\d+]/g, '');
+            if (digits.startsWith('+')) {
+                digits = digits.substring(1);
+            } else if (digits.startsWith('00')) {
+                digits = digits.substring(2);
+            } else if (digits.startsWith('0') && defaultCountryCode) {
+                digits = defaultCountryCode.replace(/\D/g, '') + digits.substring(1);
+            }
+            return digits;
+        }
+
+        function buildWhatsappLink(phone, message, defaultCountryCode) {
+            const number = normalizeWhatsappNumber(phone, defaultCountryCode);
+            return `https://wa.me/${number}?text=${encodeURIComponent(message || '')}`;
+        }
+
         const CUSTOM_FIELD_TYPES = [
             { id: 'text', label: 'Short Text' },
             { id: 'textarea', label: 'Long Text' },
@@ -2310,7 +2348,7 @@
                         <div className="modal-body">
                             <div>
                                 <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#333' }}>
-                                    {isWhatsapp ? 'WhatsApp Message (becomes the branded PDF body)' : 'SMS Message'}
+                                    {isWhatsapp ? 'WhatsApp Message' : 'SMS Message'}
                                 </label>
                                 <textarea
                                     value={template}
@@ -2331,7 +2369,7 @@
                             </div>
                             <div style={{ marginTop: '12px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '4px', fontSize: '12px', color: '#666' }}>
                                 <strong>Available placeholders:</strong> [Candidate Name], [Position], [Date], [Time], [Location], [Interviewer Name]
-                                {isWhatsapp && ' - delivered as a professionally branded PDF, not a raw text message.'}
+                                {isWhatsapp && ' - opens WhatsApp in a new tab pre-filled with this text; you press Send there yourself.'}
                             </div>
                         </div>
                         <div className="modal-footer">
@@ -2685,7 +2723,7 @@
         };
 
         // Candidate Card Component
-        const CandidateCard = ({ candidate, onStatusChange, onViewCV, onViewCoverLetter, onViewPassportPhoto, onInterview, onSendEmail, onSendSms, onSendWhatsapp, selected, onSelect }) => {
+        const CandidateCard = ({ candidate, onStatusChange, onViewCV, onViewCoverLetter, onViewPassportPhoto, onViewCertificate, onInterview, onSendEmail, onSendSms, onSendWhatsapp, selected, onSelect }) => {
             return (
                 <div className="candidate-card">
                     <div className="candidate-header">
@@ -2724,6 +2762,14 @@
                                     <i className="fas fa-camera-retro"></i> Photo
                                 </button>
                             )}
+                            {onViewCertificate && CERTIFICATE_LEVELS.map(level => {
+                                const url = candidate[`${level.id}CertificateUrl`];
+                                return (url && !url.startsWith('Upload Failed')) ? (
+                                    <button key={level.id} className="action-btn btn-view-cv" onClick={() => onViewCertificate(candidate, level.id, level.label)}>
+                                        <i className="fas fa-certificate"></i> {level.label}
+                                    </button>
+                                ) : null;
+                            })}
                             {onSendEmail && (
                                 <button className="action-btn btn-interview" onClick={() => onSendEmail(candidate)}>
                                     <i className="fas fa-envelope"></i> Email
@@ -3782,10 +3828,12 @@ HR Team`
             const [testSmsPhone, setTestSmsPhone] = useState('');
             const [smsBalance, setSmsBalance] = useState(null); // { success, balance, currency }
 
-            // WhatsApp (Meta Cloud API) - fallback channel to SMS, delivers a
-            // branded PDF instead of plain text
+            // WhatsApp - no API/credentials. The "Send WhatsApp" action opens
+            // a wa.me click-to-chat link in a new tab, pre-filled with the
+            // applicant's number and a personalized message; the admin still
+            // presses Send themselves inside WhatsApp.
             const [whatsappConfig, setWhatsappConfig] = useState({
-                enabled: false, phoneNumberId: '', accessToken: '', apiVersion: 'v21.0', defaultCountryCode: ''
+                enabled: true, defaultCountryCode: ''
             });
             const [whatsappTemplates, setWhatsappTemplates] = useState({
                 confirmation: '', shortlist: '', interview: '', rejection: ''
@@ -4339,22 +4387,16 @@ HR Team`
 
             const handleSendTestWhatsapp = () => {
                 if (!testWhatsappPhone) {
-                    showToast('Enter a phone number to send the test WhatsApp message to.', 'warning');
+                    showToast('Enter a phone number to test with.', 'warning');
                     return;
                 }
-                if (typeof google !== 'undefined' && google.script && google.script.run) {
-                    google.script.run
-                        .withSuccessHandler((response) => {
-                            showToast(
-                                response.success ? 'Test WhatsApp message sent successfully!' : 'Test WhatsApp failed: ' + response.message,
-                                response.success ? 'success' : 'error'
-                            );
-                        })
-                        .withFailureHandler((error) => showToast('Test WhatsApp failed: ' + error.message, 'error'))
-                        .sendTestWhatsapp(testWhatsappPhone);
-                } else {
-                    showToast('Test WhatsApp message sent (demo mode)!', 'success');
-                }
+                const link = buildWhatsappLink(
+                    testWhatsappPhone,
+                    'This is a test message from your Job Application System. WhatsApp is set up correctly!',
+                    whatsappConfig.defaultCountryCode
+                );
+                window.open(link, '_blank');
+                showToast('Opening WhatsApp - press Send there to complete the test.', 'success');
             };
 
             const handleSaveWhatsappTemplates = () => {
@@ -4535,6 +4577,19 @@ HR Team`
                     });
                 } else {
                     showToast('Passport photo not available for this candidate', 'warning');
+                }
+            };
+
+            const handleViewCertificate = (candidate, level, label) => {
+                const url = candidate[`${level}CertificateUrl`];
+                if (url && url !== '' && !url.startsWith('Upload Failed')) {
+                    setCvModal({
+                        isOpen: true,
+                        cvUrl: url,
+                        candidateName: `${candidate.firstName} ${candidate.lastName} - ${label} Certificate`
+                    });
+                } else {
+                    showToast(`${label} certificate not available for this candidate`, 'warning');
                 }
             };
 
@@ -5715,35 +5770,19 @@ HR Team`
                                         </h3>
                                         <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#e8f5e9', borderRadius: '8px', border: '1px solid #66bb6a' }}>
                                             <p style={{ margin: 0, color: '#2e7d32', fontSize: '14px' }}>
-                                                <i className="fas fa-info-circle"></i> Connect the Meta WhatsApp Business Cloud API so applicants can be messaged on WhatsApp - useful as a fallback when SMS isn't reachable. Every message is delivered as a professionally branded PDF (your company name, colors, contact info and social links) rather than plain text. WhatsApp is admin-triggered only (no automatic sending) - message a candidate from the bulk actions bar or their own "WhatsApp" button.
+                                                <i className="fas fa-info-circle"></i> No WhatsApp Business API or credentials needed. Clicking "WhatsApp" (bulk actions bar or a candidate's own button) opens a WhatsApp chat with that applicant's number in a new tab, with your message pre-filled - you press Send yourself inside WhatsApp. Admin-triggered only, never automatic.
                                             </p>
                                         </div>
                                         <div className="template-card" style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
                                             <div className="checkbox-group" style={{ marginBottom: '20px' }}>
                                                 <input type="checkbox" id="whatsappEnabled" checked={whatsappConfig.enabled} onChange={(e) => setWhatsappConfig({ ...whatsappConfig, enabled: e.target.checked })} />
-                                                <label htmlFor="whatsappEnabled" style={{ marginBottom: 0 }}>Enable WhatsApp sending</label>
+                                                <label htmlFor="whatsappEnabled" style={{ marginBottom: 0 }}>Show WhatsApp action buttons</label>
                                             </div>
 
-                                            <div style={{ display: 'grid', gap: '15px', marginBottom: '15px' }}>
-                                                <div>
-                                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Phone Number ID</label>
-                                                    <input type="text" value={whatsappConfig.phoneNumberId} onChange={(e) => setWhatsappConfig({ ...whatsappConfig, phoneNumberId: e.target.value })} placeholder="From Meta for Developers > WhatsApp > API Setup" style={{ width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }} />
-                                                </div>
-                                                <div>
-                                                    <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Access Token</label>
-                                                    <input type="password" value={whatsappConfig.accessToken} onChange={(e) => setWhatsappConfig({ ...whatsappConfig, accessToken: e.target.value })} placeholder="Permanent access token from a System User" style={{ width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }} />
-                                                </div>
-                                                <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-                                                    <div style={{ flex: 1, minWidth: '160px' }}>
-                                                        <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Graph API Version</label>
-                                                        <input type="text" value={whatsappConfig.apiVersion} onChange={(e) => setWhatsappConfig({ ...whatsappConfig, apiVersion: e.target.value })} placeholder="v21.0" style={{ width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }} />
-                                                    </div>
-                                                    <div style={{ flex: 1, minWidth: '160px' }}>
-                                                        <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Default Country Code</label>
-                                                        <input type="text" value={whatsappConfig.defaultCountryCode} onChange={(e) => setWhatsappConfig({ ...whatsappConfig, defaultCountryCode: e.target.value })} placeholder="e.g., 233" style={{ width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }} />
-                                                    </div>
-                                                </div>
-                                                <p style={{ fontSize: '12px', color: '#666', margin: 0 }}>
+                                            <div style={{ marginBottom: '15px', maxWidth: '320px' }}>
+                                                <label style={{ display: 'block', marginBottom: '5px', fontWeight: '500' }}>Default Country Code</label>
+                                                <input type="text" value={whatsappConfig.defaultCountryCode} onChange={(e) => setWhatsappConfig({ ...whatsappConfig, defaultCountryCode: e.target.value })} placeholder="e.g., 233" style={{ width: '100%', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '14px' }} />
+                                                <p style={{ fontSize: '12px', color: '#666', margin: '5px 0 0 0' }}>
                                                     Used to fill in the country code on numbers applicants entered starting with a leading 0 (e.g. 024... becomes 233024... without it, but 233244... with a default country code of 233). Digits only, no +.
                                                 </p>
                                             </div>
@@ -5755,7 +5794,7 @@ HR Team`
                                                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                                                     <input type="tel" value={testWhatsappPhone} onChange={(e) => setTestWhatsappPhone(e.target.value)} placeholder="+233 XX XXX XXXX" style={{ padding: '10px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }} />
                                                     <button className="action-btn" onClick={handleSendTestWhatsapp} style={{ backgroundColor: '#1976d2', color: '#fff', padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>
-                                                        <i className="fas fa-paper-plane"></i> Send Test WhatsApp
+                                                        <i className="fas fa-paper-plane"></i> Test with a Number
                                                     </button>
                                                 </div>
                                             </div>
@@ -5769,7 +5808,7 @@ HR Team`
                                         </h3>
                                         <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#e8f5e9', borderRadius: '8px', border: '1px solid #66bb6a' }}>
                                             <p style={{ margin: 0, color: '#2e7d32', fontSize: '14px' }}>
-                                                <i className="fas fa-info-circle"></i> This text becomes the body of the branded PDF (and the document's caption). Placeholders: [Candidate Name], [Position], [Date], [Time], [Location], [Interviewer Name]
+                                                <i className="fas fa-info-circle"></i> This text pre-fills the WhatsApp message. Placeholders: [Candidate Name], [Position], [Date], [Time], [Location], [Interviewer Name]
                                             </p>
                                         </div>
                                     </div>
@@ -6450,7 +6489,7 @@ HR Team`
                                                     <th>Designation</th>
                                                     <th>Experience</th>
                                                     <th>Status</th>
-                                                    <th>CV</th>
+                                                    <th>Documents</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -6511,6 +6550,20 @@ HR Team`
                                                                         <i className="fas fa-camera-retro"></i>
                                                                     </button>
                                                                 )}
+                                                                {CERTIFICATE_LEVELS.map(level => {
+                                                                    const url = app[`${level.id}CertificateUrl`];
+                                                                    return (url && !url.startsWith('Upload Failed')) ? (
+                                                                        <button
+                                                                            key={level.id}
+                                                                            className="action-btn btn-view-cv"
+                                                                            onClick={() => handleViewCertificate(app, level.id, level.label)}
+                                                                            style={{ fontSize: '12px', padding: '6px 12px' }}
+                                                                            title={`View ${level.label} Certificate`}
+                                                                        >
+                                                                            <i className="fas fa-certificate"></i> {level.label}
+                                                                        </button>
+                                                                    ) : null;
+                                                                })}
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -6537,6 +6590,7 @@ HR Team`
                                         onViewCV={handleViewCV}
                                         onViewCoverLetter={handleViewCoverLetter}
                                         onViewPassportPhoto={handleViewPassportPhoto}
+                                        onViewCertificate={handleViewCertificate}
                                         onInterview={(candidate) => setInterviewModal({ isOpen: true, candidate })}
                                         onSendEmail={(candidate) => {
                                             setEmailModal({
@@ -6682,39 +6736,27 @@ HR Team`
                         template={whatsappModal.template}
                         onChange={(template) => setWhatsappModal({ ...whatsappModal, template })}
                         onSend={() => {
-                            // Handle WhatsApp sending (branded PDF) to all selected candidates
+                            // No API involved - just opens a wa.me click-to-chat
+                            // link per candidate in a new tab, pre-filled with
+                            // their number and the personalized message. The
+                            // admin still presses Send themselves in WhatsApp.
                             if (whatsappModal.candidates && whatsappModal.candidates.length > 0) {
-                                let successCount = 0;
-
                                 whatsappModal.candidates.forEach(candidate => {
                                     const candidateName = `${candidate.firstName} ${candidate.lastName}`;
                                     const personalizedMessage = whatsappModal.template
                                         .replace(/\[Candidate Name\]/g, candidateName)
                                         .replace(/\[Position\]/g, candidate.applyingFor || 'the position');
 
-                                    if (typeof google !== 'undefined' && google.script && google.script.run) {
-                                        google.script.run
-                                            .withSuccessHandler((response) => {
-                                                if (response.success) successCount++;
-                                                console.log(`WhatsApp to ${candidate.mobile}: ${response.message}`);
-                                            })
-                                            .withFailureHandler((error) => {
-                                                console.error(`Failed to send WhatsApp to ${candidate.mobile}:`, error);
-                                            })
-                                            .sendWhatsappToCandidate(candidate.mobile, candidateName, personalizedMessage);
-                                    } else {
-                                        console.log(`Demo: Would send WhatsApp to ${candidate.mobile}`);
-                                        successCount++;
-                                    }
+                                    const link = buildWhatsappLink(candidate.mobile, personalizedMessage, whatsappConfig.defaultCountryCode);
+                                    window.open(link, '_blank');
                                 });
 
-                                setTimeout(() => {
-                                    if (typeof google !== 'undefined' && google.script && google.script.run) {
-                                        showToast(`WhatsApp sending initiated for ${whatsappModal.candidates.length} candidate(s). Check Admin > Settings > WhatsApp if messages don't arrive.`, 'success');
-                                    } else {
-                                        showToast(`Demo: WhatsApp sent to ${successCount} candidate(s)`, 'success');
-                                    }
-                                }, 500);
+                                showToast(
+                                    whatsappModal.candidates.length > 1
+                                        ? `Opening WhatsApp for ${whatsappModal.candidates.length} candidates - allow pop-ups for this site if any tabs were blocked.`
+                                        : 'Opening WhatsApp - press Send there to deliver the message.',
+                                    'success'
+                                );
 
                                 setSelectedCandidates([]);
                             }
