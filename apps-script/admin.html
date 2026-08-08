@@ -5590,6 +5590,85 @@
                                 </div>
                                 <input type="checkbox" id="set_ALLOW_TEACHER_SIGN" style="display:none;">
                             </div>
+
+                            <div style="font-size:11px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:.5px;margin:20px 0 4px">Conduct &amp; Remarks Section</div>
+                            <div style="font-size:12px;color:var(--mu);margin-bottom:10px">Choose which of these appear in the "Conduct &amp; Remarks" block on the report card. Class Teacher's Remark always shows.</div>
+
+                            <div
+                                style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px;background:#f8fafc;border-radius:12px;border:1px solid var(--bd);margin-top:12px">
+                                <div>
+                                    <div style="font-weight:700;color:var(--nv);font-size:14px">Show Interest / Talent</div>
+                                    <div style="font-size:12px;color:var(--mu);margin-top:2px">The pupil's Interest/Talent remark row.</div>
+                                </div>
+                                <div class="radio-group" style="display: flex; gap: 20px; align-items: center; padding: 4px; flex-shrink: 0;">
+                                    <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 700; font-size: 14px; color: var(--nv);">
+                                        <input type="radio" name="set_SHOW_INTEREST_TALENT_RADIO" id="radio_SHOW_INTEREST_TALENT_YES" value="true" onchange="toggleShowInterestTalent(true)" style="accent-color: var(--bl); width: 18px; height: 18px; cursor: pointer;">
+                                        Yes
+                                    </label>
+                                    <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 700; font-size: 14px; color: var(--nv);">
+                                        <input type="radio" name="set_SHOW_INTEREST_TALENT_RADIO" id="radio_SHOW_INTEREST_TALENT_NO" value="false" onchange="toggleShowInterestTalent(false)" style="accent-color: var(--bl); width: 18px; height: 18px; cursor: pointer;">
+                                        No
+                                    </label>
+                                </div>
+                                <input type="checkbox" id="set_SHOW_INTEREST_TALENT" style="display:none;">
+                            </div>
+
+                            <div
+                                style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px;background:#f8fafc;border-radius:12px;border:1px solid var(--bd);margin-top:12px">
+                                <div>
+                                    <div style="font-weight:700;color:var(--nv);font-size:14px">Show Conduct</div>
+                                    <div style="font-size:12px;color:var(--mu);margin-top:2px">The pupil's Conduct remark row.</div>
+                                </div>
+                                <div class="radio-group" style="display: flex; gap: 20px; align-items: center; padding: 4px; flex-shrink: 0;">
+                                    <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 700; font-size: 14px; color: var(--nv);">
+                                        <input type="radio" name="set_SHOW_CONDUCT_RADIO" id="radio_SHOW_CONDUCT_YES" value="true" onchange="toggleShowConduct(true)" style="accent-color: var(--bl); width: 18px; height: 18px; cursor: pointer;">
+                                        Yes
+                                    </label>
+                                    <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 700; font-size: 14px; color: var(--nv);">
+                                        <input type="radio" name="set_SHOW_CONDUCT_RADIO" id="radio_SHOW_CONDUCT_NO" value="false" onchange="toggleShowConduct(false)" style="accent-color: var(--bl); width: 18px; height: 18px; cursor: pointer;">
+                                        No
+                                    </label>
+                                </div>
+                                <input type="checkbox" id="set_SHOW_CONDUCT" style="display:none;">
+                            </div>
+
+                            <div
+                                style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px;background:#f8fafc;border-radius:12px;border:1px solid var(--bd);margin-top:12px">
+                                <div>
+                                    <div style="font-weight:700;color:var(--nv);font-size:14px">Show Attitude to Work</div>
+                                    <div style="font-size:12px;color:var(--mu);margin-top:2px">The pupil's Attitude to Work remark row.</div>
+                                </div>
+                                <div class="radio-group" style="display: flex; gap: 20px; align-items: center; padding: 4px; flex-shrink: 0;">
+                                    <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 700; font-size: 14px; color: var(--nv);">
+                                        <input type="radio" name="set_SHOW_ATTITUDE_RADIO" id="radio_SHOW_ATTITUDE_YES" value="true" onchange="toggleShowAttitude(true)" style="accent-color: var(--bl); width: 18px; height: 18px; cursor: pointer;">
+                                        Yes
+                                    </label>
+                                    <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 700; font-size: 14px; color: var(--nv);">
+                                        <input type="radio" name="set_SHOW_ATTITUDE_RADIO" id="radio_SHOW_ATTITUDE_NO" value="false" onchange="toggleShowAttitude(false)" style="accent-color: var(--bl); width: 18px; height: 18px; cursor: pointer;">
+                                        No
+                                    </label>
+                                </div>
+                                <input type="checkbox" id="set_SHOW_ATTITUDE" style="display:none;">
+                            </div>
+
+                            <div
+                                style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px;background:#f8fafc;border-radius:12px;border:1px solid var(--bd);margin-top:12px">
+                                <div>
+                                    <div style="font-weight:700;color:var(--nv);font-size:14px">Show Headteacher's Remark</div>
+                                    <div style="font-size:12px;color:var(--mu);margin-top:2px">The Headmaster/Headmistress's remark row.</div>
+                                </div>
+                                <div class="radio-group" style="display: flex; gap: 20px; align-items: center; padding: 4px; flex-shrink: 0;">
+                                    <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 700; font-size: 14px; color: var(--nv);">
+                                        <input type="radio" name="set_SHOW_HEADTEACHER_REMARK_RADIO" id="radio_SHOW_HEADTEACHER_REMARK_YES" value="true" onchange="toggleShowHeadteacherRemark(true)" style="accent-color: var(--bl); width: 18px; height: 18px; cursor: pointer;">
+                                        Yes
+                                    </label>
+                                    <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 700; font-size: 14px; color: var(--nv);">
+                                        <input type="radio" name="set_SHOW_HEADTEACHER_REMARK_RADIO" id="radio_SHOW_HEADTEACHER_REMARK_NO" value="false" onchange="toggleShowHeadteacherRemark(false)" style="accent-color: var(--bl); width: 18px; height: 18px; cursor: pointer;">
+                                        No
+                                    </label>
+                                </div>
+                                <input type="checkbox" id="set_SHOW_HEADTEACHER_REMARK" style="display:none;">
+                            </div>
                         </div>
                     </div>
 
@@ -9034,7 +9113,7 @@
             if (!_fbStudents.length) { document.getElementById('feesBillsArea').innerHTML = '<div style="padding:24px;text-align:center;color:var(--mu)">No students found.</div>'; return; }
             window.removeFeeComp = function (idx) { var f = ((window._cachedSettings || {}).FEE_COMPONENTS || '').split(',').map(function (s) { return s.trim(); }).filter(function (s) { return s; }); f.splice(idx, 1); window.updateFeeComps(f.join(', ')); };
             window.addFeeComp = function () { var v = document.getElementById('newFeeCompInp').value; if (!v) return; var f = ((window._cachedSettings || {}).FEE_COMPONENTS || '').split(',').map(function (s) { return s.trim(); }).filter(function (s) { return s; }); f.push(v.trim()); window.updateFeeComps(f.join(', ')); };
-            window.updateFeeComps = function (str) { if (!window._cachedSettings) window._cachedSettings = {}; window._cachedSettings.FEE_COMPONENTS = str; var e = document.getElementById('set_FEE_COMPONENTS'); if (e) e.value = str; renderFeesBills(); var obj = {};['SCHOOL_NAME', 'SCHOOL_ADDRESS', 'SCHOOL_EMAIL', 'SCHOOL_PHONE', 'SCHOOL_OPEN_DAYS', 'SMS_API_KEY', 'SMS_SENDER', 'HEADMASTER_NAME', 'CLASS_SCORE_MAX', 'EXAM_SCORE_MAX', 'CUSTOM_CT_REMARKS', 'CUSTOM_HM_REMARKS', 'FEE_COMPONENTS', 'ADMIN_NAME', 'ADMIN_PHONE', 'HEADTEACHER_USER', 'HEADTEACHER_PASS'].forEach(function (k) { var el = document.getElementById('set_' + k); if (el) obj[k] = el.value; }); ['VACATION_DATE', 'REOPENING_DATE'].forEach(function (k) { var el = document.getElementById('set_' + k); if (el) obj[k] = el.value; }); var pe = document.getElementById('set_SHOW_OVERALL_POSITION'); if (pe) obj.SHOW_OVERALL_POSITION = pe.checked ? 'true' : 'false'; var pAvg = document.getElementById('set_SHOW_CLASS_AVERAGE'); if (pAvg) obj.SHOW_CLASS_AVERAGE = pAvg.checked ? 'true' : 'false'; var tSign = document.getElementById('set_ALLOW_TEACHER_SIGN'); if (tSign) obj.ALLOW_TEACHER_SIGN = tSign.checked ? 'true' : 'false'; var sp2 = document.getElementById('set_SMS_PROVIDER'); if (sp2) obj.SMS_PROVIDER = sp2.value; var at2 = document.getElementById('set_ACTIVE_TERM'); if (at2) obj.ACTIVE_TERM = at2.checked ? 'true' : 'false'; var ay2 = document.getElementById('set_ACTIVE_YEAR'); if (ay2) obj.ACTIVE_YEAR = ay2.checked ? 'true' : 'false'; var ad2 = document.getElementById('set_ACTIVE_DATES'); if (ad2) obj.ACTIVE_DATES = ad2.checked ? 'true' : 'false'; var ai2 = document.getElementById('set_AUTO_ID'); if (ai2) obj.AUTO_ID = ai2.checked ? 'true' : 'false'; var ip2 = document.getElementById('set_ID_PREFIX'); if (ip2) obj.ID_PREFIX = ip2.value; obj.REPORT_TEMPLATE = String(window.selectedTemplate || '1'); google.script.run.withSuccessHandler(function (r) { if (!r.success) toast(r.message, 'error'); }).updateSettings(adminToken, obj); };
+            window.updateFeeComps = function (str) { if (!window._cachedSettings) window._cachedSettings = {}; window._cachedSettings.FEE_COMPONENTS = str; var e = document.getElementById('set_FEE_COMPONENTS'); if (e) e.value = str; renderFeesBills(); var obj = {};['SCHOOL_NAME', 'SCHOOL_ADDRESS', 'SCHOOL_EMAIL', 'SCHOOL_PHONE', 'SCHOOL_OPEN_DAYS', 'SMS_API_KEY', 'SMS_SENDER', 'HEADMASTER_NAME', 'CLASS_SCORE_MAX', 'EXAM_SCORE_MAX', 'CUSTOM_CT_REMARKS', 'CUSTOM_HM_REMARKS', 'FEE_COMPONENTS', 'ADMIN_NAME', 'ADMIN_PHONE', 'HEADTEACHER_USER', 'HEADTEACHER_PASS'].forEach(function (k) { var el = document.getElementById('set_' + k); if (el) obj[k] = el.value; }); ['VACATION_DATE', 'REOPENING_DATE'].forEach(function (k) { var el = document.getElementById('set_' + k); if (el) obj[k] = el.value; }); var pe = document.getElementById('set_SHOW_OVERALL_POSITION'); if (pe) obj.SHOW_OVERALL_POSITION = pe.checked ? 'true' : 'false'; var pPromo2 = document.getElementById('set_SHOW_PROMOTION_STATUS'); if (pPromo2) obj.SHOW_PROMOTION_STATUS = pPromo2.checked ? 'true' : 'false'; var pAvg = document.getElementById('set_SHOW_CLASS_AVERAGE'); if (pAvg) obj.SHOW_CLASS_AVERAGE = pAvg.checked ? 'true' : 'false'; var tSign = document.getElementById('set_ALLOW_TEACHER_SIGN'); if (tSign) obj.ALLOW_TEACHER_SIGN = tSign.checked ? 'true' : 'false';['SHOW_INTEREST_TALENT', 'SHOW_CONDUCT', 'SHOW_ATTITUDE', 'SHOW_HEADTEACHER_REMARK'].forEach(function (rk) { var elx = document.getElementById('set_' + rk); if (elx) obj[rk] = elx.checked ? 'true' : 'false'; }); var sp2 = document.getElementById('set_SMS_PROVIDER'); if (sp2) obj.SMS_PROVIDER = sp2.value; var at2 = document.getElementById('set_ACTIVE_TERM'); if (at2) obj.ACTIVE_TERM = at2.checked ? 'true' : 'false'; var ay2 = document.getElementById('set_ACTIVE_YEAR'); if (ay2) obj.ACTIVE_YEAR = ay2.checked ? 'true' : 'false'; var ad2 = document.getElementById('set_ACTIVE_DATES'); if (ad2) obj.ACTIVE_DATES = ad2.checked ? 'true' : 'false'; var ai2 = document.getElementById('set_AUTO_ID'); if (ai2) obj.AUTO_ID = ai2.checked ? 'true' : 'false'; var ip2 = document.getElementById('set_ID_PREFIX'); if (ip2) obj.ID_PREFIX = ip2.value; obj.REPORT_TEMPLATE = String(window.selectedTemplate || '1'); google.script.run.withSuccessHandler(function (r) { if (!r.success) toast(r.message, 'error'); }).updateSettings(adminToken, obj); };
 
             var feeComps = ((window._cachedSettings || {}).FEE_COMPONENTS || '').split(',').map(function (s) { return s.trim(); }).filter(function (s) { return s; });
             var h = '<div class="card no-print" style="margin-bottom:20px;border:none;box-shadow:none;background:#f8fafc;border-radius:12px;padding:16px;">';
@@ -9511,6 +9590,10 @@
             var hmn = st.HEADMASTER_NAME || headmasterName || 'Headmaster';
             var gSBA = 0, gExam = 0, gTotal = 0;
             var showAvg = String(st.SHOW_CLASS_AVERAGE !== undefined ? st.SHOW_CLASS_AVERAGE : 'true').toLowerCase() === 'true';
+            var showInterest = String(st.SHOW_INTEREST_TALENT !== undefined ? st.SHOW_INTEREST_TALENT : 'true').toLowerCase() === 'true';
+            var showConduct = String(st.SHOW_CONDUCT !== undefined ? st.SHOW_CONDUCT : 'true').toLowerCase() === 'true';
+            var showAttitude = String(st.SHOW_ATTITUDE !== undefined ? st.SHOW_ATTITUDE : 'true').toLowerCase() === 'true';
+            var showHtRemark = String(st.SHOW_HEADTEACHER_REMARK !== undefined ? st.SHOW_HEADTEACHER_REMARK : 'true').toLowerCase() === 'true';
             var verifyUrl = '';
             var baseUrl = data.scriptUrl || (typeof scriptUrl !== 'undefined' ? scriptUrl : '');
             if (baseUrl && baseUrl.indexOf('/dev') !== -1) baseUrl = baseUrl.replace('/dev', '/exec');
@@ -9558,7 +9641,13 @@
                 + '<div class="rctw"><table class="rct" style="border-color:' + v.accentLine + '"><thead><tr><th style="width:28px;border-color:' + v.accentLine + '">#</th><th style="text-align:left;padding-left:8px;border-color:' + v.accentLine + '">SUBJECT</th><th style="border-color:' + v.accentLine + '">SBA<br><small style="font-weight:400;font-size:8px">/50</small></th><th style="border-color:' + v.accentLine + '">EXAM<br><small style="font-weight:400;font-size:8px">/50</small></th><th style="border-color:' + v.accentLine + '">TOTAL</th>' + (showAvg ? '<th style="border-color:' + v.accentLine + '">CLASS<br><small style="font-weight:400;font-size:8px">AVG</small></th>' : '') + '<th style="border-color:' + v.accentLine + '">GRADE</th><th style="border-color:' + v.accentLine + '">POS.</th><th style="border-color:' + v.accentLine + '">REMARKS</th></tr></thead><tbody>' + rows + '</tbody><tfoot><tr style="background:' + v.ssBg + '"><td colspan="2" style="padding:6px;font-weight:700;text-align:left;padding-left:8px;letter-spacing:1px;border:1px solid rgba(255,255,255,.3);color:#ffffff">GRAND TOTAL</td><td style="padding:6px;text-align:center;border:1px solid rgba(255,255,255,.3);font-weight:700;color:#ffffff">' + Math.round(gSBA) + '</td><td style="padding:6px;text-align:center;border:1px solid rgba(255,255,255,.3);font-weight:700;color:#ffffff">' + Math.round(gExam) + '</td><td style="padding:6px;text-align:center;border:1px solid rgba(255,255,255,.3);font-weight:700;color:#ffffff">' + gTotal + '</td><td colspan="' + (showAvg ? '4' : '3') + '" style="border:1px solid rgba(255,255,255,.2)"></td></tr></tfoot></table></div>'
                 + '<div class="rcsb" style="border-top-color:' + v.accentLine + ';border-bottom-color:' + v.accentLine + '"><div class="rcst"><span class="rcsll">Attendance</span><span class="rcsvl">' + s.Attendance + ' / ' + s.OutOf + '</span></div><div class="rcst"><span class="rcsll">Total Score</span><span class="rcsvl">' + gTotal + '</span></div><div class="rcst"><span class="rcsll">Average</span><span class="rcsvl">' + Math.round(Number(s.Average || 0)) + '</span></div><div class="rcst"><span class="rcsll">Subjects</span><span class="rcsvl">' + res.length + '</span></div></div>'
                 + posBar + aggBar
-                + '<div class="rcrm"><div class="rcrt" style="border-bottom-color:' + v.accent + '">Conduct &amp; Remarks</div><div class="rcrr"><span class="rcrk">Interest / Talent:</span><span class="rcrv">' + (s.Interest || '—') + '</span></div><div class="rcrr"><span class="rcrk">Conduct:</span><span class="rcrv">' + (s.Conduct || '—') + '</span></div><div class="rcrr"><span class="rcrk">Attitude to Work:</span><span class="rcrv">' + (s.Attitude || '—') + '</span></div><div class="rcrr"><span class="rcrk">Class Teacher\'s Remark:</span><span class="rcrv">' + (s.ClassTeacherRemark || '—') + '</span></div><div class="rcrr"><span class="rcrk">Headmaster\'s Remark:</span><span class="rcrv">' + (s.HeadTeacherRemark || '—') + '</span></div></div>'
+                + '<div class="rcrm"><div class="rcrt" style="border-bottom-color:' + v.accent + '">Conduct &amp; Remarks</div>'
+                + (showInterest ? '<div class="rcrr"><span class="rcrk">Interest / Talent:</span><span class="rcrv">' + (s.Interest || '—') + '</span></div>' : '')
+                + (showConduct ? '<div class="rcrr"><span class="rcrk">Conduct:</span><span class="rcrv">' + (s.Conduct || '—') + '</span></div>' : '')
+                + (showAttitude ? '<div class="rcrr"><span class="rcrk">Attitude to Work:</span><span class="rcrv">' + (s.Attitude || '—') + '</span></div>' : '')
+                + '<div class="rcrr"><span class="rcrk">Class Teacher\'s Remark:</span><span class="rcrv">' + (s.ClassTeacherRemark || '—') + '</span></div>'
+                + (showHtRemark ? '<div class="rcrr"><span class="rcrk">Headmaster\'s Remark:</span><span class="rcrv">' + (s.HeadTeacherRemark || '—') + '</span></div>' : '')
+                + '</div>'
                 + sigHtml
                 + '<div class="rcgk" style="border-color:' + v.accentLine + '"><div class="rcgkh" style="background:' + v.accentLine + '">Grade Interpretation Key</div><div class="rcgki" style="border-top-color:' + v.accentLine + '">' + gkItems + '</div></div>'
                 + '<div class="rcfs" style="background:' + v.rcBg + ';color:' + v.ttCol + ';border-top-color:' + v.accentLine + '"><span>Generated by: <strong>' + sN + '</strong></span><span>' + s.Class + ' · ' + s.Term + ' · ' + s.Year + '</span></div>'
@@ -9728,6 +9817,10 @@
             var pPromo = document.getElementById('set_SHOW_PROMOTION_STATUS'); if (pPromo) { pPromo.checked = String(s.SHOW_PROMOTION_STATUS !== undefined ? s.SHOW_PROMOTION_STATUS : 'false').toLowerCase() === 'true'; }
             var peAvg = document.getElementById('set_SHOW_CLASS_AVERAGE'); if (peAvg) { peAvg.checked = String(s.SHOW_CLASS_AVERAGE !== undefined ? s.SHOW_CLASS_AVERAGE : 'true').toLowerCase() === 'true'; }
             var peSign = document.getElementById('set_ALLOW_TEACHER_SIGN'); if (peSign) { peSign.checked = String(s.ALLOW_TEACHER_SIGN !== undefined ? s.ALLOW_TEACHER_SIGN : 'false').toLowerCase() === 'true'; }
+            ['SHOW_INTEREST_TALENT', 'SHOW_CONDUCT', 'SHOW_ATTITUDE', 'SHOW_HEADTEACHER_REMARK'].forEach(function (key) {
+                var el = document.getElementById('set_' + key);
+                if (el) el.checked = String(s[key] !== undefined ? s[key] : 'true').toLowerCase() === 'true';
+            });
             updateYNButtons();
             if (s.SCHOOL_LOGO) { applyLogo(s.SCHOOL_LOGO); previewImgBox('logoPreview', s.SCHOOL_LOGO, 'Logo'); schoolLogoB64 = s.SCHOOL_LOGO; }
             if (s.SCHOOL_WATERMARK) { schoolWatermarkB64 = s.SCHOOL_WATERMARK; previewImgBox('watermarkPreview', s.SCHOOL_WATERMARK, 'Watermark'); schoolWatermarkB64 = s.SCHOOL_WATERMARK; }
@@ -9943,6 +10036,7 @@
                 var termSpecificKey = 'OPEN_DAYS_' + sessionYear + '_' + sessionTerm;
                 obj[termSpecificKey] = openDaysVal;
             } ['VACATION_DATE', 'REOPENING_DATE'].forEach(function (k) { var el = document.getElementById('set_' + k); if (el) obj[k] = el.value; }); var pe = document.getElementById('set_SHOW_OVERALL_POSITION'); if (pe) obj.SHOW_OVERALL_POSITION = pe.checked ? 'true' : 'false'; var pPromo = document.getElementById('set_SHOW_PROMOTION_STATUS'); if (pPromo) obj.SHOW_PROMOTION_STATUS = pPromo.checked ? 'true' : 'false'; var pAvg = document.getElementById('set_SHOW_CLASS_AVERAGE'); if (pAvg) obj.SHOW_CLASS_AVERAGE = pAvg.checked ? 'true' : 'false'; var tSign = document.getElementById('set_ALLOW_TEACHER_SIGN'); if (tSign) obj.ALLOW_TEACHER_SIGN = tSign.checked ? 'true' : 'false';
+            ['SHOW_INTEREST_TALENT', 'SHOW_CONDUCT', 'SHOW_ATTITUDE', 'SHOW_HEADTEACHER_REMARK'].forEach(function (rk) { var elx = document.getElementById('set_' + rk); if (elx) obj[rk] = elx.checked ? 'true' : 'false'; });
             var sp2 = document.getElementById('set_SMS_PROVIDER'); if (sp2) obj.SMS_PROVIDER = sp2.value;
             var at2 = document.getElementById('set_ACTIVE_TERM'); if (at2) obj.ACTIVE_TERM = at2.checked ? 'true' : 'false';
             var ay2 = document.getElementById('set_ACTIVE_YEAR'); if (ay2) obj.ACTIVE_YEAR = ay2.checked ? 'true' : 'false';
@@ -11042,6 +11136,26 @@
             }
             updateYNButtons();
         }
+        function toggleShowInterestTalent(val) {
+            var cb = document.getElementById('set_SHOW_INTEREST_TALENT');
+            if (cb) { cb.checked = val; if (window.updateFeeComps) window.updateFeeComps(document.getElementById('set_FEE_COMPONENTS').value); }
+            updateYNButtons();
+        }
+        function toggleShowConduct(val) {
+            var cb = document.getElementById('set_SHOW_CONDUCT');
+            if (cb) { cb.checked = val; if (window.updateFeeComps) window.updateFeeComps(document.getElementById('set_FEE_COMPONENTS').value); }
+            updateYNButtons();
+        }
+        function toggleShowAttitude(val) {
+            var cb = document.getElementById('set_SHOW_ATTITUDE');
+            if (cb) { cb.checked = val; if (window.updateFeeComps) window.updateFeeComps(document.getElementById('set_FEE_COMPONENTS').value); }
+            updateYNButtons();
+        }
+        function toggleShowHeadteacherRemark(val) {
+            var cb = document.getElementById('set_SHOW_HEADTEACHER_REMARK');
+            if (cb) { cb.checked = val; if (window.updateFeeComps) window.updateFeeComps(document.getElementById('set_FEE_COMPONENTS').value); }
+            updateYNButtons();
+        }
         function updateYNButtons() {
             var cb = document.getElementById('set_SHOW_OVERALL_POSITION');
             var radYes = document.getElementById('radio_SHOW_OVERALL_POSITION_YES');
@@ -11083,6 +11197,14 @@
                     if (radSignNo) radSignNo.checked = true;
                 }
             }
+            ['SHOW_INTEREST_TALENT', 'SHOW_CONDUCT', 'SHOW_ATTITUDE', 'SHOW_HEADTEACHER_REMARK'].forEach(function (key) {
+                var cbX = document.getElementById('set_' + key);
+                var radYesX = document.getElementById('radio_' + key + '_YES');
+                var radNoX = document.getElementById('radio_' + key + '_NO');
+                if (!cbX) return;
+                if (cbX.checked) { if (radYesX) radYesX.checked = true; }
+                else { if (radNoX) radNoX.checked = true; }
+            });
         }
 
         // ── SMS DASHBOARD LOGIC ──

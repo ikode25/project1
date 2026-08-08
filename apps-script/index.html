@@ -1788,6 +1788,10 @@
             if (!data || !data.student) return '<div style="color:#fff;padding:40px;text-align:center">Failed to load report data.</div>';
             var s = data.student, res = data.results || [], ci = data.classInfo || {}, st = data.settings || {};
             var showPos = String(st.SHOW_OVERALL_POSITION !== undefined ? st.SHOW_OVERALL_POSITION : 'true').toLowerCase() === 'true';
+            var showInterest = String(st.SHOW_INTEREST_TALENT !== undefined ? st.SHOW_INTEREST_TALENT : 'true').toLowerCase() === 'true';
+            var showConduct = String(st.SHOW_CONDUCT !== undefined ? st.SHOW_CONDUCT : 'true').toLowerCase() === 'true';
+            var showAttitude = String(st.SHOW_ATTITUDE !== undefined ? st.SHOW_ATTITUDE : 'true').toLowerCase() === 'true';
+            var showHtRemark = String(st.SHOW_HEADTEACHER_REMARK !== undefined ? st.SHOW_HEADTEACHER_REMARK : 'true').toLowerCase() === 'true';
             var schoolName = st.SCHOOL_NAME || 'MY SCHOOL';
             var addr = st.SCHOOL_ADDRESS || 'P.O. BOX DC1732 B, DANSOMAN - ACCRA';
             var email = st.SCHOOL_EMAIL || ''; var phone = st.SCHOOL_PHONE || '';
@@ -1888,11 +1892,11 @@
                 + '</div>'
                 + posBar + aggBar
                 + '<div class="rc-rmk"><div class="rc-rmk-title">Conduct &amp; Remarks</div>'
-                + '<div class="rc-rmk-row"><span class="rc-rmk-k">Interest / Talent:</span><span class="rc-rmk-v">' + (s.Interest || '—') + '</span></div>'
-                + '<div class="rc-rmk-row"><span class="rc-rmk-k">Conduct:</span><span class="rc-rmk-v">' + (s.Conduct || '—') + '</span></div>'
-                + '<div class="rc-rmk-row"><span class="rc-rmk-k">Attitude to Work:</span><span class="rc-rmk-v">' + (s.Attitude || '—') + '</span></div>'
+                + (showInterest ? '<div class="rc-rmk-row"><span class="rc-rmk-k">Interest / Talent:</span><span class="rc-rmk-v">' + (s.Interest || '—') + '</span></div>' : '')
+                + (showConduct ? '<div class="rc-rmk-row"><span class="rc-rmk-k">Conduct:</span><span class="rc-rmk-v">' + (s.Conduct || '—') + '</span></div>' : '')
+                + (showAttitude ? '<div class="rc-rmk-row"><span class="rc-rmk-k">Attitude to Work:</span><span class="rc-rmk-v">' + (s.Attitude || '—') + '</span></div>' : '')
                 + '<div class="rc-rmk-row"><span class="rc-rmk-k">Class Teacher\'s Remark:</span><span class="rc-rmk-v">' + (s.ClassTeacherRemark || '—') + '</span></div>'
-                + '<div class="rc-rmk-row"><span class="rc-rmk-k">Headmaster\'s Remark:</span><span class="rc-rmk-v">' + (s.HeadTeacherRemark || '—') + '</span></div>'
+                + (showHtRemark ? '<div class="rc-rmk-row"><span class="rc-rmk-k">Headmaster\'s Remark:</span><span class="rc-rmk-v">' + (s.HeadTeacherRemark || '—') + '</span></div>' : '')
                 + '</div>'
                 + sigsHtml
                 + '<div class="rc-gkey"><div class="rc-gkey-hdr">Grade Interpretation Key</div>'
