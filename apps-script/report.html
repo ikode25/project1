@@ -699,7 +699,7 @@
     <div id="loadingScreen">
         <div class="toolbar">
             <div class="t-brand">
-                <div class="t-logo" id="tLogoBox">🎓</div>
+                <div class="t-logo" id="tLogoBox"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0d1b4b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></div>
                 <div>
                     <div class="t-name">School Portal</div>
                     <div class="t-sub">Student Report Card</div>
@@ -717,7 +717,7 @@
     <div id="reportContent" style="display:none">
         <div class="toolbar no-print">
             <div class="t-brand">
-                <div class="t-logo" id="tLogoBox2">🎓</div>
+                <div class="t-logo" id="tLogoBox2"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0d1b4b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></div>
                 <div>
                     <div class="t-name" id="tSchoolName">School Portal</div>
                     <div class="t-sub" id="tStudentName">Student Report Card</div>
@@ -725,7 +725,7 @@
             </div>
             <div class="t-actions">
                 <button class="tbtn tbtn-back" onclick="goBackToChecker()">← Back</button>
-                <button class="tbtn tbtn-print" onclick="window.print()">🖨️ Print Report</button>
+                <button class="tbtn tbtn-print" onclick="window.print()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print Report</button>
             </div>
         </div>
         <div id="reportCardArea"></div>
@@ -735,7 +735,7 @@
     <div id="errorScreen" style="display:none">
         <div class="toolbar">
             <div class="t-brand">
-                <div class="t-logo">🎓</div>
+                <div class="t-logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0d1b4b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></div>
                 <div>
                     <div class="t-name">School Portal</div>
                     <div class="t-sub">Student Report Card</div>
@@ -743,7 +743,7 @@
             </div>
         </div>
         <div class="err-screen">
-            <div class="err-icon">⚠️</div>
+            <div class="err-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
             <div class="err-title">Report Not Found</div>
             <div class="err-msg" id="errMsg">The requested student report could not be loaded. Please check the link or
                 contact the school administrator.</div>
@@ -827,7 +827,7 @@
                     + (bestStr ? '<div class="rc-agg-detail">Core: ' + coreStr + ' + Best 2: ' + bestStr + '</div>' : '')
                     + '</div>';
             }
-            var logoHtml = logoSrc ? '<img src="' + logoSrc + '" alt="Logo">' : '🎓';
+            var logoHtml = logoSrc ? '<img src="' + logoSrc + '" alt="Logo">' : '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0d1b4b" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>';
 
             var allowTeacherSign = String(st.ALLOW_TEACHER_SIGN || 'false') === 'true';
             var teacherSigSrc = (ci && ci.teacherSig) ? fixDriveUrl(ci.teacherSig) : '';
@@ -842,7 +842,7 @@
             return '<div class="rc-page">'
                 + '<div class="rc-hdr"><div class="rc-logo">' + logoHtml + '</div>'
                 + '<div style="text-align:center"><div class="rc-sname">' + schoolName + '</div><div class="rc-scontact">' + addr + '<br>Tel: ' + phone + (email ? ' · ' + email : '') + '</div></div>'
-                + '<div class="rc-photobox">' + (s.PhotoUrl ? '<img src="' + fixDriveUrl(s.PhotoUrl) + '" alt="">' : '👤') + '</div></div>'
+                + '<div class="rc-photobox">' + (s.PhotoUrl ? '<img src="' + fixDriveUrl(s.PhotoUrl) + '" alt="">' : '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>') + '</div></div>'
                 + '<div class="rc-titlestrip"><div class="rc-titletext">Pupil\'s Terminal Report Card</div></div>'
                 + '<div class="rc-substrip">End of ' + (s.Term || '').toUpperCase() + ' Examinations · Academic Year ' + s.Year + '</div>'
                 + '<div class="rc-id-row"><span style="font-size:12px;color:#6b7280;margin-right:8px">Student ID:</span><span class="rc-id-badge">' + s.ID + '</span></div>'

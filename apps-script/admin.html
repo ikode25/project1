@@ -2696,14 +2696,17 @@
         .toast.success {
             border-left: 4px solid #22c55e
         }
+        .toast.success svg { color: #22c55e }
 
         .toast.error {
             border-left: 4px solid #ef4444
         }
+        .toast.error svg { color: #ef4444 }
 
         .toast.info {
             border-left: 4px solid #3b82f6
         }
+        .toast.info svg { color: #3b82f6 }
 
         .txbtn {
             background: none;
@@ -3971,13 +3974,13 @@
         <div class="main">
             <div class="greetbar" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
                 <div>
-                    <div class="grttx">Good <strong id="greetPart">morning</strong>, <strong
-                            id="greetName">Administrator</strong> 👋 Welcome back
+                    <div class="grttx"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><circle cx="12" cy="12" r="10" /><path d="M8 14s1.5 2 4 2 4-2 4-2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" /></svg>Good <strong id="greetPart">morning</strong>, <strong
+                            id="greetName">Administrator</strong> — Welcome back
                     </div>
                     <div class="dttx" id="datetimeTxt"></div>
                 </div>
                 <div id="activeSessionBadge" style="background:var(--bl, #0d1b4b); color:#ffffff; padding:6px 14px; border-radius:30px; font-size:12px; font-weight:700; display:flex; align-items:center; gap:8px; box-shadow:var(--sh);">
-                    <span style="font-size:14px">📅</span> Active Session:
+                    <span style="font-size:14px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg></span> Active Session:
                     <select id="headerSessionYear" style="background:transparent; color:#fff; border:none; font-weight:700; font-size:12px; cursor:pointer; outline:none; font-family:inherit;" onchange="changeSessionPeriod()"></select>
                     <span style="opacity:0.6">•</span>
                     <select id="headerSessionTerm" style="background:transparent; color:#fff; border:none; font-weight:700; font-size:12px; cursor:pointer; outline:none; font-family:inherit;" onchange="changeSessionPeriod()"></select>
@@ -4047,7 +4050,7 @@
                         <div class="chatbot-win" id="chatbotWin">
                             <div class="cwhdr">
                                 <div class="cwhdr-title">
-                                    <div class="cwav">👋</div>School Assistant
+                                    <div class="cwav"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0d1b4b" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg></div>School Assistant
                                 </div><button class="cwcl" onclick="toggleChatbot()"><svg viewBox="0 0 24 24"
                                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                                         <line x1="18" y1="6" x2="6" y2="18" />
@@ -4055,7 +4058,7 @@
                                     </svg></button>
                             </div>
                             <div class="cwmsgs" id="cwMsgs">
-                                <div class="cwmsg bot">Hello! 👋 I'm your school assistant. Type <strong>"help"</strong>
+                                <div class="cwmsg bot">Hello! I'm your school assistant. Type <strong>"help"</strong>
                                     to see what I
                                     can do for you.</div>
                             </div>
@@ -4143,7 +4146,7 @@
                         <div class="card" style="padding:0; overflow:hidden; border-radius:16px;">
                             <div style="padding:14px 18px 10px; background:linear-gradient(135deg,var(--nv),var(--bl)); display:flex; align-items:center; justify-content:space-between;">
                                 <div>
-                                    <div style="font-size:13px; font-weight:800; color:#fff; letter-spacing:0.3px;">🧑‍🤝‍🧑 Gender Split</div>
+                                    <div style="font-size:13px; font-weight:800; color:#fff; letter-spacing:0.3px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><circle cx="9" cy="7" r="4" /><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>Gender Split</div>
                                     <div style="font-size:11px; color:rgba(255,255,255,0.65); margin-top:2px;">Male vs. Female enrollment</div>
                                 </div>
                             </div>
@@ -4157,7 +4160,7 @@
                         <div class="card" style="padding:0; overflow:hidden; border-radius:16px;">
                             <div style="padding:14px 18px 10px; background:linear-gradient(135deg,var(--nv),var(--bl)); display:flex; align-items:center; justify-content:space-between;">
                                 <div>
-                                    <div style="font-size:13px; font-weight:800; color:#fff; letter-spacing:0.3px;">🥧 Class Size Distribution</div>
+                                    <div style="font-size:13px; font-weight:800; color:#fff; letter-spacing:0.3px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><path d="M21.21 15.89A10 10 0 1 1 8 2.83" /><path d="M22 12A10 10 0 0 0 12 2v10z" /></svg>Class Size Distribution</div>
                                     <div style="font-size:11px; color:rgba(255,255,255,0.65); margin-top:2px;">Share of students per class</div>
                                 </div>
                             </div>
@@ -4171,7 +4174,7 @@
                         <div class="card" style="padding:0; overflow:hidden; border-radius:16px;">
                             <div style="padding:14px 18px 10px; background:linear-gradient(135deg,var(--nv),var(--bl)); display:flex; align-items:center; justify-content:space-between;">
                                 <div>
-                                    <div style="font-size:13px; font-weight:800; color:#fff; letter-spacing:0.3px;">🎯 Overall School Average</div>
+                                    <div style="font-size:13px; font-weight:800; color:#fff; letter-spacing:0.3px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></svg>Overall School Average</div>
                                     <div style="font-size:11px; color:rgba(255,255,255,0.65); margin-top:2px;">Across all classes, current term</div>
                                 </div>
                             </div>
@@ -4198,7 +4201,7 @@
                         <div class="card" style="padding:0; overflow:hidden; border-radius:16px;">
                             <div style="padding:16px 20px 12px; background:linear-gradient(135deg,#1e1b4b 0%,#312e81 100%); display:flex; align-items:center; justify-content:space-between;">
                                 <div>
-                                    <div style="font-size:13px; font-weight:800; color:#fff; letter-spacing:0.3px;">📊 Class Academic Performance</div>
+                                    <div style="font-size:13px; font-weight:800; color:#fff; letter-spacing:0.3px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></svg>Class Academic Performance</div>
                                     <div style="font-size:11px; color:rgba(255,255,255,0.6); margin-top:2px;">Average scores by class</div>
                                 </div>
                                 <div id="dashBarPerformBadge" style="background:rgba(255,255,255,0.15); color:#fff; font-size:10px; font-weight:700; padding:4px 10px; border-radius:20px; letter-spacing:0.5px;">LIVE</div>
@@ -4213,7 +4216,7 @@
                         <div class="card" style="padding:0; overflow:hidden; border-radius:16px;">
                             <div style="padding:16px 20px 12px; background:linear-gradient(135deg,#064e3b 0%,#065f46 100%); display:flex; align-items:center; justify-content:space-between;">
                                 <div>
-                                    <div style="font-size:13px; font-weight:800; color:#fff; letter-spacing:0.3px;">📈 Term Performance Trend</div>
+                                    <div style="font-size:13px; font-weight:800; color:#fff; letter-spacing:0.3px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18" /><polyline points="17 6 23 6 23 12" /></svg>Term Performance Trend</div>
                                     <div style="font-size:11px; color:rgba(255,255,255,0.6); margin-top:2px;">Average scores across terms</div>
                                 </div>
                                 <div id="dashTrendBadge" style="background:rgba(255,255,255,0.15); color:#fff; font-size:10px; font-weight:700; padding:4px 10px; border-radius:20px; letter-spacing:0.5px;">TERM</div>
@@ -4883,7 +4886,7 @@
                         <div class="chdr">
                             <div class="ctitle">Grading System</div>
                                 <div class="no-print" style="display:flex;gap:8px">
-                                    <button class="btn bo bsm" onclick="autogenerateGrading()" style="display:inline-flex; align-items:center; gap:4px;">⚙️ Autogenerate Rules</button>
+                                    <button class="btn bo bsm" onclick="autogenerateGrading()" style="display:inline-flex; align-items:center; gap:4px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Autogenerate Rules</button>
                                     <button class="btn bo bsm" onclick="addGradeRow()">+ Add Row</button>
                                     <button class="btn bp" onclick="saveGrading()">Save All</button>
                                 </div>
@@ -5042,7 +5045,7 @@
                     <!-- SMS STATS DASHBOARD -->
                     <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin-bottom:20px;">
                         <div style="background:#ffffff; padding:18px; border-radius:12px; border:1px solid var(--bd); box-shadow:var(--sh); display:flex; align-items:center; gap:14px;">
-                            <div style="background:#eff6ff; color:#2563eb; padding:10px; border-radius:10px; font-size:20px; display:flex;">💳</div>
+                            <div style="background:#eff6ff; color:#2563eb; padding:10px; border-radius:10px; display:flex;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>
                             <div>
                                 <div style="font-size:12px; color:var(--mu);">API Status &amp; Balance</div>
                                 <div style="font-weight:800; color:var(--nv); font-size:15px; margin-top:2px;" id="smsDashBalance">Checking…</div>
@@ -5050,14 +5053,14 @@
                             </div>
                         </div>
                         <div style="background:#ffffff; padding:18px; border-radius:12px; border:1px solid var(--bd); box-shadow:var(--sh); display:flex; align-items:center; gap:14px;">
-                            <div style="background:#f0fdf4; color:#16a34a; padding:10px; border-radius:10px; font-size:20px; display:flex;">✅</div>
+                            <div style="background:#f0fdf4; color:#16a34a; padding:10px; border-radius:10px; display:flex;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
                             <div>
                                 <div style="font-size:12px; color:var(--mu);">SMS Sent Successfully</div>
                                 <div style="font-weight:800; color:#16a34a; font-size:18px; margin-top:2px;" id="smsDashSent">0</div>
                             </div>
                         </div>
                         <div style="background:#ffffff; padding:18px; border-radius:12px; border:1px solid var(--bd); box-shadow:var(--sh); display:flex; align-items:center; gap:14px;">
-                            <div style="background:#fff1f2; color:#e11d48; padding:10px; border-radius:10px; font-size:20px; display:flex;">❌</div>
+                            <div style="background:#fff1f2; color:#e11d48; padding:10px; border-radius:10px; display:flex;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></div>
                             <div>
                                 <div style="font-size:12px; color:var(--mu);">SMS Failed / Errored</div>
                                 <div style="font-weight:800; color:#e11d48; font-size:18px; margin-top:2px;" id="smsDashFailed">0</div>
@@ -5069,7 +5072,7 @@
                         <!-- SMS SEND CARD -->
                         <div class="card" style="flex:1; min-width:300px; margin-bottom:20px;">
                             <div class="chdr">
-                                <div class="ctitle">📤 Send Notification SMS</div>
+                                <div class="ctitle"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Send Notification SMS</div>
                             </div>
                             <div class="cbody">
                                 <div class="fg">
@@ -5138,7 +5141,7 @@
                                 </div>
                                 
                                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-                                    <button class="btn bp" id="btnSendBulkSMS" onclick="sendBulkSMSFromPanel()">📤 Send SMS Notification</button>
+                                    <button class="btn bp" id="btnSendBulkSMS" onclick="sendBulkSMSFromPanel()" style="display:inline-flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Send SMS Notification</button>
                                     <div id="smsBulkProgress" style="font-size:12px; font-weight:600; color:#2563eb;"></div>
                                 </div>
                             </div>
@@ -5147,7 +5150,7 @@
                         <!-- SMS LOGS CARD -->
                         <div class="card" style="flex:2; min-width:320px; margin-bottom:20px;">
                             <div class="chdr" style="display:flex; justify-content:space-between; align-items:center;">
-                                <div class="ctitle">📋 Transmission Logs &amp; History</div>
+                                <div class="ctitle"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>Transmission Logs &amp; History</div>
                                 <button class="btn bd2 bsm" onclick="clearSMSLogsHistory()">Clear Logs</button>
                             </div>
                             <div class="cbody" style="padding:0;">
@@ -5657,7 +5660,7 @@
                     <!-- THEME COLOR SETTINGS -->
                     <div class="card admin-only" id="setThemeCard" style="margin-bottom:20px;">
                         <div class="chdr">
-                            <div class="ctitle" style="font-size:14px;">🎨 Theme &amp; Colors</div>
+                            <div class="ctitle" style="font-size:14px; display:flex; align-items:center; gap:7px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>Theme &amp; Colors</div>
                         </div>
                         <div class="cbody">
                             <div style="padding:10px;background:#eff6ff;border-radius:10px;font-size:12px;color:#1e40af;margin-bottom:14px">Customize the admin portal colors. Changes apply immediately and save with your settings.</div>
@@ -5716,7 +5719,7 @@
                     <div class="card admin-only" id="setTypographyCard" style="margin-bottom:20px;">
                         <div class="chdr">
                             <div class="ctitle" style="font-size:14px; display:flex; align-items:center; gap:8px;">
-                                <span style="font-size:16px;">🔤</span> System Typography &amp; Font Style
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg> System Typography &amp; Font Style
                             </div>
                         </div>
                         <div class="cbody">
@@ -5807,16 +5810,16 @@
                     <div class="card" id="setVideoTutorialCard" style="display:none; margin-bottom:20px;">
                         <div class="chdr">
                             <div class="ctitle" style="font-size:14px; display:flex; align-items:center; gap:8px;">
-                                <span style="font-size:16px;">🎥</span> System Video Tutorials &amp; Walkthroughs
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg> System Video Tutorials &amp; Walkthroughs
                             </div>
                         </div>
                         <div class="cbody" style="padding:24px;">
                             <div class="admin-only" style="padding:12px 14px; background:linear-gradient(135deg,#eff6ff,#e0f2fe); border-radius:10px; font-size:13px; color:#1e40af; margin-bottom:18px; border-left:3px solid #3b82f6;">
-                                🔧 <strong>Developer Note:</strong> Add multiple tutorial videos below. Each video can be from YouTube, Google Drive, Vimeo, Loom, or any embeddable platform. These appear in all portals (Admin &amp; Teacher).
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg> <strong>Developer Note:</strong> Add multiple tutorial videos below. Each video can be from YouTube, Google Drive, Vimeo, Loom, or any embeddable platform. These appear in all portals (Admin &amp; Teacher).
                             </div>
                             <!-- Add Video Form (admin only) -->
                             <div class="admin-only" style="background:#f8fafc; border:1.5px dashed var(--bd); border-radius:12px; padding:18px; margin-bottom:20px;">
-                                <div style="font-size:13px; font-weight:700; color:var(--nv); margin-bottom:12px;">➕ Add New Tutorial Video</div>
+                                <div style="font-size:13px; font-weight:700; color:var(--nv); margin-bottom:12px; display:flex; align-items:center; gap:6px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add New Tutorial Video</div>
                                 <div class="frow" style="margin-bottom:10px;">
                                     <div class="fg">
                                         <label style="font-weight:600;">Video Title</label>
@@ -6032,8 +6035,9 @@
                             
                             <!-- Browser Activity Logs section -->
                             <div id="section_local_logs">
-                                <div style="padding:12px;background:#dbeafe;border-radius:10px;font-size:13px;color:#1e40af;margin-bottom:14px">
-                                    📋 Logs are saved locally in your browser. They track admin actions such as saving scores, student records, and settings changes.
+                                <div style="padding:12px;background:#dbeafe;border-radius:10px;font-size:13px;color:#1e40af;margin-bottom:14px;display:flex;align-items:flex-start;gap:8px">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
+                                    Logs are saved locally in your browser. They track admin actions such as saving scores, student records, and settings changes.
                                 </div>
                                 <div id="activityLogArea">
                                     <div style="padding:24px;text-align:center;color:var(--mu)">No activity recorded yet.</div>
@@ -6042,8 +6046,9 @@
                             
                             <!-- Sign-in Audit Trail section -->
                             <div id="section_audit_trail" style="display:none;">
-                                <div style="padding:12px;background:#f0fdf4;border-radius:10px;font-size:13px;color:#166534;margin-bottom:14px">
-                                    🔒 Audit trail logs are stored securely in the Google Sheets database. They track user sign-in attempts, IP addresses, sandboxed MAC codes, devices, and browser signatures.
+                                <div style="padding:12px;background:#f0fdf4;border-radius:10px;font-size:13px;color:#166534;margin-bottom:14px;display:flex;align-items:flex-start;gap:8px">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                    Audit trail logs are stored securely in the Google Sheets database. They track user sign-in attempts, IP addresses, sandboxed MAC codes, devices, and browser signatures.
                                 </div>
                                 <div id="auditTrailArea">
                                     <div style="padding:24px;text-align:center;color:var(--mu)">Loading database logs...</div>
@@ -6079,7 +6084,7 @@
                     <!-- BACKUP CARDS LIST CONTAINER -->
                     <div id="driveBackupsContainer" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:20px;">
                         <div style="grid-column:1/-1; text-align:center; padding:40px; color:var(--mu); background:#ffffff; border-radius:16px; border:1px solid var(--bd); box-shadow:var(--sh);">
-                            <div style="font-size:32px; margin-bottom:8px">⌛</div>
+                            <div style="margin-bottom:8px"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
                             Loading system backups from Google Drive...
                         </div>
                     </div>
@@ -6106,7 +6111,7 @@
                             <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
                                 <span style="padding:6px 18px;background:rgba(240,192,32,.15);border:1px solid rgba(240,192,32,.35);border-radius:20px;font-size:12px;color:#f0c020;font-weight:600;">Version 7.0</span>
                                 <span style="padding:6px 18px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:20px;font-size:12px;color:rgba(255,255,255,.8);">Google Apps Script</span>
-                                <span style="padding:6px 18px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);border-radius:20px;font-size:12px;color:#4ade80;font-weight:600;">⬤ Active</span>
+                                <span style="padding:6px 18px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);border-radius:20px;font-size:12px;color:#4ade80;font-weight:600;display:inline-flex;align-items:center;gap:6px"><svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="currentColor"/></svg> Active</span>
                             </div>
                         </div>
                     </div>
@@ -6142,16 +6147,16 @@
                             </div>
                             <div class="cbody">
                                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;">
-                                    <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px dashed var(--bd);font-size:12.5px;color:var(--tx);"><span style="color:#22c55e;font-size:14px;line-height:1;">✅</span>Student Management</div>
-                                    <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px dashed var(--bd);font-size:12.5px;color:var(--tx);"><span style="color:#22c55e;font-size:14px;line-height:1;">✅</span>SMS &amp; WhatsApp</div>
-                                    <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px dashed var(--bd);font-size:12.5px;color:var(--tx);"><span style="color:#22c55e;font-size:14px;line-height:1;">✅</span>SBA &amp; Exam Scores</div>
-                                    <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px dashed var(--bd);font-size:12.5px;color:var(--tx);"><span style="color:#22c55e;font-size:14px;line-height:1;">✅</span>Cumulative Records</div>
-                                    <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px dashed var(--bd);font-size:12.5px;color:var(--tx);"><span style="color:#22c55e;font-size:14px;line-height:1;">✅</span>Auto Grade &amp; Position</div>
-                                    <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px dashed var(--bd);font-size:12.5px;color:var(--tx);"><span style="color:#22c55e;font-size:14px;line-height:1;">✅</span>Master Sheet &amp; Rankings</div>
-                                    <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px dashed var(--bd);font-size:12.5px;color:var(--tx);"><span style="color:#22c55e;font-size:14px;line-height:1;">✅</span>Report Card (3 Templates)</div>
-                                    <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px dashed var(--bd);font-size:12.5px;color:var(--tx);"><span style="color:#22c55e;font-size:14px;line-height:1;">✅</span>Activity Logs &amp; Audit</div>
-                                    <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;font-size:12.5px;color:var(--tx);"><span style="color:#22c55e;font-size:14px;line-height:1;">✅</span>Bulk Printing</div>
-                                    <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;font-size:12.5px;color:var(--tx);"><span style="color:#22c55e;font-size:14px;line-height:1;">✅</span>Teacher Portal</div>
+                                    <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px dashed var(--bd);font-size:12.5px;color:var(--tx);"><span style="color:#22c55e;flex-shrink:0;display:inline-flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>Student Management</div>
+                                    <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px dashed var(--bd);font-size:12.5px;color:var(--tx);"><span style="color:#22c55e;flex-shrink:0;display:inline-flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>SMS &amp; WhatsApp</div>
+                                    <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px dashed var(--bd);font-size:12.5px;color:var(--tx);"><span style="color:#22c55e;flex-shrink:0;display:inline-flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>SBA &amp; Exam Scores</div>
+                                    <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px dashed var(--bd);font-size:12.5px;color:var(--tx);"><span style="color:#22c55e;flex-shrink:0;display:inline-flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>Cumulative Records</div>
+                                    <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px dashed var(--bd);font-size:12.5px;color:var(--tx);"><span style="color:#22c55e;flex-shrink:0;display:inline-flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>Auto Grade &amp; Position</div>
+                                    <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px dashed var(--bd);font-size:12.5px;color:var(--tx);"><span style="color:#22c55e;flex-shrink:0;display:inline-flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>Master Sheet &amp; Rankings</div>
+                                    <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px dashed var(--bd);font-size:12.5px;color:var(--tx);"><span style="color:#22c55e;flex-shrink:0;display:inline-flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>Report Card (3 Templates)</div>
+                                    <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;border-bottom:1px dashed var(--bd);font-size:12.5px;color:var(--tx);"><span style="color:#22c55e;flex-shrink:0;display:inline-flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>Activity Logs &amp; Audit</div>
+                                    <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;font-size:12.5px;color:var(--tx);"><span style="color:#22c55e;flex-shrink:0;display:inline-flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>Bulk Printing</div>
+                                    <div style="display:flex;align-items:flex-start;gap:8px;padding:7px 0;font-size:12.5px;color:var(--tx);"><span style="color:#22c55e;flex-shrink:0;display:inline-flex"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>Teacher Portal</div>
                                 </div>
                             </div>
                         </div>
@@ -6352,7 +6357,7 @@
     <div class="mov" id="notifModal" onclick="backdropClose(event,'notifModal')">
         <div class="modal" style="max-width:500px; border-radius:12px; box-shadow:0 10px 25px rgba(0,0,0,0.1);">
             <div class="mhdr">
-                <div class="mtitle">📢 Broadcast Notification</div>
+                <div class="mtitle" style="display:flex;align-items:center;gap:7px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>Broadcast Notification</div>
                 <button class="mclose" onclick="closeModal('notifModal')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                         <line x1="18" y1="6" x2="6" y2="18" />
@@ -6371,7 +6376,7 @@
                 </div>
                 <div style="margin-top:16px; display:flex; gap:10px; justify-content:flex-end;">
                     <button class="btn bg2" onclick="closeModal('notifModal')">Cancel</button>
-                    <button class="btn bp" id="btnSendNotif" onclick="sendBroadcastNotif()">📢 Broadcast</button>
+                    <button class="btn bp" id="btnSendNotif" onclick="sendBroadcastNotif()" style="display:inline-flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> Broadcast</button>
                 </div>
             </div>
         </div>
@@ -6381,7 +6386,7 @@
     <div class="mov" id="smsConfirmModal" onclick="backdropClose(event,'smsConfirmModal')">
         <div class="modal" style="max-width:500px; border-radius:12px; box-shadow:0 10px 25px rgba(0,0,0,0.1);">
             <div class="mhdr">
-                <div class="mtitle">✉️ Review SMS Notification</div>
+                <div class="mtitle" style="display:flex;align-items:center;gap:7px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>Review SMS Notification</div>
                 <button class="mclose" onclick="closeModal('smsConfirmModal')">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
                         <line x1="18" y1="6" x2="6" y2="18" />
@@ -6402,7 +6407,7 @@
                 </div>
                 <div style="margin-top:16px; display:flex; gap:10px; justify-content:flex-end;">
                     <button class="btn bg2" onclick="closeModal('smsConfirmModal')">Cancel</button>
-                    <button class="btn bp" id="btnSmsConfirmSend" onclick="dispatchSMSConfirm()">📤 Send SMS</button>
+                    <button class="btn bp" id="btnSmsConfirmSend" onclick="dispatchSMSConfirm()" style="display:inline-flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg> Send SMS</button>
                 </div>
             </div>
         </div>
@@ -6779,9 +6784,9 @@
                     <div id="uniModalSub" style="font-size:12px;color:var(--mu);margin-top:3px"></div>
                 </div>
                 <div style="display:flex;gap:8px;align-items:center">
-                    <button class="btn bw bsm" onclick="clearAllUniScores()">🗑️ Clear All</button>
-                    <button class="btn bo bsm" onclick="exportSubjectTemplateCSV()">⬇ Download CSV</button>
-                    <button class="btn bi bsm" onclick="showSubjectImportModal()">⬆ Import CSV</button>
+                    <button class="btn bw bsm" onclick="clearAllUniScores()" style="display:inline-flex;align-items:center;gap:5px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Clear All</button>
+                    <button class="btn bo bsm" onclick="exportSubjectTemplateCSV()" style="display:inline-flex;align-items:center;gap:5px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download CSV</button>
+                    <button class="btn bi bsm" onclick="showSubjectImportModal()" style="display:inline-flex;align-items:center;gap:5px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Import CSV</button>
                     <button class="mclose" onclick="closeModal('uniModal')"><svg viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" stroke-width="2" stroke-linecap="round">
                             <line x1="18" y1="6" x2="6" y2="18" />
@@ -6849,7 +6854,7 @@
             <div class="mbody">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
                     <div style="font-size:14px;font-weight:600;color:var(--nv)">Upload Students CSV</div><button
-                        class="btn bo bsm" onclick="downloadTemplate()">⬇ Download Template</button>
+                        class="btn bo bsm" onclick="downloadTemplate()" style="display:inline-flex;align-items:center;gap:5px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Download Template</button>
                 </div>
                 <div
                     style="padding:12px;background:#dbeafe;border-radius:10px;font-size:13px;color:#1e40af;margin-bottom:14px">
@@ -7039,7 +7044,9 @@
                     var isMe = (userRole === 'admin' && m.Sender === 'admin') || (userRole !== 'admin' && m.Sender === userName);
                     var rowClass = isMe ? 'me' : 'them';
                     var timeStr = new Date(m.Timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    var readIcon = isMe ? (m.IsRead === true || String(m.IsRead) === 'true' ? '<span style="color:#34b7f1;font-size:10px;margin-left:4px">✓✓</span>' : '<span style="color:rgba(255,255,255,0.7);font-size:10px;margin-left:4px">✓</span>') : '';
+                    var doubleCheckSvg = '<svg width="14" height="10" viewBox="0 0 16 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 5.5 4.5 9 11 1.5"/><polyline points="5.5 5.5 9 9 15.5 1.5"/></svg>';
+                    var singleCheckSvg = '<svg width="10" height="10" viewBox="0 0 12 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 5.5 4.5 9 11 1.5"/></svg>';
+                    var readIcon = isMe ? (m.IsRead === true || String(m.IsRead) === 'true' ? '<span style="color:#34b7f1;margin-left:4px;display:inline-flex;vertical-align:middle">' + doubleCheckSvg + '</span>' : '<span style="color:rgba(255,255,255,0.7);margin-left:4px;display:inline-flex;vertical-align:middle">' + singleCheckSvg + '</span>') : '';
                     html += '<div class="chat-msg-row ' + rowClass + '">' +
                                    '<div class="chat-msg-bubble">' +
                                    m.Message +
@@ -7089,7 +7096,15 @@
         var OPT_HT = ['Keep working hard and continue to make the school proud.', 'A commendable effort; strive to achieve even higher results.', 'There is room for improvement; put in more effort next term.', 'Take your studies seriously to achieve better outcomes.', 'Parents/guardians are encouraged to support learning at home.', 'Greater commitment is needed for improved performance.'];
 
         // ── UTILS ──
-        function toast(msg, type) { type = type || 'info'; var ic = { success: '✓', error: '✕', info: 'i' }; var el = document.createElement('div'); el.className = 'toast ' + type; el.innerHTML = '<span style="font-weight:800;font-size:14px">' + ic[type] + '</span><span style="flex:1">' + msg + '</span><button class="txbtn" onclick="this.parentElement.remove()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>'; document.getElementById('toastCtr').appendChild(el); setTimeout(function () { if (el.parentNode) el.remove(); }, 5000); }
+        // Toast icons are inline SVGs keyed by type (no emoji) — most toast()/showAlert() calls
+        // still prefix their message text with an emoji left over from before this existed; those
+        // are redundant now that the bubble itself carries a proper icon, and are being cleaned up.
+        var TOAST_ICONS = {
+            success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+            error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>',
+            info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
+        };
+        function toast(msg, type) { type = type || 'info'; var el = document.createElement('div'); el.className = 'toast ' + type; el.innerHTML = '<span style="width:16px;height:16px;flex-shrink:0">' + (TOAST_ICONS[type] || TOAST_ICONS.info) + '</span><span style="flex:1">' + msg + '</span><button class="txbtn" onclick="this.parentElement.remove()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>'; document.getElementById('toastCtr').appendChild(el); setTimeout(function () { if (el.parentNode) el.remove(); }, 5000); }
         function ord(n) { var s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
         function popYears(id, cur) { var el = document.getElementById(id); if (!el) return; var p = el.value; el.innerHTML = ''; YEARS.forEach(function (y) { var o = document.createElement('option'); o.value = y; o.textContent = y; if (y === (cur || p)) o.selected = true; el.appendChild(o); }); if (!el.value && YEARS.length > 0) el.value = YEARS[0]; }
         function populateAllYears() { ['resYear', 'remYear', 'msYear', 'bulkYear', 'm_Year', 'set_CURRENT_YEAR', 'cumYear', 'fbYear', 'eaYear'].forEach(function (id) { popYears(id, '2025-2026'); }); }
@@ -7265,11 +7280,11 @@
 
         // ── CHATBOT ──
         var chatOpen = false;
-        var chatReplies = { help: 'I can help with:\n• <b>SBA scores</b> — Results Entry → Enter Class Scores\n• <b>Exam scores</b> — Results Entry → Enter Examination Scores\n• <b>Class Summary</b> — Results Entry → Class Summary\n• <b>Cumulative Record</b> — Cumulative Record section\n• <b>Report card templates</b> — Preview Report → choose template\n• <b>Add subjects per class</b> — Subjects (Per Class)\n• <b>Headmaster name</b> — Settings → School\n• <b>Print reports</b> — Preview Report or Bulk Print', sba: 'Enter SBA by going to Results Entry → Select class → Click "Enter Class Scores (SBA)". You can configure components (Test 1, Group Work, Test 2, Project Work) by clicking ⚙ Configure SBA. The total is automatically scaled to 50.', exam: 'For exam scores, go to Results Entry → Select class → "Enter Examination Scores". Enter scores out of 100 — system scales to 50. Final total = SBA (50) + Exam (50) = 100.', template: 'Choose from 3 report card templates in Preview Report: Classic Navy, Royal Purple, and Forest Green. Each has thick outer borders and dotted inner table lines.', cumulative: 'Cumulative Record shows performance across all 3 terms. Go to Cumulative Record → Enter Student ID + Year → Load. You can print and export it.', headmaster: 'Add the headmaster name in Settings → School → Headmaster Name field. It appears under the signature on the report card.', password: 'Change admin password in Settings → Security. Enter your current password first.', sms: 'Send SMS to parents via SMS Notifications. First configure Hubtel API key in Settings → SMS.' };
+        var chatReplies = { help: 'I can help with:\n• <b>SBA scores</b> — Results Entry → Enter Class Scores\n• <b>Exam scores</b> — Results Entry → Enter Examination Scores\n• <b>Class Summary</b> — Results Entry → Class Summary\n• <b>Cumulative Record</b> — Cumulative Record section\n• <b>Report card templates</b> — Preview Report → choose template\n• <b>Add subjects per class</b> — Subjects (Per Class)\n• <b>Headmaster name</b> — Settings → School\n• <b>Print reports</b> — Preview Report or Bulk Print', sba: 'Enter SBA by going to Results Entry → Select class → Click "Enter Class Scores (SBA)". You can configure components (Test 1, Group Work, Test 2, Project Work) by clicking the Configure SBA button. The total is automatically scaled to 50.', exam: 'For exam scores, go to Results Entry → Select class → "Enter Examination Scores". Enter scores out of 100 — system scales to 50. Final total = SBA (50) + Exam (50) = 100.', template: 'Choose from 3 report card templates in Preview Report: Classic Navy, Royal Purple, and Forest Green. Each has thick outer borders and dotted inner table lines.', cumulative: 'Cumulative Record shows performance across all 3 terms. Go to Cumulative Record → Enter Student ID + Year → Load. You can print and export it.', headmaster: 'Add the headmaster name in Settings → School → Headmaster Name field. It appears under the signature on the report card.', password: 'Change admin password in Settings → Security. Enter your current password first.', sms: 'Send SMS to parents via SMS Notifications. First configure Hubtel API key in Settings → SMS.' };
         function toggleChatbot() { chatOpen = !chatOpen; document.getElementById('chatbotWin').classList.toggle('open', chatOpen); }
         function sendChat() { var inp = document.getElementById('cwInput'), msg = inp.value.trim(); if (!msg) return; inp.value = ''; addChatMsg(msg, 'user'); setTimeout(function () { addChatMsg(getReply(msg.toLowerCase()), 'bot'); }, 500); }
         function addChatMsg(msg, type) { var el = document.createElement('div'); el.className = 'cwmsg ' + type; el.innerHTML = msg.replace(/\n/g, '<br>'); var msgs = document.getElementById('cwMsgs'); msgs.appendChild(el); msgs.scrollTop = msgs.scrollHeight; }
-        function getReply(q) { for (var k in chatReplies) { if (q.includes(k)) return chatReplies[k]; } if (q.includes('hello') || q.includes('hi')) return 'Hello! 👋 How can I help? Type "help" to see options.'; if (q.includes('thank')) return 'You\'re welcome! 😊 Is there anything else?'; return 'I\'m not sure about that. Type "help" to see what I can assist with.'; }
+        function getReply(q) { for (var k in chatReplies) { if (q.includes(k)) return chatReplies[k]; } if (q.includes('hello') || q.includes('hi')) return 'Hello! How can I help? Type "help" to see options.'; if (q.includes('thank')) return 'You\'re welcome! Is there anything else?'; return 'I\'m not sure about that. Type "help" to see what I can assist with.'; }
 
         // ── REFRESH ──
         function refreshCurrentPanel() { var btn = document.getElementById('refreshBtn'); btn.style.transform = 'rotate(360deg)'; btn.style.transition = 'transform .5s'; setTimeout(function () { btn.style.transform = ''; btn.style.transition = ''; }, 500); var m = { dashboard: loadAllData, students: loadStudents, classes: loadClasses, subjects: loadSubjectsPanel, grading: loadGrading, settings: loadSettings, mastersheet: loadMasterSheet }; if (m[currentPanel]) m[currentPanel](); else toast('Refreshed', 'info'); }
@@ -7863,6 +7878,103 @@
             }
         });
 
+        // ── ULTRA-MODERN BAR CHART HELPERS ──────────────────────────────────────
+        // Shared building blocks for both dashboard charts: pill-shaped glowing bars, dashed
+        // (rather than solid-fill) performance threshold lines, and floating rounded value chips
+        // above each bar — used by both the class-performance and term-trend charts below.
+        function perfBand(v) { return v >= 70 ? 'Excellent' : v >= 50 ? 'Average' : 'Needs Attention'; }
+
+        // Soft glow behind the bars — a single ambient shadow color (rather than a precise
+        // per-bar tint) is enough to read as "glowing pills" without the extra draw passes a fully
+        // accurate per-bar glow would need.
+        function makeGlowPlugin(id, glowColor) {
+            return {
+                id: id,
+                beforeDatasetDraw: function (chart) {
+                    chart.ctx.save();
+                    chart.ctx.shadowColor = glowColor;
+                    chart.ctx.shadowBlur = 16;
+                    chart.ctx.shadowOffsetY = 4;
+                },
+                afterDatasetDraw: function (chart) { chart.ctx.restore(); }
+            };
+        }
+
+        // Dashed reference lines at the pass (50%) / excellent (70%) thresholds, with small
+        // pill labels — a lighter, more modern alternative to solid traffic-light background bands.
+        function makeThresholdLinesPlugin(id) {
+            return {
+                id: id,
+                afterDraw: function (chart) {
+                    var ctx2 = chart.ctx, yAxis = chart.scales.y, xAxis = chart.scales.x;
+                    if (!yAxis || !xAxis) return;
+                    var left = xAxis.left, right = xAxis.right;
+                    [[70, '#10b981', 'Excellent'], [50, '#f59e0b', 'Pass']].forEach(function (t) {
+                        var y = yAxis.getPixelForValue(t[0]);
+                        ctx2.save();
+                        ctx2.setLineDash([5, 5]);
+                        ctx2.strokeStyle = t[1];
+                        ctx2.globalAlpha = 0.35;
+                        ctx2.lineWidth = 1.5;
+                        ctx2.beginPath();
+                        ctx2.moveTo(left, y);
+                        ctx2.lineTo(right, y);
+                        ctx2.stroke();
+                        ctx2.restore();
+                    });
+                }
+            };
+        }
+
+        // Floating rounded "chip" value labels above each bar, colored to match that bar.
+        function makeChipLabelsPlugin(id, dataRef, colorFor, suffix) {
+            return {
+                id: id,
+                afterDatasetsDraw: function (chart) {
+                    var meta = chart.getDatasetMeta(0);
+                    var ctx2 = chart.ctx;
+                    ctx2.save();
+                    meta.data.forEach(function (bar, i) {
+                        var v = dataRef[i];
+                        if (!v) return;
+                        var label = v + (suffix || '');
+                        ctx2.font = '800 11px "Segoe UI", Tahoma, Geneva, Verdana, sans-serif';
+                        var w = ctx2.measureText(label).width + 14;
+                        var h = 18, x = bar.x - w / 2, y = bar.y - h - 8;
+                        var col = colorFor(i);
+                        ctx2.fillStyle = col;
+                        ctx2.beginPath();
+                        ctx2.roundRect ? ctx2.roundRect(x, y, w, h, 9) : ctx2.rect(x, y, w, h);
+                        ctx2.fill();
+                        ctx2.fillStyle = '#fff';
+                        ctx2.textAlign = 'center';
+                        ctx2.textBaseline = 'middle';
+                        ctx2.fillText(label, bar.x, y + h / 2 + 0.5);
+                    });
+                    ctx2.restore();
+                }
+            };
+        }
+
+        function ultraModernScales(suffix) {
+            return {
+                y: {
+                    beginAtZero: true, max: 100,
+                    border: { display: false },
+                    grid: { display: false },
+                    ticks: {
+                        font: { size: 11, weight: '600' }, color: '#94a3b8',
+                        callback: function (v) { return v + (suffix || ''); }, stepSize: 20
+                    }
+                },
+                x: {
+                    border: { display: false },
+                    grid: { display: false },
+                    ticks: { font: { size: 10, weight: '700' }, color: '#64748b', maxRotation: 35 }
+                }
+            };
+        }
+
         function renderCharts(cad, tad) {
             if (!document.getElementById('barChart') || !document.getElementById('lineChart')) return;
 
@@ -7880,43 +7992,29 @@
                 { start: '#6366f1', end: '#818cf8' }   // Indigo
             ];
 
-            // ── BAR CHART ──
+            // ── BAR CHART: Class Academic Performance (ultra-modern pill bars) ──
             var bCtx = document.getElementById('barChart').getContext('2d');
             if (barChartInst) barChartInst.destroy();
             var bl = Object.keys(cad);
             var bData = bl.map(function(k) { return Math.round((Number(cad[k]) || 0) * 10) / 10; });
 
-            // Build per-bar gradients
             var barGrads = bl.map(function(_, i) {
                 var col = palette[i % palette.length];
-                var g = bCtx.createLinearGradient(0, 0, 0, 280);
+                var g = bCtx.createLinearGradient(0, 0, 280, 0);
                 g.addColorStop(0, col.start);
                 g.addColorStop(1, col.end);
                 return g;
             });
-            var barHovers = bl.map(function(_, i) { return palette[i % palette.length].start; });
-
-            // Performance zone background plugin
-            var zonePlugin = {
-                id: 'perfZones',
-                beforeDraw: function(chart) {
-                    var ctx2 = chart.ctx, yAxis = chart.scales.y, xAxis = chart.scales.x;
-                    var left = xAxis.left, right = xAxis.right;
-                    // Green zone 70-100
-                    ctx2.fillStyle = 'rgba(16,185,129,0.05)';
-                    ctx2.fillRect(left, yAxis.getPixelForValue(100), right - left, yAxis.getPixelForValue(70) - yAxis.getPixelForValue(100));
-                    // Yellow zone 50-70
-                    ctx2.fillStyle = 'rgba(245,158,11,0.05)';
-                    ctx2.fillRect(left, yAxis.getPixelForValue(70), right - left, yAxis.getPixelForValue(50) - yAxis.getPixelForValue(70));
-                    // Red zone 0-50
-                    ctx2.fillStyle = 'rgba(244,63,94,0.05)';
-                    ctx2.fillRect(left, yAxis.getPixelForValue(50), right - left, yAxis.getPixelForValue(0) - yAxis.getPixelForValue(50));
-                }
-            };
+            var barHovers = bl.map(function(_, i) { return palette[i % palette.length].end; });
+            var barColorAt = function (i) { return palette[i % palette.length].start; };
 
             barChartInst = new Chart(bCtx, {
                 type: 'bar',
-                plugins: [zonePlugin],
+                plugins: [
+                    makeGlowPlugin('barGlow', 'rgba(99,102,241,0.35)'),
+                    makeThresholdLinesPlugin('perfThresholds'),
+                    makeChipLabelsPlugin('barChips', bData, barColorAt, '%')
+                ],
                 data: {
                     labels: bl,
                     datasets: [{
@@ -7924,15 +8022,21 @@
                         data: bData,
                         backgroundColor: barGrads,
                         hoverBackgroundColor: barHovers,
-                        borderRadius: { topLeft: 8, topRight: 8 },
+                        borderRadius: 999,
                         borderSkipped: false,
-                        maxBarThickness: 44
+                        barPercentage: 0.55,
+                        categoryPercentage: 0.75
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    animation: { duration: 900, easing: 'easeOutBounce' },
+                    animation: {
+                        duration: 1100,
+                        easing: 'easeOutElastic',
+                        delay: function (ctx) { return ctx.type === 'data' ? ctx.dataIndex * 90 : 0; }
+                    },
+                    elements: { bar: { borderSkipped: false } },
                     plugins: {
                         legend: { display: false },
                         tooltip: {
@@ -7940,85 +8044,35 @@
                             titleFont: { size: 13, weight: '700' },
                             bodyFont: { size: 12 },
                             padding: 12,
-                            cornerRadius: 10,
+                            cornerRadius: 12,
                             displayColors: true,
                             callbacks: {
-                                label: function(ctx) {
-                                    var v = ctx.raw;
-                                    var badge = v >= 70 ? '🟢 Excellent' : v >= 50 ? '🟡 Average' : '🔴 Needs Attention';
-                                    return ' ' + v + '% — ' + badge;
-                                }
+                                label: function(ctx) { return ' ' + ctx.raw + '% — ' + perfBand(ctx.raw); }
                             }
-                        },
-                        // Data labels on top of bars
-                        datalabels: false
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true, max: 100,
-                            border: { display: false },
-                            grid: { color: 'rgba(148,163,184,0.10)', lineWidth: 1 },
-                            ticks: {
-                                font: { size: 11, weight: '600' },
-                                color: '#94a3b8',
-                                callback: function(v) { return v + '%'; },
-                                stepSize: 20
-                            }
-                        },
-                        x: {
-                            border: { display: false },
-                            grid: { display: false },
-                            ticks: { font: { size: 10, weight: '700' }, color: '#64748b', maxRotation: 35 }
                         }
-                    }
+                    },
+                    scales: ultraModernScales('%')
                 }
             });
 
-            // Draw data value labels on top of bars (after chart renders)
-            setTimeout(function() {
-                if (!barChartInst) return;
-                var meta = barChartInst.getDatasetMeta(0);
-                var ctx2 = bCtx;
-                ctx2.save();
-                meta.data.forEach(function(bar, i) {
-                    var v = bData[i];
-                    if (!v) return;
-                    ctx2.font = 'bold 11px sans-serif';
-                    ctx2.fillStyle = palette[i % palette.length].start;
-                    ctx2.textAlign = 'center';
-                    ctx2.fillText(v + '%', bar.x, bar.y - 6);
-                });
-                ctx2.restore();
-            }, 950);
-
-            // ── LINE CHART ──
+            // ── BAR CHART: Term Performance Trend (was a line chart — now an ultra-modern bar
+            // chart too, colored from the admin's theme accent colors) ──
             var lCtx = document.getElementById('lineChart').getContext('2d');
             if (lineChartInst) lineChartInst.destroy();
             var ll = ['Term 1', 'Term 2', 'Term 3'];
             var lData = ll.map(function(t) { return Math.round((Number(tad[t]) || 0) * 10) / 10; });
 
-            // Gradient fill for line
-            var lineGradFill = lCtx.createLinearGradient(0, 0, 0, 280);
-            lineGradFill.addColorStop(0, 'rgba(16,185,129,0.30)');
-            lineGradFill.addColorStop(0.6, 'rgba(16,185,129,0.08)');
-            lineGradFill.addColorStop(1, 'rgba(16,185,129,0.00)');
+            var themePal = (typeof getThemeChartPalette === 'function') ? getThemeChartPalette() : { nv: '#0d1b4b', bl: '#1a3a8a', go: '#f0c020' };
+            var termColors = [themePal.bl, themePal.go, themePal.nv];
+            var termGrads = ll.map(function (_, i) {
+                var g = lCtx.createLinearGradient(0, 0, 280, 0);
+                g.addColorStop(0, termColors[i % termColors.length]);
+                g.addColorStop(1, (typeof shiftColor === 'function') ? shiftColor(termColors[i % termColors.length], 40) : termColors[i % termColors.length]);
+                return g;
+            });
+            var termColorAt = function (i) { return termColors[i % termColors.length]; };
 
-            // Zone plugin for line chart
-            var lZonePlugin = {
-                id: 'lPerfZones',
-                beforeDraw: function(chart) {
-                    var ctx2 = chart.ctx, yAxis = chart.scales.y, xAxis = chart.scales.x;
-                    var left = xAxis.left, right = xAxis.right;
-                    ctx2.fillStyle = 'rgba(16,185,129,0.04)';
-                    ctx2.fillRect(left, yAxis.getPixelForValue(100), right - left, yAxis.getPixelForValue(70) - yAxis.getPixelForValue(100));
-                    ctx2.fillStyle = 'rgba(245,158,11,0.04)';
-                    ctx2.fillRect(left, yAxis.getPixelForValue(70), right - left, yAxis.getPixelForValue(50) - yAxis.getPixelForValue(70));
-                    ctx2.fillStyle = 'rgba(244,63,94,0.04)';
-                    ctx2.fillRect(left, yAxis.getPixelForValue(50), right - left, yAxis.getPixelForValue(0) - yAxis.getPixelForValue(50));
-                }
-            };
-
-            // Trend direction for badge
+            // Trend direction for badge (arrow glyphs, not emoji — kept as plain typographic marks)
             var trendDir = '—';
             if (lData[2] > lData[0]) trendDir = '↑ Improving';
             else if (lData[2] < lData[0]) trendDir = '↓ Declining';
@@ -8027,34 +8081,34 @@
             if (tBadge && trendDir !== '—') tBadge.textContent = trendDir;
 
             lineChartInst = new Chart(lCtx, {
-                type: 'line',
-                plugins: [lZonePlugin],
+                type: 'bar',
+                plugins: [
+                    makeGlowPlugin('trendGlow', 'rgba(240,192,32,0.35)'),
+                    makeThresholdLinesPlugin('trendThresholds'),
+                    makeChipLabelsPlugin('trendChips', lData, termColorAt, '%')
+                ],
                 data: {
                     labels: ll,
                     datasets: [{
                         label: 'School Average',
                         data: lData,
-                        borderColor: '#10b981',
-                        borderWidth: 3.5,
-                        backgroundColor: lineGradFill,
-                        fill: true,
-                        tension: 0.42,
-                        pointBackgroundColor: '#ffffff',
-                        pointBorderColor: '#10b981',
-                        pointBorderWidth: 3,
-                        pointRadius: 8,
-                        pointHoverRadius: 11,
-                        pointHoverBorderWidth: 4,
-                        pointHoverBackgroundColor: '#10b981',
-                        pointHoverBorderColor: '#ffffff',
-                        shadowColor: 'rgba(16,185,129,0.4)',
-                        shadowBlur: 12
+                        backgroundColor: termGrads,
+                        hoverBackgroundColor: termColors,
+                        borderRadius: 999,
+                        borderSkipped: false,
+                        barPercentage: 0.5,
+                        categoryPercentage: 0.7
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    animation: { duration: 1100, easing: 'easeInOutQuart' },
+                    animation: {
+                        duration: 1200,
+                        easing: 'easeOutElastic',
+                        delay: function (ctx) { return ctx.type === 'data' ? ctx.dataIndex * 140 : 0; }
+                    },
+                    elements: { bar: { borderSkipped: false } },
                     plugins: {
                         legend: { display: false },
                         tooltip: {
@@ -8062,35 +8116,14 @@
                             titleFont: { size: 13, weight: '700' },
                             bodyFont: { size: 12 },
                             padding: 12,
-                            cornerRadius: 10,
+                            cornerRadius: 12,
                             displayColors: false,
                             callbacks: {
-                                label: function(ctx) {
-                                    var v = ctx.raw;
-                                    var badge = v >= 70 ? '🟢 Excellent' : v >= 50 ? '🟡 Average' : '🔴 Needs Attention';
-                                    return ' ' + v + '% — ' + badge;
-                                }
+                                label: function(ctx) { return ' ' + ctx.raw + '% — ' + perfBand(ctx.raw); }
                             }
                         }
                     },
-                    scales: {
-                        y: {
-                            beginAtZero: true, max: 100,
-                            border: { display: false },
-                            grid: { color: 'rgba(148,163,184,0.10)' },
-                            ticks: {
-                                font: { size: 11, weight: '600' },
-                                color: '#94a3b8',
-                                callback: function(v) { return v + '%'; },
-                                stepSize: 20
-                            }
-                        },
-                        x: {
-                            border: { display: false },
-                            grid: { color: 'rgba(148,163,184,0.07)' },
-                            ticks: { font: { size: 11, weight: '700' }, color: '#64748b' }
-                        }
-                    }
+                    scales: ultraModernScales('%')
                 }
             });
         }
@@ -8319,7 +8352,7 @@
                 if (!subjects.length) { grid.innerHTML = '<div style="color:var(--mu);padding:10px;text-align:center">No subjects configured. Go to Subjects (Per Class) first.</div>'; return; }
                 var h = '<div class="etiles" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">';
                 subjects.forEach(function (sn) {
-                    h += '<div class="etile sba" onclick="openSubjectEntry(\'' + sn.replace(/'/g, "\\'") + '\')"><div class="etile-ico">📝</div><div class="etile-title">' + sn + '</div><div class="etile-desc" style="font-size:11px">Enter Class & Exam Scores</div></div>';
+                    h += '<div class="etile sba" onclick="openSubjectEntry(\'' + sn.replace(/'/g, "\\'") + '\')"><div class="etile-ico"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div><div class="etile-title">' + sn + '</div><div class="etile-desc" style="font-size:11px">Enter Class & Exam Scores</div></div>';
                 });
                 h += '</div>';
                 grid.innerHTML = h;
@@ -9155,7 +9188,11 @@
             var h = '<div class="tw" style="overflow-x:auto;"><table class="dt"><thead><tr><th>Rank</th><th>Photo</th><th>ID</th><th>Name</th>';
             subjects.forEach(function (sub) { h += '<th>' + sub.name + '</th>'; }); h += '<th>Total</th><th>Average</th><th>Overall Pos.</th>' + (isJHS ? '<th>Aggregate</th>' : '') + '<th>Status</th><th class="no-print">Actions</th></tr></thead><tbody>';
             students.forEach(function (s, idx) {
-                var pos = idx + 1; var rcClass = pos === 1 ? 'rc1' : pos === 2 ? 'rc2' : pos === 3 ? 'rc3' : 'rcn'; var rc = pos <= 3 ? ['🥇', '🥈', '🥉'][pos - 1] : pos;
+                var pos = idx + 1; var rcClass = pos === 1 ? 'rc1' : pos === 2 ? 'rc2' : pos === 3 ? 'rc3' : 'rcn';
+                var medalColors = { 1: '#f0c020', 2: '#c0c9d6', 3: '#cd7f32' };
+                var rc = pos <= 3
+                    ? '<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:' + medalColors[pos] + ';color:#fff"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/></svg></span>'
+                    : pos;
                 var phUrl = fixDriveUrl(s.PhotoUrl);
                 var ph = phUrl ? '<img src="' + phUrl + '" style="width:30px;height:35px;object-fit:cover;border-radius:5px;border:1px solid var(--bd)">' : '<div style="width:30px;height:35px;background:#f1f5f9;border-radius:5px;display:flex;align-items:center;justify-content:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>';
                 h += '<tr><td><div class="rcirc ' + rcClass + '">' + rc + '</div></td><td>' + ph + '</td><td><span class="bdg bb">' + s.ID + '</span></td><td><strong>' + s.Name + '</strong></td>';
@@ -9700,10 +9737,12 @@
             if (s.REPORT_TEMPLATE) { selectedTemplate = Number(s.REPORT_TEMPLATE) || 1; document.querySelectorAll('.tpl-card').forEach(function (c) { c.classList.remove('sel'); if (Number(c.dataset.tpl) === selectedTemplate) c.classList.add('sel'); }); }
             var pfi = document.getElementById('photoFolderInfo');
             if (pfi) {
+                var checkSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="20 6 9 17 4 12"/></svg>';
+                var xSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#e11d48" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
                 if (s.PHOTOS_FOLDER_ID) {
-                    pfi.innerHTML = '✅ Storage Folder Initialized: <a href="https://drive.google.com/drive/folders/' + s.PHOTOS_FOLDER_ID + '" target="_blank" style="color:var(--bl); text-decoration:underline; font-weight:700;">View in Drive (' + s.PHOTOS_FOLDER_ID + ')</a>';
+                    pfi.innerHTML = checkSvg + 'Storage Folder Initialized: <a href="https://drive.google.com/drive/folders/' + s.PHOTOS_FOLDER_ID + '" target="_blank" style="color:var(--bl); text-decoration:underline; font-weight:700;">View in Drive (' + s.PHOTOS_FOLDER_ID + ')</a>';
                 } else {
-                    pfi.innerHTML = '❌ Folder status: Not Initialized (Photos will not display until initialized)';
+                    pfi.innerHTML = xSvg + 'Folder status: Not Initialized (Photos will not display until initialized)';
                 }
             }
             // Bind typography values to settings selects.
@@ -10165,7 +10204,7 @@
             applyTypography(fontFam, fontSize, fontWeight);
             google.script.run.withSuccessHandler(function (r) {
                 if (r.success) {
-                    toast('✅ Typography settings saved & applied!', 'success');
+                    toast('Typography settings saved & applied!', 'success');
                     if (!window._cachedSettings) window._cachedSettings = {};
                     window._cachedSettings.SYSTEM_FONT_FAMILY = fontFam;
                     window._cachedSettings.SYSTEM_FONT_SIZE = fontSize;
@@ -10234,12 +10273,16 @@
             var btn = event.target; btn.disabled = true; btn.textContent = 'Preparing…';
             var statusEl = document.getElementById('bkpStatus');
             statusEl.style.display = 'block';
+            var ICO_CLOCK = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+            var ICO_BOX = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M21 8V21H3V8"/><path d="M1 3h22v5H1z"/><line x1="10" y1="12" x2="14" y2="12"/></svg>';
+            var ICO_X = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+            var ICO_CHECK = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="20 6 9 17 4 12"/></svg>';
             statusEl.style.background = '#dbeafe'; statusEl.style.color = '#1e40af';
-            statusEl.textContent = '⏳ Loading data from server…';
+            statusEl.innerHTML = ICO_CLOCK + 'Loading data from server…';
             document.getElementById('bkpDownloadBtn').style.display = 'none';
             google.script.run.withSuccessHandler(function(r) {
-                btn.disabled = false; btn.textContent = '📦 Prepare Backup';
-                if (!r.success) { statusEl.style.background='#fee2e2'; statusEl.style.color='#991b1b'; statusEl.textContent = '✕ Error: ' + r.message; return; }
+                btn.disabled = false; btn.innerHTML = ICO_BOX + 'Prepare Backup';
+                if (!r.success) { statusEl.style.background='#fee2e2'; statusEl.style.color='#991b1b'; statusEl.innerHTML = ICO_X + 'Error: ' + r.message; return; }
                 _backupData = {
                     exportedAt: new Date().toISOString(),
                     version: '7.0',
@@ -10256,13 +10299,13 @@
                 document.getElementById('bkpSettingsStatus').textContent = 'Included';
                 document.getElementById('bkpLastTime').textContent = new Date().toLocaleString();
                 statusEl.style.background = '#dcfce7'; statusEl.style.color = '#166534';
-                statusEl.textContent = '✓ Backup data ready! Click Download to save the file.';
+                statusEl.innerHTML = ICO_CHECK + 'Backup data ready! Click Download to save the file.';
                 document.getElementById('bkpDownloadBtn').style.display = 'inline-flex';
                 addNotif('Backup Prepared', _backupData.students.length + ' students, ' + _backupData.classes.length + ' classes exported');
             }).withFailureHandler(function(e) {
-                btn.disabled = false; btn.textContent = '📦 Prepare Backup';
+                btn.disabled = false; btn.innerHTML = ICO_BOX + 'Prepare Backup';
                 statusEl.style.background='#fee2e2'; statusEl.style.color='#991b1b';
-                statusEl.textContent = '✕ Error: ' + e.message;
+                statusEl.innerHTML = ICO_X + 'Error: ' + e.message;
             }).getFullBackupData(adminToken);
         }
         function downloadBackup() {
@@ -10631,9 +10674,9 @@
                 var details = e.Details || 'Successful sign-in';
                 var dev = e.DeviceType || '—';
                 var devIcon = '';
-                if (dev === 'Mobile') devIcon = '📱 ';
-                else if (dev === 'Tablet') devIcon = '📱 ';
-                else if (dev === 'Desktop') devIcon = '🖥️ ';
+                var svgAttrs = ' width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px"';
+                if (dev === 'Mobile' || dev === 'Tablet') devIcon = '<svg' + svgAttrs + '><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>';
+                else if (dev === 'Desktop') devIcon = '<svg' + svgAttrs + '><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>';
                 
                 h += '<tr>'
                    + '<td style="white-space:nowrap;font-size:11px;color:var(--mu)">' + d + '</td>'
@@ -10730,7 +10773,7 @@
                         '<div style="font-weight:700; color:var(--nv); font-size:13px; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + (v.title || 'Video ' + (i+1)) + '</div>' +
                         '<div style="font-size:11px; color:var(--mu); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + (v.url || '') + '</div>' +
                         '</div>' +
-                        '<button onclick="deleteTutorialVideo(' + i + ')" title="Remove" style="flex-shrink:0; background:#fee2e2; color:#dc2626; border:none; border-radius:8px; padding:6px 10px; cursor:pointer; font-size:12px; font-weight:700;">✕ Remove</button>' +
+                        '<button onclick="deleteTutorialVideo(' + i + ')" title="Remove" style="flex-shrink:0; background:#fee2e2; color:#dc2626; border:none; border-radius:8px; padding:6px 10px; cursor:pointer; font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:4px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Remove</button>' +
                         '</div>';
                 }).join('');
             }
@@ -10769,7 +10812,7 @@
                     if (titleEl) titleEl.value = '';
                     if (urlEl) urlEl.value = '';
                     renderTutorialVideoList();
-                    toast('✅ Video added!', 'success');
+                    toast('Video added!', 'success');
                 } else {
                     _tutorialVideos.pop(); // rollback
                     toast(r.message || 'Save failed.', 'error');
@@ -11179,7 +11222,7 @@
             prog.textContent = 'Sending SMS... Please wait.';
             google.script.run.withSuccessHandler(function (r) {
                 btn.disabled = false;
-                btn.textContent = '📤 Send SMS Notification';
+                btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Send SMS Notification';
                 prog.textContent = '';
                 if (r.success) {
                     toast(r.message, 'success');
@@ -11230,7 +11273,7 @@
             btn.textContent = 'Sending…';
             google.script.run.withSuccessHandler(function (r) {
                 btn.disabled = false;
-                btn.textContent = '📤 Send SMS';
+                btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Send SMS';
                 if (r.success) {
                     toast('SMS sent successfully!', 'success');
                     closeModal('smsConfirmModal');
@@ -11292,7 +11335,7 @@
                     renderDriveBackups(r.backups);
                 } else {
                     if (container) {
-                        container.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:40px; color:#ef4444; background:#fef2f2; border-radius:16px; border:1px solid #fee2e2;"><div style="font-size:32px; margin-bottom:8px">⚠️</div>Failed to load backups: ' + r.message + '</div>';
+                        container.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:40px; color:#ef4444; background:#fef2f2; border-radius:16px; border:1px solid #fee2e2;"><div style="margin-bottom:8px"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>Failed to load backups: ' + r.message + '</div>';
                     }
                 }
             }).listDriveBackups(adminToken);
@@ -11302,7 +11345,7 @@
             var container = document.getElementById('driveBackupsContainer');
             if (!container) return;
             if (!backups || !backups.length) {
-                container.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:40px; color:var(--mu); background:#ffffff; border-radius:16px; border:1px solid var(--bd); box-shadow:var(--sh);"><div style="font-size:32px; margin-bottom:8px">📂</div>No system backups found in "System_Backups" folder. Click "Create New Backup" above to create one!</div>';
+                container.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:40px; color:var(--mu); background:#ffffff; border-radius:16px; border:1px solid var(--bd); box-shadow:var(--sh);"><div style="margin-bottom:8px"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto;opacity:0.6"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></div>No system backups found in "System_Backups" folder. Click "Create New Backup" above to create one!</div>';
                 return;
             }
             container.innerHTML = backups.map(function(b) {
@@ -11346,7 +11389,7 @@
         }
 
         function triggerRestoreBackup(fileId, name) {
-            if (!confirm('⚠️ CRITICAL DATA WARNING!\n\nAre you sure you want to restore the entire database from:\n"' + name + '"?\n\nThis will completely replace all current student lists, classes, grades/SBA marks, teacher records, and configurations. Previous term records remain preserved in archive. This action cannot be undone!')) {
+            if (!confirm('CRITICAL DATA WARNING!\n\nAre you sure you want to restore the entire database from:\n"' + name + '"?\n\nThis will completely replace all current student lists, classes, grades/SBA marks, teacher records, and configurations. Previous term records remain preserved in archive. This action cannot be undone!')) {
                 return;
             }
             toast('Overwriting database from backup...', 'info');
@@ -11842,10 +11885,10 @@
             '</div>';
             
             var overlayHTML = '<div class="rc-toolbar no-print">' +
-                '<div class="rc-toolbar-brand"><div class="rc-toolbar-logo">📊</div><div class="rc-toolbar-name">Exams Analyzer Report</div></div>' +
+                '<div class="rc-toolbar-brand"><div class="rc-toolbar-logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><div class="rc-toolbar-name">Exams Analyzer Report</div></div>' +
                 '<div class="rc-toolbar-acts">' +
                     '<button class="rc-btn rc-btn-back" onclick="closeEAPrint()">← Back</button>' +
-                    '<button class="rc-btn rc-btn-print" onclick="window.print()">🖨️ Print</button>' +
+                    '<button class="rc-btn rc-btn-print" onclick="window.print()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print</button>' +
                 '</div>' +
             '</div>' +
             '<div class="ea-print-pages">' + page1HTML + page2HTML + '</div>';
@@ -12749,8 +12792,9 @@
                         <select id="promoTargetTerm" style="width:100%; padding:8px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;"></select>
                     </div>
                 </div>
-                <p style="font-size:12px; color:#ef4444; font-weight:600; margin-bottom:10px;">
-                    ⚠️ Warning: This will clear the current Attendance, Scores, and Remarks for all promoted students to prepare for the new term.
+                <p style="font-size:12px; color:#ef4444; font-weight:600; margin-bottom:10px; display:flex; align-items:flex-start; gap:6px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    Warning: This will clear the current Attendance, Scores, and Remarks for all promoted students to prepare for the new term.
                 </p>
             </div>
             <div class="mfoot" style="display:flex; justify-content:space-between; width:100%; padding: 15px 20px;">
@@ -12785,44 +12829,44 @@
                 <div class="wk-step" id="wk-admin-0">
                     <div class="wk-step-title"><div class="wk-step-num">1</div> Dashboard Overview</div>
                     <div class="wk-step-desc">Your <strong>Dashboard</strong> shows a live summary — total students, classes, recent activities, academic performance charts and term trends. It's your command center for the whole school.</div>
-                    <div class="wk-tip">💡 <strong>Tip:</strong> The top bar shows the active academic year and term. You can switch sessions anytime from the header dropdowns.</div>
+                    <div class="wk-tip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg><strong>Tip:</strong> The top bar shows the active academic year and term. You can switch sessions anytime from the header dropdowns.</div>
                 </div>
                 <div class="wk-step" id="wk-admin-1">
                     <div class="wk-step-title"><div class="wk-step-num">2</div> System Settings</div>
                     <div class="wk-step-desc">Go to <strong>Settings</strong> to configure your school name, logo, grading system, SMS alerts, report templates, and typography. All changes save to the cloud and sync instantly.</div>
-                    <div class="wk-tip">💡 <strong>Tip:</strong> Upload your school logo and stamp under Settings → School Info so they appear on all generated report cards.</div>
+                    <div class="wk-tip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg><strong>Tip:</strong> Upload your school logo and stamp under Settings → School Info so they appear on all generated report cards.</div>
                 </div>
                 <div class="wk-step" id="wk-admin-2">
                     <div class="wk-step-title"><div class="wk-step-num">3</div> Student Records &amp; Reports</div>
                     <div class="wk-step-desc">Add and manage students under <strong>Students</strong>. Teachers enter SBA and exam scores; the system auto-calculates grades, positions, and generates printable report cards for each student.</div>
-                    <div class="wk-tip">💡 <strong>Tip:</strong> Use <em>Bulk Print</em> to generate report cards for an entire class in one click.</div>
+                    <div class="wk-tip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg><strong>Tip:</strong> Use <em>Bulk Print</em> to generate report cards for an entire class in one click.</div>
                 </div>
                 <div class="wk-step" id="wk-admin-3">
                     <div class="wk-step-title"><div class="wk-step-num">4</div> Teachers &amp; Portals</div>
                     <div class="wk-step-desc">Add teachers in <strong>Manage Teachers</strong>. Each teacher logs in with their own credentials and can only access their assigned class. They can enter scores, view their profile, and access tutorials.</div>
-                    <div class="wk-tip">💡 <strong>Tip:</strong> You can set the default teacher password from Settings → Security at any time.</div>
+                    <div class="wk-tip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg><strong>Tip:</strong> You can set the default teacher password from Settings → Security at any time.</div>
                 </div>
                 <div class="wk-step" id="wk-admin-4">
                     <div class="wk-step-title"><div class="wk-step-num">5</div> SMS &amp; WhatsApp Alerts</div>
                     <div class="wk-step-desc">Send SMS or WhatsApp messages to parents directly from the system. Configure your <strong>Arkesel SMS API key</strong> in Settings → SMS API to enable bulk parent notifications.</div>
-                    <div class="wk-tip">💡 <strong>Tip:</strong> Visit <strong>Settings → Video Tutorial</strong> to watch a full walkthrough video once the developer adds the tutorial link.</div>
+                    <div class="wk-tip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg><strong>Tip:</strong> Visit <strong>Settings → Video Tutorial</strong> to watch a full walkthrough video once the developer adds the tutorial link.</div>
                 </div>
 
                 <!-- TEACHER STEPS -->
                 <div class="wk-step" id="wk-teacher-0">
                     <div class="wk-step-title"><div class="wk-step-num">1</div> Your Teacher Dashboard</div>
                     <div class="wk-step-desc">Welcome! Your dashboard shows your <strong>assigned class</strong>, recent score entries, and a quick summary of your students. Everything here is specific to your class only.</div>
-                    <div class="wk-tip">💡 <strong>Tip:</strong> Your username and class assignment were set by the Admin. Contact them if you need to update your credentials.</div>
+                    <div class="wk-tip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg><strong>Tip:</strong> Your username and class assignment were set by the Admin. Contact them if you need to update your credentials.</div>
                 </div>
                 <div class="wk-step" id="wk-teacher-1">
                     <div class="wk-step-title"><div class="wk-step-num">2</div> Entering SBA &amp; Exam Scores</div>
                     <div class="wk-step-desc">Go to <strong>Score Entry</strong> (or use the full-screen score editor) to enter Class Assessment (SBA) and End-of-Term Exam scores for each student. The system calculates totals automatically.</div>
-                    <div class="wk-tip">💡 <strong>Tip:</strong> Press <kbd style="background:#e2e8f0;padding:1px 5px;border-radius:4px;font-size:11px;">Tab</kbd> to move between cells quickly when entering scores.</div>
+                    <div class="wk-tip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg><strong>Tip:</strong> Press <kbd style="background:#e2e8f0;padding:1px 5px;border-radius:4px;font-size:11px;">Tab</kbd> to move between cells quickly when entering scores.</div>
                 </div>
                 <div class="wk-step" id="wk-teacher-2">
                     <div class="wk-step-title"><div class="wk-step-num">3</div> Student Reports &amp; Profile</div>
                     <div class="wk-step-desc">You can view and preview report cards for your students. Update your <strong>profile photo and signature</strong> from the Settings tab — your signature will appear on every report card you generate.</div>
-                    <div class="wk-tip">💡 <strong>Tip:</strong> Check <strong>Settings → Video Tutorial</strong> to watch a guided video on how to use the full system efficiently.</div>
+                    <div class="wk-tip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><line x1="9" y1="18" x2="15" y2="18"/><line x1="10" y1="22" x2="14" y2="22"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></svg><strong>Tip:</strong> Check <strong>Settings → Video Tutorial</strong> to watch a guided video on how to use the full system efficiently.</div>
                 </div>
             </div>
 

@@ -142,7 +142,7 @@ function initPhotoFolder() {
 function manualSetupPhotoFolder() {
   PropertiesService.getScriptProperties().deleteProperty(PHOTOS_KEY);
   var id = initPhotoFolder();
-  Logger.log(id ? '✅ Folder: https://drive.google.com/drive/folders/'+id : '❌ Failed');
+  Logger.log(id ? 'Folder: https://drive.google.com/drive/folders/'+id : 'Failed');
 }
 
 // ── SPREADSHEET SETUP ──────────────────────────────────────

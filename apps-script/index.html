@@ -1592,8 +1592,8 @@
             <!-- Student silhouette tiles injected by JS -->
         </div>
         <div class="hero-content">
-            <div class="hero-logo-wrap" id="heroLogoWrap">🎓</div>
-            <div class="hero-school-badge">🎓 Welcome To</div>
+            <div class="hero-logo-wrap" id="heroLogoWrap"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#0d1b4b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></div>
+            <div class="hero-school-badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:4px"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>Welcome To</div>
             <div class="hero-title" id="heroSchoolName">School Management System</div>
             <div class="hero-subtitle" id="heroTagline">Check academic results, track performance, and access official report
                 cards — securely, anytime, from any device.</div>
@@ -1836,7 +1836,7 @@
                 aggBar = '<div class="rc-agg-bar"><span class="rc-agg-lbl">JHS AGGREGATE SCORE</span><span class="rc-agg-badge">' + data.jhsAggregate.aggregate + '</span><span class="rc-agg-lbl" style="font-size:10.5px">(lower is better)</span></div>';
             }
 
-            var logoHtml = logoSrc ? '<img src="' + logoSrc + '" alt="Logo">' : '🎓';
+            var logoHtml = logoSrc ? '<img src="' + logoSrc + '" alt="Logo">' : '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0d1b4b" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>';
 
             var allowTeacherSign = String(st.ALLOW_TEACHER_SIGN || 'false') === 'true';
             var teacherSigSrc = (ci && ci.teacherSig) ? fixDriveUrl(ci.teacherSig) : '';
@@ -1852,7 +1852,7 @@
                 + '<div class="rc-hdr">'
                 + '<div class="rc-logo">' + logoHtml + '</div>'
                 + '<div style="text-align:center"><div class="rc-sname">' + schoolName + '</div><div class="rc-scontact">' + addr + '<br>Tel: ' + phone + (email ? ' · ' + email : '') + '</div></div>'
-                + '<div class="rc-photobox">' + (s.PhotoUrl ? '<img src="' + fixDriveUrl(s.PhotoUrl) + '" alt="">' : '👤') + '</div>'
+                + '<div class="rc-photobox">' + (s.PhotoUrl ? '<img src="' + fixDriveUrl(s.PhotoUrl) + '" alt="">' : '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>') + '</div>'
                 + '</div>'
                 + '<div class="rc-title-strip"><div class="rc-title-text">Pupil\'s Terminal Report Card</div></div>'
                 + '<div class="rc-sub-strip">End of ' + (s.Term || '').toUpperCase() + ' Examinations · Academic Year ' + s.Year + '</div>'
@@ -1958,7 +1958,7 @@
                         return (
                             <React.Fragment key={st.n}>
                                 <div className={'step-info' + (cls === 'pending' ? '' : ' ' + cls)}>
-                                    <div className={'step-dot ' + cls}>{cls === 'done' ? '✓' : st.n}</div>
+                                    <div className={'step-dot ' + cls}>{cls === 'done' ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> : st.n}</div>
                                     <div className="step-label">{st.label}</div>
                                 </div>
                                 {idx < steps.length - 1 && <div className={'step-connector' + (st.n < dotStep ? ' done' : '')}></div>}
@@ -1969,9 +1969,14 @@
             );
         }
 
+        var ALERT_ICONS = {
+            error: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>,
+            success: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>,
+            info: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+        };
         function Alert({ alert }) {
             if (!alert) return null;
-            return <div className={'alert show ' + alert.type}>{alert.msg}</div>;
+            return <div className={'alert show ' + alert.type}><span style={{ flexShrink: 0, display: 'inline-flex' }}>{ALERT_ICONS[alert.type] || ALERT_ICONS.info}</span><span>{alert.msg}</span></div>;
         }
 
         var CATEGORIES = [
@@ -2172,14 +2177,14 @@
             return (
                 <div id="reportOverlay" className="show">
                     <div className="rc-toolbar no-print">
-                        <div className="rc-toolbar-brand"><div className="rc-toolbar-logo">🎓</div><div className="rc-toolbar-name">{schoolName}</div></div>
+                        <div className="rc-toolbar-brand"><div className="rc-toolbar-logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0d1b4b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg></div><div className="rc-toolbar-name">{schoolName}</div></div>
                         <div style={{ display: 'flex', gap: 8 }} className="rc-tabs-wrap">
-                            <button className="btn-sec" style={{ border: 'none', background: tab === 'report' ? 'var(--gold)' : 'transparent', color: tab === 'report' ? '#0d1b4b' : '#fff', borderRadius: 8, padding: '6px 12px', fontWeight: 700 }} onClick={function () { setTab('report'); }}>📄 Result</button>
-                            <button className="btn-sec" style={{ border: 'none', background: tab === 'fees' ? 'var(--gold)' : 'transparent', color: tab === 'fees' ? '#0d1b4b' : '#fff', borderRadius: 8, padding: '6px 12px', fontWeight: 700 }} onClick={function () { setTab('fees'); }}>💳 Fee Bill</button>
+                            <button className="btn-sec" style={{ border: 'none', background: tab === 'report' ? 'var(--gold)' : 'transparent', color: tab === 'report' ? '#0d1b4b' : '#fff', borderRadius: 8, padding: '6px 12px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={function () { setTab('report'); }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg> Result</button>
+                            <button className="btn-sec" style={{ border: 'none', background: tab === 'fees' ? 'var(--gold)' : 'transparent', color: tab === 'fees' ? '#0d1b4b' : '#fff', borderRadius: 8, padding: '6px 12px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={function () { setTab('fees'); }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg> Fee Bill</button>
                         </div>
                         <div className="rc-toolbar-acts">
                             <button className="rc-btn rc-btn-back" onClick={onClose}>← Back</button>
-                            <button className="rc-btn rc-btn-print" onClick={function () { window.print(); }}>🖨️ Print</button>
+                            <button className="rc-btn rc-btn-print" onClick={function () { window.print(); }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: '-2px', marginRight: 5 }}><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></svg>Print</button>
                         </div>
                     </div>
                     <div dangerouslySetInnerHTML={{ __html: html }} />
@@ -2239,7 +2244,7 @@
             var handleStep1 = useCallback(function () {
                 var sid = studentId.trim(), sname = studentName.trim();
                 setAlert('identity', null);
-                if (!sid || !sname) { setAlert('identity', { type: 'error', msg: '⚠️ Please enter both Student ID and Full Name.' }); return; }
+                if (!sid || !sname) { setAlert('identity', { type: 'error', msg: 'Please enter both Student ID and Full Name.' }); return; }
                 setBusy('identity', true);
                 gasCall('validateStudent', sid, sname).then(function (r) {
                     setBusy('identity', false);
@@ -2248,26 +2253,26 @@
                         setDemoCode(r.code);
                         setPanel('otp');
                     } else {
-                        setAlert('identity', { type: 'error', msg: '⚠️ ' + r.message });
+                        setAlert('identity', { type: 'error', msg: '' + r.message });
                     }
                 }).catch(function (e) {
                     setBusy('identity', false);
-                    setAlert('identity', { type: 'error', msg: '❌ Connection error: ' + e.message });
+                    setAlert('identity', { type: 'error', msg: 'Connection error: ' + e.message });
                 });
             }, [studentId, studentName]);
 
             var handleStep2 = useCallback(function () {
                 var code = otp.join('');
                 setAlert('otp', null);
-                if (code.length < 6) { setAlert('otp', { type: 'error', msg: '⚠️ Please enter the full 6-digit code.' }); return; }
+                if (code.length < 6) { setAlert('otp', { type: 'error', msg: 'Please enter the full 6-digit code.' }); return; }
                 setBusy('otp', true);
                 gasCall('verifyCode', currentStudentId, code).then(function (r) {
                     setBusy('otp', false);
                     if (r.success) setPanel('period');
-                    else setAlert('otp', { type: 'error', msg: '❌ ' + r.message });
+                    else setAlert('otp', { type: 'error', msg: '' + r.message });
                 }).catch(function (e) {
                     setBusy('otp', false);
-                    setAlert('otp', { type: 'error', msg: '❌ Connection error: ' + e.message });
+                    setAlert('otp', { type: 'error', msg: 'Connection error: ' + e.message });
                 });
             }, [otp, currentStudentId]);
 
@@ -2277,10 +2282,10 @@
                 gasCall('getStudentReport', currentStudentId, year, term).then(function (r) {
                     setBusy('period', false);
                     if (r.success) setReportData(r);
-                    else setAlert('period', { type: 'error', msg: '❌ ' + r.message });
+                    else setAlert('period', { type: 'error', msg: '' + r.message });
                 }).catch(function (e) {
                     setBusy('period', false);
-                    setAlert('period', { type: 'error', msg: '❌ Connection error: ' + e.message });
+                    setAlert('period', { type: 'error', msg: 'Connection error: ' + e.message });
                 });
             }
 
@@ -2305,7 +2310,7 @@
                         <div className="portal-card">
                             <div className="card-head">
                                 <div className="logo-ring-wrap">
-                                    <div className="logo-badge">{logoSrc ? <img src={logoSrc} alt="Logo" /> : '🎓'}</div>
+                                    <div className="logo-badge">{logoSrc ? <img src={logoSrc} alt="Logo" /> : <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#0d1b4b" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>}</div>
                                     <div className="logo-ring"></div>
                                 </div>
                                 <div className="school-name-head">{(settingsData && settingsData.SCHOOL_NAME) || 'School Portal'}</div>
