@@ -36,6 +36,7 @@ function doGet(e) {
     t.studentId = sid;
     t.year = (e && e.parameter && e.parameter.year) ? e.parameter.year : '';
     t.term = (e && e.parameter && e.parameter.term) ? e.parameter.term : '';
+    t.sessionId = (e && e.parameter && e.parameter.sessionId) ? e.parameter.sessionId : '';
     t.scriptUrl = ScriptApp.getService().getUrl();
     return t.evaluate()
       .setTitle('Report Card')
@@ -91,6 +92,7 @@ function initializeSystem() {
         ensureReportStatusHeader(ss);
         ensureDefaultGradingGeneral(ss);
         cleanUpRMEDuplicates(ss);
+        ensureExamTypesSeeded(ss);
         cache.put('sys_init_checked', '1', 21600); // 6 hours
       }
     } catch(e) {
@@ -411,6 +413,410 @@ function ensureClassResultSheet(ss, cn, subjectNames) {
   return sh;
 }
 
+// ══════════════════════════════════════════════════════════
+// ── EXAM TYPES / SESSIONS / SCORES ──────────────────────────
+// Generic system for any assessment besides the classic End-of-Term report card, which keeps
+// using the original Students/[ClassName] sheets untouched (zero risk to existing school data).
+// Class Test / Mid-Term Examination / Mock Examination ship as seeded rows in ExamTypes; admins
+// can add more of their own from the Exams panel. ExamScores is a single long/normalized sheet
+// (one row per student per subject per session) instead of a new sheet per class per exam type,
+// so this doesn't repeat the sheet-count-growth problem the legacy per-class sheets already have.
+// ══════════════════════════════════════════════════════════
+var EXAM_TYPES_HEADERS    = ['ID','Name','Category','MaxScore','HasSBAExamSplit','ShowConduct','ShowAttitude','ShowInterest','ShowHeadRemark','RequiresPublish','GradingLevelGroup','Active','Order'];
+var EXAM_SESSIONS_HEADERS = ['SessionID','ExamTypeID','Label','Class','Year','Term','MaxScoreOverride','Status','PublishedAt','CreatedAt','CreatedBy'];
+var EXAM_SCORES_HEADERS   = ['SessionID','StudentID','StudentName','SubjectName','Score','Grade','Remarks'];
+var EXAM_NEW_BADGE_MS = 14 * 24 * 3600000; // "🆕 New" badge window in the student portal
+
+function getOrCreateExamTypesSheet(ss) {
+  var sh = ss.getSheetByName('ExamTypes');
+  if (!sh) { sh = ss.insertSheet('ExamTypes'); styleHeader(sh, EXAM_TYPES_HEADERS); }
+  return sh;
+}
+function getOrCreateExamSessionsSheet(ss) {
+  var sh = ss.getSheetByName('ExamSessions');
+  if (!sh) { sh = ss.insertSheet('ExamSessions'); styleHeader(sh, EXAM_SESSIONS_HEADERS); }
+  return sh;
+}
+function getOrCreateExamScoresSheet(ss) {
+  var sh = ss.getSheetByName('ExamScores');
+  if (!sh) { sh = ss.insertSheet('ExamScores'); styleHeader(sh, EXAM_SCORES_HEADERS); }
+  return sh;
+}
+function ensureExamTypesSeeded(ss) {
+  try {
+    var sh = getOrCreateExamTypesSheet(ss);
+    getOrCreateExamSessionsSheet(ss);
+    getOrCreateExamScoresSheet(ss);
+    if (sh.getLastRow() > 1) return; // already seeded
+    [
+      // ID,           Name,                       Category,     MaxScore, SBASplit, Conduct, Attitude, Interest, HeadRemark, ReqPublish, GradingLevelGroup, Active,  Order
+      ['endofterm', 'End of Term Examination', 'EndOfTerm', 100, true,  true,  true,  true,  true,  true,  '',          'true', 1],
+      ['classtest', 'Class Test',              'ClassTest',  20, false, false, false, false, false, false, 'ClassTest', 'true', 2],
+      ['midterm',   'Mid-Term Examination',    'MidTerm',   100, false, false, false, false, false, true,  'MidTerm',   'true', 3],
+      ['mock',      'Mock Examination',        'Mock',      100, false, false, false, false, false, true,  'Mock',      'true', 4]
+    ].forEach(function(r){ sh.appendRow(r); });
+  } catch(e) { Logger.log('ensureExamTypesSeeded error: '+e.message); }
+}
+function getExamTypesInternal(ss) {
+  var sh = getOrCreateExamTypesSheet(ss);
+  if (sh.getLastRow() < 2) return [];
+  var data = sh.getRange(2,1,sh.getLastRow()-1,EXAM_TYPES_HEADERS.length).getValues();
+  return data.filter(function(r){ return r[0]; }).map(function(r){
+    var o = {}; EXAM_TYPES_HEADERS.forEach(function(h,i){ o[h]=r[i]; }); return o;
+  });
+}
+function hasGradingRows(grdD, lvl) {
+  if (!lvl) return false;
+  for (var i=1;i<grdD.length;i++) if (grdD[i][5] === lvl) return true;
+  return false;
+}
+function canManageClass(td, cls) {
+  if (!td) return false;
+  if (td.role === 'admin' || td.role === 'headteacher') return true;
+  if (td.role === 'teacher') return td.assignedClass === cls;
+  return false;
+}
+function findExamSessionRow(sh, sessionId) {
+  var data = sh.getDataRange().getValues();
+  for (var i=1;i<data.length;i++) if (data[i][0] === sessionId) return {row:i+1, data:data[i]};
+  return null;
+}
+function rowToExamSession(rowData) {
+  var o = {}; EXAM_SESSIONS_HEADERS.forEach(function(h,i){ o[h]=rowData[i]; }); return o;
+}
+
+// ── ADMIN: EXAM TYPE CRUD ──
+function getExamTypes(token) {
+  var td = getTokenData(token);
+  if (!td) return {success:false, message:'Unauthorized'};
+  try {
+    var ss = SS();
+    ensureExamTypesSeeded(ss);
+    var types = getExamTypesInternal(ss).sort(function(a,b){ return (Number(a.Order)||0)-(Number(b.Order)||0); });
+    return {success:true, examTypes: types};
+  } catch(e) { return {success:false, message:e.message}; }
+}
+function saveExamType(token, obj) {
+  if (!validateAdminToken(token)) return {success:false, message:'Unauthorized'};
+  try {
+    var ss = SS();
+    var sh = getOrCreateExamTypesSheet(ss);
+    var data = sh.getDataRange().getValues();
+    var id = obj.ID || ('custom_' + Utilities.getUuid().slice(0,8));
+    var isLocked = ['endofterm','classtest','midterm','mock'].indexOf(id) !== -1;
+    var row = EXAM_TYPES_HEADERS.map(function(h) {
+      if (h === 'ID') return id;
+      if (h === 'Category' && isLocked) { for(var i=1;i<data.length;i++) if(data[i][0]===id) return data[i][EXAM_TYPES_HEADERS.indexOf('Category')]; }
+      if (h === 'Active') return (obj.Active !== undefined ? String(obj.Active) : 'true');
+      if (h === 'Order') return obj.Order !== undefined ? Number(obj.Order) : data.length;
+      return obj[h] !== undefined ? obj[h] : '';
+    });
+    for (var i=1;i<data.length;i++) {
+      if (data[i][0] === id) { sh.getRange(i+1,1,1,row.length).setValues([row]); return {success:true, id:id}; }
+    }
+    sh.appendRow(row);
+    return {success:true, id:id};
+  } catch(e) { return {success:false, message:e.message}; }
+}
+function setExamTypeActive(token, id, active) {
+  if (!validateAdminToken(token)) return {success:false, message:'Unauthorized'};
+  if (id === 'endofterm') return {success:false, message:'End of Term cannot be deactivated.'};
+  try {
+    var sh = getOrCreateExamTypesSheet(SS());
+    var data = sh.getDataRange().getValues();
+    var col = EXAM_TYPES_HEADERS.indexOf('Active') + 1;
+    for (var i=1;i<data.length;i++) if (data[i][0] === id) { sh.getRange(i+1,col).setValue(active ? 'true' : 'false'); return {success:true}; }
+    return {success:false, message:'Exam type not found.'};
+  } catch(e) { return {success:false, message:e.message}; }
+}
+
+// ── ADMIN/TEACHER: SESSIONS ──
+function getExamSessions(token, examTypeId, cls) {
+  var td = getTokenData(token);
+  if (!td) return {success:false, message:'Unauthorized'};
+  try {
+    var ss = SS();
+    var sh = getOrCreateExamSessionsSheet(ss);
+    if (sh.getLastRow() < 2) return {success:true, sessions:[]};
+    var data = sh.getRange(2,1,sh.getLastRow()-1,EXAM_SESSIONS_HEADERS.length).getValues();
+    var sessions = data.filter(function(r){return r[0];}).map(rowToExamSession).filter(function(s){
+      if (examTypeId && s.ExamTypeID !== examTypeId) return false;
+      if (cls && s.Class !== cls) return false;
+      if (td.role === 'teacher' && s.Class !== td.assignedClass) return false;
+      return true;
+    }).sort(function(a,b){ return new Date(b.CreatedAt) - new Date(a.CreatedAt); });
+    return {success:true, sessions:sessions};
+  } catch(e) { return {success:false, message:e.message}; }
+}
+function createExamSession(token, obj) {
+  var td = getTokenData(token);
+  if (!td) return {success:false, message:'Unauthorized'};
+  if (!canManageClass(td, obj.Class)) return {success:false, message:'You are not assigned to this class.'};
+  try {
+    var ss = SS();
+    var type = getExamTypesInternal(ss).filter(function(t){ return t.ID === obj.ExamTypeID; })[0];
+    if (!type) return {success:false, message:'Unknown exam type.'};
+    var sh = getOrCreateExamSessionsSheet(ss);
+    var id = 'sess_' + Utilities.getUuid().replace(/-/g,'').slice(0,10);
+    var requiresPublish = String(type.RequiresPublish) === 'true';
+    var now = new Date().toISOString();
+    var row = [id, obj.ExamTypeID, obj.Label || type.Name, obj.Class, obj.Year, obj.Term,
+      obj.MaxScoreOverride || '', requiresPublish ? 'Draft' : 'Published',
+      requiresPublish ? '' : now, now, td.username || 'admin'];
+    sh.appendRow(row);
+    logServerAction(token, 'Create Exam Session', type.Name + ' — ' + obj.Class + ' (' + row[7] + ')');
+    return {success:true, sessionId:id, status: row[7]};
+  } catch(e) { return {success:false, message:e.message}; }
+}
+function publishExamSession(token, sessionId) {
+  if (!validateAdminToken(token)) return {success:false, message:'Unauthorized'};
+  try {
+    var sh = getOrCreateExamSessionsSheet(SS());
+    var found = findExamSessionRow(sh, sessionId);
+    if (!found) return {success:false, message:'Session not found.'};
+    sh.getRange(found.row, EXAM_SESSIONS_HEADERS.indexOf('Status')+1).setValue('Published');
+    sh.getRange(found.row, EXAM_SESSIONS_HEADERS.indexOf('PublishedAt')+1).setValue(new Date().toISOString());
+    return {success:true};
+  } catch(e) { return {success:false, message:e.message}; }
+}
+function unpublishExamSession(token, sessionId) {
+  if (!validateAdminToken(token)) return {success:false, message:'Unauthorized'};
+  try {
+    var sh = getOrCreateExamSessionsSheet(SS());
+    var found = findExamSessionRow(sh, sessionId);
+    if (!found) return {success:false, message:'Session not found.'};
+    sh.getRange(found.row, EXAM_SESSIONS_HEADERS.indexOf('Status')+1).setValue('Draft');
+    return {success:true};
+  } catch(e) { return {success:false, message:e.message}; }
+}
+function deleteExamSession(token, sessionId) {
+  if (!validateAdminToken(token)) return {success:false, message:'Unauthorized'};
+  try {
+    var ss = SS();
+    var sh = getOrCreateExamSessionsSheet(ss);
+    var found = findExamSessionRow(sh, sessionId);
+    if (found) sh.deleteRow(found.row);
+    var scoreSh = getOrCreateExamScoresSheet(ss);
+    if (scoreSh.getLastRow() > 1) {
+      var data = scoreSh.getDataRange().getValues();
+      for (var i=data.length-1;i>=1;i--) if (data[i][0] === sessionId) scoreSh.deleteRow(i+1);
+    }
+    return {success:true};
+  } catch(e) { return {success:false, message:e.message}; }
+}
+
+// ── ADMIN/TEACHER: SCORE ENTRY (same rows either way — "admin behaves as teacher" with zero
+// risk of divergence, since both write the exact same ExamScores rows keyed by session+student+subject) ──
+function getExamSessionScores(token, sessionId) {
+  var td = getTokenData(token);
+  if (!td) return {success:false, message:'Unauthorized'};
+  try {
+    var ss = SS();
+    var sessSh = getOrCreateExamSessionsSheet(ss);
+    var found = findExamSessionRow(sessSh, sessionId);
+    if (!found) return {success:false, message:'Session not found.'};
+    var session = rowToExamSession(found.data);
+    if (!canManageClass(td, session.Class)) return {success:false, message:'You are not assigned to this class.'};
+
+    var subjects = getClassSubjectNames(ss, session.Class);
+    var stuD = ss.getSheetByName('Students').getDataRange().getValues();
+    var students = [];
+    for (var i=1;i<stuD.length;i++) {
+      if (stuD[i][3] === session.Class && String(stuD[i][4]) === String(session.Year) && stuD[i][5] === session.Term) {
+        students.push({ID:String(stuD[i][0]), Name:String(stuD[i][1])});
+      }
+    }
+    var scoreSh = getOrCreateExamScoresSheet(ss);
+    var scores = {};
+    if (scoreSh.getLastRow() > 1) {
+      var sData = scoreSh.getDataRange().getValues();
+      for (var r=1;r<sData.length;r++) {
+        if (sData[r][0] !== sessionId) continue;
+        var sid = String(sData[r][1]), subj = String(sData[r][3]);
+        if (!scores[sid]) scores[sid] = {};
+        scores[sid][subj] = {Score:sData[r][4], Grade:sData[r][5], Remarks:sData[r][6]};
+      }
+    }
+    var type = getExamTypesInternal(ss).filter(function(t){ return t.ID === session.ExamTypeID; })[0] || {};
+    return {success:true, session:session, examType:type, subjects:subjects, students:students, scores:scores};
+  } catch(e) { return {success:false, message:e.message}; }
+}
+function saveExamSessionScores(token, sessionId, entries) {
+  var td = getTokenData(token);
+  if (!td) return {success:false, message:'Unauthorized'};
+  try {
+    var ss = SS();
+    var sessSh = getOrCreateExamSessionsSheet(ss);
+    var found = findExamSessionRow(sessSh, sessionId);
+    if (!found) return {success:false, message:'Session not found.'};
+    var session = rowToExamSession(found.data);
+    if (!canManageClass(td, session.Class)) return {success:false, message:'You are not assigned to this class.'};
+
+    var type = getExamTypesInternal(ss).filter(function(t){ return t.ID === session.ExamTypeID; })[0] || {};
+    var maxScore = Number(session.MaxScoreOverride || type.MaxScore || 100);
+    var grdSh = ss.getSheetByName('Grading');
+    var grdD = grdSh ? grdSh.getDataRange().getValues() : [[]];
+    var lvl = type.GradingLevelGroup || '';
+    var graded = hasGradingRows(grdD, lvl);
+
+    var scoreSh = getOrCreateExamScoresSheet(ss);
+    var existing = {};
+    if (scoreSh.getLastRow() > 1) {
+      var sData = scoreSh.getDataRange().getValues();
+      for (var r=1;r<sData.length;r++) {
+        if (sData[r][0] !== sessionId) continue;
+        existing[String(sData[r][1]) + '|' + String(sData[r][3])] = r + 1;
+      }
+    }
+    var stuD = ss.getSheetByName('Students').getDataRange().getValues();
+    var stuNames = {};
+    for (var si=1;si<stuD.length;si++) if (stuD[si][0]) stuNames[String(stuD[si][0])] = stuD[si][1];
+
+    (entries||[]).forEach(function(e) {
+      var sid = String(e.StudentID), subj = String(e.SubjectName);
+      var scoreVal = Number(e.Score || 0);
+      var pct = maxScore > 0 ? (scoreVal / maxScore * 100) : 0;
+      var gradeInfo = graded ? getGradeInfo(pct, grdD, lvl) : null;
+      var row = [sessionId, sid, stuNames[sid] || e.StudentName || '', subj, scoreVal,
+        gradeInfo ? gradeInfo.grade : '', gradeInfo ? gradeInfo.remarks : ''];
+      var key = sid + '|' + subj;
+      if (existing[key]) scoreSh.getRange(existing[key],1,1,row.length).setValues([row]);
+      else scoreSh.appendRow(row);
+    });
+    logServerAction(token, 'Save Exam Scores', session.Label + ' — ' + session.Class + ' (' + entries.length + ' entries)');
+    return {success:true};
+  } catch(e) { return {success:false, message:e.message}; }
+}
+
+// ── PUBLIC: STUDENT PORTAL ──
+// Combined list the student sees after identity+OTP verification: published End-of-Term
+// Year/Term records (from Students, same publish gate as before) plus every published
+// ExamSessions row for that student's class/year/term. This list *is* the "new result
+// available" notification — each item is flagged isNew if published in the last 14 days.
+function getPublicExamSessionsForStudent(studentId) {
+  try {
+    var ss = SS();
+    var sid = studentId.toString().trim();
+    var stuD = ss.getSheetByName('Students').getDataRange().getValues();
+    var stuH = stuD[0];
+    var statusIdx = stuH.indexOf('ReportStatus');
+    var items = [];
+    var studentPeriods = {};
+
+    for (var i=1;i<stuD.length;i++) {
+      if (!stuD[i][0] || String(stuD[i][0]).trim() !== sid) continue;
+      studentPeriods[stuD[i][3]+'|'+String(stuD[i][4])+'|'+stuD[i][5]] = true;
+      var status = statusIdx>=0 ? String(stuD[i][statusIdx]||'').trim() : '';
+      if (status !== 'Published') continue;
+      items.push({
+        kind:'endofterm', sessionId:null, examTypeId:'endofterm', examTypeName:'End of Term Examination',
+        label:String(stuD[i][5]) + ' Report Card', year:String(stuD[i][4]), term:String(stuD[i][5]),
+        class:String(stuD[i][3]), isNew:false
+      });
+    }
+
+    var sessSh = ss.getSheetByName('ExamSessions');
+    if (sessSh && sessSh.getLastRow() > 1) {
+      var typeMap = {}; getExamTypesInternal(ss).forEach(function(t){ typeMap[t.ID]=t; });
+      var sessData = sessSh.getDataRange().getValues();
+      var now = new Date().getTime();
+      for (var r=1;r<sessData.length;r++) {
+        var session = rowToExamSession(sessData[r]);
+        if (!session.SessionID || session.Status !== 'Published') continue;
+        if (!studentPeriods[session.Class+'|'+String(session.Year)+'|'+session.Term]) continue;
+        var type = typeMap[session.ExamTypeID] || {};
+        var pubTime = session.PublishedAt ? new Date(session.PublishedAt).getTime() : 0;
+        items.push({
+          kind:'session', sessionId:session.SessionID, examTypeId:session.ExamTypeID,
+          examTypeName:type.Name || session.ExamTypeID, category:type.Category || '',
+          label:session.Label, year:String(session.Year), term:session.Term, class:session.Class,
+          isNew: pubTime>0 && (now-pubTime) < EXAM_NEW_BADGE_MS
+        });
+      }
+    }
+    items.sort(function(a,b){ return (b.isNew?1:0)-(a.isNew?1:0); });
+    return {success:true, items:items};
+  } catch(e) { return {success:false, message:e.message}; }
+}
+// token is optional — pass an admin/teacher token (for the class) to preview a Draft session;
+// omitted/anonymous callers (the public student portal) only ever see Published ones.
+function getExamSessionReport(studentId, sessionId, token) {
+  try {
+    var ss = SS();
+    var sid = studentId.toString().trim();
+    var sessSh = getOrCreateExamSessionsSheet(ss);
+    var found = findExamSessionRow(sessSh, sessionId);
+    if (!found) return {success:false, message:'Exam session not found.'};
+    var session = rowToExamSession(found.data);
+
+    var td = token ? getTokenData(token) : null;
+    var bypass = td && canManageClass(td, session.Class);
+    if (!bypass && session.Status !== 'Published') return {success:false, message:'This result has not been published yet.'};
+
+    var stuD = ss.getSheetByName('Students').getDataRange().getValues();
+    var stuH = stuD[0];
+    var stu = null;
+    for (var i=1;i<stuD.length;i++) {
+      if (stuD[i][0] && String(stuD[i][0]).trim() === sid && stuD[i][3] === session.Class &&
+          String(stuD[i][4]) === String(session.Year) && stuD[i][5] === session.Term) {
+        var s = {}; stuH.forEach(function(h,idx){ s[h]=stuD[i][idx]; });
+        stu = { ID:String(s.ID), Name:String(s.Name), Gender:String(s.Gender||''), Class:String(s.Class),
+                Year:String(s.Year), Term:String(s.Term), PhotoUrl:String(s.PhotoUrl||''),
+                Interest:String(s.Interest||''), Conduct:String(s.Conduct||''), Attitude:String(s.Attitude||''),
+                HeadTeacherRemark:String(s.HeadTeacherRemark||''), LevelGroup:String(s.LevelGroup||'General') };
+        break;
+      }
+    }
+    if (!stu) return {success:false, message:'Student not found for this class/period.'};
+
+    var type = getExamTypesInternal(ss).filter(function(t){ return t.ID === session.ExamTypeID; })[0] || {};
+    var scoreSh = getOrCreateExamScoresSheet(ss);
+    var results = [], classTotals = {};
+    if (scoreSh.getLastRow() > 1) {
+      var sData = scoreSh.getDataRange().getValues();
+      for (var r=1;r<sData.length;r++) {
+        if (sData[r][0] !== sessionId) continue;
+        var rowSid = String(sData[r][1]);
+        classTotals[rowSid] = (classTotals[rowSid]||0) + Number(sData[r][4]||0);
+        if (rowSid !== sid) continue;
+        results.push({SubjectName:String(sData[r][3]), Score:Number(sData[r][4]||0), Grade:String(sData[r][5]||''), Remarks:String(sData[r][6]||'')});
+      }
+    }
+    results.sort(function(a,b){ return a.SubjectName.localeCompare(b.SubjectName); });
+
+    var ranked = Object.keys(classTotals).map(function(k){ return {id:k, total:classTotals[k]}; }).sort(function(a,b){ return b.total-a.total; });
+    var pos = 1;
+    for (var p=0;p<ranked.length;p++) if (ranked[p].id === sid) { pos = p+1; break; }
+
+    var jhsAgg = null;
+    if (type.Category === 'Mock' && results.some(function(r){ return r.Grade; })) {
+      var grdSh = ss.getSheetByName('Grading');
+      var grdD = grdSh ? grdSh.getDataRange().getValues() : [[]];
+      jhsAgg = computeJHSAggregate(results, grdD);
+    }
+
+    var sett = getCachedSettingsMap(ss);
+    var props = PropertiesService.getScriptProperties();
+    sett['SCHOOL_LOGO'] = sett['SCHOOL_LOGO'] || props.getProperty(LOGO_KEY) || '';
+    sett['SCHOOL_STAMP'] = sett['SCHOOL_STAMP'] || props.getProperty(STAMP_KEY) || '';
+    sett['SCHOOL_SIGNATURE'] = sett['SCHOOL_SIGNATURE'] || props.getProperty(SIG_KEY) || '';
+
+    var clsSh = ss.getSheetByName('Classes');
+    var clsD = clsSh ? clsSh.getDataRange().getValues() : [];
+    var ci = {numPupils: ranked.length || 'N/A', teacher:''};
+    for (var c=1;c<clsD.length;c++) if (clsD[c][0] === session.Class) { ci.teacher = clsD[c][1]; break; }
+
+    var scriptUrl=''; try { scriptUrl = ScriptApp.getService().getUrl(); } catch(e3) {}
+
+    return {
+      success:true, student:stu, results:results, classInfo:ci, settings:sett,
+      session:session, examType:type, overallPosition:pos, classmatesCount:ranked.length,
+      jhsAggregate:jhsAgg, scriptUrl:scriptUrl,
+      maxScore: Number(session.MaxScoreOverride || type.MaxScore || 100)
+    };
+  } catch(e) { return {success:false, message:'Report error: '+e.message}; }
+}
+
 // ── SAMPLE DATA ────────────────────────────────────────────
 function populateSampleData(ss) {
   var st = ss.getSheetByName('Students');
@@ -468,6 +874,67 @@ function initializePhotoFolderFromUI(token) {
     return { success: false, message: e.message };
   }
 }
+// ── LANDING PAGE HERO PHOTOS (multi-image gallery, stored in Drive like student photos) ──
+function initHeroPhotosFolder() {
+  var props = PropertiesService.getScriptProperties();
+  var folderId = props.getProperty('HERO_PHOTOS_FOLDER_ID');
+  if (folderId) { try { DriveApp.getFolderById(folderId); return folderId; } catch(e) {} }
+  try {
+    var folder = DriveApp.createFolder('School Hero Photos');
+    folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    var id = folder.getId(); props.setProperty('HERO_PHOTOS_FOLDER_ID', id); return id;
+  } catch(e) { Logger.log('Hero photos folder error: '+e.message); return null; }
+}
+function getHeroPhotos() {
+  try {
+    var sh = SS().getSheetByName('Settings');
+    if (!sh) return [];
+    var data = sh.getDataRange().getValues();
+    for (var i=1;i<data.length;i++) {
+      if (data[i][0]==='HERO_PHOTOS') { try { return JSON.parse(data[i][1]||'[]'); } catch(e2) { return []; } }
+    }
+  } catch(e) {}
+  return [];
+}
+function setHeroPhotosOnSheet(urls) {
+  var sh = SS().getSheetByName('Settings');
+  var data = sh.getDataRange().getValues();
+  var json = JSON.stringify(urls);
+  for (var i=1;i<data.length;i++) {
+    if (data[i][0]==='HERO_PHOTOS') { sh.getRange(i+1,2).setValue(json); invalidateSettingsCache(); return; }
+  }
+  sh.appendRow(['HERO_PHOTOS', json]);
+  invalidateSettingsCache();
+}
+function uploadHeroPhoto(token, b64) {
+  if (!validateAdminToken(token)) return {success:false, message:'Unauthorized'};
+  try {
+    var fid = initHeroPhotosFolder();
+    if (!fid) return {success:false, message:'Could not create/access the Drive folder for hero photos.'};
+    var folder = DriveApp.getFolderById(fid);
+    var d = b64.indexOf(',')!==-1 ? b64.split(',')[1] : b64;
+    var file = folder.createFile(Utilities.newBlob(Utilities.base64Decode(d), 'image/jpeg', 'hero_'+Utilities.getUuid()+'.jpg'));
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    var url = 'https://drive.google.com/thumbnail?sz=w1600&id='+file.getId();
+    var urls = getHeroPhotos();
+    urls.push(url);
+    setHeroPhotosOnSheet(urls);
+    return {success:true, url:url, photos:urls};
+  } catch(e) { return {success:false, message:e.message}; }
+}
+function deleteHeroPhoto(token, url) {
+  if (!validateAdminToken(token)) return {success:false, message:'Unauthorized'};
+  try {
+    var urls = getHeroPhotos().filter(function(u){ return u !== url; });
+    setHeroPhotosOnSheet(urls);
+    return {success:true, photos:urls};
+  } catch(e) { return {success:false, message:e.message}; }
+}
+function getHeroPhotosForAdmin(token) {
+  if (!validateAdminToken(token)) return {success:false, message:'Unauthorized'};
+  return {success:true, photos:getHeroPhotos()};
+}
+
 function uploadSchoolLogo(b64){return saveSettingDirect('SCHOOL_LOGO',LOGO_KEY,b64);}
 function uploadSchoolWatermark(b64){return saveSettingDirect('SCHOOL_WATERMARK','WATERMARK_KEY',b64);}
 function uploadSchoolStamp(b64){return saveSettingDirect('SCHOOL_STAMP',STAMP_KEY,b64);}
@@ -512,11 +979,33 @@ function saveSettingDirect(key, propKey, b64) {
 }
 
 // ── VERIFICATION ───────────────────────────────────────────
-function generateCode(sid){var c=Math.floor(100000+Math.random()*900000).toString();CacheService.getScriptCache().put('vc_'+sid,c,300);return c;}
-function checkCode(sid,code){var s=CacheService.getScriptCache().get('vc_'+sid);return s&&s.toString()===code.toString().trim();}
+// OTP throttling: a 6-digit code with an unlimited number of guesses over its 5-minute window is
+// brute-forceable well within that window. Cap wrong guesses per code; once exhausted, the code is
+// dead until the student goes back and requests a fresh one (generateCode resets the counter).
+var OTP_MAX_ATTEMPTS = 5;
+function generateCode(sid){
+  var c=Math.floor(100000+Math.random()*900000).toString();
+  var cache=CacheService.getScriptCache();
+  cache.put('vc_'+sid,c,300);
+  cache.remove('vc_attempts_'+sid);
+  return c;
+}
+function checkCode(sid,code){
+  var cache=CacheService.getScriptCache();
+  var attemptsKey='vc_attempts_'+sid;
+  var attempts=Number(cache.get(attemptsKey)||0);
+  if(attempts>=OTP_MAX_ATTEMPTS) return false;
+  var s=cache.get('vc_'+sid);
+  var ok=s&&s.toString()===code.toString().trim();
+  if(!ok) cache.put(attemptsKey,String(attempts+1),300);
+  return ok;
+}
+function isOtpLocked(sid){
+  return Number(CacheService.getScriptCache().get('vc_attempts_'+sid)||0)>=OTP_MAX_ATTEMPTS;
+}
 function validateStudent(studentId,studentName){try{var data=SS().getSheetByName('Students').getDataRange().getValues();for(var i=1;i<data.length;i++){if(!data[i][0])continue;if(data[i][0].toString().trim()===studentId.toString().trim()&&data[i][1].toString().trim().toLowerCase()===studentName.toString().trim().toLowerCase()){return{success:true,code:generateCode(studentId.toString().trim())};}}return{success:false,message:'Student not found.'};}catch(e){return{success:false,message:'System error: '+e.message};}}
-function verifyAndGetReport(studentId,code){var sid=studentId.toString().trim();if(!checkCode(sid,code))return{success:false,message:'Invalid or expired code.'};return getStudentReport(sid);}
-function verifyCode(studentId,code){var sid=studentId.toString().trim();if(!checkCode(sid,code))return{success:false,message:'Invalid or expired code.'};return{success:true};}
+function verifyAndGetReport(studentId,code){var sid=studentId.toString().trim();if(isOtpLocked(sid))return{success:false,message:'Too many incorrect attempts. Please go back and request a new code.'};if(!checkCode(sid,code))return{success:false,message:'Invalid or expired code.'};return getStudentReport(sid);}
+function verifyCode(studentId,code){var sid=studentId.toString().trim();if(isOtpLocked(sid))return{success:false,message:'Too many incorrect attempts. Please go back and request a new code.'};if(!checkCode(sid,code))return{success:false,message:'Invalid or expired code.'};return{success:true};}
 
 // ── CORE REPORT ────────────────────────────────────────────
 function getStudentReport(studentId, year, term, bypassPublishCheck) {
@@ -813,10 +1302,17 @@ function getStudentReport(studentId, year, term, bypassPublishCheck) {
 
 function isCore(name){var n=(name||'').trim().toLowerCase();return n==='english language'||n==='english'||n==='mathematics'||n==='maths'||n==='math'||n==='integrated science'||n==='science'||n==='social studies'||n==='social';}
 function computeJHSAggregate(results,grdD){function g2p(grade){var g=grade.toString().toUpperCase();var d={'A1':1,'A2':2,'B3':3,'B4':4,'C5':5,'C6':6,'D7':7,'E8':8,'F9':9};if(d[g])return d[g];var num=parseInt(g.replace(/\D/g,''),10);return isNaN(num)?9:num;}var coreP=[],otherP=[];results.forEach(function(r){var pt=g2p(r.Grade);(isCore(r.SubjectName)?coreP:otherP).push({name:r.SubjectName,point:pt,grade:r.Grade});});otherP.sort(function(a,b){return a.point-b.point;});var best2=otherP.slice(0,2),agg=0;coreP.forEach(function(x){agg+=x.point;});best2.forEach(function(x){agg+=x.point;});return {coreSubjects:coreP,bestTwoCores:best2,aggregate:agg};}
-function getGradeInfo(score,grdD,lvl){var lk=(lvl==='JHS')?'JHS':'General';for(var i=1;i<grdD.length;i++){if((grdD[i][5]||'General')===lk&&score>=Number(grdD[i][0])&&score<=Number(grdD[i][1]))return{grade:grdD[i][2],name:grdD[i][3],remarks:grdD[i][4]};}return{grade:lk==='JHS'?'F9':5,name:'Beginning',remarks:'Beginning'};}
+function getGradeInfo(score,grdD,lvl){var lk=lvl||'General';for(var i=1;i<grdD.length;i++){if((grdD[i][5]||'General')===lk&&score>=Number(grdD[i][0])&&score<=Number(grdD[i][1]))return{grade:grdD[i][2],name:grdD[i][3],remarks:grdD[i][4]};}return{grade:lk==='JHS'?'F9':5,name:'Beginning',remarks:'Beginning'};}
 
 // ── ADMIN AUTH ─────────────────────────────────────────────
-function sysLogin(username, pw){
+// Session length: 1 hour by default, 30 days when the caller passes keepSignedIn=true (admin.html's
+// "Keep Signed In" checkbox). getTokenData() already re-hydrates the short-lived CacheService entry
+// from the PropertiesService-backed session on every check, as long as that session's own `expires`
+// is still in the future — so all that's needed here is a longer `expires` for the keepSignedIn case.
+var SESSION_MS_DEFAULT = 3600000;      // 1 hour
+var SESSION_MS_KEEP_SIGNED_IN = 30 * 24 * 3600000; // 30 days
+function sysLogin(username, pw, keepSignedIn){
+  var sessionLen = keepSignedIn ? SESSION_MS_KEEP_SIGNED_IN : SESSION_MS_DEFAULT;
   // Cleanup old script properties sessions first
   try {
     var props = PropertiesService.getScriptProperties();
@@ -837,10 +1333,14 @@ function sysLogin(username, pw){
     });
   } catch(e){}
 
+  // SECURITY: only the actual stored password works here — 'admin123' is merely the seed value
+  // initializeSystem() writes on first run (see ADMIN_PASS_KEY), not a permanent bypass. Previously
+  // this also accepted the literal string 'admin123' unconditionally, which meant changing the admin
+  // password never actually locked out the default — a permanent backdoor. Fixed.
   var stored = PropertiesService.getScriptProperties().getProperty(ADMIN_PASS_KEY) || 'admin123';
-  if (username === 'admin' && (pw === stored || pw === 'admin123')) {
+  if (username === 'admin' && pw === stored) {
     var token = Utilities.getUuid();
-    var sessionData = {role: 'admin', expires: new Date().getTime() + 3600000};
+    var sessionData = {role: 'admin', expires: new Date().getTime() + sessionLen};
     CacheService.getScriptCache().put('auth_' + token, JSON.stringify({role: 'admin'}), 3600);
     try {
       PropertiesService.getScriptProperties().setProperty('session_' + token, JSON.stringify(sessionData));
@@ -852,7 +1352,7 @@ function sysLogin(username, pw){
   var htPass = PropertiesService.getScriptProperties().getProperty('HEADTEACHER_PASS') || 'headteacher123';
   if (username.trim().toLowerCase() === htUser.toLowerCase() && pw === htPass) {
     var token = Utilities.getUuid();
-    var sessionData = {role: 'headteacher', username: username, expires: new Date().getTime() + 3600000};
+    var sessionData = {role: 'headteacher', username: username, expires: new Date().getTime() + sessionLen};
     CacheService.getScriptCache().put('auth_' + token, JSON.stringify({role: 'headteacher', username: username}), 3600);
     try {
       PropertiesService.getScriptProperties().setProperty('session_' + token, JSON.stringify(sessionData));
@@ -874,7 +1374,7 @@ function sysLogin(username, pw){
       for (var i = 1; i < data.length; i++) {
         if (data[i][0] && data[i][0].toString() === username.trim() && data[i][1] && data[i][1].toString() === pw) {
           var token = Utilities.getUuid();
-          var sessionData = {role: 'teacher', username: username, assignedClass: data[i][3] || '', expires: new Date().getTime() + 3600000};
+          var sessionData = {role: 'teacher', username: username, assignedClass: data[i][3] || '', expires: new Date().getTime() + sessionLen};
           CacheService.getScriptCache().put('auth_' + token, JSON.stringify({role: 'teacher', username: username, assignedClass: data[i][3] || ''}), 3600);
           try {
             PropertiesService.getScriptProperties().setProperty('session_' + token, JSON.stringify(sessionData));
@@ -1586,6 +2086,7 @@ function getPublicSettings(){
     var sett=getCachedSettingsMap(ss);
     var props=PropertiesService.getScriptProperties();
     var logo=sett['SCHOOL_LOGO']||props.getProperty(LOGO_KEY)||'';
+    var heroPhotos=[]; try{ heroPhotos=JSON.parse(sett['HERO_PHOTOS']||'[]'); }catch(e2){}
     // Includes CURRENT_TERM/CURRENT_YEAR so the portal's period selector can default to the
     // school's actual active term instead of a hardcoded fallback.
     return{
@@ -1596,7 +2097,8 @@ function getPublicSettings(){
       SCHOOL_PHONE:sett['SCHOOL_PHONE']||'',
       SCHOOL_EMAIL:sett['SCHOOL_EMAIL']||'',
       CURRENT_TERM:sett['CURRENT_TERM']||'',
-      CURRENT_YEAR:sett['CURRENT_YEAR']||''
+      CURRENT_YEAR:sett['CURRENT_YEAR']||'',
+      HERO_PHOTOS:heroPhotos
     };
   }catch(e){return{success:false};}
 }
@@ -2258,6 +2760,14 @@ function updateTeacherSignature(token, un, b64){
 function getFullBackupData(token) {
   if (!validateAdminToken(token)) return {success:false, message:'Unauthorized'};
   try {
+    return Object.assign({success:true}, gatherBackupData());
+  } catch(e) {
+    return {success: false, message: e.message};
+  }
+}
+// Pure data-gathering, no auth check — shared by the manual "Prepare Backup" download
+// (getFullBackupData, above) and the scheduled auto-backup (runScheduledBackup, below).
+function gatherBackupData() {
     var ss = SS();
 
     // Students
@@ -2346,9 +2856,49 @@ function getFullBackupData(token) {
       settings: settings,
       teachers: teachers
     };
+}
+
+// ── SCHEDULED AUTO-BACKUP ───────────────────────────────────
+// Writes a timestamped JSON snapshot into the same "System_Backups" Drive folder the manual
+// "Prepare Backup" download already uses, so nothing is lost if no one remembers to click it.
+var BACKUP_TRIGGER_FN = 'runScheduledBackup';
+function getOrCreateBackupsFolder() {
+  var it = DriveApp.getFoldersByName('System_Backups');
+  if (it.hasNext()) return it.next();
+  return DriveApp.createFolder('System_Backups');
+}
+function runScheduledBackup() {
+  try {
+    var data = gatherBackupData();
+    var folder = getOrCreateBackupsFolder();
+    var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd_HH-mm');
+    folder.createFile(Utilities.newBlob(JSON.stringify(data), 'application/json', 'auto_backup_' + stamp + '.json'));
   } catch(e) {
-    return {success: false, message: e.message};
+    Logger.log('runScheduledBackup failed: ' + e.message);
   }
+}
+function installWeeklyBackupTrigger(token) {
+  if (!validateAdminToken(token)) return {success:false, message:'Unauthorized'};
+  try {
+    removeWeeklyBackupTrigger(token); // avoid stacking duplicate triggers if clicked twice
+    ScriptApp.newTrigger(BACKUP_TRIGGER_FN).timeBased().everyWeeks(1).onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(2).create();
+    PropertiesService.getScriptProperties().setProperty('AUTO_BACKUP_ENABLED', 'true');
+    return {success:true};
+  } catch(e) { return {success:false, message:e.message}; }
+}
+function removeWeeklyBackupTrigger(token) {
+  if (!validateAdminToken(token)) return {success:false, message:'Unauthorized'};
+  try {
+    ScriptApp.getProjectTriggers().forEach(function(t) {
+      if (t.getHandlerFunction() === BACKUP_TRIGGER_FN) ScriptApp.deleteTrigger(t);
+    });
+    PropertiesService.getScriptProperties().deleteProperty('AUTO_BACKUP_ENABLED');
+    return {success:true};
+  } catch(e) { return {success:false, message:e.message}; }
+}
+function getAutoBackupStatus(token) {
+  if (!validateAdminToken(token)) return {success:false, message:'Unauthorized'};
+  return {success:true, enabled: PropertiesService.getScriptProperties().getProperty('AUTO_BACKUP_ENABLED') === 'true'};
 }
 
 // ── RESTORE SYSTEM BACKUP ──────────────────────────────────

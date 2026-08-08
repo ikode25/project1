@@ -893,10 +893,160 @@
                 + '</div>';
         }
 
-        // Load report using server-injected student ID
+        // Class Test / Mid-Term report — mirrors index.html's builder of the same name: same
+        // rc-* chrome as buildReportCard above, single Score column (no SBA/Exam split), a Grade
+        // column only when the exam type actually has grading configured, and the Conduct &
+        // Remarks block gated by that exam type's own Show* flags.
+        function buildClassTestOrMidTermCard(data) {
+            var s = data.student, res = data.results || [], st = data.settings || {};
+            var session = data.session || {}, type = data.examType || {};
+            var maxScore = data.maxScore || type.MaxScore || 100;
+            var graded = res.some(function (r) { return r.Grade; });
+            var showInterest = String(type.ShowInterest) === 'true';
+            var showConduct = String(type.ShowConduct) === 'true';
+            var showAttitude = String(type.ShowAttitude) === 'true';
+            var showHtRemark = String(type.ShowHeadRemark) === 'true';
+            var showRmkBlock = showInterest || showConduct || showAttitude || showHtRemark;
+            var schoolName = st.SCHOOL_NAME || 'School Management System';
+            var addr = st.SCHOOL_ADDRESS || '';
+            var email = st.SCHOOL_EMAIL || '', phone = st.SCHOOL_PHONE || '';
+            var logoSrc = fixDriveUrl(st.SCHOOL_LOGO || ''), stampSrc = fixDriveUrl(st.SCHOOL_STAMP || '');
+            var logoHtml = logoSrc ? '<img src="' + logoSrc + '" alt="Logo">' : '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0d1b4b" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>';
+
+            document.getElementById('tSchoolName').textContent = schoolName;
+            document.getElementById('tStudentName').textContent = s.Name + ' — ' + (type.Name || 'Assessment');
+            if (logoSrc) { ['tLogoBox', 'tLogoBox2'].forEach(function (id) { var el = document.getElementById(id); if (el) el.innerHTML = '<img src="' + logoSrc + '" alt="Logo">'; }); }
+
+            var gTotal = 0;
+            var rows = res.map(function (r, i) {
+                gTotal += Number(r.Score || 0);
+                return '<tr' + (i % 2 === 1 ? ' style="background:#f8faff"' : '') + '>'
+                    + '<td style="color:#6b7280;font-weight:600">' + (i + 1) + '</td>'
+                    + '<td class="rc-td-subj">' + r.SubjectName + '</td>'
+                    + '<td style="font-weight:700;color:#0d1b4b">' + r.Score + '</td>'
+                    + (graded ? '<td style="font-weight:700;color:#c0392b">' + (r.Grade || '—') + '</td>' : '')
+                    + '<td style="font-size:11px;color:#374151">' + (r.Remarks || '') + '</td></tr>';
+            }).join('');
+            var avg = res.length ? Math.round(gTotal / res.length) : 0;
+            var posBar = data.overallPosition ? '<div class="rc-pos-bar"><span class="rc-pos-lbl">CLASS POSITION</span><span class="rc-pos-badge">' + ord(data.overallPosition) + ' / ' + (data.classmatesCount || 'N/A') + '</span></div>' : '';
+
+            var rmkHtml = '';
+            if (showRmkBlock) {
+                rmkHtml = '<div class="rc-rmk"><div class="rc-rmk-title">Conduct &amp; Remarks</div>'
+                    + (showInterest ? '<div class="rc-rmk-row"><span class="rc-rmk-k"> Interest / Talent:</span><span class="rc-rmk-v">' + (s.Interest || '—') + '</span></div>' : '')
+                    + (showConduct ? '<div class="rc-rmk-row"><span class="rc-rmk-k"> Conduct:</span><span class="rc-rmk-v">' + (s.Conduct || '—') + '</span></div>' : '')
+                    + (showAttitude ? '<div class="rc-rmk-row"><span class="rc-rmk-k"> Attitude to Work:</span><span class="rc-rmk-v">' + (s.Attitude || '—') + '</span></div>' : '')
+                    + (showHtRemark ? '<div class="rc-rmk-row"><span class="rc-rmk-k"> Headmaster\'s Remark:</span><span class="rc-rmk-v">' + (s.HeadTeacherRemark || '—') + '</span></div>' : '')
+                    + '</div>';
+            }
+
+            return '<div class="rc-page">'
+                + '<div class="rc-hdr"><div class="rc-logo">' + logoHtml + '</div>'
+                + '<div style="text-align:center"><div class="rc-sname">' + schoolName + '</div><div class="rc-scontact">' + addr + '<br>Tel: ' + phone + (email ? ' · ' + email : '') + '</div></div>'
+                + '<div class="rc-photobox">' + (s.PhotoUrl ? '<img src="' + fixDriveUrl(s.PhotoUrl) + '" alt="">' : '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>') + '</div></div>'
+                + '<div class="rc-titlestrip"><div class="rc-titletext">' + (type.Name || 'Assessment') + ' Report</div></div>'
+                + '<div class="rc-substrip">' + (session.Label || type.Name || '') + ' · Academic Year ' + s.Year + '</div>'
+                + '<div class="rc-id-row"><span style="font-size:12px;color:#6b7280;margin-right:8px">Student ID:</span><span class="rc-id-badge">' + s.ID + '</span></div>'
+                + '<div class="rc-info"><div class="rc-info-grid">'
+                + '<div class="rc-info-item"><span class="rc-il">Name:</span><span class="rc-iv">' + s.Name + '</span></div>'
+                + '<div class="rc-info-item"><span class="rc-il">Class:</span><span class="rc-iv">' + s.Class + '</span></div>'
+                + '<div class="rc-info-item"><span class="rc-il">Gender:</span><span class="rc-iv">' + (s.Gender || '') + '</span></div>'
+                + '<div class="rc-info-item"><span class="rc-il">Term:</span><span class="rc-iv">' + s.Term + '</span></div>'
+                + '<div class="rc-info-item"><span class="rc-il">Max Score:</span><span class="rc-iv">' + maxScore + '</span></div>'
+                + '<div class="rc-info-item"><span class="rc-il">Year:</span><span class="rc-iv">' + s.Year + '</span></div>'
+                + '</div></div>'
+                + '<div class="rc-tbl-wrap"><table class="rc-tbl"><thead><tr>'
+                + '<th style="width:32px">#</th><th style="text-align:left;padding-left:10px">SUBJECT</th>'
+                + '<th>SCORE<br><small style="font-weight:400;font-size:8.5px">(of ' + maxScore + ')</small></th>'
+                + (graded ? '<th>GRADE</th>' : '') + '<th>REMARKS</th>'
+                + '</tr></thead><tbody>' + rows + '</tbody>'
+                + '<tfoot><tr style="background:#0d1b4b">'
+                + '<td colspan="2" style="padding:7px;font-weight:700;text-align:left;padding-left:10px;letter-spacing:1px;border:1px solid rgba(255,255,255,.3);color:#ffffff">TOTAL</td>'
+                + '<td style="padding:7px;text-align:center;border:1px solid rgba(255,255,255,.3);font-weight:700;color:#ffffff">' + gTotal + '</td>'
+                + '<td colspan="' + (graded ? 2 : 1) + '" style="border:1px solid rgba(255,255,255,.2)"></td></tr></tfoot></table></div>'
+                + '<div class="rc-stats">'
+                + '<div class="rc-stat"><span class="rc-stat-lbl">Total Score</span><span class="rc-stat-val">' + gTotal + '</span></div>'
+                + '<div class="rc-stat"><span class="rc-stat-lbl">Average</span><span class="rc-stat-val">' + avg + '</span></div>'
+                + '<div class="rc-stat"><span class="rc-stat-lbl">Subjects</span><span class="rc-stat-val">' + res.length + '</span></div>'
+                + '</div>'
+                + posBar
+                + rmkHtml
+                + '<div class="rc-sigs"><div class="rc-sig"><div class="rc-sig-line">' + (stampSrc ? '<img src="' + stampSrc + '" style="max-height:64px;max-width:130px;object-fit:contain">' : '') + '</div><div class="rc-sig-role">Official School Stamp</div></div></div>'
+                + '<div class="rc-footer-strip"><span>Generated by: <strong>' + schoolName + '</strong></span><span>' + s.Class + ' · ' + s.Term + ' · ' + s.Year + '</span></div>'
+                + '</div>';
+        }
+
+        // Basic 9 (JHS3) Mock Examination — mirrors index.html's compact "Result Slip" builder.
+        function buildMockResultSlip(data) {
+            var s = data.student, res = data.results || [], st = data.settings || {};
+            var session = data.session || {}, type = data.examType || {};
+            var schoolName = st.SCHOOL_NAME || 'School Management System';
+            var logoSrc = fixDriveUrl(st.SCHOOL_LOGO || '');
+            var mockLabel = (session.Label || type.Name || 'MOCK').toUpperCase();
+            var mockDate = session.PublishedAt || session.CreatedAt;
+            mockDate = mockDate ? new Date(mockDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }) : '—';
+
+            document.getElementById('tSchoolName').textContent = schoolName;
+            document.getElementById('tStudentName').textContent = s.Name + ' — ' + mockLabel + ' Result Slip';
+            if (logoSrc) { ['tLogoBox', 'tLogoBox2'].forEach(function (id) { var el = document.getElementById(id); if (el) el.innerHTML = '<img src="' + logoSrc + '" alt="Logo">'; }); }
+
+            var verifyUrl = (typeof scriptUrl !== 'undefined' && scriptUrl && scriptUrl.indexOf('<' + '?') === -1)
+                ? scriptUrl + '?page=report&sessionId=' + encodeURIComponent(session.SessionID) + '&id=' + encodeURIComponent(s.ID)
+                : window.location.href;
+            var qrHtml = verifyUrl ? '<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(verifyUrl) + '" alt="QR Code" style="width:100%;height:100%;object-fit:contain">' : '';
+
+            var rows = res.map(function (r) {
+                return '<tr><td style="padding:9px 10px;border-bottom:1px solid #edf1f7;font-weight:600;color:#1e293b">' + r.SubjectName.toUpperCase() + '</td>'
+                    + '<td style="padding:9px 10px;border-bottom:1px solid #edf1f7;text-align:center;font-weight:700;color:#0d1b4b">' + r.Score + '</td>'
+                    + '<td style="padding:9px 10px;border-bottom:1px solid #edf1f7;text-align:right;color:#c0392b;font-weight:600;font-size:11.5px">' + (r.Remarks || r.Grade || '—') + '</td></tr>';
+            }).join('');
+            var agg = data.jhsAggregate ? data.jhsAggregate.aggregate : null;
+
+            return '<style>.ms-slip *{box-sizing:border-box}.ms-slip{max-width:720px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.5);font-family:\'Plus Jakarta Sans\',sans-serif}'
+                + '.ms-band1{background:linear-gradient(135deg,#0d1b4b,#1a237e);color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px}'
+                + '.ms-band1 .nm{font-family:\'Outfit\',sans-serif;font-weight:800;font-size:17px;letter-spacing:.4px;text-transform:uppercase}'
+                + '.ms-band2{background:linear-gradient(90deg,#f0c020,#ffd700);color:#0d1b4b;padding:9px 20px;display:flex;align-items:center;justify-content:space-between;font-weight:800;font-size:13px;letter-spacing:1px;text-transform:uppercase}'
+                + '.ms-sub{text-align:center;font-weight:700;font-size:12px;color:#374151;padding:10px 20px 0;font-style:italic}'
+                + '.ms-media{display:flex;justify-content:center;gap:26px;padding:18px 20px 6px}'
+                + '.ms-media .box{width:88px;height:88px;border:2px solid #0d1b4b;border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#f8fafc}'
+                + '.ms-info{padding:14px 26px 4px}'
+                + '.ms-info-row{display:flex;padding:5px 0;font-size:12.5px;border-bottom:1px dashed #e5e7eb}'
+                + '.ms-info-row .k{width:180px;flex-shrink:0;color:#0d1b4b;font-weight:700}'
+                + '.ms-info-row .v{color:#1e293b;font-weight:600}'
+                + '.ms-tbl-wrap{padding:16px 26px}'
+                + '.ms-tbl-wrap table{width:100%;border-collapse:collapse;border:2px solid #0d1b4b;border-radius:6px;overflow:hidden}'
+                + '.ms-tbl-wrap thead th{background:#0d1b4b;color:#f0c020;padding:9px 10px;font-size:11px;letter-spacing:.5px;text-transform:uppercase}'
+                + '.ms-agg{display:flex;justify-content:center;margin:6px 26px 4px}'
+                + '.ms-agg .b{background:linear-gradient(135deg,#f0c020,#ffd700);color:#0d1b4b;font-weight:800;font-size:13px;padding:8px 22px;border-radius:30px;letter-spacing:.5px}'
+                + '.ms-sig{display:flex;justify-content:space-between;align-items:flex-end;padding:26px 26px 10px;margin-top:10px}'
+                + '.ms-sig .line{border-top:1.5px solid #0d1b4b;padding-top:5px;font-size:11px;color:#374151;font-weight:600;min-width:180px;text-align:center}'
+                + '.ms-foot{background:#0d1b4b;color:rgba(255,255,255,.7);font-size:10px;padding:10px 20px;display:flex;justify-content:space-between}'
+                + '@media print{.ms-slip{box-shadow:none}}</style>'
+                + '<div class="ms-slip">'
+                + '<div class="ms-band1"><div style="display:flex;align-items:center;gap:10px">' + (logoSrc ? '<img src="' + logoSrc + '" style="width:36px;height:36px;border-radius:50%;object-fit:cover">' : '') + '<span class="nm">' + schoolName + '</span></div><span style="font-size:10px;color:rgba(255,255,255,.6);font-weight:600">' + (s.Class || '') + '</span></div>'
+                + '<div class="ms-band2"><span>' + mockLabel + '</span><span>Result Slip</span></div>'
+                + '<div class="ms-sub">Provisional Result Slip</div>'
+                + '<div class="ms-media"><div class="box">' + qrHtml + '</div><div class="box">' + (s.PhotoUrl ? '<img src="' + fixDriveUrl(s.PhotoUrl) + '" style="width:100%;height:100%;object-fit:cover">' : '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>') + '</div></div>'
+                + '<div class="ms-info">'
+                + '<div class="ms-info-row"><span class="k">Candidate Name</span><span class="v">: ' + s.Name + '</span></div>'
+                + '<div class="ms-info-row"><span class="k">Index Number</span><span class="v">: ' + s.ID + '</span></div>'
+                + '<div class="ms-info-row"><span class="k">Type of Examination</span><span class="v">: ' + mockLabel + ' - ' + s.Year + '</span></div>'
+                + '<div class="ms-info-row"><span class="k">School</span><span class="v">: ' + schoolName + '</span></div>'
+                + (agg !== null ? '<div class="ms-info-row"><span class="k">Aggregate</span><span class="v">: ' + agg + '</span></div>' : '')
+                + '<div class="ms-info-row"><span class="k">Mock Date</span><span class="v">: ' + mockDate + '</span></div>'
+                + '</div>'
+                + '<div class="ms-tbl-wrap"><table><thead><tr><th style="text-align:left">Subject</th><th>Score</th><th style="text-align:right">Remarks</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+                + (agg !== null ? '<div class="ms-agg"><span class="b">Aggregate Score: ' + agg + ' (lower is better)</span></div>' : '')
+                + '<div class="ms-sig"><span class="line">Head Teacher\'s Signature</span><span style="font-size:10px;color:#6b7280">Generated ' + new Date().toLocaleDateString() + '</span></div>'
+                + '<div class="ms-foot"><span>Result on this print-out can be cross-checked by scanning the QR code.</span><span>' + schoolName + '</span></div>'
+                + '</div>';
+        }
+
+        // Load report using server-injected student ID (and, for exam sessions, a sessionId)
         var studentId = '<?= typeof studentId !== "undefined" ? studentId : "" ?>';
         var initialYear = '<?= typeof year !== "undefined" ? year : "" ?>';
         var initialTerm = '<?= typeof term !== "undefined" ? term : "" ?>';
+        var initialSessionId = '<?= typeof sessionId !== "undefined" ? sessionId : "" ?>';
 
         // Fallback for static server deployments (e.g., Netlify) where scriptlets are not parsed
         if (studentId.startsWith('<' + '?') || !studentId) {
@@ -904,7 +1054,9 @@
             studentId = urlParams.get('id') || '';
             initialYear = urlParams.get('year') || '';
             initialTerm = urlParams.get('term') || '';
+            initialSessionId = urlParams.get('sessionId') || '';
         }
+        if (initialSessionId.startsWith('<' + '?')) initialSessionId = '';
 
         function goBackToChecker() {
             google.script.run.withSuccessHandler(function (url) {
@@ -917,6 +1069,25 @@
             document.getElementById('loadingScreen').style.display = 'none';
             document.getElementById('errorScreen').style.display = 'block';
             document.getElementById('errMsg').textContent = 'No student ID was provided in the URL. Please check the link.';
+        } else if (initialSessionId) {
+            google.script.run
+                .withSuccessHandler(function (data) {
+                    document.getElementById('loadingScreen').style.display = 'none';
+                    if (!data.success) {
+                        document.getElementById('errorScreen').style.display = 'block';
+                        document.getElementById('errMsg').textContent = data.message || 'Could not load this result.';
+                        return;
+                    }
+                    var category = (data.examType && data.examType.Category) || '';
+                    document.getElementById('reportCardArea').innerHTML = category === 'Mock' ? buildMockResultSlip(data) : buildClassTestOrMidTermCard(data);
+                    document.getElementById('reportContent').style.display = 'block';
+                })
+                .withFailureHandler(function (e) {
+                    document.getElementById('loadingScreen').style.display = 'none';
+                    document.getElementById('errorScreen').style.display = 'block';
+                    document.getElementById('errMsg').textContent = 'Connection error: ' + e.message;
+                })
+                .getExamSessionReport(studentId, initialSessionId, '');
         } else {
             google.script.run
                 .withSuccessHandler(function (data) {

@@ -57,9 +57,56 @@
             z-index: 1;
         }
 
-        /* Ultramodern classroom background */
+        /* Fallback color while the photo carousel below loads/paints */
         .landing-hero {
-            background: url('https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=1400&q=80') center/cover no-repeat;
+            background: #0d1b4b;
+        }
+
+        /* Crossfading hero photo carousel — admin-uploaded school photos (HERO_PHOTOS) if any
+           exist, otherwise a curated default set of elite school building images. Sits behind the
+           ::before gradient veil and .hero-content, with a slow Ken-Burns zoom on each slide. */
+        .hero-carousel {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            overflow: hidden;
+            background: #0d1b4b;
+        }
+
+        .hero-carousel-slide {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            transform: scale(1.02);
+            transition: opacity 2.4s ease;
+            animation: heroKenBurns 18s ease-in-out infinite;
+        }
+
+        .hero-carousel-slide.active {
+            opacity: 1;
+        }
+
+        @keyframes heroKenBurns {
+            0% {
+                transform: scale(1.02);
+            }
+
+            50% {
+                transform: scale(1.13);
+            }
+
+            100% {
+                transform: scale(1.02);
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .hero-carousel-slide {
+                animation: none;
+            }
         }
 
         .hero-grid {
@@ -1588,6 +1635,10 @@
          React app; kept as plain HTML/JS so the interactive login/report flow below can be
          rewritten in React without touching this working piece). -->
     <div class="landing-hero" id="landingHero">
+        <div class="hero-carousel" id="heroCarousel">
+            <!-- Crossfading background photos injected by JS: admin-uploaded HERO_PHOTOS, or a
+                 default curated set of school building images if none have been uploaded. -->
+        </div>
         <div class="hero-grid" id="heroPupilImages">
             <!-- Student silhouette tiles injected by JS -->
         </div>
@@ -1679,12 +1730,54 @@
             return url;
         };
 
+        // ── HERO PHOTO CAROUSEL ──
+        // Crossfades either the admin's uploaded school photos (HERO_PHOTOS, from Settings) or a
+        // default curated set of elite school building images. Plain JS, same spirit as the hero
+        // banner below — not part of the React app.
+        var DEFAULT_HERO_PHOTOS = [
+            'https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=1600&q=80&auto=format&fit=crop',
+            'https://images.unsplash.com/photo-1541339907198-e08756dedf3f?w=1600&q=80&auto=format&fit=crop',
+            'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=1600&q=80&auto=format&fit=crop',
+            'https://images.unsplash.com/photo-1592280771190-3e2e4d571952?w=1600&q=80&auto=format&fit=crop'
+        ];
+        function renderHeroCarousel(urls) {
+            var host = document.getElementById('heroCarousel');
+            if (!host || !urls || !urls.length) return;
+            host.innerHTML = '';
+            urls.forEach(function (u, i) {
+                var img = document.createElement('img');
+                img.className = 'hero-carousel-slide' + (i === 0 ? ' active' : '');
+                img.src = u;
+                img.alt = '';
+                // A dead/unreachable photo URL just drops out of rotation instead of showing a
+                // broken-image icon over the hero.
+                img.onerror = function () { img.style.display = 'none'; img.classList.remove('active'); };
+                host.appendChild(img);
+            });
+            if (window.__heroCarouselTimer) clearInterval(window.__heroCarouselTimer);
+            if (urls.length <= 1) return;
+            var idx = 0;
+            window.__heroCarouselTimer = setInterval(function () {
+                var slides = Array.prototype.filter.call(host.querySelectorAll('.hero-carousel-slide'), function (s) { return s.style.display !== 'none'; });
+                if (slides.length <= 1) return;
+                slides[idx % slides.length].classList.remove('active');
+                idx = (idx + 1) % slides.length;
+                slides[idx].classList.add('active');
+            }, 6500);
+        }
+        renderHeroCarousel(DEFAULT_HERO_PHOTOS);
+        window.__heroCarouselKey = JSON.stringify(DEFAULT_HERO_PHOTOS);
+
         // ── HERO BRANDING (school name/address/logo banner) ──
         // Kept as plain JS + localStorage cache, unchanged in spirit from the original: paint
         // instantly from the last-known cached settings, then refresh from the server. The
         // interactive portal card (React, below) fetches the same data itself via SWR for its
         // own branding — this only drives the static hero banner above it.
         function applyHeroBranding(r) {
+            if (r.HERO_PHOTOS && r.HERO_PHOTOS.length) {
+                var key = JSON.stringify(r.HERO_PHOTOS);
+                if (key !== window.__heroCarouselKey) { window.__heroCarouselKey = key; renderHeroCarousel(r.HERO_PHOTOS); }
+            }
             var nameEl = document.getElementById('heroSchoolName');
             if (r.SCHOOL_NAME && nameEl) nameEl.textContent = r.SCHOOL_NAME;
 
@@ -1947,6 +2040,172 @@
             return h;
         }
 
+        // Class Test / Mid-Term report — same visual chrome as the End-of-Term report card
+        // (buildReportCard) but a single Score column (no SBA/Exam split), a Grade column only
+        // when that exam type actually has grading configured, and the Conduct & Remarks block
+        // gated entirely by the exam type's own Show* flags (Class Teacher's Remark isn't part of
+        // these — only the End-of-Term flow has a "class teacher remark" field on a session).
+        function buildClassTestOrMidTermCard(data) {
+            if (!data || !data.student) return '<div style="color:#fff;padding:40px;text-align:center">Failed to load report data.</div>';
+            var s = data.student, res = data.results || [], ci = data.classInfo || {}, st = data.settings || {};
+            var session = data.session || {}, type = data.examType || {};
+            var maxScore = data.maxScore || type.MaxScore || 100;
+            var graded = res.some(function (r) { return r.Grade; });
+            var showInterest = String(type.ShowInterest) === 'true';
+            var showConduct = String(type.ShowConduct) === 'true';
+            var showAttitude = String(type.ShowAttitude) === 'true';
+            var showHtRemark = String(type.ShowHeadRemark) === 'true';
+            var showRmkBlock = showInterest || showConduct || showAttitude || showHtRemark;
+            var schoolName = st.SCHOOL_NAME || 'MY SCHOOL';
+            var addr = st.SCHOOL_ADDRESS || '';
+            var email = st.SCHOOL_EMAIL || ''; var phone = st.SCHOOL_PHONE || '';
+            var logoSrc = fixDriveUrl(st.SCHOOL_LOGO || '');
+            var stampSrc = fixDriveUrl(st.SCHOOL_STAMP || '');
+            var logoHtml = logoSrc ? '<img src="' + logoSrc + '" alt="Logo">' : '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0d1b4b" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>';
+
+            var gTotal = 0;
+            var rows = res.map(function (r, i) {
+                gTotal += Number(r.Score || 0);
+                return '<tr' + (i % 2 === 1 ? ' style="background:#f8faff"' : '') + '>'
+                    + '<td style="color:#6b7280;font-weight:600">' + (i + 1) + '</td>'
+                    + '<td class="rc-td-subj">' + r.SubjectName + '</td>'
+                    + '<td style="font-weight:700;color:#0d1b4b">' + r.Score + '</td>'
+                    + (graded ? '<td style="font-weight:700;color:#c0392b">' + (r.Grade || '—') + '</td>' : '')
+                    + '<td style="font-size:11px;color:#374151">' + (r.Remarks || '') + '</td>'
+                    + '</tr>';
+            }).join('');
+
+            var avg = res.length ? Math.round(gTotal / res.length) : 0;
+            var posBar = data.overallPosition ? '<div class="rc-pos-bar"><span class="rc-pos-lbl">CLASS POSITION</span><span class="rc-pos-badge">' + ord(data.overallPosition) + ' / ' + (data.classmatesCount || 'N/A') + '</span></div>' : '';
+
+            var rmkHtml = '';
+            if (showRmkBlock) {
+                rmkHtml = '<div class="rc-rmk"><div class="rc-rmk-title">Conduct &amp; Remarks</div>'
+                    + (showInterest ? '<div class="rc-rmk-row"><span class="rc-rmk-k">Interest / Talent:</span><span class="rc-rmk-v">' + (s.Interest || '—') + '</span></div>' : '')
+                    + (showConduct ? '<div class="rc-rmk-row"><span class="rc-rmk-k">Conduct:</span><span class="rc-rmk-v">' + (s.Conduct || '—') + '</span></div>' : '')
+                    + (showAttitude ? '<div class="rc-rmk-row"><span class="rc-rmk-k">Attitude to Work:</span><span class="rc-rmk-v">' + (s.Attitude || '—') + '</span></div>' : '')
+                    + (showHtRemark ? '<div class="rc-rmk-row"><span class="rc-rmk-k">Headmaster\'s Remark:</span><span class="rc-rmk-v">' + (s.HeadTeacherRemark || '—') + '</span></div>' : '')
+                    + '</div>';
+            }
+
+            return '<div class="rc-page">'
+                + '<div class="rc-hdr">'
+                + '<div class="rc-logo">' + logoHtml + '</div>'
+                + '<div style="text-align:center"><div class="rc-sname">' + schoolName + '</div><div class="rc-scontact">' + addr + '<br>Tel: ' + phone + (email ? ' · ' + email : '') + '</div></div>'
+                + '<div class="rc-photobox">' + (s.PhotoUrl ? '<img src="' + fixDriveUrl(s.PhotoUrl) + '" alt="">' : '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>') + '</div>'
+                + '</div>'
+                + '<div class="rc-title-strip"><div class="rc-title-text">' + (type.Name || 'Assessment') + ' Report</div></div>'
+                + '<div class="rc-sub-strip">' + (session.Label || type.Name || '') + ' · Academic Year ' + s.Year + '</div>'
+                + '<div class="rc-id-row"><span style="font-size:12px;color:#6b7280;margin-right:8px">Student ID:</span><span class="rc-id-badge">' + s.ID + '</span></div>'
+                + '<div class="rc-info"><div class="rc-info-grid">'
+                + '<div class="rc-info-item"><span class="rc-il">Name:</span><span class="rc-iv">' + s.Name + '</span></div>'
+                + '<div class="rc-info-item"><span class="rc-il">Class:</span><span class="rc-iv">' + s.Class + '</span></div>'
+                + '<div class="rc-info-item"><span class="rc-il">Gender:</span><span class="rc-iv">' + (s.Gender || '') + '</span></div>'
+                + '<div class="rc-info-item"><span class="rc-il">Term:</span><span class="rc-iv">' + s.Term + '</span></div>'
+                + '<div class="rc-info-item"><span class="rc-il">Max Score:</span><span class="rc-iv">' + maxScore + '</span></div>'
+                + '<div class="rc-info-item"><span class="rc-il">Year:</span><span class="rc-iv">' + s.Year + '</span></div>'
+                + '</div></div>'
+                + '<div class="rc-tbl-wrap"><table class="rc-tbl"><thead><tr>'
+                + '<th style="width:30px">#</th><th style="text-align:left;padding-left:9px">SUBJECT</th>'
+                + '<th>SCORE<br><small style="font-weight:400;font-size:8.5px">(of ' + maxScore + ')</small></th>'
+                + (graded ? '<th>GRADE</th>' : '') + '<th>REMARKS</th>'
+                + '</tr></thead><tbody>' + rows + '</tbody>'
+                + '<tfoot><tr style="background:#0d1b4b">'
+                + '<td colspan="2" style="padding:7px;font-weight:700;text-align:left;padding-left:9px;letter-spacing:1px;border:1px solid rgba(255,255,255,.3);color:#ffffff">TOTAL</td>'
+                + '<td style="padding:7px;text-align:center;border:1px solid rgba(255,255,255,.3);font-weight:700;color:#ffffff">' + gTotal + '</td>'
+                + '<td colspan="' + (graded ? 2 : 1) + '" style="border:1px solid rgba(255,255,255,.2)"></td></tr></tfoot></table></div>'
+                + '<div class="rc-stats">'
+                + '<div class="rc-stat"><span class="rc-stat-lbl">Total Score</span><span class="rc-stat-val">' + gTotal + '</span></div>'
+                + '<div class="rc-stat"><span class="rc-stat-lbl">Average</span><span class="rc-stat-val">' + avg + '</span></div>'
+                + '<div class="rc-stat"><span class="rc-stat-lbl">Subjects</span><span class="rc-stat-val">' + res.length + '</span></div>'
+                + '</div>'
+                + posBar
+                + rmkHtml
+                + '<div class="rc-sigs"><div class="rc-sig"><div class="rc-sig-line">' + (stampSrc ? '<img src="' + stampSrc + '" style="max-height:64px;max-width:130px;object-fit:contain">' : '') + '</div><div class="rc-sig-role">Official School Stamp</div></div></div>'
+                + '<div class="rc-footer-strip"><span>Generated by: <strong>' + schoolName + '</strong></span><span>' + s.Class + ' · ' + s.Term + ' · ' + s.Year + '</span></div>'
+                + '</div>';
+        }
+
+        // Basic 9 (JHS3) Mock Examination — a compact "Result Slip" rather than a full report
+        // card, in the spirit of the school's existing paper mock slips: header band, candidate
+        // info block, subject/score/remarks table, aggregate, signature. Restyled to this app's
+        // navy/gold brand rather than a pixel clone of any particular paper slip.
+        function buildMockResultSlip(data) {
+            if (!data || !data.student) return '<div style="color:#fff;padding:40px;text-align:center">Failed to load report data.</div>';
+            var s = data.student, res = data.results || [], st = data.settings || {};
+            var session = data.session || {}, type = data.examType || {};
+            var schoolName = st.SCHOOL_NAME || 'MY SCHOOL';
+            var logoSrc = fixDriveUrl(st.SCHOOL_LOGO || '');
+            var mockLabel = (session.Label || type.Name || 'MOCK').toUpperCase();
+            var mockDate = session.PublishedAt || session.CreatedAt;
+            mockDate = mockDate ? new Date(mockDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }) : '—';
+
+            var verifyUrl = '';
+            var baseUrl = data.scriptUrl || window.scriptUrl || '';
+            var isStatic = (!baseUrl || baseUrl.indexOf('<' + '?=') !== -1 || baseUrl.indexOf('<' + '?') !== -1 || window.location.origin.indexOf('netlify') !== -1 || window.location.hostname !== 'script.google.com');
+            if (isStatic) {
+                var origin = window.location.origin, path = window.location.pathname;
+                if (path.endsWith('/') || path === '') path += 'report.html'; else path = path.substring(0, path.lastIndexOf('/') + 1) + 'report.html';
+                verifyUrl = origin + path + '?sessionId=' + encodeURIComponent(session.SessionID) + '&id=' + encodeURIComponent(s.ID);
+            } else {
+                verifyUrl = baseUrl + '?page=report&sessionId=' + encodeURIComponent(session.SessionID) + '&id=' + encodeURIComponent(s.ID);
+            }
+            var qrHtml = verifyUrl ? '<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(verifyUrl) + '" alt="QR Code" style="width:100%;height:100%;object-fit:contain">' : '';
+
+            var rows = res.map(function (r) {
+                return '<tr><td style="padding:9px 10px;border-bottom:1px solid #edf1f7;font-weight:600;color:#1e293b">' + r.SubjectName.toUpperCase() + '</td>'
+                    + '<td style="padding:9px 10px;border-bottom:1px solid #edf1f7;text-align:center;font-weight:700;color:#0d1b4b">' + r.Score + '</td>'
+                    + '<td style="padding:9px 10px;border-bottom:1px solid #edf1f7;text-align:right;color:#c0392b;font-weight:600;font-size:11.5px">' + (r.Remarks || r.Grade || '—') + '</td></tr>';
+            }).join('');
+
+            var agg = data.jhsAggregate ? data.jhsAggregate.aggregate : null;
+
+            return '<style>.ms-slip *{box-sizing:border-box}.ms-slip{max-width:720px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.5);font-family:\'Plus Jakarta Sans\',sans-serif}'
+                + '.ms-band1{background:linear-gradient(135deg,#0d1b4b,#1a237e);color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px}'
+                + '.ms-band1 .nm{font-family:\'Outfit\',sans-serif;font-weight:800;font-size:17px;letter-spacing:.4px;text-transform:uppercase}'
+                + '.ms-band2{background:linear-gradient(90deg,#f0c020,#ffd700);color:#0d1b4b;padding:9px 20px;display:flex;align-items:center;justify-content:space-between;font-weight:800;font-size:13px;letter-spacing:1px;text-transform:uppercase}'
+                + '.ms-sub{text-align:center;font-weight:700;font-size:12px;color:#374151;padding:10px 20px 0;font-style:italic}'
+                + '.ms-media{display:flex;justify-content:center;gap:26px;padding:18px 20px 6px}'
+                + '.ms-media .box{width:88px;height:88px;border:2px solid #0d1b4b;border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#f8fafc}'
+                + '.ms-info{padding:14px 26px 4px}'
+                + '.ms-info-row{display:flex;padding:5px 0;font-size:12.5px;border-bottom:1px dashed #e5e7eb}'
+                + '.ms-info-row .k{width:180px;flex-shrink:0;color:#0d1b4b;font-weight:700}'
+                + '.ms-info-row .v{color:#1e293b;font-weight:600}'
+                + '.ms-tbl-wrap{padding:16px 26px}'
+                + '.ms-tbl-wrap table{width:100%;border-collapse:collapse;border:2px solid #0d1b4b;border-radius:6px;overflow:hidden}'
+                + '.ms-tbl-wrap thead th{background:#0d1b4b;color:#f0c020;padding:9px 10px;font-size:11px;letter-spacing:.5px;text-transform:uppercase}'
+                + '.ms-agg{display:flex;justify-content:center;margin:6px 26px 4px}'
+                + '.ms-agg .b{background:linear-gradient(135deg,#f0c020,#ffd700);color:#0d1b4b;font-weight:800;font-size:13px;padding:8px 22px;border-radius:30px;letter-spacing:.5px}'
+                + '.ms-sig{display:flex;justify-content:space-between;align-items:flex-end;padding:26px 26px 10px;margin-top:10px}'
+                + '.ms-sig .line{border-top:1.5px solid #0d1b4b;padding-top:5px;font-size:11px;color:#374151;font-weight:600;min-width:180px;text-align:center}'
+                + '.ms-foot{background:#0d1b4b;color:rgba(255,255,255,.7);font-size:10px;padding:10px 20px;display:flex;justify-content:space-between}'
+                + '@media print{.ms-slip{box-shadow:none}}</style>'
+                + '<div class="ms-slip">'
+                + '<div class="ms-band1">'
+                + '<div style="display:flex;align-items:center;gap:10px">' + (logoSrc ? '<img src="' + logoSrc + '" style="width:36px;height:36px;border-radius:50%;object-fit:cover">' : '') + '<span class="nm">' + schoolName + '</span></div>'
+                + '<span style="font-size:10px;color:rgba(255,255,255,.6);font-weight:600">' + (s.Class || '') + '</span>'
+                + '</div>'
+                + '<div class="ms-band2"><span>' + mockLabel + '</span><span>Result Slip</span></div>'
+                + '<div class="ms-sub">Provisional Result Slip</div>'
+                + '<div class="ms-media">'
+                + '<div class="box">' + qrHtml + '</div>'
+                + '<div class="box">' + (s.PhotoUrl ? '<img src="' + fixDriveUrl(s.PhotoUrl) + '" style="width:100%;height:100%;object-fit:cover">' : '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>') + '</div>'
+                + '</div>'
+                + '<div class="ms-info">'
+                + '<div class="ms-info-row"><span class="k">Candidate Name</span><span class="v">: ' + s.Name + '</span></div>'
+                + '<div class="ms-info-row"><span class="k">Index Number</span><span class="v">: ' + s.ID + '</span></div>'
+                + '<div class="ms-info-row"><span class="k">Type of Examination</span><span class="v">: ' + mockLabel + ' - ' + s.Year + '</span></div>'
+                + '<div class="ms-info-row"><span class="k">School</span><span class="v">: ' + schoolName + '</span></div>'
+                + (agg !== null ? '<div class="ms-info-row"><span class="k">Aggregate</span><span class="v">: ' + agg + '</span></div>' : '')
+                + '<div class="ms-info-row"><span class="k">Mock Date</span><span class="v">: ' + mockDate + '</span></div>'
+                + '</div>'
+                + '<div class="ms-tbl-wrap"><table><thead><tr><th style="text-align:left">Subject</th><th>Score</th><th style="text-align:right">Remarks</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+                + (agg !== null ? '<div class="ms-agg"><span class="b">Aggregate Score: ' + agg + ' (lower is better)</span></div>' : '')
+                + '<div class="ms-sig"><span class="line">Head Teacher\'s Signature</span><span style="font-size:10px;color:#6b7280">Generated ' + new Date().toLocaleDateString() + '</span></div>'
+                + '<div class="ms-foot"><span>Result on this print-out can be cross-checked by scanning the QR code.</span><span>' + schoolName + '</span></div>'
+                + '</div>';
+        }
+
         // ── Small presentational components ─────────────────────────────────────
         function StepIndicator({ dotStep }) {
             var steps = [
@@ -2136,39 +2395,57 @@
             );
         }
 
-        function PeriodPanel({ year, setYear, term, setTerm, onSubmit, onBack, alert, loading }) {
+        // Replaces the old fixed "Select Year & Term" form: after OTP the portal already knows
+        // every result the student actually has (End-of-Term + any published Class Test / Mid-Term
+        // / Mock sessions), so it lists them instead of asking the student to guess a period. A
+        // "NEW" badge on a card *is* the "result released" notification — no separate messaging
+        // system needed, it's just whether that item published within the last 14 days.
+        function ExamSelectionPanel({ items, itemsLoading, onSelect, onBack, alert, loading, busyKey }) {
             return (
                 <div className="step-panel active">
-                    <div className="panel-title">Select Report Period</div>
-                    <div className="panel-sub">Choose the Academic Year and Term/Semester to view your report card</div>
+                    <div className="panel-title">Your Results</div>
+                    <div className="panel-sub">Select a result below to view it. Newly released results are marked NEW.</div>
                     <Alert alert={alert} />
-                    <div className="fg">
-                        <label className="fg-lbl">Academic Year</label>
-                        <div className="input-wrap">
-                            <span className="inp-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block', color: '#9ca3af' }}><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg></span>
-                            <select className="field-inp" style={{ cursor: 'pointer' }} value={year} onChange={function (e) { setYear(e.target.value); }}>
-                                {YEARS.map(function (y) { return <option key={y} value={y}>{y}</option>; })}
-                            </select>
+                    {itemsLoading ? (
+                        <div style={{ textAlign: 'center', color: '#6b7280', fontSize: 13, padding: '30px 8px' }}>Loading your results…</div>
+                    ) : (!items || items.length === 0) ? (
+                        <div style={{ textAlign: 'center', color: '#6b7280', fontSize: 13, padding: '24px 8px', lineHeight: 1.6 }}>
+                            No published results are available for you yet.<br />Please check back later.
                         </div>
-                    </div>
-                    <div className="fg">
-                        <label className="fg-lbl">Term / Semester</label>
-                        <div className="input-wrap">
-                            <span className="inp-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block', color: '#9ca3af' }}><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg></span>
-                            <select className="field-inp" style={{ cursor: 'pointer' }} value={term} onChange={function (e) { setTerm(e.target.value); }}>
-                                <option>Term 1</option><option>Term 2</option><option>Term 3</option>
-                                <option>Semester 1</option><option>Semester 2</option>
-                            </select>
+                    ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 360, overflowY: 'auto', margin: '4px 0 8px' }}>
+                            {items.map(function (it) {
+                                var key = it.kind + '-' + (it.sessionId || (it.year + '|' + it.term));
+                                var busy = busyKey === key;
+                                return (
+                                    <button key={key} type="button" disabled={!!loading} onClick={function () { onSelect(it, key); }}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                                            width: '100%', textAlign: 'left', padding: '13px 16px', borderRadius: 12,
+                                            border: it.isNew ? '1.5px solid #f0c020' : '1.5px solid #e5e7eb', background: it.isNew ? '#fffdf5' : '#fff',
+                                            cursor: loading ? 'default' : 'pointer', opacity: (loading && !busy) ? 0.5 : 1, transition: 'all .15s'
+                                        }}>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
+                                            <span style={{ fontWeight: 700, color: '#0d1b4b', fontSize: 13.5 }}>{it.examTypeName}{it.label && it.label !== it.examTypeName ? ' — ' + it.label : ''}</span>
+                                            <span style={{ fontSize: 11.5, color: '#6b7280' }}>{it.class} · {it.term} · {it.year}</span>
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                                            {it.isNew && (
+                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'linear-gradient(135deg,#f0c020,#ffd700)', color: '#0d1b4b', fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 20, letterSpacing: '.4px' }}>
+                                                    <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" /></svg> NEW
+                                                </span>
+                                            )}
+                                            {busy ? (
+                                                <span style={{ width: 16, height: 16, border: '2.5px solid #e5e7eb', borderTopColor: '#0d1b4b', borderRadius: '50%', display: 'inline-block', animation: 'spin .7s linear infinite' }}></span>
+                                            ) : (
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+                                            )}
+                                        </div>
+                                    </button>
+                                );
+                            })}
                         </div>
-                    </div>
-                    <button className={'btn-primary' + (loading ? ' loading' : '')} disabled={loading} style={{ marginTop: 20 }} onClick={onSubmit}>
-                        <span className="shine"></span>
-                        <span className="btn-lbl" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>
-                            View Report Card
-                        </span>
-                        <div className="spinner"></div>
-                    </button>
+                    )}
                     <button className="btn-sec" onClick={onBack}>← Go Back</button>
                 </div>
             );
@@ -2177,15 +2454,25 @@
         function ReportOverlay({ data, onClose }) {
             var [tab, setTab] = useState('report');
             var schoolName = (data.settings && data.settings.SCHOOL_NAME) || 'School Portal';
-            var html = tab === 'report' ? buildReportCard(data) : buildFeesInvoice(data);
+            // data.__kind: 'endofterm' (legacy getStudentReport) has a Fee Bill tab; any exam
+            // session picks its report builder from its exam type's Category — Mock gets the
+            // compact Result Slip, everything else (Class Test, Mid-Term, custom types) gets the
+            // simplified single-score report card.
+            var isSession = data.__kind === 'session';
+            var category = isSession ? (data.examType && data.examType.Category) || '' : '';
+            var hasFeesTab = !isSession;
+            var reportHtml = !isSession ? buildReportCard(data) : (category === 'Mock' ? buildMockResultSlip(data) : buildClassTestOrMidTermCard(data));
+            var html = (tab === 'report' || !hasFeesTab) ? reportHtml : buildFeesInvoice(data);
             return (
                 <div id="reportOverlay" className="show">
                     <div className="rc-toolbar no-print">
                         <div className="rc-toolbar-brand"><div className="rc-toolbar-logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0d1b4b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg></div><div className="rc-toolbar-name">{schoolName}</div></div>
-                        <div style={{ display: 'flex', gap: 8 }} className="rc-tabs-wrap">
-                            <button className="btn-sec" style={{ border: 'none', background: tab === 'report' ? 'var(--gold)' : 'transparent', color: tab === 'report' ? '#0d1b4b' : '#fff', borderRadius: 8, padding: '6px 12px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={function () { setTab('report'); }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg> Result</button>
-                            <button className="btn-sec" style={{ border: 'none', background: tab === 'fees' ? 'var(--gold)' : 'transparent', color: tab === 'fees' ? '#0d1b4b' : '#fff', borderRadius: 8, padding: '6px 12px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={function () { setTab('fees'); }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg> Fee Bill</button>
-                        </div>
+                        {hasFeesTab && (
+                            <div style={{ display: 'flex', gap: 8 }} className="rc-tabs-wrap">
+                                <button className="btn-sec" style={{ border: 'none', background: tab === 'report' ? 'var(--gold)' : 'transparent', color: tab === 'report' ? '#0d1b4b' : '#fff', borderRadius: 8, padding: '6px 12px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={function () { setTab('report'); }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg> Result</button>
+                                <button className="btn-sec" style={{ border: 'none', background: tab === 'fees' ? 'var(--gold)' : 'transparent', color: tab === 'fees' ? '#0d1b4b' : '#fff', borderRadius: 8, padding: '6px 12px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={function () { setTab('fees'); }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg> Fee Bill</button>
+                            </div>
+                        )}
                         <div className="rc-toolbar-acts">
                             <button className="rc-btn rc-btn-back" onClick={onClose}>← Back</button>
                             <button className="rc-btn rc-btn-print" onClick={function () { window.print(); }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: '-2px', marginRight: 5 }}><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></svg>Print</button>
@@ -2216,20 +2503,13 @@
             var [currentStudentId, setCurrentStudentId] = useState('');
             var [demoCode, setDemoCode] = useState('');
             var [otp, setOtp] = useState(['', '', '', '', '', '']);
-            var [year, setYear] = useState('2025-2026');
-            var [term, setTerm] = useState('Term 1');
+            var [examItems, setExamItems] = useState([]);
+            var [examItemsLoading, setExamItemsLoading] = useState(false);
+            var [busyKey, setBusyKey] = useState(null);
             var [alerts, setAlerts] = useState({});
             var [loading, setLoading] = useState({});
             var [reportData, setReportData] = useState(null);
             var identityInputRef = useRef(null);
-
-            // Default the period selector to the school's active term/year once settings load.
-            useEffect(function () {
-                if (settingsData) {
-                    if (settingsData.CURRENT_YEAR) setYear(settingsData.CURRENT_YEAR);
-                    if (settingsData.CURRENT_TERM) setTerm(settingsData.CURRENT_TERM);
-                }
-            }, [settingsData && settingsData.CURRENT_YEAR, settingsData && settingsData.CURRENT_TERM]);
 
             var dotStep = (panel === 'category' || panel === 'class') ? 1 : panel === 'identity' ? 2 : panel === 'otp' ? 3 : 4;
 
@@ -2240,7 +2520,7 @@
             function selectClass(cls) { setPanel('identity'); setTimeout(function () { if (identityInputRef.current) identityInputRef.current.focus(); }, 50); }
             function goToCategories() {
                 setPanel('category'); setCategory(null); setOtp(['', '', '', '', '', '']);
-                setStudentId(''); setStudentName(''); setAlerts({}); setDemoCode('');
+                setStudentId(''); setStudentName(''); setAlerts({}); setDemoCode(''); setExamItems([]);
             }
             function goBack() { setPanel('identity'); setOtp(['', '', '', '', '', '']); setAlert('otp', null); setDemoCode(''); }
             function goBackToOtp() { setPanel('otp'); }
@@ -2265,6 +2545,8 @@
                 });
             }, [studentId, studentName]);
 
+            // After OTP, fetch the combined list of everything published for this student
+            // (End-of-Term + Class Test / Mid-Term / Mock sessions) instead of asking for a period.
             var handleStep2 = useCallback(function () {
                 var code = otp.join('');
                 setAlert('otp', null);
@@ -2272,24 +2554,39 @@
                 setBusy('otp', true);
                 gasCall('verifyCode', currentStudentId, code).then(function (r) {
                     setBusy('otp', false);
-                    if (r.success) setPanel('period');
-                    else setAlert('otp', { type: 'error', msg: '' + r.message });
+                    if (r.success) {
+                        setPanel('examselect');
+                        setExamItemsLoading(true);
+                        gasCall('getPublicExamSessionsForStudent', currentStudentId).then(function (r2) {
+                            setExamItemsLoading(false);
+                            if (r2.success) setExamItems(r2.items || []);
+                            else setAlert('examselect', { type: 'error', msg: '' + r2.message });
+                        }).catch(function (e2) {
+                            setExamItemsLoading(false);
+                            setAlert('examselect', { type: 'error', msg: 'Connection error: ' + e2.message });
+                        });
+                    } else {
+                        setAlert('otp', { type: 'error', msg: '' + r.message });
+                    }
                 }).catch(function (e) {
                     setBusy('otp', false);
                     setAlert('otp', { type: 'error', msg: 'Connection error: ' + e.message });
                 });
             }, [otp, currentStudentId]);
 
-            function handleStep3() {
-                setAlert('period', null);
-                setBusy('period', true);
-                gasCall('getStudentReport', currentStudentId, year, term).then(function (r) {
-                    setBusy('period', false);
-                    if (r.success) setReportData(r);
-                    else setAlert('period', { type: 'error', msg: '' + r.message });
+            function handleSelectExam(item, key) {
+                setAlert('examselect', null);
+                setBusyKey(key);
+                var req = item.kind === 'endofterm'
+                    ? gasCall('getStudentReport', currentStudentId, item.year, item.term)
+                    : gasCall('getExamSessionReport', currentStudentId, item.sessionId);
+                req.then(function (r) {
+                    setBusyKey(null);
+                    if (r.success) { r.__kind = item.kind; setReportData(r); }
+                    else setAlert('examselect', { type: 'error', msg: '' + r.message });
                 }).catch(function (e) {
-                    setBusy('period', false);
-                    setAlert('period', { type: 'error', msg: 'Connection error: ' + e.message });
+                    setBusyKey(null);
+                    setAlert('examselect', { type: 'error', msg: 'Connection error: ' + e.message });
                 });
             }
 
@@ -2335,9 +2632,9 @@
                                 {panel === 'otp' && (
                                     <OtpPanel otp={otp} setOtp={setOtp} demoCode={demoCode} onSubmit={handleStep2} onBack={goBack} alert={alerts.otp} loading={!!loading.otp} />
                                 )}
-                                {panel === 'period' && (
-                                    <PeriodPanel year={year} setYear={setYear} term={term} setTerm={setTerm}
-                                        onSubmit={handleStep3} onBack={goBackToOtp} alert={alerts.period} loading={!!loading.period} />
+                                {panel === 'examselect' && (
+                                    <ExamSelectionPanel items={examItems} itemsLoading={examItemsLoading} onSelect={handleSelectExam}
+                                        onBack={goBackToOtp} alert={alerts.examselect} loading={!!busyKey} busyKey={busyKey} />
                                 )}
                             </div>
                         </div>

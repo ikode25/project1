@@ -3820,6 +3820,11 @@
                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                         </svg>Results Entry</div>
+                    <div class="ni" data-nav-id="exams" onclick="showPanel('exams',this)"><svg viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                            <path d="M9 11l3 3L22 4" />
+                            <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+                        </svg>Exams</div>
                     <div class="ni" data-nav-id="remarks" onclick="showPanel('remarks',this)"><svg viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" stroke-width="2" stroke-linecap="round">
                             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -4494,6 +4499,46 @@
                                             performance for this class.</div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- EXAMS -->
+                <div class="panel" id="panel-exams">
+                    <div class="card">
+                        <div class="chdr">
+                            <div class="ctitle">Exams</div>
+                            <div style="display:flex;gap:8px" class="no-print">
+                                <button class="btn bo bsm" id="examsTabTypesBtn" onclick="switchExamsTab('types')">Exam Types</button>
+                                <button class="btn bo bsm" id="examsTabSessionsBtn" onclick="switchExamsTab('sessions')">Sessions &amp; Scores</button>
+                            </div>
+                        </div>
+                        <div class="cbody">
+                            <div id="examsTypesTab">
+                                <div class="ttb no-print" style="align-items:center">
+                                    <div style="font-size:12px;color:var(--mu)">Class Test, Mid-Term and Mock Exam are pre-configured. Add your own assessment types below — each controls its own max score, grading and whether the Head Teacher must publish it before students can see results.</div>
+                                    <button class="btn bp bsm admin-only" style="margin-left:auto;white-space:nowrap" onclick="openExamTypeModal(null)">+ Add Exam Type</button>
+                                </div>
+                                <div class="tw">
+                                    <table class="dt">
+                                        <thead>
+                                            <tr><th>Name</th><th>Category</th><th>Max Score</th><th>Publish Gate</th><th>Grading Group</th><th>Status</th><th class="no-print">Actions</th></tr>
+                                        </thead>
+                                        <tbody id="examTypesTbody"><tr><td colspan="7" style="text-align:center;color:var(--mu);padding:24px">Loading…</td></tr></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div id="examsSessionsTab" style="display:none">
+                                <div class="frow">
+                                    <div class="fg"><label>Exam Type</label><select id="examSessType" onchange="loadExamSessionsList()"></select></div>
+                                    <div class="fg"><label>Class</label><select id="examSessClass" onchange="loadExamSessionsList()"><option value="">Select class…</option></select></div>
+                                    <div class="fg"><label>Academic Year</label><select id="examSessYear" onchange="loadExamSessionsList()"></select></div>
+                                    <div class="fg" style="display:flex;align-items:flex-end">
+                                        <button class="btn bp bsm" onclick="openNewExamSessionModal()" style="height:38px">+ New Session</button>
+                                    </div>
+                                </div>
+                                <div id="examSessionsList" style="margin-top:14px"></div>
                             </div>
                         </div>
                     </div>
@@ -5392,6 +5437,23 @@
                         </div>
                     </div>
 
+                    <div class="card admin-only" id="setHeroPhotosCard" style="margin-bottom:20px;">
+                        <div class="chdr">
+                            <div class="ctitle" style="font-size:14px;">Result Checker Page — School Photos</div>
+                        </div>
+                        <div class="cbody">
+                            <div style="font-size:12px;color:var(--mu);margin-bottom:12px">Upload photos of your school buildings/campus to display as a rotating background on the public result checker landing page. If none are uploaded, a default set of images is used instead.</div>
+                            <div class="no-print" style="margin-bottom:14px;display:flex;align-items:center;gap:10px">
+                                <button type="button" class="btn bp bsm" onclick="document.getElementById('heroPhotoFile').click()">+ Upload Photo</button>
+                                <input type="file" id="heroPhotoFile" accept="image/*" style="display:none" onchange="handleHeroPhotoUpload(event)">
+                                <span id="heroPhotoUploadingMsg" style="display:none;font-size:12px;color:var(--mu)">Uploading…</span>
+                            </div>
+                            <div id="heroPhotoGallery" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px">
+                                <div style="color:var(--mu);font-size:12px">Loading…</div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="card admin-only" id="setPhotosCard" style="margin-bottom:20px;">
                         <div class="chdr">
                             <div class="ctitle" style="font-size:14px;">Photo Storage Folder (Google Drive)</div>
@@ -6160,6 +6222,28 @@
                         </div>
                     </div>
 
+                    <!-- AUTO-BACKUP TOGGLE -->
+                    <div class="card" style="margin-bottom:20px; padding:20px 24px; background:#ffffff; border-radius:16px; border:1px solid var(--bd); box-shadow:var(--sh);">
+                        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px;">
+                            <div style="flex:1; min-width:260px;">
+                                <div style="font-weight:700;color:var(--nv);font-size:14px;display:flex;align-items:center;gap:8px">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--bl)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                    Weekly Auto-Backup
+                                </div>
+                                <div style="font-size:12px;color:var(--mu);margin-top:4px">Automatically saves a full data snapshot to "System_Backups" every Sunday at 2am — no need to remember to click "Create New Backup".</div>
+                                <div id="autoBackupStatusMsg" style="font-size:11px;font-weight:600;color:var(--bl);margin-top:6px">Checking status…</div>
+                            </div>
+                            <div class="no-print">
+                                <label style="display:inline-flex;align-items:center;gap:10px;cursor:pointer">
+                                    <span id="autoBackupToggleLbl" style="font-size:12px;font-weight:700;color:var(--mu)">Off</span>
+                                    <span class="switch" onclick="toggleAutoBackup()" id="autoBackupSwitch" style="position:relative;display:inline-block;width:44px;height:24px;background:#cbd5e1;border-radius:999px;transition:.2s;cursor:pointer">
+                                        <span id="autoBackupKnob" style="position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:.2s"></span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- BACKUP CARDS LIST CONTAINER -->
                     <div id="driveBackupsContainer" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:20px;">
                         <div style="grid-column:1/-1; text-align:center; padding:40px; color:var(--mu); background:#ffffff; border-radius:16px; border:1px solid var(--bd); box-shadow:var(--sh);">
@@ -6892,6 +6976,100 @@
         </div>
     </div>
 
+    <!-- Exam Type modal -->
+    <div class="mov" id="examTypeModal" onclick="backdropClose(event,'examTypeModal')">
+        <div class="modal" style="max-width:520px">
+            <div class="mhdr">
+                <div class="mtitle" id="examTypeModalTitle">Add Exam Type</div>
+                <button class="mclose" onclick="closeModal('examTypeModal')"><svg viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg></button>
+            </div>
+            <div class="mbody">
+                <input type="hidden" id="et_ID">
+                <input type="hidden" id="et_locked">
+                <div class="fg"><label>Name</label><input type="text" id="et_Name" placeholder="e.g. Weekly Quiz"></div>
+                <div class="fg"><label>Category</label><input type="text" id="et_Category" placeholder="e.g. Custom"></div>
+                <div class="fg"><label>Max Score</label><input type="number" id="et_MaxScore" value="100" min="1"></div>
+                <div class="fg"><label>Grading Level Group <span style="font-weight:400;color:var(--mu)">(optional — matches a "Level Group" in Grading System; leave blank for no grade column)</span></label>
+                    <input type="text" id="et_GradingLevelGroup" placeholder="e.g. ClassTest"></div>
+                <div class="fg"><label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                        <input type="checkbox" id="et_RequiresPublish" style="width:16px;height:16px"> Requires admin publish before students can see results</label></div>
+                <div style="font-size:12px;font-weight:700;color:var(--nv);margin:12px 0 6px">Show on report card:</div>
+                <div style="display:flex;flex-wrap:wrap;gap:14px">
+                    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="et_ShowConduct" style="width:15px;height:15px"> Conduct</label>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="et_ShowAttitude" style="width:15px;height:15px"> Attitude</label>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="et_ShowInterest" style="width:15px;height:15px"> Interest/Talent</label>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="et_ShowHeadRemark" style="width:15px;height:15px"> Head Teacher's Remark</label>
+                </div>
+            </div>
+            <div class="mfoot"><button class="btn bo" onclick="closeModal('examTypeModal')">Cancel</button><button
+                    class="btn bg2" onclick="saveExamTypeSubmit()">Save</button></div>
+        </div>
+    </div>
+
+    <!-- New Exam Session modal -->
+    <div class="mov" id="examSessionModal" onclick="backdropClose(event,'examSessionModal')">
+        <div class="modal" style="max-width:480px">
+            <div class="mhdr">
+                <div class="mtitle">New Exam Session</div>
+                <button class="mclose" onclick="closeModal('examSessionModal')"><svg viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg></button>
+            </div>
+            <div class="mbody">
+                <div class="fg"><label>Label</label><input type="text" id="es_Label" placeholder="e.g. Class Test — October"></div>
+                <div class="fg"><label>Class</label><select id="es_Class"><option value="">Select class…</option></select></div>
+                <div class="fg"><label>Academic Year</label><select id="es_Year"></select></div>
+                <div class="fg"><label>Term</label><select id="es_Term">
+                        <option>Term 1</option>
+                        <option selected>Term 2</option>
+                        <option>Term 3</option>
+                        <option>Semester 1</option>
+                        <option>Semester 2</option>
+                    </select></div>
+                <div class="fg"><label>Max Score Override <span style="font-weight:400;color:var(--mu)">(optional — leave blank to use the exam type's default)</span></label>
+                    <input type="number" id="es_MaxScoreOverride" placeholder="e.g. 20" min="1"></div>
+            </div>
+            <div class="mfoot"><button class="btn bo" onclick="closeModal('examSessionModal')">Cancel</button><button
+                    class="btn bg2" onclick="createExamSessionSubmit()">Create Session</button></div>
+        </div>
+    </div>
+
+    <!-- Exam Session Score Entry modal -->
+    <div class="mov" id="examScoreModal" onclick="backdropClose(event,'examScoreModal')">
+        <div class="modal fullscreen">
+            <div class="mhdr">
+                <div>
+                    <div class="mtitle" id="examScoreModalTitle">Enter Scores</div>
+                    <div id="examScoreModalSub" style="font-size:12px;color:var(--mu);margin-top:3px"></div>
+                </div>
+                <button class="mclose" onclick="closeModal('examScoreModal')"><svg viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg></button>
+            </div>
+            <div class="mbody" style="padding:16px">
+                <div id="examScoreConfigInfo"
+                    style="padding:10px;background:#f0fdf4;border-radius:8px;font-size:12px;color:#166534;margin-bottom:12px;font-weight:600"></div>
+                <div style="overflow:auto;max-height:calc(95vh - 230px);border:3px solid #0d1b4b;border-radius:var(--rs)">
+                    <table class="sbatbl" id="examScoreTbl">
+                        <tr>
+                            <td style="padding:20px;text-align:center;color:var(--mu)">Loading…</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            <div class="mfoot"><button class="btn bo" onclick="closeModal('examScoreModal')">Cancel</button><button
+                    class="btn bg2" onclick="saveExamScoresSubmit()">Save Scores</button></div>
+        </div>
+    </div>
+
     <!-- Class Summary modal -->
     <div class="mov" id="summaryModal" onclick="backdropClose(event,'summaryModal')">
         <div class="modal" style="max-width:1050px">
@@ -7186,9 +7364,9 @@
         function toast(msg, type) { type = type || 'info'; var el = document.createElement('div'); el.className = 'toast ' + type; el.innerHTML = '<span style="width:16px;height:16px;flex-shrink:0">' + (TOAST_ICONS[type] || TOAST_ICONS.info) + '</span><span style="flex:1">' + msg + '</span><button class="txbtn" onclick="this.parentElement.remove()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>'; document.getElementById('toastCtr').appendChild(el); setTimeout(function () { if (el.parentNode) el.remove(); }, 5000); }
         function ord(n) { var s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
         function popYears(id, cur) { var el = document.getElementById(id); if (!el) return; var p = el.value; el.innerHTML = ''; YEARS.forEach(function (y) { var o = document.createElement('option'); o.value = y; o.textContent = y; if (y === (cur || p)) o.selected = true; el.appendChild(o); }); if (!el.value && YEARS.length > 0) el.value = YEARS[0]; }
-        function populateAllYears() { ['resYear', 'remYear', 'msYear', 'bulkYear', 'm_Year', 'set_CURRENT_YEAR', 'cumYear', 'fbYear', 'eaYear'].forEach(function (id) { popYears(id, '2025-2026'); }); }
+        function populateAllYears() { ['resYear', 'remYear', 'msYear', 'bulkYear', 'm_Year', 'set_CURRENT_YEAR', 'cumYear', 'fbYear', 'eaYear', 'examSessYear', 'es_Year'].forEach(function (id) { popYears(id, '2025-2026'); }); }
         function populateAllClassDropdowns() {
-            ['remClass', 'msClass', 'bulkClass', 'fbClass', 'eaClass'].forEach(function (id) {
+            ['remClass', 'msClass', 'bulkClass', 'fbClass', 'eaClass', 'examSessClass', 'es_Class'].forEach(function (id) {
                 var el = document.getElementById(id); if (!el) return;
                 var cur = el.value; el.innerHTML = '<option value="">Select class…</option>';
                 allClasses.forEach(function (c) { if (userRole === 'teacher' && c.ClassName !== userClass) return; el.innerHTML += '<option value="' + c.ClassName + '">' + c.ClassName + '</option>'; });
@@ -7210,6 +7388,227 @@
                 if (userRole === 'teacher') { ac.value = userClass; ac.disabled = true; } else if (cur) ac.value = cur;
             }
         }
+
+        // ── EXAMS (Exam Types / Sessions / Scores) ──
+        var _examTypesCache = [], _examSessionsCache = [], _examsTabActive = 'types', _examsPanelInited = false;
+        var _curScoreSession = null, _curScoreData = null;
+        function initExamsPanel() {
+            loadExamTypes();
+            if (!_examsPanelInited) {
+                _examsPanelInited = true;
+                switchExamsTab('types');
+            }
+        }
+        function switchExamsTab(tab) {
+            _examsTabActive = tab;
+            document.getElementById('examsTypesTab').style.display = tab === 'types' ? '' : 'none';
+            document.getElementById('examsSessionsTab').style.display = tab === 'sessions' ? '' : 'none';
+            document.getElementById('examsTabTypesBtn').className = 'btn bsm ' + (tab === 'types' ? 'bp' : 'bo');
+            document.getElementById('examsTabSessionsBtn').className = 'btn bsm ' + (tab === 'sessions' ? 'bp' : 'bo');
+            if (tab === 'sessions') {
+                populateExamTypeSelect();
+                loadExamSessionsList();
+            }
+        }
+        function loadExamTypes() {
+            google.script.run.withSuccessHandler(function (r) {
+                if (r && r.success) {
+                    _examTypesCache = r.examTypes || [];
+                    renderExamTypesTable();
+                    populateExamTypeSelect();
+                } else {
+                    toast((r && r.message) || 'Failed to load exam types.', 'error');
+                }
+            }).withFailureHandler(function (e) { toast('Error loading exam types: ' + e.message, 'error'); }).getExamTypes(adminToken);
+        }
+        function renderExamTypesTable() {
+            var tb = document.getElementById('examTypesTbody'); if (!tb) return;
+            if (!_examTypesCache.length) { tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--mu);padding:24px">No exam types yet.</td></tr>'; return; }
+            var order = { 'endofterm': 0, 'classtest': 1, 'midterm': 2, 'mock': 3 };
+            var sorted = _examTypesCache.slice().sort(function (a, b) { return (order[a.ID] !== undefined ? order[a.ID] : 99) - (order[b.ID] !== undefined ? order[b.ID] : 99); });
+            tb.innerHTML = sorted.map(function (t) {
+                var locked = t.ID === 'endofterm';
+                var statusBdg = t.Active === false || t.Active === 'false' ? '<span class="bdg br">Inactive</span>' : '<span class="bdg bgr">Active</span>';
+                var pubBdg = (t.RequiresPublish === true || t.RequiresPublish === 'true') ? '<span class="bdg bgo">Admin Publish</span>' : '<span class="bdg bb">Instant</span>';
+                var btns = '<button class="btn bo bsm" onclick="openExamTypeModal(\'' + t.ID + '\')">Edit</button>';
+                if (!locked) {
+                    var isActive = !(t.Active === false || t.Active === 'false');
+                    btns += ' <button class="btn ' + (isActive ? 'br' : 'bg2') + ' bsm" onclick="toggleExamTypeActiveUI(\'' + t.ID + '\',' + (!isActive) + ')">' + (isActive ? 'Deactivate' : 'Activate') + '</button>';
+                }
+                return '<tr><td><strong>' + t.Name + '</strong>' + (locked ? ' <span class="bdg bpu" style="margin-left:4px">Built-in</span>' : '') + '</td><td>' + (t.Category || '—') + '</td><td>' + (t.MaxScore || 100) + '</td><td>' + pubBdg + '</td><td>' + (t.GradingLevelGroup || '<span style="color:var(--mu)">None</span>') + '</td><td>' + statusBdg + '</td><td class="no-print">' + btns + '</td></tr>';
+            }).join('');
+        }
+        function populateExamTypeSelect() {
+            var sel = document.getElementById('examSessType'); if (!sel) return;
+            var cur = sel.value;
+            sel.innerHTML = _examTypesCache.filter(function (t) { return !(t.Active === false || t.Active === 'false'); })
+                .map(function (t) { return '<option value="' + t.ID + '">' + t.Name + '</option>'; }).join('');
+            if (cur) sel.value = cur;
+        }
+        function openExamTypeModal(id) {
+            var t = id ? _examTypesCache.find(function (x) { return x.ID === id; }) : null;
+            document.getElementById('examTypeModalTitle').textContent = t ? 'Edit Exam Type' : 'Add Exam Type';
+            document.getElementById('et_ID').value = t ? t.ID : '';
+            document.getElementById('et_locked').value = t && t.ID === 'endofterm' ? '1' : '';
+            document.getElementById('et_Name').value = t ? t.Name : '';
+            document.getElementById('et_Category').value = t ? (t.Category || '') : '';
+            document.getElementById('et_MaxScore').value = t ? (t.MaxScore || 100) : 100;
+            document.getElementById('et_GradingLevelGroup').value = t ? (t.GradingLevelGroup || '') : '';
+            document.getElementById('et_RequiresPublish').checked = t ? (t.RequiresPublish === true || t.RequiresPublish === 'true') : true;
+            document.getElementById('et_ShowConduct').checked = t ? (t.ShowConduct === true || t.ShowConduct === 'true') : false;
+            document.getElementById('et_ShowAttitude').checked = t ? (t.ShowAttitude === true || t.ShowAttitude === 'true') : false;
+            document.getElementById('et_ShowInterest').checked = t ? (t.ShowInterest === true || t.ShowInterest === 'true') : false;
+            document.getElementById('et_ShowHeadRemark').checked = t ? (t.ShowHeadRemark === true || t.ShowHeadRemark === 'true') : false;
+            var nameEl = document.getElementById('et_Name'), catEl = document.getElementById('et_Category');
+            nameEl.disabled = false; catEl.disabled = !!(t && t.ID === 'endofterm');
+            document.getElementById('examTypeModal').classList.add('show');
+        }
+        function saveExamTypeSubmit() {
+            var name = document.getElementById('et_Name').value.trim();
+            if (!name) { toast('Please enter a name for this exam type.', 'error'); return; }
+            var obj = {
+                ID: document.getElementById('et_ID').value || undefined,
+                Name: name,
+                Category: document.getElementById('et_Category').value.trim() || 'Custom',
+                MaxScore: Number(document.getElementById('et_MaxScore').value) || 100,
+                GradingLevelGroup: document.getElementById('et_GradingLevelGroup').value.trim(),
+                RequiresPublish: document.getElementById('et_RequiresPublish').checked,
+                ShowConduct: document.getElementById('et_ShowConduct').checked,
+                ShowAttitude: document.getElementById('et_ShowAttitude').checked,
+                ShowInterest: document.getElementById('et_ShowInterest').checked,
+                ShowHeadRemark: document.getElementById('et_ShowHeadRemark').checked
+            };
+            google.script.run.withSuccessHandler(function (r) {
+                if (r && r.success) { toast('Exam type saved.', 'success'); closeModal('examTypeModal'); loadExamTypes(); }
+                else toast((r && r.message) || 'Save failed.', 'error');
+            }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); }).saveExamType(adminToken, obj);
+        }
+        function toggleExamTypeActiveUI(id, active) {
+            google.script.run.withSuccessHandler(function (r) {
+                if (r && r.success) { toast(active ? 'Exam type activated.' : 'Exam type deactivated.', 'success'); loadExamTypes(); }
+                else toast((r && r.message) || 'Failed.', 'error');
+            }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); }).setExamTypeActive(adminToken, id, active);
+        }
+        function loadExamSessionsList() {
+            var typeId = document.getElementById('examSessType').value;
+            var cls = document.getElementById('examSessClass').value;
+            var yr = document.getElementById('examSessYear').value;
+            if (!typeId) { document.getElementById('examSessionsList').innerHTML = ''; return; }
+            document.getElementById('examSessionsList').innerHTML = '<div style="text-align:center;color:var(--mu);padding:24px">Loading…</div>';
+            google.script.run.withSuccessHandler(function (r) {
+                if (!(r && r.success)) { toast((r && r.message) || 'Failed to load sessions.', 'error'); return; }
+                _examSessionsCache = (r.sessions || []).filter(function (s) { return !yr || s.Year === yr; });
+                renderExamSessionsList();
+            }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); }).getExamSessions(adminToken, typeId, cls);
+        }
+        function renderExamSessionsList() {
+            var el = document.getElementById('examSessionsList');
+            if (!_examSessionsCache.length) { el.innerHTML = '<div style="text-align:center;color:var(--mu);padding:24px">No sessions yet for this filter. Click "+ New Session" to create one.</div>'; return; }
+            el.innerHTML = '<div class="tw"><table class="dt"><thead><tr><th>Label</th><th>Class</th><th>Year / Term</th><th>Status</th><th>Published</th><th class="no-print">Actions</th></tr></thead><tbody>' +
+                _examSessionsCache.map(function (s) {
+                    var statusBdg = s.Status === 'Published' ? '<span class="bdg bgr">Published</span>' : '<span class="bdg bgo">Draft</span>';
+                    var pubDate = s.PublishedAt ? new Date(s.PublishedAt).toLocaleDateString() : '—';
+                    var btns = '<button class="btn bp bsm" onclick="openExamScoreEntry(\'' + s.SessionID + '\')">Enter Scores</button>';
+                    if (s.Status === 'Published') btns += ' <button class="btn bo bsm admin-only" onclick="doUnpublishExamSession(\'' + s.SessionID + '\')">Unpublish</button>';
+                    else btns += ' <button class="btn bg2 bsm admin-only" onclick="doPublishExamSession(\'' + s.SessionID + '\')">Publish</button>';
+                    btns += ' <button class="btn br bsm admin-only" onclick="doDeleteExamSession(\'' + s.SessionID + '\')">Delete</button>';
+                    return '<tr><td><strong>' + s.Label + '</strong></td><td>' + s.Class + '</td><td>' + s.Year + ' · ' + s.Term + '</td><td>' + statusBdg + '</td><td>' + pubDate + '</td><td class="no-print">' + btns + '</td></tr>';
+                }).join('') + '</tbody></table></div>';
+        }
+        function openNewExamSessionModal() {
+            var typeId = document.getElementById('examSessType').value;
+            if (!typeId) { toast('Select an exam type first.', 'error'); return; }
+            document.getElementById('es_Label').value = '';
+            document.getElementById('es_MaxScoreOverride').value = '';
+            var cls = document.getElementById('examSessClass').value; if (cls) document.getElementById('es_Class').value = cls;
+            var yr = document.getElementById('examSessYear').value; if (yr) document.getElementById('es_Year').value = yr;
+            document.getElementById('examSessionModal').classList.add('show');
+        }
+        function createExamSessionSubmit() {
+            var typeId = document.getElementById('examSessType').value;
+            var label = document.getElementById('es_Label').value.trim();
+            var cls = document.getElementById('es_Class').value;
+            var yr = document.getElementById('es_Year').value;
+            var tm = document.getElementById('es_Term').value;
+            if (!label) { toast('Please enter a label for this session.', 'error'); return; }
+            if (!cls) { toast('Please select a class.', 'error'); return; }
+            var override = document.getElementById('es_MaxScoreOverride').value;
+            google.script.run.withSuccessHandler(function (r) {
+                if (r && r.success) {
+                    toast('Session created' + (r.status === 'Published' ? ' and published — students can see it now.' : '.'), 'success');
+                    closeModal('examSessionModal');
+                    document.getElementById('examSessClass').value = cls;
+                    document.getElementById('examSessYear').value = yr;
+                    loadExamSessionsList();
+                } else toast((r && r.message) || 'Failed to create session.', 'error');
+            }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); }).createExamSession(adminToken, { ExamTypeID: typeId, Label: label, Class: cls, Year: yr, Term: tm, MaxScoreOverride: override ? Number(override) : '' });
+        }
+        function doPublishExamSession(sessionId) {
+            if (!confirm('Publish this session? Students in this class will immediately be able to see their results.')) return;
+            google.script.run.withSuccessHandler(function (r) {
+                if (r && r.success) { toast('Session published.', 'success'); loadExamSessionsList(); }
+                else toast((r && r.message) || 'Failed.', 'error');
+            }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); }).publishExamSession(adminToken, sessionId);
+        }
+        function doUnpublishExamSession(sessionId) {
+            if (!confirm('Unpublish this session? Students will no longer be able to see it.')) return;
+            google.script.run.withSuccessHandler(function (r) {
+                if (r && r.success) { toast('Session unpublished.', 'success'); loadExamSessionsList(); }
+                else toast((r && r.message) || 'Failed.', 'error');
+            }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); }).unpublishExamSession(adminToken, sessionId);
+        }
+        function doDeleteExamSession(sessionId) {
+            if (!confirm('Delete this session and all its scores? This cannot be undone.')) return;
+            google.script.run.withSuccessHandler(function (r) {
+                if (r && r.success) { toast('Session deleted.', 'success'); loadExamSessionsList(); }
+                else toast((r && r.message) || 'Failed.', 'error');
+            }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); }).deleteExamSession(adminToken, sessionId);
+        }
+        function openExamScoreEntry(sessionId) {
+            _curScoreSession = sessionId;
+            document.getElementById('examScoreTbl').innerHTML = '<tr><td style="padding:20px;text-align:center;color:var(--mu)">Loading…</td></tr>';
+            document.getElementById('examScoreModal').classList.add('show');
+            google.script.run.withSuccessHandler(function (r) {
+                if (!(r && r.success)) { toast((r && r.message) || 'Failed to load scores.', 'error'); closeModal('examScoreModal'); return; }
+                _curScoreData = r;
+                document.getElementById('examScoreModalTitle').textContent = r.session.Label + ' — ' + r.session.Class;
+                document.getElementById('examScoreModalSub').textContent = r.examType.Name + ' · Max Score ' + (r.session.MaxScoreOverride || r.examType.MaxScore || 100) + (r.session.Status === 'Published' ? ' · Published' : ' · Draft (not yet visible to students)');
+                document.getElementById('examScoreConfigInfo').textContent = 'Max Score: ' + (r.session.MaxScoreOverride || r.examType.MaxScore || 100) + (r.examType.GradingLevelGroup ? ' | Grading Group: ' + r.examType.GradingLevelGroup : ' | Grading: not configured for this exam type (scores only)');
+                renderExamScoreTable();
+            }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); closeModal('examScoreModal'); }).getExamSessionScores(adminToken, sessionId);
+        }
+        function renderExamScoreTable() {
+            var d = _curScoreData; if (!d) return;
+            var tbl = document.getElementById('examScoreTbl');
+            if (!d.students.length) { tbl.innerHTML = '<tr><td style="padding:20px;text-align:center;color:var(--mu)">No students found for this class/year/term.</td></tr>'; return; }
+            var subjects = d.subjects || [];
+            var h = '<tr><th style="position:sticky;left:0;background:#0d1b4b;color:#fff;z-index:2">Student</th>';
+            subjects.forEach(function (sub) { h += '<th>' + sub + '</th>'; });
+            h += '</tr>';
+            d.students.forEach(function (s) {
+                h += '<tr><td style="position:sticky;left:0;background:#f8fafc;font-weight:600;white-space:nowrap">' + s.Name + '<div style="font-size:10px;color:var(--mu)">' + s.ID + '</div></td>';
+                subjects.forEach(function (sub) {
+                    var existing = (d.scores[s.ID] && d.scores[s.ID][sub]) || {};
+                    h += '<td><input type="number" class="scin" min="0" data-sid="' + s.ID + '" data-subj="' + sub.replace(/"/g, '&quot;') + '" value="' + (existing.Score !== undefined && existing.Score !== '' ? existing.Score : '') + '" style="width:64px"></td>';
+                });
+                h += '</tr>';
+            });
+            tbl.innerHTML = h;
+        }
+        function saveExamScoresSubmit() {
+            if (!_curScoreSession) return;
+            var inputs = document.querySelectorAll('#examScoreTbl input.scin');
+            var entries = [];
+            inputs.forEach(function (inp) {
+                if (inp.value === '') return;
+                entries.push({ StudentID: inp.getAttribute('data-sid'), SubjectName: inp.getAttribute('data-subj'), Score: Number(inp.value) });
+            });
+            google.script.run.withSuccessHandler(function (r) {
+                if (r && r.success) { toast('Scores saved.', 'success'); closeModal('examScoreModal'); }
+                else toast((r && r.message) || 'Save failed.', 'error');
+            }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); }).saveExamSessionScores(adminToken, _curScoreSession, entries);
+        }
+
         function applyLogo(b64) { if (!b64) return; schoolLogoB64 = b64; var sb = document.getElementById('sbLogo'); if (sb) sb.innerHTML = '<img src="' + b64 + '" alt="Logo">'; var ll = document.getElementById('loginLogo'); if (ll) ll.innerHTML = '<img src="' + b64 + '" alt="Logo" style="width:100%;height:100%;object-fit:cover;border-radius:50%">'; }
         function resetBrandingPlaceholder(type) {
             var el = document.getElementById(type + 'Preview');
@@ -7389,6 +7788,7 @@
             var btn = document.querySelector('.lbtn');
             var u = document.getElementById('loginUser').value.trim();
             var p = document.getElementById('loginPass').value.trim();
+            var keepSignedIn = document.getElementById('keepSignedIn') && document.getElementById('keepSignedIn').checked;
             if (!u || !p) return;
             document.getElementById('loginErr').style.display = 'none';
             var origText = btn ? btn.innerHTML : "Sign In";
@@ -7405,7 +7805,6 @@
                     userName = u;
                     
                     try {
-                        var keepSignedIn = document.getElementById('keepSignedIn') && document.getElementById('keepSignedIn').checked;
                         if (keepSignedIn) {
                             localStorage.setItem('adminToken', r.token);
                             localStorage.setItem('userRole', r.role);
@@ -7461,7 +7860,7 @@
                 if (btn) { btn.innerHTML = origText; btn.disabled = false; }
                 document.getElementById('loginErr').textContent = 'Error: ' + e.message;
                 document.getElementById('loginErr').style.display = 'block';
-            }).sysLogin(u, p);
+            }).sysLogin(u, p, keepSignedIn);
         }
         function doLogout() {
             adminToken = '';
@@ -7766,7 +8165,7 @@
                 }
             });
         }
-        var panelTitles = { dashboard: 'Dashboard', students: 'Students', results: 'Results Entry', remarks: 'Remarks & Conduct', mastersheet: 'Master Sheet', cumulative: 'Cumulative Record', examanalyzer: 'Exams Results Analyzer', feesbills: 'Fees & Bills', archiveexplorer: 'Archive Explorer', classes: 'Classes', subjects: 'Subjects (Per Class)', grading: 'Grading System', preview: 'Preview Report', bulkprint: 'Bulk Print', sms: 'SMS Notifications', export: 'Export / Import', settings: 'Settings', activitylog: 'Activity Logs', about: 'About System', backuprestore: 'Backup & Restore', promotions: 'Promotions', teachers: 'Manage Teachers', messages: 'Chats', 'mobile-account': 'My Account' };
+        var panelTitles = { dashboard: 'Dashboard', students: 'Students', results: 'Results Entry', exams: 'Exams', remarks: 'Remarks & Conduct', mastersheet: 'Master Sheet', cumulative: 'Cumulative Record', examanalyzer: 'Exams Results Analyzer', feesbills: 'Fees & Bills', archiveexplorer: 'Archive Explorer', classes: 'Classes', subjects: 'Subjects (Per Class)', grading: 'Grading System', preview: 'Preview Report', bulkprint: 'Bulk Print', sms: 'SMS Notifications', export: 'Export / Import', settings: 'Settings', activitylog: 'Activity Logs', about: 'About System', backuprestore: 'Backup & Restore', promotions: 'Promotions', teachers: 'Manage Teachers', messages: 'Chats', 'mobile-account': 'My Account' };
         function showPanel(name, el) {
             currentPanel = name;
             if (name === 'messages') {
@@ -7781,6 +8180,9 @@
             }
             if (name === 'remarks' && userRole === 'teacher' && document.getElementById('remClass').value) {
                 loadRemarksStudents();
+            }
+            if (name === 'exams') {
+                initExamsPanel();
             }
             document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
             var pan = document.getElementById('panel-' + name);
@@ -9871,6 +10273,7 @@
             var firstTabBtn = document.querySelector('.sett-tabs-nav .btn');
             if (firstTabBtn) switchSettingsTab('school', firstTabBtn);
             popYears('set_CURRENT_YEAR', '2025-2026');
+            loadHeroPhotosAdmin();
             var cached = localStorage.getItem('schoolSettings');
             if (cached) {
                 try {
@@ -10019,6 +10422,61 @@
                 img.src = ev.target.result;
             };
             reader.readAsDataURL(file);
+        }
+        function loadHeroPhotosAdmin() {
+            var g = document.getElementById('heroPhotoGallery'); if (!g) return;
+            google.script.run.withSuccessHandler(function (r) {
+                if (!(r && r.success)) { g.innerHTML = '<div style="color:var(--mu);font-size:12px">Failed to load photos.</div>'; return; }
+                window._heroPhotos = r.photos || [];
+                renderHeroPhotoGallery();
+            }).withFailureHandler(function (e) { g.innerHTML = '<div style="color:var(--mu);font-size:12px">Error: ' + e.message + '</div>'; }).getHeroPhotosForAdmin(adminToken);
+        }
+        function renderHeroPhotoGallery() {
+            var g = document.getElementById('heroPhotoGallery'); if (!g) return;
+            var photos = window._heroPhotos || [];
+            if (!photos.length) { g.innerHTML = '<div style="color:var(--mu);font-size:12px;grid-column:1/-1">No photos uploaded yet — the landing page will use a default set of stock school images.</div>'; return; }
+            g.innerHTML = photos.map(function (url) {
+                return '<div style="position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--bd);aspect-ratio:4/3;background:#f1f5f9">' +
+                    '<img src="' + url + '" style="width:100%;height:100%;object-fit:cover;display:block">' +
+                    '<button type="button" class="no-print" onclick="removeHeroPhotoUI(\'' + url.replace(/'/g, "\\'") + '\')" style="position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;border:none;background:rgba(220,38,38,.9);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
+                    '</div>';
+            }).join('');
+        }
+        function handleHeroPhotoUpload(e) {
+            var file = e.target.files[0]; if (!file) return;
+            var reader = new FileReader();
+            reader.onload = function (ev) {
+                var img = document.createElement('img');
+                img.onload = function () {
+                    var canvas = document.createElement('canvas');
+                    var MAX_W = 1600, MAX_H = 1600;
+                    var w = img.width, h = img.height;
+                    if (w > h) { if (w > MAX_W) { h *= MAX_W / w; w = MAX_W; } } else { if (h > MAX_H) { w *= MAX_H / h; h = MAX_H; } }
+                    canvas.width = w; canvas.height = h;
+                    var ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, w, h);
+                    var b64 = canvas.toDataURL('image/jpeg', 0.85);
+                    document.getElementById('heroPhotoUploadingMsg').style.display = '';
+                    google.script.run.withSuccessHandler(function (r) {
+                        document.getElementById('heroPhotoUploadingMsg').style.display = 'none';
+                        document.getElementById('heroPhotoFile').value = '';
+                        if (r && r.success) { window._heroPhotos = r.photos || []; renderHeroPhotoGallery(); toast('Photo uploaded!', 'success'); }
+                        else toast('Upload failed: ' + ((r && r.message) || ''), 'error');
+                    }).withFailureHandler(function (err) {
+                        document.getElementById('heroPhotoUploadingMsg').style.display = 'none';
+                        toast('Upload error: ' + err.message, 'error');
+                    }).uploadHeroPhoto(adminToken, b64);
+                };
+                img.src = ev.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+        function removeHeroPhotoUI(url) {
+            if (!confirm('Remove this photo from the result checker page?')) return;
+            google.script.run.withSuccessHandler(function (r) {
+                if (r && r.success) { window._heroPhotos = r.photos || []; renderHeroPhotoGallery(); toast('Photo removed.', 'success'); }
+                else toast('Remove failed: ' + ((r && r.message) || ''), 'error');
+            }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); }).deleteHeroPhoto(adminToken, url);
         }
         function saveSettings() {
             var obj = {};['SCHOOL_NAME', 'SCHOOL_ADDRESS', 'SCHOOL_EMAIL', 'SCHOOL_PHONE', 'SCHOOL_OPEN_DAYS', 'SMS_API_KEY', 'SMS_SENDER', 'HEADMASTER_NAME', 'CLASS_SCORE_MAX', 'EXAM_SCORE_MAX', 'CUSTOM_CT_REMARKS', 'CUSTOM_HM_REMARKS', 'FEE_COMPONENTS', 'ADMIN_NAME', 'ADMIN_PHONE', 'HEADTEACHER_USER', 'HEADTEACHER_PASS'].forEach(function (k) { var el = document.getElementById('set_' + k); if (el) obj[k] = el.value; });
@@ -10940,6 +11398,7 @@
         var _NAV_ITEMS = [
             { id: 'students',       label: 'Students' },
             { id: 'results',        label: 'Results Entry' },
+            { id: 'exams',          label: 'Exams' },
             { id: 'remarks',        label: 'Remarks & Conduct' },
             { id: 'mastersheet',    label: 'Master Sheet' },
             { id: 'cumulative',     label: 'Cumulative Record' },
@@ -11450,8 +11909,9 @@
         function loadBackupRestorePanel() {
             var container = document.getElementById('driveBackupsContainer');
             if (container) {
-                container.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:40px; color:var(--mu); background:#ffffff; border-radius:16px; border:1px solid var(--bd); box-shadow:var(--sh);"><div style="font-size:32px; margin-bottom:8px">⌛</div>Loading system backups from Google Drive...</div>';
+                container.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:40px; color:var(--mu); background:#ffffff; border-radius:16px; border:1px solid var(--bd); box-shadow:var(--sh);"><div style="margin-bottom:8px"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>Loading system backups from Google Drive...</div>';
             }
+            loadAutoBackupStatus();
             google.script.run.withSuccessHandler(function (r) {
                 if (r.success) {
                     renderDriveBackups(r.backups);
@@ -11463,6 +11923,42 @@
             }).listDriveBackups(adminToken);
         }
 
+        var _autoBackupEnabled = false, _autoBackupBusy = false;
+        function loadAutoBackupStatus() {
+            google.script.run.withSuccessHandler(function (r) {
+                if (r && r.success) {
+                    _autoBackupEnabled = !!r.enabled;
+                    renderAutoBackupToggle();
+                }
+            }).getAutoBackupStatus(adminToken);
+        }
+        function renderAutoBackupToggle() {
+            var sw = document.getElementById('autoBackupSwitch'), knob = document.getElementById('autoBackupKnob'), lbl = document.getElementById('autoBackupToggleLbl'), msg = document.getElementById('autoBackupStatusMsg');
+            if (!sw) return;
+            sw.style.background = _autoBackupEnabled ? '#10b981' : '#cbd5e1';
+            knob.style.left = _autoBackupEnabled ? '22px' : '2px';
+            lbl.textContent = _autoBackupEnabled ? 'On' : 'Off';
+            lbl.style.color = _autoBackupEnabled ? '#059669' : 'var(--mu)';
+            if (msg) msg.textContent = _autoBackupEnabled ? 'Auto-backup is active — a fresh snapshot is created every Sunday at 2:00 AM.' : 'Auto-backup is currently off. Turn it on to schedule weekly snapshots automatically.';
+        }
+        function toggleAutoBackup() {
+            if (_autoBackupBusy) return;
+            _autoBackupBusy = true;
+            var turningOn = !_autoBackupEnabled;
+            var msg = document.getElementById('autoBackupStatusMsg'); if (msg) msg.textContent = 'Updating…';
+            var fn = turningOn ? 'installWeeklyBackupTrigger' : 'removeWeeklyBackupTrigger';
+            google.script.run.withSuccessHandler(function (r) {
+                _autoBackupBusy = false;
+                if (r && r.success) {
+                    _autoBackupEnabled = turningOn;
+                    renderAutoBackupToggle();
+                    toast(turningOn ? 'Weekly auto-backup enabled.' : 'Weekly auto-backup disabled.', 'success');
+                } else {
+                    toast((r && r.message) || 'Failed to update auto-backup.', 'error');
+                    if (msg) msg.textContent = '';
+                }
+            }).withFailureHandler(function (e) { _autoBackupBusy = false; toast('Error: ' + e.message, 'error'); })[fn](adminToken);
+        }
         function renderDriveBackups(backups) {
             var container = document.getElementById('driveBackupsContainer');
             if (!container) return;

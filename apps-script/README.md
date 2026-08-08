@@ -76,3 +76,25 @@ the repo root wrapper does), most browsers block Google's sign-in flow inside th
    `STU-` if never set) — no toggle, no manual entry: the ID field is locked and pre-filled
    whenever adding a new student, and `addStudent()` assigns the next sequential ID itself (under
    a lock, so concurrent admins never collide).
+5. **Multi-exam-type system:** the portal now manages more than End-of-Term report cards. New
+   `ExamTypes` / `ExamSessions` / `ExamScores` sheets (long/normalized, one row per student per
+   subject per session — not one sheet per class per type) support **Class Test** (monthly,
+   teacher-chosen max score, visible the moment the teacher saves it, grading optional),
+   **Mid-Term Examination** (marked out of 100, needs an admin publish before students see it,
+   grading optional), and **Basic 9/JHS3 Mock Examination** (rendered as a compact "Result Slip"
+   with a BECE-style aggregate). Admins can define further custom exam types from the new **Exams**
+   panel. `getGradeInfo()` was generalized (`lvl || 'General'`) so any exam type's
+   `GradingLevelGroup` reuses the existing Grading sheet/panel — no new grading UI. Admins can
+   enter scores for any class from the same panel teachers use ("admin behaves as teacher"), both
+   writing the same `ExamScores` rows keyed by session+student+subject, so there's no divergence.
+   The student portal's old "Select Year & Term" step is replaced by a list of everything actually
+   published for that student (`getPublicExamSessionsForStudent`), each flagged "NEW" if published
+   in the last 14 days — that badge *is* the "result released" notification.
+6. **Security/reliability fixes:** removed the permanent `admin123` login backdoor; "Keep Signed
+   In" now actually grants a 30-day session instead of always expiring in 1 hour; OTP verification
+   is rate-limited (5 attempts per code); and a weekly auto-backup (Sunday 2am, via
+   `ScriptApp.newTrigger`) can be turned on from Backup & Restore, writing timestamped JSON
+   snapshots to a "System_Backups" Drive folder alongside on-demand backups.
+7. **Result checker landing page:** the hero background is now a crossfading photo carousel
+   (Ken-Burns zoom) — admin-uploaded school photos (Settings → School Photos) if any exist,
+   otherwise a curated default set of school building images.
