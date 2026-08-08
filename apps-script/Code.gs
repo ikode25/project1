@@ -1594,6 +1594,7 @@ function getPublicSettings(){
       SCHOOL_LOGO:logo,
       SCHOOL_ADDRESS:sett['SCHOOL_ADDRESS']||'',
       SCHOOL_PHONE:sett['SCHOOL_PHONE']||'',
+      SCHOOL_EMAIL:sett['SCHOOL_EMAIL']||'',
       CURRENT_TERM:sett['CURRENT_TERM']||'',
       CURRENT_YEAR:sett['CURRENT_YEAR']||''
     };

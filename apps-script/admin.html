@@ -9,7 +9,8 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&family=Poppins:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;500;600;700&family=Montserrat:wght@300;400;500;600;700;800&display=swap"
         rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js v4 (pinned to the v4 line) — powers every chart on the Dashboard tab -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <style>
         * {
             margin: 0;
@@ -46,7 +47,7 @@
         }
 
         :root {
-            --sys-font: 'Plus Jakarta Sans', sans-serif;
+            --sys-font: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             --sys-size: 14px;
             --sys-weight: 500;
             --nv: #0d1b4b;
@@ -4135,6 +4136,62 @@
                         </div>
                     </div>
 
+                    <!-- Dashboard KPI Charts (Pie / Doughnut / SVG ring) — Chart.js v4, colored from
+                         the admin's Theme & Colors settings (--nv / --bl / --go). -->
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:20px; margin-bottom:20px;">
+                        <!-- Doughnut: Gender Split -->
+                        <div class="card" style="padding:0; overflow:hidden; border-radius:16px;">
+                            <div style="padding:14px 18px 10px; background:linear-gradient(135deg,var(--nv),var(--bl)); display:flex; align-items:center; justify-content:space-between;">
+                                <div>
+                                    <div style="font-size:13px; font-weight:800; color:#fff; letter-spacing:0.3px;">🧑‍🤝‍🧑 Gender Split</div>
+                                    <div style="font-size:11px; color:rgba(255,255,255,0.65); margin-top:2px;">Male vs. Female enrollment</div>
+                                </div>
+                            </div>
+                            <div style="padding:16px 18px 20px; background:#fff;">
+                                <div style="height:200px; position:relative;">
+                                    <canvas id="genderDoughnutChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Pie: Class Size Distribution -->
+                        <div class="card" style="padding:0; overflow:hidden; border-radius:16px;">
+                            <div style="padding:14px 18px 10px; background:linear-gradient(135deg,var(--nv),var(--bl)); display:flex; align-items:center; justify-content:space-between;">
+                                <div>
+                                    <div style="font-size:13px; font-weight:800; color:#fff; letter-spacing:0.3px;">🥧 Class Size Distribution</div>
+                                    <div style="font-size:11px; color:rgba(255,255,255,0.65); margin-top:2px;">Share of students per class</div>
+                                </div>
+                            </div>
+                            <div style="padding:16px 18px 20px; background:#fff;">
+                                <div style="height:200px; position:relative;">
+                                    <canvas id="classPieChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Custom SVG circular progress ring: Overall Average -->
+                        <div class="card" style="padding:0; overflow:hidden; border-radius:16px;">
+                            <div style="padding:14px 18px 10px; background:linear-gradient(135deg,var(--nv),var(--bl)); display:flex; align-items:center; justify-content:space-between;">
+                                <div>
+                                    <div style="font-size:13px; font-weight:800; color:#fff; letter-spacing:0.3px;">🎯 Overall School Average</div>
+                                    <div style="font-size:11px; color:rgba(255,255,255,0.65); margin-top:2px;">Across all classes, current term</div>
+                                </div>
+                            </div>
+                            <div style="padding:16px 18px 20px; background:#fff; display:flex; align-items:center; justify-content:center;">
+                                <div style="height:180px; width:180px; position:relative; display:flex; align-items:center; justify-content:center;">
+                                    <svg id="avgRingSvg" width="180" height="180" viewBox="0 0 180 180" style="transform:rotate(-90deg); position:absolute; top:0; left:0;">
+                                        <circle cx="90" cy="90" r="78" fill="none" stroke="#eef1f8" stroke-width="16"></circle>
+                                        <circle id="avgRingProgress" cx="90" cy="90" r="78" fill="none" stroke="var(--go)" stroke-width="16"
+                                            stroke-linecap="round" stroke-dasharray="490" stroke-dashoffset="490"
+                                            style="transition:stroke-dashoffset 1s cubic-bezier(.22,1,.36,1)"></circle>
+                                    </svg>
+                                    <div id="avgRingLabel" style="position:relative; text-align:center; z-index:1;">
+                                        <div id="avgRingVal" style="font-family:'Outfit',sans-serif; font-size:28px; font-weight:800; color:var(--nv);">—</div>
+                                        <div style="font-size:10px; font-weight:700; color:var(--mu); text-transform:uppercase; letter-spacing:0.5px;">Average Score</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Dashboard Charts Section -->
                     <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:20px; margin-bottom:24px;">
                         <!-- Bar Chart Card -->
@@ -5668,8 +5725,9 @@
                                 <div class="fg">
                                     <label>System Font Style</label>
                                     <select id="set_SYSTEM_FONT_FAMILY">
+                                        <option value="'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" selected>Segoe UI (System Default)</option>
                                         <option value="'Poppins', sans-serif">Poppins (Modern Rounded)</option>
-                                        <option value="'Plus Jakarta Sans', sans-serif">Plus Jakarta Sans (Sleek Modern - Default)</option>
+                                        <option value="'Plus Jakarta Sans', sans-serif">Plus Jakarta Sans (Sleek Modern)</option>
                                         <option value="'Outfit', sans-serif">Outfit (Ultra-Modern Headers)</option>
                                         <option value="'Inter', sans-serif">Inter (Clean Geometric)</option>
                                         <option value="'Roboto', sans-serif">Roboto (Standard Neo-grotesque)</option>
@@ -7018,7 +7076,7 @@
         var editStudentId = null, editClassId = null, subjectEditClass = null, subjectEditOldName = null;
         var masterData = [], masterSubjects = [], masterResMap = {}, currentGrdTab = 'General', currentPanel = 'dashboard';
         var schoolLogoB64 = '', schoolStampB64 = '', schoolSigB64 = '', headmasterName = '';
-        var barChartInst = null, lineChartInst = null, importFileData = null, notifications = [];
+        var barChartInst = null, lineChartInst = null, genderDoughnutInst = null, classPieInst = null, importFileData = null, notifications = [];
         var stuAllData = [], stuFiltered = [], stuPage = 1, selectedTemplate = 1;
         var sbaClass = '', sbaYear = '', sbaTerm = '', sbaComps = [], sbaStuds = [], sbaSubjs = [];
         var examClass = '', examYear = '', examTerm = '';
@@ -8037,6 +8095,116 @@
             });
         }
 
+        // ── DASHBOARD KPI CHARTS (Doughnut / Pie / SVG ring) ──
+        // Colors are derived live from the admin's Theme & Colors settings (--nv/--bl/--go CSS
+        // vars) so these charts always match whatever palette/preset is currently applied.
+        function getThemeChartPalette() {
+            var cs = getComputedStyle(document.documentElement);
+            var nv = (cs.getPropertyValue('--nv') || '#0d1b4b').trim() || '#0d1b4b';
+            var bl = (cs.getPropertyValue('--bl') || '#1a3a8a').trim() || '#1a3a8a';
+            var go = (cs.getPropertyValue('--go') || '#f0c020').trim() || '#f0c020';
+            return {
+                nv: nv, bl: bl, go: go,
+                // Wider rotation for charts with more than 2-3 segments — shifts of the same three
+                // theme colors, so extra segments stay on-brand instead of introducing new hues.
+                rotation: [bl, go, nv, shiftColor(bl, 55), shiftColor(go, -45), shiftColor(nv, 60), shiftColor(bl, -45), shiftColor(go, 45)]
+            };
+        }
+
+        function renderGenderDoughnut(male, female) {
+            var el = document.getElementById('genderDoughnutChart');
+            if (!el || typeof Chart === 'undefined') return;
+            var pal = getThemeChartPalette();
+            if (genderDoughnutInst) genderDoughnutInst.destroy();
+            genderDoughnutInst = new Chart(el.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['Male', 'Female'],
+                    datasets: [{
+                        data: [male, female],
+                        backgroundColor: [pal.bl, pal.go],
+                        hoverBackgroundColor: [shiftColor(pal.bl, -20), shiftColor(pal.go, -20)],
+                        borderWidth: 3,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '68%',
+                    animation: { duration: 900, easing: 'easeOutQuart' },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { size: 11, weight: '700' }, color: '#475569', padding: 14, usePointStyle: true, pointStyle: 'circle' } },
+                        tooltip: {
+                            backgroundColor: '#0f172a', padding: 12, cornerRadius: 10,
+                            callbacks: { label: function (ctx) { var total = male + female; var pct = total ? Math.round(ctx.raw / total * 100) : 0; return ' ' + ctx.label + ': ' + ctx.raw + ' (' + pct + '%)'; } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderClassPie(classCounts) {
+            var el = document.getElementById('classPieChart');
+            if (!el || typeof Chart === 'undefined') return;
+            var pal = getThemeChartPalette();
+            var labels = Object.keys(classCounts || {}).filter(function (k) { return classCounts[k] > 0; });
+            var data = labels.map(function (k) { return classCounts[k]; });
+            if (classPieInst) classPieInst.destroy();
+            if (!labels.length) return;
+            var colors = labels.map(function (_, i) { return pal.rotation[i % pal.rotation.length]; });
+            classPieInst = new Chart(el.getContext('2d'), {
+                type: 'pie',
+                data: { labels: labels, datasets: [{ data: data, backgroundColor: colors, borderWidth: 2, borderColor: '#fff' }] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 900, easing: 'easeOutQuart' },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { size: 10, weight: '600' }, color: '#475569', boxWidth: 10, padding: 10 } },
+                        tooltip: {
+                            backgroundColor: '#0f172a', padding: 12, cornerRadius: 10,
+                            callbacks: {
+                                label: function (ctx) {
+                                    var total = data.reduce(function (a, b) { return a + b; }, 0);
+                                    var pct = total ? Math.round(ctx.raw / total * 100) : 0;
+                                    return ' ' + ctx.label + ': ' + ctx.raw + ' student' + (ctx.raw !== 1 ? 's' : '') + ' (' + pct + '%)';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderAvgRing(avgPercent) {
+            var circle = document.getElementById('avgRingProgress');
+            var val = document.getElementById('avgRingVal');
+            if (!circle || !val) return;
+            var pct = Math.max(0, Math.min(100, Math.round(avgPercent || 0)));
+            var circumference = 2 * Math.PI * 78; // matches r=78 on the <circle>
+            var offset = circumference - (pct / 100) * circumference;
+            var pal = getThemeChartPalette();
+            // Performance-band color (green/amber/red is a dashboard-wide convention here — see the
+            // bar/line "perfZones" plugins above); "excellent" uses the theme's own accent color so
+            // the ring still reads as on-brand for the common case of a healthy school average.
+            var ringColor = pct >= 70 ? pal.go : pct >= 50 ? '#f59e0b' : '#e53e3e';
+            circle.style.stroke = ringColor;
+            requestAnimationFrame(function () { circle.style.strokeDashoffset = offset; });
+            val.textContent = pct + '%';
+            val.style.color = ringColor;
+        }
+
+        // Re-renders the KPI charts (without a new server round trip) using the last dashboard
+        // payload — called after the admin applies new theme colors so charts stay in sync.
+        function refreshDashboardKpiChartColors() {
+            var d = window._lastDashboardChartData;
+            if (!d) return;
+            try { renderGenderDoughnut(d.maleCount, d.femaleCount); } catch (e) {}
+            try { renderClassPie(d.classCounts); } catch (e) {}
+            try { renderAvgRing(d.avgPercent); } catch (e) {}
+        }
+
         // ── LOAD ALL ──
         function loadAllData() {
             google.script.run.withSuccessHandler(function (r) {
@@ -8055,7 +8223,21 @@
                 try {
                     renderCharts(r.classAvgData || {}, r.termAvgData || {});
                 } catch(e) {}
-                
+                try {
+                    var cad = r.classAvgData || {};
+                    var cadVals = Object.keys(cad).map(function (k) { return Number(cad[k]) || 0; }).filter(function (v) { return v > 0; });
+                    var avgPercent = cadVals.length ? (cadVals.reduce(function (a, b) { return a + b; }, 0) / cadVals.length) : 0;
+                    window._lastDashboardChartData = {
+                        maleCount: r.maleCount || 0,
+                        femaleCount: r.femaleCount || 0,
+                        classCounts: r.classCounts || {},
+                        avgPercent: avgPercent
+                    };
+                    renderGenderDoughnut(r.maleCount || 0, r.femaleCount || 0);
+                    renderClassPie(r.classCounts || {});
+                    renderAvgRing(avgPercent);
+                } catch(e) {}
+
                 // Initialize active session tracking
                 if (r.roleInfo) {
                     if (r.roleInfo.role === 'admin') {
@@ -9496,9 +9678,10 @@
             var ad = document.getElementById('set_ACTIVE_DATES'); if (ad) ad.checked = String(s.ACTIVE_DATES || 'false') === 'true';
             var ip = document.getElementById('set_ID_PREFIX'); if (ip) ip.value = s.ID_PREFIX || '';
             previewNextStudentId();
-            var sff = document.getElementById('set_SYSTEM_FONT_FAMILY'); if (sff) { sff.value = s.SYSTEM_FONT_FAMILY || "'Plus Jakarta Sans', sans-serif"; }
-            var sfs = document.getElementById('set_SYSTEM_FONT_SIZE'); if (sfs) sfs.value = s.SYSTEM_FONT_SIZE || "14px";
-            var sfw = document.getElementById('set_SYSTEM_FONT_WEIGHT'); if (sfw) sfw.value = s.SYSTEM_FONT_WEIGHT || "500";
+            // (Font-family/size/weight selects are populated further down, from the dedicated
+            // sysTypography cache first — see the "Bind typography values" block below. Setting
+            // them here too, straight from `s`, used to race with that block and briefly flash
+            // the just-saved font back to whatever stale value was in `s`.)
             var tutUrl = document.getElementById('set_TUTORIAL_VIDEO_URL'); if (tutUrl) tutUrl.value = s.TUTORIAL_VIDEO_URL || '';
             // Render the tutorial video if URL is already set
             renderTutorialVideo(s.TUTORIAL_VIDEO_URL || '');
@@ -9523,12 +9706,20 @@
                     pfi.innerHTML = '❌ Folder status: Not Initialized (Photos will not display until initialized)';
                 }
             }
-            // Bind typography values to settings selects
-            // Use sysTypography key as primary source (never overwritten by general settings), fall back to server value
+            // Bind typography values to settings selects.
+            // BUGFIX: this must use the dedicated sysTypography cache as the PRIMARY source (falling
+            // back to whatever came in `s` only if it's empty) — not the other way around. `s` can be
+            // a stale settings snapshot (the localStorage 'schoolSettings' cache, or a getSettings()
+            // response that was in flight before the save and resolves after it), and every call to
+            // populateSettingsUI() re-applies whatever font it derives here. With the old priority
+            // (`s` first), saving a new font would apply instantly and then get silently reverted a
+            // moment later by the next populateSettingsUI() call (e.g. from re-opening the Settings
+            // panel) using the stale value. sysTypography is written synchronously by applyTypography()
+            // the instant a font is applied, so it's always the freshest source of truth.
             var _storedFont = null; try { var _sf = localStorage.getItem('sysTypography'); if (_sf) _storedFont = JSON.parse(_sf); } catch(e) {}
-            var fontFam = (s.SYSTEM_FONT_FAMILY) || (_storedFont && _storedFont.fam) || "'Plus Jakarta Sans', sans-serif";
-            var fontSize = (s.SYSTEM_FONT_SIZE) || (_storedFont && _storedFont.size) || '14px';
-            var fontWeight = (s.SYSTEM_FONT_WEIGHT) || (_storedFont && _storedFont.weight) || '500';
+            var fontFam = (_storedFont && _storedFont.fam) || s.SYSTEM_FONT_FAMILY || "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+            var fontSize = (_storedFont && _storedFont.size) || s.SYSTEM_FONT_SIZE || '14px';
+            var fontWeight = (_storedFont && _storedFont.weight) || s.SYSTEM_FONT_WEIGHT || '500';
             var fontEl = document.getElementById('set_SYSTEM_FONT_FAMILY');
             if (fontEl) {
                 fontEl.value = fontFam;
@@ -9701,7 +9892,7 @@
             var obj = {};['SCHOOL_NAME', 'SCHOOL_ADDRESS', 'SCHOOL_EMAIL', 'SCHOOL_PHONE', 'SCHOOL_OPEN_DAYS', 'SMS_API_KEY', 'SMS_SENDER', 'HEADMASTER_NAME', 'CLASS_SCORE_MAX', 'EXAM_SCORE_MAX', 'CUSTOM_CT_REMARKS', 'CUSTOM_HM_REMARKS', 'FEE_COMPONENTS', 'ADMIN_NAME', 'ADMIN_PHONE', 'HEADTEACHER_USER', 'HEADTEACHER_PASS'].forEach(function (k) { var el = document.getElementById('set_' + k); if (el) obj[k] = el.value; });
             // Font: use cached value as fallback so a blank dropdown never overwrites the saved font
             var _ctCache = window._currentTypography || {}; var _csCache = (window._cachedSettings || {}); var _stfRaw = null; try { _stfRaw = JSON.parse(localStorage.getItem('sysTypography') || 'null'); } catch(e) {}
-            obj.SYSTEM_FONT_FAMILY = (document.getElementById('set_SYSTEM_FONT_FAMILY') && document.getElementById('set_SYSTEM_FONT_FAMILY').value) || (_ctCache.fam) || (_stfRaw && _stfRaw.fam) || _csCache.SYSTEM_FONT_FAMILY || "'Plus Jakarta Sans', sans-serif";
+            obj.SYSTEM_FONT_FAMILY = (document.getElementById('set_SYSTEM_FONT_FAMILY') && document.getElementById('set_SYSTEM_FONT_FAMILY').value) || (_ctCache.fam) || (_stfRaw && _stfRaw.fam) || _csCache.SYSTEM_FONT_FAMILY || "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
             obj.SYSTEM_FONT_SIZE = (document.getElementById('set_SYSTEM_FONT_SIZE') && document.getElementById('set_SYSTEM_FONT_SIZE').value) || (_ctCache.size) || (_stfRaw && _stfRaw.size) || _csCache.SYSTEM_FONT_SIZE || '14px';
             obj.SYSTEM_FONT_WEIGHT = (document.getElementById('set_SYSTEM_FONT_WEIGHT') && document.getElementById('set_SYSTEM_FONT_WEIGHT').value) || (_ctCache.weight) || (_stfRaw && _stfRaw.weight) || _csCache.SYSTEM_FONT_WEIGHT || '500';
             // Tutorial videos stored separately via TUTORIAL_VIDEOS key
@@ -9936,9 +10127,12 @@
             var root = document.documentElement;
             // Extract clean font name (strip quotes and fallback)
             var cleanName = fontFam.replace(/['"/]/g, '').split(',')[0].trim();
-            // Dynamically ensure the Google Font is loaded
+            // Dynamically ensure the Google Font is loaded — but skip that for web-safe/system
+            // font stacks (e.g. Segoe UI, the new default), which aren't on Google Fonts and would
+            // just waste a request.
+            var WEB_SAFE_FONTS = ['Segoe UI', 'Tahoma', 'Geneva', 'Verdana', 'Arial', 'Helvetica', 'sans-serif'];
             var fontId = 'dyn-gfont-' + cleanName.replace(/\s+/g, '-');
-            if (cleanName && !document.getElementById(fontId)) {
+            if (cleanName && WEB_SAFE_FONTS.indexOf(cleanName) === -1 && !document.getElementById(fontId)) {
                 var link = document.createElement('link');
                 link.id = fontId;
                 link.rel = 'stylesheet';
@@ -9993,6 +10187,7 @@
             root.style.setProperty('--bg', bg);
             applySidebarColor(sb);
             try { localStorage.setItem('themeColors', JSON.stringify({sb:sb,go:go,bg:bg})); } catch(e){}
+            try { refreshDashboardKpiChartColors(); } catch(e){}
             toast('Theme colors applied!', 'success');
         }
         function resetThemeColors() {
@@ -10324,7 +10519,7 @@
                 var sbn = document.getElementById('sbSchoolName'); if (sbn && s.SCHOOL_NAME) sbn.textContent = s.SCHOOL_NAME;
                 /* Read font from dedicated sysTypography key first (most reliable), fall back to schoolSettings */
                 var _stf = null; try { var _stfr = localStorage.getItem('sysTypography'); if (_stfr) _stf = JSON.parse(_stfr); } catch(e){}
-                var _ff = (_stf && _stf.fam) || s.SYSTEM_FONT_FAMILY || "'Plus Jakarta Sans', sans-serif";
+                var _ff = (_stf && _stf.fam) || s.SYSTEM_FONT_FAMILY || "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
                 var _fs = (_stf && _stf.size) || s.SYSTEM_FONT_SIZE || '14px';
                 var _fw = (_stf && _stf.weight) || s.SYSTEM_FONT_WEIGHT || '500';
                 applyTypography(_ff, _fs, _fw);
@@ -10348,8 +10543,11 @@
             }).getSettings(adminToken);
         }
 
-        // ── AUTO-GENERATE STUDENT ID ──
-        function autoGenerateStudentId() { var s = window._cachedSettings || {}; if (String(s.AUTO_ID) !== 'true') return; var prefix = s.ID_PREFIX || ''; var maxNum = 0; allStudents.forEach(function (st) { var id = st.ID.toString(); if (!prefix || id.startsWith(prefix)) { var num = parseInt(id.substring(prefix.length), 10); if (!isNaN(num) && num > maxNum) maxNum = num; } }); var next = String(maxNum + 1).padStart(3, '0'); var el = document.getElementById('m_ID'); if (el && !el.disabled) el.value = prefix + next; }
+        // NOTE: autoGenerateStudentId() lives near the ID Prefix settings UI (Settings → School)
+        // and always asks the server for the next ID via getNextStudentId() — see there. (A second,
+        // stale client-only definition used to live here, gated on a since-removed AUTO_ID toggle;
+        // because a later top-level `function` declaration silently wins over an earlier one with
+        // the same name, that dead copy was actually shadowing the real one. Removed.)
 
         // ── LEVEL GROUP AUTO-FILL ──
         function autoFillLevelGroup() { var cls = document.getElementById('m_Class').value; if (!cls) return; var c = allClasses.find(function (x) { return x.ClassName === cls; }); if (c && c.LevelGroup) document.getElementById('m_LevelGroup').value = c.LevelGroup; }

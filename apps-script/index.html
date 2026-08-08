@@ -39,7 +39,7 @@
         /* ── LANDING PAGE HERO ── */
         .landing-hero {
             width: 100%;
-            padding: 60px 20px 180px;
+            padding: 96px 24px 200px;
             position: relative;
             text-align: center;
             overflow: hidden;
@@ -53,7 +53,7 @@
             content: '';
             position: absolute;
             inset: 0;
-            background: linear-gradient(180deg, rgba(8, 16, 50, 0.45) 0%, rgba(13, 27, 75, 0.65) 100%);
+            background: linear-gradient(180deg, rgba(8, 16, 50, 0.55) 0%, rgba(13, 27, 75, 0.78) 100%);
             z-index: 1;
         }
 
@@ -93,47 +93,76 @@
         .hero-content {
             position: relative;
             z-index: 2;
+            max-width: 640px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .hero-logo-wrap {
+            width: 92px;
+            height: 92px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #f0c020, #ffd700, #e6a800);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 42px;
+            margin-bottom: 18px;
+            box-shadow: 0 10px 36px rgba(240, 192, 32, .45), 0 0 0 6px rgba(255, 255, 255, .08);
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .hero-logo-wrap img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
         }
 
         .hero-school-badge {
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            background: rgba(240, 192, 32, 0.12);
-            border: 1px solid rgba(240, 192, 32, 0.3);
+            background: rgba(240, 192, 32, 0.14);
+            border: 1px solid rgba(240, 192, 32, 0.35);
             border-radius: 20px;
-            padding: 5px 16px;
+            padding: 6px 18px;
             font-size: 11px;
-            font-weight: 600;
+            font-weight: 700;
             color: #f0c020;
-            letter-spacing: 1.5px;
+            letter-spacing: 2px;
             text-transform: uppercase;
-            margin-bottom: 16px;
+            margin-bottom: 18px;
         }
 
         .hero-title {
             font-family: 'Outfit', sans-serif;
-            font-size: 32px;
+            font-size: 40px;
             font-weight: 900;
             color: #fff;
-            line-height: 1.2;
-            margin-bottom: 10px;
-            text-shadow: 0 2px 20px rgba(0, 0, 0, 0.4);
+            line-height: 1.15;
+            margin-bottom: 14px;
+            text-shadow: 0 2px 24px rgba(0, 0, 0, 0.5);
+            letter-spacing: -0.5px;
         }
 
         .hero-subtitle {
-            font-size: 14px;
-            color: rgba(255, 255, 255, 0.65);
-            line-height: 1.6;
-            max-width: 420px;
+            font-size: 15px;
+            color: rgba(255, 255, 255, 0.75);
+            line-height: 1.65;
+            max-width: 540px;
             margin: 0 auto;
         }
 
         .hero-stats {
             display: flex;
-            gap: 30px;
+            gap: 34px;
             justify-content: center;
-            margin-top: 22px;
+            margin-top: 30px;
+            flex-wrap: wrap;
         }
 
         .hero-stat {
@@ -153,6 +182,37 @@
             color: rgba(255, 255, 255, 0.5);
             text-transform: uppercase;
             letter-spacing: 1px;
+        }
+
+        /* Address / phone / email pills under the stats row */
+        .hero-contact-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 28px;
+            padding-top: 24px;
+            border-top: 1px solid rgba(255, 255, 255, 0.14);
+            width: 100%;
+        }
+
+        .hero-contact-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 20px;
+            padding: 7px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(4px);
+        }
+
+        .hero-contact-item svg {
+            flex-shrink: 0;
+            color: #f0c020;
         }
 
         /* Card now overlaps the hero */
@@ -1532,9 +1592,11 @@
             <!-- Student silhouette tiles injected by JS -->
         </div>
         <div class="hero-content">
-            <div class="hero-school-badge" id="heroSchoolBadge" style="display:none">
-                <span id="heroSchoolName">School Portal</span>
-            </div>
+            <div class="hero-logo-wrap" id="heroLogoWrap">🎓</div>
+            <div class="hero-school-badge">🎓 Welcome To</div>
+            <div class="hero-title" id="heroSchoolName">School Management System</div>
+            <div class="hero-subtitle" id="heroTagline">Check academic results, track performance, and access official report
+                cards — securely, anytime, from any device.</div>
             <div class="hero-stats">
                 <div class="hero-stat">
                     <span class="hero-stat-val"><svg width="28" height="28" viewBox="0 0 24 24" fill="none"
@@ -1562,7 +1624,20 @@
                     <span class="hero-stat-lbl">Secure</span>
                 </div>
             </div>
-            <div class="hero-subtitle" id="heroSchoolAddr" style="margin-top:10px"></div>
+            <div class="hero-contact-row" id="heroContactRow" style="display:none">
+                <span class="hero-contact-item" id="heroContactAddr" style="display:none">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
+                    <span id="heroContactAddrText"></span>
+                </span>
+                <span class="hero-contact-item" id="heroContactPhone" style="display:none">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.37a2 2 0 0 1 1.99-2.18h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6.13 6.13l.98-.98a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" /></svg>
+                    <span id="heroContactPhoneText"></span>
+                </span>
+                <span class="hero-contact-item" id="heroContactEmail" style="display:none">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>
+                    <span id="heroContactEmailText"></span>
+                </span>
+            </div>
         </div>
     </div>
 
@@ -1610,11 +1685,29 @@
         // interactive portal card (React, below) fetches the same data itself via SWR for its
         // own branding — this only drives the static hero banner above it.
         function applyHeroBranding(r) {
-            var badge = document.getElementById('heroSchoolBadge');
             var nameEl = document.getElementById('heroSchoolName');
-            var addrEl = document.getElementById('heroSchoolAddr');
-            if (r.SCHOOL_NAME && nameEl) { nameEl.textContent = r.SCHOOL_NAME; if (badge) badge.style.display = 'inline-flex'; }
-            if (addrEl) addrEl.textContent = [r.SCHOOL_ADDRESS, r.SCHOOL_PHONE].filter(Boolean).join(' · ');
+            if (r.SCHOOL_NAME && nameEl) nameEl.textContent = r.SCHOOL_NAME;
+
+            var logoWrap = document.getElementById('heroLogoWrap');
+            if (logoWrap && r.SCHOOL_LOGO && !logoWrap.querySelector('img')) {
+                logoWrap.innerHTML = '<img src="' + r.SCHOOL_LOGO + '" alt="' + (r.SCHOOL_NAME || 'School') + ' logo">';
+            }
+
+            var row = document.getElementById('heroContactRow');
+            var any = false;
+            var pairs = [
+                ['heroContactAddr', 'heroContactAddrText', r.SCHOOL_ADDRESS],
+                ['heroContactPhone', 'heroContactPhoneText', r.SCHOOL_PHONE],
+                ['heroContactEmail', 'heroContactEmailText', r.SCHOOL_EMAIL]
+            ];
+            pairs.forEach(function (p) {
+                var wrapEl = document.getElementById(p[0]), textEl = document.getElementById(p[1]);
+                if (wrapEl && textEl) {
+                    if (p[2]) { textEl.textContent = p[2]; wrapEl.style.display = 'inline-flex'; any = true; }
+                    else { wrapEl.style.display = 'none'; }
+                }
+            });
+            if (row) row.style.display = any ? 'flex' : 'none';
         }
         var cachedPublic = null;
         try {
