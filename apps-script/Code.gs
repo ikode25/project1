@@ -93,6 +93,7 @@ function initializeSystem() {
         ensureDefaultGradingGeneral(ss);
         cleanUpRMEDuplicates(ss);
         ensureExamTypesSeeded(ss);
+        syncCredentialsSheet(ss);
         cache.put('sys_init_checked', '1', 21600); // 6 hours
       }
     } catch(e) {
@@ -1483,6 +1484,41 @@ function verifySavedSession(token) {
   }
   return {success: false};
 }
+// ── CREDENTIALS SHEET ──────────────────────────────────────
+// Consolidates every login (Admin, Headteacher, every Teacher) into one plaintext sheet visible
+// directly in Google Sheets — Admin/Headteacher passwords otherwise only live in PropertiesService
+// (Script Properties, only reachable from the Apps Script editor), so this is the one place to
+// look up or recover any login without needing editor access or an already-working admin session.
+// Rebuilt (not appended-to) on every call so deletions/renames in Teachers stay in sync too.
+function syncCredentialsSheet(ss) {
+  try {
+    ss = ss || SS();
+    var headers = ['Role','Username','Password','Full Name / Class','Last Synced'];
+    var sh = ss.getSheetByName('Credentials');
+    if (!sh) { sh = ss.insertSheet('Credentials'); styleHeader(sh, headers); }
+    var props = PropertiesService.getScriptProperties();
+    var adminPass = props.getProperty(ADMIN_PASS_KEY) || 'admin123';
+    var htUser = props.getProperty('HEADTEACHER_USER') || 'headteacher';
+    var htPass = props.getProperty('HEADTEACHER_PASS') || 'headteacher123';
+    var stamp = new Date();
+    var rows = [
+      ['Admin', 'admin', adminPass, 'Administrator', stamp],
+      ['Headteacher', htUser, htPass, 'Head Teacher', stamp]
+    ];
+    var tchSh = ss.getSheetByName('Teachers');
+    if (tchSh && tchSh.getLastRow() > 1) {
+      var tData = tchSh.getDataRange().getValues();
+      for (var i = 1; i < tData.length; i++) {
+        if (!tData[i][0]) continue;
+        var label = (tData[i][2] || '') + (tData[i][3] ? ' (' + tData[i][3] + ')' : '');
+        rows.push(['Teacher', tData[i][0], tData[i][1], label, stamp]);
+      }
+    }
+    if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, headers.length).clearContent();
+    sh.getRange(2, 1, rows.length, headers.length).setValues(rows);
+  } catch(e) { Logger.log('syncCredentialsSheet error: ' + e.message); }
+}
+
 function changePasswordEndpoint(token,oldP,newP){
   var td=getTokenData(token);
   if(!td)return{success:false,message:'Session expired.'};
@@ -1491,7 +1527,8 @@ function changePasswordEndpoint(token,oldP,newP){
     var currentPass = props.getProperty(ADMIN_PASS_KEY) || 'admin123';
     if(oldP!==currentPass)return{success:false,message:'Current password incorrect.'};
     props.setProperty(ADMIN_PASS_KEY,newP);
-    
+    syncCredentialsSheet();
+
     // Alert admin via SMS if phone is configured
     try {
       var ss = SS();
@@ -1519,6 +1556,7 @@ function changePasswordEndpoint(token,oldP,newP){
     var currentHtPass = props.getProperty('HEADTEACHER_PASS') || 'headteacher123';
     if(oldP!==currentHtPass)return{success:false,message:'Current password incorrect.'};
     props.setProperty('HEADTEACHER_PASS',newP);
+    syncCredentialsSheet();
     return{success:true};
   }else{
     try{
@@ -1529,12 +1567,27 @@ function changePasswordEndpoint(token,oldP,newP){
         if(data[i][0]&&data[i][0].toString()===td.username){
           if(data[i][1].toString()!==oldP)return{success:false,message:'Current password incorrect.'};
           sh.getRange(i+1,2).setValue(newP);
+          syncCredentialsSheet(ss);
           return{success:true};
         }
       }
       return{success:false,message:'Account not found.'};
     }catch(e){return{success:false,message:e.message};}
   }
+}
+
+// Admin-only convenience link to the underlying spreadsheet's Credentials tab, re-syncing it
+// on the way so it's guaranteed current at the moment the admin actually looks at it (the
+// gated init hook only refreshes it at most once every few hours).
+function getCredentialsSheetUrl(token) {
+  if (!validateAdminToken(token)) return {success:false, message:'Unauthorized'};
+  try {
+    var ss = SS();
+    syncCredentialsSheet(ss);
+    var sh = ss.getSheetByName('Credentials');
+    var gid = sh ? sh.getSheetId() : 0;
+    return {success:true, url: ss.getUrl() + '#gid=' + gid};
+  } catch(e) { return {success:false, message:e.message}; }
 }
 
 function changeAdminPassword(token, oldP, newP) {
@@ -2683,6 +2736,7 @@ function addTeacher(token, d) {
         Logger.log("New teacher SMS alert failed: " + e.message);
       }
     }
+    syncCredentialsSheet(ss);
     return {success: true};
   } catch(e) {
     return {success: false, message: e.message};
@@ -2709,6 +2763,7 @@ function updateTeacher(token, d) {
           data[i][6] || '',
           d.PortalUrl || ''
         ]]);
+        syncCredentialsSheet();
         return {success: true};
       }
     }
@@ -2717,7 +2772,7 @@ function updateTeacher(token, d) {
     return {success: false, message: e.message};
   }
 }
-function deleteTeacher(token,un){if(!getTokenData(token)||getTokenData(token).role!=='admin')return{success:false,message:'Unauthorized'};try{var sh=SS().getSheetByName('Teachers'),data=sh.getDataRange().getValues();for(var i=1;i<data.length;i++){if(data[i][0]===un){sh.deleteRow(i+1);return{success:true};}}return{success:false,message:'Teacher not found.'};}catch(e){return{success:false,message:e.message};}}
+function deleteTeacher(token,un){if(!getTokenData(token)||getTokenData(token).role!=='admin')return{success:false,message:'Unauthorized'};try{var sh=SS().getSheetByName('Teachers'),data=sh.getDataRange().getValues();for(var i=1;i<data.length;i++){if(data[i][0]===un){sh.deleteRow(i+1);syncCredentialsSheet();return{success:true};}}return{success:false,message:'Teacher not found.'};}catch(e){return{success:false,message:e.message};}}
 
 // ── MESSAGING ──────────────────────────────────────────────
 function getMessages(token, target){var td=getTokenData(token);if(!td)return{success:false,message:'Unauthorized'};try{var ss=SS(),sh=ss.getSheetByName('Messages');if(!sh)return{success:true,messages:[]};var data=sh.getDataRange().getValues(),msgs=[];for(var i=1;i<data.length;i++){if(!data[i][0])continue;var s=data[i][1],r=data[i][2],m=data[i][3],ir=data[i][4];if(td.role==='admin' && (s===target||r===target)){msgs.push({Timestamp:data[i][0],Sender:s,Receiver:r,Message:m,IsRead:ir});}else if(td.role==='teacher' && target==='admin' && (s===td.username||r===td.username||r==='All Teachers')){msgs.push({Timestamp:data[i][0],Sender:s,Receiver:r,Message:m,IsRead:ir});}}return{success:true,messages:msgs};}catch(e){return{success:false,message:e.message};}}

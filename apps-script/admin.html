@@ -6391,7 +6391,12 @@
                     <div class="frow">
                         <div class="card">
                             <div class="chdr">
-                                <div class="ctitle">Manage Teachers</div><button class="btn bo"
+                                <div class="ctitle">Manage Teachers</div>
+                                <button class="btn bo admin-only" onclick="openCredentialsSheet()" style="margin-right:8px;display:inline-flex;align-items:center;gap:6px">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                    All Login Credentials
+                                </button>
+                                <button class="btn bo"
                                     onclick="document.getElementById('teacherMod').style.display='flex'">Add
                                     Teacher</button>
                             </div>
@@ -7160,6 +7165,17 @@
         }
 
         // ── TEACHERS LOGIC ──
+        // Opens the spreadsheet's "Credentials" tab in a new tab — a consolidated, plaintext
+        // Role|Username|Password list for Admin, Headteacher and every Teacher, kept in sync
+        // server-side (syncCredentialsSheet) whenever any of those actually change. Useful as a
+        // recovery path when locked out of the portal itself, since it lives directly in Sheets.
+        function openCredentialsSheet() {
+            toast('Opening credentials sheet…', 'info');
+            google.script.run.withSuccessHandler(function (r) {
+                if (r && r.success && r.url) window.open(r.url, '_blank');
+                else toast((r && r.message) || 'Could not open the credentials sheet.', 'error');
+            }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); }).getCredentialsSheetUrl(adminToken);
+        }
         function loadTeachersPanel() {
             document.getElementById('teachersTable').innerHTML = '<tr><td colspan="6" style="text-align:center">Loading teachers...</td></tr>';
             var clSel = document.getElementById('mT_Class');
