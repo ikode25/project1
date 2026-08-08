@@ -98,3 +98,25 @@ the repo root wrapper does), most browsers block Google's sign-in flow inside th
 7. **Result checker landing page:** the hero background is now a crossfading photo carousel
    (Ken-Burns zoom) — admin-uploaded school photos (Settings → School Photos) if any exist,
    otherwise a curated default set of school building images.
+8. **Exam types are now first-class everywhere in the admin panel**, not just their own island tab.
+   Results Entry, Master Sheet, Preview Report, Bulk Print, and Cumulative Record all gained an
+   Exam Type selector — "End of Term Examination" (the default) behaves exactly as before in every
+   one of them; picking Class Test/Mid-Term/Mock/a custom type swaps in a shared session picker
+   (pick or create a session for that class+year+term) and the matching data flow. The old
+   standalone "Sessions & Scores" tab is gone — **Master Sheet is now where admin publishes any
+   exam type** (a session-level Publish/Unpublish button appears there once a session is loaded),
+   and admin can now hard-**delete** an exam type (not just deactivate it), which cascades to its
+   sessions and scores. The Student Profile modal gained a tab row (End of Term + one per active
+   exam type) showing that student's session history for whichever type is selected, and the
+   Dashboard gained an "Assessment Types Overview" card row. Two new self-contained report
+   builders (`buildExamCardAdmin`, `buildMockSlipAdmin`) render Class Test/Mid-Term and Mock
+   results in Preview/Bulk Print, matching the existing report card's theming.
+9. **Stale browser cache:** added explicit `Cache-Control: no-cache` meta tags to all three pages
+   so a redeploy doesn't require a hard refresh to see the new code. Google's own edge cache in
+   front of `script.google.com` can still lag a minute or two right after a fresh deployment —
+   that part isn't something app code can control.
+10. **Consolidated Credentials sheet:** a new "Credentials" tab in the spreadsheet lists every
+    login (Admin, Headteacher, every Teacher) in one place — Admin/Headteacher passwords
+    previously only lived in Script Properties, invisible without opening the Apps Script editor.
+    Kept in sync automatically whenever a password changes or a teacher is added/edited/removed;
+    reachable from Manage Teachers → "All Login Credentials".

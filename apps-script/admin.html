@@ -4,6 +4,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- Prevents the browser's own HTTP cache from serving a stale copy of this large page after a
+         redeploy (the common cause of "I have to hard-refresh every time"). Google's edge cache in
+         front of script.google.com is outside our control and can still lag a minute or two right
+         after a fresh deployment — this only stops the browser-side half of the problem. -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Admin Panel</title>
     <link rel="icon" href="favicon.png" type="image/png">
     <link
@@ -4144,6 +4151,19 @@
                         </div>
                     </div>
 
+                    <!-- Assessment Types Overview — the dashboard isn't just an End-of-Term summary
+                         anymore: one card per active exam type (Class Test/Mid-Term/Mock/custom)
+                         showing how many sessions exist, how many are published, and the overall
+                         average across every score recorded for it. -->
+                    <div class="card" id="examTypesOverviewCard" style="margin-bottom:20px; display:none;">
+                        <div class="chdr">
+                            <div class="ctitle">Assessment Types Overview</div><button class="btn bo bsm no-print" onclick="showPanel('exams',null)">Manage Exam Types</button>
+                        </div>
+                        <div class="cbody">
+                            <div id="examTypesOverviewGrid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px;"></div>
+                        </div>
+                    </div>
+
                     <!-- Dashboard KPI Charts (Pie / Doughnut / SVG ring) — Chart.js v4, colored from
                          the admin's Theme & Colors settings (--nv / --bl / --go). -->
                     <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:20px; margin-bottom:20px;">
@@ -4469,6 +4489,7 @@
                         </div>
                         <div class="cbody">
                             <div class="frow">
+                                <div class="fg"><label>Exam Type</label><select id="resExamType" onchange="renderResultTiles()"></select></div>
                                 <div class="fg"><label>Class</label><select id="resClass"
                                         onchange="renderResultTiles()">
                                         <option value="">Select class…</option>
@@ -4500,6 +4521,12 @@
                                     </div>
                                 </div>
                             </div>
+                            <!-- Non-End-of-Term exam types (Class Test / Mid-Term / Mock / custom): pick or
+                                 create a session for this class+year+term, then enter marks for it. -->
+                            <div id="resSessionArea" style="display:none">
+                                <div id="resSessionPicker"></div>
+                                <div id="resSessionActions" style="margin-top:14px"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -4508,37 +4535,20 @@
                 <div class="panel" id="panel-exams">
                     <div class="card">
                         <div class="chdr">
-                            <div class="ctitle">Exams</div>
-                            <div style="display:flex;gap:8px" class="no-print">
-                                <button class="btn bo bsm" id="examsTabTypesBtn" onclick="switchExamsTab('types')">Exam Types</button>
-                                <button class="btn bo bsm" id="examsTabSessionsBtn" onclick="switchExamsTab('sessions')">Sessions &amp; Scores</button>
-                            </div>
+                            <div class="ctitle">Exam Types</div>
                         </div>
                         <div class="cbody">
-                            <div id="examsTypesTab">
-                                <div class="ttb no-print" style="align-items:center">
-                                    <div style="font-size:12px;color:var(--mu)">Class Test, Mid-Term and Mock Exam are pre-configured. Add your own assessment types below — each controls its own max score, grading and whether the Head Teacher must publish it before students can see results.</div>
-                                    <button class="btn bp bsm admin-only" style="margin-left:auto;white-space:nowrap" onclick="openExamTypeModal(null)">+ Add Exam Type</button>
-                                </div>
-                                <div class="tw">
-                                    <table class="dt">
-                                        <thead>
-                                            <tr><th>Name</th><th>Category</th><th>Max Score</th><th>Publish Gate</th><th>Grading Group</th><th>Status</th><th class="no-print">Actions</th></tr>
-                                        </thead>
-                                        <tbody id="examTypesTbody"><tr><td colspan="7" style="text-align:center;color:var(--mu);padding:24px">Loading…</td></tr></tbody>
-                                    </table>
-                                </div>
+                            <div class="ttb no-print" style="align-items:center">
+                                <div style="font-size:12px;color:var(--mu)">Class Test, Mid-Term and Mock Exam are pre-configured. Add your own assessment types below — each controls its own max score, grading, and whether the Head Teacher must publish it before students can see results. Pick a type from the Exam Type dropdown in Results Entry, Master Sheet, Preview, Bulk Print, or Cumulative Record to work with it — sessions are created inline there, wherever you need one.</div>
+                                <button class="btn bp bsm admin-only" style="margin-left:auto;white-space:nowrap" onclick="openExamTypeModal(null)">+ Add Exam Type</button>
                             </div>
-                            <div id="examsSessionsTab" style="display:none">
-                                <div class="frow">
-                                    <div class="fg"><label>Exam Type</label><select id="examSessType" onchange="loadExamSessionsList()"></select></div>
-                                    <div class="fg"><label>Class</label><select id="examSessClass" onchange="loadExamSessionsList()"><option value="">Select class…</option></select></div>
-                                    <div class="fg"><label>Academic Year</label><select id="examSessYear" onchange="loadExamSessionsList()"></select></div>
-                                    <div class="fg" style="display:flex;align-items:flex-end">
-                                        <button class="btn bp bsm" onclick="openNewExamSessionModal()" style="height:38px">+ New Session</button>
-                                    </div>
-                                </div>
-                                <div id="examSessionsList" style="margin-top:14px"></div>
+                            <div class="tw">
+                                <table class="dt">
+                                    <thead>
+                                        <tr><th>Name</th><th>Category</th><th>Max Score</th><th>Publish Gate</th><th>Grading Group</th><th>Status</th><th class="no-print">Actions</th></tr>
+                                    </thead>
+                                    <tbody id="examTypesTbody"><tr><td colspan="7" style="text-align:center;color:var(--mu);padding:24px">Loading…</td></tr></tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -4580,11 +4590,12 @@
                         </div>
                         <div class="cbody">
                             <div class="frow">
-                                <div class="fg"><label>Class</label><select id="msClass">
+                                <div class="fg"><label>Exam Type</label><select id="msExamType" onchange="onMsExamTypeChange()"></select></div>
+                                <div class="fg"><label>Class</label><select id="msClass" onchange="onMsFilterChange()">
                                         <option value="">Select class…</option>
                                     </select></div>
-                                <div class="fg"><label>Year</label><select id="msYear"></select></div>
-                                <div class="fg"><label>Term</label><select id="msTerm">
+                                <div class="fg"><label>Year</label><select id="msYear" onchange="onMsFilterChange()"></select></div>
+                                <div class="fg"><label>Term</label><select id="msTerm" onchange="onMsFilterChange()">
                                         <option>Term 1</option>
                                         <option selected>Term 2</option>
                                         <option>Term 3</option>
@@ -4592,12 +4603,18 @@
                                         <option>Semester 2</option>
                                     </select></div>
                             </div>
-                            <div class="ttb no-print"><button class="btn bp" onclick="loadMasterSheet()">Load Master Sheet</button>
+                            <div id="msEndOfTermControls" class="ttb no-print"><button class="btn bp" onclick="loadMasterSheet()">Load Master Sheet</button>
                                 <div class="sbox"><input type="text" id="msSearch" placeholder="Search student…"
                                         oninput="filterMS()">
                                 </div>
                                 <button class="btn bo bsm" onclick="window.print()">Print</button>
                                 <button class="btn bo bsm" onclick="exportMsCSV()">Export CSV</button>
+                            </div>
+                            <!-- Non-End-of-Term exam types: pick/create a session here, then this IS where
+                                 admin publishes it — no separate Sessions & Scores page anymore. -->
+                            <div id="msSessionArea" style="display:none">
+                                <div id="msSessionPicker"></div>
+                                <div id="msSessionActions" style="margin-top:12px"></div>
                             </div>
                             <div id="masterSheetArea"></div>
                         </div>
@@ -4712,6 +4729,7 @@
                         </div>
                         <div class="cbody">
                             <div class="frow no-print">
+                                <div class="fg"><label>Exam Type</label><select id="cumExamType"></select></div>
                                 <div class="fg"><label>Student ID</label><input type="text" id="cumStudentId"
                                         placeholder="e.g. 001">
                                 </div>
@@ -4967,10 +4985,11 @@
                         </div>
                         <div class="cbody">
                             <div class="frow" style="margin-bottom:14px">
+                                <div class="fg"><label>Exam Type</label><select id="prevExamType" onchange="onPrevExamTypeChange()"></select></div>
                                 <div class="fg"><label>Academic Year</label><select id="prevYear"
-                                        onchange="loadPreviewStudents()"></select></div>
+                                        onchange="onPrevFilterChange()"></select></div>
                                 <div class="fg"><label>Term</label><select id="prevTerm"
-                                        onchange="loadPreviewStudents()">
+                                        onchange="onPrevFilterChange()">
                                         <option>Term 1</option>
                                         <option selected>Term 2</option>
                                         <option>Term 3</option>
@@ -4978,12 +4997,17 @@
                                         <option>Semester 2</option>
                                     </select></div>
                                 <div class="fg"><label>Class</label><select id="prevClass"
-                                        onchange="loadPreviewStudents()">
+                                        onchange="onPrevFilterChange()">
                                         <option value="">Select class…</option>
                                     </select></div>
                                 <div class="fg"><label>Student Name</label><select id="prevStudent">
                                         <option value="">Select student…</option>
                                     </select></div>
+                            </div>
+                            <!-- Non-End-of-Term exam types need a session picked too (a class can have
+                                 several Class Test/Mock sessions in one term). -->
+                            <div id="prevSessionArea" style="display:none;margin-bottom:14px">
+                                <div id="prevSessionPicker"></div>
                             </div>
                             <input type="hidden" id="previewId">
                             <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
@@ -5055,17 +5079,21 @@
                         </div>
                         <div class="cbody">
                             <div class="frow">
-                                <div class="fg"><label>Class</label><select id="bulkClass">
+                                <div class="fg"><label>Exam Type</label><select id="bulkExamType" onchange="onBulkExamTypeChange()"></select></div>
+                                <div class="fg"><label>Class</label><select id="bulkClass" onchange="onBulkFilterChange()">
                                         <option value="">Select class…</option>
                                     </select></div>
-                                <div class="fg"><label>Year</label><select id="bulkYear"></select></div>
-                                <div class="fg"><label>Term</label><select id="bulkTerm">
+                                <div class="fg"><label>Year</label><select id="bulkYear" onchange="onBulkFilterChange()"></select></div>
+                                <div class="fg"><label>Term</label><select id="bulkTerm" onchange="onBulkFilterChange()">
                                         <option>Term 1</option>
                                         <option selected>Term 2</option>
                                         <option>Term 3</option>
                                         <option>Semester 1</option>
                                         <option>Semester 2</option>
                                     </select></div>
+                            </div>
+                            <div id="bulkSessionArea" style="display:none;margin-bottom:14px">
+                                <div id="bulkSessionPicker"></div>
                             </div>
                             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"><button class="btn bp"
                                     onclick="loadBulkReports()">Load All Reports</button><button class="btn bg2"
@@ -6821,50 +6849,58 @@
                     </div>
                 </div>
 
-                <!-- Detailed Subject Performances -->
-                <div id="profSubjectSection" style="margin-top:24px; border-top:1px solid #e2e8f0; padding-top:20px;">
-                    <div style="font-family:'Outfit',sans-serif; font-size:14px; font-weight:800; color:var(--nv); margin-bottom:12px">Subject Performances (<span id="profSubTermLabel">Current Term</span>)</div>
-                    <div id="profSubLoading" style="display:none; text-align:center; padding:12px; color:var(--mu)">
-                        <div class="spinner" style="margin:0 auto 6px;width:18px;height:18px;border:2px solid var(--bd);border-top-color:var(--bl);border-radius:50%;animation:spin 1s linear infinite"></div>
-                        Loading subject performances...
-                    </div>
-                    <div id="profSubTableWrap" style="overflow-x:auto; display:none">
-                        <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left">
-                            <thead>
-                                <tr style="border-bottom:2px solid #e2e8f0; color:var(--mu); font-weight:600">
-                                    <th style="padding:6px 4px">Subject</th>
-                                    <th style="padding:6px 4px; text-align:center">SBA</th>
-                                    <th style="padding:6px 4px; text-align:center">Exam</th>
-                                    <th style="padding:6px 4px; text-align:center">Total</th>
-                                    <th style="padding:6px 4px; text-align:center">Grade</th>
-                                    <th style="padding:6px 4px; text-align:center">Rank</th>
-                                </tr>
-                            </thead>
-                            <tbody id="profSubjectRows"></tbody>
-                        </table>
-                    </div>
-                </div>
+                <!-- Exam type tabs: End of Term (default) plus one per active exam type -->
+                <div id="profExamTabs" style="margin-top:24px; display:flex; gap:8px; flex-wrap:wrap; border-top:1px solid #e2e8f0; padding-top:20px;"></div>
 
-                <div style="margin-top:24px; border-top:1px solid #e2e8f0; padding-top:20px">
-                    <div style="font-family:'Outfit',sans-serif; font-size:14px; font-weight:800; color:var(--nv); margin-bottom:12px">Academic History (All Terms)</div>
-                    <div style="overflow-x:auto">
-                        <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left">
-                            <thead>
-                                <tr style="border-bottom:2px solid #e2e8f0; color:var(--mu); font-weight:600">
-                                    <th style="padding:8px 4px">Academic Period</th>
-                                    <th style="padding:8px 4px">Class</th>
-                                    <th style="padding:8px 4px; text-align:center">Average</th>
-                                    <th style="padding:8px 4px; text-align:center">Attendance</th>
-                                    <th style="padding:8px 4px">Remarks</th>
-                                    <th style="padding:8px 4px">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody id="profPerformanceHistory">
-                                <!-- Populated dynamically -->
-                            </tbody>
-                        </table>
+                <div id="profEndOfTermArea">
+                    <!-- Detailed Subject Performances -->
+                    <div id="profSubjectSection" style="margin-top:16px;">
+                        <div style="font-family:'Outfit',sans-serif; font-size:14px; font-weight:800; color:var(--nv); margin-bottom:12px">Subject Performances (<span id="profSubTermLabel">Current Term</span>)</div>
+                        <div id="profSubLoading" style="display:none; text-align:center; padding:12px; color:var(--mu)">
+                            <div class="spinner" style="margin:0 auto 6px;width:18px;height:18px;border:2px solid var(--bd);border-top-color:var(--bl);border-radius:50%;animation:spin 1s linear infinite"></div>
+                            Loading subject performances...
+                        </div>
+                        <div id="profSubTableWrap" style="overflow-x:auto; display:none">
+                            <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left">
+                                <thead>
+                                    <tr style="border-bottom:2px solid #e2e8f0; color:var(--mu); font-weight:600">
+                                        <th style="padding:6px 4px">Subject</th>
+                                        <th style="padding:6px 4px; text-align:center">SBA</th>
+                                        <th style="padding:6px 4px; text-align:center">Exam</th>
+                                        <th style="padding:6px 4px; text-align:center">Total</th>
+                                        <th style="padding:6px 4px; text-align:center">Grade</th>
+                                        <th style="padding:6px 4px; text-align:center">Rank</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="profSubjectRows"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div style="margin-top:24px; border-top:1px solid #e2e8f0; padding-top:20px">
+                        <div style="font-family:'Outfit',sans-serif; font-size:14px; font-weight:800; color:var(--nv); margin-bottom:12px">Academic History (All Terms)</div>
+                        <div style="overflow-x:auto">
+                            <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:left">
+                                <thead>
+                                    <tr style="border-bottom:2px solid #e2e8f0; color:var(--mu); font-weight:600">
+                                        <th style="padding:8px 4px">Academic Period</th>
+                                        <th style="padding:8px 4px">Class</th>
+                                        <th style="padding:8px 4px; text-align:center">Average</th>
+                                        <th style="padding:8px 4px; text-align:center">Attendance</th>
+                                        <th style="padding:8px 4px">Remarks</th>
+                                        <th style="padding:8px 4px">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="profPerformanceHistory">
+                                    <!-- Populated dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
+                <!-- Class Test / Mid-Term / Mock / custom: chronological list of this student's
+                     sessions of the selected exam type, populated by switchProfTab(). -->
+                <div id="profExamTypeArea" style="display:none; margin-top:16px;"></div>
             </div>
             <div class="mfoot" style="background:#f1f5f9; display:flex; justify-content:space-between">
                 <div>
@@ -7380,9 +7416,9 @@
         function toast(msg, type) { type = type || 'info'; var el = document.createElement('div'); el.className = 'toast ' + type; el.innerHTML = '<span style="width:16px;height:16px;flex-shrink:0">' + (TOAST_ICONS[type] || TOAST_ICONS.info) + '</span><span style="flex:1">' + msg + '</span><button class="txbtn" onclick="this.parentElement.remove()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>'; document.getElementById('toastCtr').appendChild(el); setTimeout(function () { if (el.parentNode) el.remove(); }, 5000); }
         function ord(n) { var s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
         function popYears(id, cur) { var el = document.getElementById(id); if (!el) return; var p = el.value; el.innerHTML = ''; YEARS.forEach(function (y) { var o = document.createElement('option'); o.value = y; o.textContent = y; if (y === (cur || p)) o.selected = true; el.appendChild(o); }); if (!el.value && YEARS.length > 0) el.value = YEARS[0]; }
-        function populateAllYears() { ['resYear', 'remYear', 'msYear', 'bulkYear', 'm_Year', 'set_CURRENT_YEAR', 'cumYear', 'fbYear', 'eaYear', 'examSessYear', 'es_Year'].forEach(function (id) { popYears(id, '2025-2026'); }); }
+        function populateAllYears() { ['resYear', 'remYear', 'msYear', 'bulkYear', 'm_Year', 'set_CURRENT_YEAR', 'cumYear', 'fbYear', 'eaYear', 'es_Year'].forEach(function (id) { popYears(id, '2025-2026'); }); }
         function populateAllClassDropdowns() {
-            ['remClass', 'msClass', 'bulkClass', 'fbClass', 'eaClass', 'examSessClass', 'es_Class'].forEach(function (id) {
+            ['remClass', 'msClass', 'bulkClass', 'fbClass', 'eaClass', 'es_Class'].forEach(function (id) {
                 var el = document.getElementById(id); if (!el) return;
                 var cur = el.value; el.innerHTML = '<option value="">Select class…</option>';
                 allClasses.forEach(function (c) { if (userRole === 'teacher' && c.ClassName !== userClass) return; el.innerHTML += '<option value="' + c.ClassName + '">' + c.ClassName + '</option>'; });
@@ -7405,33 +7441,20 @@
             }
         }
 
-        // ── EXAMS (Exam Types / Sessions / Scores) ──
-        var _examTypesCache = [], _examSessionsCache = [], _examsTabActive = 'types', _examsPanelInited = false;
-        var _curScoreSession = null, _curScoreData = null;
+        // ── EXAMS (Exam Types) ── the Exams panel now only manages exam TYPE definitions.
+        // Sessions themselves are picked/created inline wherever they're needed — Results Entry,
+        // Master Sheet, Preview, Bulk Print, Cumulative Record — via the shared session picker
+        // below, instead of living on their own separate tab.
+        var _examTypesCache = [];
         function initExamsPanel() {
             loadExamTypes();
-            if (!_examsPanelInited) {
-                _examsPanelInited = true;
-                switchExamsTab('types');
-            }
-        }
-        function switchExamsTab(tab) {
-            _examsTabActive = tab;
-            document.getElementById('examsTypesTab').style.display = tab === 'types' ? '' : 'none';
-            document.getElementById('examsSessionsTab').style.display = tab === 'sessions' ? '' : 'none';
-            document.getElementById('examsTabTypesBtn').className = 'btn bsm ' + (tab === 'types' ? 'bp' : 'bo');
-            document.getElementById('examsTabSessionsBtn').className = 'btn bsm ' + (tab === 'sessions' ? 'bp' : 'bo');
-            if (tab === 'sessions') {
-                populateExamTypeSelect();
-                loadExamSessionsList();
-            }
         }
         function loadExamTypes() {
             google.script.run.withSuccessHandler(function (r) {
                 if (r && r.success) {
                     _examTypesCache = r.examTypes || [];
                     renderExamTypesTable();
-                    populateExamTypeSelect();
+                    populateAllExamTypeSelects();
                 } else {
                     toast((r && r.message) || 'Failed to load exam types.', 'error');
                 }
@@ -7450,16 +7473,57 @@
                 if (!locked) {
                     var isActive = !(t.Active === false || t.Active === 'false');
                     btns += ' <button class="btn ' + (isActive ? 'br' : 'bg2') + ' bsm" onclick="toggleExamTypeActiveUI(\'' + t.ID + '\',' + (!isActive) + ')">' + (isActive ? 'Deactivate' : 'Activate') + '</button>';
+                    btns += ' <button class="btn br bsm" onclick="deleteExamTypeUI(\'' + t.ID + '\')">Delete</button>';
                 }
                 return '<tr><td><strong>' + t.Name + '</strong>' + (locked ? ' <span class="bdg bpu" style="margin-left:4px">Built-in</span>' : '') + '</td><td>' + (t.Category || '—') + '</td><td>' + (t.MaxScore || 100) + '</td><td>' + pubBdg + '</td><td>' + (t.GradingLevelGroup || '<span style="color:var(--mu)">None</span>') + '</td><td>' + statusBdg + '</td><td class="no-print">' + btns + '</td></tr>';
             }).join('');
         }
-        function populateExamTypeSelect() {
-            var sel = document.getElementById('examSessType'); if (!sel) return;
-            var cur = sel.value;
-            sel.innerHTML = _examTypesCache.filter(function (t) { return !(t.Active === false || t.Active === 'false'); })
-                .map(function (t) { return '<option value="' + t.ID + '">' + t.Name + '</option>'; }).join('');
-            if (cur) sel.value = cur;
+        // Dashboard "Assessment Types Overview" — one card per active exam type besides End of
+        // Term (whose numbers already live in the KPI tiles/charts above). Hides itself entirely
+        // when there's nothing to show (e.g. a school that hasn't used any exam type yet).
+        function loadExamTypesOverview() {
+            google.script.run.withSuccessHandler(function (r) {
+                var card = document.getElementById('examTypesOverviewCard');
+                if (!(r && r.success) || !r.overview || !r.overview.length) { if (card) card.style.display = 'none'; return; }
+                if (card) card.style.display = '';
+                renderExamTypesOverview(r.overview);
+            }).withFailureHandler(function () { var card = document.getElementById('examTypesOverviewCard'); if (card) card.style.display = 'none'; }).getExamTypesOverview(adminToken);
+        }
+        function renderExamTypesOverview(overview) {
+            var grid = document.getElementById('examTypesOverviewGrid'); if (!grid) return;
+            var palette = ['#1a3a8a', '#7c3aed', '#0284c7', '#166534', '#b45309', '#be185d'];
+            grid.innerHTML = overview.map(function (o, i) {
+                var acc = palette[i % palette.length];
+                return '<div class="scard static-card" style="--acc:' + acc + '; cursor:pointer" onclick="showPanel(\'mastersheet\',null)">'
+                    + '<div class="slbl" style="margin-bottom:4px">' + o.name + '</div>'
+                    + '<div class="sval" style="font-size:22px">' + o.sessionCount + '<span style="font-size:11px;color:var(--mu);font-weight:600"> session' + (o.sessionCount === 1 ? '' : 's') + '</span></div>'
+                    + '<div style="font-size:11px;color:var(--mu);margin-top:4px">' + o.publishedCount + ' published · Avg ' + o.avgScore + '</div>'
+                    + '</div>';
+            }).join('');
+        }
+        function deleteExamTypeUI(id) {
+            var t = _examTypesCache.find(function (x) { return x.ID === id; });
+            var name = t ? t.Name : id;
+            if (!confirm('Permanently delete "' + name + '"? This also deletes every session and every score recorded under it for every class — this cannot be undone.')) return;
+            google.script.run.withSuccessHandler(function (r) {
+                if (r && r.success) { toast('Exam type deleted.', 'success'); loadExamTypes(); }
+                else toast((r && r.message) || 'Delete failed.', 'error');
+            }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); }).deleteExamType(adminToken, id);
+        }
+        // Every panel that's exam-type-aware (Results Entry, Master Sheet, Preview, Bulk Print,
+        // Cumulative Record) gets its own <select>, all kept in sync from the same cache — "End of
+        // Term Examination" always sorts first so it stays the default in every one of them.
+        var EXAM_TYPE_SELECT_IDS = ['resExamType', 'msExamType', 'prevExamType', 'bulkExamType', 'cumExamType'];
+        function populateAllExamTypeSelects() {
+            var order = { 'endofterm': 0, 'classtest': 1, 'midterm': 2, 'mock': 3 };
+            var active = _examTypesCache.filter(function (t) { return !(t.Active === false || t.Active === 'false'); })
+                .slice().sort(function (a, b) { return (order[a.ID] !== undefined ? order[a.ID] : 99) - (order[b.ID] !== undefined ? order[b.ID] : 99); });
+            EXAM_TYPE_SELECT_IDS.forEach(function (id) {
+                var sel = document.getElementById(id); if (!sel) return;
+                var cur = sel.value;
+                sel.innerHTML = active.map(function (t) { return '<option value="' + t.ID + '">' + t.Name + '</option>'; }).join('');
+                sel.value = (cur && active.some(function (t) { return t.ID === cur; })) ? cur : 'endofterm';
+            });
         }
         function openExamTypeModal(id) {
             var t = id ? _examTypesCache.find(function (x) { return x.ID === id; }) : null;
@@ -7505,43 +7569,55 @@
                 else toast((r && r.message) || 'Failed.', 'error');
             }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); }).setExamTypeActive(adminToken, id, active);
         }
-        function loadExamSessionsList() {
-            var typeId = document.getElementById('examSessType').value;
-            var cls = document.getElementById('examSessClass').value;
-            var yr = document.getElementById('examSessYear').value;
-            if (!typeId) { document.getElementById('examSessionsList').innerHTML = ''; return; }
-            document.getElementById('examSessionsList').innerHTML = '<div style="text-align:center;color:var(--mu);padding:24px">Loading…</div>';
+        // ── SHARED SESSION PICKER ──────────────────────────────────────────────
+        // Used by every panel once a non-End-of-Term exam type is selected: Results Entry, Master
+        // Sheet, Preview, Bulk Print, Cumulative Record. Renders a session <select> + "New Session"
+        // button into containerId, and calls onChosen(sessionId, sessionObj|null) whenever a
+        // session is picked or newly created. This is what replaced the old standalone Sessions &
+        // Scores tab — the same createExamSession/publishExamSession/etc. functions are reused,
+        // just invoked from wherever the admin/teacher actually needs a session instead of from
+        // one dedicated page.
+        var _spContext = null; // {examTypeId, cls, yr, tm, containerId} for whichever picker last opened "+ New Session"
+        function renderSessionPicker(containerId, examTypeId, cls, yr, tm, onChosen) {
+            var host = document.getElementById(containerId);
+            if (!host) return;
+            host._spOnChosen = onChosen;
+            if (!cls) { host.innerHTML = '<div style="font-size:12px;color:var(--mu)">Select a class first.</div>'; return; }
+            host.innerHTML = '<div style="font-size:12px;color:var(--mu)">Loading sessions…</div>';
             google.script.run.withSuccessHandler(function (r) {
-                if (!(r && r.success)) { toast((r && r.message) || 'Failed to load sessions.', 'error'); return; }
-                _examSessionsCache = (r.sessions || []).filter(function (s) { return !yr || s.Year === yr; });
-                renderExamSessionsList();
-            }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); }).getExamSessions(adminToken, typeId, cls);
+                if (!(r && r.success)) { host.innerHTML = '<div style="color:#dc2626;font-size:12px">' + ((r && r.message) || 'Failed to load sessions.') + '</div>'; return; }
+                var sessions = (r.sessions || []).filter(function (s) { return String(s.Year) === String(yr) && s.Term === tm; });
+                host._spSessions = sessions;
+                var selId = containerId + '_sel';
+                var html = '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+                    + '<select id="' + selId + '" class="fsel" style="min-width:230px" onchange="_spPick(\'' + containerId + '\',this.value)">'
+                    + '<option value="">' + (sessions.length ? 'Select a session…' : 'No sessions yet') + '</option>'
+                    + sessions.map(function (s) { return '<option value="' + s.SessionID + '">' + s.Label + ' (' + (s.Status === 'Published' ? 'Published' : 'Draft') + ')</option>'; }).join('')
+                    + '</select>'
+                    + '<button type="button" class="btn bp bsm" onclick="_spNewSession(\'' + containerId + '\')">+ New Session</button>'
+                    + '</div>';
+                host.innerHTML = html;
+            }).withFailureHandler(function (e) { host.innerHTML = '<div style="color:#dc2626;font-size:12px">Error: ' + e.message + '</div>'; }).getExamSessions(adminToken, examTypeId, cls);
+            _spContext = { examTypeId: examTypeId, cls: cls, yr: yr, tm: tm, containerId: containerId };
         }
-        function renderExamSessionsList() {
-            var el = document.getElementById('examSessionsList');
-            if (!_examSessionsCache.length) { el.innerHTML = '<div style="text-align:center;color:var(--mu);padding:24px">No sessions yet for this filter. Click "+ New Session" to create one.</div>'; return; }
-            el.innerHTML = '<div class="tw"><table class="dt"><thead><tr><th>Label</th><th>Class</th><th>Year / Term</th><th>Status</th><th>Published</th><th class="no-print">Actions</th></tr></thead><tbody>' +
-                _examSessionsCache.map(function (s) {
-                    var statusBdg = s.Status === 'Published' ? '<span class="bdg bgr">Published</span>' : '<span class="bdg bgo">Draft</span>';
-                    var pubDate = s.PublishedAt ? new Date(s.PublishedAt).toLocaleDateString() : '—';
-                    var btns = '<button class="btn bp bsm" onclick="openExamScoreEntry(\'' + s.SessionID + '\')">Enter Scores</button>';
-                    if (s.Status === 'Published') btns += ' <button class="btn bo bsm admin-only" onclick="doUnpublishExamSession(\'' + s.SessionID + '\')">Unpublish</button>';
-                    else btns += ' <button class="btn bg2 bsm admin-only" onclick="doPublishExamSession(\'' + s.SessionID + '\')">Publish</button>';
-                    btns += ' <button class="btn br bsm admin-only" onclick="doDeleteExamSession(\'' + s.SessionID + '\')">Delete</button>';
-                    return '<tr><td><strong>' + s.Label + '</strong></td><td>' + s.Class + '</td><td>' + s.Year + ' · ' + s.Term + '</td><td>' + statusBdg + '</td><td>' + pubDate + '</td><td class="no-print">' + btns + '</td></tr>';
-                }).join('') + '</tbody></table></div>';
+        function _spPick(containerId, sessionId) {
+            var host = document.getElementById(containerId);
+            if (!host || !host._spOnChosen) return;
+            var s = (host._spSessions || []).find(function (x) { return x.SessionID === sessionId; }) || null;
+            host._spOnChosen(sessionId || null, s);
         }
-        function openNewExamSessionModal() {
-            var typeId = document.getElementById('examSessType').value;
-            if (!typeId) { toast('Select an exam type first.', 'error'); return; }
+        function _spNewSession(containerId) {
+            if (!_spContext || _spContext.containerId !== containerId) return;
             document.getElementById('es_Label').value = '';
             document.getElementById('es_MaxScoreOverride').value = '';
-            var cls = document.getElementById('examSessClass').value; if (cls) document.getElementById('es_Class').value = cls;
-            var yr = document.getElementById('examSessYear').value; if (yr) document.getElementById('es_Year').value = yr;
+            document.getElementById('es_Class').value = _spContext.cls;
+            document.getElementById('es_Year').value = _spContext.yr;
+            document.getElementById('es_Term').value = _spContext.tm;
             document.getElementById('examSessionModal').classList.add('show');
         }
         function createExamSessionSubmit() {
-            var typeId = document.getElementById('examSessType').value;
+            if (!_spContext) { toast('Nothing to create a session for.', 'error'); return; }
+            var ctx = _spContext;
             var label = document.getElementById('es_Label').value.trim();
             var cls = document.getElementById('es_Class').value;
             var yr = document.getElementById('es_Year').value;
@@ -7549,39 +7625,46 @@
             if (!label) { toast('Please enter a label for this session.', 'error'); return; }
             if (!cls) { toast('Please select a class.', 'error'); return; }
             var override = document.getElementById('es_MaxScoreOverride').value;
+            var host = document.getElementById(ctx.containerId);
+            var onChosen = host ? host._spOnChosen : null;
             google.script.run.withSuccessHandler(function (r) {
                 if (r && r.success) {
                     toast('Session created' + (r.status === 'Published' ? ' and published — students can see it now.' : '.'), 'success');
                     closeModal('examSessionModal');
-                    document.getElementById('examSessClass').value = cls;
-                    document.getElementById('examSessYear').value = yr;
-                    loadExamSessionsList();
+                    renderSessionPicker(ctx.containerId, ctx.examTypeId, ctx.cls, ctx.yr, ctx.tm, onChosen);
+                    if (onChosen) onChosen(r.sessionId, { SessionID: r.sessionId, Label: label, Class: cls, Year: yr, Term: tm, Status: r.status, MaxScoreOverride: override });
                 } else toast((r && r.message) || 'Failed to create session.', 'error');
-            }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); }).createExamSession(adminToken, { ExamTypeID: typeId, Label: label, Class: cls, Year: yr, Term: tm, MaxScoreOverride: override ? Number(override) : '' });
+            }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); }).createExamSession(adminToken, { ExamTypeID: ctx.examTypeId, Label: label, Class: cls, Year: yr, Term: tm, MaxScoreOverride: override ? Number(override) : '' });
         }
-        function doPublishExamSession(sessionId) {
+        // onDone is an optional refresh callback — different panels need different things
+        // refreshed after a publish/unpublish/delete, so each caller wires its own.
+        function doPublishExamSession(sessionId, onDone) {
             if (!confirm('Publish this session? Students in this class will immediately be able to see their results.')) return;
             google.script.run.withSuccessHandler(function (r) {
-                if (r && r.success) { toast('Session published.', 'success'); loadExamSessionsList(); }
+                if (r && r.success) { toast('Session published.', 'success'); if (onDone) onDone(); }
                 else toast((r && r.message) || 'Failed.', 'error');
             }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); }).publishExamSession(adminToken, sessionId);
         }
-        function doUnpublishExamSession(sessionId) {
+        function doUnpublishExamSession(sessionId, onDone) {
             if (!confirm('Unpublish this session? Students will no longer be able to see it.')) return;
             google.script.run.withSuccessHandler(function (r) {
-                if (r && r.success) { toast('Session unpublished.', 'success'); loadExamSessionsList(); }
+                if (r && r.success) { toast('Session unpublished.', 'success'); if (onDone) onDone(); }
                 else toast((r && r.message) || 'Failed.', 'error');
             }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); }).unpublishExamSession(adminToken, sessionId);
         }
-        function doDeleteExamSession(sessionId) {
+        function doDeleteExamSession(sessionId, onDone) {
             if (!confirm('Delete this session and all its scores? This cannot be undone.')) return;
             google.script.run.withSuccessHandler(function (r) {
-                if (r && r.success) { toast('Session deleted.', 'success'); loadExamSessionsList(); }
+                if (r && r.success) { toast('Session deleted.', 'success'); if (onDone) onDone(); }
                 else toast((r && r.message) || 'Failed.', 'error');
             }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); }).deleteExamSession(adminToken, sessionId);
         }
-        function openExamScoreEntry(sessionId) {
+
+        // ── SHARED SCORE ENTRY MODAL ── (Results Entry uses this once a non-End-of-Term session is picked)
+        var _curScoreSession = null, _curScoreData = null, _curScoreOnSaved = null;
+        function openExamScoreEntry(sessionId, onSaved) {
             _curScoreSession = sessionId;
+            _curScoreOnSaved = onSaved || null;
             document.getElementById('examScoreTbl').innerHTML = '<tr><td style="padding:20px;text-align:center;color:var(--mu)">Loading…</td></tr>';
             document.getElementById('examScoreModal').classList.add('show');
             google.script.run.withSuccessHandler(function (r) {
@@ -7619,8 +7702,9 @@
                 if (inp.value === '') return;
                 entries.push({ StudentID: inp.getAttribute('data-sid'), SubjectName: inp.getAttribute('data-subj'), Score: Number(inp.value) });
             });
+            var onSaved = _curScoreOnSaved;
             google.script.run.withSuccessHandler(function (r) {
-                if (r && r.success) { toast('Scores saved.', 'success'); closeModal('examScoreModal'); }
+                if (r && r.success) { toast('Scores saved.', 'success'); closeModal('examScoreModal'); if (onSaved) onSaved(); }
                 else toast((r && r.message) || 'Save failed.', 'error');
             }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); }).saveExamSessionScores(adminToken, _curScoreSession, entries);
         }
@@ -8750,6 +8834,8 @@
                 renderDashRecent(r.recentStudents || []);
                 renderClassTiles(r.classes || [], r.classCounts || {});
                 populateAllClassDropdowns();
+                loadExamTypes(); // populates every panel's Exam Type select, not just the Exams tab
+                loadExamTypesOverview();
                 try {
                     renderCharts(r.classAvgData || {}, r.termAvgData || {});
                 } catch(e) {}
@@ -8830,7 +8916,37 @@
 
         // ── RESULT TILES ──
         // ── UNIFIED SUBJECT SCORE ENTRY ──
+        // Dispatcher: "End of Term Examination" (the default) keeps the exact subject-tiles →
+        // uniModal flow that's always existed here; any other exam type instead shows the shared
+        // session picker + "Enter Marks" button (opening the same examScoreModal the old Sessions
+        // & Scores tab used).
         function renderResultTiles() {
+            var examType = (document.getElementById('resExamType') || {}).value || 'endofterm';
+            var sessCont = document.getElementById('resSessionArea');
+            if (examType === 'endofterm') {
+                if (sessCont) sessCont.style.display = 'none';
+                renderEndOfTermResultTiles();
+                return;
+            }
+            var etCont = document.getElementById('resultActionTiles');
+            if (etCont) etCont.style.display = 'none';
+            renderResultSessionArea(examType);
+        }
+        function renderResultSessionArea(examTypeId) {
+            var cls = document.getElementById('resClass').value, yr = document.getElementById('resYear').value, tm = document.getElementById('resTerm').value;
+            var cont = document.getElementById('resSessionArea');
+            if (!cls) { cont.style.display = 'none'; return; }
+            cont.style.display = 'block';
+            document.getElementById('resSessionActions').innerHTML = '';
+            renderSessionPicker('resSessionPicker', examTypeId, cls, yr, tm, function (sessionId, sessionObj) {
+                var actEl = document.getElementById('resSessionActions');
+                if (!sessionId) { actEl.innerHTML = ''; return; }
+                var statusTxt = sessionObj && sessionObj.Status === 'Published' ? 'Published — students can already see this.' : 'Draft — not visible to students yet.';
+                actEl.innerHTML = '<div style="font-size:12px;color:var(--mu);margin-bottom:8px">' + statusTxt + '</div>'
+                    + '<button class="btn bp" onclick="openExamScoreEntry(\'' + sessionId + '\')">Enter Marks</button>';
+            });
+        }
+        function renderEndOfTermResultTiles() {
             var cls = document.getElementById('resClass').value;
             var cont = document.getElementById('resultActionTiles');
             if (!cls) { cont.style.display = 'none'; return; }
@@ -9053,11 +9169,41 @@
         }
 
         // ── CUMULATIVE RECORD ──
+        // "End of Term Examination" (default) is the unchanged 3-term grid. Any other exam type
+        // instead shows a flat chronological list of that student's sessions of that type across
+        // the year — Class Test/Mock recur many times a year rather than once per term, so a fixed
+        // Term 1/2/3 grid doesn't fit them the way it fits End of Term.
         function loadCumulative() {
             var sid = document.getElementById('cumStudentId').value.trim(), yr = document.getElementById('cumYear').value;
+            var examType = document.getElementById('cumExamType').value || 'endofterm';
             if (!sid) { toast('Please enter a Student ID.', 'error'); return; }
             document.getElementById('cumulativeArea').innerHTML = '<div style="padding:24px;text-align:center;color:var(--mu)">Loading cumulative record…</div>';
-            google.script.run.withSuccessHandler(function (r) { if (!r.success) { toast(r.message, 'error'); document.getElementById('cumulativeArea').innerHTML = '<div style="padding:24px;text-align:center;color:#e53e3e">' + r.message + '</div>'; return; } renderCumulative(r); }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); }).getStudentCumulativeRecord(adminToken, sid, yr);
+            if (examType === 'endofterm') {
+                google.script.run.withSuccessHandler(function (r) { if (!r.success) { toast(r.message, 'error'); document.getElementById('cumulativeArea').innerHTML = '<div style="padding:24px;text-align:center;color:#e53e3e">' + r.message + '</div>'; return; } renderCumulative(r); }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); }).getStudentCumulativeRecord(adminToken, sid, yr);
+            } else {
+                google.script.run.withSuccessHandler(function (r) { if (!r.success) { toast(r.message, 'error'); document.getElementById('cumulativeArea').innerHTML = '<div style="padding:24px;text-align:center;color:#e53e3e">' + r.message + '</div>'; return; } renderExamTypeCumulative(r); }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); }).getStudentExamTypeCumulative(adminToken, sid, examType, yr);
+            }
+        }
+        function renderExamTypeCumulative(data) {
+            var stu = data.student || {}, type = data.examType || {}, sessions = data.sessions || [];
+            var sn = (window._cachedSettings && window._cachedSettings.SCHOOL_NAME) || 'School Portal';
+            var h = '<div style="background:#fff;max-width:820px;margin:0 auto;border:5px solid #0d1b4b;border-radius:4px;overflow:hidden">';
+            h += '<div style="background:linear-gradient(135deg,#0d1b4b,#1a3a8a);padding:14px 20px;text-align:center"><div style="font-size:16px;font-weight:700;color:#fff;text-transform:uppercase">' + sn + '</div></div>';
+            h += '<div style="background:linear-gradient(135deg,#f0c020,#ffd700);padding:7px 20px;text-align:center"><div style="font-size:13px;font-weight:700;color:#0d1b4b;letter-spacing:2px;text-transform:uppercase">' + (type.Name || 'Exam') + ' — Cumulative Record</div></div>';
+            h += '<div style="padding:10px 20px;border-bottom:3px solid #0d1b4b;font-size:12px"><strong>' + (stu.Name || '') + '</strong> · ID ' + (stu.ID || '') + ' · ' + (stu.Class || '') + '</div>';
+            if (!sessions.length) {
+                h += '<div style="padding:30px;text-align:center;color:var(--mu)">No published ' + (type.Name || 'exam') + ' results found for this student this year.</div>';
+            } else {
+                h += '<div style="padding:0 20px;overflow-x:auto"><table class="cum-tbl" style="margin:14px 0;width:100%"><thead><tr><th style="text-align:left">Session</th><th>Term</th><th>Date</th><th>Total</th><th>Average</th></tr></thead><tbody>';
+                sessions.forEach(function (s, i) {
+                    var pubDate = s.publishedAt ? new Date(s.publishedAt).toLocaleDateString() : '—';
+                    h += '<tr style="' + (i % 2 === 1 ? 'background:#f8faff' : '') + '"><td style="text-align:left;font-weight:600">' + s.label + '</td><td>' + s.term + '</td><td>' + pubDate + '</td><td style="font-weight:700;color:#0d1b4b">' + s.totalScore + ' / ' + (s.maxScore * s.subjectCount) + '</td><td style="font-weight:700;color:var(--nv)">' + s.average + '</td></tr>';
+                });
+                h += '</tbody></table></div>';
+            }
+            h += '</div>';
+            h += '<div class="ttb no-print" style="margin-top:14px"><button class="btn bp" onclick="window.print()">Print</button></div>';
+            document.getElementById('cumulativeArea').innerHTML = h;
         }
         function renderCumulative(data) {
             var stu = data.student, subjects = data.subjects || [], termRecords = data.termRecords || {}, att = data.attendanceByTerm || {}, sett = data.settings || {};
@@ -9226,9 +9372,55 @@
         }
         function openStudentModal(editId) { editStudentId = editId || null; document.getElementById('stuModalTitle').textContent = editId ? 'Edit Student' : 'Add Student';['m_ID', 'm_Name', 'm_ParentPhone'].forEach(function (f) { var el = document.getElementById(f); if (el) el.value = ''; }); document.getElementById('m_PhotoUrl').value = ''; document.getElementById('photoPreviewWrap').innerHTML = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><div style="font-size:13px;color:var(--mu)">Click to select photo</div>'; var mc = document.getElementById('m_Class'); mc.innerHTML = '<option value="">Select class…</option>'; allClasses.forEach(function (c) { mc.innerHTML += '<option value="' + c.ClassName + '">' + c.ClassName + '</option>'; }); popYears('m_Year', '2025-2026'); document.getElementById('m_ID').disabled = !!editId; if (!editId) { autoGenerateStudentId(); } if (editId) { var s = allStudents.find(function (x) { return x.ID.toString() === editId.toString(); }); if (s) { document.getElementById('m_ID').value = s.ID; document.getElementById('m_Name').value = s.Name; document.getElementById('m_Gender').value = s.Gender || 'Male'; document.getElementById('m_Class').value = s.Class || ''; document.getElementById('m_LevelGroup').value = s.LevelGroup || 'General'; popYears('m_Year', s.Year || '2025-2026'); document.getElementById('m_Term').value = s.Term || 'Term 1'; document.getElementById('m_ParentPhone').value = s.ParentPhone || ''; document.getElementById('m_PhotoUrl').value = s.PhotoUrl || ''; var phUrl = fixDriveUrl(s.PhotoUrl); if (phUrl) document.getElementById('photoPreviewWrap').innerHTML = '<button class="img-pick-remove-btn" onclick="clearStudentPhoto(event)">&times;</button><img src="' + phUrl + '" style="width:72px;height:84px;object-fit:cover;border-radius:8px;margin:4px auto;display:block;border:2px solid var(--bd)"><div style="font-size:12px;color:#166534;text-align:center;margin-top:4px">Photo saved</div>'; } } document.getElementById('stuModal').classList.add('show'); applyActiveTermYear(); }
         function editStudent(id) { loadStudents(); openStudentModal(id); }
+        // ── STUDENT PROFILE: EXAM TYPE TABS ──
+        var _profCurrentStudentId = null, _profCurrentYear = null;
+        function renderProfExamTabs() {
+            var host = document.getElementById('profExamTabs'); if (!host) return;
+            var order = { 'endofterm': 0, 'classtest': 1, 'midterm': 2, 'mock': 3 };
+            var types = _examTypesCache.filter(function (t) { return !(t.Active === false || t.Active === 'false'); })
+                .slice().sort(function (a, b) { return (order[a.ID] !== undefined ? order[a.ID] : 99) - (order[b.ID] !== undefined ? order[b.ID] : 99); });
+            host.innerHTML = types.map(function (t) {
+                return '<button type="button" class="btn bsm ' + (t.ID === 'endofterm' ? 'bp' : 'bo') + '" data-prof-tab="' + t.ID + '" onclick="switchProfTab(\'' + t.ID + '\')">' + t.Name + '</button>';
+            }).join('');
+        }
+        function switchProfTab(examTypeId) {
+            document.querySelectorAll('#profExamTabs [data-prof-tab]').forEach(function (b) {
+                b.className = 'btn bsm ' + (b.getAttribute('data-prof-tab') === examTypeId ? 'bp' : 'bo');
+            });
+            var eotArea = document.getElementById('profEndOfTermArea');
+            var etArea = document.getElementById('profExamTypeArea');
+            if (examTypeId === 'endofterm') {
+                eotArea.style.display = '';
+                etArea.style.display = 'none';
+                return;
+            }
+            eotArea.style.display = 'none';
+            etArea.style.display = 'block';
+            etArea.innerHTML = '<div style="padding:20px;text-align:center;color:var(--mu)">Loading…</div>';
+            if (!_profCurrentStudentId) return;
+            google.script.run.withSuccessHandler(function (r) {
+                if (!(r && r.success)) { etArea.innerHTML = '<div style="padding:20px;text-align:center;color:#e53e3e">' + ((r && r.message) || 'Failed to load.') + '</div>'; return; }
+                renderProfExamTypeSessions(etArea, r);
+            }).withFailureHandler(function (e) { etArea.innerHTML = '<div style="padding:20px;text-align:center;color:#e53e3e">Error: ' + e.message + '</div>'; }).getStudentExamTypeCumulative(adminToken, _profCurrentStudentId, examTypeId, _profCurrentYear);
+        }
+        function renderProfExamTypeSessions(container, data) {
+            var sessions = data.sessions || [];
+            if (!sessions.length) { container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--mu)">No ' + ((data.examType && data.examType.Name) || 'exam') + ' results found for this student.</div>'; return; }
+            var h = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px;text-align:left"><thead><tr style="border-bottom:2px solid #e2e8f0;color:var(--mu);font-weight:600"><th style="padding:8px 4px">Session</th><th style="padding:8px 4px">Term</th><th style="padding:8px 4px">Status</th><th style="padding:8px 4px;text-align:center">Total</th><th style="padding:8px 4px;text-align:center">Average</th></tr></thead><tbody>';
+            sessions.forEach(function (s) {
+                var statusBdg = s.status === 'Published' ? '<span class="bdg bgr">Published</span>' : '<span class="bdg bgo">Draft</span>';
+                h += '<tr><td style="padding:8px 4px;font-weight:600">' + s.label + '</td><td style="padding:8px 4px">' + s.term + '</td><td style="padding:8px 4px">' + statusBdg + '</td><td style="padding:8px 4px;text-align:center;font-weight:700;color:#0d1b4b">' + s.totalScore + '</td><td style="padding:8px 4px;text-align:center;font-weight:700;color:var(--nv)">' + s.average + '</td></tr>';
+            });
+            h += '</tbody></table></div>';
+            container.innerHTML = h;
+        }
         function viewStudentProfile(id) {
             var s = allStudents.find(function (x) { return x.ID.toString() === id.toString(); });
             if (!s) return toast('Student not found', 'error');
+
+            _profCurrentStudentId = s.ID; _profCurrentYear = s.Year;
+            renderProfExamTabs();
+            switchProfTab('endofterm');
 
             document.getElementById('profName').textContent = s.Name || '—';
             document.getElementById('profClass').textContent = s.Class || '—';
@@ -9668,8 +9860,61 @@
         }
 
         // ── MASTER SHEET ──
-        function loadMasterSheet() { var cls = document.getElementById('msClass').value, yr = document.getElementById('msYear').value, tm = document.getElementById('msTerm').value; if (!cls) { toast('Please select a class.', 'error'); return; } document.getElementById('masterSheetArea').innerHTML = '<div style="padding:24px;text-align:center;color:var(--mu)">Loading…</div>'; google.script.run.withSuccessHandler(function (r) { if (!r.success) { toast(r.message, 'error'); return; } masterData = r.students; masterSubjects = r.subjects; masterResMap = r.resMap; renderMasterSheet(r.students, r.subjects, r.resMap); }).getMasterSheet(adminToken, cls, yr, tm); }
-        function filterMS() { var q = document.getElementById('msSearch').value.toLowerCase(); renderMasterSheet(masterData.filter(function (s) { return (s.Name || '').toLowerCase().includes(q) || s.ID.toString().includes(q); }), masterSubjects, masterResMap); }
+        // "End of Term Examination" (default) is the exact original flow, untouched. Any other
+        // exam type swaps the Load-button controls for a session picker — Master Sheet is also
+        // where admin publishes that session, so there's no separate Sessions & Scores page.
+        var _msMode = 'endofterm';
+        function onMsExamTypeChange() {
+            var examType = document.getElementById('msExamType').value || 'endofterm';
+            var etControls = document.getElementById('msEndOfTermControls');
+            var sessArea = document.getElementById('msSessionArea');
+            document.getElementById('masterSheetArea').innerHTML = '';
+            document.getElementById('msSessionActions').innerHTML = '';
+            if (examType === 'endofterm') {
+                etControls.style.display = '';
+                sessArea.style.display = 'none';
+                return;
+            }
+            etControls.style.display = 'none';
+            sessArea.style.display = 'block';
+            renderMsSessionPicker();
+        }
+        function onMsFilterChange() {
+            var examType = document.getElementById('msExamType').value || 'endofterm';
+            if (examType === 'endofterm') return; // legacy flow still uses the explicit "Load Master Sheet" button
+            renderMsSessionPicker();
+        }
+        function renderMsSessionPicker() {
+            var examType = document.getElementById('msExamType').value;
+            var cls = document.getElementById('msClass').value, yr = document.getElementById('msYear').value, tm = document.getElementById('msTerm').value;
+            document.getElementById('msSessionActions').innerHTML = '';
+            document.getElementById('masterSheetArea').innerHTML = '';
+            renderSessionPicker('msSessionPicker', examType, cls, yr, tm, function (sessionId) {
+                if (!sessionId) { document.getElementById('masterSheetArea').innerHTML = ''; document.getElementById('msSessionActions').innerHTML = ''; return; }
+                loadExamSessionMasterSheet(sessionId);
+            });
+        }
+        function loadExamSessionMasterSheet(sessionId) {
+            document.getElementById('masterSheetArea').innerHTML = '<div style="padding:24px;text-align:center;color:var(--mu)">Loading…</div>';
+            google.script.run.withSuccessHandler(function (r) {
+                if (!(r && r.success)) { toast((r && r.message) || 'Failed to load.', 'error'); document.getElementById('masterSheetArea').innerHTML = ''; return; }
+                _msMode = 'session';
+                masterData = r.students; masterSubjects = r.subjects; masterResMap = r.resMap;
+                renderMasterSheet(r.students, r.subjects, r.resMap, 'session');
+                renderMsPublishControls(r.session);
+            }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); }).getExamSessionMasterSheet(adminToken, sessionId);
+        }
+        function renderMsPublishControls(session) {
+            var el = document.getElementById('msSessionActions');
+            var statusBdg = session.Status === 'Published' ? '<span class="bdg bgr">Published</span>' : '<span class="bdg bgo">Draft</span>';
+            var toggleBtn = session.Status === 'Published'
+                ? '<button class="btn bo bsm admin-only" onclick="doUnpublishExamSession(\'' + session.SessionID + '\', renderMsSessionPicker)">Unpublish</button>'
+                : '<button class="btn bg2 bsm admin-only" onclick="doPublishExamSession(\'' + session.SessionID + '\', renderMsSessionPicker)">Publish</button>';
+            var delBtn = '<button class="btn br bsm admin-only" onclick="doDeleteExamSession(\'' + session.SessionID + '\', renderMsSessionPicker)">Delete Session</button>';
+            el.innerHTML = '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><strong>' + session.Label + '</strong> ' + statusBdg + toggleBtn + delBtn + '</div>';
+        }
+        function loadMasterSheet() { var cls = document.getElementById('msClass').value, yr = document.getElementById('msYear').value, tm = document.getElementById('msTerm').value; if (!cls) { toast('Please select a class.', 'error'); return; } document.getElementById('masterSheetArea').innerHTML = '<div style="padding:24px;text-align:center;color:var(--mu)">Loading…</div>'; google.script.run.withSuccessHandler(function (r) { if (!r.success) { toast(r.message, 'error'); return; } _msMode = 'endofterm'; masterData = r.students; masterSubjects = r.subjects; masterResMap = r.resMap; renderMasterSheet(r.students, r.subjects, r.resMap, 'endofterm'); }).getMasterSheet(adminToken, cls, yr, tm); }
+        function filterMS() { var q = document.getElementById('msSearch').value.toLowerCase(); renderMasterSheet(masterData.filter(function (s) { return (s.Name || '').toLowerCase().includes(q) || s.ID.toString().includes(q); }), masterSubjects, masterResMap, _msMode); }
         function buildRemarksDropdown(id, defaults, customCsv, currentVal) {
             var allOpts = defaults.slice();
             if (customCsv) { var cArr = customCsv.split(',').map(function (x) { return x.trim(); }).filter(function (x) { return x; }); allOpts = allOpts.concat(cArr); }
@@ -9680,10 +9925,16 @@
             html += '</select><span style="display:none" class="print-only">' + (currentVal || '—') + '</span>';
             return html;
         }
-        function renderMasterSheet(students, subjects, resMap) {
+        // mode:'endofterm' (default, omit the 4th arg) is byte-for-byte the original behaviour —
+        // Total/Average/Status/Publish all read straight off each student's Students-row fields.
+        // mode:'session' is for a Class Test/Mid-Term/Mock/custom exam session: totals come from
+        // resMap's summed scores instead, and there's no per-student Status/Publish column since
+        // publishing is per-session (handled once, above the table, by renderMsPublishControls).
+        function renderMasterSheet(students, subjects, resMap, mode) {
+            mode = mode || 'endofterm';
             if (!students.length) { document.getElementById('masterSheetArea').innerHTML = '<div style="padding:24px;text-align:center;color:var(--mu)">No students found.</div>'; return; } var isJHS = students.length && (students[0].LevelGroup || '').toLowerCase() === 'jhs';
             var h = '<div class="tw" style="overflow-x:auto;"><table class="dt"><thead><tr><th>Rank</th><th>Photo</th><th>ID</th><th>Name</th>';
-            subjects.forEach(function (sub) { h += '<th>' + sub.name + '</th>'; }); h += '<th>Total</th><th>Average</th><th>Overall Pos.</th>' + (isJHS ? '<th>Aggregate</th>' : '') + '<th>Status</th><th class="no-print">Actions</th></tr></thead><tbody>';
+            subjects.forEach(function (sub) { h += '<th>' + sub.name + '</th>'; }); h += '<th>Total</th><th>Average</th><th>Overall Pos.</th>' + (isJHS ? '<th>Aggregate</th>' : '') + (mode === 'endofterm' ? '<th>Status</th>' : '') + '<th class="no-print">Actions</th></tr></thead><tbody>';
             students.forEach(function (s, idx) {
                 var pos = idx + 1; var rcClass = pos === 1 ? 'rc1' : pos === 2 ? 'rc2' : pos === 3 ? 'rc3' : 'rcn';
                 var medalColors = { 1: '#f0c020', 2: '#c0c9d6', 3: '#cd7f32' };
@@ -9693,29 +9944,52 @@
                 var phUrl = fixDriveUrl(s.PhotoUrl);
                 var ph = phUrl ? '<img src="' + phUrl + '" style="width:30px;height:35px;object-fit:cover;border-radius:5px;border:1px solid var(--bd)">' : '<div style="width:30px;height:35px;background:#f1f5f9;border-radius:5px;display:flex;align-items:center;justify-content:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>';
                 h += '<tr><td><div class="rcirc ' + rcClass + '">' + rc + '</div></td><td>' + ph + '</td><td><span class="bdg bb">' + s.ID + '</span></td><td><strong>' + s.Name + '</strong></td>';
-                subjects.forEach(function (sub) { var rv = (resMap[s.ID.toString()] || {})[sub.name]; h += '<td style="text-align:center">' + (rv && rv.total !== '' && rv.total !== undefined ? '<strong>' + rv.total + '</strong><br><span style="font-size:10px;color:#c0392b">' + rv.grade + '</span>' : '—') + '</td>'; });
-                h += '<td style="text-align:center"><strong>' + Number(s.TotalScore || 0) + '</strong></td><td style="text-align:center"><strong style="color:var(--nv)">' + Math.round(Number(s.Average || 0)) + '</strong></td><td style="text-align:center"><strong>' + ord(pos) + '</strong></td>';
+                subjects.forEach(function (sub) {
+                    var rv = (resMap[s.ID.toString()] || {})[sub.name];
+                    var val = rv ? (rv.total !== undefined ? rv.total : rv.score) : undefined;
+                    var grd = rv ? rv.grade : '';
+                    h += '<td style="text-align:center">' + (val !== '' && val !== undefined ? '<strong>' + val + '</strong>' + (grd ? '<br><span style="font-size:10px;color:#c0392b">' + grd + '</span>' : '') : '—') + '</td>';
+                });
+                var totalScore = mode === 'session' ? (s._sessionTotal || 0) : Number(s.TotalScore || 0);
+                var avgScore = mode === 'session' ? (subjects.length ? Math.round((s._sessionTotal || 0) / subjects.length) : 0) : Math.round(Number(s.Average || 0));
+                h += '<td style="text-align:center"><strong>' + totalScore + '</strong></td><td style="text-align:center"><strong style="color:var(--nv)">' + avgScore + '</strong></td><td style="text-align:center"><strong>' + ord(pos) + '</strong></td>';
                 if (isJHS) { var agg = s._aggregate ? s._aggregate.aggregate : '—'; h += '<td style="text-align:center"><span style="background:#0d1b4b;color:#f0c020;padding:2px 10px;border-radius:12px;font-weight:700;font-size:13px">' + agg + '</span></td>'; }
-                
-                // Status Badge
-                var status = s.ReportStatus || 'Draft';
-                var statusColor = status === 'Published' ? '#10b981' : '#64748b';
-                var statusBdg = '<span class="bdg" style="background:' + statusColor + ';color:#fff;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600">' + status + '</span>';
-                h += '<td>' + statusBdg + '</td>';
-                
-                // Actions Column
-                var isPub = (status === 'Published');
-                var pubBtnText = isPub ? 'Draft' : 'Publish';
-                var pubBtnClass = isPub ? 'btn bxs bo' : 'btn bxs bg2';
-                var pubStyle = isPub ? '' : 'background:#10b981!important;color:#fff!important;border:none!important;';
-                
-                h += '<td class="no-print"><div style="display:flex;gap:4px"><button class="btn bxs bp" onclick="viewStudentProfile(\'' + s.ID + '\')">Profile</button><button class="btn bxs bo" onclick="previewFromStudent(\'' + s.ID + '\')">Preview</button><button class="' + pubBtnClass + '" style="' + pubStyle + '" onclick="updateStudentPublishStatus(\'' + s.ID + '\', ' + !isPub + ')">' + pubBtnText + '</button><button class="btn bxs bi" onclick="smsSingle(\'' + s.ID + '\')">SMS</button>';
-                h += '</div></td></tr>';
+
+                if (mode === 'endofterm') {
+                    // Status Badge
+                    var status = s.ReportStatus || 'Draft';
+                    var statusColor = status === 'Published' ? '#10b981' : '#64748b';
+                    var statusBdg = '<span class="bdg" style="background:' + statusColor + ';color:#fff;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:600">' + status + '</span>';
+                    h += '<td>' + statusBdg + '</td>';
+
+                    // Actions Column
+                    var isPub = (status === 'Published');
+                    var pubBtnText = isPub ? 'Draft' : 'Publish';
+                    var pubBtnClass = isPub ? 'btn bxs bo' : 'btn bxs bg2';
+                    var pubStyle = isPub ? '' : 'background:#10b981!important;color:#fff!important;border:none!important;';
+
+                    h += '<td class="no-print"><div style="display:flex;gap:4px"><button class="btn bxs bp" onclick="viewStudentProfile(\'' + s.ID + '\')">Profile</button><button class="btn bxs bo" onclick="previewFromStudent(\'' + s.ID + '\')">Preview</button><button class="' + pubBtnClass + '" style="' + pubStyle + '" onclick="updateStudentPublishStatus(\'' + s.ID + '\', ' + !isPub + ')">' + pubBtnText + '</button><button class="btn bxs bi" onclick="smsSingle(\'' + s.ID + '\')">SMS</button>';
+                    h += '</div></td>';
+                } else {
+                    // Session mode: publishing happens once for the whole session (renderMsPublishControls
+                    // above the table), so each row just links to the shared Profile/SMS actions.
+                    h += '<td class="no-print"><div style="display:flex;gap:4px"><button class="btn bxs bp" onclick="viewStudentProfile(\'' + s.ID + '\')">Profile</button><button class="btn bxs bi" onclick="smsSingle(\'' + s.ID + '\')">SMS</button></div></td>';
+                }
+                h += '</tr>';
             });
             h += '</tbody></table></div>'; document.getElementById('masterSheetArea').innerHTML = h;
         }
 
-        function exportMsCSV() { if (!masterData.length) { toast('Load master sheet first.', 'error'); return; } var rows = [['Rank', 'ID', 'Name', 'TotalScore', 'Average']]; masterData.forEach(function (s, i) { rows.push([i + 1, s.ID, s.Name, s.TotalScore, Number(s.Average || 0).toFixed(2)]); }); downloadCSV(rows.map(function (r) { return r.map(function (c) { return '"' + c + '"'; }).join(','); }).join('\n'), 'master_sheet.csv'); }
+        function exportMsCSV() {
+            if (!masterData.length) { toast('Load master sheet first.', 'error'); return; }
+            var rows = [['Rank', 'ID', 'Name', 'Total', 'Average']];
+            masterData.forEach(function (s, i) {
+                var total = _msMode === 'session' ? (s._sessionTotal || 0) : Number(s.TotalScore || 0);
+                var avg = _msMode === 'session' ? (masterSubjects.length ? (total / masterSubjects.length).toFixed(2) : '0.00') : Number(s.Average || 0).toFixed(2);
+                rows.push([i + 1, s.ID, s.Name, total, avg]);
+            });
+            downloadCSV(rows.map(function (r) { return r.map(function (c) { return '"' + c + '"'; }).join(','); }).join('\n'), 'master_sheet.csv');
+        }
         function smsSingle(id) { showPanel('sms', null); document.getElementById('smsId').value = id; }
 
         // ── CLASSES ──
@@ -10073,44 +10347,216 @@
             return h;
         }
 
+        // Class Test / Mid-Term / custom exam-type report — same rcpage/rchdr/... CSS classes and
+        // tplVars(selectedTemplate) theming as buildRC above, just a single Score column (no SBA/
+        // Exam split), a Grade column only when that exam type actually has grading configured,
+        // and the Conduct & Remarks block gated by that exam type's own Show* flags.
+        function buildExamCardAdmin(data) {
+            if (!data || !data.student) return '<div style="padding:40px;text-align:center;color:var(--mu)">Failed to load report.</div>';
+            var s = data.student, res = data.results || [], st = data.settings || {};
+            var session = data.session || {}, type = data.examType || {};
+            var v = tplVars(selectedTemplate);
+            var maxScore = data.maxScore || type.MaxScore || 100;
+            var graded = res.some(function (r) { return r.Grade; });
+            var showInterest = String(type.ShowInterest) === 'true';
+            var showConduct = String(type.ShowConduct) === 'true';
+            var showAttitude = String(type.ShowAttitude) === 'true';
+            var showHtRemark = String(type.ShowHeadRemark) === 'true';
+            var showRmkBlock = showInterest || showConduct || showAttitude || showHtRemark;
+            var sN = st.SCHOOL_NAME || (window._cachedSettings && window._cachedSettings.SCHOOL_NAME) || 'School Portal', addr = st.SCHOOL_ADDRESS || '';
+            var email = st.SCHOOL_EMAIL || '', phone = st.SCHOOL_PHONE || '';
+            var logo = fixDriveUrl(st.SCHOOL_LOGO || schoolLogoB64 || ''), stamp = fixDriveUrl(st.SCHOOL_STAMP || schoolStampB64 || '');
+            var logoHtml = logo ? '<img src="' + logo + '" alt="Logo" style="width:100%;height:100%;object-fit:cover;border-radius:50%">'
+                : '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0d1b4b" stroke-width="2" stroke-linecap="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>';
+
+            var gTotal = 0;
+            var rows = res.map(function (r, i) {
+                gTotal += Number(r.Score || 0);
+                return '<tr' + (i % 2 === 1 ? ' style="background:#f8faff"' : '') + '><td style="color:#6b7280;font-weight:600">' + (i + 1) + '</td><td class="rctj">' + r.SubjectName + '</td><td style="font-weight:700;color:#0d1b4b">' + r.Score + '</td>'
+                    + (graded ? '<td style="font-weight:700;color:#c0392b">' + (r.Grade || '—') + '</td>' : '')
+                    + '<td style="font-size:10.5px;color:#374151">' + (r.Remarks || '') + '</td></tr>';
+            }).join('');
+            var avg = res.length ? Math.round(gTotal / res.length) : 0;
+            var posBar = data.overallPosition ? '<div class="rcpbar" style="background:' + v.pbarBg + '"><span class="rcplbl">CLASS POSITION</span><span class="rcpbdg" style="background:' + v.accent + ';color:' + v.ttCol + '">' + ord(data.overallPosition) + ' / ' + (data.classmatesCount || 'N/A') + '</span></div>' : '';
+
+            var rmkHtml = '';
+            if (showRmkBlock) {
+                rmkHtml = '<div class="rcrm"><div class="rcrt" style="border-bottom-color:' + v.accent + '">Conduct &amp; Remarks</div>'
+                    + (showInterest ? '<div class="rcrr"><span class="rcrk">Interest / Talent:</span><span class="rcrv">' + (s.Interest || '—') + '</span></div>' : '')
+                    + (showConduct ? '<div class="rcrr"><span class="rcrk">Conduct:</span><span class="rcrv">' + (s.Conduct || '—') + '</span></div>' : '')
+                    + (showAttitude ? '<div class="rcrr"><span class="rcrk">Attitude to Work:</span><span class="rcrv">' + (s.Attitude || '—') + '</span></div>' : '')
+                    + (showHtRemark ? '<div class="rcrr"><span class="rcrk">Headmaster\'s Remark:</span><span class="rcrv">' + (s.HeadTeacherRemark || '—') + '</span></div>' : '')
+                    + '</div>';
+            }
+
+            var h = '<div class="rcpage" style="border:' + v.border + '">'
+                + '<div class="rchdr" style="background:' + v.hdrBg + '"><div style="position:absolute;top:0;left:0;right:0;height:4px;background:' + v.stripe + '"></div><div class="rclog">' + logoHtml + '</div><div style="text-align:center"><div class="rcsn">' + sN + '</div><div class="rcsc">' + addr + '<br>Tel: ' + phone + (email ? ' &middot; ' + email : '') + '</div></div><div class="rcpb" style="border-color:' + v.accent + '">' + (s.PhotoUrl ? '<img src="' + fixDriveUrl(s.PhotoUrl) + '">' : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>') + '</div></div>'
+                + '<div class="rcidr"><span style="font-size:11px;color:#6b7280;margin-right:8px">Student ID:</span><span class="rcidb" style="background:' + v.idbBg + ';color:' + v.idbCol + '">' + s.ID + '</span></div>'
+                + '<div class="rcis" style="border-bottom-color:' + v.accentLine + '"><div class="rcig"><div class="rcii"><span class="rcil">Name:</span><span class="rciv">' + s.Name + '</span></div><div class="rcii"><span class="rcil">Class:</span><span class="rciv">' + s.Class + '</span></div><div class="rcii"><span class="rcil">Gender:</span><span class="rciv">' + (s.Gender || '') + '</span></div><div class="rcii"><span class="rcil">Term:</span><span class="rciv">' + s.Term + '</span></div><div class="rcii"><span class="rcil">Max Score:</span><span class="rciv">' + maxScore + '</span></div><div class="rcii"><span class="rcil">Year:</span><span class="rciv">' + s.Year + '</span></div></div></div>'
+                + '<div style="text-align:center;padding:8px 0;font-weight:700;color:' + v.accentLine + ';font-size:13px;text-transform:uppercase;letter-spacing:.5px">' + (type.Name || 'Assessment') + (session.Label ? ' — ' + session.Label : '') + '</div>'
+                + '<div class="rctw"><table class="rct" style="border-color:' + v.accentLine + '"><thead><tr><th style="width:28px;border-color:' + v.accentLine + '">#</th><th style="text-align:left;padding-left:8px;border-color:' + v.accentLine + '">SUBJECT</th><th style="border-color:' + v.accentLine + '">SCORE<br><small style="font-weight:400;font-size:8px">/' + maxScore + '</small></th>' + (graded ? '<th style="border-color:' + v.accentLine + '">GRADE</th>' : '') + '<th style="border-color:' + v.accentLine + '">REMARKS</th></tr></thead><tbody>' + rows + '</tbody>'
+                + '<tfoot><tr style="background:' + v.ssBg + '"><td colspan="2" style="padding:6px;font-weight:700;text-align:left;padding-left:8px;letter-spacing:1px;border:1px solid rgba(255,255,255,.3);color:#ffffff">TOTAL</td><td style="padding:6px;text-align:center;border:1px solid rgba(255,255,255,.3);font-weight:700;color:#ffffff">' + gTotal + '</td><td colspan="' + (graded ? 2 : 1) + '" style="border:1px solid rgba(255,255,255,.2)"></td></tr></tfoot></table></div>'
+                + '<div class="rcsb" style="border-top-color:' + v.accentLine + ';border-bottom-color:' + v.accentLine + '"><div class="rcst"><span class="rcsll">Total Score</span><span class="rcsvl">' + gTotal + '</span></div><div class="rcst"><span class="rcsll">Average</span><span class="rcsvl">' + avg + '</span></div><div class="rcst"><span class="rcsll">Subjects</span><span class="rcsvl">' + res.length + '</span></div></div>'
+                + posBar
+                + rmkHtml
+                + '<div class="rcfs" style="background:' + v.rcBg + ';color:' + v.ttCol + ';border-top-color:' + v.accentLine + '"><span>Generated by: <strong>' + sN + '</strong></span><span>' + s.Class + ' · ' + s.Term + ' · ' + s.Year + '</span></div>'
+                + '</div>';
+            return h;
+        }
+
+        // Basic 9 (JHS3) Mock Examination — compact "Result Slip" layout, self-contained styling
+        // (matches the same approach index.html/report.html use for this one) since admin.html's
+        // rcpage/rchdr classes are shaped for the full report card, not this distinct layout.
+        function buildMockSlipAdmin(data) {
+            if (!data || !data.student) return '<div style="padding:40px;text-align:center;color:var(--mu)">Failed to load report.</div>';
+            var s = data.student, res = data.results || [], st = data.settings || {};
+            var session = data.session || {}, type = data.examType || {};
+            var schoolName = st.SCHOOL_NAME || (window._cachedSettings && window._cachedSettings.SCHOOL_NAME) || 'School Portal';
+            var logoSrc = fixDriveUrl(st.SCHOOL_LOGO || schoolLogoB64 || '');
+            var mockLabel = (session.Label || type.Name || 'MOCK').toUpperCase();
+            var mockDate = session.PublishedAt || session.CreatedAt;
+            mockDate = mockDate ? new Date(mockDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' }) : '—';
+
+            var baseUrl = data.scriptUrl || (typeof scriptUrl !== 'undefined' ? scriptUrl : '');
+            var verifyUrl = (baseUrl && baseUrl.indexOf('<' + '?') === -1)
+                ? baseUrl + '?page=report&sessionId=' + encodeURIComponent(session.SessionID) + '&id=' + encodeURIComponent(s.ID)
+                : '';
+            var qrHtml = verifyUrl ? '<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(verifyUrl) + '" alt="QR Code" style="width:100%;height:100%;object-fit:contain">' : '';
+
+            var rows = res.map(function (r) {
+                return '<tr><td style="padding:9px 10px;border-bottom:1px solid #edf1f7;font-weight:600;color:#1e293b">' + r.SubjectName.toUpperCase() + '</td>'
+                    + '<td style="padding:9px 10px;border-bottom:1px solid #edf1f7;text-align:center;font-weight:700;color:#0d1b4b">' + r.Score + '</td>'
+                    + '<td style="padding:9px 10px;border-bottom:1px solid #edf1f7;text-align:right;color:#c0392b;font-weight:600;font-size:11.5px">' + (r.Remarks || r.Grade || '—') + '</td></tr>';
+            }).join('');
+            var agg = data.jhsAggregate ? data.jhsAggregate.aggregate : null;
+
+            return '<style>.ms-slip *{box-sizing:border-box}.ms-slip{max-width:720px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.12)}'
+                + '.ms-band1{background:linear-gradient(135deg,#0d1b4b,#1a237e);color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px}'
+                + '.ms-band1 .nm{font-weight:800;font-size:17px;letter-spacing:.4px;text-transform:uppercase}'
+                + '.ms-band2{background:linear-gradient(90deg,#f0c020,#ffd700);color:#0d1b4b;padding:9px 20px;display:flex;align-items:center;justify-content:space-between;font-weight:800;font-size:13px;letter-spacing:1px;text-transform:uppercase}'
+                + '.ms-sub{text-align:center;font-weight:700;font-size:12px;color:#374151;padding:10px 20px 0;font-style:italic}'
+                + '.ms-media{display:flex;justify-content:center;gap:26px;padding:18px 20px 6px}'
+                + '.ms-media .box{width:88px;height:88px;border:2px solid #0d1b4b;border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#f8fafc}'
+                + '.ms-info{padding:14px 26px 4px}'
+                + '.ms-info-row{display:flex;padding:5px 0;font-size:12.5px;border-bottom:1px dashed #e5e7eb}'
+                + '.ms-info-row .k{width:180px;flex-shrink:0;color:#0d1b4b;font-weight:700}'
+                + '.ms-info-row .v{color:#1e293b;font-weight:600}'
+                + '.ms-tbl-wrap{padding:16px 26px}'
+                + '.ms-tbl-wrap table{width:100%;border-collapse:collapse;border:2px solid #0d1b4b;border-radius:6px;overflow:hidden}'
+                + '.ms-tbl-wrap thead th{background:#0d1b4b;color:#f0c020;padding:9px 10px;font-size:11px;letter-spacing:.5px;text-transform:uppercase}'
+                + '.ms-agg{display:flex;justify-content:center;margin:6px 26px 4px}'
+                + '.ms-agg .b{background:linear-gradient(135deg,#f0c020,#ffd700);color:#0d1b4b;font-weight:800;font-size:13px;padding:8px 22px;border-radius:30px;letter-spacing:.5px}'
+                + '.ms-sig{display:flex;justify-content:space-between;align-items:flex-end;padding:26px 26px 10px;margin-top:10px}'
+                + '.ms-sig .line{border-top:1.5px solid #0d1b4b;padding-top:5px;font-size:11px;color:#374151;font-weight:600;min-width:180px;text-align:center}'
+                + '.ms-foot{background:#0d1b4b;color:rgba(255,255,255,.7);font-size:10px;padding:10px 20px;display:flex;justify-content:space-between}'
+                + '@media print{.ms-slip{box-shadow:none}}</style>'
+                + '<div class="ms-slip">'
+                + '<div class="ms-band1"><div style="display:flex;align-items:center;gap:10px">' + (logoSrc ? '<img src="' + logoSrc + '" style="width:36px;height:36px;border-radius:50%;object-fit:cover">' : '') + '<span class="nm">' + schoolName + '</span></div><span style="font-size:10px;color:rgba(255,255,255,.6);font-weight:600">' + (s.Class || '') + '</span></div>'
+                + '<div class="ms-band2"><span>' + mockLabel + '</span><span>Result Slip</span></div>'
+                + '<div class="ms-sub">Provisional Result Slip</div>'
+                + '<div class="ms-media"><div class="box">' + qrHtml + '</div><div class="box">' + (s.PhotoUrl ? '<img src="' + fixDriveUrl(s.PhotoUrl) + '" style="width:100%;height:100%;object-fit:cover">' : '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>') + '</div></div>'
+                + '<div class="ms-info">'
+                + '<div class="ms-info-row"><span class="k">Candidate Name</span><span class="v">: ' + s.Name + '</span></div>'
+                + '<div class="ms-info-row"><span class="k">Index Number</span><span class="v">: ' + s.ID + '</span></div>'
+                + '<div class="ms-info-row"><span class="k">Type of Examination</span><span class="v">: ' + mockLabel + ' - ' + s.Year + '</span></div>'
+                + '<div class="ms-info-row"><span class="k">School</span><span class="v">: ' + schoolName + '</span></div>'
+                + (agg !== null ? '<div class="ms-info-row"><span class="k">Aggregate</span><span class="v">: ' + agg + '</span></div>' : '')
+                + '<div class="ms-info-row"><span class="k">Mock Date</span><span class="v">: ' + mockDate + '</span></div>'
+                + '</div>'
+                + '<div class="ms-tbl-wrap"><table><thead><tr><th style="text-align:left">Subject</th><th>Score</th><th style="text-align:right">Remarks</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+                + (agg !== null ? '<div class="ms-agg"><span class="b">Aggregate Score: ' + agg + ' (lower is better)</span></div>' : '')
+                + '<div class="ms-sig"><span class="line">Head Teacher\'s Signature</span><span style="font-size:10px;color:#6b7280">Generated ' + new Date().toLocaleDateString() + '</span></div>'
+                + '<div class="ms-foot"><span>Result on this print-out can be cross-checked by scanning the QR code.</span><span>' + schoolName + '</span></div>'
+                + '</div>';
+        }
+        // Shared picker used by both Preview and Bulk Print once a report is fetched.
+        function buildAnyReport(data, isSession) {
+            if (!isSession) return buildRC(data);
+            var category = (data.examType && data.examType.Category) || '';
+            return category === 'Mock' ? buildMockSlipAdmin(data) : buildExamCardAdmin(data);
+        }
+
         // ── PREVIEW ──
-        function loadPreview() { 
-            var id = ''; 
-            var prevStu = document.getElementById('prevStudent'); 
-            if (prevStu && prevStu.value) id = prevStu.value; 
-            else id = document.getElementById('previewId').value.trim(); 
-            if (!id) { 
-                toast('Please select a student to preview.', 'error'); 
-                document.getElementById('previewArea').innerHTML = ''; 
-                return; 
-            } 
-            document.getElementById('previewId').value = id; 
+        // "End of Term Examination" (default) is the unchanged original flow (getAdminStudentReport
+        // + buildRC). Any other exam type additionally needs a session picked (a class can have
+        // several Class Test/Mock sessions in one term) before Preview has anything to fetch.
+        var _prevSelectedSessionId = null;
+        function onPrevExamTypeChange() {
+            _prevSelectedSessionId = null;
+            var examType = document.getElementById('prevExamType').value || 'endofterm';
+            document.getElementById('prevSessionArea').style.display = examType === 'endofterm' ? 'none' : 'block';
+            onPrevFilterChange();
+        }
+        function onPrevFilterChange() {
+            loadPreviewStudents(); // roster is the same regardless of exam type
+            var examType = document.getElementById('prevExamType').value || 'endofterm';
+            if (examType === 'endofterm') return;
+            _prevSelectedSessionId = null;
+            var cls = document.getElementById('prevClass').value, yr = document.getElementById('prevYear').value, tm = document.getElementById('prevTerm').value;
+            renderSessionPicker('prevSessionPicker', examType, cls, yr, tm, function (sessionId) { _prevSelectedSessionId = sessionId; });
+        }
+        function loadPreview() {
+            var id = '';
+            var prevStu = document.getElementById('prevStudent');
+            if (prevStu && prevStu.value) id = prevStu.value;
+            else id = document.getElementById('previewId').value.trim();
+            if (!id) {
+                toast('Please select a student to preview.', 'error');
+                document.getElementById('previewArea').innerHTML = '';
+                return;
+            }
+            document.getElementById('previewId').value = id;
+            var examType = document.getElementById('prevExamType').value || 'endofterm';
+            var isSession = examType !== 'endofterm';
+            if (isSession && !_prevSelectedSessionId) { toast('Please select a session first.', 'error'); return; }
             var yr = document.getElementById('prevYear').value;
             var tm = document.getElementById('prevTerm').value;
-            document.getElementById('previewArea').innerHTML = '<div style="padding:40px;text-align:center;color:var(--mu)"><div style="width:44px;height:44px;border:4px solid rgba(26,58,138,.15);border-top-color:#1a3a8a;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px"></div><div>Loading report card…</div></div>'; 
-            var _pt = setTimeout(function () { 
-                document.getElementById('previewArea').innerHTML = '<div style="padding:24px;text-align:center;color:#e53e3e">&#9888;&#65039; Request timed out. Please check your connection and try again.</div>'; 
-                toast('Preview timed out. Please try again.', 'error'); 
-            }, 35000); 
-            google.script.run.withSuccessHandler(function (r) { 
-                clearTimeout(_pt); 
-                if (!r.success) { 
-                    toast(r.message, 'error'); 
-                    document.getElementById('previewArea').innerHTML = '<div style="padding:24px;text-align:center;color:#e53e3e">' + r.message + '</div>'; 
-                    return; 
-                } 
-                document.getElementById('previewArea').innerHTML = buildRC(r); 
-            }).withFailureHandler(function (e) { 
-                clearTimeout(_pt); 
-                toast('Preview error: ' + e.message, 'error'); 
-                document.getElementById('previewArea').innerHTML = '<div style="padding:24px;text-align:center;color:#e53e3e">' + e.message + '</div>'; 
-            }).getAdminStudentReport(adminToken, id, yr, tm); 
+            document.getElementById('previewArea').innerHTML = '<div style="padding:40px;text-align:center;color:var(--mu)"><div style="width:44px;height:44px;border:4px solid rgba(26,58,138,.15);border-top-color:#1a3a8a;border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px"></div><div>Loading report card…</div></div>';
+            var _pt = setTimeout(function () {
+                document.getElementById('previewArea').innerHTML = '<div style="padding:24px;text-align:center;color:#e53e3e">&#9888;&#65039; Request timed out. Please check your connection and try again.</div>';
+                toast('Preview timed out. Please try again.', 'error');
+            }, 35000);
+            var handler = google.script.run.withSuccessHandler(function (r) {
+                clearTimeout(_pt);
+                if (!r.success) {
+                    toast(r.message, 'error');
+                    document.getElementById('previewArea').innerHTML = '<div style="padding:24px;text-align:center;color:#e53e3e">' + r.message + '</div>';
+                    return;
+                }
+                document.getElementById('previewArea').innerHTML = buildAnyReport(r, isSession);
+            }).withFailureHandler(function (e) {
+                clearTimeout(_pt);
+                toast('Preview error: ' + e.message, 'error');
+                document.getElementById('previewArea').innerHTML = '<div style="padding:24px;text-align:center;color:#e53e3e">' + e.message + '</div>';
+            });
+            if (isSession) handler.getExamSessionReport(id, _prevSelectedSessionId, adminToken);
+            else handler.getAdminStudentReport(adminToken, id, yr, tm);
         }
 
         // ── BULK PRINT ──
+        // Same End-of-Term-unchanged / other-exam-type-needs-a-session split as Preview above, just
+        // looping the whole class roster through getExamSessionReport instead of one student.
+        var _bulkSelectedSessionId = null;
+        function onBulkExamTypeChange() {
+            _bulkSelectedSessionId = null;
+            var examType = document.getElementById('bulkExamType').value || 'endofterm';
+            document.getElementById('bulkSessionArea').style.display = examType === 'endofterm' ? 'none' : 'block';
+            onBulkFilterChange();
+        }
+        function onBulkFilterChange() {
+            var examType = document.getElementById('bulkExamType').value || 'endofterm';
+            if (examType === 'endofterm') return;
+            _bulkSelectedSessionId = null;
+            var cls = document.getElementById('bulkClass').value, yr = document.getElementById('bulkYear').value, tm = document.getElementById('bulkTerm').value;
+            renderSessionPicker('bulkSessionPicker', examType, cls, yr, tm, function (sessionId) { _bulkSelectedSessionId = sessionId; });
+        }
         function loadBulkReports() {
             var cls = document.getElementById('bulkClass').value, yr = document.getElementById('bulkYear').value, tm = document.getElementById('bulkTerm').value;
             if (!cls) { toast('Please select a class.', 'error'); return; }
+            var examType = document.getElementById('bulkExamType').value || 'endofterm';
+            var isSession = examType !== 'endofterm';
+            if (isSession && !_bulkSelectedSessionId) { toast('Please select a session first.', 'error'); return; }
+            var sessionId = _bulkSelectedSessionId;
             document.getElementById('bulkProgress').style.display = 'block'; document.getElementById('bulkBar').style.width = '5%'; document.getElementById('bulkLbl').textContent = 'Loading student list…'; document.getElementById('bulkArea').innerHTML = ''; document.getElementById('bulkPrintBtn').style.display = 'none';
             google.script.run.withSuccessHandler(function (r) {
                 if (!r.success) { toast(r.message, 'error'); document.getElementById('bulkProgress').style.display = 'none'; return; }
@@ -10118,11 +10564,13 @@
                 if (!students.length) { toast('No students found.', 'error'); document.getElementById('bulkProgress').style.display = 'none'; document.getElementById('bulkArea').innerHTML = '<div style="padding:24px;text-align:center;color:var(--mu)">No students found for ' + cls + ' · ' + yr + ' · ' + tm + '</div>'; return; }
                 var reports = new Array(students.length), done = 0;
                 students.forEach(function (stu, idx) {
-                    google.script.run.withSuccessHandler(function (rep) {
+                    var handler = google.script.run.withSuccessHandler(function (rep) {
                         done++; document.getElementById('bulkBar').style.width = Math.round((done / students.length) * 100) + '%'; document.getElementById('bulkLbl').textContent = done + ' / ' + students.length + ' loaded…';
-                        reports[idx] = rep.success ? buildRC(rep) : '<div style="padding:20px;color:#e53e3e">Error for ' + stu.ID + ': ' + (rep.message || 'Unknown error') + '</div>';
+                        reports[idx] = rep.success ? buildAnyReport(rep, isSession) : '<div style="padding:20px;color:#e53e3e">Error for ' + stu.ID + ': ' + (rep.message || 'Unknown error') + '</div>';
                         if (done === students.length) { document.getElementById('bulkArea').innerHTML = reports.map(function (h) { return '<div style="page-break-after:always;margin-bottom:28px">' + h + '</div>'; }).join(''); document.getElementById('bulkProgress').style.display = 'none'; document.getElementById('bulkPrintBtn').style.display = 'inline-flex'; toast(students.length + ' report cards ready!', 'success'); }
-                    }).withFailureHandler(function (e) { done++; reports[idx] = '<div style="padding:20px;color:#e53e3e">Error: ' + e.message + '</div>'; if (done === students.length) { document.getElementById('bulkArea').innerHTML = reports.join(''); document.getElementById('bulkProgress').style.display = 'none'; } }).getAdminStudentReport(adminToken, stu.ID, yr, tm);
+                    }).withFailureHandler(function (e) { done++; reports[idx] = '<div style="padding:20px;color:#e53e3e">Error: ' + e.message + '</div>'; if (done === students.length) { document.getElementById('bulkArea').innerHTML = reports.join(''); document.getElementById('bulkProgress').style.display = 'none'; } });
+                    if (isSession) handler.getExamSessionReport(stu.ID, sessionId, adminToken);
+                    else handler.getAdminStudentReport(adminToken, stu.ID, yr, tm);
                 });
             }).withFailureHandler(function (e) { toast('Error: ' + e.message, 'error'); document.getElementById('bulkProgress').style.display = 'none'; }).getStudentsByClass(adminToken, cls, yr, tm);
         }

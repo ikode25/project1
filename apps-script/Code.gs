@@ -530,6 +530,45 @@ function setExamTypeActive(token, id, active) {
     return {success:false, message:'Exam type not found.'};
   } catch(e) { return {success:false, message:e.message}; }
 }
+// Hard delete (not just deactivate) — admin can remove any exam type they've added, including
+// the seeded Class Test/Mid-Term/Mock, just never the End of Term marker (that's not a real
+// type with sessions of its own; deleting it would break every other panel's default branch).
+// Cascades to every ExamSessions row of that type and every ExamScores row of those sessions,
+// same cleanup deleteExamSession already does for a single session.
+function deleteExamType(token, id) {
+  if (!validateAdminToken(token)) return {success:false, message:'Unauthorized'};
+  if (id === 'endofterm') return {success:false, message:'End of Term cannot be deleted.'};
+  try {
+    var ss = SS();
+    var sh = getOrCreateExamTypesSheet(ss);
+    var data = sh.getDataRange().getValues();
+    var found = false;
+    for (var i=1;i<data.length;i++) {
+      if (data[i][0] === id) { sh.deleteRow(i+1); found = true; break; }
+    }
+    if (!found) return {success:false, message:'Exam type not found.'};
+
+    var sessSh = getOrCreateExamSessionsSheet(ss);
+    var sessIds = [];
+    if (sessSh.getLastRow() > 1) {
+      var sessData = sessSh.getDataRange().getValues();
+      for (var j=sessData.length-1;j>=1;j--) {
+        if (sessData[j][1] === id) { sessIds.push(sessData[j][0]); sessSh.deleteRow(j+1); }
+      }
+    }
+    if (sessIds.length) {
+      var scoreSh = getOrCreateExamScoresSheet(ss);
+      if (scoreSh.getLastRow() > 1) {
+        var sData = scoreSh.getDataRange().getValues();
+        for (var k=sData.length-1;k>=1;k--) {
+          if (sessIds.indexOf(sData[k][0]) !== -1) scoreSh.deleteRow(k+1);
+        }
+      }
+    }
+    logServerAction(token, 'Delete Exam Type', id);
+    return {success:true};
+  } catch(e) { return {success:false, message:e.message}; }
+}
 
 // ── ADMIN/TEACHER: SESSIONS ──
 function getExamSessions(token, examTypeId, cls) {
@@ -816,6 +855,160 @@ function getExamSessionReport(studentId, sessionId, token) {
       maxScore: Number(session.MaxScoreOverride || type.MaxScore || 100)
     };
   } catch(e) { return {success:false, message:'Report error: '+e.message}; }
+}
+
+// ── ADMIN: MASTER SHEET FOR AN EXAM SESSION ──
+// Mirrors getMasterSheet's shape (students[] + subjects[] + resMap{studentId:{subject:{...}}})
+// but sourced from ExamScores/ExamSessions instead of the per-class result sheet, so the same
+// Master Sheet panel/renderer can show either — mode:'endofterm' keeps today's SBA/Exam/Total/
+// Grade resMap shape, this one gives resMap[sid][subject] = {score, grade} for the session.
+function getExamSessionMasterSheet(token, sessionId) {
+  var td = getTokenData(token);
+  if (!td) return {success:false, message:'Unauthorized'};
+  try {
+    var ss = SS();
+    var sessSh = getOrCreateExamSessionsSheet(ss);
+    var found = findExamSessionRow(sessSh, sessionId);
+    if (!found) return {success:false, message:'Session not found.'};
+    var session = rowToExamSession(found.data);
+    if (!canManageClass(td, session.Class)) return {success:false, message:'You are not assigned to this class.'};
+
+    var type = getExamTypesInternal(ss).filter(function(t){ return t.ID === session.ExamTypeID; })[0] || {};
+    var subjectNames = getClassSubjectNames(ss, session.Class);
+    var subjects = subjectNames.map(function(n, idx){ return {id:n, name:n, order:idx+1}; });
+
+    var stuD = ss.getSheetByName('Students').getDataRange().getValues();
+    var stuH = stuD[0];
+    var students = [];
+    for (var i=1;i<stuD.length;i++) {
+      if (!stuD[i][0]) continue;
+      if (stuD[i][3] === session.Class && String(stuD[i][4]) === String(session.Year) && stuD[i][5] === session.Term) {
+        var sv = {}; stuH.forEach(function(h, idx){ sv[h] = stuD[i][idx]; });
+        students.push(sv);
+      }
+    }
+
+    var scoreSh = getOrCreateExamScoresSheet(ss);
+    var resMap = {}, totals = {};
+    if (scoreSh.getLastRow() > 1) {
+      var sData = scoreSh.getDataRange().getValues();
+      for (var r=1;r<sData.length;r++) {
+        if (sData[r][0] !== sessionId) continue;
+        var sid = String(sData[r][1]), subj = String(sData[r][3]);
+        if (!resMap[sid]) resMap[sid] = {};
+        resMap[sid][subj] = {score:sData[r][4], grade:sData[r][5]};
+        totals[sid] = (totals[sid]||0) + Number(sData[r][4]||0);
+      }
+    }
+    students.forEach(function(s){ s._sessionTotal = totals[String(s.ID)] || 0; });
+    students.sort(function(a,b){ return b._sessionTotal - a._sessionTotal; });
+    students.forEach(function(s, idx){ s.OverallPosition = idx+1; });
+
+    return {success:true, session:session, examType:type, students:students, subjects:subjects, resMap:resMap};
+  } catch(e) { return {success:false, message:e.message}; }
+}
+
+// ── CUMULATIVE VIEW FOR ONE STUDENT × ONE EXAM TYPE (all sessions in a year) ──
+// Used by Cumulative Record's exam-type mode and the Student Profile exam-type tabs. Unlike
+// End-of-Term's fixed Term 1/2/3 grid, Class Test/Mock recur many times a year, so this returns
+// a flat chronological list of that student's sessions of this type instead. token optional —
+// with an admin/teacher token for the student's class, Draft sessions are included too; without
+// one (or a token for a different class), only Published sessions show.
+function getStudentExamTypeCumulative(token, studentId, examTypeId, year) {
+  try {
+    var ss = SS();
+    var sid = studentId.toString().trim();
+    var stuD = ss.getSheetByName('Students').getDataRange().getValues();
+    var stuH = stuD[0];
+    var stu = null, studentClass = '';
+    for (var i=1;i<stuD.length;i++) {
+      if (stuD[i][0] && String(stuD[i][0]).trim() === sid && String(stuD[i][4]) === String(year)) {
+        var s = {}; stuH.forEach(function(h,idx){ s[h]=stuD[i][idx]; });
+        stu = s; studentClass = String(stuD[i][3]);
+        break;
+      }
+    }
+    if (!stu) return {success:false, message:'Student not found for that year.'};
+
+    var type = getExamTypesInternal(ss).filter(function(t){ return t.ID === examTypeId; })[0];
+    if (!type) return {success:false, message:'Unknown exam type.'};
+
+    var td = token ? getTokenData(token) : null;
+    var bypass = !!(td && canManageClass(td, studentClass));
+
+    var sessSh = ss.getSheetByName('ExamSessions');
+    var sessions = [];
+    if (sessSh && sessSh.getLastRow() > 1) {
+      var sessData = sessSh.getDataRange().getValues();
+      for (var r=1;r<sessData.length;r++) {
+        var session = rowToExamSession(sessData[r]);
+        if (!session.SessionID || session.ExamTypeID !== examTypeId) continue;
+        if (session.Class !== studentClass || String(session.Year) !== String(year)) continue;
+        if (!bypass && session.Status !== 'Published') continue;
+        sessions.push(session);
+      }
+    }
+    var scoreSh = ss.getSheetByName('ExamScores');
+    var scoresBySession = {};
+    if (scoreSh && scoreSh.getLastRow() > 1) {
+      var sData = scoreSh.getDataRange().getValues();
+      for (var k=1;k<sData.length;k++) {
+        if (String(sData[k][1]) !== sid) continue;
+        var sessId = sData[k][0];
+        if (!scoresBySession[sessId]) scoresBySession[sessId] = [];
+        scoresBySession[sessId].push({SubjectName:String(sData[k][3]), Score:Number(sData[k][4]||0), Grade:String(sData[k][5]||'')});
+      }
+    }
+    var out = sessions.map(function(session) {
+      var scores = scoresBySession[session.SessionID] || [];
+      var total = scores.reduce(function(a,b){ return a+b.Score; }, 0);
+      var maxScore = Number(session.MaxScoreOverride || type.MaxScore || 100);
+      return {
+        sessionId: session.SessionID, label: session.Label, term: session.Term,
+        status: session.Status, publishedAt: session.PublishedAt,
+        subjectCount: scores.length, totalScore: total,
+        average: scores.length ? Math.round(total/scores.length) : 0,
+        maxScore: maxScore
+      };
+    }).filter(function(x){ return x.subjectCount > 0; });
+    out.sort(function(a,b){ return new Date(a.publishedAt||0) - new Date(b.publishedAt||0); });
+
+    return {success:true, student:{ID:stu.ID, Name:stu.Name, Class:studentClass}, examType:type, sessions:out};
+  } catch(e) { return {success:false, message:e.message}; }
+}
+
+// ── DASHBOARD: EXAM TYPES OVERVIEW ──
+// One card per active exam type (excluding the End-of-Term marker, which the existing dashboard
+// charts already cover) — sessions created, how many are published, and an overall average
+// across every score recorded for that type. Any authenticated admin/teacher/headteacher token.
+function getExamTypesOverview(token) {
+  if (!getTokenData(token)) return {success:false, message:'Unauthorized'};
+  try {
+    var ss = SS();
+    var types = getExamTypesInternal(ss).filter(function(t){ return t.ID !== 'endofterm' && !(t.Active===false || t.Active==='false'); });
+    var sessSh = ss.getSheetByName('ExamSessions');
+    var sessData = (sessSh && sessSh.getLastRow() > 1) ? sessSh.getDataRange().getValues() : [];
+    var scoreSh = ss.getSheetByName('ExamScores');
+    var scoreData = (scoreSh && scoreSh.getLastRow() > 1) ? scoreSh.getDataRange().getValues() : [];
+
+    var overview = types.map(function(t) {
+      var sessionCount = 0, publishedCount = 0;
+      var sessionIds = {};
+      for (var i=0;i<sessData.length;i++) {
+        if (sessData[i][1] !== t.ID) continue;
+        sessionCount++;
+        sessionIds[sessData[i][0]] = true;
+        if (sessData[i][7] === 'Published') publishedCount++;
+      }
+      var sum = 0, count = 0;
+      for (var j=0;j<scoreData.length;j++) {
+        if (!sessionIds[scoreData[j][0]]) continue;
+        sum += Number(scoreData[j][4]||0); count++;
+      }
+      return {id:t.ID, name:t.Name, sessionCount:sessionCount, publishedCount:publishedCount, avgScore: count ? Math.round(sum/count) : 0};
+    });
+    return {success:true, overview:overview};
+  } catch(e) { return {success:false, message:e.message}; }
 }
 
 // ── SAMPLE DATA ────────────────────────────────────────────
