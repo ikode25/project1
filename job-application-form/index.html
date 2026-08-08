@@ -1593,7 +1593,16 @@
         .preview-modal-content {
             max-width: 720px;
             border-radius: 16px;
-            overflow: hidden;
+            /* NOT `overflow: hidden` - that shorthand also sets overflow-y,
+               silently overriding the base .modal-content's `overflow-y:
+               auto` (same rule this class relies on for scrolling) since
+               this rule is declared later in the stylesheet. That's what
+               made the modal content impossible to scroll past ~80vh -
+               the Confirm & Submit button was there, just unreachable.
+               overflow-x: hidden alone still clips content to the rounded
+               corners; overflow-y stays auto so long applications scroll. */
+            overflow-x: hidden;
+            overflow-y: auto;
         }
 
         .preview-modal-header {
@@ -2753,7 +2762,18 @@
                                     rel="noopener noreferrer"
                                     className="action-btn btn-shortlist"
                                     style={{ background: '#25D366', textDecoration: 'none' }}
-                                    onClick={onSend}
+                                    onClick={() => {
+                                        // onSend closes this modal (unmounting
+                                        // this very <a>). Doing that in the
+                                        // same tick as the click races the
+                                        // browser's own handling of the
+                                        // anchor's default navigation - inside
+                                        // Apps Script's sandboxed iframe that
+                                        // race was leaving the whole app blank.
+                                        // Deferring one tick lets the browser
+                                        // finish opening the new tab first.
+                                        setTimeout(onSend, 0);
+                                    }}
                                 >
                                     <i className="fab fa-whatsapp"></i> Send WhatsApp
                                 </a>
