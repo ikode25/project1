@@ -64,12 +64,19 @@ values into the *Students sheet* — because bug #1 above (before it was fixed)
 often filed the resave under a different archive key than the one the report
 was reading.
 
-**Fix**: each archived field now only overrides the live value when the
-archive actually has something non-empty in it. An incomplete/stale archive
-snapshot can no longer blank out real data. This fix alone should make
-already-entered remarks reappear on report cards immediately after
-redeploying — no re-entering of data required, since the correct values were
-sitting on the Students sheet the whole time.
+**Fix**: this whole block is now skipped for the student's current/live term —
+the Students sheet is trusted directly, since that's exactly what the Remarks
+& Conduct tab reads and writes. The archive is only consulted for a genuinely
+historical report view (a past term whose Students-sheet row has since been
+overwritten by a rollover into a newer term — see bug #4 below for why that
+happens). This is also the fix for **"Out Of (School Days) was set to 67 but
+the report still shows 75"**, and the same class of bug for Attendance,
+Conduct, Interest/Talent, Attitude, and both remarks fields: whatever was
+freshly saved on the Students sheet for the current term could never again be
+shadowed by an older archive snapshot. This fix alone should make
+already-entered data reappear on report cards immediately after redeploying —
+no re-entering required, since the correct values were sitting on the
+Students sheet the whole time.
 
 ### 3. Remarks/conduct/attendance silently reset to blank after someone edits a student's name, class, or photo
 
@@ -100,32 +107,62 @@ by this bug and will need to be re-entered once. Bug #2's fix will recover
 any student where the Remarks tab already shows the correct values but the
 report didn't — no re-entry needed for those.
 
-### 4. Printed report cards — text too faint to read
+### 4. A term-ending action (Activate Term / Academic Rollover / Automatic Promotions) can permanently erase a term's remarks/fees if no one happened to save them first
 
-**Root cause** (`report.html` and the duplicate report-card renderer in
-`index.html`): several bars on the report card (school name banner, "End of
+**Root cause** (`Code.gs`, `executeAcademicRollover`, `activateAcademicTerm`,
+`executeAutomaticPromotions`): these are the admin actions that move the whole
+school into a new term/year — they mutate every student's row on the Students
+sheet in place: Class/Year/Term get overwritten for the new period, and
+Attendance/OutOf/Interest/Conduct/Attitude/both remarks fields/fees get reset
+to 0/blank/default "for the new term." None of the three ever took a snapshot
+of the term that was ending before wiping it. Combined with bug #2's fix (the
+report now trusts the archive for historical terms), that means a past term
+is only recoverable if someone had explicitly pressed "Save" on the Remarks &
+Conduct or Fees & Bills tab for every student before the term rolled over —
+otherwise that term's data is simply gone, with no way for a historical
+report to reconstruct it.
+
+**Fix**: added `archiveOutgoingTermSnapshot()`, called at the start of all
+three functions, right before they start overwriting rows. It snapshots every
+student's current (about-to-be-overwritten) row into `RemarksArchive`/
+`FeesArchive` under that row's own current Year/Term, so the term that's
+ending is always recoverable via a historical report lookup afterward,
+whether or not staff happened to save it first.
+
+### 5. Printed report cards — text too faint to read (including Bulk Print's own preview)
+
+**Root cause**: several bars on the report card (school name banner, "End of
 Term Examinations" strip, position/aggregate bars, grade-key header, grand
 total row) use light/white text on a dark navy or gold background — an
 on-screen-only design choice. Browsers commonly print with **background
 colors turned off by default** (and some printers/toner-saving modes fade
-them further even when on); when that happens, that light text sits directly
-on white paper and is unreadable — the report doesn't just look "faint," the
-text is effectively gone.
+them further even when on, which is exactly what the browser's own print
+preview simulates when "Color: Black and white" is selected); when that
+happens, that light text sits directly on white paper and is unreadable — the
+report doesn't just look "faint," the text is effectively gone. This exists
+in **three separate copies** of the report-card renderer/stylesheet:
+`report.html`, the student/parent portal's own report view in `index.html`,
+and — found from the Bulk Print screenshot — **`admin.html`'s own renderer**
+(`buildRC()`, used by both the "Preview Report" and "Bulk Print" tabs), which
+had a `@media print` rule that made this actively worse by *force-setting*
+`.rcsn, .rcsc, .rctw tfoot tr td { color:#fff !important; font-weight:800 }` —
+guaranteeing invisible text the moment the background doesn't render.
 
-**Fix**: added a print-only stylesheet that (a) asks the browser not to
+**Fix**: every one of the three stylesheets now (a) asks the browser not to
 desaturate colors it does print (`print-color-adjust: exact`), and more
-importantly (b) gives every such bar a print-safe fallback — white background,
-solid dark navy text, a border — so the report stays fully legible on paper
-no matter what the printer/browser does with background colors. Also darkened
-the lighter grey label/body text used throughout the table and remarks
-section for better contrast on lower-quality printers. This was fixed in both
-`report.html` (the standalone report-card page) and `index.html` (the
-student/parent portal's own report-card print view), since both had their own
-copy of the same CSS.
+importantly (b) gives every such bar a print-safe fallback — white/no
+background, solid dark navy text, a border — so the report stays fully
+legible on paper no matter what the printer/browser does with background
+colors, and removed the rule that was forcing white text. Also darkened the
+lighter grey label/body text used throughout the table and remarks section
+for better contrast on lower-quality or black-and-white printers.
 
 ## Files touched
-- `Code.gs` — `batchUpdateRemarks`, `batchUpdateFeesBills`, `getStudentReport`, `updateStudent`
-- `admin.html` — `saveAllRemarks()`, `saveFeesBills()`
+- `Code.gs` — `batchUpdateRemarks`, `batchUpdateFeesBills`, `getStudentReport`,
+  `updateStudent`, `executeAcademicRollover`, `activateAcademicTerm`,
+  `executeAutomaticPromotions`, new `archiveOutgoingTermSnapshot()`
+- `admin.html` — `saveAllRemarks()`, `saveFeesBills()`, `@media print` block
+  (used by Preview Report and Bulk Print)
 - `report.html` — `@media print` block
 - `index.html` — `@media print` block
 

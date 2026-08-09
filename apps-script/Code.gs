@@ -630,16 +630,27 @@ function getStudentReport(studentId, year, term, bypassPublishCheck) {
     }
     
     // Load historical remarks/attendance snapshot if present
-    // BUGFIX: this used to unconditionally overwrite the live values already resolved above from
-    // the Students sheet (the correct source for the requested year/term) with whatever sat in
-    // RemarksArchive for that same year/term — including a field that was blank in the archive.
-    // A stale/incomplete archive row (e.g. written before remarks had actually been entered for
-    // this term, or before another field was ever saved through the Remarks tab) would then
-    // permanently mask correctly-entered data on the Students sheet, which is exactly why some
-    // students' Conduct/Interest/Attitude/remarks showed up on the report card and others'
-    // didn't. Each field is now only pulled from the archive when the archive actually has a
-    // non-empty value for it, so an incomplete archive snapshot can never blank out real data.
-    var remarksArchive = ss.getSheetByName('RemarksArchive');
+    // BUGFIX (two layers):
+    // 1) This used to run for *every* lookup, including the student's own current/live term,
+    //    unconditionally overwriting the values already correctly resolved above from the
+    //    Students sheet — the authoritative source for the current term, since that's exactly
+    //    what the Remarks & Conduct tab reads and writes — with whatever sat in RemarksArchive
+    //    for that same year/term. The Students sheet in this system is mutated in place as terms
+    //    progress (see executeAcademicRollover/activateAcademicTerm), so RemarksArchive exists to
+    //    reconstruct *past* terms whose row has since been overwritten by a newer term — it was
+    //    never meant to shadow the live term. But because it always ran, any archive row for the
+    //    current term — even one written earlier in the same term with some fields still
+    //    unset/blank/outdated (e.g. an early save that only touched attendance, before Attendance/
+    //    OutOf/remarks were corrected) — could mask a value that had since been correctly updated
+    //    on the Students sheet. That's why a freshly corrected Attendance/OutOf/Conduct/etc. could
+    //    keep showing its old value on the report no matter how many times it was resaved. Now
+    //    this whole block is skipped for the live/current-term lookup (isHistoricalLookup false)
+    //    and only consulted for genuinely historical report views.
+    // 2) For the historical case, each field is still only pulled from the archive when the
+    //    archive actually has a non-empty value for it, so an incomplete archive snapshot can
+    //    never blank out a field that does have a value in it (defense in depth, kept from the
+    //    first pass of this fix).
+    var remarksArchive = isHistoricalLookup ? ss.getSheetByName('RemarksArchive') : null;
     if (remarksArchive && remarksArchive.getLastRow() > 1) {
       var remData = remarksArchive.getDataRange().getValues();
       var remHeaders = remData[0];
@@ -675,7 +686,11 @@ function getStudentReport(studentId, year, term, bypassPublishCheck) {
     }
 
     // Load historical fees snapshot if present
-    var feesArchive = ss.getSheetByName('FeesArchive');
+    // BUGFIX: same reasoning as the RemarksArchive block above — only consult FeesArchive for a
+    // genuinely historical (past-term) lookup, never for the student's current/live term, so a
+    // stale archived fees snapshot can't shadow a fresher value already saved on the Students
+    // sheet for the term actually being viewed.
+    var feesArchive = isHistoricalLookup ? ss.getSheetByName('FeesArchive') : null;
     if (feesArchive && feesArchive.getLastRow() > 1) {
       var feesData = feesArchive.getDataRange().getValues();
       var feesHeaders = feesData[0];
@@ -3163,6 +3178,89 @@ function clearAllNotifications(token) {
 // ACADEMIC ROLLOVER MODULE
 // ==========================================
 
+// SAFETY NET: executeAcademicRollover / activateAcademicTerm / executeAutomaticPromotions all
+// mutate the Students sheet in place — Class/Year/Term get overwritten for the new period, and
+// Attendance/OutOf/Interest/Conduct/Attitude/remarks/fees get reset to 0/blank/defaults for it.
+// The *outgoing* term's values only survive this if they'd already been explicitly archived via
+// a Remarks & Conduct or Fees & Bills save — if staff simply never got around to pressing Save
+// for a given student before the term rolled over, that student's data for the term just ended
+// is gone forever, and later can't even be reconstructed for a historical report view. Call this
+// once, right before the wipe, to snapshot every student's current (about-to-be-overwritten) row
+// into RemarksArchive/FeesArchive under its own current Year/Term, so the term that's ending is
+// always recoverable regardless of whether anyone happened to save it first.
+function archiveOutgoingTermSnapshot(ss, data, headers) {
+  try {
+    var idIdx = headers.indexOf('ID'), nameIdx = headers.indexOf('Name'), classIdx = headers.indexOf('Class');
+    var yearIdx = headers.indexOf('Year'), termIdx = headers.indexOf('Term');
+    var attIdx = headers.indexOf('Attendance'), outIdx = headers.indexOf('OutOf');
+    var intIdx = headers.indexOf('Interest'), condIdx = headers.indexOf('Conduct'), attitIdx = headers.indexOf('Attitude');
+    var ctrIdx = headers.indexOf('ClassTeacherRemark'), htrIdx = headers.indexOf('HeadTeacherRemark');
+    var promoIdx = headers.indexOf('PromotionStatus');
+    var arrIdx = headers.indexOf('Arrears'), nxtIdx = headers.indexOf('NextTermFees'), fdIdx = headers.indexOf('FeeData');
+    if (yearIdx < 0 || termIdx < 0 || idIdx < 0) return;
+
+    var remarksArchive = ss.getSheetByName('RemarksArchive');
+    if (!remarksArchive) {
+      remarksArchive = ss.insertSheet('RemarksArchive');
+      styleHeader(remarksArchive, ['StudentID', 'StudentName', 'Class', 'Year', 'Term', 'Attendance', 'OutOf', 'Interest', 'Conduct', 'Attitude', 'ClassTeacherRemark', 'HeadTeacherRemark', 'PromotionStatus']);
+    }
+    var remData = remarksArchive.getLastRow() > 1 ? remarksArchive.getDataRange().getValues() : [[]];
+    var remMap = {};
+    for (var r = 1; r < remData.length; r++) {
+      if (!remData[r][0]) continue;
+      remMap[remData[r][0] + '_' + remData[r][3] + '_' + remData[r][4]] = r + 1;
+    }
+
+    var feesArchive = ss.getSheetByName('FeesArchive');
+    if (!feesArchive) {
+      feesArchive = ss.insertSheet('FeesArchive');
+      styleHeader(feesArchive, ['StudentID', 'StudentName', 'Class', 'Year', 'Term', 'Arrears', 'NextTermFees', 'FeeData']);
+    }
+    var feesData = feesArchive.getLastRow() > 1 ? feesArchive.getDataRange().getValues() : [[]];
+    var feesMap = {};
+    for (var r = 1; r < feesData.length; r++) {
+      if (!feesData[r][0]) continue;
+      feesMap[feesData[r][0] + '_' + feesData[r][3] + '_' + feesData[r][4]] = r + 1;
+    }
+
+    for (var i = 1; i < data.length; i++) {
+      if (!data[i][idIdx]) continue;
+      var sid = data[i][idIdx].toString();
+      var yr = data[i][yearIdx], tm = data[i][termIdx];
+      if (!yr || !tm) continue;
+      var key = sid + '_' + yr + '_' + tm;
+
+      var remRow = [
+        sid, nameIdx>=0?data[i][nameIdx]:'', classIdx>=0?data[i][classIdx]:'', yr, tm,
+        attIdx>=0?data[i][attIdx]:0, outIdx>=0?data[i][outIdx]:0,
+        intIdx>=0?data[i][intIdx]:'', condIdx>=0?data[i][condIdx]:'', attitIdx>=0?data[i][attitIdx]:'',
+        ctrIdx>=0?data[i][ctrIdx]:'', htrIdx>=0?data[i][htrIdx]:'', promoIdx>=0?data[i][promoIdx]:''
+      ];
+      if (remMap[key]) {
+        remarksArchive.getRange(remMap[key], 1, 1, 13).setValues([remRow]);
+      } else {
+        remarksArchive.appendRow(remRow);
+        remMap[key] = remarksArchive.getLastRow();
+      }
+
+      if (arrIdx >= 0 || nxtIdx >= 0 || fdIdx >= 0) {
+        var feeRow = [
+          sid, nameIdx>=0?data[i][nameIdx]:'', classIdx>=0?data[i][classIdx]:'', yr, tm,
+          arrIdx>=0?data[i][arrIdx]:0, nxtIdx>=0?data[i][nxtIdx]:0, fdIdx>=0?data[i][fdIdx]:''
+        ];
+        if (feesMap[key]) {
+          feesArchive.getRange(feesMap[key], 1, 1, 8).setValues([feeRow]);
+        } else {
+          feesArchive.appendRow(feeRow);
+          feesMap[key] = feesArchive.getLastRow();
+        }
+      }
+    }
+  } catch(e) {
+    Logger.log('archiveOutgoingTermSnapshot error: ' + e.message);
+  }
+}
+
 function executeAcademicRollover(token, config) {
   if (!validateAdminToken(token)) return {success: false, message: 'Unauthorized'};
   try {
@@ -3172,6 +3270,7 @@ function executeAcademicRollover(token, config) {
 
     var data = stuSheet.getDataRange().getValues();
     if (data.length < 2) return {success: false, message: 'No students found.'};
+    archiveOutgoingTermSnapshot(ss, data, data[0]);
     
     var headers = data[0];
     var classIdx = headers.indexOf('Class');
@@ -3358,6 +3457,7 @@ function activateAcademicTerm(token, term) {
     var stuSheet = ss.getSheetByName('Students');
     if (stuSheet && stuSheet.getLastRow() > 1) {
       var stuData = stuSheet.getDataRange().getValues();
+      archiveOutgoingTermSnapshot(ss, stuData, stuData[0]);
       var h = stuData[0];
       var tIdx = h.indexOf('Term');
       var attIdx = h.indexOf('Attendance');
@@ -3402,13 +3502,14 @@ function executeAutomaticPromotions(token, targetYear, targetTerm) {
 
     var data = stuSheet.getDataRange().getValues();
     if (data.length < 2) return {success: false, message: 'No students found.'};
-    
+    archiveOutgoingTermSnapshot(ss, data, data[0]);
+
     var headers = data[0];
     var classIdx = headers.indexOf('Class');
     var yearIdx = headers.indexOf('Year');
     var termIdx = headers.indexOf('Term');
     var promoIdx = headers.indexOf('PromotionStatus');
-    
+
     var attIdx = headers.indexOf('Attendance');
     var outOfIdx = headers.indexOf('OutOf');
     var tsIdx = headers.indexOf('TotalScore');
@@ -3418,7 +3519,7 @@ function executeAutomaticPromotions(token, targetYear, targetTerm) {
     var attitIdx = headers.indexOf('Attitude');
     var ctRemIdx = headers.indexOf('ClassTeacherRemark');
     var htRemIdx = headers.indexOf('HeadTeacherRemark');
-    
+
     var countPromoted = 0;
     var countRepeated = 0;
     var countGraduated = 0;

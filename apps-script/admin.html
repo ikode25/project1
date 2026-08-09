@@ -2787,6 +2787,12 @@
                 max-width: 100% !important;
             }
 
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+
             .rcpage {
                 box-shadow: none !important;
                 max-width: 190mm !important;
@@ -2796,9 +2802,47 @@
                 margin: 0 auto !important;
             }
 
-            .rcsn, .rcsc, .rctw tfoot tr td {
-                color: #ffffff !important;
-                font-weight: 800 !important;
+            /* FIX: "faint/unreadable text when printed" — including the browser's own
+               Print dialog preview with Color set to Black and White (exactly what shows
+               up in Bulk Print). Several bars here use light/white text on a dark navy or
+               gold background for the on-screen look; browsers commonly print with
+               background colors off by default (and B&W/toner-saving modes fade any that
+               do print), so that light text lands on plain paper and disappears. This used
+               to make it actively worse by force-forcing white bold text
+               (`.rcsn, .rcsc, .rctw tfoot tr td { color:#fff!important }`) — guaranteed
+               invisible the moment the background doesn't render. Every such bar now gets
+               a print-safe fallback instead: solid dark navy text on white, with a border,
+               so it stays legible no matter what the printer/browser does with
+               backgrounds or color. */
+            .rchdr, .rcts, .rcss, .rcpbar, .rcabar, .rcgkh, .rcfs, .rct tfoot tr {
+                background: #ffffff !important;
+                border-bottom: 1.5px solid #0d1b4b !important;
+            }
+
+            .rchdr::before {
+                display: none !important;
+            }
+
+            .rcsn, .rcsc, .rctt, .rcplbl, .rcalbl, .rcgkh, .rcfs,
+            .rctw tfoot tr td, .rct tfoot tr td {
+                color: #0d1b4b !important;
+                opacity: 1 !important;
+                font-weight: 700 !important;
+            }
+
+            .rcpbdg, .rcabdg, .rcidb {
+                background: #ffffff !important;
+                border: 1.5px solid #0d1b4b !important;
+                color: #0d1b4b !important;
+            }
+
+            .rclog, .rcpb {
+                border: 2px solid #0d1b4b !important;
+            }
+
+            .rct td, .rcrv, .rcrk, .rcil, .rcsll, .rcsig {
+                color: #111827 !important;
+                opacity: 1 !important;
             }
 
             .rct th,
@@ -2807,7 +2851,7 @@
             }
 
             .rct tfoot td {
-                border: 2px solid rgba(255, 255, 255, 0.4) !important;
+                border: 2px solid #0d1b4b !important;
             }
 
             .rct {
