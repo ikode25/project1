@@ -157,7 +157,7 @@ colors, and removed the rule that was forcing white text. Also darkened the
 lighter grey label/body text used throughout the table and remarks section
 for better contrast on lower-quality or black-and-white printers.
 
-## Files touched
+## Files touched (bugfix round)
 - `Code.gs` — `batchUpdateRemarks`, `batchUpdateFeesBills`, `getStudentReport`,
   `updateStudent`, `executeAcademicRollover`, `activateAcademicTerm`,
   `executeAutomaticPromotions`, new `archiveOutgoingTermSnapshot()`
@@ -166,4 +166,89 @@ for better contrast on lower-quality or black-and-white printers.
 - `report.html` — `@media print` block
 - `index.html` — `@media print` block
 
-`index.html`'s script content and `admin.html`'s other tabs are unchanged.
+---
+
+## Feature: admin-set report card colors (replaces the 3-template picker)
+
+The Preview Report tab used to offer three fixed color presets ("Classic Navy",
+"Royal Purple", "Forest Green"). That's been replaced with two color pickers —
+**Header/Primary Color** and **Accent Color** — saved as
+`Settings.REPORT_PRIMARY_COLOR` / `REPORT_ACCENT_COLOR` (defaults `#0d1b4b` /
+`#f0c020`, i.e. the old "Classic Navy" look, so nothing changes for a school
+that hasn't touched the picker). A change saves automatically and applies
+everywhere a report card is rendered:
+- `admin.html` — Preview Report and Bulk Print (`buildRC()`, via
+  `deriveReportTheme(primary, accent)` — replaces `tplVars(templateNumber)`)
+- `report.html` — the standalone report-card page parents/students open
+- `index.html` — the student/parent portal's own report view
+
+`report.html`/`index.html` apply the two colors as CSS custom properties
+(`--rc-primary`, `--rc-accent`, plus a lighter shade of each for gradients,
+computed in JS) on `<html>`, and the stylesheet's themed rules reference
+`var(--rc-primary, #0d1b4b)` etc., so a page that hasn't loaded the settings
+yet still renders with the original colors.
+
+**Printed reports intentionally do NOT use the custom colors** — the
+`@media print` fallback added in the previous round (dark navy text on white,
+regardless of theme) stays pinned to a known-safe color rather than
+inheriting whatever the admin picked, so a poorly-contrasting color choice
+can never reproduce the original "faint print" bug. On-screen and PDF/print-
+preview rendering (where backgrounds do show) does use the chosen colors.
+
+Only the "structural" surfaces (header bar, title/sub strips, position/
+aggregate bars, ID badge, table header, grade-key header, footer strip, and
+their borders) are themed — this matches exactly what the old 3-preset system
+actually varied; per-cell data colors (grade in red, total score in navy,
+etc.) were never part of the template system and are unchanged.
+
+Files touched: `Code.gs` (`populateSampleData` default settings),
+`admin.html` (`buildRC()`, template picker UI → color picker UI, all
+`REPORT_TEMPLATE` read/write sites), `report.html`, `index.html`.
+
+---
+
+## Promotion flow review ("promote students from one class to another")
+
+Reviewed `executeAutomaticPromotions` (wired to the "Promote Students & Term
+Rollover" button — the only promotion path the UI actually calls) and the
+unused `executeAcademicRollover`. Two real gaps found and fixed:
+
+1. **Nothing stopped running it twice against the same target.** Each run
+   bumps every non-Repeated/Graduated/Withdrawn student up one class
+   (Basic 4 → Basic 5, etc.). A double-click, a resubmitted request, or an
+   admin re-running it "just to be sure" would silently promote everyone a
+   *second* class (Basic 4 → Basic 6) with no warning. Fixed: the server now
+   checks the school's active year/term before doing anything, and refuses
+   with a clear message if the target already matches it (i.e. promotion for
+   that period has almost certainly already run).
+2. **The Target Year dropdown allowed picking the currently active year.**
+   Since this action always bumps every student to their *next class*,
+   targeting the year the school is already in would promote everyone a
+   class level mid-year — never actually intended, only ever a misclick.
+   Fixed: the current active year is now excluded from that dropdown.
+
+Also confirmed as correct / not touched: `Repeated` students correctly stay
+in their current class; `Graduated`/`Withdrawn` students correctly move to
+`Graduated / Alumni` and `getNextClass()` correctly leaves them there on any
+future run (no re-promotion of alumni); `PromotionStatus` is correctly reset
+to blank for the new period on every student, including alumni. The unused
+`executeAcademicRollover` was left in place (in case some other caller
+depends on its admin-supplied class-name map) but is now commented to flag
+that — unlike the function the UI actually uses — it does **not** sync
+`Settings.CURRENT_YEAR`/`CURRENT_TERM` to the new period, so it shouldn't be
+substituted for the "Promote Students & Term Rollover" button without also
+fixing that.
+
+**Known limitation, not changed:** class progression beyond JHS 3 only
+recognizes `Basic N` and `JHS N` naming; a school also running Senior High
+(SHS 1–3) classes would need that added to `getNextClass()` in `Code.gs`, or
+those students will silently stay in place on promotion (no error, no
+class-name match). Flagging this since it wasn't part of the reported
+symptom and the sample data here only goes up to JHS, so I didn't want to
+guess at SHS naming without confirming the school actually needs it.
+
+Files touched: `Code.gs` (`executeAutomaticPromotions`), `admin.html`
+(`openPromotionsModal()`).
+
+`index.html`'s script content (other than `buildReportCard`/theme helpers)
+and `admin.html`'s other tabs are unchanged.

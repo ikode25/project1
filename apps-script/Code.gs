@@ -6,7 +6,8 @@
 //   - SBA component config per class in [ClassName]_SBAConfig: Name|MaxMark|Order
 //   - Exam scores stored separately in class result sheet (Exam column)
 //   - Cumulative record: getStudentCumulativeRecord(token,studentId,year)
-//   - Settings: HEADMASTER_NAME, REPORT_TEMPLATE (1|2|3)
+//   - Settings: HEADMASTER_NAME, REPORT_PRIMARY_COLOR, REPORT_ACCENT_COLOR (admin-chosen report
+//     card colors — replaced the old fixed REPORT_TEMPLATE 1|2|3 picker)
 // ============================================================
 
 var SS_ID_KEY      = 'SPREADSHEET_ID';
@@ -440,7 +441,7 @@ function populateSampleData(ss) {
    [80,100,'A1','Excellent','Excellent','JHS'],[75,79,'A2','Very Good','Very Good','JHS'],[70,74,'B3','Good','Good','JHS'],[65,69,'B4','Good','Good','JHS'],[60,64,'C5','Average','Average','JHS'],[55,59,'C6','Average','Average','JHS'],[50,54,'D7','Pass','Pass','JHS'],[45,49,'E8','Below Average','Below Average','JHS'],[0,44,'F9','Fail','Fail','JHS']
   ].forEach(function(r){grd.appendRow(r);});
   var sett=ss.getSheetByName('Settings');
-  [['SCHOOL_NAME','MY SCHOOL'],['SCHOOL_ADDRESS','School Address'],['SCHOOL_EMAIL',''],['SCHOOL_PHONE',''],['CURRENT_TERM','Term 1'],['CURRENT_YEAR','2025-2026'],['SCHOOL_OPEN_DAYS','75'],['VACATION_DATE','2025-04-17'],['REOPENING_DATE','2025-05-16'],['SHOW_OVERALL_POSITION','true'],['SCHOOL_LOGO',''],['SCHOOL_STAMP',''],['SCHOOL_SIGNATURE',''],['HEADMASTER_NAME',''],['REPORT_TEMPLATE','1']].forEach(function(r){sett.appendRow(r);});
+  [['SCHOOL_NAME','MY SCHOOL'],['SCHOOL_ADDRESS','School Address'],['SCHOOL_EMAIL',''],['SCHOOL_PHONE',''],['CURRENT_TERM','Term 1'],['CURRENT_YEAR','2025-2026'],['SCHOOL_OPEN_DAYS','75'],['VACATION_DATE','2025-04-17'],['REOPENING_DATE','2025-05-16'],['SHOW_OVERALL_POSITION','true'],['SCHOOL_LOGO',''],['SCHOOL_STAMP',''],['SCHOOL_SIGNATURE',''],['HEADMASTER_NAME',''],['REPORT_PRIMARY_COLOR','#0d1b4b'],['REPORT_ACCENT_COLOR','#f0c020']].forEach(function(r){sett.appendRow(r);});
   var b4Names=['English Language','Mathematics','Integrated Science','Social Studies','Religious & Moral Ed','Computing/ICT','Creative Arts & Design'];
   var b4Sheet=ensureClassResultSheet(ss,'Basic 4',b4Names);
   var h4=b4Sheet.getRange(1,1,1,b4Sheet.getLastColumn()).getValues()[0];
@@ -3261,6 +3262,11 @@ function archiveOutgoingTermSnapshot(ss, data, headers) {
   }
 }
 
+// NOTE: not called from admin.html — the "Promote Students & Term Rollover" button uses
+// executeAutomaticPromotions() below instead, which additionally syncs Settings.CURRENT_YEAR/
+// CURRENT_TERM to the new period (this function does not). Left in place in case a caller
+// outside the UI depends on its admin-supplied classMap, but be aware it will leave the "active"
+// period out of sync with students' actual Year/Term if used as a substitute for the UI flow.
 function executeAcademicRollover(token, config) {
   if (!validateAdminToken(token)) return {success: false, message: 'Unauthorized'};
   try {
@@ -3499,6 +3505,17 @@ function executeAutomaticPromotions(token, targetYear, targetTerm) {
     var ss = SS();
     var stuSheet = ss.getSheetByName('Students');
     if (!stuSheet) return {success: false, message: 'Students sheet not found.'};
+
+    // BUGFIX: this bumps every student up one class (Basic 4 -> Basic 5, etc.) and there was
+    // nothing to stop it running twice against the same target — a double-click, a page refresh
+    // that resubmits, or an admin re-running it "just to be sure" would silently promote every
+    // student a *second* class (e.g. Basic 4 -> Basic 6) with no warning. If the school's active
+    // period already matches the requested target, promotion for it has almost certainly already
+    // run, so refuse and make the admin pick a different target instead of guessing.
+    var currentPeriod = getActiveYearTerm(ss);
+    if (String(currentPeriod.year) === String(targetYear) && String(currentPeriod.term) === String(targetTerm)) {
+      return {success: false, message: 'The active academic period is already ' + targetYear + ' / ' + targetTerm + ' — promotions for it have most likely already been run. Pick a different target year/term if you really intend to promote again.'};
+    }
 
     var data = stuSheet.getDataRange().getValues();
     if (data.length < 2) return {success: false, message: 'No students found.'};

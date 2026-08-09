@@ -4993,54 +4993,34 @@
                             </div>
                             <div
                                 style="font-size:11px;font-weight:700;color:#374151;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">
-                                Choose Report Template</div>
-                            <div class="tpl-grid" id="templatePicker">
-                                <div class="tpl-card sel" data-tpl="1" onclick="selectTemplate(1,this)">
-                                    <div class="tpl-thumb" style="background:linear-gradient(135deg,#0d1b4b,#1a3a8a)">
-                                        <div
-                                            style="width:75%;height:75%;border:2px solid #f0c020;border-radius:3px;display:flex;flex-direction:column;padding:5px;gap:3px">
-                                            <div style="height:10px;background:rgba(240,192,32,.5);border-radius:1px">
-                                            </div>
-                                            <div
-                                                style="flex:1;background:rgba(255,255,255,.06);border-radius:1px;border:1px dotted rgba(255,255,255,.2)">
-                                            </div>
-                                            <div style="height:5px;background:rgba(240,192,32,.3);border-radius:1px">
-                                            </div>
-                                        </div>
+                                Report Card Colors</div>
+                            <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:center;background:#f8fafc;border-radius:12px;padding:14px 16px;margin-bottom:6px">
+                                <div style="display:flex;align-items:center;gap:10px">
+                                    <input type="color" id="rcPrimaryColor" value="#0d1b4b"
+                                        onchange="onReportColorChange()"
+                                        style="width:44px;height:44px;border:2px solid var(--bd);border-radius:8px;padding:2px;cursor:pointer;background:#fff">
+                                    <div>
+                                        <div style="font-size:12.5px;font-weight:700;color:#0d1b4b">Header / Primary
+                                            Color</div>
+                                        <div style="font-size:11px;color:#94a3b8">Dark bars, borders, ID badge</div>
                                     </div>
-                                    <div class="tpl-nm">Classic Navy</div>
                                 </div>
-                                <div class="tpl-card" data-tpl="2" onclick="selectTemplate(2,this)">
-                                    <div class="tpl-thumb" style="background:linear-gradient(135deg,#7c3aed,#4c1d95)">
-                                        <div
-                                            style="width:75%;height:75%;border:2px solid #fbbf24;border-radius:3px;display:flex;flex-direction:column;padding:5px;gap:3px">
-                                            <div style="height:10px;background:rgba(251,191,36,.5);border-radius:1px">
-                                            </div>
-                                            <div
-                                                style="flex:1;background:rgba(255,255,255,.06);border-radius:1px;border:1px dotted rgba(255,255,255,.2)">
-                                            </div>
-                                            <div style="height:5px;background:rgba(251,191,36,.3);border-radius:1px">
-                                            </div>
-                                        </div>
+                                <div style="display:flex;align-items:center;gap:10px">
+                                    <input type="color" id="rcAccentColor" value="#f0c020"
+                                        onchange="onReportColorChange()"
+                                        style="width:44px;height:44px;border:2px solid var(--bd);border-radius:8px;padding:2px;cursor:pointer;background:#fff">
+                                    <div>
+                                        <div style="font-size:12.5px;font-weight:700;color:#0d1b4b">Accent Color</div>
+                                        <div style="font-size:11px;color:#94a3b8">Title strip, stripe, badges</div>
                                     </div>
-                                    <div class="tpl-nm">Royal Purple</div>
                                 </div>
-                                <div class="tpl-card" data-tpl="3" onclick="selectTemplate(3,this)">
-                                    <div class="tpl-thumb" style="background:linear-gradient(135deg,#166534,#15803d)">
-                                        <div
-                                            style="width:75%;height:75%;border:2px solid #fde047;border-radius:3px;display:flex;flex-direction:column;padding:5px;gap:3px">
-                                            <div style="height:10px;background:rgba(253,224,71,.5);border-radius:1px">
-                                            </div>
-                                            <div
-                                                style="flex:1;background:rgba(255,255,255,.06);border-radius:1px;border:1px dotted rgba(255,255,255,.2)">
-                                            </div>
-                                            <div style="height:5px;background:rgba(253,224,71,.3);border-radius:1px">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="tpl-nm">Forest Green</div>
-                                </div>
+                                <button class="btn bo" style="padding:8px 14px;font-size:12px"
+                                    onclick="resetReportColors()">Reset to Default</button>
                             </div>
+                            <div style="font-size:11px;color:#94a3b8;margin-bottom:8px">These colors apply to every
+                                report card the school issues — Preview, Bulk Print, and the report parents/students
+                                see and print. Pick a dark Header color and a light Accent color for the best
+                                contrast; a change saves automatically.</div>
                         </div>
                     </div>
                     <div id="previewArea" style="padding:0 0 20px"></div>
@@ -7207,7 +7187,7 @@
         var masterData = [], masterSubjects = [], masterResMap = {}, currentGrdTab = 'General', currentPanel = 'dashboard';
         var schoolLogoB64 = '', schoolStampB64 = '', schoolSigB64 = '', headmasterName = '';
         var barChartInst = null, lineChartInst = null, genderDoughnutInst = null, classPieInst = null, importFileData = null, notifications = [];
-        var stuAllData = [], stuFiltered = [], stuPage = 1, selectedTemplate = 1;
+        var stuAllData = [], stuFiltered = [], stuPage = 1;
         var sbaClass = '', sbaYear = '', sbaTerm = '', sbaComps = [], sbaStuds = [], sbaSubjs = [];
         var examClass = '', examYear = '', examTerm = '';
         var sumClass = '', sumYear = '', sumTerm = '', sumData = {};
@@ -7362,9 +7342,68 @@
         function updateClock() { var now = new Date(), h = now.getHours(), m = now.getMinutes(), s = now.getSeconds(); document.getElementById('greetPart').textContent = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening'; var days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']; var months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']; document.getElementById('datetimeTxt').textContent = days[now.getDay()] + ', ' + months[now.getMonth()] + ' ' + now.getDate() + ', ' + now.getFullYear() + ' · ' + (h % 12 || 12) + ':' + (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s + ' ' + (h < 12 ? 'AM' : 'PM'); }
         setInterval(updateClock, 1000); updateClock();
 
-        // ── TEMPLATE ──
-        function selectTemplate(n, el) { selectedTemplate = n; document.querySelectorAll('.tpl-card').forEach(function (c) { c.classList.remove('sel'); }); el.classList.add('sel'); }
-        function tplVars(n) { var tpls = { 1: { hdrBg: 'linear-gradient(145deg,#0d1b4b,#1a237e)', stripe: 'linear-gradient(90deg,transparent,#f0c020,#ffd700,#f0c020,transparent)', accent: '#f0c020', rcBg: 'linear-gradient(135deg,#f0c020,#ffd700)', ttCol: '#0d1b4b', ssBg: '#0d1b4b', idbBg: '#0d1b4b', idbCol: '#f0c020', pbarBg: 'linear-gradient(135deg,#0d1b4b,#1a3a8a)', accentLine: '#0d1b4b', border: '5px solid #0d1b4b' }, 2: { hdrBg: 'linear-gradient(145deg,#7c3aed,#4c1d95)', stripe: 'linear-gradient(90deg,transparent,#fbbf24,#fcd34d,#fbbf24,transparent)', accent: '#fbbf24', rcBg: 'linear-gradient(135deg,#fbbf24,#fcd34d)', ttCol: '#3b0764', ssBg: '#4c1d95', idbBg: '#4c1d95', idbCol: '#fbbf24', pbarBg: 'linear-gradient(135deg,#4c1d95,#7c3aed)', accentLine: '#4c1d95', border: '5px solid #4c1d95' }, 3: { hdrBg: 'linear-gradient(145deg,#166534,#15803d)', stripe: 'linear-gradient(90deg,transparent,#fde047,#facc15,#fde047,transparent)', accent: '#fde047', rcBg: 'linear-gradient(135deg,#fde047,#facc15)', ttCol: '#14532d', ssBg: '#166534', idbBg: '#166534', idbCol: '#fde047', pbarBg: 'linear-gradient(135deg,#166534,#15803d)', accentLine: '#166534', border: '5px solid #166534' } }; return tpls[n] || tpls[1]; }
+        // ── REPORT CARD COLORS ──
+        // Replaces the old fixed 3-template picker: the admin now picks two colors (a dark
+        // "primary" for header bars/borders and a light "accent" for stripes/badges) and every
+        // other shade used across the report card is derived from those two, the same way each
+        // of the three old presets varied just those two hues. deriveReportTheme() returns the
+        // same shape tplVars() used to, so buildRC() below barely changes.
+        function lightenHex(hex, pct) {
+            hex = (hex || '#000000').replace('#', '');
+            if (hex.length === 3) hex = hex.split('').map(function (c) { return c + c; }).join('');
+            var num = parseInt(hex, 16) || 0;
+            var r = (num >> 16) & 255, g = (num >> 8) & 255, b = num & 255;
+            r = Math.min(255, Math.round(r + (255 - r) * pct));
+            g = Math.min(255, Math.round(g + (255 - g) * pct));
+            b = Math.min(255, Math.round(b + (255 - b) * pct));
+            return '#' + [r, g, b].map(function (v) { return v.toString(16).padStart(2, '0'); }).join('');
+        }
+        function deriveReportTheme(primary, accent) {
+            primary = primary || '#0d1b4b';
+            accent = accent || '#f0c020';
+            var primaryLight = lightenHex(primary, 0.28);
+            var accentLight = lightenHex(accent, 0.35);
+            return {
+                hdrBg: 'linear-gradient(145deg,' + primary + ',' + primaryLight + ')',
+                stripe: 'linear-gradient(90deg,transparent,' + accent + ',' + accentLight + ',' + accent + ',transparent)',
+                accent: accent,
+                rcBg: 'linear-gradient(135deg,' + accent + ',' + accentLight + ')',
+                ttCol: primary,
+                ssBg: primary,
+                idbBg: primary,
+                idbCol: accent,
+                pbarBg: 'linear-gradient(145deg,' + primary + ',' + primaryLight + ')',
+                accentLine: primary,
+                border: '5px solid ' + primary
+            };
+        }
+        function getReportColors() {
+            var cs = window._cachedSettings || {};
+            var p = (document.getElementById('rcPrimaryColor') && document.getElementById('rcPrimaryColor').value) || cs.REPORT_PRIMARY_COLOR || '#0d1b4b';
+            var a = (document.getElementById('rcAccentColor') && document.getElementById('rcAccentColor').value) || cs.REPORT_ACCENT_COLOR || '#f0c020';
+            return { primary: p, accent: a };
+        }
+        function setReportColorPickers(primary, accent) {
+            var pEl = document.getElementById('rcPrimaryColor'), aEl = document.getElementById('rcAccentColor');
+            if (pEl && primary) pEl.value = primary;
+            if (aEl && accent) aEl.value = accent;
+        }
+        function onReportColorChange() {
+            var c = getReportColors();
+            if (!window._cachedSettings) window._cachedSettings = {};
+            window._cachedSettings.REPORT_PRIMARY_COLOR = c.primary;
+            window._cachedSettings.REPORT_ACCENT_COLOR = c.accent;
+            google.script.run.withSuccessHandler(function (r) {
+                if (r.success) toast('Report colors saved!', 'success'); else toast(r.message, 'error');
+            }).updateSettings(adminToken, { REPORT_PRIMARY_COLOR: c.primary, REPORT_ACCENT_COLOR: c.accent });
+            // Live-refresh whatever report is currently on screen so the change is visible immediately
+            var pv = document.getElementById('previewArea');
+            if (pv && pv.innerHTML.trim()) loadPreview();
+        }
+        function resetReportColors() {
+            setReportColorPickers('#0d1b4b', '#f0c020');
+            onReportColorChange();
+        }
 
         // ── NOTIFICATIONS ──
         function fetchNotifications() {
@@ -8410,7 +8449,7 @@
                     if (r.settings.SCHOOL_STAMP) schoolStampB64 = r.settings.SCHOOL_STAMP;
                     if (r.settings.SCHOOL_SIGNATURE) schoolSigB64 = r.settings.SCHOOL_SIGNATURE;
                     if (r.settings.HEADMASTER_NAME) headmasterName = r.settings.HEADMASTER_NAME;
-                    if (r.settings.REPORT_TEMPLATE) selectedTemplate = Number(r.settings.REPORT_TEMPLATE) || 1;
+                    setReportColorPickers(r.settings.REPORT_PRIMARY_COLOR, r.settings.REPORT_ACCENT_COLOR);
                     window._cachedSettings = r.settings; saveSettingsToCache(r.settings);
                     try { updateDashboardGreeting(); } catch(e) {}
 
@@ -9160,7 +9199,7 @@
             if (!_fbStudents.length) { document.getElementById('feesBillsArea').innerHTML = '<div style="padding:24px;text-align:center;color:var(--mu)">No students found.</div>'; return; }
             window.removeFeeComp = function (idx) { var f = ((window._cachedSettings || {}).FEE_COMPONENTS || '').split(',').map(function (s) { return s.trim(); }).filter(function (s) { return s; }); f.splice(idx, 1); window.updateFeeComps(f.join(', ')); };
             window.addFeeComp = function () { var v = document.getElementById('newFeeCompInp').value; if (!v) return; var f = ((window._cachedSettings || {}).FEE_COMPONENTS || '').split(',').map(function (s) { return s.trim(); }).filter(function (s) { return s; }); f.push(v.trim()); window.updateFeeComps(f.join(', ')); };
-            window.updateFeeComps = function (str) { if (!window._cachedSettings) window._cachedSettings = {}; window._cachedSettings.FEE_COMPONENTS = str; var e = document.getElementById('set_FEE_COMPONENTS'); if (e) e.value = str; renderFeesBills(); var obj = {};['SCHOOL_NAME', 'SCHOOL_ADDRESS', 'SCHOOL_EMAIL', 'SCHOOL_PHONE', 'SCHOOL_OPEN_DAYS', 'SMS_API_KEY', 'SMS_SENDER', 'HEADMASTER_NAME', 'CLASS_SCORE_MAX', 'EXAM_SCORE_MAX', 'CUSTOM_CT_REMARKS', 'CUSTOM_HM_REMARKS', 'FEE_COMPONENTS', 'ADMIN_NAME', 'ADMIN_PHONE', 'HEADTEACHER_USER', 'HEADTEACHER_PASS'].forEach(function (k) { var el = document.getElementById('set_' + k); if (el) obj[k] = el.value; }); ['VACATION_DATE', 'REOPENING_DATE'].forEach(function (k) { var el = document.getElementById('set_' + k); if (el) obj[k] = el.value; }); var pe = document.getElementById('set_SHOW_OVERALL_POSITION'); if (pe) obj.SHOW_OVERALL_POSITION = pe.checked ? 'true' : 'false'; var pPromo2 = document.getElementById('set_SHOW_PROMOTION_STATUS'); if (pPromo2) obj.SHOW_PROMOTION_STATUS = pPromo2.checked ? 'true' : 'false'; var pAvg = document.getElementById('set_SHOW_CLASS_AVERAGE'); if (pAvg) obj.SHOW_CLASS_AVERAGE = pAvg.checked ? 'true' : 'false'; var tSign = document.getElementById('set_ALLOW_TEACHER_SIGN'); if (tSign) obj.ALLOW_TEACHER_SIGN = tSign.checked ? 'true' : 'false';['SHOW_INTEREST_TALENT', 'SHOW_CONDUCT', 'SHOW_ATTITUDE', 'SHOW_HEADTEACHER_REMARK'].forEach(function (rk) { var elx = document.getElementById('set_' + rk); if (elx) obj[rk] = elx.checked ? 'true' : 'false'; }); var sp2 = document.getElementById('set_SMS_PROVIDER'); if (sp2) obj.SMS_PROVIDER = sp2.value; var at2 = document.getElementById('set_ACTIVE_TERM'); if (at2) obj.ACTIVE_TERM = at2.checked ? 'true' : 'false'; var ay2 = document.getElementById('set_ACTIVE_YEAR'); if (ay2) obj.ACTIVE_YEAR = ay2.checked ? 'true' : 'false'; var ad2 = document.getElementById('set_ACTIVE_DATES'); if (ad2) obj.ACTIVE_DATES = ad2.checked ? 'true' : 'false'; var ai2 = document.getElementById('set_AUTO_ID'); if (ai2) obj.AUTO_ID = ai2.checked ? 'true' : 'false'; var ip2 = document.getElementById('set_ID_PREFIX'); if (ip2) obj.ID_PREFIX = ip2.value; obj.REPORT_TEMPLATE = String(window.selectedTemplate || '1'); google.script.run.withSuccessHandler(function (r) { if (!r.success) toast(r.message, 'error'); }).updateSettings(adminToken, obj); };
+            window.updateFeeComps = function (str) { if (!window._cachedSettings) window._cachedSettings = {}; window._cachedSettings.FEE_COMPONENTS = str; var e = document.getElementById('set_FEE_COMPONENTS'); if (e) e.value = str; renderFeesBills(); var obj = {};['SCHOOL_NAME', 'SCHOOL_ADDRESS', 'SCHOOL_EMAIL', 'SCHOOL_PHONE', 'SCHOOL_OPEN_DAYS', 'SMS_API_KEY', 'SMS_SENDER', 'HEADMASTER_NAME', 'CLASS_SCORE_MAX', 'EXAM_SCORE_MAX', 'CUSTOM_CT_REMARKS', 'CUSTOM_HM_REMARKS', 'FEE_COMPONENTS', 'ADMIN_NAME', 'ADMIN_PHONE', 'HEADTEACHER_USER', 'HEADTEACHER_PASS'].forEach(function (k) { var el = document.getElementById('set_' + k); if (el) obj[k] = el.value; }); ['VACATION_DATE', 'REOPENING_DATE'].forEach(function (k) { var el = document.getElementById('set_' + k); if (el) obj[k] = el.value; }); var pe = document.getElementById('set_SHOW_OVERALL_POSITION'); if (pe) obj.SHOW_OVERALL_POSITION = pe.checked ? 'true' : 'false'; var pPromo2 = document.getElementById('set_SHOW_PROMOTION_STATUS'); if (pPromo2) obj.SHOW_PROMOTION_STATUS = pPromo2.checked ? 'true' : 'false'; var pAvg = document.getElementById('set_SHOW_CLASS_AVERAGE'); if (pAvg) obj.SHOW_CLASS_AVERAGE = pAvg.checked ? 'true' : 'false'; var tSign = document.getElementById('set_ALLOW_TEACHER_SIGN'); if (tSign) obj.ALLOW_TEACHER_SIGN = tSign.checked ? 'true' : 'false';['SHOW_INTEREST_TALENT', 'SHOW_CONDUCT', 'SHOW_ATTITUDE', 'SHOW_HEADTEACHER_REMARK'].forEach(function (rk) { var elx = document.getElementById('set_' + rk); if (elx) obj[rk] = elx.checked ? 'true' : 'false'; }); var sp2 = document.getElementById('set_SMS_PROVIDER'); if (sp2) obj.SMS_PROVIDER = sp2.value; var at2 = document.getElementById('set_ACTIVE_TERM'); if (at2) obj.ACTIVE_TERM = at2.checked ? 'true' : 'false'; var ay2 = document.getElementById('set_ACTIVE_YEAR'); if (ay2) obj.ACTIVE_YEAR = ay2.checked ? 'true' : 'false'; var ad2 = document.getElementById('set_ACTIVE_DATES'); if (ad2) obj.ACTIVE_DATES = ad2.checked ? 'true' : 'false'; var ai2 = document.getElementById('set_AUTO_ID'); if (ai2) obj.AUTO_ID = ai2.checked ? 'true' : 'false'; var ip2 = document.getElementById('set_ID_PREFIX'); if (ip2) obj.ID_PREFIX = ip2.value; var _rc = getReportColors(); obj.REPORT_PRIMARY_COLOR = _rc.primary; obj.REPORT_ACCENT_COLOR = _rc.accent; google.script.run.withSuccessHandler(function (r) { if (!r.success) toast(r.message, 'error'); }).updateSettings(adminToken, obj); };
 
             var feeComps = ((window._cachedSettings || {}).FEE_COMPONENTS || '').split(',').map(function (s) { return s.trim(); }).filter(function (s) { return s; });
             var h = '<div class="card no-print" style="margin-bottom:20px;border:none;box-shadow:none;background:#f8fafc;border-radius:12px;padding:16px;">';
@@ -9623,11 +9662,14 @@
         function saveGrading() { var rows = allGrading.filter(function (g) { return (g.LevelGroup || 'General') === currentGrdTab; }); rows.forEach(function (g, i) { g.MinScore = Number(document.getElementById('gmin_' + i).value); g.MaxScore = Number(document.getElementById('gmax_' + i).value); g.Grade = document.getElementById('ggrd_' + i).value; g.GradeName = document.getElementById('gnam_' + i).value; g.Remarks = document.getElementById('grem_' + i).value; g.LevelGroup = document.getElementById('glvl_' + i).value; }); google.script.run.withSuccessHandler(function (r) { if (r.success) toast('Grading saved!', 'success'); else toast(r.message, 'error'); }).updateGrading(adminToken, allGrading); }
 
         // ── REPORT CARD BUILDER ──
-        function applyTplVars(n) { var v = tplVars(n); var el = document.querySelector('.rcpage'); if (!el) return; el.style.border = v.border; el.querySelectorAll('.rchdr').forEach(function (e) { e.style.background = v.hdrBg; }); el.querySelectorAll('.rchdr::before').forEach(function (e) { e.style.background = v.stripe; }); el.querySelectorAll('.rcpb').forEach(function (e) { e.style.borderColor = v.accent; }); el.querySelectorAll('.rcts').forEach(function (e) { e.style.background = v.rcBg; }); el.querySelectorAll('.rctt').forEach(function (e) { e.style.color = v.ttCol; }); el.querySelectorAll('.rcss').forEach(function (e) { e.style.background = v.ssBg; }); el.querySelectorAll('.rcidb').forEach(function (e) { e.style.background = v.idbBg; e.style.color = v.idbCol; }); el.querySelectorAll('.rcpbar').forEach(function (e) { e.style.background = v.pbarBg; }); el.querySelectorAll('.rcpbdg').forEach(function (e) { e.style.background = v.accent; e.style.color = v.ttCol; }); el.querySelectorAll('.rcts,.rcfs').forEach(function (e) { e.style.background = v.rcBg; }); el.querySelectorAll('.rctt,.rcfs').forEach(function (e) { e.style.color = v.ttCol; }); }
         function buildRC(data) {
             if (!data || !data.student) return '<div style="padding:40px;text-align:center;color:var(--mu)">Failed to load report.</div>';
             var s = data.student, res = data.results || [], ci = data.classInfo || {}, st = data.settings || {};
-            var v = tplVars(selectedTemplate);
+            // Prefer colors saved on this report's own settings (the server-truth every viewer —
+            // Preview, Bulk Print, and the public report.html/index.html — will agree on); fall
+            // back to whatever's currently in the color pickers for instant feedback right after
+            // a change, before the settings round-trip has come back.
+            var v = deriveReportTheme(st.REPORT_PRIMARY_COLOR || getReportColors().primary, st.REPORT_ACCENT_COLOR || getReportColors().accent);
             var showPos = String(st.SHOW_OVERALL_POSITION !== undefined ? st.SHOW_OVERALL_POSITION : 'true').toLowerCase() === 'true';
             var sN = st.SCHOOL_NAME || (window._cachedSettings && window._cachedSettings.SCHOOL_NAME) || 'School Portal', addr = st.SCHOOL_ADDRESS || '';
             var email = st.SCHOOL_EMAIL || '', phone = st.SCHOOL_PHONE || '';
@@ -9662,7 +9704,7 @@
             var rows = res.map(function (r, i) { gSBA += Number(r.SBAScore || 0); gExam += Number(r.ExamScore || 0); gTotal += Number(r.TotalScore || 0); return '<tr' + (i % 2 === 1 ? ' style="background:#f8faff"' : '') + '><td style="color:#6b7280;font-weight:600">' + (i + 1) + '</td><td class="rctj">' + r.SubjectName + '</td><td>' + Math.round(Number(r.SBAScore || 0)) + '</td><td>' + Math.round(Number(r.ExamScore || 0)) + '</td><td style="font-weight:700;color:#0d1b4b">' + Math.round(Number(r.TotalScore || 0)) + '</td>' + (showAvg ? '<td>' + (r.SubjectAverage !== undefined ? r.SubjectAverage : '—') + '</td>' : '') + '<td style="font-weight:700;color:#c0392b">' + r.Grade + '</td><td style="font-weight:600;color:#1a3a8a;font-size:10.5px">' + ord(Number(r.Position || 1)) + '</td><td style="font-size:10.5px;color:#374151">' + (r.Remarks || '') + '</td></tr>'; }).join('');
             var gkItems = (data.grading || []).map(function (g) { return '<span><b>' + g.grade + '</b>' + g.min + '–' + g.max + '% · ' + g.name + '</span>'; }).join('');
             var posBar = showPos && data.overallPosition ? '<div class="rcpbar" style="background:' + v.pbarBg + '"><span class="rcplbl">OVERALL CLASS POSITION</span><span class="rcpbdg" style="background:' + v.accent + ';color:' + v.ttCol + '">' + ord(data.overallPosition) + ' / ' + numPupils + '</span></div>' : '';
-            var aggBar = ''; if (data.jhsAggregate) { var ag = data.jhsAggregate; aggBar = '<div class="rcabar"><span class="rcalbl">JHS AGGREGATE</span><span class="rcabdg">' + ag.aggregate + '</span></div>'; }
+            var aggBar = ''; if (data.jhsAggregate) { var ag = data.jhsAggregate; aggBar = '<div class="rcabar" style="background:' + v.pbarBg + '"><span class="rcalbl">JHS AGGREGATE</span><span class="rcabdg" style="background:' + v.accent + ';color:' + v.ttCol + '">' + ag.aggregate + '</span></div>'; }
             var logoHtml = logo ? '<img src="' + logo + '" alt="Logo" style="width:100%;height:100%;object-fit:cover;border-radius:50%">'
                 : '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0d1b4b" stroke-width="2" stroke-linecap="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>';
             var watermark = wmTarget ? '<div class="rcwm"><img src="' + wmTarget + '" alt=""></div>' : '';
@@ -9874,7 +9916,7 @@
             if (s.SCHOOL_STAMP) { schoolStampB64 = s.SCHOOL_STAMP; previewImgBox('stampPreview', s.SCHOOL_STAMP, 'Stamp'); schoolStampB64 = s.SCHOOL_STAMP; }
             if (s.SCHOOL_SIGNATURE) { schoolSigB64 = s.SCHOOL_SIGNATURE; previewImgBox('sigPreview', s.SCHOOL_SIGNATURE, 'Signature'); schoolSigB64 = s.SCHOOL_SIGNATURE; }
             if (s.HEADMASTER_NAME) headmasterName = s.HEADMASTER_NAME; var sbn = document.getElementById('sbSchoolName'); if (sbn && s.SCHOOL_NAME) sbn.textContent = s.SCHOOL_NAME;
-            if (s.REPORT_TEMPLATE) { selectedTemplate = Number(s.REPORT_TEMPLATE) || 1; document.querySelectorAll('.tpl-card').forEach(function (c) { c.classList.remove('sel'); if (Number(c.dataset.tpl) === selectedTemplate) c.classList.add('sel'); }); }
+            setReportColorPickers(s.REPORT_PRIMARY_COLOR, s.REPORT_ACCENT_COLOR);
             var pfi = document.getElementById('photoFolderInfo');
             if (pfi) {
                 var checkSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><polyline points="20 6 9 17 4 12"/></svg>';
@@ -10088,7 +10130,8 @@
             var at2 = document.getElementById('set_ACTIVE_TERM'); if (at2) obj.ACTIVE_TERM = at2.checked ? 'true' : 'false';
             var ay2 = document.getElementById('set_ACTIVE_YEAR'); if (ay2) obj.ACTIVE_YEAR = ay2.checked ? 'true' : 'false';
             var ad2 = document.getElementById('set_ACTIVE_DATES'); if (ad2) obj.ACTIVE_DATES = ad2.checked ? 'true' : 'false';
-            var ip2 = document.getElementById('set_ID_PREFIX'); if (ip2) obj.ID_PREFIX = ip2.value; obj.REPORT_TEMPLATE = String(selectedTemplate);
+            var ip2 = document.getElementById('set_ID_PREFIX'); if (ip2) obj.ID_PREFIX = ip2.value;
+            var _rc2 = getReportColors(); obj.REPORT_PRIMARY_COLOR = _rc2.primary; obj.REPORT_ACCENT_COLOR = _rc2.accent;
             var mobNameEl = document.getElementById('mob_set_ADMIN_NAME'); if (mobNameEl) mobNameEl.value = obj.ADMIN_NAME || '';
             var mobPhoneEl = document.getElementById('mob_set_ADMIN_PHONE'); if (mobPhoneEl) mobPhoneEl.value = obj.ADMIN_PHONE || '';
             var mobHmNameEl = document.getElementById('mob_set_HEADMASTER_NAME'); if (mobHmNameEl) mobHmNameEl.value = obj.HEADMASTER_NAME || '';
@@ -10699,7 +10742,7 @@
                 if (s.SCHOOL_STAMP) schoolStampB64 = s.SCHOOL_STAMP;
                 if (s.SCHOOL_SIGNATURE) schoolSigB64 = s.SCHOOL_SIGNATURE;
                 if (s.HEADMASTER_NAME) headmasterName = s.HEADMASTER_NAME;
-                if (s.REPORT_TEMPLATE) selectedTemplate = Number(s.REPORT_TEMPLATE) || 1;
+                setReportColorPickers(s.REPORT_PRIMARY_COLOR, s.REPORT_ACCENT_COLOR);
                 var sbn = document.getElementById('sbSchoolName'); if (sbn && s.SCHOOL_NAME) sbn.textContent = s.SCHOOL_NAME;
                 /* Read font from dedicated sysTypography key first (most reliable), fall back to schoolSettings */
                 var _stf = null; try { var _stfr = localStorage.getItem('sysTypography'); if (_stfr) _stf = JSON.parse(_stfr); } catch(e){}
@@ -12421,9 +12464,12 @@
             // Populate year options
             yearSelect.innerHTML = '';
             var nextYearVal = getNextAcademicYear(acadActiveYear);
-            
-            // Add next calculated year and other loaded years
-            var displayYears = [nextYearVal].concat(acadYears.filter(function(y) { return y !== nextYearVal; }));
+
+            // Add next calculated year and other loaded years — deliberately excluding the
+            // currently active year. This promotes every student to their *next class*, so
+            // targeting the year the school is already in would bump everyone up a class level
+            // mid-year, which is never actually what's wanted; picking it is only ever a mistake.
+            var displayYears = [nextYearVal].concat(acadYears.filter(function(y) { return y !== nextYearVal && y !== acadActiveYear; }));
             displayYears.forEach(function(y) {
                 var o = document.createElement('option');
                 o.value = y;
