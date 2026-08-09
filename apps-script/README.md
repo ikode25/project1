@@ -43,7 +43,64 @@ same way. Both functions also now clear the short-lived report cache for any
 student they touch, so a report viewed right after saving reflects the new
 values instead of a stale cached copy.
 
-### 2. Printed report cards — text too faint to read
+### 2. A student's Conduct/remarks are correctly filled in on the Remarks & Conduct tab, but still show as blank ("—") on their report card
+
+This is the deeper, more common cause of "showed up for some students, not
+others" — found after the first round of fixes, by reproducing it on a real
+student (Adjei Enam, ROA0080) whose Remarks & Conduct tab showed all fields
+filled in, but whose Preview Report still showed every field as "—".
+
+**Root cause** (`Code.gs`, `getStudentReport`): the report builder reads the
+student's base record from the Students sheet (correct, current), but then
+unconditionally overwrites it with whatever sits in the `RemarksArchive` sheet
+for that same student/year/term — *including blank fields*. If a
+`RemarksArchive` row for that exact period had already been created earlier
+with some fields still blank (e.g. an early save that only touched attendance
+or promotion status, before the actual remarks were typed in), that old blank
+snapshot would permanently mask the correct, non-blank values sitting right
+there on the Students sheet — every time the report was generated, forever,
+regardless of how many times the Remarks tab was resaved afterward with real
+values into the *Students sheet* — because bug #1 above (before it was fixed)
+often filed the resave under a different archive key than the one the report
+was reading.
+
+**Fix**: each archived field now only overrides the live value when the
+archive actually has something non-empty in it. An incomplete/stale archive
+snapshot can no longer blank out real data. This fix alone should make
+already-entered remarks reappear on report cards immediately after
+redeploying — no re-entering of data required, since the correct values were
+sitting on the Students sheet the whole time.
+
+### 3. Remarks/conduct/attendance silently reset to blank after someone edits a student's name, class, or photo
+
+**Root cause** (`Code.gs`, `updateStudent`): the "Edit Student" modal only
+collects Name/Gender/Class/LevelGroup/Year/Term/ParentPhone/PhotoUrl — it has
+no fields for Attendance, Interest, Conduct, Attitude, Class Teacher's Remark,
+or Headmaster's Remark. `updateStudent` wrote all 18 columns of the student's
+row on every save, and for every column the edit form doesn't send, it wrote
+`0` or `''` instead of keeping what was already there. So simply correcting a
+misspelled name or uploading a student's photo — routine admin tasks — quietly
+wiped that student's attendance and every remarks field, even weeks after they
+had been carefully entered. This is very likely the single biggest source of
+"entered and saved, then later cleared."
+
+**Fix**: `updateStudent` now only changes a field when the caller actually
+sends a value for it, and otherwise keeps the existing value (the same
+pattern the code already used for TotalScore/Average/PhotoUrl — just not
+consistently applied to every field). It also now matches the exact
+Year/Term row being edited instead of just the first row with that Student
+ID, for the same reason described in bug #1.
+
+**Note on data already lost to this bug**: this fix stops it from happening
+again, but it can't bring back a value that was already overwritten with a
+blank before the fix was deployed — the old value is gone from the sheet. If
+a student's remarks are still blank *everywhere* (both the Remarks tab and
+the report) after redeploying, that student's data was likely already wiped
+by this bug and will need to be re-entered once. Bug #2's fix will recover
+any student where the Remarks tab already shows the correct values but the
+report didn't — no re-entry needed for those.
+
+### 4. Printed report cards — text too faint to read
 
 **Root cause** (`report.html` and the duplicate report-card renderer in
 `index.html`): several bars on the report card (school name banner, "End of
@@ -67,7 +124,7 @@ student/parent portal's own report-card print view), since both had their own
 copy of the same CSS.
 
 ## Files touched
-- `Code.gs` — `batchUpdateRemarks`, `batchUpdateFeesBills`
+- `Code.gs` — `batchUpdateRemarks`, `batchUpdateFeesBills`, `getStudentReport`, `updateStudent`
 - `admin.html` — `saveAllRemarks()`, `saveFeesBills()`
 - `report.html` — `@media print` block
 - `index.html` — `@media print` block

@@ -630,6 +630,15 @@ function getStudentReport(studentId, year, term, bypassPublishCheck) {
     }
     
     // Load historical remarks/attendance snapshot if present
+    // BUGFIX: this used to unconditionally overwrite the live values already resolved above from
+    // the Students sheet (the correct source for the requested year/term) with whatever sat in
+    // RemarksArchive for that same year/term — including a field that was blank in the archive.
+    // A stale/incomplete archive row (e.g. written before remarks had actually been entered for
+    // this term, or before another field was ever saved through the Remarks tab) would then
+    // permanently mask correctly-entered data on the Students sheet, which is exactly why some
+    // students' Conduct/Interest/Attitude/remarks showed up on the report card and others'
+    // didn't. Each field is now only pulled from the archive when the archive actually has a
+    // non-empty value for it, so an incomplete archive snapshot can never blank out real data.
     var remarksArchive = ss.getSheetByName('RemarksArchive');
     if (remarksArchive && remarksArchive.getLastRow() > 1) {
       var remData = remarksArchive.getDataRange().getValues();
@@ -645,20 +654,21 @@ function getStudentReport(studentId, year, term, bypassPublishCheck) {
       var ctrIdx = remHeaders.indexOf('ClassTeacherRemark');
       var htrIdx = remHeaders.indexOf('HeadTeacherRemark');
       var pStatusIdx = remHeaders.indexOf('PromotionStatus');
-      
+      var hasVal = function(v) { return v !== '' && v !== null && v !== undefined; };
+
       for (var r = 1; r < remData.length; r++) {
         if (remData[r][sidIdx] && remData[r][sidIdx].toString().trim() === studentId.toString().trim() &&
             remData[r][yrIdx] && remData[r][yrIdx].toString().trim() === tYear.toString().trim() &&
             remData[r][tmIdx] && remData[r][tmIdx].toString().trim() === tTerm.toString().trim()) {
-          
-          if (attIdx >= 0) stu.Attendance = remData[r][attIdx].toString();
-          if (outIdx >= 0) stu.OutOf = remData[r][outIdx].toString();
-          if (intIdx >= 0) stu.Interest = remData[r][intIdx].toString();
-          if (condIdx >= 0) stu.Conduct = remData[r][condIdx].toString();
-          if (attitIdx >= 0) stu.Attitude = remData[r][attitIdx].toString();
-          if (ctrIdx >= 0) stu.ClassTeacherRemark = remData[r][ctrIdx].toString();
-          if (htrIdx >= 0) stu.HeadTeacherRemark = remData[r][htrIdx].toString();
-          if (pStatusIdx >= 0) stu.PromotionStatus = remData[r][pStatusIdx].toString();
+
+          if (attIdx >= 0 && hasVal(remData[r][attIdx])) stu.Attendance = remData[r][attIdx].toString();
+          if (outIdx >= 0 && hasVal(remData[r][outIdx])) stu.OutOf = remData[r][outIdx].toString();
+          if (intIdx >= 0 && hasVal(remData[r][intIdx])) stu.Interest = remData[r][intIdx].toString();
+          if (condIdx >= 0 && hasVal(remData[r][condIdx])) stu.Conduct = remData[r][condIdx].toString();
+          if (attitIdx >= 0 && hasVal(remData[r][attitIdx])) stu.Attitude = remData[r][attitIdx].toString();
+          if (ctrIdx >= 0 && hasVal(remData[r][ctrIdx])) stu.ClassTeacherRemark = remData[r][ctrIdx].toString();
+          if (htrIdx >= 0 && hasVal(remData[r][htrIdx])) stu.HeadTeacherRemark = remData[r][htrIdx].toString();
+          if (pStatusIdx >= 0 && hasVal(remData[r][pStatusIdx])) stu.PromotionStatus = remData[r][pStatusIdx].toString();
           break;
         }
       }
@@ -1194,7 +1204,61 @@ function addStudent(token,d){
     try { lock.releaseLock(); } catch(e2) {}
   }
 }
-function updateStudent(token,d){if(!validateAdminToken(token))return{success:false,message:'Unauthorized'};try{var ss=SS(),sheet=ss.getSheetByName('Students'),data=sheet.getDataRange().getValues();for(var i=1;i<data.length;i++){if(data[i][0]&&data[i][0].toString()===d.ID.toString()){sheet.getRange(i+1,1,1,18).setValues([[d.ID,d.Name,d.Gender||'Male',d.Class||'',d.Year||'',d.Term||'Term 1',Number(d.Attendance||0),Number(d.OutOf||75),Number(d.TotalScore||data[i][8]||0),Number(d.Average||data[i][9]||0),d.Interest||'',d.Conduct||'',d.Attitude||'',d.ClassTeacherRemark||'',d.HeadTeacherRemark||'',d.ParentPhone||'',d.PhotoUrl||data[i][16]||'',d.LevelGroup||'General']]);recalculateClassSizes(ss);logServerAction(token, 'Update Student', 'ID: ' + d.ID + ', Name: ' + d.Name + ', Class: ' + (d.Class || 'N/A'));return{success:true};}}return{success:false,message:'Student not found.'};}catch(e){return{success:false,message:e.message};}}
+// BUGFIX: this used to always write Number(d.Attendance||0), d.Interest||'', d.Conduct||'', etc.
+// The "Edit Student" modal (admin.html saveStudent()) only ever sends
+// ID/Name/Gender/Class/LevelGroup/Year/Term/ParentPhone/PhotoUrl — it doesn't carry
+// Attendance/OutOf/Interest/Conduct/Attitude/ClassTeacherRemark/HeadTeacherRemark at all. So
+// every time staff fixed a name, changed a class, or uploaded a photo, this silently reset that
+// student's attendance and every remarks field on the sheet back to 0/blank, wiping out whatever
+// had been entered on the Remarks & Conduct tab moments (or months) earlier — the "results
+// entered and saved, then later cleared" symptom. Only TotalScore/Average/PhotoUrl had a
+// fallback to the existing value; every other field now does too, so a field is only changed
+// when the caller actually sends a value for it. Also now matches the exact Year/Term row being
+// edited (when the caller supplies one) instead of just the first row with this Student ID —
+// a student can have one row per term, and ID-only matching could silently edit the wrong term.
+function updateStudent(token,d){
+  if(!validateAdminToken(token))return{success:false,message:'Unauthorized'};
+  try{
+    var ss=SS(),sheet=ss.getSheetByName('Students'),data=sheet.getDataRange().getValues();
+    var targetRow=-1;
+    if(d.Year!==undefined&&d.Year!==''&&d.Term!==undefined&&d.Term!==''){
+      for(var i=1;i<data.length;i++){
+        if(data[i][0]&&data[i][0].toString()===d.ID.toString()&&String(data[i][4])===String(d.Year)&&String(data[i][5])===String(d.Term)){targetRow=i;break;}
+      }
+    }
+    if(targetRow===-1){
+      for(var i=1;i<data.length;i++){
+        if(data[i][0]&&data[i][0].toString()===d.ID.toString()){targetRow=i;break;}
+      }
+    }
+    if(targetRow===-1)return{success:false,message:'Student not found.'};
+    var i=targetRow;
+    var row=[
+      d.ID,
+      d.Name,
+      d.Gender||'Male',
+      d.Class||'',
+      d.Year||data[i][4]||'',
+      d.Term||data[i][5]||'Term 1',
+      (d.Attendance!==undefined&&d.Attendance!=='')?Number(d.Attendance):(data[i][6]||0),
+      (d.OutOf!==undefined&&d.OutOf!=='')?Number(d.OutOf):(data[i][7]||75),
+      Number(d.TotalScore||data[i][8]||0),
+      Number(d.Average||data[i][9]||0),
+      d.Interest!==undefined?d.Interest:(data[i][10]||''),
+      d.Conduct!==undefined?d.Conduct:(data[i][11]||''),
+      d.Attitude!==undefined?d.Attitude:(data[i][12]||''),
+      d.ClassTeacherRemark!==undefined?d.ClassTeacherRemark:(data[i][13]||''),
+      d.HeadTeacherRemark!==undefined?d.HeadTeacherRemark:(data[i][14]||''),
+      d.ParentPhone!==undefined?d.ParentPhone:(data[i][15]||''),
+      d.PhotoUrl||data[i][16]||'',
+      d.LevelGroup||data[i][17]||'General'
+    ];
+    sheet.getRange(i+1,1,1,18).setValues([row]);
+    recalculateClassSizes(ss);
+    logServerAction(token, 'Update Student', 'ID: ' + d.ID + ', Name: ' + d.Name + ', Class: ' + (d.Class || 'N/A'));
+    return{success:true};
+  }catch(e){return{success:false,message:e.message};}
+}
 function deleteStudent(token,id){if(!validateAdminToken(token))return{success:false,message:'Unauthorized'};try{var ss=SS(),sheet=ss.getSheetByName('Students'),data=sheet.getDataRange().getValues();for(var i=1;i<data.length;i++){if(data[i][0]&&data[i][0].toString()===id.toString()){var sClass=data[i][3];sheet.deleteRow(i+1);if(sClass){var rs=ss.getSheetByName(sClass);if(rs&&rs.getLastRow()>1){var rd=rs.getDataRange().getValues();for(var r=rd.length-1;r>=1;r--){if(rd[r][0]&&rd[r][0].toString()===id.toString())rs.deleteRow(r+1);}}var sba=ss.getSheetByName(sClass+'_SBA');if(sba&&sba.getLastRow()>1){var sd=sba.getDataRange().getValues();for(var r=sd.length-1;r>=1;r--){if(sd[r][0]&&sd[r][0].toString()===id.toString())sba.deleteRow(r+1);}}}recalculateClassSizes(ss);logServerAction(token, 'Delete Student', 'ID: ' + id);return{success:true};}}return{success:false,message:'Student not found.'};}catch(e){return{success:false,message:e.message};}}
 
 // ── PER-CLASS SUBJECTS ─────────────────────────────────────
