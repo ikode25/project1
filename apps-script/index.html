@@ -49,47 +49,44 @@
         /* ── LANDING PAGE HERO ── */
         .landing-hero {
             width: 100%;
-            /* Carousel photos should fill the whole screen ("fullscreen slider"), not just
-               whatever height the hero content happens to need. min-height (not height) so the
-               hero still grows to fit taller content on small/zoomed screens instead of clipping
-               it. The plain vh rule is the fallback for browsers without svh support; where svh
-               *is* supported it uses the browser's stable viewport height so the hero doesn't
-               jump/resize as a mobile browser's address bar shows and hides. */
+            /* Sizes the intro area (logo/title/stats) before the portal card overlaps it — the
+               actual fullscreen photo backdrop is .hero-carousel below, which is `fixed` and
+               independent of this box's height, so it covers the *whole page* (including
+               everything below the card) rather than just this section. */
             min-height: 100vh;
             min-height: 100svh;
             padding: 96px 24px 200px;
             position: relative;
             text-align: center;
-            overflow: hidden;
             display: flex;
             flex-direction: column;
             align-items: center;
             z-index: 0;
         }
 
-        .landing-hero::before {
-            content: '';
-            position: absolute;
+        /* Fullscreen photo backdrop for the ENTIRE page, not just the hero section — fixed to
+           the viewport so it's still the backdrop behind content further down the page (the
+           portal card, "Staff Portal" link, footer), instead of handing off to the plain navy
+           body background partway down. Sits behind everything (negative z-index) but still
+           paints above the body's own background. Default background-image here is the
+           fallback shown until/unless the carousel (below) renders admin-uploaded school photos
+           (Settings → School Info → Landing Page Carousel). */
+        .hero-carousel {
+            position: fixed;
             inset: 0;
-            background: linear-gradient(180deg, rgba(8, 16, 50, 0.55) 0%, rgba(13, 27, 75, 0.78) 100%);
-            z-index: 1;
-        }
-
-        /* Default/fallback background — shown until the carousel (below) renders school photos
-           uploaded by the admin (Settings → School Info → Landing Page Carousel), and permanently
-           if none have been uploaded. */
-        .landing-hero {
+            z-index: -2;
+            overflow: hidden;
             background: url('https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=1400&q=80') center/cover no-repeat;
         }
 
-        /* Photo carousel — sits between the default background above and the dark gradient
-           overlay (.landing-hero::before, z-index:1) so slides are always legible under the
-           hero text regardless of which photo is showing. */
-        .hero-carousel {
-            position: absolute;
+        /* Dark gradient overlay for text legibility, also fixed full-page so it stays consistent
+           under content the whole way down, not just within the hero section. */
+        .hero-carousel-overlay {
+            position: fixed;
             inset: 0;
-            z-index: 0;
-            overflow: hidden;
+            z-index: -1;
+            background: linear-gradient(180deg, rgba(8, 16, 50, 0.55) 0%, rgba(13, 27, 75, 0.82) 60%, rgba(13, 27, 75, 0.94) 100%);
+            pointer-events: none;
         }
 
         .hero-slide {
@@ -106,7 +103,7 @@
         }
 
         .hero-carousel-dots {
-            position: absolute;
+            position: fixed;
             left: 0;
             right: 0;
             bottom: 16px;
@@ -1731,8 +1728,11 @@
     <div class="landing-hero" id="landingHero">
         <div class="hero-carousel" id="heroCarousel">
             <!-- Admin-uploaded school/classroom photos, cross-faded by JS. Falls back to the
-                 default background-image above when none are configured. -->
+                 default background-image set in CSS when none are configured. Fixed full-page
+                 (see .hero-carousel in <style>), so this is the backdrop for the whole page, not
+                 just this hero section. -->
         </div>
+        <div class="hero-carousel-overlay"></div>
         <div class="hero-carousel-dots" id="heroCarouselDots"></div>
         <div class="hero-grid" id="heroPupilImages">
             <!-- Student silhouette tiles injected by JS -->
