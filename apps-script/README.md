@@ -162,6 +162,69 @@ with just the list of links kept in Settings (`SCHOOL_CAROUSEL_IMAGES`, a small 
 `getPublicSettings()` (already unauthenticated, used by the landing page before anyone logs in)
 now includes it.
 
+### 9. Admin's chosen font "disappears" on mobile
+**admin.html** — `populateSettingsUI`, `applyBrandingFromCache`, `saveSettings`
+
+Root cause was the opposite of what it looked like. `SYSTEM_FONT_FAMILY`/`SIZE`/`WEIGHT` is one
+shared, school-wide setting — correctly saved server-side (confirmed by the desktop screenshot
+showing the real "Poppins / Medium 500" that had been set). But the code that *applies* a fetched
+font to the UI was written to prefer a dedicated `sysTypography` key in **localStorage** over
+whatever the server just returned — a leftover guard against a narrower bug (saving a font, then
+having a slightly-stale in-flight settings fetch resolve a moment later and silently revert it
+back). localStorage has no expiry and is per-device: any phone that had *ever* cached a different
+font locally — from before the admin last changed it on another device, or from some earlier
+session — would keep re-imposing that stale local value forever, even though the server had since
+been correctly updated. That's exactly "admin sets the font, but it doesn't show on mobile": the
+phone's own old cached font permanently shadowing the real one.
+
+Fixed by using `window._currentTypography` (in-memory, cleared on every fresh page load, only
+ever set by `applyTypography()` running *during the current session*) for that same-session
+protection instead of the persistent localStorage cache — so a real cross-device settings change
+is no longer at the mercy of whatever a given phone happened to cache at some point in the past.
+
+Separately, `saveSettings()` (the generic "Save Settings" button) was also caching only the
+handful of fields *that form* saves, wholesale-replacing the entire cached `schoolSettings`
+localStorage blob instead of merging into it — silently dropping the font (and logo/stamp/
+signature) from that cache until the next full settings fetch corrected it. Harmless on a fast
+connection; on a slow one it could show a brief flash of the wrong/default font on next load.
+Fixed to merge instead of replace.
+
+### 10. Landing page carousel — fill the whole screen
+**index.html**
+
+The hero (and the carousel behind it) sized itself to its content, which could be shorter than
+the viewport. Gave `.landing-hero` `min-height: 100vh` (`100svh` where supported, so it doesn't
+jump as a mobile browser's address bar shows/hides) so the photos always cover the full screen —
+a true fullscreen slider — while still growing further if content needs more room.
+
+### 11. "Email to Owner" errored
+**Code.gs** — `emailOwnerPerformanceReport`, `testMailAppAuthorization` (new)
+
+Sending email from Apps Script needs a permission (`MailApp`/`GmailApp` "send email" scope) that
+Google can only prompt for when someone runs a mail-sending function **directly in the Apps
+Script editor** and accepts the consent screen — a web app deployed to run "as me" has no way to
+trigger that prompt for a visitor, so the very first email send after adding this feature fails
+with a permission/authorization error until that one-time consent has been granted.
+
+**Fix on your end (one-time):** open the Apps Script editor → Code.gs → pick
+`testMailAppAuthorization` from the function dropdown → **Run** → approve the permission prompt.
+It sends a one-line confirmation email to your own account; once you've done this, "Email to
+Owner" works from the deployed web app. `emailOwnerPerformanceReport` now also detects this
+specific failure and returns that same instruction instead of a raw exception message, and checks
+the account's daily email quota first so a used-up quota (100/day on a plain Google account) also
+gets a clear, specific message instead of a generic error.
+
+### 12. Result Checker QR code — styled with the school's brand color + logo
+**admin.html** — `generatePortalQR`, `compositeQRWithLogo`, `printPortalQR`
+
+The QR (Settings → Result Checker QR) now renders in the school's own report-card brand color
+(`REPORT_PRIMARY_COLOR`, set under Settings → Report Options) instead of plain black-on-white,
+generated at high error-correction (`ecc=H`) specifically so it tolerates a school logo
+composited into the center (client-side, via canvas) without becoming unscannable. If the logo
+can't be read back out of a canvas in a given browser (e.g. a CORS restriction on wherever it's
+hosted), it falls back to the plain color-themed QR rather than failing outright. The printable
+poster's border/logo ring now use the same brand colors instead of a fixed gold.
+
 ## Deploying these changes
 
 This repo isn't connected to the Apps Script project via `clasp`, so the fastest path is manual:
@@ -179,6 +242,9 @@ This repo isn't connected to the Apps Script project via `clasp`, so the fastest
 3. Deploy → Manage deployments → edit your existing web app deployment → New version → Deploy.
    (Just saving the files updates the `/dev` URL; you need a new deployment version for the
    `/exec` URL the repo-root `index.html` iframes.)
+4. **One-time, only needed for "Email to Owner" to work:** in the same editor, pick
+   `testMailAppAuthorization` from the function dropdown next to the Run button, click **Run**,
+   and approve the permission prompt. See fix #11 above for why.
 
 If you'd rather set this repo up to push straight to Apps Script via `clasp` going forward, that's
 a one-time `clasp login` + `clasp clone <scriptId>` (matching this folder as the root) and then

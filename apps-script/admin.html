@@ -10033,16 +10033,24 @@
                 }
             }
             // Bind typography values to settings selects.
-            // BUGFIX: this must use the dedicated sysTypography cache as the PRIMARY source (falling
-            // back to whatever came in `s` only if it's empty) — not the other way around. `s` can be
-            // a stale settings snapshot (the localStorage 'schoolSettings' cache, or a getSettings()
-            // response that was in flight before the save and resolves after it), and every call to
-            // populateSettingsUI() re-applies whatever font it derives here. With the old priority
-            // (`s` first), saving a new font would apply instantly and then get silently reverted a
-            // moment later by the next populateSettingsUI() call (e.g. from re-opening the Settings
-            // panel) using the stale value. sysTypography is written synchronously by applyTypography()
-            // the instant a font is applied, so it's always the freshest source of truth.
-            var _storedFont = null; try { var _sf = localStorage.getItem('sysTypography'); if (_sf) _storedFont = JSON.parse(_sf); } catch(e) {}
+            // BUGFIX ("admin's chosen font doesn't show on mobile"): this used to prioritize the
+            // dedicated sysTypography *localStorage* cache over whatever came in `s` (the real,
+            // freshly-fetched, school-wide settings from the server) — see the old comment this
+            // replaces. That protected against one race (saving a font, then having a slightly
+            // stale in-flight settings fetch resolve a moment later and silently revert it) but
+            // caused a worse bug: localStorage is per-device, with no expiry, so any mobile
+            // browser that had EVER cached a different font locally — from before the admin last
+            // changed it school-wide on another device, or from a completely different session —
+            // would keep re-imposing that stale local value forever, even though the server has
+            // since been correctly updated. That's exactly what "admin sets the font, but it
+            // doesn't show on mobile" looks like: the phone's own old cached font permanently
+            // shadowing the real one.
+            // window._currentTypography is the right guard instead: it's in-memory only, starts
+            // empty on every fresh page load (mobile or desktop), and is only ever set by
+            // applyTypography() running *during this same page session* — so it still protects
+            // against the original same-session revert race, without a per-device cache able to
+            // outlive and override a real cross-device settings change.
+            var _storedFont = window._currentTypography || null;
             var fontFam = (_storedFont && _storedFont.fam) || s.SYSTEM_FONT_FAMILY || "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
             var fontSize = (_storedFont && _storedFont.size) || s.SYSTEM_FONT_SIZE || '14px';
             var fontWeight = (_storedFont && _storedFont.weight) || s.SYSTEM_FONT_WEIGHT || '500';
@@ -10252,7 +10260,25 @@
             var mobHmNameEl = document.getElementById('mob_set_HEADMASTER_NAME'); if (mobHmNameEl) mobHmNameEl.value = obj.HEADMASTER_NAME || '';
             var mobHtUserEl = document.getElementById('mob_set_HEADTEACHER_USER'); if (mobHtUserEl) mobHtUserEl.value = obj.HEADTEACHER_USER || 'headteacher';
             var mobHtPassEl = document.getElementById('mob_set_HEADTEACHER_PASS'); if (mobHtPassEl) mobHtPassEl.value = obj.HEADTEACHER_PASS || 'headteacher123';
-            google.script.run.withSuccessHandler(function (r) { if (r.success) { toast('Settings saved!', 'success'); saveSettingsToCache(obj); applyBrandingFromCache(); try { updateDashboardGreeting(); } catch(e) {} } else toast(r.message, 'error'); }).updateSettings(adminToken, obj);
+            google.script.run.withSuccessHandler(function (r) {
+                if (r.success) {
+                    toast('Settings saved!', 'success');
+                    // BUGFIX: this used to cache `obj` as-is — only the handful of fields this
+                    // particular form saves — which replaced the *entire* cached 'schoolSettings'
+                    // blob in localStorage, silently dropping everything else already cached
+                    // (font, logo, stamp, signature, ...) until the next full getSettings() fetch
+                    // corrected it. Harmless on a fast connection, but on a slow one (or if the
+                    // tab is closed first) the next page load would instant-paint from that
+                    // truncated cache and briefly show the wrong/default font and no branding.
+                    // Merge onto the existing cache instead of replacing it.
+                    var merged = window._cachedSettings || {};
+                    Object.keys(obj).forEach(function(k) { merged[k] = obj[k]; });
+                    window._cachedSettings = merged;
+                    saveSettingsToCache(merged);
+                    applyBrandingFromCache();
+                    try { updateDashboardGreeting(); } catch(e) {}
+                } else toast(r.message, 'error');
+            }).updateSettings(adminToken, obj);
         }
         function saveTeacherCustomRemarks() {
             var rem = document.getElementById('set_TCH_CUSTOM_CT_REMARKS').value;
@@ -10498,36 +10524,105 @@
             var sep = base.indexOf('?') > -1 ? '&' : '?';
             return base + sep + 'page=student';
         }
+        // Styles the QR with the school's own report-card brand color (REPORT_PRIMARY_COLOR —
+        // the color admin picks under Settings → Report Options, used across generated report
+        // cards) instead of plain black-on-white, and — where the browser allows reading the
+        // image data back out (see loadImageCORS below) — composites the school logo into the
+        // center. High error-correction (ecc=H) is requested specifically so the code stays
+        // scannable with up to ~30% of it obstructed, comfortably covering a small centered logo.
         function generatePortalQR() {
             var url = getPortalCheckerUrl();
             if (!url) { toast('Could not determine the portal URL.', 'error'); return; }
-            var qrSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(url);
+            var themeColor = ((window._cachedSettings && window._cachedSettings.REPORT_PRIMARY_COLOR) || '#0d1b4b').replace('#', '');
+            var qrSrc = 'https://api.qrserver.com/v1/create-qr-code/?size=400x400&ecc=H&color=' + encodeURIComponent(themeColor) + '&bgcolor=ffffff&data=' + encodeURIComponent(url);
             var box = document.getElementById('portalQRBox');
-            box.innerHTML = '<img src="' + qrSrc + '" alt="Result Checker QR Code" style="width:100%;height:100%;object-fit:contain">';
+            box.innerHTML = '<span style="font-size:11px;color:var(--mu)">Generating…</span>';
             document.getElementById('portalQRUrl').value = url;
-            var printBtn = document.getElementById('btnPrintPortalQR');
-            printBtn.disabled = false;
-            var dlBtn = document.getElementById('btnDownloadPortalQR');
-            dlBtn.href = qrSrc;
-            dlBtn.style.pointerEvents = 'auto';
-            dlBtn.style.opacity = '1';
-            window._portalQRSrc = qrSrc;
             window._portalQRUrl = url;
-            toast('QR code generated!', 'success');
+
+            function finishQR(finalSrc) {
+                box.innerHTML = '<img src="' + finalSrc + '" alt="Result Checker QR Code" style="width:100%;height:100%;object-fit:contain;background:#fff">';
+                var printBtn = document.getElementById('btnPrintPortalQR'); if (printBtn) printBtn.disabled = false;
+                var dlBtn = document.getElementById('btnDownloadPortalQR');
+                if (dlBtn) { dlBtn.href = finalSrc; dlBtn.download = 'result-checker-qr.png'; dlBtn.style.pointerEvents = 'auto'; dlBtn.style.opacity = '1'; }
+                window._portalQRSrc = finalSrc;
+                toast('QR code generated!', 'success');
+            }
+            function showPlainQR() { finishQR(qrSrc); }
+            function showError() {
+                box.innerHTML = '<span style="font-size:11px;color:#e11d48;text-align:center;padding:10px">Could not generate QR code. Check your connection and try again.</span>';
+                toast('QR generation failed.', 'error');
+            }
+
+            var logoUrl = (window._cachedSettings && window._cachedSettings.SCHOOL_LOGO) || '';
+            if (!logoUrl) {
+                // Still confirm the colored QR itself actually loads before showing it.
+                loadImageCORS(qrSrc).then(showPlainQR).catch(showError);
+                return;
+            }
+            loadImageCORS(qrSrc).then(function (qrImg) {
+                loadImageCORS(logoUrl).then(function (logoImg) {
+                    var composited = compositeQRWithLogo(qrImg, logoImg);
+                    if (composited) finishQR(composited); else showPlainQR();
+                }).catch(showPlainQR); // logo couldn't be loaded/read back (e.g. CORS) — still show the themed QR
+            }).catch(showError);
+        }
+        function loadImageCORS(src) {
+            return new Promise(function (resolve, reject) {
+                var img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = function () { resolve(img); };
+                img.onerror = reject;
+                img.src = src;
+            });
+        }
+        function compositeQRWithLogo(qrImg, logoImg) {
+            try {
+                var size = qrImg.naturalWidth || 400;
+                var canvas = document.createElement('canvas');
+                canvas.width = size; canvas.height = size;
+                var ctx = canvas.getContext('2d');
+                ctx.drawImage(qrImg, 0, 0, size, size);
+
+                // White rounded "badge" behind the logo so it stays legible against the QR
+                // modules, sized well within ecc=H's ~30% error-correction budget.
+                var badge = size * 0.26, cx = size / 2, cy = size / 2, r = badge / 2, rr = 8;
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.moveTo(cx - r + rr, cy - r);
+                ctx.arcTo(cx + r, cy - r, cx + r, cy + r, rr);
+                ctx.arcTo(cx + r, cy + r, cx - r, cy + r, rr);
+                ctx.arcTo(cx - r, cy + r, cx - r, cy - r, rr);
+                ctx.arcTo(cx - r, cy - r, cx + r, cy - r, rr);
+                ctx.closePath();
+                ctx.fill();
+
+                var logoSize = badge * 0.8, lw = logoSize, lh = logoSize;
+                if (logoImg.naturalWidth && logoImg.naturalHeight) {
+                    var ratio = logoImg.naturalWidth / logoImg.naturalHeight;
+                    if (ratio > 1) lh = logoSize / ratio; else lw = logoSize * ratio;
+                }
+                ctx.drawImage(logoImg, cx - lw / 2, cy - lh / 2, lw, lh);
+                return canvas.toDataURL('image/png');
+            } catch (e) {
+                return null; // tainted canvas or other failure — caller falls back to the plain QR
+            }
         }
         function printPortalQR() {
             if (!window._portalQRSrc) { toast('Generate the QR code first.', 'error'); return; }
             var schoolName = (window._cachedSettings && window._cachedSettings.SCHOOL_NAME) || 'School';
             var logo = (window._cachedSettings && window._cachedSettings.SCHOOL_LOGO) || '';
+            var themeColor = (window._cachedSettings && window._cachedSettings.REPORT_PRIMARY_COLOR) || '#0d1b4b';
+            var accentColor = (window._cachedSettings && window._cachedSettings.REPORT_ACCENT_COLOR) || '#f0c020';
             var w = window.open('', '_blank');
             if (!w) { toast('Please allow pop-ups to print the QR code.', 'error'); return; }
             w.document.write('<!DOCTYPE html><html><head><title>Result Checker QR — ' + schoolName + '</title><style>'
                 + '@page{size:A4 portrait;margin:20mm}'
-                + 'body{font-family:"Segoe UI",Arial,sans-serif;text-align:center;color:#0d1b4b;padding:20px}'
-                + 'img.logo{width:80px;height:80px;object-fit:cover;border-radius:50%;margin-bottom:10px}'
+                + 'body{font-family:"Segoe UI",Arial,sans-serif;text-align:center;color:' + themeColor + ';padding:20px}'
+                + 'img.logo{width:80px;height:80px;object-fit:cover;border-radius:50%;margin-bottom:10px;border:2px solid ' + themeColor + '}'
                 + 'h1{font-size:24px;margin:6px 0}'
                 + 'p{font-size:14px;color:#374151;margin:6px 0 24px}'
-                + 'img.qr{width:280px;height:280px;border:6px solid #f0c020;border-radius:12px;padding:10px}'
+                + 'img.qr{width:280px;height:280px;border:6px solid ' + accentColor + ';border-radius:12px;padding:10px}'
                 + '.url{margin-top:18px;font-size:12px;color:#6b7280;word-break:break-all}'
                 + '</style></head><body>'
                 + (logo ? '<img class="logo" src="' + logo + '">' : '')
@@ -11090,8 +11185,12 @@
                 if (s.HEADMASTER_NAME) headmasterName = s.HEADMASTER_NAME;
                 setReportColorPickers(s.REPORT_PRIMARY_COLOR, s.REPORT_ACCENT_COLOR);
                 var sbn = document.getElementById('sbSchoolName'); if (sbn && s.SCHOOL_NAME) sbn.textContent = s.SCHOOL_NAME;
-                /* Read font from dedicated sysTypography key first (most reliable), fall back to schoolSettings */
-                var _stf = null; try { var _stfr = localStorage.getItem('sysTypography'); if (_stfr) _stf = JSON.parse(_stfr); } catch(e){}
+                /* Same reasoning as populateSettingsUI: prefer the in-memory, this-session-only
+                   typography (set once applyTypography() has actually run this page load) over
+                   the cached settings blob — never the persistent sysTypography localStorage
+                   cache, which is per-device with no expiry and would otherwise keep re-imposing
+                   a stale local font over a legitimate cross-device change forever. */
+                var _stf = window._currentTypography || null;
                 var _ff = (_stf && _stf.fam) || s.SYSTEM_FONT_FAMILY || "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
                 var _fs = (_stf && _stf.size) || s.SYSTEM_FONT_SIZE || '14px';
                 var _fw = (_stf && _stf.weight) || s.SYSTEM_FONT_WEIGHT || '500';

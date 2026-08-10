@@ -49,6 +49,14 @@
         /* ── LANDING PAGE HERO ── */
         .landing-hero {
             width: 100%;
+            /* Carousel photos should fill the whole screen ("fullscreen slider"), not just
+               whatever height the hero content happens to need. min-height (not height) so the
+               hero still grows to fit taller content on small/zoomed screens instead of clipping
+               it. The plain vh rule is the fallback for browsers without svh support; where svh
+               *is* supported it uses the browser's stable viewport height so the hero doesn't
+               jump/resize as a mobile browser's address bar shows and hides. */
+            min-height: 100vh;
+            min-height: 100svh;
             padding: 96px 24px 200px;
             position: relative;
             text-align: center;

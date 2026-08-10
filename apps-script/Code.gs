@@ -1679,6 +1679,18 @@ function emailOwnerPerformanceReport(token, toEmail, year, term, classNames, not
   if (!toEmail || toEmail.indexOf('@') === -1) return {success: false, message: 'A valid owner email is required.'};
   try {
     if (!classNames || !classNames.length) return {success: false, message: 'Select at least one class.'};
+
+    // Fail with a clear, actionable message instead of a cryptic MailApp exception when the
+    // account's daily send quota (100/day on a plain Google account, much higher on Workspace)
+    // is used up — easy to hit while testing this feature repeatedly. A failure to even check
+    // the quota isn't fatal on its own; fall through and let the real send surface whatever the
+    // actual problem is.
+    try {
+      if (MailApp.getRemainingDailyQuota() <= 0) {
+        return {success: false, message: "This Google account's daily email sending limit has been reached. Try again after it resets (~24h), or use \"Send via WhatsApp\" instead."};
+      }
+    } catch(qe) {}
+
     var ss = SS();
     var sett = getCachedSettingsMap(ss);
     var html = buildOwnerPerformanceHtml(ss, sett, classNames, year, term);
@@ -1701,7 +1713,31 @@ function emailOwnerPerformanceReport(token, toEmail, year, term, classNames, not
 
     logServerAction(token, 'Email Owner Performance Report', 'To: ' + toEmail + ' — Classes: ' + classNames.join(', ') + ' — ' + term + ' ' + year);
     return {success: true, message: 'Performance report emailed to ' + toEmail + '.'};
-  } catch(e) { return {success: false, message: 'Email error: ' + e.message}; }
+  } catch(e) {
+    var msg = (e && e.message) ? e.message : String(e);
+    // Most common real-world cause: this Apps Script project has never actually been authorized
+    // for the "send email" permission. A web app deployed to run "as me" can't pop the Google
+    // consent screen for an end user visiting the page — that consent can only be granted by the
+    // project's owner running a function that calls MailApp/GmailApp directly from the Apps
+    // Script editor and accepting the prompt, once. Until that's done, every email send from the
+    // deployed web app fails with a permission/authorization error. Point directly at the fix
+    // instead of just surfacing the raw exception.
+    if (/permission|authoriz|scope|not been granted/i.test(msg)) {
+      return {success: false, message: 'Could not send email — this looks like a one-time authorization issue. In the Apps Script editor, open Code.gs, select "testMailAppAuthorization" from the function dropdown, click Run, and approve the permission prompt (this sends a test email to your own account). Then try again. (Details: ' + msg + ')'};
+    }
+    return {success: false, message: 'Email error: ' + msg};
+  }
+}
+
+// Run this ONCE from the Apps Script editor (function dropdown → testMailAppAuthorization →
+// Run) after adding/updating this project, to grant it permission to send email. This is what
+// "Email to Owner" (Settings → Owner Reports) needs and can't prompt for on its own — Google
+// only shows the consent screen to whoever runs a mail-sending function directly in the editor,
+// not to someone visiting the deployed web app. Sends a one-line confirmation to yourself.
+function testMailAppAuthorization() {
+  var me = Session.getEffectiveUser().getEmail() || Session.getActiveUser().getEmail();
+  if (!me) throw new Error('Could not determine your account email — run this from the Apps Script editor while signed in.');
+  MailApp.sendEmail(me, 'Mail authorization OK', 'If you received this, this Apps Script project is authorized to send email — Settings → Owner Reports → "Email to Owner" will now work from the deployed web app.');
 }
 
 // ── CUMULATIVE RECORD ──────────────────────────────────────
