@@ -1,0 +1,2462 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Portal</title>
+    <link rel="icon" href="favicon.png" type="image/png">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&display=swap"
+        rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        :root {
+            --navy: #0d1b4b;
+            --blue: #1a3a8a;
+            --gold: #f0c020;
+            --gold2: #e6a800;
+            /* Report card theme colors only (the .rc-* classes below). The admin picks these
+               two in the Admin Panel (replacing the old fixed 3-template picker); JS sets them
+               once the school's settings load. Defaults match the original "Classic Navy" look,
+               so a school that hasn't set custom colors yet sees the same report card as
+               before. Kept separate from --navy/--gold above, which theme the rest of this page
+               (landing hero, buttons, etc.) and are not affected by this setting. */
+            --rc-primary: #0d1b4b;
+            --rc-primary-light: #1a237e;
+            --rc-accent: #f0c020;
+            --rc-accent-light: #ffd700;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: linear-gradient(135deg, #0d1b4b 0%, #152566 45%, #0d2d6b 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 0 16px 40px;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* ── LANDING PAGE HERO ── */
+        .landing-hero {
+            width: 100%;
+            padding: 96px 24px 200px;
+            position: relative;
+            text-align: center;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 0;
+        }
+
+        .landing-hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(8, 16, 50, 0.55) 0%, rgba(13, 27, 75, 0.78) 100%);
+            z-index: 1;
+        }
+
+        /* Ultramodern classroom background */
+        .landing-hero {
+            background: url('https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=1400&q=80') center/cover no-repeat;
+        }
+
+        .hero-grid {
+            display: none;
+        }
+
+        .hero-pupil-images {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            gap: 12px;
+            padding: 12px;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            align-content: space-around;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .hero-pupil-images .hp-img {
+            width: 70px;
+            height: 82px;
+            border-radius: 8px;
+            object-fit: cover;
+            opacity: 0.15;
+            filter: grayscale(40%);
+            border: 1px solid rgba(240, 192, 32, 0.2);
+        }
+
+        /* hero-content sits above the overlay */
+        .hero-content {
+            position: relative;
+            z-index: 2;
+            max-width: 640px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .hero-logo-wrap {
+            width: 92px;
+            height: 92px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #f0c020, #ffd700, #e6a800);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 42px;
+            margin-bottom: 18px;
+            box-shadow: 0 10px 36px rgba(240, 192, 32, .45), 0 0 0 6px rgba(255, 255, 255, .08);
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .hero-logo-wrap img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+
+        .hero-school-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(240, 192, 32, 0.14);
+            border: 1px solid rgba(240, 192, 32, 0.35);
+            border-radius: 20px;
+            padding: 6px 18px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #f0c020;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 18px;
+        }
+
+        .hero-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 40px;
+            font-weight: 900;
+            color: #fff;
+            line-height: 1.15;
+            margin-bottom: 14px;
+            text-shadow: 0 2px 24px rgba(0, 0, 0, 0.5);
+            letter-spacing: -0.5px;
+        }
+
+        .hero-subtitle {
+            font-size: 15px;
+            color: rgba(255, 255, 255, 0.75);
+            line-height: 1.65;
+            max-width: 540px;
+            margin: 0 auto;
+        }
+
+        .hero-stats {
+            display: flex;
+            gap: 34px;
+            justify-content: center;
+            margin-top: 30px;
+            flex-wrap: wrap;
+        }
+
+        .hero-stat {
+            text-align: center;
+        }
+
+        .hero-stat-val {
+            font-family: 'Outfit', sans-serif;
+            font-size: 28px;
+            font-weight: 900;
+            color: #f0c020;
+            display: block;
+        }
+
+        .hero-stat-lbl {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Address / phone / email pills under the stats row */
+        .hero-contact-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 28px;
+            padding-top: 24px;
+            border-top: 1px solid rgba(255, 255, 255, 0.14);
+            width: 100%;
+        }
+
+        .hero-contact-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 20px;
+            padding: 7px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(4px);
+        }
+
+        .hero-contact-item svg {
+            flex-shrink: 0;
+            color: #f0c020;
+        }
+
+        /* Card now overlaps the hero */
+        .portal-card-wrap {
+            width: 100%;
+            max-width: 460px;
+            margin: -140px auto 0;
+            position: relative;
+            z-index: 10;
+        }
+
+        .bg-canvas {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            overflow: hidden;
+            z-index: 0
+        }
+
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(90px);
+            animation: drift 14s infinite alternate
+        }
+
+        .orb1 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(240, 192, 32, .11), transparent 70%);
+            top: -120px;
+            left: -100px;
+            animation-duration: 16s
+        }
+
+        .orb2 {
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(26, 58, 138, .22), transparent 70%);
+            bottom: -100px;
+            right: -100px
+        }
+
+        .orb3 {
+            width: 280px;
+            height: 280px;
+            background: radial-gradient(circle, rgba(240, 192, 32, .07), transparent 70%);
+            top: 50%;
+            left: 60%
+        }
+
+        @keyframes drift {
+            0% {
+                transform: translate(0, 0) scale(1)
+            }
+
+            100% {
+                transform: translate(30px, 40px) scale(1.08)
+            }
+        }
+
+        .particle {
+            position: fixed;
+            border-radius: 50%;
+            background: rgba(240, 192, 32, .55);
+            animation: floatUp linear infinite;
+            pointer-events: none;
+            z-index: 1
+        }
+
+        @keyframes floatUp {
+            0% {
+                transform: translateY(100vh) rotate(0deg);
+                opacity: 0
+            }
+
+            10% {
+                opacity: 1
+            }
+
+            90% {
+                opacity: .8
+            }
+
+            100% {
+                transform: translateY(-80px) rotate(720deg);
+                opacity: 0
+            }
+        }
+
+        /* PORTAL CARD */
+        .portal-card {
+            background: #fff;
+            border-radius: 28px;
+            width: 100%;
+            box-shadow: 0 40px 100px rgba(13, 27, 75, .55), 0 0 0 1px rgba(240, 192, 32, .18);
+            overflow: hidden;
+            position: relative;
+            animation: slideUp .65s cubic-bezier(.22, 1, .36, 1);
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(48px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        .card-head {
+            background: linear-gradient(145deg, #0a1540 0%, #1a3a8a 55%, #0d2d6b 100%);
+            padding: 36px 32px 28px;
+            text-align: center;
+            position: relative;
+            overflow: hidden
+        }
+
+        .card-head::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #f0c020, #ffd700, #f0c020, transparent)
+        }
+
+        .card-head::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(240, 192, 32, .35), transparent)
+        }
+
+        .logo-ring-wrap {
+            position: relative;
+            width: 86px;
+            height: 86px;
+            margin: 0 auto 16px
+        }
+
+        .logo-badge {
+            width: 86px;
+            height: 86px;
+            background: linear-gradient(135deg, #f0c020, #ffd700, #e6a800);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            box-shadow: 0 8px 32px rgba(240, 192, 32, .5);
+            overflow: hidden
+        }
+
+        .logo-badge img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%
+        }
+
+        .logo-ring {
+            position: absolute;
+            inset: -6px;
+            border-radius: 50%;
+            border: 2px solid rgba(240, 192, 32, .3);
+            animation: pulse-ring 2s infinite
+        }
+
+        @keyframes pulse-ring {
+
+            0%,
+            100% {
+                transform: scale(1);
+                opacity: .5
+            }
+
+            50% {
+                transform: scale(1.06);
+                opacity: 1
+            }
+        }
+
+        .school-name-head {
+            font-family: 'Outfit', sans-serif;
+            font-size: 16.5px;
+            font-weight: 700;
+            color: #fff;
+            line-height: 1.35;
+            margin-bottom: 4px;
+            letter-spacing: .4px
+        }
+
+        .school-tagline-head {
+            font-size: 11px;
+            color: rgba(255, 255, 255, .5);
+            letter-spacing: 2.5px;
+            text-transform: uppercase
+        }
+
+        .gold-line {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(240, 192, 32, .45), transparent);
+            margin: 14px 0 0
+        }
+
+        .card-body {
+            padding: 30px 28px
+        }
+
+        /* CATEGORY & CLASS TILES */
+        .cat-tiles {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .cat-tile {
+            background: linear-gradient(135deg, #0d1b4b, #1a3a8a);
+            border: 2px solid rgba(240, 192, 32, 0.2);
+            border-radius: 16px;
+            padding: 18px 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all .25s cubic-bezier(.22, 1, .36, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cat-tile::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(240, 192, 32, 0.08), transparent);
+            opacity: 0;
+            transition: opacity .25s
+        }
+
+        .cat-tile:hover {
+            transform: translateY(-3px);
+            border-color: #f0c020;
+            box-shadow: 0 8px 24px rgba(240, 192, 32, 0.2)
+        }
+
+        .cat-tile:hover::before {
+            opacity: 1
+        }
+
+        .cat-tile-icon {
+            font-size: 28px;
+            margin-bottom: 8px;
+            display: block
+        }
+
+        .cat-tile-name {
+            font-family: 'Outfit', sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            color: #fff;
+            line-height: 1.3
+        }
+
+        .cat-tile-sub {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-top: 3px
+        }
+
+        .cls-tiles {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .cls-tile {
+            background: #f8faff;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 14px 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all .22s;
+            font-weight: 700;
+            font-size: 13px;
+            color: #0d1b4b;
+        }
+
+        .cls-tile:hover {
+            background: #0d1b4b;
+            color: #f0c020;
+            border-color: #0d1b4b;
+            transform: translateY(-2px)
+        }
+
+        .back-link {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            color: #6b7280;
+            cursor: pointer;
+            margin-bottom: 14px;
+            transition: color .2s
+        }
+
+        .back-link:hover {
+            color: #0d1b4b
+        }
+
+        /* STEPS */
+        .step-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 26px
+        }
+
+        .step-dot {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 700;
+            flex-shrink: 0;
+            transition: all .35s cubic-bezier(.22, 1, .36, 1)
+        }
+
+        .step-dot.done {
+            background: linear-gradient(135deg, #16a34a, #22c55e);
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(34, 197, 94, .3)
+        }
+
+        .step-dot.active {
+            background: linear-gradient(135deg, #0d1b4b, #1a3a8a);
+            color: #f0c020;
+            box-shadow: 0 4px 16px rgba(13, 27, 75, .35)
+        }
+
+        .step-dot.pending {
+            background: #f3f4f6;
+            color: #9ca3af;
+            border: 2px solid #e5e7eb
+        }
+
+        .step-connector {
+            flex: 1;
+            height: 2px;
+            background: #e5e7eb;
+            margin: 0 -1px;
+            transition: background .35s
+        }
+
+        .step-connector.done {
+            background: linear-gradient(90deg, #16a34a, #22c55e)
+        }
+
+        .step-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 3px
+        }
+
+        .step-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            color: #9ca3af;
+            margin-top: 4px
+        }
+
+        .step-info.active .step-label {
+            color: #0d1b4b
+        }
+
+        .step-info.done .step-label {
+            color: #16a34a
+        }
+
+        /* PANELS */
+        .step-panel {
+            display: none
+        }
+
+        .step-panel.active {
+            display: block;
+            animation: panelFade .4s cubic-bezier(.22, 1, .36, 1)
+        }
+
+        @keyframes panelFade {
+            from {
+                opacity: 0;
+                transform: translateX(14px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0)
+            }
+        }
+
+        .panel-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 23px;
+            font-weight: 700;
+            color: #0d1b4b;
+            margin-bottom: 4px
+        }
+
+        .panel-sub {
+            font-size: 13px;
+            color: #6b7280;
+            margin-bottom: 22px;
+            line-height: 1.5
+        }
+
+        /* ALERT */
+        .alert {
+            padding: 11px 16px;
+            border-radius: 11px;
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 14px;
+            display: none;
+            align-items: center;
+            gap: 9px;
+            animation: alertIn .3s
+        }
+
+        @keyframes alertIn {
+            from {
+                opacity: 0;
+                transform: translateY(-6px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        .alert.show {
+            display: flex
+        }
+
+        .alert.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5
+        }
+
+        .alert.success {
+            background: #dcfce7;
+            color: #166534;
+            border: 1px solid #86efac
+        }
+
+        .alert.info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd
+        }
+
+        /* DEMO CODE BOX */
+        .demo-box {
+            background: linear-gradient(135deg, #fef9e7, #fffbf0);
+            border: 1.5px solid rgba(240, 192, 32, .5);
+            border-radius: 12px;
+            padding: 14px 18px;
+            margin-bottom: 18px;
+            display: none;
+            animation: alertIn .3s
+        }
+
+        .demo-box.show {
+            display: block
+        }
+
+        .demo-box-lbl {
+            font-size: 10.5px;
+            color: #92400e;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 6px
+        }
+
+        .demo-code {
+            font-size: 30px;
+            font-weight: 700;
+            letter-spacing: 12px;
+            color: #0d1b4b;
+            font-family: monospace
+        }
+
+        .demo-note {
+            font-size: 11px;
+            color: #92400e;
+            margin-top: 5px;
+            opacity: .8
+        }
+
+        /* FORM */
+        .fg {
+            margin-bottom: 18px
+        }
+
+        .fg-lbl {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            color: #374151;
+            letter-spacing: .8px;
+            text-transform: uppercase;
+            margin-bottom: 7px
+        }
+
+        .input-wrap {
+            position: relative
+        }
+
+        .inp-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 18px;
+            color: #9ca3af;
+            pointer-events: none
+        }
+
+        .field-inp {
+            width: 100%;
+            padding: 13px 14px 13px 46px;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            font-size: 15px;
+            font-family: 'DM Sans', sans-serif;
+            color: #1a1a2e;
+            background: #fafafa;
+            transition: all .22s;
+            outline: none
+        }
+
+        .field-inp:focus {
+            border-color: #1a3a8a;
+            background: #fff;
+            box-shadow: 0 0 0 4px rgba(26, 58, 138, .07)
+        }
+
+        .field-inp::placeholder {
+            color: #c4c9d4
+        }
+
+        /* OTP */
+        .otp-row {
+            display: flex;
+            gap: 9px;
+            justify-content: center;
+            margin: 6px 0 4px
+        }
+
+        .otp-d {
+            width: 52px;
+            height: 56px;
+            border: 2px solid #e5e7eb;
+            border-radius: 13px;
+            font-size: 24px;
+            font-weight: 700;
+            text-align: center;
+            color: #0d1b4b;
+            background: #fafafa;
+            transition: all .22s;
+            outline: none;
+            font-family: 'DM Sans', sans-serif
+        }
+
+        .otp-d:focus {
+            border-color: #1a3a8a;
+            background: #fff;
+            box-shadow: 0 0 0 4px rgba(26, 58, 138, .07);
+            transform: scale(1.04)
+        }
+
+        .otp-d.filled {
+            border-color: #f0c020;
+            background: linear-gradient(135deg, #fef9e7, #fff)
+        }
+
+        /* PRIMARY BUTTON */
+        .btn-primary {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #0d1b4b, #1a3a8a);
+            color: #fff;
+            border: none;
+            border-radius: 13px;
+            font-size: 15px;
+            font-weight: 600;
+            font-family: 'DM Sans', sans-serif;
+            cursor: pointer;
+            transition: all .22s;
+            position: relative;
+            overflow: hidden;
+            letter-spacing: .3px;
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 28px rgba(13, 27, 75, .33)
+        }
+
+        .btn-primary:disabled {
+            opacity: .55;
+            cursor: not-allowed;
+            transform: none
+        }
+
+        .btn-primary .shine {
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 50%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .15), transparent);
+            transition: left .5s
+        }
+
+        .btn-primary:hover .shine {
+            left: 150%
+        }
+
+        .btn-sec {
+            width: 100%;
+            padding: 12px;
+            background: transparent;
+            color: #6b7280;
+            border: 2px solid #e5e7eb;
+            border-radius: 11px;
+            font-size: 14px;
+            font-weight: 500;
+            font-family: 'DM Sans', sans-serif;
+            cursor: pointer;
+            transition: all .22s;
+            margin-top: 9px
+        }
+
+        .btn-sec:hover {
+            border-color: #1a3a8a;
+            color: #1a3a8a;
+            background: #e8f0fe
+        }
+
+        .spinner {
+            width: 19px;
+            height: 19px;
+            border: 2.5px solid rgba(255, 255, 255, .3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+            display: none
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg)
+            }
+        }
+
+        .btn-primary.loading .spinner {
+            display: inline-block
+        }
+
+        .btn-primary.loading .btn-lbl {
+            display: none
+        }
+
+        .admin-link {
+            margin-top: 18px;
+            text-align: center;
+            font-size: 12px;
+            color: rgba(255, 255, 255, .45);
+            z-index: 10;
+            position: relative
+        }
+
+        .admin-link a {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 50%;
+            color: #f0c020;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(240, 192, 32, 0.2)
+        }
+
+        .admin-link a:hover {
+            background: rgba(240, 192, 32, 0.1);
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(240, 192, 32, 0.2)
+        }
+
+        .footer-note {
+            margin-top: 14px;
+            text-align: center;
+            font-size: 11px;
+            color: rgba(255, 255, 255, .28);
+            letter-spacing: .5px;
+            z-index: 10;
+            position: relative
+        }
+
+        /* ── REPORT OVERLAY ─────────────────────────────── */
+        #reportOverlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(10, 20, 60, .97);
+            z-index: 2000;
+            overflow-y: auto;
+            padding: 20px 12px 48px
+        }
+
+        #reportOverlay.show {
+            display: block;
+            animation: fadeIn .4s
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0
+            }
+
+            to {
+                opacity: 1
+            }
+        }
+
+        .rc-toolbar {
+            max-width: 860px;
+            margin: 0 auto 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px
+        }
+
+        .rc-toolbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px
+        }
+
+        .rc-toolbar-logo {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #f0c020, #ffd700);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px
+        }
+
+        .rc-toolbar-name {
+            font-family: 'Outfit', sans-serif;
+            font-size: 14px;
+            color: #f0c020;
+            font-weight: 700
+        }
+
+        .rc-toolbar-acts {
+            display: flex;
+            gap: 8px
+        }
+
+        .rc-btn {
+            padding: 9px 18px;
+            border: none;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'DM Sans', sans-serif;
+            transition: all .2s;
+            display: flex;
+            align-items: center;
+            gap: 6px
+        }
+
+        .rc-btn-back {
+            background: rgba(255, 255, 255, .08);
+            color: rgba(255, 255, 255, .8);
+            border: 1px solid rgba(255, 255, 255, .12)
+        }
+
+        .rc-btn-back:hover {
+            background: rgba(255, 255, 255, .15);
+            color: #fff
+        }
+
+        .rc-btn-print {
+            background: linear-gradient(135deg, #f0c020, #ffd700);
+            color: #0d1b4b;
+            font-weight: 700
+        }
+
+        .rc-btn-print:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(240, 192, 32, .35)
+        }
+
+        /* ── REPORT CARD STYLES ─────────────────────────── */
+        .rc-page {
+            background: #fff;
+            max-width: 860px;
+            margin: 0 auto;
+            border-radius: 4px;
+            overflow: hidden;
+            box-shadow: 0 24px 80px rgba(0, 0, 0, .5)
+        }
+
+        .rc-hdr {
+            display: grid;
+            grid-template-columns: 76px 1fr 76px;
+            align-items: center;
+            gap: 12px;
+            padding: 18px 22px;
+            background: linear-gradient(145deg, var(--rc-primary) 0%, var(--rc-primary-light) 55%, var(--rc-primary) 100%);
+            position: relative
+        }
+
+        .rc-hdr::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--rc-accent), var(--rc-accent-light), var(--rc-accent), transparent)
+        }
+
+        .rc-logo {
+            width: 68px;
+            height: 68px;
+            background: linear-gradient(135deg, var(--rc-accent), var(--rc-accent-light));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            flex-shrink: 0;
+            box-shadow: 0 4px 16px rgba(240, 192, 32, .4);
+            overflow: hidden
+        }
+
+        .rc-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%
+        }
+
+        .rc-sname {
+            font-family: 'Outfit', sans-serif;
+            font-size: 17px;
+            font-weight: 700;
+            color: #fff;
+            text-align: center;
+            text-transform: uppercase;
+            line-height: 1.3
+        }
+
+        .rc-scontact {
+            font-size: 10.5px;
+            color: rgba(255, 255, 255, .65);
+            text-align: center;
+            margin-top: 4px;
+            line-height: 1.7
+        }
+
+        .rc-photobox {
+            width: 68px;
+            height: 80px;
+            background: #fff;
+            border: 2px solid var(--rc-accent);
+            border-radius: 4px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            color: #9ca3af;
+            flex-shrink: 0
+        }
+
+        .rc-photobox img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover
+        }
+
+        .rc-title-strip {
+            background: linear-gradient(135deg, var(--rc-accent), var(--rc-accent-light));
+            padding: 9px 22px;
+            text-align: center
+        }
+
+        .rc-title-text {
+            font-family: 'Outfit', sans-serif;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--rc-primary);
+            letter-spacing: 3px;
+            text-transform: uppercase
+        }
+
+        .rc-sub-strip {
+            background: var(--rc-primary);
+            padding: 5px 22px;
+            text-align: center;
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, .8);
+            letter-spacing: 2.5px;
+            text-transform: uppercase
+        }
+
+        .rc-id-row {
+            padding: 8px 22px;
+            text-align: center;
+            background: #f8faff;
+            border-bottom: 1px solid #e5e7eb
+        }
+
+        .rc-id-badge {
+            display: inline-block;
+            background: var(--rc-primary);
+            color: var(--rc-accent);
+            font-size: 14px;
+            font-weight: 700;
+            padding: 2px 16px;
+            border-radius: 4px;
+            letter-spacing: 2px
+        }
+
+        .rc-info {
+            padding: 11px 22px;
+            border-bottom: 2px solid var(--rc-primary)
+        }
+
+        .rc-info-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 7px 14px
+        }
+
+        .rc-info-item {
+            font-size: 12px;
+            display: flex;
+            gap: 5px;
+            align-items: baseline
+        }
+
+        .rc-il {
+            color: #6b7280;
+            font-weight: 500;
+            white-space: nowrap;
+            flex-shrink: 0
+        }
+
+        .rc-iv {
+            color: #0d1b4b;
+            font-weight: 700;
+            border-bottom: 1px dotted #e5e7eb;
+            flex: 1;
+            min-width: 0;
+            word-break: break-word
+        }
+
+        .rc-tbl-wrap {
+            padding: 0 22px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .rc-tbl {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin: 10px 0
+        }
+
+        .rc-tbl thead tr {
+            background: linear-gradient(135deg, var(--rc-accent), var(--rc-accent-light))
+        }
+
+        .rc-tbl th {
+            padding: 7px 5px;
+            text-align: center;
+            color: var(--rc-primary);
+            font-weight: 700;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            border: 1px solid var(--rc-primary)
+        }
+
+        .rc-tbl td {
+            padding: 6px 5px;
+            border: 1px solid #dee2e6;
+            text-align: center;
+            color: #374151;
+            vertical-align: middle
+        }
+
+        .rc-tbl tbody tr:nth-child(even) {
+            background: #f8faff
+        }
+
+        .rc-td-subj {
+            text-align: left !important;
+            font-weight: 500;
+            padding-left: 9px !important
+        }
+
+        .rc-stats {
+            display: flex;
+            flex-wrap: wrap;
+            background: #f8faff;
+            border-top: 2px solid var(--rc-primary);
+            border-bottom: 2px solid var(--rc-primary);
+            margin: 0 22px
+        }
+
+        .rc-stat {
+            flex: 1;
+            padding: 9px 8px;
+            text-align: center;
+            border-right: 1px solid #e5e7eb;
+            min-width: 80px
+        }
+
+        .rc-stat:last-child {
+            border-right: none
+        }
+
+        .rc-stat-lbl {
+            font-size: 9.5px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            font-weight: 600;
+            display: block
+        }
+
+        .rc-stat-val {
+            font-size: 15px;
+            font-weight: 700;
+            color: #c0392b;
+            display: block;
+            margin-top: 2px
+        }
+
+        .rc-pos-bar {
+            background: linear-gradient(135deg, var(--rc-primary), var(--rc-primary-light));
+            padding: 7px 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px
+        }
+
+        .rc-pos-lbl {
+            font-size: 11.5px;
+            color: rgba(255, 255, 255, .7);
+            font-weight: 500;
+            letter-spacing: .3px
+        }
+
+        .rc-pos-badge {
+            background: var(--rc-accent);
+            color: var(--rc-primary);
+            font-size: 15px;
+            font-weight: 700;
+            padding: 2px 14px;
+            border-radius: 20px
+        }
+
+        .rc-agg-bar {
+            background: var(--rc-primary-light);
+            padding: 7px 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            border-top: 2px solid var(--rc-accent)
+        }
+
+        .rc-agg-lbl {
+            font-size: 11.5px;
+            color: rgba(255, 255, 255, .8);
+            font-weight: 600
+        }
+
+        .rc-agg-badge {
+            background: var(--rc-accent);
+            color: var(--rc-primary);
+            font-size: 18px;
+            font-weight: 700;
+            padding: 2px 18px;
+            border-radius: 20px
+        }
+
+        .rc-rmk {
+            padding: 10px 22px;
+            border-top: 1px solid #e5e7eb
+        }
+
+        .rc-rmk-title {
+            font-size: 10.5px;
+            font-weight: 700;
+            color: var(--rc-primary);
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 7px;
+            padding-bottom: 3px;
+            border-bottom: 2px solid var(--rc-accent);
+            display: inline-block
+        }
+
+        .rc-rmk-row {
+            display: flex;
+            gap: 10px;
+            padding: 4px 0;
+            border-bottom: 2px dashed #94a3b8;
+            font-size: 12px;
+            align-items: flex-start
+        }
+
+        .rc-rmk-row:last-child {
+            border-bottom: none
+        }
+
+        .rc-rmk-k {
+            min-width: 165px;
+            color: #6b7280;
+            font-weight: 600;
+            flex-shrink: 0
+        }
+
+        .rc-rmk-v {
+            color: #0d1b4b;
+            font-weight: 500;
+            line-height: 1.45
+        }
+
+        .rc-sigs {
+            display: flex;
+            justify-content: space-between;
+            padding: 11px 22px;
+            gap: 16px
+        }
+
+        .rc-sig {
+            flex: 1;
+            text-align: center;
+            font-size: 11px;
+            color: #374151;
+            position: relative
+        }
+
+        .rc-sig-line {
+            margin-bottom: 8px;
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden
+        }
+
+        .rc-sig-role {
+            font-weight: 700;
+            color: var(--rc-primary)
+        }
+
+        .rc-gkey {
+            margin: 0 22px 8px
+        }
+
+        .rc-gkey-hdr {
+            background: var(--rc-primary);
+            padding: 5px 12px;
+            font-size: 10.5px;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: 2px;
+            text-transform: uppercase
+        }
+
+        .rc-gkey-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 18px;
+            padding: 7px 12px;
+            border: 1px solid var(--rc-primary);
+            font-size: 11px
+        }
+
+        .rc-gkey-items b {
+            color: #c0392b;
+            margin-right: 2px
+        }
+
+        .rc-footer-strip {
+            background: linear-gradient(135deg, var(--rc-accent), var(--rc-accent-light));
+            padding: 7px 22px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: var(--rc-primary);
+            font-weight: 600
+        }
+
+        @media screen and (max-width:540px) {
+            .rc-page {
+                width: 100% !important;
+                max-width: 100% !important;
+                border-radius: 0 !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+                border: 2px solid var(--rc-primary) !important;
+            }
+
+            .rc-sigs {
+                flex-direction: column !important;
+                align-items: center !important;
+                gap: 20px !important;
+            }
+
+            .rc-hdr {
+                grid-template-columns: 56px 1fr 56px;
+                gap: 8px;
+                padding: 14px
+            }
+
+            .rc-sname {
+                font-size: 13px
+            }
+
+            .rc-info-grid {
+                grid-template-columns: 1fr 1fr
+            }
+
+            .otp-d {
+                width: 44px;
+                height: 48px;
+                font-size: 20px
+            }
+        }
+
+        @media print {
+
+            /* Ask the browser not to fade/grayscale vivid colors to save ink. This only
+               takes effect when the print dialog's "Background graphics" option is on — it
+               can't force that setting, which is why the rules below also give every
+               colored section a print-safe fallback that stays legible even if background
+               colors don't make it to the page at all. */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+
+            /* Hide EVERYTHING except the report overlay — most robust approach.
+               #appRoot is the single React mount point (portal card + report overlay live inside
+               it as siblings), so this targets it instead of `body` directly. */
+            #appRoot>* {
+                display: none !important;
+            }
+
+            #appRoot>#reportOverlay {
+                display: block !important;
+            }
+
+            .landing-hero,
+            .hero-school-badge,
+            .hero-stats,
+            .portal-card-wrap,
+            .card-head,
+            .rc-toolbar,
+            .no-print,
+            .bg-canvas,
+            .admin-link {
+                display: none !important;
+            }
+
+            @page {
+                size: A4 portrait;
+                margin: 10mm;
+            }
+
+            body,
+            html {
+                background: #fff !important;
+                padding: 0 !important
+            }
+
+            #reportOverlay {
+                position: static !important;
+                background: #fff !important;
+                padding: 0 !important;
+                display: block !important
+            }
+
+            .rc-toolbar,
+            .no-print {
+                display: none !important
+            }
+
+            .rc-page {
+                box-shadow: none !important;
+                border-radius: 0 !important;
+                max-width: 190mm !important;
+                width: 100% !important;
+                margin: 0 auto !important;
+                border: 4px solid #0d1b4b !important
+            }
+
+            .rc-tbl th,
+            .rc-tbl td {
+                border: 2px solid rgba(13, 27, 75, 0.2) !important;
+            }
+
+            .rc-tbl tfoot td {
+                border: 2px solid rgba(255, 255, 255, 0.4) !important;
+            }
+
+            .rc-tbl {
+                border-bottom: 2px dotted #0d1b4b !important;
+            }
+            .rc-sigs {
+                display: flex !important;
+                flex-direction: row !important;
+                justify-content: space-between !important;
+                align-items: flex-end !important;
+            }
+
+            /* FIX: "faint/invisible text when printed". Several bars use light or translucent
+               white text on a dark navy/gold background for the on-screen look. Many browsers
+               print with background colors turned off by default (and some printers/toner-
+               saving modes fade them further even when they are on) — when that happens this
+               light text sits on plain white paper and is unreadable. Give every such section a
+               print-only palette of solid, dark, opaque text plus a border, so the report stays
+               fully legible on paper regardless of what the printer does with the backgrounds. */
+            .rc-hdr,
+            .rc-substrip,
+            .rc-pos-bar,
+            .rc-agg-bar,
+            .rc-gkey-hdr,
+            .rc-footer-strip,
+            .rc-tbl tfoot tr {
+                background: #ffffff !important;
+                border-bottom: 1.5px solid #0d1b4b !important;
+            }
+
+            .rc-hdr::before {
+                display: none !important;
+            }
+
+            .rc-sname,
+            .rc-scontact,
+            .rc-substrip,
+            .rc-pos-lbl,
+            .rc-agg-lbl,
+            .rc-agg-detail,
+            .rc-gkey-hdr,
+            .rc-footer-strip,
+            .rc-tbl tfoot td {
+                color: #0d1b4b !important;
+                opacity: 1 !important;
+                text-shadow: none !important;
+            }
+
+            .rc-pos-badge,
+            .rc-agg-badge,
+            .rc-id-badge {
+                background: #ffffff !important;
+                border: 1.5px solid #0d1b4b !important;
+                color: #0d1b4b !important;
+            }
+
+            .rc-logo,
+            .rc-photobox {
+                border: 2px solid #0d1b4b !important;
+            }
+
+            .rc-tbl td,
+            .rc-rmk-v,
+            .rc-rmk-k,
+            .rc-il,
+            .rc-stat-lbl,
+            .rc-sig {
+                color: #111827 !important;
+                opacity: 1 !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="bg-canvas">
+        <div class="orb orb1"></div>
+        <div class="orb orb2"></div>
+        <div class="orb orb3"></div>
+    </div>
+
+    <!-- LANDING HERO SECTION (static — purely decorative branding banner, not part of the
+         React app; kept as plain HTML/JS so the interactive login/report flow below can be
+         rewritten in React without touching this working piece). -->
+    <div class="landing-hero" id="landingHero">
+        <div class="hero-grid" id="heroPupilImages">
+            <!-- Student silhouette tiles injected by JS -->
+        </div>
+        <div class="hero-content">
+            <div class="hero-logo-wrap" id="heroLogoWrap"><svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#0d1b4b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg></div>
+            <div class="hero-school-badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:4px"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>Welcome To</div>
+            <div class="hero-title" id="heroSchoolName">School Management System</div>
+            <div class="hero-subtitle" id="heroTagline">Check academic results, track performance, and access official report
+                cards — securely, anytime, from any device.</div>
+            <div class="hero-stats">
+                <div class="hero-stat">
+                    <span class="hero-stat-val"><svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+                            stroke="#f0c020" stroke-width="2" stroke-linecap="round">
+                            <line x1="18" y1="20" x2="18" y2="10" />
+                            <line x1="12" y1="20" x2="12" y2="4" />
+                            <line x1="6" y1="20" x2="6" y2="14" />
+                        </svg></span>
+                    <span class="hero-stat-lbl">Results</span>
+                </div>
+                <div class="hero-stat">
+                    <span class="hero-stat-val"><svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+                            stroke="#f0c020" stroke-width="2" stroke-linecap="round">
+                            <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+                            <path d="M6 12v5c3 3 9 3 12 0v-5" />
+                        </svg></span>
+                    <span class="hero-stat-lbl">Excellence</span>
+                </div>
+                <div class="hero-stat">
+                    <span class="hero-stat-val"><svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+                            stroke="#f0c020" stroke-width="2" stroke-linecap="round">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg></span>
+                    <span class="hero-stat-lbl">Secure</span>
+                </div>
+            </div>
+            <div class="hero-contact-row" id="heroContactRow" style="display:none">
+                <span class="hero-contact-item" id="heroContactAddr" style="display:none">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>
+                    <span id="heroContactAddrText"></span>
+                </span>
+                <span class="hero-contact-item" id="heroContactPhone" style="display:none">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.37a2 2 0 0 1 1.99-2.18h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6.13 6.13l.98-.98a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" /></svg>
+                    <span id="heroContactPhoneText"></span>
+                </span>
+                <span class="hero-contact-item" id="heroContactEmail" style="display:none">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" /><polyline points="22,6 12,13 2,6" /></svg>
+                    <span id="heroContactEmailText"></span>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- REACT APP MOUNTS HERE — everything interactive (category → class → identity → OTP →
+         period → report) lives inside this single root, rendered with React 18. -->
+    <div id="appRoot"></div>
+
+    <div style="text-align:center;margin-top:30px">
+        <a href="<?= scriptUrl ?>?page=admin" target="_top"
+            style="display:inline-flex;align-items:center;padding:6px 14px;border-radius:20px;text-decoration:none;margin-bottom:6px;border:1px solid rgba(255,255,255,0.4);color:rgba(255,255,255,0.95);font-size:12px;font-weight:600;background:rgba(255,255,255,0.05);transition:all 0.2s;font-family:'DM Sans',sans-serif;"
+            onmouseover="this.style.background='rgba(255,255,255,0.15)';this.style.borderColor='var(--gold)';this.style.color='var(--gold)';"
+            onmouseout="this.style.background='rgba(255,255,255,0.05)';this.style.borderColor='rgba(255,255,255,0.4)';this.style.color='rgba(255,255,255,0.95)';"
+            class="staff-portal-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            Staff Portal
+        </a>
+        <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-top:4px;font-weight:600;letter-spacing:0.5px;">Admin / Teacher / HeadTeacher</div>
+    </div>
+    <div class="footer-note">© 2025 School Management System</div>
+
+    <script>
+        // ── DECORATIVE / SHARED (plain JS — not part of the React app) ──────────────
+        // Particles background.
+        (function () { for (var i = 0; i < 18; i++) { var p = document.createElement('div'); p.className = 'particle'; var s = Math.random() * 4 + 1; p.style.cssText = 'width:' + s + 'px;height:' + s + 'px;left:' + Math.random() * 100 + '%;animation-duration:' + (Math.random() * 14 + 10) + 's;animation-delay:' + (Math.random() * 8) + 's'; document.body.appendChild(p); } })();
+
+        // scriptUrl is templated in by Code.gs (HtmlService scriptlet); shared with the React app via window.
+        window.scriptUrl = '<?= scriptUrl ?>';
+
+        window.fixDriveUrl = function fixDriveUrl(url) {
+            if (!url) return '';
+            if (url.indexOf('data:') === 0) return url;
+            var match = url.match(/(?:id=|\/d\/|d=)([\w-]+)/);
+            if (match && (url.indexOf('drive.google.com') !== -1 || url.indexOf('docs.google.com') !== -1 || url.indexOf('googleusercontent.com') !== -1)) {
+                return 'https://lh3.googleusercontent.com/d/' + match[1];
+            }
+            return url;
+        };
+
+        // ── HERO BRANDING (school name/address/logo banner) ──
+        // Kept as plain JS + localStorage cache, unchanged in spirit from the original: paint
+        // instantly from the last-known cached settings, then refresh from the server. The
+        // interactive portal card (React, below) fetches the same data itself via SWR for its
+        // own branding — this only drives the static hero banner above it.
+        function applyHeroBranding(r) {
+            var nameEl = document.getElementById('heroSchoolName');
+            if (r.SCHOOL_NAME && nameEl) nameEl.textContent = r.SCHOOL_NAME;
+
+            var logoWrap = document.getElementById('heroLogoWrap');
+            if (logoWrap && r.SCHOOL_LOGO && !logoWrap.querySelector('img')) {
+                logoWrap.innerHTML = '<img src="' + r.SCHOOL_LOGO + '" alt="' + (r.SCHOOL_NAME || 'School') + ' logo">';
+            }
+
+            var row = document.getElementById('heroContactRow');
+            var any = false;
+            var pairs = [
+                ['heroContactAddr', 'heroContactAddrText', r.SCHOOL_ADDRESS],
+                ['heroContactPhone', 'heroContactPhoneText', r.SCHOOL_PHONE],
+                ['heroContactEmail', 'heroContactEmailText', r.SCHOOL_EMAIL]
+            ];
+            pairs.forEach(function (p) {
+                var wrapEl = document.getElementById(p[0]), textEl = document.getElementById(p[1]);
+                if (wrapEl && textEl) {
+                    if (p[2]) { textEl.textContent = p[2]; wrapEl.style.display = 'inline-flex'; any = true; }
+                    else { wrapEl.style.display = 'none'; }
+                }
+            });
+            if (row) row.style.display = any ? 'flex' : 'none';
+        }
+        var cachedPublic = null;
+        try {
+            var rawCache = localStorage.getItem('cached_public_settings');
+            if (rawCache) { cachedPublic = JSON.parse(rawCache); applyHeroBranding(cachedPublic); }
+        } catch (e) {}
+        if (window.google && google.script && google.script.run) {
+            google.script.run.withSuccessHandler(function (r) {
+                if (r && r.success) {
+                    var currentJson = JSON.stringify(r);
+                    if (currentJson !== JSON.stringify(cachedPublic)) {
+                        try { localStorage.setItem('cached_public_settings', currentJson); } catch (e) {}
+                        applyHeroBranding(r);
+                    }
+                    window.__publicSettingsPreload = r;
+                }
+            }).getPublicSettings();
+        }
+    </script>
+
+    <!-- ── REACT 18 + BABEL STANDALONE + SWR, ALL VIA CDN ─────────────────────────
+         React/ReactDOM/SWR are resolved through this import map so that SWR's internal
+         `import "react"` reference and the app's own `import React from "react"` resolve to the
+         exact same module instance — required to avoid "invalid hook call" from duplicate React
+         copies when mixing a hooks-using library with a CDN-loaded React. -->
+    <script type="importmap">
+    {
+        "imports": {
+            "react": "https://esm.sh/react@18.3.1",
+            "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+            "swr": "https://esm.sh/swr@2.2.5?deps=react@18.3.1"
+        }
+    }
+    </script>
+    <script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
+
+    <script type="text/babel" data-type="module" data-presets="react">
+        import React, { useState, useEffect, useRef, useCallback } from 'react';
+        import { createRoot } from 'react-dom/client';
+        import useSWR from 'swr';
+
+        // ── google.script.run → Promise bridge ──────────────────────────────────
+        function gasCall(fnName) {
+            var args = Array.prototype.slice.call(arguments, 1);
+            return new Promise(function (resolve, reject) {
+                if (!window.google || !window.google.script || !window.google.script.run) {
+                    reject(new Error('This page must be opened through the deployed school portal link.'));
+                    return;
+                }
+                var runner = window.google.script.run
+                    .withSuccessHandler(resolve)
+                    .withFailureHandler(function (err) { reject(err); });
+                runner[fnName].apply(runner, args);
+            });
+        }
+
+        var YEARS = ["2023-2024", "2024-2025", "2025-2026", "2026-2027", "2027-2028", "2028-2029", "2029-2030"];
+
+        function ord(n) {
+            var s = ['th', 'st', 'nd', 'rd'], v = n % 100;
+            return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        }
+        function fixDriveUrl(url) { return window.fixDriveUrl(url); }
+
+        // localStorage helpers (used as SWR fallbackData so the UI paints instantly on repeat
+        // visits instead of waiting for a round trip — this is the main front-end contributor to
+        // the "delay" a school with hundreds of concurrent visitors would otherwise feel).
+        function readCache(key) {
+            try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : undefined; } catch (e) { return undefined; }
+        }
+        function writeCache(key, val) {
+            try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+        }
+
+        // Report card theme: the admin picks a Header/Primary color and an Accent color in the
+        // Admin Panel (Settings.REPORT_PRIMARY_COLOR / REPORT_ACCENT_COLOR — replaces the old
+        // fixed 3-template picker). Apply them as CSS custom properties on <html> so every
+        // themed .rc-* rule in the stylesheet (see :root above) picks them up; a lighter shade
+        // of each is derived for gradients, the same way the old templates paired a base +
+        // lighter tone.
+        function lightenHex(hex, pct) {
+            hex = (hex || '#000000').replace('#', '');
+            if (hex.length === 3) hex = hex.split('').map(function (c) { return c + c; }).join('');
+            var num = parseInt(hex, 16) || 0;
+            var r = (num >> 16) & 255, g = (num >> 8) & 255, b = num & 255;
+            r = Math.min(255, Math.round(r + (255 - r) * pct));
+            g = Math.min(255, Math.round(g + (255 - g) * pct));
+            b = Math.min(255, Math.round(b + (255 - b) * pct));
+            return '#' + [r, g, b].map(function (v) { return v.toString(16).padStart(2, '0'); }).join('');
+        }
+        function applyReportTheme(settings) {
+            var primary = (settings && settings.REPORT_PRIMARY_COLOR) || '#0d1b4b';
+            var accent = (settings && settings.REPORT_ACCENT_COLOR) || '#f0c020';
+            var root = document.documentElement.style;
+            root.setProperty('--rc-primary', primary);
+            root.setProperty('--rc-primary-light', lightenHex(primary, 0.28));
+            root.setProperty('--rc-accent', accent);
+            root.setProperty('--rc-accent-light', lightenHex(accent, 0.35));
+        }
+
+        // ── Report card / fee invoice HTML builders (ported as-is from the original portal so
+        // the printed report is pixel-identical; rendered into React via dangerouslySetInnerHTML). ──
+        function buildReportCard(data) {
+            if (!data || !data.student) return '<div style="color:#fff;padding:40px;text-align:center">Failed to load report data.</div>';
+            var s = data.student, res = data.results || [], ci = data.classInfo || {}, st = data.settings || {};
+            applyReportTheme(st);
+            var showPos = String(st.SHOW_OVERALL_POSITION !== undefined ? st.SHOW_OVERALL_POSITION : 'true').toLowerCase() === 'true';
+            var showInterest = String(st.SHOW_INTEREST_TALENT !== undefined ? st.SHOW_INTEREST_TALENT : 'true').toLowerCase() === 'true';
+            var showConduct = String(st.SHOW_CONDUCT !== undefined ? st.SHOW_CONDUCT : 'true').toLowerCase() === 'true';
+            var showAttitude = String(st.SHOW_ATTITUDE !== undefined ? st.SHOW_ATTITUDE : 'true').toLowerCase() === 'true';
+            var showHtRemark = String(st.SHOW_HEADTEACHER_REMARK !== undefined ? st.SHOW_HEADTEACHER_REMARK : 'true').toLowerCase() === 'true';
+            var schoolName = st.SCHOOL_NAME || 'MY SCHOOL';
+            var addr = st.SCHOOL_ADDRESS || 'P.O. BOX DC1732 B, DANSOMAN - ACCRA';
+            var email = st.SCHOOL_EMAIL || ''; var phone = st.SCHOOL_PHONE || '';
+            var vacDate = ci.vacationDate || st.VACATION_DATE || 'N/A';
+            var reopDate = ci.reopeningDate || st.REOPENING_DATE || 'N/A';
+            var numPupils = ci.numPupils || data.classmatesCount || 'N/A';
+            var logoSrc = fixDriveUrl(st.SCHOOL_LOGO || '');
+            var stampSrc = fixDriveUrl(st.SCHOOL_STAMP || '');
+            var sigSrc = fixDriveUrl(st.SCHOOL_SIGNATURE || '');
+            var verifyUrl = '';
+            var baseUrl = data.scriptUrl || window.scriptUrl || '';
+            var isStatic = (!baseUrl || baseUrl.indexOf('<' + '?=') !== -1 || baseUrl.indexOf('<' + '?') !== -1 || window.location.origin.indexOf('netlify') !== -1 || window.location.hostname !== 'script.google.com');
+            if (isStatic) {
+                var origin = window.location.origin;
+                var path = window.location.pathname;
+                if (path.endsWith('/') || path === '') { path += 'report.html'; }
+                else { var lastSlash = path.lastIndexOf('/'); path = path.substring(0, lastSlash + 1) + 'report.html'; }
+                verifyUrl = origin + path + '?id=' + encodeURIComponent(s.ID) + '&year=' + encodeURIComponent(s.Year) + '&term=' + encodeURIComponent(s.Term);
+            } else {
+                verifyUrl = baseUrl + '?page=report&id=' + encodeURIComponent(s.ID) + '&year=' + encodeURIComponent(s.Year) + '&term=' + encodeURIComponent(s.Term);
+            }
+            var qrHtml = verifyUrl ? '<img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(verifyUrl) + '" alt="QR Code" style="max-height:65px;max-width:65px;object-fit:contain">' : '';
+
+            var gSBA = 0, gExam = 0, gTotal = 0;
+            var rows = res.map(function (r, i) {
+                gSBA += Number(r.SBAScore || 0); gExam += Number(r.ExamScore || 0); gTotal += Number(r.TotalScore || 0);
+                return '<tr' + (i % 2 === 1 ? ' style="background:#f8faff"' : '') + '>'
+                    + '<td style="color:#6b7280;font-weight:600">' + (i + 1) + '</td>'
+                    + '<td class="rc-td-subj">' + r.SubjectName + '</td>'
+                    + '<td>' + r.SBAScore + '</td><td>' + r.ExamScore + '</td>'
+                    + '<td style="font-weight:700;color:#0d1b4b">' + r.TotalScore + '</td>'
+                    + '<td>' + (r.SubjectAverage !== undefined ? r.SubjectAverage : '—') + '</td>'
+                    + '<td style="font-weight:700;color:#c0392b">' + r.Grade + '</td>'
+                    + '<td style="font-weight:600;color:#1a3a8a;font-size:11px">' + ord(Number(r.Position || 1)) + '</td>'
+                    + '<td style="font-size:11px;color:#374151">' + (r.Remarks || '') + '</td>'
+                    + '</tr>';
+            }).join('');
+
+            var gkItems = (data.grading || []).map(function (g) { return '<span><b>' + g.grade + '</b>' + g.min + '–' + g.max + '% · ' + g.name + '</span>'; }).join('');
+
+            var posBar = showPos && data.overallPosition
+                ? '<div class="rc-pos-bar"><span class="rc-pos-lbl">OVERALL CLASS POSITION</span><span class="rc-pos-badge">' + ord(data.overallPosition) + ' / ' + numPupils + '</span></div>' : '';
+
+            var aggBar = '';
+            if (data.jhsAggregate) {
+                aggBar = '<div class="rc-agg-bar"><span class="rc-agg-lbl">JHS AGGREGATE SCORE</span><span class="rc-agg-badge">' + data.jhsAggregate.aggregate + '</span><span class="rc-agg-lbl" style="font-size:10.5px">(lower is better)</span></div>';
+            }
+
+            var logoHtml = logoSrc ? '<img src="' + logoSrc + '" alt="Logo">' : '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0d1b4b" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>';
+
+            var allowTeacherSign = String(st.ALLOW_TEACHER_SIGN || 'false') === 'true';
+            var teacherSigSrc = (ci && ci.teacherSig) ? fixDriveUrl(ci.teacherSig) : '';
+            var sigsHtml = '<div class="rc-sigs">'
+                + '<div class="rc-sig"><div class="rc-sig-line">' + (stampSrc ? '<img src="' + stampSrc + '" style="max-height:64px;max-width:130px;object-fit:contain">' : '') + '</div><div class="rc-sig-role">Official School Stamp</div></div>';
+            if (allowTeacherSign) {
+                sigsHtml += '<div class="rc-sig"><div class="rc-sig-line">' + (teacherSigSrc ? '<img src="' + teacherSigSrc + '" style="max-height:64px;max-width:130px;object-fit:contain">' : '') + '</div><div class="rc-sig-role">Class Teacher\'s Signature</div></div>';
+            }
+            sigsHtml += '<div class="rc-sig"><div class="rc-sig-line">' + (sigSrc ? '<img src="' + sigSrc + '" style="max-height:64px;max-width:130px;object-fit:contain">' : '') + '</div><div class="rc-sig-role">Headmaster / Headmistress Signature</div></div>'
+                + '</div>';
+
+            return '<div class="rc-page">'
+                + '<div class="rc-hdr">'
+                + '<div class="rc-logo">' + logoHtml + '</div>'
+                + '<div style="text-align:center"><div class="rc-sname">' + schoolName + '</div><div class="rc-scontact">' + addr + '<br>Tel: ' + phone + (email ? ' · ' + email : '') + '</div></div>'
+                + '<div class="rc-photobox">' + (s.PhotoUrl ? '<img src="' + fixDriveUrl(s.PhotoUrl) + '" alt="">' : '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>') + '</div>'
+                + '</div>'
+                + '<div class="rc-title-strip"><div class="rc-title-text">Pupil\'s Terminal Report Card</div></div>'
+                + '<div class="rc-sub-strip">End of ' + (s.Term || '').toUpperCase() + ' Examinations · Academic Year ' + s.Year + '</div>'
+                + '<div class="rc-id-row"><span style="font-size:12px;color:#6b7280;margin-right:8px">Student ID:</span><span class="rc-id-badge">' + s.ID + '</span></div>'
+                + '<div class="rc-info" style="display:flex; justify-content:space-between; align-items:center; gap:20px;"><div class="rc-info-grid" style="flex:1;">'
+                + '<div class="rc-info-item"><span class="rc-il">Name:</span><span class="rc-iv">' + s.Name + '</span></div>'
+                + '<div class="rc-info-item"><span class="rc-il">Class:</span><span class="rc-iv">' + s.Class + '</span></div>'
+                + '<div class="rc-info-item"><span class="rc-il">Gender:</span><span class="rc-iv">' + s.Gender + '</span></div>'
+                + '<div class="rc-info-item"><span class="rc-il">Term:</span><span class="rc-iv">' + s.Term + '</span></div>'
+                + '<div class="rc-info-item"><span class="rc-il">Class Size:</span><span class="rc-iv">' + numPupils + '</span></div>'
+                + '<div class="rc-info-item"><span class="rc-il">Year:</span><span class="rc-iv">' + s.Year + '</span></div>'
+                + (String((st || {}).SHOW_PROMOTION_STATUS).toLowerCase() === 'true' ? '<div class="rc-info-item"><span class="rc-il">Promotion Status:</span><span class="rc-iv">' + (s.PromotionStatus || '-') + '</span></div>' : '')
+                + '<div class="rc-info-item"><span class="rc-il">Vacation:</span><span class="rc-iv">' + vacDate + '</span></div>'
+                + '<div class="rc-info-item"><span class="rc-il">Reopening:</span><span class="rc-iv">' + reopDate + '</span></div>'
+                + '</div><div class="rc-qr-box" style="flex-shrink:0; display:flex; flex-direction:column; align-items:center; text-align:center; padding-left:15px; border-left:1px dashed var(--rc-primary);"><div style="height:65px; width:65px; display:flex; align-items:center; justify-content:center; overflow:hidden; margin-bottom:4px;">' + qrHtml + '</div><div style="font-weight:700; color:var(--rc-primary); font-size:8px; text-transform:uppercase; letter-spacing:0.5px;">Scan to Verify</div></div></div>'
+                + '<div class="rc-tbl-wrap"><table class="rc-tbl"><thead><tr>'
+                + '<th style="width:30px">#</th><th style="text-align:left;padding-left:9px">SUBJECT</th>'
+                + '<th>SBA<br><small style="font-weight:400;font-size:8.5px">(50%)</small></th>'
+                + '<th>EXAM<br><small style="font-weight:400;font-size:8.5px">(50%)</small></th>'
+                + '<th>TOTAL</th><th>CLASS<br><small style="font-weight:400;font-size:8.5px">AVG</small></th><th>GRADE</th><th>POS.</th><th>REMARKS</th>'
+                + '</tr></thead><tbody>' + rows + '</tbody>'
+                + '<tfoot><tr style="background:var(--rc-primary)">'
+                + '<td colspan="2" style="padding:7px;font-weight:700;text-align:left;padding-left:9px;letter-spacing:1px;border:1px solid rgba(255,255,255,.3);color:#ffffff">GRAND TOTAL</td>'
+                + '<td style="padding:7px;text-align:center;border:1px solid rgba(255,255,255,.3);font-weight:700;color:#ffffff">' + Math.round(gSBA) + '</td>'
+                + '<td style="padding:7px;text-align:center;border:1px solid rgba(255,255,255,.3);font-weight:700;color:#ffffff">' + Math.round(gExam) + '</td>'
+                + '<td style="padding:7px;text-align:center;border:1px solid rgba(255,255,255,.3);font-weight:700;color:#ffffff">' + gTotal + '</td>'
+                + '<td colspan="4" style="border:1px solid rgba(255,255,255,.2)"></td></tr></tfoot></table></div>'
+                + '<div class="rc-stats">'
+                + '<div class="rc-stat"><span class="rc-stat-lbl">Attendance</span><span class="rc-stat-val">' + s.Attendance + ' / ' + s.OutOf + '</span></div>'
+                + '<div class="rc-stat"><span class="rc-stat-lbl">Total Score</span><span class="rc-stat-val">' + gTotal + '</span></div>'
+                + '<div class="rc-stat"><span class="rc-stat-lbl">Average</span><span class="rc-stat-val">' + Math.round(Number(s.Average || 0)) + '</span></div>'
+                + '<div class="rc-stat"><span class="rc-stat-lbl">Subjects</span><span class="rc-stat-val">' + res.length + '</span></div>'
+                + '</div>'
+                + posBar + aggBar
+                + '<div class="rc-rmk"><div class="rc-rmk-title">Conduct &amp; Remarks</div>'
+                + (showInterest ? '<div class="rc-rmk-row"><span class="rc-rmk-k">Interest / Talent:</span><span class="rc-rmk-v">' + (s.Interest || '—') + '</span></div>' : '')
+                + (showConduct ? '<div class="rc-rmk-row"><span class="rc-rmk-k">Conduct:</span><span class="rc-rmk-v">' + (s.Conduct || '—') + '</span></div>' : '')
+                + (showAttitude ? '<div class="rc-rmk-row"><span class="rc-rmk-k">Attitude to Work:</span><span class="rc-rmk-v">' + (s.Attitude || '—') + '</span></div>' : '')
+                + '<div class="rc-rmk-row"><span class="rc-rmk-k">Class Teacher\'s Remark:</span><span class="rc-rmk-v">' + (s.ClassTeacherRemark || '—') + '</span></div>'
+                + (showHtRemark ? '<div class="rc-rmk-row"><span class="rc-rmk-k">Headmaster\'s Remark:</span><span class="rc-rmk-v">' + (s.HeadTeacherRemark || '—') + '</span></div>' : '')
+                + '</div>'
+                + sigsHtml
+                + '<div class="rc-gkey"><div class="rc-gkey-hdr">Grade Interpretation Key</div>'
+                + '<div class="rc-gkey-items">' + gkItems + '</div></div>'
+                + '<div class="rc-footer-strip"><span>Generated by: <strong>' + schoolName + '</strong></span><span>' + s.Class + ' · ' + s.Term + ' · ' + s.Year + '</span></div>'
+                + '</div>';
+        }
+
+        function buildFeesInvoice(data) {
+            var s = data.student, st = data.settings || {};
+            var sN = st.SCHOOL_NAME || 'School Portal', addr = st.SCHOOL_ADDRESS || '', phone = st.SCHOOL_PHONE || '';
+            var logo = st.SCHOOL_LOGO || '';
+            var feeComps = (st.FEE_COMPONENTS || '').split(',').map(function (x) { return x.trim(); }).filter(function (x) { return x; });
+            var fd = (typeof s.FeeData === 'object' && s.FeeData !== null) ? s.FeeData : {};
+            if (typeof s.FeeData === 'string' && s.FeeData) { try { fd = JSON.parse(s.FeeData); } catch (e) {} }
+
+            var tbody = '';
+            var tot = 0;
+
+            if (feeComps.length === 0) {
+                var arr = Number(parseFloat(s.Arrears || 0));
+                var nxt = Number(parseFloat(s.NextTermFees || 0));
+                tot = arr + nxt;
+                tbody += '<tr><td style="padding:12px;border-bottom:1px solid #e5e7eb">Previous Arrears</td><td style="padding:12px;border-bottom:1px solid #e5e7eb;text-align:right">GH¢ ' + arr.toFixed(2) + '</td></tr>';
+                tbody += '<tr><td style="padding:12px;border-bottom:1px solid #e5e7eb">Next Term Fees</td><td style="padding:12px;border-bottom:1px solid #e5e7eb;text-align:right">GH¢ ' + nxt.toFixed(2) + '</td></tr>';
+            } else {
+                feeComps.forEach(function (fc) {
+                    var v = Number(parseFloat(fd[fc] || 0));
+                    if (fc.toLowerCase() === 'arrears' && !fd[fc]) v = Number(parseFloat(s.Arrears || 0));
+                    if (fc.toLowerCase() === 'next term fees' && !fd[fc]) v = Number(parseFloat(s.NextTermFees || 0));
+                    tot += v;
+                    tbody += '<tr><td style="padding:12px;border-bottom:1px solid #e5e7eb">' + fc + '</td><td style="padding:12px;border-bottom:1px solid #e5e7eb;text-align:right">GH¢ ' + v.toFixed(2) + '</td></tr>';
+                });
+            }
+
+            var h = '<div class="rc-page" style="padding:40px;background:#fff;border:4px solid #0d1b4b;border-radius:12px;margin:16px auto;color:#1e293b">';
+            h += '<div style="text-align:center;margin-bottom:20px;background:linear-gradient(145deg,#0d1b4b,#1a237e);padding:24px;border-radius:12px;color:#fff">';
+            if (logo) h += '<img src="' + logo + '" style="height:70px;border-radius:50%;margin-bottom:10px;border:2px solid #f0c020">';
+            h += '<h2 style="margin:0;color:#f0c020;text-transform:uppercase;letter-spacing:1px">' + sN + '</h2><p style="margin:5px 0;font-size:13px;color:rgba(255,255,255,0.7)">' + addr + ' | ' + phone + '</p>';
+            h += '</div>';
+            h += '<div style="text-align:center;margin:20px 0 15px 0"><h3 style="margin:0;color:#0d1b4b;text-transform:uppercase;border-bottom:2px solid #f0c020;display:inline-block;padding-bottom:5px;letter-spacing:1px">Next Academic Term Bill</h3></div>';
+            h += '<div style="display:flex;justify-content:space-between;margin-bottom:30px;padding:15px;background:#f8fafc;border-left:4px solid #0d1b4b;border-radius:4px"><div><strong style="color:#0d1b4b">Student:</strong> ' + s.Name + '<br><strong style="color:#0d1b4b">ID:</strong> ' + s.ID + '<br><strong style="color:#0d1b4b">Class:</strong> ' + s.Class + '</div><div><strong style="color:#0d1b4b">Date:</strong> ' + new Date().toLocaleDateString() + '</div></div>';
+            h += '<table style="width:100%;border-collapse:collapse;margin-bottom:20px;border:2px solid #0d1b4b;font-size:14px"><thead><tr><th style="background:#0d1b4b;color:#f0c020;padding:12px;text-align:left;border-bottom:2px solid #cbd5e1;text-transform:uppercase">Description</th><th style="background:#0d1b4b;color:#f0c020;padding:12px;text-align:right;border-bottom:2px solid #cbd5e1;text-transform:uppercase">Amount</th></tr></thead><tbody>';
+            h += tbody;
+            h += '</tbody><tfoot><tr><th style="padding:15px 10px;text-align:right;font-size:16px;background:#f8fafc;border-top:2px solid #0d1b4b">Total Expected:</th><th style="padding:15px 10px;text-align:right;font-size:16px;color:#c0392b;background:#f8fafc;border-top:2px solid #0d1b4b">GH¢ ' + tot.toFixed(2) + '</th></tr></tfoot></table>';
+            h += '<div style="text-align:center;margin-top:40px;padding:20px;font-size:12px;color:#0d1b4b;font-weight:600;border-top:1px dashed #cbd5e1">Thank you for your prompt payment!</div>';
+            h += '</div>';
+            return h;
+        }
+
+        // ── Small presentational components ─────────────────────────────────────
+        function StepIndicator({ dotStep }) {
+            var steps = [
+                { n: 1, label: 'Category' },
+                { n: 2, label: 'Identity' },
+                { n: 3, label: 'Verify' },
+                { n: 4, label: 'Period' }
+            ];
+            return (
+                <div className="step-row">
+                    {steps.map(function (st, idx) {
+                        var cls = st.n < dotStep ? 'done' : st.n === dotStep ? 'active' : 'pending';
+                        return (
+                            <React.Fragment key={st.n}>
+                                <div className={'step-info' + (cls === 'pending' ? '' : ' ' + cls)}>
+                                    <div className={'step-dot ' + cls}>{cls === 'done' ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg> : st.n}</div>
+                                    <div className="step-label">{st.label}</div>
+                                </div>
+                                {idx < steps.length - 1 && <div className={'step-connector' + (st.n < dotStep ? ' done' : '')}></div>}
+                            </React.Fragment>
+                        );
+                    })}
+                </div>
+            );
+        }
+
+        var ALERT_ICONS = {
+            error: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>,
+            success: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>,
+            info: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
+        };
+        function Alert({ alert }) {
+            if (!alert) return null;
+            return <div className={'alert show ' + alert.type}><span style={{ flexShrink: 0, display: 'inline-flex' }}>{ALERT_ICONS[alert.type] || ALERT_ICONS.info}</span><span>{alert.msg}</span></div>;
+        }
+
+        var CATEGORIES = [
+            { cat: 'preschool', label: 'Preschool', name: 'Preschool', sub: 'KG 1 & KG 2',
+              icon: <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#f0c020" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" /></svg> },
+            { cat: 'lower', label: 'Lower Primary', name: 'Lower Primary', sub: 'Basic 1 – 3',
+              icon: <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#f0c020" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></svg> },
+            { cat: 'upper', label: 'Upper Primary', name: 'Upper Primary', sub: 'Basic 4 – 6',
+              icon: <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#f0c020" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg> },
+            { cat: 'jhs', label: 'JHS', name: 'Junior High School', sub: 'Basic 7 – 9',
+              icon: <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#f0c020" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg> }
+        ];
+
+        function CategoryPanel({ onSelect }) {
+            return (
+                <div className="step-panel active">
+                    <div className="panel-title">Select Your Level</div>
+                    <div className="panel-sub">Choose your school category to get started</div>
+                    <div className="cat-tiles">
+                        {CATEGORIES.map(function (c) {
+                            return (
+                                <div className="cat-tile" key={c.cat} onClick={function () { onSelect(c); }}>
+                                    <span className="cat-tile-icon">{c.icon}</span>
+                                    <div className="cat-tile-name">{c.label}</div>
+                                    <div className="cat-tile-sub">{c.sub}</div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        }
+
+        function filterClassesForCategory(cat, allClasses) {
+            var filtered = [];
+            if (!allClasses || !allClasses.length) return filtered;
+            if (cat === 'preschool') {
+                filtered = allClasses.filter(function (c) {
+                    var cn = c.ClassName.toLowerCase();
+                    return cn.indexOf('kindergarten') !== -1 || cn.indexOf('kg') !== -1 || cn.indexOf('nursery') !== -1 || cn.indexOf('preschool') !== -1;
+                });
+            } else if (cat === 'lower') {
+                filtered = allClasses.filter(function (c) { var cn = c.ClassName; return cn.startsWith('Basic 1') || cn.startsWith('Basic 2') || cn.startsWith('Basic 3'); });
+            } else if (cat === 'upper') {
+                filtered = allClasses.filter(function (c) { var cn = c.ClassName; return cn.startsWith('Basic 4') || cn.startsWith('Basic 5') || cn.startsWith('Basic 6'); });
+            } else if (cat === 'jhs') {
+                filtered = allClasses.filter(function (c) { var cn = c.ClassName; return cn.startsWith('Basic 7') || cn.startsWith('Basic 8') || cn.startsWith('Basic 9'); });
+            }
+            filtered.sort(function (a, b) { return a.ClassName.localeCompare(b.ClassName); });
+            return filtered;
+        }
+
+        function ClassPanel({ category, allClasses, classesLoading, onSelectClass, onBack }) {
+            var classes = filterClassesForCategory(category.cat, allClasses);
+            return (
+                <div className="step-panel active">
+                    <div className="back-link" onClick={onBack}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6" /></svg>
+                        Back to Categories
+                    </div>
+                    <div className="panel-title">{category.name} - Select Class</div>
+                    <div className="panel-sub">Choose your class in {category.name}</div>
+                    <div className="cls-tiles">
+                        {classesLoading && <div style={{ color: '#6b7280', gridColumn: '1/-1', textAlign: 'center', padding: 20 }}>Loading classes…</div>}
+                        {!classesLoading && classes.length === 0 && <div style={{ color: '#6b7280', gridColumn: '1/-1', textAlign: 'center', padding: 20 }}>No classes configured in this category.</div>}
+                        {!classesLoading && classes.map(function (c) {
+                            return <div className="cls-tile" key={c.ClassName} onClick={function () { onSelectClass(c.ClassName); }}>{c.ClassName}</div>;
+                        })}
+                    </div>
+                </div>
+            );
+        }
+
+        function IdentityPanel({ studentId, setStudentId, studentName, setStudentName, onBack, onSubmit, alert, loading, inputRef }) {
+            return (
+                <div className="step-panel active">
+                    <div className="back-link" onClick={onBack}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6" /></svg>
+                        Back to Categories
+                    </div>
+                    <div className="panel-title">Access Your Results</div>
+                    <div className="panel-sub">Enter your Student ID and full name to get started</div>
+                    <Alert alert={alert} />
+                    <div className="fg">
+                        <label className="fg-lbl">Student ID Number</label>
+                        <div className="input-wrap">
+                            <span className="inp-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block', color: '#9ca3af' }}><rect x="3" y="4" width="18" height="16" rx="2" /><line x1="7" y1="8" x2="17" y2="8" /><line x1="7" y1="12" x2="13" y2="12" /><line x1="7" y1="16" x2="9" y2="16" /></svg></span>
+                            <input ref={inputRef} className="field-inp" type="text" placeholder="e.g. 001" autoComplete="off"
+                                value={studentId} onChange={function (e) { setStudentId(e.target.value); }} />
+                        </div>
+                    </div>
+                    <div className="fg">
+                        <label className="fg-lbl">Full Name</label>
+                        <div className="input-wrap">
+                            <span className="inp-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block', color: '#9ca3af' }}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg></span>
+                            <input className="field-inp" type="text" placeholder="e.g. Ama Owusu" autoComplete="off"
+                                value={studentName} onChange={function (e) { setStudentName(e.target.value); }} />
+                        </div>
+                    </div>
+                    <button className={'btn-primary' + (loading ? ' loading' : '')} disabled={loading} onClick={onSubmit}>
+                        <span className="shine"></span><span className="btn-lbl">Continue →</span>
+                        <div className="spinner"></div>
+                    </button>
+                </div>
+            );
+        }
+
+        function OtpPanel({ otp, setOtp, demoCode, onSubmit, onBack, alert, loading }) {
+            var refs = useRef([]);
+            useEffect(function () { if (refs.current[0]) refs.current[0].focus(); }, []);
+
+            function handleChange(i, val) {
+                val = val.replace(/[^0-9]/g, '').slice(0, 1);
+                var next = otp.slice(); next[i] = val; setOtp(next);
+                if (val && i < 5 && refs.current[i + 1]) refs.current[i + 1].focus();
+            }
+            function handleKeyDown(i, e) {
+                if (e.key === 'Backspace' && !otp[i] && i > 0 && refs.current[i - 1]) refs.current[i - 1].focus();
+            }
+
+            return (
+                <div className="step-panel active">
+                    <div className="panel-title">Verify Identity</div>
+                    <div className="panel-sub">Enter the 6-digit code shown below (sent to parent's phone in production)</div>
+                    <Alert alert={alert} />
+                    <div className={'demo-box' + (demoCode ? ' show' : '')}>
+                        <div className="demo-box-lbl" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="7.5" cy="15.5" r="5.5" /><path d="M11.5 11.5 22 1l2 2-2 2-2-2-3 3 2 2-2 2-2-2-2 2" /></svg>
+                            Verification Code
+                        </div>
+                        <div className="demo-code">{demoCode || '——————'}</div>
+                        <div className="demo-note">In production, this code is sent via SMS to the parent's phone number</div>
+                    </div>
+                    <div className="fg">
+                        <label className="fg-lbl">Enter 6-digit Code</label>
+                        <div className="otp-row">
+                            {otp.map(function (v, i) {
+                                return (
+                                    <input key={i} ref={function (el) { refs.current[i] = el; }} className={'otp-d' + (v ? ' filled' : '')}
+                                        maxLength={1} inputMode="numeric" value={v}
+                                        onChange={function (e) { handleChange(i, e.target.value); }}
+                                        onKeyDown={function (e) { handleKeyDown(i, e); }} />
+                                );
+                            })}
+                        </div>
+                    </div>
+                    <button className={'btn-primary' + (loading ? ' loading' : '')} disabled={loading} onClick={onSubmit}>
+                        <span className="shine"></span><span className="btn-lbl">Verify Code →</span>
+                        <div className="spinner"></div>
+                    </button>
+                    <button className="btn-sec" onClick={onBack}>← Go Back</button>
+                </div>
+            );
+        }
+
+        function PeriodPanel({ year, setYear, term, setTerm, onSubmit, onBack, alert, loading }) {
+            return (
+                <div className="step-panel active">
+                    <div className="panel-title">Select Report Period</div>
+                    <div className="panel-sub">Choose the Academic Year and Term/Semester to view your report card</div>
+                    <Alert alert={alert} />
+                    <div className="fg">
+                        <label className="fg-lbl">Academic Year</label>
+                        <div className="input-wrap">
+                            <span className="inp-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block', color: '#9ca3af' }}><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg></span>
+                            <select className="field-inp" style={{ cursor: 'pointer' }} value={year} onChange={function (e) { setYear(e.target.value); }}>
+                                {YEARS.map(function (y) { return <option key={y} value={y}>{y}</option>; })}
+                            </select>
+                        </div>
+                    </div>
+                    <div className="fg">
+                        <label className="fg-lbl">Term / Semester</label>
+                        <div className="input-wrap">
+                            <span className="inp-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block', color: '#9ca3af' }}><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg></span>
+                            <select className="field-inp" style={{ cursor: 'pointer' }} value={term} onChange={function (e) { setTerm(e.target.value); }}>
+                                <option>Term 1</option><option>Term 2</option><option>Term 3</option>
+                                <option>Semester 1</option><option>Semester 2</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button className={'btn-primary' + (loading ? ' loading' : '')} disabled={loading} style={{ marginTop: 20 }} onClick={onSubmit}>
+                        <span className="shine"></span>
+                        <span className="btn-lbl" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>
+                            View Report Card
+                        </span>
+                        <div className="spinner"></div>
+                    </button>
+                    <button className="btn-sec" onClick={onBack}>← Go Back</button>
+                </div>
+            );
+        }
+
+        function ReportOverlay({ data, onClose }) {
+            var [tab, setTab] = useState('report');
+            var schoolName = (data.settings && data.settings.SCHOOL_NAME) || 'School Portal';
+            var html = tab === 'report' ? buildReportCard(data) : buildFeesInvoice(data);
+            return (
+                <div id="reportOverlay" className="show">
+                    <div className="rc-toolbar no-print">
+                        <div className="rc-toolbar-brand"><div className="rc-toolbar-logo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0d1b4b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg></div><div className="rc-toolbar-name">{schoolName}</div></div>
+                        <div style={{ display: 'flex', gap: 8 }} className="rc-tabs-wrap">
+                            <button className="btn-sec" style={{ border: 'none', background: tab === 'report' ? 'var(--gold)' : 'transparent', color: tab === 'report' ? '#0d1b4b' : '#fff', borderRadius: 8, padding: '6px 12px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={function () { setTab('report'); }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg> Result</button>
+                            <button className="btn-sec" style={{ border: 'none', background: tab === 'fees' ? 'var(--gold)' : 'transparent', color: tab === 'fees' ? '#0d1b4b' : '#fff', borderRadius: 8, padding: '6px 12px', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={function () { setTab('fees'); }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg> Fee Bill</button>
+                        </div>
+                        <div className="rc-toolbar-acts">
+                            <button className="rc-btn rc-btn-back" onClick={onClose}>← Back</button>
+                            <button className="rc-btn rc-btn-print" onClick={function () { window.print(); }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: '-2px', marginRight: 5 }}><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></svg>Print</button>
+                        </div>
+                    </div>
+                    <div dangerouslySetInnerHTML={{ __html: html }} />
+                </div>
+            );
+        }
+
+        // ── Main App ─────────────────────────────────────────────────────────────
+        function App() {
+            var { data: settingsData } = useSWR('publicSettings', function () { return gasCall('getPublicSettings'); }, {
+                fallbackData: window.__publicSettingsPreload || readCache('cached_public_settings'),
+                revalidateOnFocus: false,
+                dedupingInterval: 60000,
+                onSuccess: function (r) { writeCache('cached_public_settings', r); }
+            });
+            var { data: classesData, isLoading: classesLoading } = useSWR('classesPublic', function () { return gasCall('getClassesPublic'); }, {
+                revalidateOnFocus: false,
+                dedupingInterval: 60000
+            });
+
+            var [panel, setPanel] = useState('category'); // category | class | identity | otp | period
+            var [category, setCategory] = useState(null);
+            var [studentId, setStudentId] = useState('');
+            var [studentName, setStudentName] = useState('');
+            var [currentStudentId, setCurrentStudentId] = useState('');
+            var [demoCode, setDemoCode] = useState('');
+            var [otp, setOtp] = useState(['', '', '', '', '', '']);
+            var [year, setYear] = useState('2025-2026');
+            var [term, setTerm] = useState('Term 1');
+            var [alerts, setAlerts] = useState({});
+            var [loading, setLoading] = useState({});
+            var [reportData, setReportData] = useState(null);
+            var identityInputRef = useRef(null);
+
+            // Default the period selector to the school's active term/year once settings load.
+            useEffect(function () {
+                if (settingsData) {
+                    if (settingsData.CURRENT_YEAR) setYear(settingsData.CURRENT_YEAR);
+                    if (settingsData.CURRENT_TERM) setTerm(settingsData.CURRENT_TERM);
+                }
+            }, [settingsData && settingsData.CURRENT_YEAR, settingsData && settingsData.CURRENT_TERM]);
+
+            var dotStep = (panel === 'category' || panel === 'class') ? 1 : panel === 'identity' ? 2 : panel === 'otp' ? 3 : 4;
+
+            function setAlert(n, alert) { setAlerts(function (a) { var b = Object.assign({}, a); b[n] = alert; return b; }); }
+            function setBusy(n, v) { setLoading(function (l) { var b = Object.assign({}, l); b[n] = v; return b; }); }
+
+            function selectCategory(c) { setCategory(c); setPanel('class'); }
+            function selectClass(cls) { setPanel('identity'); setTimeout(function () { if (identityInputRef.current) identityInputRef.current.focus(); }, 50); }
+            function goToCategories() {
+                setPanel('category'); setCategory(null); setOtp(['', '', '', '', '', '']);
+                setStudentId(''); setStudentName(''); setAlerts({}); setDemoCode('');
+            }
+            function goBack() { setPanel('identity'); setOtp(['', '', '', '', '', '']); setAlert('otp', null); setDemoCode(''); }
+            function goBackToOtp() { setPanel('otp'); }
+
+            var handleStep1 = useCallback(function () {
+                var sid = studentId.trim(), sname = studentName.trim();
+                setAlert('identity', null);
+                if (!sid || !sname) { setAlert('identity', { type: 'error', msg: 'Please enter both Student ID and Full Name.' }); return; }
+                setBusy('identity', true);
+                gasCall('validateStudent', sid, sname).then(function (r) {
+                    setBusy('identity', false);
+                    if (r.success) {
+                        setCurrentStudentId(sid);
+                        setDemoCode(r.code);
+                        setPanel('otp');
+                    } else {
+                        setAlert('identity', { type: 'error', msg: '' + r.message });
+                    }
+                }).catch(function (e) {
+                    setBusy('identity', false);
+                    setAlert('identity', { type: 'error', msg: 'Connection error: ' + e.message });
+                });
+            }, [studentId, studentName]);
+
+            var handleStep2 = useCallback(function () {
+                var code = otp.join('');
+                setAlert('otp', null);
+                if (code.length < 6) { setAlert('otp', { type: 'error', msg: 'Please enter the full 6-digit code.' }); return; }
+                setBusy('otp', true);
+                gasCall('verifyCode', currentStudentId, code).then(function (r) {
+                    setBusy('otp', false);
+                    if (r.success) setPanel('period');
+                    else setAlert('otp', { type: 'error', msg: '' + r.message });
+                }).catch(function (e) {
+                    setBusy('otp', false);
+                    setAlert('otp', { type: 'error', msg: 'Connection error: ' + e.message });
+                });
+            }, [otp, currentStudentId]);
+
+            function handleStep3() {
+                setAlert('period', null);
+                setBusy('period', true);
+                gasCall('getStudentReport', currentStudentId, year, term).then(function (r) {
+                    setBusy('period', false);
+                    if (r.success) setReportData(r);
+                    else setAlert('period', { type: 'error', msg: '' + r.message });
+                }).catch(function (e) {
+                    setBusy('period', false);
+                    setAlert('period', { type: 'error', msg: 'Connection error: ' + e.message });
+                });
+            }
+
+            function closeReport() { setReportData(null); goToCategories(); window.scrollTo(0, 0); }
+
+            // Enter-to-submit, matching the original portal's keyboard shortcut.
+            useEffect(function () {
+                function onKey(e) {
+                    if (e.key !== 'Enter') return;
+                    if (panel === 'identity') handleStep1();
+                    else if (panel === 'otp') handleStep2();
+                }
+                document.addEventListener('keydown', onKey);
+                return function () { document.removeEventListener('keydown', onKey); };
+            }, [panel, handleStep1, handleStep2]);
+
+            var logoSrc = settingsData && settingsData.SCHOOL_LOGO;
+
+            return (
+                <React.Fragment>
+                    <div className="portal-card-wrap">
+                        <div className="portal-card">
+                            <div className="card-head">
+                                <div className="logo-ring-wrap">
+                                    <div className="logo-badge">{logoSrc ? <img src={logoSrc} alt="Logo" /> : <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#0d1b4b" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z" /><path d="M6 12v5c3 3 9 3 12 0v-5" /></svg>}</div>
+                                    <div className="logo-ring"></div>
+                                </div>
+                                <div className="school-name-head">{(settingsData && settingsData.SCHOOL_NAME) || 'School Portal'}</div>
+                                <div className="school-tagline-head">Student Result Portal</div>
+                                <div className="gold-line"></div>
+                            </div>
+                            <div className="card-body">
+                                <StepIndicator dotStep={dotStep} />
+                                {panel === 'category' && <CategoryPanel onSelect={selectCategory} />}
+                                {panel === 'class' && category && (
+                                    <ClassPanel category={category} allClasses={classesData && classesData.classes} classesLoading={classesLoading}
+                                        onSelectClass={selectClass} onBack={goToCategories} />
+                                )}
+                                {panel === 'identity' && (
+                                    <IdentityPanel studentId={studentId} setStudentId={setStudentId} studentName={studentName} setStudentName={setStudentName}
+                                        onBack={goToCategories} onSubmit={handleStep1} alert={alerts.identity} loading={!!loading.identity} inputRef={identityInputRef} />
+                                )}
+                                {panel === 'otp' && (
+                                    <OtpPanel otp={otp} setOtp={setOtp} demoCode={demoCode} onSubmit={handleStep2} onBack={goBack} alert={alerts.otp} loading={!!loading.otp} />
+                                )}
+                                {panel === 'period' && (
+                                    <PeriodPanel year={year} setYear={setYear} term={term} setTerm={setTerm}
+                                        onSubmit={handleStep3} onBack={goBackToOtp} alert={alerts.period} loading={!!loading.period} />
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    {reportData && <ReportOverlay data={reportData} onClose={closeReport} />}
+                </React.Fragment>
+            );
+        }
+
+        var mountEl = document.getElementById('appRoot');
+        createRoot(mountEl).render(<App />);
+    </script>
+</body>
+
+</html>
