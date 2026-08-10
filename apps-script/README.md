@@ -76,13 +76,41 @@ about evicting `localStorage` between sessions than desktop browsers:
   `localStorage` kept only as a same-device fast path. "First time only" now means first time on
   the account, not first time in this particular mobile browser.
 
-### 5. New: QR code generator for the Result Checker portal
-**admin.html** (Settings → School Info → "Result Checker QR Code")
+### 5. QR code generator for the Result Checker portal
+**admin.html** (Settings → **Result Checker QR** tab)
 
 Admins can generate a QR code that opens the Student/Parent Result Checker portal
 (`?page=student`), then print a ready-to-post poster (school name/logo + QR code) or download the
 QR image directly, so parents/students can scan it with their phone camera instead of typing a web
 address.
+
+> First version of this card was added inside the School Info tab's content, but
+> `switchSettingsTab()` only shows cards it's explicitly told to show per tab — since the card
+> wasn't in that list, it was hidden the instant the page loaded (School Info tab activates by
+> default) and never visible. It's now its own tab ("Result Checker QR") with its own entry in
+> `switchSettingsTab()`.
+
+### 6. Owner Performance Reports (new)
+**admin.html** (Settings → **Owner Reports** tab), **Code.gs** — `buildOwnerPerformanceHtml`,
+`generateOwnerPerformancePDF`, `emailOwnerPerformanceReport`, `getClassSummaryData`
+
+Once exam scores are entered and report cards are generated, the admin can compile **one PDF**
+covering every selected class: each student's full performance (ID, name, total, average,
+position) plus a Top 10 table per class, then send it to the school owner:
+
+- **Generate & Preview PDF** — builds the PDF server-side (HTML → PDF via `Utilities`'s blob
+  conversion), saves it to a dedicated "School Performance Reports" Drive folder with link
+  sharing on, and shows a preview link.
+- **Email to Owner** — sends the PDF as a direct email attachment via `MailApp` to the address
+  saved in Owner Contact Details.
+- **Send via WhatsApp** — WhatsApp's `wa.me` links can only pre-fill text, not attach a file, so
+  this opens a WhatsApp chat with the owner's number pre-filled with a message containing the
+  Drive preview link generated in the previous step (same pattern the app already uses for
+  texting individual report cards via WhatsApp).
+
+Owner Name/Email/WhatsApp Phone are new settings (`OWNER_NAME`/`OWNER_EMAIL`/`OWNER_PHONE`),
+saved independently of the rest of Settings (mirroring the SMS API card) so an unrelated save
+elsewhere can never touch them.
 
 ## Deploying these changes
 

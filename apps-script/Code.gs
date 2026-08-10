@@ -18,6 +18,7 @@ var PHOTOS_KEY     = 'PHOTOS_FOLDER_ID';
 var LOGO_KEY       = 'SCHOOL_LOGO_B64';
 var STAMP_KEY      = 'SCHOOL_STAMP_B64';
 var SIG_KEY        = 'SCHOOL_SIG_B64';
+var REPORTS_FOLDER_KEY = 'PERFORMANCE_REPORTS_FOLDER_ID';
 
 // ── ENTRY POINT ────────────────────────────────────────────
 function doGet(e) {
@@ -144,6 +145,18 @@ function manualSetupPhotoFolder() {
   PropertiesService.getScriptProperties().deleteProperty(PHOTOS_KEY);
   var id = initPhotoFolder();
   Logger.log(id ? 'Folder: https://drive.google.com/drive/folders/'+id : 'Failed');
+}
+
+// ── PERFORMANCE REPORTS FOLDER (Owner Reports PDFs) ─────────
+function initReportsFolder() {
+  var props = PropertiesService.getScriptProperties();
+  var folderId = props.getProperty(REPORTS_FOLDER_KEY);
+  if (folderId) { try { return DriveApp.getFolderById(folderId); } catch(e) {} }
+  try {
+    var folder = DriveApp.createFolder('School Performance Reports');
+    var id = folder.getId(); props.setProperty(REPORTS_FOLDER_KEY, id);
+    return folder;
+  } catch(e) { Logger.log('Reports folder error: '+e.message); return null; }
 }
 
 // ── SPREADSHEET SETUP ──────────────────────────────────────
@@ -1521,19 +1534,154 @@ function calcPositionsAndTotals(ss,classSheet,cn,yr,tm,subNames,grdD,stuD){
 }
 
 // ── CLASS SUMMARY ──────────────────────────────────────────
+// Internal (no token check) — shared by getClassSummary (admin UI) and the Owner Performance
+// Report PDF builder below, so both agree on how a class's students are ranked.
+function getClassSummaryData(ss,cn,yr,tm){
+  var stuD=ss.getSheetByName('Students').getDataRange().getValues(),stuH=stuD[0],students=[];
+  for(var i=1;i<stuD.length;i++){if(!stuD[i][0])continue;if(stuD[i][3]===cn&&stuD[i][4].toString()===yr.toString()&&stuD[i][5]===tm){var sv={};stuH.forEach(function(h,idx){sv[h]=stuD[i][idx];});students.push(sv);}}
+  var subjectNames=getClassSubjectNames(ss,cn);
+  var classSheet=ss.getSheetByName(cn);
+  var resMap={};
+  if(classSheet&&classSheet.getLastRow()>1){var resD=classSheet.getDataRange().getValues(),resH=resD[0];var yi=resH.indexOf('Year'),ti=resH.indexOf('Term');for(var r=1;r<resD.length;r++){if(!resD[r][0])continue;if(yi>=0&&resD[r][yi].toString()!==yr.toString())continue;if(ti>=0&&resD[r][ti]!==tm)continue;var sid=resD[r][0].toString();resMap[sid]={};subjectNames.forEach(function(sn){var si=resH.indexOf(sn+'_SBA');if(si>=0)resMap[sid][sn]={sba:resD[r][si],exam:resD[r][si+1],total:resD[r][si+2],grade:resD[r][si+3],position:resD[r][si+4]};});}}
+  students.sort(function(a,b){return Number(b.Average||0)-Number(a.Average||0);});students.forEach(function(s,idx){s.OverallPosition=idx+1;});
+  return{students:students,subjects:subjectNames,resMap:resMap,sbaMap:{},components:[]};
+}
 function getClassSummary(token,cn,yr,tm){
   if(!validateAdminToken(token))return{success:false,message:'Unauthorized'};
   try{
-    var ss=SS();
-    var stuD=ss.getSheetByName('Students').getDataRange().getValues(),stuH=stuD[0],students=[];
-    for(var i=1;i<stuD.length;i++){if(!stuD[i][0])continue;if(stuD[i][3]===cn&&stuD[i][4].toString()===yr.toString()&&stuD[i][5]===tm){var sv={};stuH.forEach(function(h,idx){sv[h]=stuD[i][idx];});students.push(sv);}}
-    var subjectNames=getClassSubjectNames(ss,cn);
-    var classSheet=ss.getSheetByName(cn);
-    var resMap={};
-    if(classSheet&&classSheet.getLastRow()>1){var resD=classSheet.getDataRange().getValues(),resH=resD[0];var yi=resH.indexOf('Year'),ti=resH.indexOf('Term');for(var r=1;r<resD.length;r++){if(!resD[r][0])continue;if(yi>=0&&resD[r][yi].toString()!==yr.toString())continue;if(ti>=0&&resD[r][ti]!==tm)continue;var sid=resD[r][0].toString();resMap[sid]={};subjectNames.forEach(function(sn){var si=resH.indexOf(sn+'_SBA');if(si>=0)resMap[sid][sn]={sba:resD[r][si],exam:resD[r][si+1],total:resD[r][si+2],grade:resD[r][si+3],position:resD[r][si+4]};});}}
-    students.sort(function(a,b){return Number(b.Average||0)-Number(a.Average||0);});students.forEach(function(s,idx){s.OverallPosition=idx+1;});
-    return{success:true,students:students,subjects:subjectNames,resMap:resMap,sbaMap:{},components:[]};
+    var d=getClassSummaryData(SS(),cn,yr,tm);
+    return{success:true,students:d.students,subjects:d.subjects,resMap:d.resMap,sbaMap:d.sbaMap,components:d.components};
   }catch(e){return{success:false,message:e.message};}
+}
+
+// ── OWNER PERFORMANCE REPORT (combined class + top-10 PDF) ─
+// After all exam scores are entered and report cards generated, the admin can compile one PDF
+// covering every selected class — each student's performance plus a Top 10 table per class — and
+// send it to the school owner (email attachment, or a WhatsApp message linking to it) for
+// end-of-term review/decision-making.
+function ordSuffix(n){var s=['th','st','nd','rd'],v=n%100;return n+(s[(v-20)%10]||s[v]||s[0]);}
+
+function buildOwnerPerformanceHtml(ss, sett, classNames, yr, tm) {
+  var schoolName = sett.SCHOOL_NAME || 'School';
+  var logo = fixDriveUrlServer(sett.SCHOOL_LOGO || '');
+  var generatedOn = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'MMMM d, yyyy');
+  var html = '<html><head><meta charset="utf-8"><style>'
+    + 'body{font-family:Arial,Helvetica,sans-serif;color:#1e293b;margin:0;padding:0;font-size:12px}'
+    + '.hdr{background:#0d1b4b;color:#fff;padding:22px 24px;text-align:center}'
+    + '.hdr img{width:56px;height:56px;border-radius:50%;object-fit:cover;margin-bottom:8px}'
+    + '.hdr h1{margin:0;font-size:20px}'
+    + '.hdr p{margin:5px 0 0;font-size:12px;color:#cbd5e1}'
+    + '.section{padding:22px 24px}'
+    + '.section h2{font-size:15px;color:#0d1b4b;border-bottom:2px solid #f0c020;padding-bottom:5px;margin:0 0 10px}'
+    + '.section h3{font-size:12.5px;color:#0d1b4b;margin:16px 0 6px}'
+    + 'table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:12px}'
+    + 'th{background:#0d1b4b;color:#fff;padding:6px;text-align:left}'
+    + 'td{padding:5px 6px;border-bottom:1px solid #e2e8f0}'
+    + 'tr:nth-child(even) td{background:#f8fafc}'
+    + '.top10 th{background:#f0c020;color:#0d1b4b}'
+    + '.pagebreak{page-break-before:always}'
+    + '.summary{font-size:11px;color:#6b7280;margin-bottom:14px}'
+    + '</style></head><body>';
+  html += '<div class="hdr">' + (logo ? '<img src="' + logo + '">' : '') + '<h1>' + schoolName + '</h1>'
+    + '<p>School Performance Report &mdash; ' + tm + ', ' + yr + '</p>'
+    + '<p style="opacity:.75">Generated ' + generatedOn + '</p></div>';
+
+  var anySection = false;
+  classNames.forEach(function(cn, idx) {
+    var d = getClassSummaryData(ss, cn, yr, tm);
+    if (!d.students.length) return;
+    if (anySection) html += '<div class="pagebreak"></div>';
+    anySection = true;
+    html += '<div class="section"><h2>' + cn + '</h2>'
+      + '<div class="summary">' + d.students.length + ' student(s)</div>';
+    html += '<h3>Full Class Performance</h3>';
+    html += '<table><tr><th>Pos.</th><th>ID</th><th>Name</th><th>Total</th><th>Average</th></tr>';
+    d.students.forEach(function(s) {
+      html += '<tr><td>' + ordSuffix(s.OverallPosition) + '</td><td>' + s.ID + '</td><td>' + s.Name + '</td><td>'
+        + (s.TotalScore || 0) + '</td><td>' + Number(s.Average || 0).toFixed(2) + '</td></tr>';
+    });
+    html += '</table>';
+    html += '<h3>Top 10 Best Students</h3>';
+    html += '<table class="top10"><tr><th>Rank</th><th>ID</th><th>Name</th><th>Average</th></tr>';
+    d.students.slice(0, 10).forEach(function(s) {
+      html += '<tr><td>' + ordSuffix(s.OverallPosition) + '</td><td>' + s.ID + '</td><td>' + s.Name + '</td><td>'
+        + Number(s.Average || 0).toFixed(2) + '</td></tr>';
+    });
+    html += '</table></div>';
+  });
+  if (!anySection) {
+    html += '<div class="section"><p>No scored students were found for the selected class(es)/term.</p></div>';
+  }
+  html += '</body></html>';
+  return html;
+}
+// Local copy of report.html's fixDriveUrl, used when embedding the logo in the server-generated
+// PDF (this runs in Code.gs, not the browser, so it can't reuse the client-side helper).
+function fixDriveUrlServer(url) {
+  if (!url) return '';
+  if (url.indexOf('data:') === 0) return url;
+  var match = url.match(/(?:id=|\/d\/|d=)([\w-]+)/);
+  if (match && (url.indexOf('drive.google.com') !== -1 || url.indexOf('docs.google.com') !== -1 || url.indexOf('googleusercontent.com') !== -1)) {
+    return 'https://lh3.googleusercontent.com/d/' + match[1];
+  }
+  return url;
+}
+
+function generateOwnerPerformancePDF(token, year, term, classNames) {
+  if (!validateAdminToken(token)) return {success: false, message: 'Unauthorized'};
+  try {
+    if (!classNames || !classNames.length) return {success: false, message: 'Select at least one class.'};
+    var ss = SS();
+    var sett = getCachedSettingsMap(ss);
+    var html = buildOwnerPerformanceHtml(ss, sett, classNames, year, term);
+    var htmlBlob = Utilities.newBlob(html, 'text/html', 'performance.html');
+    var pdfBlob = htmlBlob.getAs('application/pdf');
+    var fileName = 'Performance Report - ' + term + ' ' + year + ' - ' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss') + '.pdf';
+    pdfBlob.setName(fileName);
+
+    var folder = initReportsFolder();
+    var file = folder ? folder.createFile(pdfBlob) : DriveApp.createFile(pdfBlob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    logServerAction(token, 'Generate Owner Performance Report', 'Classes: ' + classNames.join(', ') + ' — ' + term + ' ' + year);
+    return {
+      success: true,
+      fileId: file.getId(),
+      fileName: fileName,
+      viewUrl: 'https://drive.google.com/file/d/' + file.getId() + '/view',
+      downloadUrl: 'https://drive.google.com/uc?export=download&id=' + file.getId()
+    };
+  } catch(e) { return {success: false, message: 'PDF generation error: ' + e.message}; }
+}
+
+function emailOwnerPerformanceReport(token, toEmail, year, term, classNames, note) {
+  if (!validateAdminToken(token)) return {success: false, message: 'Unauthorized'};
+  if (!toEmail || toEmail.indexOf('@') === -1) return {success: false, message: 'A valid owner email is required.'};
+  try {
+    if (!classNames || !classNames.length) return {success: false, message: 'Select at least one class.'};
+    var ss = SS();
+    var sett = getCachedSettingsMap(ss);
+    var html = buildOwnerPerformanceHtml(ss, sett, classNames, year, term);
+    var htmlBlob = Utilities.newBlob(html, 'text/html', 'performance.html');
+    var pdfBlob = htmlBlob.getAs('application/pdf');
+    var schoolName = sett.SCHOOL_NAME || 'School';
+    var fileName = schoolName + ' Performance Report - ' + term + ' ' + year + '.pdf';
+    pdfBlob.setName(fileName);
+
+    var subject = schoolName + ' — Performance Report (' + term + ', ' + year + ')';
+    var bodyHtml = '<p>' + (note ? note.replace(/\n/g, '<br>') : ('Dear ' + (sett.OWNER_NAME || 'Sir/Madam') + ',<br><br>Please find attached the compiled student performance report — every student\'s results and the Top 10 best students in each class — for <strong>' + term + ', ' + year + '</strong>.')) + '</p>'
+      + '<p style="color:#6b7280;font-size:12px">Sent from the ' + schoolName + ' Result Management System.</p>';
+
+    MailApp.sendEmail({
+      to: toEmail,
+      subject: subject,
+      htmlBody: bodyHtml,
+      attachments: [pdfBlob]
+    });
+
+    logServerAction(token, 'Email Owner Performance Report', 'To: ' + toEmail + ' — Classes: ' + classNames.join(', ') + ' — ' + term + ' ' + year);
+    return {success: true, message: 'Performance report emailed to ' + toEmail + '.'};
+  } catch(e) { return {success: false, message: 'Email error: ' + e.message}; }
 }
 
 // ── CUMULATIVE RECORD ──────────────────────────────────────
