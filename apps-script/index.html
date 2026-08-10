@@ -67,9 +67,62 @@
             z-index: 1;
         }
 
-        /* Ultramodern classroom background */
+        /* Default/fallback background — shown until the carousel (below) renders school photos
+           uploaded by the admin (Settings → School Info → Landing Page Carousel), and permanently
+           if none have been uploaded. */
         .landing-hero {
             background: url('https://images.unsplash.com/photo-1580582932707-520aed937b7b?w=1400&q=80') center/cover no-repeat;
+        }
+
+        /* Photo carousel — sits between the default background above and the dark gradient
+           overlay (.landing-hero::before, z-index:1) so slides are always legible under the
+           hero text regardless of which photo is showing. */
+        .hero-carousel {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            overflow: hidden;
+        }
+
+        .hero-slide {
+            position: absolute;
+            inset: 0;
+            background-size: cover;
+            background-position: center;
+            opacity: 0;
+            transition: opacity 1.4s ease;
+        }
+
+        .hero-slide.active {
+            opacity: 1;
+        }
+
+        .hero-carousel-dots {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 16px;
+            z-index: 2;
+            display: flex;
+            justify-content: center;
+            gap: 7px;
+        }
+
+        .hero-carousel-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.38);
+            cursor: pointer;
+            transition: all 0.25s;
+            border: none;
+            padding: 0;
+        }
+
+        .hero-carousel-dot.active {
+            background: #f0c020;
+            width: 22px;
+            border-radius: 5px;
         }
 
         .hero-grid {
@@ -1668,6 +1721,11 @@
          React app; kept as plain HTML/JS so the interactive login/report flow below can be
          rewritten in React without touching this working piece). -->
     <div class="landing-hero" id="landingHero">
+        <div class="hero-carousel" id="heroCarousel">
+            <!-- Admin-uploaded school/classroom photos, cross-faded by JS. Falls back to the
+                 default background-image above when none are configured. -->
+        </div>
+        <div class="hero-carousel-dots" id="heroCarouselDots"></div>
         <div class="hero-grid" id="heroPupilImages">
             <!-- Student silhouette tiles injected by JS -->
         </div>
@@ -1788,6 +1846,51 @@
                 }
             });
             if (row) row.style.display = any ? 'flex' : 'none';
+
+            renderHeroCarousel(r.SCHOOL_CAROUSEL_IMAGES);
+        }
+
+        // ── HERO PHOTO CAROUSEL ──
+        // Cross-fades through admin-uploaded photos (Settings → School Info → Landing Page
+        // Carousel) behind the hero text. If none are configured, the CSS default background
+        // image on .landing-hero shows through untouched (this never runs / no-ops).
+        var heroCarouselTimer = null;
+        var heroCarouselIdx = 0;
+        function renderHeroCarousel(images) {
+            var list = images;
+            if (typeof list === 'string') { try { list = JSON.parse(list || '[]'); } catch (e) { list = []; } }
+            if (!list || !list.length) return;
+            var wrap = document.getElementById('heroCarousel');
+            var dotsWrap = document.getElementById('heroCarouselDots');
+            if (!wrap) return;
+            // Skip rebuilding (which would restart the fade/timer) if this is the same image set
+            // already rendered — applyHeroBranding runs once from cache, then again from the
+            // fresh server fetch.
+            var sig = list.map(function (i) { return i.url || i; }).join('|');
+            if (wrap.getAttribute('data-sig') === sig) return;
+            wrap.setAttribute('data-sig', sig);
+            wrap.innerHTML = list.map(function (img, i) {
+                var url = (img && img.url) || img;
+                return '<div class="hero-slide' + (i === 0 ? ' active' : '') + '" style="background-image:url(\'' + url + '\')"></div>';
+            }).join('');
+            if (dotsWrap) {
+                dotsWrap.innerHTML = list.length > 1 ? list.map(function (_, i) {
+                    return '<button type="button" class="hero-carousel-dot' + (i === 0 ? ' active' : '') + '" onclick="goToHeroSlide(' + i + ')" aria-label="Slide ' + (i + 1) + '"></button>';
+                }).join('') : '';
+            }
+            heroCarouselIdx = 0;
+            if (heroCarouselTimer) clearInterval(heroCarouselTimer);
+            if (list.length > 1) {
+                heroCarouselTimer = setInterval(function () { goToHeroSlide((heroCarouselIdx + 1) % list.length); }, 5500);
+            }
+        }
+        function goToHeroSlide(i) {
+            var slides = document.querySelectorAll('#heroCarousel .hero-slide');
+            var dots = document.querySelectorAll('#heroCarouselDots .hero-carousel-dot');
+            if (!slides.length) return;
+            heroCarouselIdx = i;
+            slides.forEach(function (s, idx) { s.classList.toggle('active', idx === i); });
+            dots.forEach(function (d, idx) { d.classList.toggle('active', idx === i); });
         }
         var cachedPublic = null;
         try {

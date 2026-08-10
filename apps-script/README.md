@@ -112,6 +112,56 @@ Owner Name/Email/WhatsApp Phone are new settings (`OWNER_NAME`/`OWNER_EMAIL`/`OW
 saved independently of the rest of Settings (mirroring the SMS API card) so an unrelated save
 elsewhere can never touch them.
 
+### 7. Report links still broke in the field — root cause was SMS delivery, not the code
+**Code.gs** — `ReportLinks` sheet (new), `createReportLinkToken`, `resolveReportLinkToken`,
+`buildPinnedReportUrl`, `doGet`
+
+Fix #1 above (pinning the link to a specific year/term) turned out not to be the whole story.
+A real link sent by SMS still showed up with the term cut off — `...&term=Term 3` arrived on the
+phone as a link ending in `...&term=Term`, with a stray `3` left dangling outside the hyperlink.
+Opening it landed on a report for a term that matched nothing (empty subject table again), and
+a separator character (`|`) elsewhere in the same message showed up on the phone as `@`.
+
+Both symptoms have the same explanation: SMS is plain text delivered through carriers/handsets
+that don't reliably preserve everything in a long, multi-part message — an un-encoded space isn't
+valid in a URL to begin with, and even the correctly percent-encoded form (`Term%203`) isn't
+guaranteed to survive concatenated (multi-part) SMS delivery intact. `|` sits in the GSM-7
+*extension* table (it needs a 2-byte escape sequence some gateways mishandle), which is
+consistent with it arriving as `@` instead.
+
+Rather than trying to out-guess carrier behavior, report links no longer carry the risky data at
+all: `?page=report&rid=<10-char token>` resolves server-side (via a new `ReportLinks` sheet
+mapping token → student/year/term) to the exact same pinned report — there's nothing left in the
+URL for delivery to corrupt. Old-style `?page=report&id=...&year=...&term=...` links (already
+sent, or bookmarked) still work unchanged. SMS message bodies were also switched to plain
+GSM-7-safe characters throughout (`-` instead of `|`, `GHS` instead of `¢`) as a second line of
+defense.
+
+> **This only protects SMS sent *after* redeploying.** A link already sitting in someone's
+> messages app was corrupted (or not) at the moment it was delivered — redeploying doesn't
+> retroactively fix text already on a phone. Any parent who got a broken link needs it resent
+> (Preview Report → select the student → Send Report SMS) once these changes are live; the new
+> send will use the token-based link.
+>
+> The `ReportLinks` sheet is created automatically the first time a report link is generated —
+> no manual setup needed, same as the other auto-created sheets in this system.
+
+### 8. Landing page photo carousel (new)
+**index.html** (public student portal hero banner), **Code.gs** — `uploadCarouselImage`,
+`removeCarouselImage`, `getCarouselImages`, `getPublicSettings`, **admin.html** (Settings →
+School Info → "Landing Page Carousel")
+
+The public portal's hero banner (top of the Student Portal / Result Checker landing page) now
+cross-fades through photos the admin uploads — school buildings, classrooms, students — instead
+of the single fixed stock photo. Admin manages photos from Settings → School Info: upload any
+number of images (client-side resized before upload), remove any of them, and the carousel
+picks up the change on the next portal page load. No photos uploaded → the original default
+banner image is shown, so this is fully backward compatible. Images are stored in a dedicated
+"School Carousel Images" Drive folder (same sharing pattern as the school logo/stamp/signature),
+with just the list of links kept in Settings (`SCHOOL_CAROUSEL_IMAGES`, a small JSON array) —
+`getPublicSettings()` (already unauthenticated, used by the landing page before anyone logs in)
+now includes it.
+
 ## Deploying these changes
 
 This repo isn't connected to the Apps Script project via `clasp`, so the fastest path is manual:

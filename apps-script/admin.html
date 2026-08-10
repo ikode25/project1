@@ -5444,6 +5444,22 @@
                         </div>
                     </div>
 
+                    <!-- LANDING PAGE CAROUSEL -->
+                    <div class="card admin-only" id="setCarouselCard" style="margin-bottom:20px;">
+                        <div class="chdr">
+                            <div class="ctitle" style="font-size:14px; display:flex; align-items:center; gap:7px;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="14" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>Landing Page Carousel</div>
+                        </div>
+                        <div class="cbody">
+                            <div style="padding:10px;background:#eff6ff;border-radius:10px;font-size:12px;color:#1e40af;margin-bottom:14px">Upload photos of the school, classrooms, or students — they'll rotate as a slideshow behind the header on the public Student Portal / Result Checker landing page. Landscape photos (about 1400×900) look best. If no photos are uploaded, a default banner image is shown.</div>
+                            <div id="carouselThumbGrid" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+                                <span style="font-size:12px;color:var(--mu)">Loading…</span>
+                            </div>
+                            <input type="file" id="carouselFileInput" accept="image/*" multiple style="display:none" onchange="handleCarouselUpload(event)">
+                            <button class="btn bp" onclick="document.getElementById('carouselFileInput').click()">Upload Photos</button>
+                            <span id="carouselUploadStatus" style="font-size:12px;color:var(--mu);margin-left:10px"></span>
+                        </div>
+                    </div>
+
                     <div class="card" id="setAcadCard" class="admin-only" style="margin-bottom:20px;">
                         <div class="chdr">
                             <div class="ctitle" style="font-size:14px;">Academic & Term Settings</div>
@@ -9910,6 +9926,7 @@
             if (tabName === 'school') {
                 var c1 = document.getElementById('setSchoolCard'); if (c1) c1.style.display = 'block';
                 var c2 = document.getElementById('setPhotosCard'); if (c2) c2.style.display = 'block';
+                var c3 = document.getElementById('setCarouselCard'); if (c3) { c3.style.display = 'block'; try { loadCarouselThumbs(); } catch(e) {} }
             } else if (tabName === 'academic') {
                 var c1 = document.getElementById('setAcadCard'); if (c1) c1.style.display = 'block';
                 var c2 = document.getElementById('setScoreCard'); if (c2) c2.style.display = 'block';
@@ -10521,6 +10538,76 @@
                 + '</body></html>');
             w.document.close();
             setTimeout(function () { w.print(); }, 400);
+        }
+
+        // ── LANDING PAGE CAROUSEL (Settings → School Info) ──
+        function loadCarouselThumbs() {
+            var grid = document.getElementById('carouselThumbGrid');
+            if (!grid) return;
+            grid.innerHTML = '<span style="font-size:12px;color:var(--mu)">Loading…</span>';
+            google.script.run.withSuccessHandler(function (r) {
+                if (r.success) renderCarouselThumbs(r.images || []);
+                else grid.innerHTML = '<span style="font-size:12px;color:#e11d48">' + r.message + '</span>';
+            }).withFailureHandler(function (e) {
+                grid.innerHTML = '<span style="font-size:12px;color:#e11d48">Error: ' + e.message + '</span>';
+            }).getCarouselImages(adminToken);
+        }
+        function renderCarouselThumbs(images) {
+            window._carouselImages = images;
+            var grid = document.getElementById('carouselThumbGrid');
+            if (!images.length) {
+                grid.innerHTML = '<span style="font-size:12px;color:var(--mu)">No photos uploaded yet — the default banner image will be shown.</span>';
+                return;
+            }
+            grid.innerHTML = images.map(function (img) {
+                return '<div style="position:relative;width:110px;height:74px;border-radius:8px;overflow:hidden;border:2px solid var(--bd)">'
+                    + '<img src="' + img.url + '" style="width:100%;height:100%;object-fit:cover">'
+                    + '<button type="button" onclick="deleteCarouselImage(\'' + img.id + '\')" title="Remove" style="position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:rgba(17,24,39,.75);color:#fff;border:none;cursor:pointer;font-size:12px;line-height:1;display:flex;align-items:center;justify-content:center">✕</button>'
+                    + '</div>';
+            }).join('');
+        }
+        function handleCarouselUpload(e) {
+            var files = Array.prototype.slice.call(e.target.files || []);
+            if (!files.length) return;
+            var status = document.getElementById('carouselUploadStatus');
+            var remaining = files.length;
+            status.textContent = 'Uploading 0/' + files.length + '…';
+            var uploadedSoFar = 0;
+            files.forEach(function (file) {
+                var reader = new FileReader();
+                reader.onload = function (ev) {
+                    var img = document.createElement('img');
+                    img.onload = function () {
+                        var canvas = document.createElement('canvas');
+                        var MAX_W = 1400, MAX_H = 900;
+                        var w = img.width, h = img.height;
+                        if (w > h) { if (w > MAX_W) { h *= MAX_W / w; w = MAX_W; } } else { if (h > MAX_H) { w *= MAX_H / h; h = MAX_H; } }
+                        canvas.width = w; canvas.height = h;
+                        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                        var b64 = canvas.toDataURL('image/jpeg', 0.78);
+                        google.script.run.withSuccessHandler(function (r) {
+                            uploadedSoFar++;
+                            status.textContent = 'Uploading ' + uploadedSoFar + '/' + files.length + '…';
+                            if (r.success) renderCarouselThumbs(r.images || []);
+                            if (uploadedSoFar >= files.length) { status.textContent = ''; toast('Carousel photo(s) uploaded!', 'success'); }
+                        }).withFailureHandler(function (err) {
+                            uploadedSoFar++;
+                            if (uploadedSoFar >= files.length) status.textContent = '';
+                            toast('Upload failed: ' + err.message, 'error');
+                        }).uploadCarouselImage(adminToken, b64);
+                    };
+                    img.src = ev.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+            e.target.value = '';
+        }
+        function deleteCarouselImage(fileId) {
+            if (!confirm('Remove this photo from the landing page carousel?')) return;
+            google.script.run.withSuccessHandler(function (r) {
+                if (r.success) { renderCarouselThumbs(r.images || []); toast('Photo removed.', 'success'); }
+                else toast(r.message, 'error');
+            }).removeCarouselImage(adminToken, fileId);
         }
 
         // ── OWNER PERFORMANCE REPORTS (Settings → Owner Reports) ──

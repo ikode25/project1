@@ -24,7 +24,27 @@ var REPORTS_FOLDER_KEY = 'PERFORMANCE_REPORTS_FOLDER_ID';
 function doGet(e) {
   var page = (e && e.parameter && e.parameter.page) ? e.parameter.page : 'student';
   var sid  = (e && e.parameter && e.parameter.id)   ? e.parameter.id   : '';
+  var yr   = (e && e.parameter && e.parameter.year) ? e.parameter.year : '';
+  var tm   = (e && e.parameter && e.parameter.term) ? e.parameter.term : '';
   initializeSystem();
+  // BUGFIX ("report card link opens with blank scores"): report links used to carry the
+  // student ID/year/term as raw query values, e.g. "...&term=Term 3". SMS is plain text, not
+  // HTML — carriers/handsets don't reliably preserve a link's percent-encoding through
+  // concatenated (multi-part) SMS delivery, and a space or "&"/"=" that survives un-encoded (or
+  // gets corrupted) truncates the query string right there. The recipient's phone then only
+  // linkifies "...&term=Term" (dropping " 3"), which opens the report with term="Term" instead
+  // of "Term 3" — a request that matches no data, so the page renders with the student's basic
+  // info (still pulled from a live/partial match) but an empty subject table. A short opaque
+  // token (?page=report&rid=xxxxxxxxxx, resolved via ReportLinks below) has no spaces or
+  // special characters to lose, so it survives SMS delivery intact. Old-style
+  // id/year/term links (already sent, or bookmarked) still work unchanged.
+  if (page === 'report' && !sid) {
+    var rid = (e && e.parameter && e.parameter.rid) ? e.parameter.rid : '';
+    if (rid) {
+      var resolved = resolveReportLinkToken(rid);
+      if (resolved) { sid = resolved.studentId; yr = resolved.year; tm = resolved.term; }
+    }
+  }
   if (page === 'admin') {
     var t = HtmlService.createTemplateFromFile('admin');
     t.scriptUrl = ScriptApp.getService().getUrl();
@@ -36,8 +56,8 @@ function doGet(e) {
   if (page === 'report' && sid) {
     var t = HtmlService.createTemplateFromFile('report');
     t.studentId = sid;
-    t.year = (e && e.parameter && e.parameter.year) ? e.parameter.year : '';
-    t.term = (e && e.parameter && e.parameter.term) ? e.parameter.term : '';
+    t.year = yr;
+    t.term = tm;
     t.scriptUrl = ScriptApp.getService().getUrl();
     return t.evaluate()
       .setTitle('Report Card')
@@ -1897,35 +1917,163 @@ function getPublicSettings(){
       SCHOOL_PHONE:sett['SCHOOL_PHONE']||'',
       SCHOOL_EMAIL:sett['SCHOOL_EMAIL']||'',
       CURRENT_TERM:sett['CURRENT_TERM']||'',
-      CURRENT_YEAR:sett['CURRENT_YEAR']||''
+      CURRENT_YEAR:sett['CURRENT_YEAR']||'',
+      // Landing page carousel — JSON array of {id,url}, admin-managed under Settings → School
+      // Info → Landing Page Carousel. Public/no-auth like the rest of this function since the
+      // student portal landing page loads it before anyone logs in.
+      SCHOOL_CAROUSEL_IMAGES:sett['SCHOOL_CAROUSEL_IMAGES']||'[]'
     };
   }catch(e){return{success:false};}
+}
+
+// ── LANDING PAGE CAROUSEL ────────────────────────────────────
+var CAROUSEL_FOLDER_KEY = 'CAROUSEL_FOLDER_ID';
+function initCarouselFolder() {
+  var props = PropertiesService.getScriptProperties();
+  var folderId = props.getProperty(CAROUSEL_FOLDER_KEY);
+  if (folderId) { try { return DriveApp.getFolderById(folderId); } catch(e) {} }
+  try {
+    var folder = DriveApp.createFolder('School Carousel Images');
+    var id = folder.getId(); props.setProperty(CAROUSEL_FOLDER_KEY, id);
+    return folder;
+  } catch(e) { Logger.log('Carousel folder error: ' + e.message); return null; }
+}
+function getCarouselImageList(sh, data) {
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][0] === 'SCHOOL_CAROUSEL_IMAGES') {
+      var list = [];
+      try { list = JSON.parse(data[i][1] || '[]'); } catch(e) { list = []; }
+      return {row: i + 1, list: list};
+    }
+  }
+  return {row: -1, list: []};
+}
+function saveCarouselImageList(sh, row, list) {
+  var jsonVal = JSON.stringify(list);
+  if (row > 0) sh.getRange(row, 2).setValue(jsonVal);
+  else sh.appendRow(['SCHOOL_CAROUSEL_IMAGES', jsonVal]);
+}
+function uploadCarouselImage(token, b64) {
+  if (!validateAdminToken(token)) return {success: false, message: 'Unauthorized'};
+  try {
+    var folder = initCarouselFolder();
+    if (!folder) return {success: false, message: 'Could not create/access the carousel photos folder in Google Drive.'};
+    var d = b64.indexOf(',') !== -1 ? b64.split(',')[1] : b64;
+    var file = folder.createFile(Utilities.newBlob(Utilities.base64Decode(d), 'image/jpeg', 'carousel_' + new Date().getTime() + '.jpg'));
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    var url = 'https://lh3.googleusercontent.com/d/' + file.getId();
+
+    var ss = SS();
+    var sh = ss.getSheetByName('Settings');
+    var data = sh.getDataRange().getValues();
+    var found = getCarouselImageList(sh, data);
+    found.list.push({id: file.getId(), url: url});
+    saveCarouselImageList(sh, found.row, found.list);
+    invalidateSettingsCache();
+    return {success: true, url: url, fileId: file.getId(), images: found.list};
+  } catch(e) { return {success: false, message: e.message}; }
+}
+function removeCarouselImage(token, fileId) {
+  if (!validateAdminToken(token)) return {success: false, message: 'Unauthorized'};
+  try {
+    var ss = SS();
+    var sh = ss.getSheetByName('Settings');
+    var data = sh.getDataRange().getValues();
+    var found = getCarouselImageList(sh, data);
+    var newList = found.list.filter(function(img) { return img.id !== fileId; });
+    saveCarouselImageList(sh, found.row, newList);
+    try { DriveApp.getFileById(fileId).setTrashed(true); } catch(e) {}
+    invalidateSettingsCache();
+    return {success: true, images: newList};
+  } catch(e) { return {success: false, message: e.message}; }
+}
+function getCarouselImages(token) {
+  if (!validateAdminToken(token)) return {success: false, message: 'Unauthorized'};
+  try {
+    var sett = getCachedSettingsMap(SS());
+    var list = [];
+    try { list = JSON.parse(sett.SCHOOL_CAROUSEL_IMAGES || '[]'); } catch(e) { list = []; }
+    return {success: true, images: list};
+  } catch(e) { return {success: false, message: e.message}; }
+}
+
+// ── REPORT LINK TOKENS ───────────────────────────────────────
+// A dedicated sheet mapping a short opaque token -> (StudentID, Year, Term). Report links are
+// built as "?page=report&rid=<token>" instead of spelling out id/year/term as query values.
+// SMS is plain text: a value like "Term 3" needs percent-encoding ("Term%203") to survive as a
+// URL, but concatenated (multi-part) SMS delivery through real carriers/handsets does not
+// reliably preserve that — a dropped/garbled "%20" truncates the query string at the space, so
+// the phone only links "...&term=Term" and the report opens for a term that matches nothing
+// (empty subject table, stale leftover figures). A short alphanumeric token has nothing in it
+// that SMS delivery can corrupt.
+function getOrCreateReportLinksSheet(ss) {
+  var sh = ss.getSheetByName('ReportLinks');
+  if (!sh) { sh = ss.insertSheet('ReportLinks'); styleHeader(sh, ['Token','StudentID','Year','Term','CreatedAt']); }
+  return sh;
+}
+function createReportLinkToken(studentId, year, term) {
+  try {
+    var ss = SS();
+    var sh = getOrCreateReportLinksSheet(ss);
+    // Reuse an existing token for the exact same (student, year, term) instead of minting a new
+    // row every time a report is re-shared for the same period.
+    if (sh.getLastRow() > 1) {
+      var data = sh.getDataRange().getValues();
+      for (var i = 1; i < data.length; i++) {
+        if (data[i][1] && data[i][1].toString() === studentId.toString() &&
+            data[i][2] && data[i][2].toString() === year.toString() &&
+            data[i][3] === term) {
+          return data[i][0].toString();
+        }
+      }
+    }
+    var token = Utilities.getUuid().replace(/-/g, '').substring(0, 10);
+    sh.appendRow([token, studentId.toString(), year.toString(), term, new Date().toISOString()]);
+    return token;
+  } catch(e) { Logger.log('createReportLinkToken error: ' + e.message); return ''; }
+}
+function resolveReportLinkToken(rid) {
+  try {
+    var ss = SS();
+    var sh = ss.getSheetByName('ReportLinks');
+    if (!sh || sh.getLastRow() < 2) return null;
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] && data[i][0].toString() === rid.toString()) {
+        return {studentId: data[i][1].toString(), year: data[i][2].toString(), term: data[i][3]};
+      }
+    }
+    return null;
+  } catch(e) { Logger.log('resolveReportLinkToken error: ' + e.message); return null; }
+}
+// Resolves (or pins, when blank) year/term the same way for every report-link builder below,
+// then returns a token-based URL — see the ReportLinks comment above for why.
+function buildPinnedReportUrl(studentId, year, term) {
+  var pinYear = year, pinTerm = term;
+  if (!pinYear || !pinTerm) {
+    var rep = getStudentReport(studentId, year, term, true);
+    if (rep && rep.success && rep.student) {
+      pinYear = pinYear || rep.student.Year;
+      pinTerm = pinTerm || rep.student.Term;
+    }
+  }
+  var rid = createReportLinkToken(studentId, pinYear || '', pinTerm || '');
+  if (rid) {
+    return ScriptApp.getService().getUrl() + '?page=report&rid=' + rid;
+  }
+  // Fallback (ReportLinks sheet unavailable for some reason) — old-style link, still correct,
+  // just not SMS-corruption-proof.
+  var url = ScriptApp.getService().getUrl() + '?page=report&id=' + encodeURIComponent(studentId);
+  if (pinYear) url += '&year=' + encodeURIComponent(pinYear);
+  if (pinTerm) url += '&term=' + encodeURIComponent(pinTerm);
+  return url;
 }
 
 // ── REPORT CARD URL ──
 function getReportCardUrl(token, studentId, year, term){
   if(!validateAdminToken(token))return{success:false,message:'Unauthorized'};
   try{
-    // BUGFIX: a link generated with a blank year/term used to resolve to whichever term is
-    // "current" at the moment the link is *opened* rather than the term it was actually shared
-    // for. That's harmless until the student's row gets rolled over/promoted to a new term
-    // (Class/Year/Term mutated in place by executeAutomaticPromotions) — at that point the same
-    // old link silently starts showing the new, still-empty term instead of the report it was
-    // meant to show, which looks like "scores/remarks vanished". Always pin the link to a
-    // specific year/term — resolving the student's own current one when the caller didn't
-    // supply one — so the link keeps pointing at the same report no matter what happens later.
-    var pinYear = year, pinTerm = term;
-    if (!pinYear || !pinTerm) {
-      var rep = getStudentReport(studentId, year, term, true);
-      if (rep && rep.success && rep.student) {
-        pinYear = pinYear || rep.student.Year;
-        pinTerm = pinTerm || rep.student.Term;
-      }
-    }
-    var url=ScriptApp.getService().getUrl()+'?page=report&id='+encodeURIComponent(studentId);
-    if (pinYear) url += '&year=' + encodeURIComponent(pinYear);
-    if (pinTerm) url += '&term=' + encodeURIComponent(pinTerm);
-    return{success:true,url:url};
+    return{success:true,url:buildPinnedReportUrl(studentId, year, term)};
   }catch(e){return{success:false,message:e.message};}
 }
 
@@ -2035,17 +2183,11 @@ function sendReportSMS(token,studentId,year,term){
     // Fetch report data
     var rep = getStudentReport(studentId, year, term, true);
     var msg = '';
-    // BUGFIX: pin the link to the report's actual resolved year/term (rep.student.Year/Term)
-    // instead of the raw, possibly-blank year/term arguments. Several callers (e.g. the SMS
-    // panel's "Enter Student ID" quick-send) never pass year/term at all — without pinning, the
-    // link would resolve to whatever term is "current" whenever the parent eventually opens it,
-    // which after a Term-3 rollover/promotion is a brand-new, still-empty term. That's what made
-    // the shared report look like it had no scores/remarks even though it was correct when sent.
+    // Link is pinned to the report's actual resolved year/term and built as a short token (see
+    // buildPinnedReportUrl / ReportLinks) so nothing in it can be corrupted by SMS delivery.
     var pinYear = (rep.success && rep.student && rep.student.Year) ? rep.student.Year : year;
     var pinTerm = (rep.success && rep.student && rep.student.Term) ? rep.student.Term : term;
-    var url = ScriptApp.getService().getUrl()+'?page=report&id='+encodeURIComponent(studentId);
-    if (pinYear) url += '&year=' + encodeURIComponent(pinYear);
-    if (pinTerm) url += '&term=' + encodeURIComponent(pinTerm);
+    var url = buildPinnedReportUrl(studentId, pinYear, pinTerm);
 
     if (rep.success) {
       var stu = rep.student;
@@ -2053,17 +2195,21 @@ function sendReportSMS(token,studentId,year,term){
       var total = rep.classmatesCount || '—';
       var avg = stu.Average ? Math.round(Number(stu.Average)) : '—';
 
+      // SMS-safe formatting: "|" sits in the GSM-7 *extension* table (needs a 2-byte escape
+      // sequence) and "¢" isn't in GSM-7 at all — some carriers/handsets mangle or drop
+      // characters like these in transit (this is what turned "|" into "@" in the field), so the
+      // message body sticks to plain GSM-7 default-alphabet characters throughout.
       msg = 'Dear Parent, ' + stu.Name + '\'s report card for ' + stu.Term + ' (' + stu.Year + ') is ready.\n' +
             'Class: ' + stu.Class + '\n' +
-            'Avg: ' + avg + '% | Pos: ' + pos + '/' + total + '\n';
+            'Avg: ' + avg + '% - Pos: ' + pos + '/' + total + '\n';
 
       var arrears = Number(stu.Arrears || 0);
       var nextTerm = Number(stu.NextTermFees || 0);
       if (nextTerm > 0) {
-        msg += 'Bill: GH¢ ' + nextTerm.toFixed(2) + '\n';
+        msg += 'Bill: GHS ' + nextTerm.toFixed(2) + '\n';
       }
       if (arrears > 0) {
-        msg += 'Arrears: GH¢ ' + arrears.toFixed(2) + '\n';
+        msg += 'Arrears: GHS ' + arrears.toFixed(2) + '\n';
       }
 
       if (rep.results && rep.results.length > 0) {
@@ -2171,10 +2317,8 @@ function sendBulkSMS(token, targetType, targetValue, templateText) {
       var rank = rankMaps[classKey][stu.ID] || { position: '—', total: '—' };
       var avg = stu.Average ? Math.round(Number(stu.Average)) : '—';
       
-      var url = ScriptApp.getService().getUrl() + '?page=report&id=' + encodeURIComponent(stu.ID);
-      if (stu.Year) url += '&year=' + encodeURIComponent(stu.Year);
-      if (stu.Term) url += '&term=' + encodeURIComponent(stu.Term);
-      
+      var url = buildPinnedReportUrl(stu.ID, stu.Year, stu.Term);
+
       // Get subject grades list for the student
       var gradeList = 'N/A';
       var rep = getStudentReport(stu.ID, stu.Year, stu.Term, true);
@@ -2246,12 +2390,10 @@ function getCompiledReportSMS(token, studentId, year, term) {
     var rep = getStudentReport(studentId, year, term, true);
     var msg = '';
     // See sendReportSMS for why the link must be pinned to the report's actual resolved
-    // year/term rather than the raw (possibly-blank) arguments.
+    // year/term, and built as a short token rather than raw query values.
     var pinYear = (rep.success && rep.student && rep.student.Year) ? rep.student.Year : year;
     var pinTerm = (rep.success && rep.student && rep.student.Term) ? rep.student.Term : term;
-    var url = ScriptApp.getService().getUrl() + '?page=report&id=' + encodeURIComponent(studentId);
-    if (pinYear) url += '&year=' + encodeURIComponent(pinYear);
-    if (pinTerm) url += '&term=' + encodeURIComponent(pinTerm);
+    var url = buildPinnedReportUrl(studentId, pinYear, pinTerm);
 
     if (rep.success) {
       var stu = rep.student;
@@ -2261,15 +2403,15 @@ function getCompiledReportSMS(token, studentId, year, term) {
 
       msg = 'Dear Parent, ' + stu.Name + '\'s report card for ' + stu.Term + ' (' + stu.Year + ') is ready.\n' +
             'Class: ' + stu.Class + '\n' +
-            'Avg: ' + avg + '% | Pos: ' + pos + '/' + total + '\n';
+            'Avg: ' + avg + '% - Pos: ' + pos + '/' + total + '\n';
 
       var arrears = Number(stu.Arrears || 0);
       var nextTerm = Number(stu.NextTermFees || 0);
       if (nextTerm > 0) {
-        msg += 'Bill: GH¢ ' + nextTerm.toFixed(2) + '\n';
+        msg += 'Bill: GHS ' + nextTerm.toFixed(2) + '\n';
       }
       if (arrears > 0) {
-        msg += 'Arrears: GH¢ ' + arrears.toFixed(2) + '\n';
+        msg += 'Arrears: GHS ' + arrears.toFixed(2) + '\n';
       }
 
       if (rep.results && rep.results.length > 0) {
