@@ -70,7 +70,16 @@
            body background partway down. Sits behind everything (negative z-index) but still
            paints above the body's own background. Default background-image here is the
            fallback shown until/unless the carousel (below) renders admin-uploaded school photos
-           (Settings → School Info → Landing Page Carousel). */
+           (Settings → School Info → Landing Page Carousel).
+           IMPORTANT: this (and .hero-carousel-overlay) must be a direct child of <body> in the
+           HTML — a sibling of .landing-hero, same as .bg-canvas — NOT nested inside
+           .landing-hero. .landing-hero sets its own `z-index: 0`, which makes it (and everything
+           inside it, including a negative-z-index fixed child) paint as a single positioned
+           layer *above* later plain, non-positioned siblings like #appRoot and the Staff Portal
+           link/footer, per normal CSS stacking rules — negative z-index only sorts below
+           non-positioned content at the level it's actually declared at, not several stacking
+           contexts deep. Nesting this here once made the Staff Portal button/footer invisible,
+           permanently covered by this layer at every scroll position. */
         .hero-carousel {
             position: fixed;
             inset: 0;
@@ -102,8 +111,13 @@
             opacity: 1;
         }
 
+        /* Stays inside .landing-hero (absolute, not fixed) deliberately — it only needs to be
+           visible over the initial hero/photo-intro area, and keeping it there (rather than
+           pinned to the viewport for the whole scrollable page) avoids it ever needing to
+           compete for stacking order with content further down the page (portal card, Staff
+           Portal link, footer). */
         .hero-carousel-dots {
-            position: fixed;
+            position: absolute;
             left: 0;
             right: 0;
             bottom: 16px;
@@ -1722,17 +1736,20 @@
         <div class="orb orb3"></div>
     </div>
 
+    <!-- Fullscreen photo backdrop for the WHOLE PAGE. Deliberately a direct child of <body>
+         (sibling of .landing-hero/.bg-canvas), NOT nested inside .landing-hero — see the
+         IMPORTANT note on .hero-carousel in <style> above for why nesting it breaks the Staff
+         Portal button/footer below. -->
+    <div class="hero-carousel" id="heroCarousel">
+        <!-- Admin-uploaded school/classroom photos, cross-faded by JS. Falls back to the
+             default background-image set in CSS when none are configured. -->
+    </div>
+    <div class="hero-carousel-overlay"></div>
+
     <!-- LANDING HERO SECTION (static — purely decorative branding banner, not part of the
          React app; kept as plain HTML/JS so the interactive login/report flow below can be
          rewritten in React without touching this working piece). -->
     <div class="landing-hero" id="landingHero">
-        <div class="hero-carousel" id="heroCarousel">
-            <!-- Admin-uploaded school/classroom photos, cross-faded by JS. Falls back to the
-                 default background-image set in CSS when none are configured. Fixed full-page
-                 (see .hero-carousel in <style>), so this is the backdrop for the whole page, not
-                 just this hero section. -->
-        </div>
-        <div class="hero-carousel-overlay"></div>
         <div class="hero-carousel-dots" id="heroCarouselDots"></div>
         <div class="hero-grid" id="heroPupilImages">
             <!-- Student silhouette tiles injected by JS -->
