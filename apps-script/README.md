@@ -404,6 +404,17 @@ counts). **admin.html** — the Class Academic Performance chart (now horizontal
   dashboard); Bills Generated is admin-only, matching how the rest of the Fees & Bills area is
   already admin-only.
 
+### 19. Bar chart: reverted back to vertical columns
+**admin.html** — the Class Academic Performance chart.
+
+- The horizontal-bar layout from the previous round wasn't liked, so it's reverted back to the
+  vertical column chart (wider bars, rounded top corners, fixed 340px height) from before that
+  change. The horizontal-only helper functions added for it (`makeChipLabelsPluginH`,
+  `ultraModernScalesH`, `makeThresholdLinesPluginH`) are removed since nothing uses them anymore.
+  Everything else from the last two rounds — the Poppins font fix, the genuine line chart for Term
+  Performance Trend, and the Reports Published/Unpublished/Bills Generated dashboard tiles — is
+  unaffected.
+
 ## Deploying these changes
 
 This repo isn't connected to the Apps Script project via `clasp`, so the fastest path is manual:

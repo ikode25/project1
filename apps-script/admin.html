@@ -4292,10 +4292,8 @@
                                 <div id="dashBarPerformBadge" style="background:rgba(255,255,255,0.15); color:#fff; font-size:10px; font-weight:700; padding:4px 10px; border-radius:20px; letter-spacing:0.5px;">LIVE</div>
                             </div>
                             <div style="padding:16px 20px 20px; background:#fff;">
-                                <div id="barChartScroll" style="max-height:520px; overflow-y:auto; overflow-x:hidden;">
-                                    <div id="barChartWrap" style="height:340px; position:relative;">
-                                        <canvas id="barChart"></canvas>
-                                    </div>
+                                <div id="barChartWrap" style="height:340px; position:relative;">
+                                    <canvas id="barChart"></canvas>
                                 </div>
                             </div>
                         </div>
@@ -8264,32 +8262,6 @@
             };
         }
 
-        // Horizontal-bar counterpart: the pass/excellent reference lines run vertically (at the
-        // x=50/x=70 value positions) spanning the chart's full height, instead of horizontally.
-        function makeThresholdLinesPluginH(id) {
-            return {
-                id: id,
-                afterDraw: function (chart) {
-                    var ctx2 = chart.ctx, yAxis = chart.scales.y, xAxis = chart.scales.x;
-                    if (!yAxis || !xAxis) return;
-                    var top = yAxis.top, bottom = yAxis.bottom;
-                    [[70, '#10b981', 'Excellent'], [50, '#f59e0b', 'Pass']].forEach(function (t) {
-                        var x = xAxis.getPixelForValue(t[0]);
-                        ctx2.save();
-                        ctx2.setLineDash([5, 5]);
-                        ctx2.strokeStyle = t[1];
-                        ctx2.globalAlpha = 0.35;
-                        ctx2.lineWidth = 1.5;
-                        ctx2.beginPath();
-                        ctx2.moveTo(x, top);
-                        ctx2.lineTo(x, bottom);
-                        ctx2.stroke();
-                        ctx2.restore();
-                    });
-                }
-            };
-        }
-
         // Floating rounded "chip" value labels above each bar, colored to match that bar.
         function makeChipLabelsPlugin(id, dataRef, colorFor, suffix) {
             return {
@@ -8339,59 +8311,6 @@
             };
         }
 
-        // Horizontal-bar counterpart of the chip label plugin above — the value chip sits just
-        // past the end of the bar (vertically centered on it) instead of floating above it.
-        function makeChipLabelsPluginH(id, dataRef, colorFor, suffix) {
-            return {
-                id: id,
-                afterDatasetsDraw: function (chart) {
-                    var meta = chart.getDatasetMeta(0);
-                    var ctx2 = chart.ctx;
-                    ctx2.save();
-                    meta.data.forEach(function (bar, i) {
-                        var v = dataRef[i];
-                        if (!v) return;
-                        var label = v + (suffix || '');
-                        ctx2.font = '800 11px "Segoe UI", Tahoma, Geneva, Verdana, sans-serif';
-                        var w = ctx2.measureText(label).width + 14;
-                        var h = 18, x = bar.x + 8, y = bar.y - h / 2;
-                        var col = colorFor(i);
-                        ctx2.fillStyle = col;
-                        ctx2.beginPath();
-                        ctx2.roundRect ? ctx2.roundRect(x, y, w, h, 9) : ctx2.rect(x, y, w, h);
-                        ctx2.fill();
-                        ctx2.fillStyle = '#fff';
-                        ctx2.textAlign = 'center';
-                        ctx2.textBaseline = 'middle';
-                        ctx2.fillText(label, x + w / 2, y + h / 2 + 0.5);
-                    });
-                    ctx2.restore();
-                }
-            };
-        }
-
-        // Scales for a horizontal ('indexAxis: y') bar chart — value axis runs along x (0-100%),
-        // category axis (class names) runs along y with no rotation needed since each label gets
-        // its own row.
-        function ultraModernScalesH(suffix) {
-            return {
-                x: {
-                    beginAtZero: true, max: 100,
-                    border: { display: false },
-                    grid: { display: false },
-                    ticks: {
-                        font: { size: 11, weight: '600' }, color: '#94a3b8',
-                        callback: function (v) { return v + (suffix || ''); }, stepSize: 20
-                    }
-                },
-                y: {
-                    border: { display: false },
-                    grid: { display: false },
-                    ticks: { font: { size: 11, weight: '700' }, color: '#64748b' }
-                }
-            };
-        }
-
         function renderCharts(cad, tad) {
             if (!document.getElementById('barChart') || !document.getElementById('lineChart')) return;
 
@@ -8409,24 +8328,19 @@
                 { start: '#6366f1', end: '#818cf8' }   // Indigo
             ];
 
-            // ── BAR CHART: Class Academic Performance — horizontal, one long bar per class ──
-            // Was vertical: with 10-15+ classes squeezed into one card, the columns read as thin
-            // and "compressed" (worse, rotated x-axis labels underneath). Horizontal bars give
-            // every class its own full-width row — the bar length now genuinely stretches out to
-            // represent the score, labels sit flat and readable to the left, and the wrapping
-            // #barChartScroll div grows the chart's height with the class count (scrolling only
-            // past a generous cap) so rows never get squashed back down again.
+            // ── BAR CHART: Class Academic Performance (back to vertical columns — the horizontal
+            // layout tried in a previous round wasn't liked, reverted per admin's feedback) ──
             var bl = Object.keys(cad);
             var bData = bl.map(function(k) { return Math.round((Number(cad[k]) || 0) * 10) / 10; });
             var barWrap = document.getElementById('barChartWrap');
-            if (barWrap) barWrap.style.height = Math.max(340, bl.length * 40 + 40) + 'px';
+            if (barWrap) barWrap.style.height = '340px';
 
             var bCtx = document.getElementById('barChart').getContext('2d');
             if (barChartInst) barChartInst.destroy();
 
             var barGrads = bl.map(function(_, i) {
                 var col = palette[i % palette.length];
-                var g = bCtx.createLinearGradient(0, 0, 600, 0);
+                var g = bCtx.createLinearGradient(0, 0, 280, 0);
                 g.addColorStop(0, col.start);
                 g.addColorStop(1, col.end);
                 return g;
@@ -8438,8 +8352,8 @@
                 type: 'bar',
                 plugins: [
                     makeGlowPlugin('barGlow', 'rgba(99,102,241,0.35)'),
-                    makeThresholdLinesPluginH('perfThresholds'),
-                    makeChipLabelsPluginH('barChips', bData, barColorAt, '%')
+                    makeThresholdLinesPlugin('perfThresholds'),
+                    makeChipLabelsPlugin('barChips', bData, barColorAt, '%')
                 ],
                 data: {
                     labels: bl,
@@ -8448,15 +8362,14 @@
                         data: bData,
                         backgroundColor: barGrads,
                         hoverBackgroundColor: barHovers,
-                        borderRadius: { topLeft: 0, topRight: 8, bottomLeft: 0, bottomRight: 8 },
+                        borderRadius: { topLeft: 8, topRight: 8, bottomLeft: 0, bottomRight: 0 },
                         borderSkipped: false,
-                        barPercentage: 0.75,
-                        categoryPercentage: 0.85,
-                        maxBarThickness: 32
+                        barPercentage: 0.82,
+                        categoryPercentage: 0.9,
+                        maxBarThickness: 46
                     }]
                 },
                 options: {
-                    indexAxis: 'y',
                     responsive: true,
                     maintainAspectRatio: false,
                     animation: {
@@ -8479,7 +8392,7 @@
                             }
                         }
                     },
-                    scales: ultraModernScalesH('%')
+                    scales: ultraModernScales('%')
                 }
             });
 
