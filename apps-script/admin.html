@@ -47,7 +47,7 @@
         }
 
         :root {
-            --sys-font: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            --sys-font: 'Poppins', sans-serif;
             --sys-size: 14px;
             --sys-weight: 500;
             --nv: #0d1b4b;
@@ -5925,8 +5925,8 @@
                                 <div class="fg">
                                     <label>System Font Style</label>
                                     <select id="set_SYSTEM_FONT_FAMILY">
-                                        <option value="'Segoe UI', Tahoma, Geneva, Verdana, sans-serif" selected>Segoe UI (System Default)</option>
-                                        <option value="'Poppins', sans-serif">Poppins (Modern Rounded)</option>
+                                        <option value="'Segoe UI', Tahoma, Geneva, Verdana, sans-serif">Segoe UI</option>
+                                        <option value="'Poppins', sans-serif" selected>Poppins (System Default)</option>
                                         <option value="'Plus Jakarta Sans', sans-serif">Plus Jakarta Sans (Sleek Modern)</option>
                                         <option value="'Outfit', sans-serif">Outfit (Ultra-Modern Headers)</option>
                                         <option value="'Inter', sans-serif">Inter (Clean Geometric)</option>
@@ -9548,20 +9548,30 @@
         // Shared by printFeeInvoice() and printAllBills() so both produce the exact same,
         // print-safe styling: bold (2-3px) borders and solid dark text throughout, since a plain
         // 1px grey grid and light text are what disappear on a lot of printers/toner-saving modes.
+        // BUGFIX ("margin between the fee table and the A4 paper is too wide"): the invoice used
+        // to be a flex child (`.bill-half{display:flex;align-items:center}` around
+        // `.bill-invoice{max-width:175mm;margin:0 auto}`) so it could sit vertically centered
+        // within its half of the sheet. Page-break properties inside flex containers are a known
+        // weak spot for print/PDF engines — "Print to PDF" and similar virtual printers often
+        // don't stretch a flex child to its parent's full width the way the live browser view
+        // does, collapsing it down to content width instead and leaving large, unintended blank
+        // gutters on both sides. Switched to plain block layout (no flex) with the invoice at
+        // width:100%, which print engines handle reliably — it now always fills the actual
+        // printable width (page width minus @page margins), not an inconsistently-computed one.
         var BILL_PRINT_CSS = '@page{size:A4 portrait;margin:12mm 15mm}'
             + '*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}'
             + 'body{font-family:"Inter",Arial,sans-serif;color:#0d1b4b;margin:0}'
-            + '.bill-invoice{max-width:175mm;margin:0 auto}'
+            + '.bill-invoice{width:100%;box-sizing:border-box}'
             + '.bill-table{width:100%;border-collapse:collapse;margin-bottom:14px;border:3px solid #0d1b4b}'
             + '.bill-th{background:#0d1b4b;color:#f0c020;padding:10px;border:2px solid #0d1b4b;text-transform:uppercase;font-size:12px}'
             + '.bill-td{padding:9px 10px;border:2px solid #0d1b4b;font-size:13px;color:#0d1b4b;font-weight:600}'
             + '.bill-tf{padding:12px 10px;border:2px solid #0d1b4b;background:#f1f5f9;font-size:15px;font-weight:700}'
             + '.bill-page{page-break-after:always;padding-top:4mm}'
             + '.bill-page:last-child{page-break-after:auto}'
-            + '.bill-sheet{page-break-after:always;display:flex;flex-direction:column;min-height:257mm}'
+            + '.bill-sheet{page-break-after:always}'
             + '.bill-sheet:last-child{page-break-after:auto}'
-            + '.bill-half{flex:1;display:flex;align-items:center;padding:4mm 0}'
-            + '.bill-cut{border-top:2px dashed #94a3b8;position:relative;margin:4mm 0 0}'
+            + '.bill-half{width:100%;box-sizing:border-box;padding:6mm 0}'
+            + '.bill-cut{border-top:2px dashed #94a3b8;position:relative;margin:6mm 0}'
             + '.bill-cut::after{content:"\\2702 cut here";position:relative;top:-8px;left:50%;transform:translateX(-50%);background:#fff;padding:0 10px;font-size:9px;color:#64748b;display:table;margin:0 auto}';
         function buildBillRowsForStudent(sid) {
             var s = _fbStudents.find(function (x) { return x.ID === sid; });
@@ -10369,7 +10379,7 @@
             // against the original same-session revert race, without a per-device cache able to
             // outlive and override a real cross-device settings change.
             var _storedFont = window._currentTypography || null;
-            var fontFam = (_storedFont && _storedFont.fam) || s.SYSTEM_FONT_FAMILY || "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+            var fontFam = (_storedFont && _storedFont.fam) || s.SYSTEM_FONT_FAMILY || "'Poppins', sans-serif";
             var fontSize = (_storedFont && _storedFont.size) || s.SYSTEM_FONT_SIZE || '14px';
             var fontWeight = (_storedFont && _storedFont.weight) || s.SYSTEM_FONT_WEIGHT || '500';
             var fontEl = document.getElementById('set_SYSTEM_FONT_FAMILY');
@@ -10810,8 +10820,9 @@
             // Extract clean font name (strip quotes and fallback)
             var cleanName = fontFam.replace(/['"/]/g, '').split(',')[0].trim();
             // Dynamically ensure the Google Font is loaded — but skip that for web-safe/system
-            // font stacks (e.g. Segoe UI, the new default), which aren't on Google Fonts and would
-            // just waste a request.
+            // font stacks (e.g. Segoe UI), which aren't on Google Fonts and would just waste a
+            // request. Poppins (the default) IS a Google Font, already preloaded in <head>, so
+            // this is a no-op for it in practice — the check below just won't re-request it.
             var WEB_SAFE_FONTS = ['Segoe UI', 'Tahoma', 'Geneva', 'Verdana', 'Arial', 'Helvetica', 'sans-serif'];
             var fontId = 'dyn-gfont-' + cleanName.replace(/\s+/g, '-');
             if (cleanName && WEB_SAFE_FONTS.indexOf(cleanName) === -1 && !document.getElementById(fontId)) {
@@ -11509,7 +11520,7 @@
                    cache, which is per-device with no expiry and would otherwise keep re-imposing
                    a stale local font over a legitimate cross-device change forever. */
                 var _stf = window._currentTypography || null;
-                var _ff = (_stf && _stf.fam) || s.SYSTEM_FONT_FAMILY || "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+                var _ff = (_stf && _stf.fam) || s.SYSTEM_FONT_FAMILY || "'Poppins', sans-serif";
                 var _fs = (_stf && _stf.size) || s.SYSTEM_FONT_SIZE || '14px';
                 var _fw = (_stf && _stf.weight) || s.SYSTEM_FONT_WEIGHT || '500';
                 applyTypography(_ff, _fs, _fw);

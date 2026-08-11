@@ -303,6 +303,43 @@ the existing `.bg-canvas` decoration's placement) so they're no longer trapped i
   student owes something *and* the admin's template text actually uses that placeholder — so a
   bulk announcement that doesn't mention bills doesn't generate one for every recipient).
 
+### 16. Reverted the dashboard/table redesign, Poppins as default font, bill print margins, publish-gate check
+**admin.html** — `:root{--sys-font}`, `set_SYSTEM_FONT_FAMILY` options, `populateSettingsUI`,
+`applyBrandingFromCache` font fallback chains, `BILL_PRINT_CSS`. **Code.gs** — unchanged this round.
+
+- **Dashboard/table redesign reverted.** The "same design and charts" request from the previous
+  round (Outstanding Fees/Reports Published dashboard tiles + fees-by-class chart, and the
+  search/export/print toolbar added to Teachers and Classes tables) has been fully undone via
+  `git revert`. Nothing from that round remains in Code.gs or admin.html — the Dashboard and the
+  Teachers/Classes tables are back to how they worked before that round.
+- **System default font changed to Poppins.** Every place the app falls back to a hard-coded
+  default font — the `--sys-font` CSS variable, the "System Font Style" dropdown in Settings (now
+  pre-selected on "Poppins (System Default)"), and both JS fallback chains in
+  `populateSettingsUI`/`applyBrandingFromCache` that run when no font has been saved yet — now
+  default to Poppins instead of Segoe UI. Segoe UI is still selectable from the dropdown for
+  anyone who prefers it. (Left untouched, deliberately out of scope: the chart chip-label canvas
+  font and the printable QR poster, which are meant to stay on a fixed neutral font regardless of
+  the admin's chosen UI font.)
+- **Fixed the wide blank margin on printed fee bills.** The printed bill/invoice used a
+  `max-width:175mm; margin:0 auto` wrapper centered inside a flexbox column
+  (`.bill-half{flex:1; display:flex; align-items:center}`) for the 2-per-sheet layout. Print
+  engines and "print to PDF" virtual printers are unreliable at stretching flex children to their
+  parent's full width before laying out a page break — several real printer drivers were
+  collapsing the invoice to its content width and centering it, leaving the large blank gutters
+  reported ("margin between the fee table and the A4 paper is too wide"). Fixed by removing the
+  flexbox wrapper for print entirely and using plain block-level `width:100%; box-sizing:border-box`
+  elements instead, which print engines handle far more predictably. The invoice content now fills
+  the page width, respecting only the `@page` margin (12mm/15mm).
+- **Confirmed: admin already controls report-card publishing, no code change needed.** Checked
+  both the bulk path (`publishFilteredMasterSheet(true/false)` — the "Publish All"/"Unpublish All"
+  buttons above the Students table) and the individual path (the per-row Publish/Draft toggle in
+  Master Sheet, `updateStudentPublishStatus`), plus the actual read-side gate in
+  `getStudentReport()` on the server (`if (!bypassPublishCheck && stu.ReportStatus !== 'Published')
+  return {success:false, ...}`). Both `report.html` and the student-facing portal in `index.html`
+  call `getStudentReport` without the bypass flag, so an unpublished student's report already
+  cannot be previewed by the student/parent — they get a "not been published yet" message instead
+  of scores. This was already working correctly; nothing needed to change.
+
 ## Deploying these changes
 
 This repo isn't connected to the Apps Script project via `clasp`, so the fastest path is manual:
