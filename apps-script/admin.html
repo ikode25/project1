@@ -4181,6 +4181,16 @@
                             <div class="sval" id="stResults">—</div>
                             <div class="slbl">Result Records</div>
                         </div>
+                        <div class="scard admin-only" style="--acc:#dc2626" onclick="showPanel('feesbills',null)">
+                            <div class="sico" style="background:#fee2e2"><svg viewBox="0 0 24 24" fill="none" stroke="#b91c1c" stroke-width="2" stroke-linecap="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+                            <div class="sval" id="stOutstandingFees">—</div>
+                            <div class="slbl">Outstanding Fees (GH¢)</div>
+                        </div>
+                        <div class="scard static-card" style="--acc:#0d9488">
+                            <div class="sico" style="background:#ccfbf1"><svg viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="9 15 11 17 15 12"/></svg></div>
+                            <div class="sval" id="stReportsPublished">—</div>
+                            <div class="slbl">Reports Published</div>
+                        </div>
                     </div>
 
                     <!-- Dashboard KPI Charts (Pie / Doughnut / SVG ring) — Chart.js v4, colored from
@@ -4268,6 +4278,20 @@
                             <div style="padding:16px 20px 20px; background:#fff;">
                                 <div style="height:300px; position:relative;">
                                     <canvas id="lineChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Bar Chart: Outstanding Fees by Class -->
+                        <div class="card admin-only" style="padding:0; overflow:hidden; border-radius:16px;">
+                            <div style="padding:16px 20px 12px; background:linear-gradient(135deg,#7f1d1d 0%,#991b1b 100%); display:flex; align-items:center; justify-content:space-between;">
+                                <div>
+                                    <div style="font-size:13px; font-weight:800; color:#fff; letter-spacing:0.3px;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Outstanding Fees by Class</div>
+                                    <div style="font-size:11px; color:rgba(255,255,255,0.6); margin-top:2px;">Arrears + Next Term Fees owed, per class</div>
+                                </div>
+                            </div>
+                            <div style="padding:16px 20px 20px; background:#fff;">
+                                <div style="height:300px; position:relative;">
+                                    <canvas id="feesBarChart"></canvas>
                                 </div>
                             </div>
                         </div>
@@ -4876,6 +4900,7 @@
                                 <div class="sbox"><input type="text" id="clsSearch" placeholder="Search classes…"
                                         oninput="filterClasses()"></div><button class="btn bo bsm"
                                     onclick="window.print()">Print</button>
+                                <button class="btn bo bsm" onclick="exportClassesCsv()">Export CSV</button>
                             </div>
                             <div class="tw">
                                 <table class="dt">
@@ -6430,6 +6455,11 @@
                                     Teacher</button>
                             </div>
                             <div class="cbody">
+                                <div class="ttb no-print">
+                                    <div class="sbox"><input type="text" id="tchSearch" placeholder="Search name, username, class…" oninput="filterTeachers()"></div>
+                                    <button class="btn bo bsm" onclick="window.print()">Print</button>
+                                    <button class="btn bo bsm" onclick="exportTeachersCsv()">Export CSV</button>
+                                </div>
                                 <div class="tw">
                                     <table class="dt" id="teachersTable">
                                         <thead>
@@ -6439,12 +6469,12 @@
                                                 <th>Name</th>
                                                 <th>Assigned Class</th>
                                                 <th>Phone</th>
-                                                <th>Actions</th>
+                                                <th class="no-print">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr>
-                                                <td colspan="5" style="text-align:center">Loading teachers...</td>
+                                                <td colspan="6" style="text-align:center">Loading teachers...</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -7127,14 +7157,37 @@
 
             google.script.run.withSuccessHandler(function (r) {
                 if (!r.success) return toast('Failed to load teachers: ' + r.message, 'error');
-                var tb = document.getElementById('teachersTable').querySelector('tbody');
-                tb.innerHTML = '';
                 window.allTeachers = r.teachers || [];
-                if (!allTeachers.length) { tb.innerHTML = '<tr><td colspan="5" style="text-align:center">No teachers found.</td></tr>'; return; }
-                allTeachers.forEach(function (t) {
-                    tb.innerHTML += '<tr><td><strong>' + t.Username + '</strong></td><td><code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-family:monospace;font-weight:600;color:var(--nv);">' + t.Password + '</code></td><td>' + t.FullName + '</td><td><span class="bdg">' + (t.AssignedClass || 'Unassigned') + '</span></td><td>' + (t.Phone || '-') + '</td><td><button class="btn bo bsm" onclick="editTeacher(\'' + t.Username + '\')">Edit</button> <button class="btn bred bsm" onclick="deleteTeacher(\'' + t.Username + '\')">Del</button></td></tr>';
-                });
+                var searchEl = document.getElementById('tchSearch');
+                if (searchEl) searchEl.value = '';
+                renderTeachersTable(allTeachers);
             }).getAllTeachers(adminToken);
+        }
+        function renderTeachersTable(list) {
+            var tb = document.getElementById('teachersTable').querySelector('tbody');
+            if (!list.length) { tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--mu);padding:24px">No teachers found.</td></tr>'; return; }
+            tb.innerHTML = list.map(function (t) {
+                return '<tr><td><strong>' + t.Username + '</strong></td><td><code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-family:monospace;font-weight:600;color:var(--nv);">' + t.Password + '</code></td><td>' + t.FullName + '</td><td><span class="bdg">' + (t.AssignedClass || 'Unassigned') + '</span></td><td>' + (t.Phone || '-') + '</td><td class="no-print"><button class="btn bo bsm" onclick="editTeacher(\'' + t.Username + '\')">Edit</button> <button class="btn bred bsm" onclick="deleteTeacher(\'' + t.Username + '\')">Del</button></td></tr>';
+            }).join('');
+        }
+        function filterTeachers() {
+            var q = (document.getElementById('tchSearch').value || '').toLowerCase();
+            var list = (window.allTeachers || []).filter(function (t) {
+                return (t.Username || '').toLowerCase().indexOf(q) !== -1
+                    || (t.FullName || '').toLowerCase().indexOf(q) !== -1
+                    || (t.AssignedClass || '').toLowerCase().indexOf(q) !== -1
+                    || (t.Phone || '').toLowerCase().indexOf(q) !== -1;
+            });
+            renderTeachersTable(list);
+        }
+        function exportTeachersCsv() {
+            var list = window.allTeachers || [];
+            if (!list.length) { toast('No teachers to export.', 'error'); return; }
+            var csv = 'Username,Full Name,Assigned Class,Phone\n';
+            csv += list.map(function (t) {
+                return ['"' + (t.Username || '').replace(/"/g, '""') + '"', '"' + (t.FullName || '').replace(/"/g, '""') + '"', '"' + (t.AssignedClass || '').replace(/"/g, '""') + '"', '"' + (t.Phone || '').replace(/"/g, '""') + '"'].join(',');
+            }).join('\n');
+            downloadCSV(csv, 'teachers.csv');
         }
 
         function editTeacher(un) {
@@ -7299,7 +7352,7 @@
         var editStudentId = null, editClassId = null, subjectEditClass = null, subjectEditOldName = null;
         var masterData = [], masterSubjects = [], masterResMap = {}, currentGrdTab = 'General', currentPanel = 'dashboard';
         var schoolLogoB64 = '', schoolStampB64 = '', schoolSigB64 = '', headmasterName = '';
-        var barChartInst = null, lineChartInst = null, genderDoughnutInst = null, classPieInst = null, importFileData = null, notifications = [];
+        var barChartInst = null, lineChartInst = null, genderDoughnutInst = null, classPieInst = null, feesBarChartInst = null, importFileData = null, notifications = [];
         var stuAllData = [], stuFiltered = [], stuPage = 1;
         // ── STUDENTS TABLE: columns, visibility toggle, sorting ──
         // Single source of truth for the students table's columns — renderStudentsHeader() and
@@ -8439,6 +8492,51 @@
             };
         }
 
+        // Bar chart: Outstanding Fees (Arrears + Next Term Fees) totalled per class — real
+        // figures already on the Students sheet, not a separate payments log this system
+        // doesn't keep. Reuses the same theme-color rotation as the doughnut/pie KPI charts so
+        // it stays visually consistent with the rest of the dashboard.
+        function renderFeesBarChart(feesByClass) {
+            var el = document.getElementById('feesBarChart');
+            if (!el || typeof Chart === 'undefined') return;
+            var ctx = el.getContext('2d');
+            if (feesBarChartInst) feesBarChartInst.destroy();
+            var labels = Object.keys(feesByClass);
+            var data = labels.map(function (k) { return Math.round((Number(feesByClass[k]) || 0) * 100) / 100; });
+            var colors = getThemeChartPalette();
+            var bg = labels.map(function (_, i) { return colors.rotation[i % colors.rotation.length]; });
+            feesBarChartInst = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Outstanding (GH¢)',
+                        data: data,
+                        backgroundColor: bg,
+                        borderRadius: 8,
+                        borderSkipped: false,
+                        barPercentage: 0.6,
+                        categoryPercentage: 0.75
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 900, easing: 'easeOutQuart' },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#0f172a', padding: 10, cornerRadius: 10,
+                            callbacks: { label: function (ctx) { return 'GH¢ ' + Number(ctx.parsed.y || 0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}); } }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { callback: function (v) { return 'GH¢' + v; } }, grid: { color: '#f1f5f9' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
         function renderGenderDoughnut(male, female) {
             var el = document.getElementById('genderDoughnutChart');
             if (!el || typeof Chart === 'undefined') return;
@@ -8531,6 +8629,7 @@
             try { renderGenderDoughnut(d.maleCount, d.femaleCount); } catch (e) {}
             try { renderClassPie(d.classCounts); } catch (e) {}
             try { renderAvgRing(d.avgPercent); } catch (e) {}
+            try { renderFeesBarChart(d.feesByClass || {}); } catch (e) {}
         }
 
         // ── LOAD ALL ──
@@ -8545,12 +8644,15 @@
                 document.getElementById('stClasses').textContent = r.totalClasses || 0;
                 var ts = 0; if (r.totalSubjects && typeof r.totalSubjects === 'object') { Object.values(r.totalSubjects).forEach(function (n) { ts += Number(n || 0); }); } document.getElementById('stSubjects').textContent = ts;
                 document.getElementById('stResults').textContent = r.totalResults || 0;
+                var stOutEl = document.getElementById('stOutstandingFees'); if (stOutEl) stOutEl.textContent = Number(r.outstandingFees || 0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+                var stPubEl = document.getElementById('stReportsPublished'); if (stPubEl) stPubEl.textContent = r.reportsPublished || 0;
                 renderDashRecent(r.recentStudents || []);
                 renderClassTiles(r.classes || [], r.classCounts || {});
                 populateAllClassDropdowns();
                 try {
                     renderCharts(r.classAvgData || {}, r.termAvgData || {});
                 } catch(e) {}
+                try { renderFeesBarChart(r.feesByClass || {}); } catch(e) {}
                 try {
                     var cad = r.classAvgData || {};
                     var cadVals = Object.keys(cad).map(function (k) { return Number(cad[k]) || 0; }).filter(function (v) { return v > 0; });
@@ -8559,7 +8661,8 @@
                         maleCount: r.maleCount || 0,
                         femaleCount: r.femaleCount || 0,
                         classCounts: r.classCounts || {},
-                        avgPercent: avgPercent
+                        avgPercent: avgPercent,
+                        feesByClass: r.feesByClass || {}
                     };
                     renderGenderDoughnut(r.maleCount || 0, r.femaleCount || 0);
                     renderClassPie(r.classCounts || {});
@@ -9830,6 +9933,14 @@
         }
         function filterClasses() { var q = document.getElementById('clsSearch').value.toLowerCase(); renderClasses(allClasses.filter(function (c) { return (c.ClassName || '').toLowerCase().includes(q) || (c.Teacher || '').toLowerCase().includes(q); })); }
         function renderClasses(classes) { var tb = document.getElementById('classesTbody'); if (!classes.length) { tb.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--mu);padding:24px">No classes found.</td></tr>'; return; } tb.innerHTML = classes.map(function (c) { return '<tr><td><strong>' + c.ClassName + '</strong></td><td><span class="bdg bb">' + (c.LevelGroup || 'General') + '</span></td><td>' + (c.Teacher || '—') + '</td><td>' + (c.NumPupils || '—') + '</td><td class="no-print"><div style="display:flex;gap:5px"><button class="btn bsm bo" onclick="editClass(\'' + c.ClassName.replace(/'/g, "\\'") + '\')">Edit</button><button class="btn bsm bd2" onclick="confirmDeleteClass(\'' + c.ClassName.replace(/'/g, "\\'") + '\')">Delete</button></div></td></tr>'; }).join(''); }
+        function exportClassesCsv() {
+            if (!allClasses.length) { toast('No classes to export.', 'error'); return; }
+            var csv = 'Class Name,Level Group,Teacher,No. Pupils\n';
+            csv += allClasses.map(function (c) {
+                return ['"' + (c.ClassName || '').replace(/"/g, '""') + '"', '"' + (c.LevelGroup || '').replace(/"/g, '""') + '"', '"' + (c.Teacher || '').replace(/"/g, '""') + '"', c.NumPupils || 0].join(',');
+            }).join('\n');
+            downloadCSV(csv, 'classes.csv');
+        }
         var activeStreamType = 'single';
         function openStreamChoice(mode) {
             window.streamChoiceMode = mode;

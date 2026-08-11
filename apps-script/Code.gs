@@ -1167,11 +1167,17 @@ function getDashboardData(token) {
     var classCounts={},classAvgData={},termAvgData={};
     var maleCount = 0;
     var femaleCount = 0;
+    // Dashboard tiles/chart: Outstanding Fees (Arrears + NextTermFees owed right now, across
+    // every student row this session can see) and Reports Published (how many report cards are
+    // actually live for parents to view), plus the same total broken down per class for the
+    // "Outstanding Fees by Class" chart — real figures already on the Students sheet, not a
+    // separate payments/collections log this system doesn't keep.
+    var outstandingFees = 0, reportsPublished = 0, feesByClass = {};
     students.forEach(function(s){
       var g = (s.Gender || '').toString().trim().toLowerCase();
       if (g === 'male') maleCount++;
       else if (g === 'female') femaleCount++;
-      
+
       classCounts[s.Class]=(classCounts[s.Class]||0)+1;
       if(s.Average){
         if(!classAvgData[s.Class])classAvgData[s.Class]=[];
@@ -1180,6 +1186,10 @@ function getDashboardData(token) {
         if(!termAvgData[tmName])termAvgData[tmName]=[];
         termAvgData[tmName].push(Number(s.Average||0));
       }
+      var owed = Number(s.Arrears||0) + Number(s.NextTermFees||0);
+      outstandingFees += owed;
+      feesByClass[s.Class] = (feesByClass[s.Class]||0) + owed;
+      if ((s.ReportStatus||'').toString().trim() === 'Published') reportsPublished++;
     });
     
     var totalTeachers = 0;
@@ -1193,7 +1203,7 @@ function getDashboardData(token) {
     var classAvg={},termAvg={};
     Object.keys(classAvgData).forEach(function(k){var a=classAvgData[k];classAvg[k]=a.length?(a.reduce(function(x,y){return x+y;},0)/a.length).toFixed(1):0;});
     Object.keys(termAvgData).forEach(function(k){var a=termAvgData[k];termAvg[k]=a.length?(a.reduce(function(x,y){return x+y;},0)/a.length).toFixed(1):0;});
-    return {success:true,totalStudents:students.length,maleCount:maleCount,femaleCount:femaleCount,totalTeachers:totalTeachers,totalClasses:classes.length,totalSubjects:classSubjectCounts,totalResults:totalResults,recentStudents:students.slice(-6).reverse(),classes:classes,allStudents:students,classCounts:classCounts,classAvgData:classAvg,termAvgData:termAvg,settings:sett,roleInfo:td};
+    return {success:true,totalStudents:students.length,maleCount:maleCount,femaleCount:femaleCount,totalTeachers:totalTeachers,totalClasses:classes.length,totalSubjects:classSubjectCounts,totalResults:totalResults,recentStudents:students.slice(-6).reverse(),classes:classes,allStudents:students,classCounts:classCounts,classAvgData:classAvg,termAvgData:termAvg,settings:sett,roleInfo:td,outstandingFees:outstandingFees,reportsPublished:reportsPublished,feesByClass:feesByClass};
   } catch(e) { return {success:false,message:e.message}; }
 }
 
