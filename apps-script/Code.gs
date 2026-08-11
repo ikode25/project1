@@ -1172,6 +1172,15 @@ function getDashboardData(token) {
     // headcount, not a currency total (see README for why: a $ total was tried and reverted).
     var reportsPublished = 0;
     var billsGenerated = 0;
+    // "Ready to publish": every student in the class, for the CURRENT active session year/term
+    // only, has a score entered (Average present) but the class isn't fully published yet — the
+    // signal that lets an admin see a class finished scoring without having to click into Master
+    // Sheet per class to check. Keyed by class name; the Students sheet has one row per
+    // (student, year, term), so this only counts rows matching the active period, same period the
+    // client's own "Publish Class" quick action targets.
+    var activeYear = (sett['CURRENT_YEAR'] || '').toString();
+    var activeTerm = sett['CURRENT_TERM'] || '';
+    var classReadiness = {};
     students.forEach(function(s){
       var g = (s.Gender || '').toString().trim().toLowerCase();
       if (g === 'male') maleCount++;
@@ -1185,10 +1194,26 @@ function getDashboardData(token) {
         if(!termAvgData[tmName])termAvgData[tmName]=[];
         termAvgData[tmName].push(Number(s.Average||0));
       }
-      if ((s.ReportStatus || '').toString() === 'Published') reportsPublished++;
+      var isPublished = (s.ReportStatus || '').toString() === 'Published';
+      if (isPublished) reportsPublished++;
       if (Number(s.NextTermFees || 0) > 0) billsGenerated++;
+
+      if (activeYear && (s.Year || '').toString() === activeYear && s.Term === activeTerm) {
+        if (!classReadiness[s.Class]) classReadiness[s.Class] = {total: 0, scored: 0, published: 0};
+        var cr = classReadiness[s.Class];
+        cr.total++;
+        if (s.Average) cr.scored++;
+        if (isPublished) cr.published++;
+      }
     });
     var reportsUnpublished = students.length - reportsPublished;
+    var classesReadyToPublish = Object.keys(classReadiness).filter(function(cn){
+      var cr = classReadiness[cn];
+      return cr.total > 0 && cr.scored === cr.total && cr.published < cr.total;
+    }).map(function(cn){
+      var cr = classReadiness[cn];
+      return {ClassName: cn, studentCount: cr.total, unpublishedCount: cr.total - cr.published};
+    });
 
     var totalTeachers = 0;
     try {
@@ -1201,7 +1226,7 @@ function getDashboardData(token) {
     var classAvg={},termAvg={};
     Object.keys(classAvgData).forEach(function(k){var a=classAvgData[k];classAvg[k]=a.length?(a.reduce(function(x,y){return x+y;},0)/a.length).toFixed(1):0;});
     Object.keys(termAvgData).forEach(function(k){var a=termAvgData[k];termAvg[k]=a.length?(a.reduce(function(x,y){return x+y;},0)/a.length).toFixed(1):0;});
-    return {success:true,totalStudents:students.length,maleCount:maleCount,femaleCount:femaleCount,totalTeachers:totalTeachers,totalClasses:classes.length,totalSubjects:classSubjectCounts,totalResults:totalResults,recentStudents:students.slice(-6).reverse(),classes:classes,allStudents:students,classCounts:classCounts,classAvgData:classAvg,termAvgData:termAvg,reportsPublished:reportsPublished,reportsUnpublished:reportsUnpublished,billsGenerated:billsGenerated,settings:sett,roleInfo:td};
+    return {success:true,totalStudents:students.length,maleCount:maleCount,femaleCount:femaleCount,totalTeachers:totalTeachers,totalClasses:classes.length,totalSubjects:classSubjectCounts,totalResults:totalResults,recentStudents:students.slice(-6).reverse(),classes:classes,allStudents:students,classCounts:classCounts,classAvgData:classAvg,termAvgData:termAvg,reportsPublished:reportsPublished,reportsUnpublished:reportsUnpublished,billsGenerated:billsGenerated,classesReadyToPublish:classesReadyToPublish,settings:sett,roleInfo:td};
   } catch(e) { return {success:false,message:e.message}; }
 }
 

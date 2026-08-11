@@ -4224,6 +4224,16 @@
                         </div>
                     </div>
 
+                    <!-- Ready to Publish: classes where every student now has scores entered for
+                         the active term but the class isn't fully published yet. Hidden entirely
+                         when nothing is ready, so it never sits around as empty clutter. -->
+                    <div class="card admin-only" id="readyToPublishCard" style="display:none; border-left:4px solid #10b981; margin-bottom:20px;">
+                        <div class="chdr" style="background:linear-gradient(135deg,#ecfdf5,#f0fdf4)">
+                            <div class="ctitle" style="color:#065f46"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>Classes Ready to Publish</div>
+                        </div>
+                        <div class="cbody" id="readyToPublishList"></div>
+                    </div>
+
                     <!-- Dashboard KPI Charts (Pie / Doughnut / SVG ring) — Chart.js v4, colored from
                          the admin's Theme & Colors settings (--nv / --bl / --go). -->
                     <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:20px; margin-bottom:20px;">
@@ -4502,8 +4512,8 @@
                                     <option value="50">50/page</option>
                                     <option value="100">100/page</option>
                                 </select>
-                                <button class="btn bg2 bsm admin-only" onclick="publishFilteredMasterSheet(true)" style="background:#10b981!important;color:#fff!important;border:none!important;">Publish All</button>
-                                <button class="btn bo bsm admin-only" onclick="publishFilteredMasterSheet(false)">Unpublish All</button>
+                                <button class="btn bg2 bsm admin-only" onclick="publishFilteredStudents(true)" style="background:#10b981!important;color:#fff!important;border:none!important;">Publish All</button>
+                                <button class="btn bo bsm admin-only" onclick="publishFilteredStudents(false)">Unpublish All</button>
                                 <button class="btn bo bsm" onclick="window.print()">Print</button>
                                 <button class="btn bo bsm" onclick="exportStudentsCsv()">Export CSV</button>
                                 <button class="btn bi bsm" onclick="showImportModal()">Import CSV</button>
@@ -8597,6 +8607,7 @@
                 var stRepPub = document.getElementById('stReportsPublished'); if (stRepPub) stRepPub.textContent = r.reportsPublished || 0;
                 var stRepUnpub = document.getElementById('stReportsUnpublished'); if (stRepUnpub) stRepUnpub.textContent = r.reportsUnpublished || 0;
                 var stBills = document.getElementById('stBillsGenerated'); if (stBills) stBills.textContent = r.billsGenerated || 0;
+                try { renderReadyToPublish(r.classesReadyToPublish || []); } catch(e) {}
                 renderDashRecent(r.recentStudents || []);
                 renderClassTiles(r.classes || [], r.classCounts || {});
                 populateAllClassDropdowns();
@@ -12513,38 +12524,84 @@
             }).updateReportCardPublishStatus(adminToken, studentId, yr, tm, status);
         }
 
-        function publishFilteredMasterSheet(isPublished) {
+        // BUGFIX ("No student records loaded" clicking Publish All): these buttons live in the
+        // Students panel toolbar, but this function used to read masterData/msSearch/msYear/msTerm
+        // — all state belonging to the separate Master Sheet panel, which only gets populated once
+        // an admin visits it and loads a specific class. If Master Sheet had never been opened
+        // this session, masterData was still empty and the button could never work. It now reads
+        // the Students panel's own filtered list (stuFiltered — respects whatever search/class/
+        // gender filter is set there) instead.
+        // Restricted to the active session year/term: a student row here is scoped to exactly one
+        // period, and the server only flips ReportStatus for an exact ID+Year+Term match (see
+        // batchUpdateReportPublishStatus), so mixing rows from other periods into one call would
+        // silently skip them with no error — filtering up front keeps the "N students" count in
+        // the toast accurate.
+        function publishFilteredStudents(isPublished) {
             var status = isPublished ? 'Published' : 'Draft';
-            if (typeof masterData === 'undefined' || !masterData || !masterData.length) {
+            if (typeof stuFiltered === 'undefined' || !stuFiltered || !stuFiltered.length) {
                 toast('No student records loaded.', 'error');
                 return;
             }
-            var q = document.getElementById('msSearch').value.toLowerCase();
-            var filtered = masterData.filter(function (s) { 
-                return (s.Name || '').toLowerCase().includes(q) || s.ID.toString().includes(q); 
+            var yr = sessionYear, tm = sessionTerm;
+            var filtered = stuFiltered.filter(function (s) {
+                return (s.Year || '').toString() === (yr || '').toString() && s.Term === tm;
             });
             if (!filtered.length) {
-                toast('No student records match filters.', 'error');
+                toast('No student records for ' + (tm || 'the current term') + ', ' + (yr || 'the current year') + ' match the current filters.', 'error');
                 return;
             }
             var ids = filtered.map(function(s) { return s.ID; });
-            var yr = document.getElementById('msYear').value;
-            var tm = document.getElementById('msTerm').value;
             toast((isPublished ? 'Publishing' : 'Reverting') + ' ' + ids.length + ' students...', 'info');
             google.script.run.withSuccessHandler(function (r) {
                 if (r.success) {
                     toast(r.message, 'success');
                     ids.forEach(function(id) {
-                        var sIndex = masterData.findIndex(function(x) { return x.ID.toString() === id.toString(); });
-                        if (sIndex !== -1) {
-                            masterData[sIndex].ReportStatus = status;
-                        }
+                        var sIndex = stuAllData.findIndex(function(x) { return x.ID.toString() === id.toString() && (x.Year || '').toString() === (yr || '').toString() && x.Term === tm; });
+                        if (sIndex !== -1) stuAllData[sIndex].ReportStatus = status;
                     });
-                    filterMS();
+                    applyStudentFilters();
+                    renderStudents();
                 } else {
                     toast(r.message, 'error');
                 }
             }).batchUpdateReportPublishStatus(adminToken, ids, yr, tm, status);
+        }
+
+        // ── DASHBOARD: "Classes Ready to Publish" ──
+        // Server (getDashboardData) already scopes classesReadyToPublish to the active session
+        // year/term and only lists a class once every student in it has scores entered but at
+        // least one report card is still unpublished — see the comment there for the exact rule.
+        function renderReadyToPublish(list) {
+            var card = document.getElementById('readyToPublishCard');
+            var listEl = document.getElementById('readyToPublishList');
+            if (!card || !listEl) return;
+            if (!list || !list.length) { card.style.display = 'none'; listEl.innerHTML = ''; return; }
+            card.style.display = '';
+            listEl.innerHTML = list.map(function (c) {
+                var safeName = (c.ClassName || '').replace(/'/g, "\\'");
+                return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--bd)">'
+                    + '<div><strong>' + (c.ClassName || '') + '</strong> — all ' + c.studentCount + ' student(s) scored, '
+                    + c.unpublishedCount + ' report card(s) awaiting publish</div>'
+                    + '<button class="btn bg2 bsm" style="background:#10b981!important;color:#fff!important;border:none!important;white-space:nowrap" onclick="publishClassNow(\'' + safeName + '\')">Publish Class</button>'
+                    + '</div>';
+            }).join('');
+        }
+        // One-click publish for a single "ready" class, for the active session year/term — reuses
+        // the already-loaded dashboard roster (allStudents) rather than requiring a Master Sheet
+        // visit first, same fix as publishFilteredStudents() above.
+        function publishClassNow(className) {
+            if (!confirm('Publish report cards for all ready students in "' + className + '" (' + sessionTerm + ', ' + sessionYear + ')?')) return;
+            var ids = (allStudents || []).filter(function (s) {
+                return s.Class === className && (s.Year || '').toString() === (sessionYear || '').toString() && s.Term === sessionTerm && s.Average;
+            }).map(function (s) { return s.ID; });
+            if (!ids.length) { toast('Nothing to publish for this class.', 'error'); return; }
+            toast('Publishing ' + ids.length + ' students in ' + className + '...', 'info');
+            google.script.run.withSuccessHandler(function (r) {
+                if (r.success) {
+                    toast(r.message, 'success');
+                    loadAllData();
+                } else toast(r.message, 'error');
+            }).batchUpdateReportPublishStatus(adminToken, ids, sessionYear, sessionTerm, 'Published');
         }
 
         function getGradeForScore(score, isJHS) {

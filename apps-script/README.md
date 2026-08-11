@@ -415,6 +415,28 @@ counts). **admin.html** — the Class Academic Performance chart (now horizontal
   Performance Trend, and the Reports Published/Unpublished/Bills Generated dashboard tiles — is
   unaffected.
 
+### 20. Fixed "Publish All" ("No student records loaded"), added a "Classes Ready to Publish" dashboard alert
+**Code.gs** — `getDashboardData` (new `classesReadyToPublish`). **admin.html** —
+`publishFilteredMasterSheet` renamed/rewritten to `publishFilteredStudents`, new
+`renderReadyToPublish`/`publishClassNow`, new dashboard card.
+
+- **Root cause of "No student records loaded."** The Publish All / Unpublish All buttons live in
+  the *Students* panel toolbar, but the function behind them was reading `masterData` and a
+  search/year/term box (`msSearch`/`msYear`/`msTerm`) that all belong to the separate *Master
+  Sheet* panel — state that only exists once an admin has visited Master Sheet and loaded a
+  specific class there first. If that never happened this session, `masterData` was still empty
+  and the button could never work, no matter how many students existed. It now reads the Students
+  panel's own filtered list (`stuFiltered` — respects whatever search/class/gender filter is set
+  right there), restricted to the active session year/term (a student row is scoped to exactly one
+  period, and the server only flips `ReportStatus` for an exact ID+Year+Term match, so mixing
+  periods into one call would silently skip rows with no error).
+- **New: "Classes Ready to Publish" dashboard card.** As soon as every student in a class has a
+  score entered for the active term (but the class isn't fully published yet), it shows up here
+  automatically — no more clicking into Master Sheet per class to check who's done. Each row has
+  its own "Publish Class" button that publishes just that class for the active term in one click.
+  The card is hidden entirely when nothing is ready, and it's admin-only (same as the rest of the
+  publish/fees tooling).
+
 ## Deploying these changes
 
 This repo isn't connected to the Apps Script project via `clasp`, so the fastest path is manual:
