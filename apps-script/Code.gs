@@ -1199,11 +1199,12 @@ function getDashboardData(token) {
       if (Number(s.NextTermFees || 0) > 0) billsGenerated++;
 
       if (activeYear && (s.Year || '').toString() === activeYear && s.Term === activeTerm) {
-        if (!classReadiness[s.Class]) classReadiness[s.Class] = {total: 0, scored: 0, published: 0};
+        if (!classReadiness[s.Class]) classReadiness[s.Class] = {total: 0, scored: 0, published: 0, billed: 0};
         var cr = classReadiness[s.Class];
         cr.total++;
         if (s.Average) cr.scored++;
         if (isPublished) cr.published++;
+        if (Number(s.NextTermFees || 0) > 0) cr.billed++;
       }
     });
     var reportsUnpublished = students.length - reportsPublished;
@@ -1214,6 +1215,10 @@ function getDashboardData(token) {
       var cr = classReadiness[cn];
       return {ClassName: cn, studentCount: cr.total, unpublishedCount: cr.total - cr.published};
     });
+    // Per-class publish/bill status for the active term (classReadiness, keyed by class name) is
+    // also returned as-is via classStatus — a teacher's `students` is already scoped to just their
+    // own assigned class, so this is what powers the "admin has published/billed your class"
+    // notice on the teacher dashboard (see admin.html's renderTeacherClassUpdates()).
 
     var totalTeachers = 0;
     try {
@@ -1226,7 +1231,7 @@ function getDashboardData(token) {
     var classAvg={},termAvg={};
     Object.keys(classAvgData).forEach(function(k){var a=classAvgData[k];classAvg[k]=a.length?(a.reduce(function(x,y){return x+y;},0)/a.length).toFixed(1):0;});
     Object.keys(termAvgData).forEach(function(k){var a=termAvgData[k];termAvg[k]=a.length?(a.reduce(function(x,y){return x+y;},0)/a.length).toFixed(1):0;});
-    return {success:true,totalStudents:students.length,maleCount:maleCount,femaleCount:femaleCount,totalTeachers:totalTeachers,totalClasses:classes.length,totalSubjects:classSubjectCounts,totalResults:totalResults,recentStudents:students.slice(-6).reverse(),classes:classes,allStudents:students,classCounts:classCounts,classAvgData:classAvg,termAvgData:termAvg,reportsPublished:reportsPublished,reportsUnpublished:reportsUnpublished,billsGenerated:billsGenerated,classesReadyToPublish:classesReadyToPublish,settings:sett,roleInfo:td};
+    return {success:true,totalStudents:students.length,maleCount:maleCount,femaleCount:femaleCount,totalTeachers:totalTeachers,totalClasses:classes.length,totalSubjects:classSubjectCounts,totalResults:totalResults,recentStudents:students.slice(-6).reverse(),classes:classes,allStudents:students,classCounts:classCounts,classAvgData:classAvg,termAvgData:termAvg,reportsPublished:reportsPublished,reportsUnpublished:reportsUnpublished,billsGenerated:billsGenerated,classesReadyToPublish:classesReadyToPublish,classStatus:classReadiness,activeYear:activeYear,activeTerm:activeTerm,settings:sett,roleInfo:td};
   } catch(e) { return {success:false,message:e.message}; }
 }
 

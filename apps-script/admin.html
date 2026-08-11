@@ -4224,14 +4224,15 @@
                         </div>
                     </div>
 
-                    <!-- Ready to Publish: classes where every student now has scores entered for
-                         the active term but the class isn't fully published yet. Hidden entirely
-                         when nothing is ready, so it never sits around as empty clutter. -->
-                    <div class="card admin-only" id="readyToPublishCard" style="display:none; border-left:4px solid #10b981; margin-bottom:20px;">
-                        <div class="chdr" style="background:linear-gradient(135deg,#ecfdf5,#f0fdf4)">
-                            <div class="ctitle" style="color:#065f46"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>Classes Ready to Publish</div>
+                    <!-- Teacher-only: lets a class teacher know, right on their dashboard, that the
+                         admin has published their class's report cards and/or generated bills for
+                         their class — without them having to go check. Hidden entirely when there's
+                         nothing to report yet. -->
+                    <div class="card teacher-only" id="teacherClassUpdatesCard" style="display:none; border-left:4px solid #1a3a8a; margin-bottom:20px;">
+                        <div class="chdr" style="background:linear-gradient(135deg,#eef2ff,#f5f7ff)">
+                            <div class="ctitle" style="color:#1a3a8a"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a3a8a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></svg>My Class Updates</div>
                         </div>
-                        <div class="cbody" id="readyToPublishList"></div>
+                        <div class="cbody" id="teacherClassUpdatesList"></div>
                     </div>
 
                     <!-- Dashboard KPI Charts (Pie / Doughnut / SVG ring) — Chart.js v4, colored from
@@ -4479,6 +4480,16 @@
                                 <div style="color:var(--mu);padding:20px">Loading…</div>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Ready to Publish: classes where every student now has scores entered for
+                         the active term but the class isn't fully published yet. Hidden entirely
+                         when nothing is ready, so it never sits around as empty clutter. -->
+                    <div class="card admin-only" id="readyToPublishCard" style="display:none; border-left:4px solid #10b981;">
+                        <div class="chdr" style="background:linear-gradient(135deg,#ecfdf5,#f0fdf4)">
+                            <div class="ctitle" style="color:#065f46"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:6px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>Classes Ready to Publish</div>
+                        </div>
+                        <div class="cbody" id="readyToPublishList"></div>
                     </div>
 
                 </div>
@@ -8608,6 +8619,7 @@
                 var stRepUnpub = document.getElementById('stReportsUnpublished'); if (stRepUnpub) stRepUnpub.textContent = r.reportsUnpublished || 0;
                 var stBills = document.getElementById('stBillsGenerated'); if (stBills) stBills.textContent = r.billsGenerated || 0;
                 try { renderReadyToPublish(r.classesReadyToPublish || []); } catch(e) {}
+                try { renderTeacherClassUpdates(r.classStatus || {}, r.activeYear || '', r.activeTerm || ''); } catch(e) {}
                 renderDashRecent(r.recentStudents || []);
                 renderClassTiles(r.classes || [], r.classCounts || {});
                 populateAllClassDropdowns();
@@ -12602,6 +12614,35 @@
                     loadAllData();
                 } else toast(r.message, 'error');
             }).batchUpdateReportPublishStatus(adminToken, ids, sessionYear, sessionTerm, 'Published');
+        }
+
+        // ── DASHBOARD: "My Class Updates" (teacher-only) ──
+        // r.classStatus is keyed by class name and scoped to the active session year/term; for a
+        // teacher, `students` server-side is already filtered to their own assignedClass, so there
+        // is at most one relevant entry — userClass. Shows nothing until the admin has actually
+        // published something or generated a bill for this class this term (a "ready but not yet
+        // published" class stays silent here — that's what the admin-side Ready to Publish card is
+        // for), so the card only appears when there's real news for the teacher.
+        function renderTeacherClassUpdates(classStatus, activeYear, activeTerm) {
+            var card = document.getElementById('teacherClassUpdatesCard');
+            var listEl = document.getElementById('teacherClassUpdatesList');
+            if (!card || !listEl) return;
+            var cs = (userClass && classStatus) ? classStatus[userClass] : null;
+            if (!cs || (!cs.published && !cs.billed)) { card.style.display = 'none'; listEl.innerHTML = ''; return; }
+            var periodLabel = (activeTerm || '') + (activeYear ? (', ' + activeYear) : '');
+            var rows = [];
+            if (cs.published > 0) {
+                rows.push('<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--bd)">'
+                    + '<span style="color:#10b981">●</span><div>Admin has published <strong>' + cs.published + ' of ' + cs.total
+                    + '</strong> report card(s) for <strong>' + userClass + '</strong>' + (periodLabel ? ' — ' + periodLabel : '') + '.</div></div>');
+            }
+            if (cs.billed > 0) {
+                rows.push('<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--bd)">'
+                    + '<span style="color:#0891b2">●</span><div>Admin has generated bill(s) for <strong>' + cs.billed + ' of ' + cs.total
+                    + '</strong> student(s) in <strong>' + userClass + '</strong>' + (periodLabel ? ' — ' + periodLabel : '') + '.</div></div>');
+            }
+            listEl.innerHTML = rows.join('');
+            card.style.display = '';
         }
 
         function getGradeForScore(score, isJHS) {

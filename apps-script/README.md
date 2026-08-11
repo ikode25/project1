@@ -437,6 +437,25 @@ counts). **admin.html** — the Class Academic Performance chart (now horizontal
   The card is hidden entirely when nothing is ready, and it's admin-only (same as the rest of the
   publish/fees tooling).
 
+### 21. Repositioned Ready to Publish; added "My Class Updates" for teachers
+**Code.gs** — `getDashboardData` (`classStatus`, `activeYear`, `activeTerm` added to the response).
+**admin.html** — moved `readyToPublishCard`, new `teacherClassUpdatesCard` +
+`renderTeacherClassUpdates`.
+
+- **Moved "Classes Ready to Publish."** Now sits directly under "Classes — Click to enter
+  results" instead of near the top of the dashboard, so it reads as part of the same
+  class-by-class workflow (enter results → see it's ready → publish).
+- **New: "My Class Updates" for teachers.** A class teacher now sees a notice right on their
+  dashboard as soon as the admin has published their class's report cards and/or generated bills
+  for their class this term — e.g. "Admin has published 24 of 24 report card(s) for Basic 6A —
+  Term 2, 2025-2026." Backed by the same per-class `classStatus` the Ready to Publish card already
+  computes (scoped to the active session year/term); for a teacher, `getDashboardData`'s student
+  list is already filtered to their own assigned class, so there's at most one relevant entry to
+  show. Stays hidden until there's actually something published or billed — a class that's simply
+  "ready but not yet published" stays quiet here, since that's what the admin-side card is for.
+  Admin-only elsewhere in the dashboard remain admin-only; this new card is the reverse
+  (`teacher-only`), so admins don't see it.
+
 ## Deploying these changes
 
 This repo isn't connected to the Apps Script project via `clasp`, so the fastest path is manual:
