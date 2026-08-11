@@ -340,6 +340,38 @@ the existing `.bg-canvas` decoration's placement) so they're no longer trapped i
   cannot be previewed by the student/parent — they get a "not been published yet" message instead
   of scores. This was already working correctly; nothing needed to change.
 
+### 17. Font default not applying for existing schools, thin/compressed dashboard bars, added a real line chart
+**Code.gs** — `getSettings` (now via a small `migrateLegacyFontDefault_` helper). **admin.html** —
+`.dash-charts-grid` (new CSS), the Class Academic Performance bar chart config, the Term
+Performance Trend chart (now `type:'line'`), `hexToRgba` (new helper).
+
+- **Poppins default still wasn't showing up after all.** The previous fix only changed what
+  admin.html falls back to when nothing is stored — but any school that had ever clicked "Save
+  Settings" while the font dropdown sat on the old Segoe UI default already had that literal
+  string saved in the Settings sheet, and a stored value always wins over a client-side fallback.
+  `getSettings` now runs a one-time migration: the first time it's called after this update, if
+  the stored `SYSTEM_FONT_FAMILY` is exactly that old default string, it clears the cell (guarded
+  by a script-property flag so this only ever runs once per school). That lets the new Poppins
+  default take over immediately, without wiping a font an admin genuinely picked on purpose. An
+  admin who deliberately re-selects Segoe UI afterward keeps that choice — the flag ensures this
+  migration never fires again.
+- **Dashboard bars looked thin/compressed.** Two contributing causes, both fixed: (1) the bar
+  chart width settings (`barPercentage`/`categoryPercentage`) were narrow and the full-pill
+  `borderRadius: 999` turned already-thin bars into tiny capsule shapes; widened both ratios,
+  capped bar thickness, and switched to a rounded-top-only radius so bars read as solid columns.
+  (2) the "Class Academic Performance" chart (often 10+ classes) shared an even 50/50 grid split
+  with the 3-bar trend chart; it now gets roughly double the width via a new `.dash-charts-grid`
+  layout (still stacks to one column on narrow/mobile screens).
+- **Added a genuine line chart.** The dashboard's three chart families are meant to be round
+  (doughnut/pie/ring), bar, and linear — but "Term Performance Trend" had been converted to a bar
+  chart in an earlier round, leaving no actual line chart anywhere in the app. It's now back to a
+  real `type:'line'` chart with a smooth curve, gradient area fill, and point markers, themed off
+  the admin's accent color. Since the Dashboard (charts included) isn't behind an admin-only gate,
+  this — along with the wider/less-compressed bar chart — applies to the teacher dashboard as well
+  as the admin one; a teacher's charts are still scoped to their own class's data (by design, same
+  as everywhere else in the system), so their round/bar charts may show fewer categories than an
+  admin's, but all three chart types now render properly for both roles.
+
 ## Deploying these changes
 
 This repo isn't connected to the Apps Script project via `clasp`, so the fastest path is manual:

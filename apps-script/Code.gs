@@ -2714,7 +2714,31 @@ function getStudentNamesByClass(token,cn,yr,tm){
   }catch(e){return{success:false,message:e.message};}
 }
 
-function getSettings(token){if(!validateAdminToken(token))return{success:false,message:'Unauthorized'};try{var data=SS().getSheetByName('Settings').getDataRange().getValues(),sett={};for(var i=1;i<data.length;i++){var v=data[i][1];if(v instanceof Date)v=Utilities.formatDate(v,Session.getScriptTimeZone(),'yyyy-MM-dd');sett[data[i][0]]=v;}var props=PropertiesService.getScriptProperties();sett['SMS_API_KEY']=props.getProperty(SMS_KEY_PROP)||'';sett['SMS_SENDER']=props.getProperty(SMS_SEND_PROP)||'';sett['SCHOOL_LOGO']=sett['SCHOOL_LOGO']||props.getProperty(LOGO_KEY)||'';sett['SCHOOL_WATERMARK']=sett['SCHOOL_WATERMARK']||'';sett['SCHOOL_STAMP']=sett['SCHOOL_STAMP']||props.getProperty(STAMP_KEY)||'';sett['SCHOOL_SIGNATURE']=sett['SCHOOL_SIGNATURE']||props.getProperty(SIG_KEY)||'';sett['PHOTOS_FOLDER_ID']=props.getProperty(PHOTOS_KEY)||'';return{success:true,settings:sett};}catch(e){return{success:false,message:e.message};}}
+// BUGFIX ("system default font not set to Poppins for existing schools"): the admin panel's
+// generic "Save Settings" button writes whatever the font dropdown was showing into this sheet,
+// so any school that ever saved settings back when Segoe UI was the hardcoded default now has
+// that literal value stored — and a stored value always wins over admin.html's client-side
+// "|| Poppins" fallback, so the new default never took effect for them. This runs once (guarded
+// by a script property flag) to clear a stored value that exactly matches the OLD default,
+// letting the new Poppins default take over. An admin who deliberately re-picks Segoe UI *after*
+// this migration has already run keeps that choice — the flag ensures we never touch it again.
+var LEGACY_DEFAULT_FONT_STACK = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+var FONT_DEFAULT_MIGRATION_FLAG = 'FONT_DEFAULT_MIGRATED_V1';
+function migrateLegacyFontDefault_(settSheet, data) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    if (props.getProperty(FONT_DEFAULT_MIGRATION_FLAG)) return;
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] === 'SYSTEM_FONT_FAMILY' && data[i][1] === LEGACY_DEFAULT_FONT_STACK) {
+        settSheet.getRange(i + 1, 2).setValue('');
+        data[i][1] = '';
+        break;
+      }
+    }
+    props.setProperty(FONT_DEFAULT_MIGRATION_FLAG, '1');
+  } catch (e) {}
+}
+function getSettings(token){if(!validateAdminToken(token))return{success:false,message:'Unauthorized'};try{var settSheet=SS().getSheetByName('Settings');var data=settSheet.getDataRange().getValues(),sett={};migrateLegacyFontDefault_(settSheet,data);for(var i=1;i<data.length;i++){var v=data[i][1];if(v instanceof Date)v=Utilities.formatDate(v,Session.getScriptTimeZone(),'yyyy-MM-dd');sett[data[i][0]]=v;}var props=PropertiesService.getScriptProperties();sett['SMS_API_KEY']=props.getProperty(SMS_KEY_PROP)||'';sett['SMS_SENDER']=props.getProperty(SMS_SEND_PROP)||'';sett['SCHOOL_LOGO']=sett['SCHOOL_LOGO']||props.getProperty(LOGO_KEY)||'';sett['SCHOOL_WATERMARK']=sett['SCHOOL_WATERMARK']||'';sett['SCHOOL_STAMP']=sett['SCHOOL_STAMP']||props.getProperty(STAMP_KEY)||'';sett['SCHOOL_SIGNATURE']=sett['SCHOOL_SIGNATURE']||props.getProperty(SIG_KEY)||'';sett['PHOTOS_FOLDER_ID']=props.getProperty(PHOTOS_KEY)||'';return{success:true,settings:sett};}catch(e){return{success:false,message:e.message};}}
 function updateSettings(token,obj){if(!validateAdminToken(token))return{success:false,message:'Unauthorized'};try{var sheet=SS().getSheetByName('Settings'),data=sheet.getDataRange().getValues();var props=PropertiesService.getScriptProperties();Object.keys(obj).forEach(function(key){if(key==='SMS_API_KEY'){props.setProperty(SMS_KEY_PROP,obj[key]);return;}if(key==='SMS_SENDER'){props.setProperty(SMS_SEND_PROP,obj[key]);return;}if(key==='SMS_PROVIDER'){props.setProperty('SMS_PROVIDER',obj[key]);}if(key==='SCHOOL_LOGO')props.setProperty(LOGO_KEY,obj[key]);if(key==='SCHOOL_STAMP')props.setProperty(STAMP_KEY,obj[key]);if(key==='SCHOOL_SIGNATURE')props.setProperty(SIG_KEY,obj[key]);if(key==='HEADTEACHER_USER')props.setProperty('HEADTEACHER_USER',obj[key]);if(key==='HEADTEACHER_PASS')props.setProperty('HEADTEACHER_PASS',obj[key]);var found=false;for(var i=1;i<data.length;i++){if(data[i][0]===key){sheet.getRange(i+1,2).setValue(obj[key]);found=true;break;}}if(!found)sheet.appendRow([key,obj[key]]);});invalidateSettingsCache();logServerAction(token, 'Update Settings', 'Keys: ' + Object.keys(obj).join(', '));return{success:true};}catch(e){return{success:false,message:e.message};}}
 function updateCustomCTRemarks(token, rem) { var td = getTokenData(token); if (!td || (td.role !== 'admin' && td.role !== 'teacher')) return {success: false, message: 'Unauthorized'}; try { var sheet = SS().getSheetByName('Settings'); var data = sheet.getDataRange().getValues(); var found = false; for (var i = 1; i < data.length; i++) { if (data[i][0] === 'CUSTOM_CT_REMARKS') { sheet.getRange(i + 1, 2).setValue(rem); found = true; break; } } if (!found) sheet.appendRow(['CUSTOM_CT_REMARKS', rem]); invalidateSettingsCache(); return {success: true}; } catch(e) { return {success: false, message: e.message}; } }
 
