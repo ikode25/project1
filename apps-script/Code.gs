@@ -1167,11 +1167,16 @@ function getDashboardData(token) {
     var classCounts={},classAvgData={},termAvgData={};
     var maleCount = 0;
     var femaleCount = 0;
+    // Dashboard tiles: how many of this role's students currently have a Published report card
+    // vs. still a Draft, and how many currently have an active bill (NextTermFees > 0) — a simple
+    // headcount, not a currency total (see README for why: a $ total was tried and reverted).
+    var reportsPublished = 0;
+    var billsGenerated = 0;
     students.forEach(function(s){
       var g = (s.Gender || '').toString().trim().toLowerCase();
       if (g === 'male') maleCount++;
       else if (g === 'female') femaleCount++;
-      
+
       classCounts[s.Class]=(classCounts[s.Class]||0)+1;
       if(s.Average){
         if(!classAvgData[s.Class])classAvgData[s.Class]=[];
@@ -1180,8 +1185,11 @@ function getDashboardData(token) {
         if(!termAvgData[tmName])termAvgData[tmName]=[];
         termAvgData[tmName].push(Number(s.Average||0));
       }
+      if ((s.ReportStatus || '').toString() === 'Published') reportsPublished++;
+      if (Number(s.NextTermFees || 0) > 0) billsGenerated++;
     });
-    
+    var reportsUnpublished = students.length - reportsPublished;
+
     var totalTeachers = 0;
     try {
       var tchSh = ss.getSheetByName('Teachers');
@@ -1193,7 +1201,7 @@ function getDashboardData(token) {
     var classAvg={},termAvg={};
     Object.keys(classAvgData).forEach(function(k){var a=classAvgData[k];classAvg[k]=a.length?(a.reduce(function(x,y){return x+y;},0)/a.length).toFixed(1):0;});
     Object.keys(termAvgData).forEach(function(k){var a=termAvgData[k];termAvg[k]=a.length?(a.reduce(function(x,y){return x+y;},0)/a.length).toFixed(1):0;});
-    return {success:true,totalStudents:students.length,maleCount:maleCount,femaleCount:femaleCount,totalTeachers:totalTeachers,totalClasses:classes.length,totalSubjects:classSubjectCounts,totalResults:totalResults,recentStudents:students.slice(-6).reverse(),classes:classes,allStudents:students,classCounts:classCounts,classAvgData:classAvg,termAvgData:termAvg,settings:sett,roleInfo:td};
+    return {success:true,totalStudents:students.length,maleCount:maleCount,femaleCount:femaleCount,totalTeachers:totalTeachers,totalClasses:classes.length,totalSubjects:classSubjectCounts,totalResults:totalResults,recentStudents:students.slice(-6).reverse(),classes:classes,allStudents:students,classCounts:classCounts,classAvgData:classAvg,termAvgData:termAvg,reportsPublished:reportsPublished,reportsUnpublished:reportsUnpublished,billsGenerated:billsGenerated,settings:sett,roleInfo:td};
   } catch(e) { return {success:false,message:e.message}; }
 }
 

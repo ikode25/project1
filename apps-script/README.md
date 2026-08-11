@@ -372,6 +372,38 @@ Performance Trend chart (now `type:'line'`), `hexToRgba` (new helper).
   as everywhere else in the system), so their round/bar charts may show fewer categories than an
   admin's, but all three chart types now render properly for both roles.
 
+### 18. Bar chart still felt compressed, font default still not sticking, new report/bill dashboard tiles
+**Code.gs** — `getDashboardData` (new `reportsPublished`/`reportsUnpublished`/`billsGenerated`
+counts). **admin.html** — the Class Academic Performance chart (now horizontal), `applyTypography`
+(new `explicit` guard), `.sgrid` dashboard tiles.
+
+- **Found the real reason the font kept reverting.** The migration added last round was correct
+  but incomplete: `window._currentTypography`, an in-memory guard meant to survive one narrow race
+  (a fresh font *save* briefly outrunning a slightly-stale settings fetch), was being set by
+  *every* call to `applyTypography()` — including the very first, automatic one that runs on page
+  load using whatever was in the browser's local cache, before the user even logs in or the
+  migrated server value has been fetched. Once that stale value set the guard, every later call —
+  including the one carrying the freshly-migrated, correct Poppins default — deferred to it
+  instead, for the rest of that page session. `applyTypography()` now only sets that guard on an
+  explicit save from the Typography card's own Save button; every other caller (page-init cache
+  restore, normal settings load) just renders whatever it was given without permanently locking it
+  in, so the real server value is free to win once it arrives.
+- **Bar chart: switched to horizontal bars.** Vertical columns for 10-15+ classes, each squeezed
+  into a half-width card with rotated labels underneath, is what was reading as "compressed" no
+  matter how the width settings were tuned. Class Academic Performance is now a horizontal bar
+  chart — one full-width row per class, bar length stretches out to represent the score, labels
+  sit flat and readable to the left. The chart card grows taller as classes are added (scrolling
+  only past a generous height) instead of squashing bars back down to fit a fixed box.
+- **New dashboard tiles: Reports Published, Reports Unpublished, Bills Generated.** Three more
+  stat tiles alongside the existing ones — Published/Unpublished are a live headcount of students'
+  `ReportStatus` (tap either to jump to Master Sheet, where publishing is managed), and Bills
+  Generated counts students who currently have an active bill (`NextTermFees > 0`; tap to jump to
+  Fees & Bills). These are plain counts, not currency totals — deliberately smaller in scope than
+  the fee-dollar dashboard tile from the round that was reverted earlier. Reports
+  Published/Unpublished show for teachers too (scoped to their own class, same as the rest of the
+  dashboard); Bills Generated is admin-only, matching how the rest of the Fees & Bills area is
+  already admin-only.
+
 ## Deploying these changes
 
 This repo isn't connected to the Apps Script project via `clasp`, so the fastest path is manual:

@@ -4195,6 +4195,33 @@
                             <div class="sval" id="stResults">—</div>
                             <div class="slbl">Result Records</div>
                         </div>
+                        <div class="scard static-card" style="--acc:#16a34a" onclick="showPanel('mastersheet',null)">
+                            <div class="sico" style="background:#dcfce7"><svg viewBox="0 0 24 24" fill="none"
+                                    stroke="#15803d" stroke-width="2" stroke-linecap="round">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                                    <polyline points="22 4 12 14.01 9 11.01" />
+                                </svg></div>
+                            <div class="sval" id="stReportsPublished">—</div>
+                            <div class="slbl">Reports Published</div>
+                        </div>
+                        <div class="scard static-card" style="--acc:#f59e0b" onclick="showPanel('mastersheet',null)">
+                            <div class="sico" style="background:#fef3c7"><svg viewBox="0 0 24 24" fill="none"
+                                    stroke="#b45309" stroke-width="2" stroke-linecap="round">
+                                    <circle cx="12" cy="12" r="10" />
+                                    <polyline points="12 6 12 12 16 14" />
+                                </svg></div>
+                            <div class="sval" id="stReportsUnpublished">—</div>
+                            <div class="slbl">Reports Unpublished</div>
+                        </div>
+                        <div class="scard admin-only" style="--acc:#0891b2" onclick="showPanel('feesbills',null)">
+                            <div class="sico" style="background:#cffafe"><svg viewBox="0 0 24 24" fill="none"
+                                    stroke="#0e7490" stroke-width="2" stroke-linecap="round">
+                                    <rect x="2" y="5" width="20" height="14" rx="2" />
+                                    <line x1="2" y1="10" x2="22" y2="10" />
+                                </svg></div>
+                            <div class="sval" id="stBillsGenerated">—</div>
+                            <div class="slbl">Bills Generated</div>
+                        </div>
                     </div>
 
                     <!-- Dashboard KPI Charts (Pie / Doughnut / SVG ring) — Chart.js v4, colored from
@@ -4265,8 +4292,10 @@
                                 <div id="dashBarPerformBadge" style="background:rgba(255,255,255,0.15); color:#fff; font-size:10px; font-weight:700; padding:4px 10px; border-radius:20px; letter-spacing:0.5px;">LIVE</div>
                             </div>
                             <div style="padding:16px 20px 20px; background:#fff;">
-                                <div style="height:340px; position:relative;">
-                                    <canvas id="barChart"></canvas>
+                                <div id="barChartScroll" style="max-height:520px; overflow-y:auto; overflow-x:hidden;">
+                                    <div id="barChartWrap" style="height:340px; position:relative;">
+                                        <canvas id="barChart"></canvas>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -8235,6 +8264,32 @@
             };
         }
 
+        // Horizontal-bar counterpart: the pass/excellent reference lines run vertically (at the
+        // x=50/x=70 value positions) spanning the chart's full height, instead of horizontally.
+        function makeThresholdLinesPluginH(id) {
+            return {
+                id: id,
+                afterDraw: function (chart) {
+                    var ctx2 = chart.ctx, yAxis = chart.scales.y, xAxis = chart.scales.x;
+                    if (!yAxis || !xAxis) return;
+                    var top = yAxis.top, bottom = yAxis.bottom;
+                    [[70, '#10b981', 'Excellent'], [50, '#f59e0b', 'Pass']].forEach(function (t) {
+                        var x = xAxis.getPixelForValue(t[0]);
+                        ctx2.save();
+                        ctx2.setLineDash([5, 5]);
+                        ctx2.strokeStyle = t[1];
+                        ctx2.globalAlpha = 0.35;
+                        ctx2.lineWidth = 1.5;
+                        ctx2.beginPath();
+                        ctx2.moveTo(x, top);
+                        ctx2.lineTo(x, bottom);
+                        ctx2.stroke();
+                        ctx2.restore();
+                    });
+                }
+            };
+        }
+
         // Floating rounded "chip" value labels above each bar, colored to match that bar.
         function makeChipLabelsPlugin(id, dataRef, colorFor, suffix) {
             return {
@@ -8284,6 +8339,59 @@
             };
         }
 
+        // Horizontal-bar counterpart of the chip label plugin above — the value chip sits just
+        // past the end of the bar (vertically centered on it) instead of floating above it.
+        function makeChipLabelsPluginH(id, dataRef, colorFor, suffix) {
+            return {
+                id: id,
+                afterDatasetsDraw: function (chart) {
+                    var meta = chart.getDatasetMeta(0);
+                    var ctx2 = chart.ctx;
+                    ctx2.save();
+                    meta.data.forEach(function (bar, i) {
+                        var v = dataRef[i];
+                        if (!v) return;
+                        var label = v + (suffix || '');
+                        ctx2.font = '800 11px "Segoe UI", Tahoma, Geneva, Verdana, sans-serif';
+                        var w = ctx2.measureText(label).width + 14;
+                        var h = 18, x = bar.x + 8, y = bar.y - h / 2;
+                        var col = colorFor(i);
+                        ctx2.fillStyle = col;
+                        ctx2.beginPath();
+                        ctx2.roundRect ? ctx2.roundRect(x, y, w, h, 9) : ctx2.rect(x, y, w, h);
+                        ctx2.fill();
+                        ctx2.fillStyle = '#fff';
+                        ctx2.textAlign = 'center';
+                        ctx2.textBaseline = 'middle';
+                        ctx2.fillText(label, x + w / 2, y + h / 2 + 0.5);
+                    });
+                    ctx2.restore();
+                }
+            };
+        }
+
+        // Scales for a horizontal ('indexAxis: y') bar chart — value axis runs along x (0-100%),
+        // category axis (class names) runs along y with no rotation needed since each label gets
+        // its own row.
+        function ultraModernScalesH(suffix) {
+            return {
+                x: {
+                    beginAtZero: true, max: 100,
+                    border: { display: false },
+                    grid: { display: false },
+                    ticks: {
+                        font: { size: 11, weight: '600' }, color: '#94a3b8',
+                        callback: function (v) { return v + (suffix || ''); }, stepSize: 20
+                    }
+                },
+                y: {
+                    border: { display: false },
+                    grid: { display: false },
+                    ticks: { font: { size: 11, weight: '700' }, color: '#64748b' }
+                }
+            };
+        }
+
         function renderCharts(cad, tad) {
             if (!document.getElementById('barChart') || !document.getElementById('lineChart')) return;
 
@@ -8301,15 +8409,24 @@
                 { start: '#6366f1', end: '#818cf8' }   // Indigo
             ];
 
-            // ── BAR CHART: Class Academic Performance (ultra-modern pill bars) ──
-            var bCtx = document.getElementById('barChart').getContext('2d');
-            if (barChartInst) barChartInst.destroy();
+            // ── BAR CHART: Class Academic Performance — horizontal, one long bar per class ──
+            // Was vertical: with 10-15+ classes squeezed into one card, the columns read as thin
+            // and "compressed" (worse, rotated x-axis labels underneath). Horizontal bars give
+            // every class its own full-width row — the bar length now genuinely stretches out to
+            // represent the score, labels sit flat and readable to the left, and the wrapping
+            // #barChartScroll div grows the chart's height with the class count (scrolling only
+            // past a generous cap) so rows never get squashed back down again.
             var bl = Object.keys(cad);
             var bData = bl.map(function(k) { return Math.round((Number(cad[k]) || 0) * 10) / 10; });
+            var barWrap = document.getElementById('barChartWrap');
+            if (barWrap) barWrap.style.height = Math.max(340, bl.length * 40 + 40) + 'px';
+
+            var bCtx = document.getElementById('barChart').getContext('2d');
+            if (barChartInst) barChartInst.destroy();
 
             var barGrads = bl.map(function(_, i) {
                 var col = palette[i % palette.length];
-                var g = bCtx.createLinearGradient(0, 0, 280, 0);
+                var g = bCtx.createLinearGradient(0, 0, 600, 0);
                 g.addColorStop(0, col.start);
                 g.addColorStop(1, col.end);
                 return g;
@@ -8321,8 +8438,8 @@
                 type: 'bar',
                 plugins: [
                     makeGlowPlugin('barGlow', 'rgba(99,102,241,0.35)'),
-                    makeThresholdLinesPlugin('perfThresholds'),
-                    makeChipLabelsPlugin('barChips', bData, barColorAt, '%')
+                    makeThresholdLinesPluginH('perfThresholds'),
+                    makeChipLabelsPluginH('barChips', bData, barColorAt, '%')
                 ],
                 data: {
                     labels: bl,
@@ -8331,14 +8448,15 @@
                         data: bData,
                         backgroundColor: barGrads,
                         hoverBackgroundColor: barHovers,
-                        borderRadius: { topLeft: 8, topRight: 8, bottomLeft: 0, bottomRight: 0 },
+                        borderRadius: { topLeft: 0, topRight: 8, bottomLeft: 0, bottomRight: 8 },
                         borderSkipped: false,
-                        barPercentage: 0.82,
-                        categoryPercentage: 0.9,
-                        maxBarThickness: 46
+                        barPercentage: 0.75,
+                        categoryPercentage: 0.85,
+                        maxBarThickness: 32
                     }]
                 },
                 options: {
+                    indexAxis: 'y',
                     responsive: true,
                     maintainAspectRatio: false,
                     animation: {
@@ -8361,7 +8479,7 @@
                             }
                         }
                     },
-                    scales: ultraModernScales('%')
+                    scales: ultraModernScalesH('%')
                 }
             });
 
@@ -8563,6 +8681,9 @@
                 document.getElementById('stClasses').textContent = r.totalClasses || 0;
                 var ts = 0; if (r.totalSubjects && typeof r.totalSubjects === 'object') { Object.values(r.totalSubjects).forEach(function (n) { ts += Number(n || 0); }); } document.getElementById('stSubjects').textContent = ts;
                 document.getElementById('stResults').textContent = r.totalResults || 0;
+                var stRepPub = document.getElementById('stReportsPublished'); if (stRepPub) stRepPub.textContent = r.reportsPublished || 0;
+                var stRepUnpub = document.getElementById('stReportsUnpublished'); if (stRepUnpub) stRepUnpub.textContent = r.reportsUnpublished || 0;
+                var stBills = document.getElementById('stBillsGenerated'); if (stBills) stBills.textContent = r.billsGenerated || 0;
                 renderDashRecent(r.recentStudents || []);
                 renderClassTiles(r.classes || [], r.classCounts || {});
                 populateAllClassDropdowns();
@@ -10838,7 +10959,18 @@
             var gbEl = document.querySelector('.greetbar');
             if (gbEl) gbEl.style.background = 'linear-gradient(135deg,' + dark + ',' + sb_color + ')';
         }
-        function applyTypography(fontFam, fontSize, fontWeight) {
+        // BUGFIX ("font not working" — Poppins default still not sticking): `explicit` must be
+        // true ONLY when the admin just picked a font and clicked Save (saveTypographySettings())
+        // — that's the one narrow race window window._currentTypography is meant to survive
+        // (a fresh save briefly outrunning a slightly-stale in-flight settings fetch). Every other
+        // caller (page-init cache restore, populateSettingsUI's normal load, applyBrandingFromCache)
+        // was passing no 4th argument but this function set window._currentTypography regardless —
+        // so the very first render of the page (from the old, possibly-stale cached localStorage
+        // blob, well before login) permanently "locked in" that stale font for window._currentTypography,
+        // and every later fetch of the real, corrected server value was then ignored because those
+        // callers all prefer window._currentTypography over the server's answer. Only setting the
+        // guard on an explicit save closes that hole while keeping the original race protection.
+        function applyTypography(fontFam, fontSize, fontWeight, explicit) {
             if (!fontFam) return;
             var root = document.documentElement;
             // Extract clean font name (strip quotes and fallback)
@@ -10863,9 +10995,15 @@
             document.body.style.fontFamily = '';
             void document.body.offsetHeight;
             document.body.style.fontFamily = 'var(--sys-font)';
-            // Persist to dedicated key so general settings save can NEVER accidentally wipe the font
-            try { localStorage.setItem('sysTypography', JSON.stringify({ fam: fontFam, size: fontSize || '14px', weight: fontWeight || '500' })); } catch(e) {}
-            window._currentTypography = { fam: fontFam, size: fontSize || '14px', weight: fontWeight || '500' };
+            // Only an explicit admin save (saveTypographySettings()) is allowed to set the
+            // in-session guard / legacy backup key — see the BUGFIX comment above. Any other
+            // caller (page-init cache restore, populateSettingsUI, applyBrandingFromCache) just
+            // renders whatever font it was told to, without locking that value in for the rest
+            // of the session.
+            if (explicit) {
+                try { localStorage.setItem('sysTypography', JSON.stringify({ fam: fontFam, size: fontSize || '14px', weight: fontWeight || '500' })); } catch(e) {}
+                window._currentTypography = { fam: fontFam, size: fontSize || '14px', weight: fontWeight || '500' };
+            }
         }
 
         // ── RESULT CHECKER QR CODE (Settings → School Info) ──
@@ -11178,8 +11316,10 @@
                 SYSTEM_FONT_WEIGHT: fontWeight
             };
             toast('Applying & saving typography settings...', 'info');
-            // Apply immediately so user sees the change right away
-            applyTypography(fontFam, fontSize, fontWeight);
+            // Apply immediately so user sees the change right away. `explicit:true` — this is the
+            // one real admin action that should win over a slightly-stale in-flight settings fetch
+            // for the rest of this session (see the BUGFIX comment on applyTypography()).
+            applyTypography(fontFam, fontSize, fontWeight, true);
             google.script.run.withSuccessHandler(function (r) {
                 if (r.success) {
                     toast('Typography settings saved & applied!', 'success');
