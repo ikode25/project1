@@ -1744,6 +1744,143 @@ function testMailAppAuthorization() {
   MailApp.sendEmail(me, 'Mail authorization OK', 'If you received this, this Apps Script project is authorized to send email — Settings → Owner Reports → "Email to Owner" will now work from the deployed web app.');
 }
 
+// ── EXTRA (AD-HOC) STUDENT FEES ──────────────────────────────
+// Lets the admin bill ONE particular student for something that doesn't apply to the whole
+// class (a damaged textbook, a late-registration fee, an excursion only some students are
+// going on, ...) without adding a new column to the shared FEE_COMPONENTS list every other
+// student in the class would also see. Stored as fd._extraFees = [{name, amount, addedAt}] in
+// that student's own FeeData JSON, and rolled straight into NextTermFees so it's automatically
+// reflected everywhere that already reads NextTermFees — the report card stat, the "Bill: GHS…"
+// SMS line, the bill PDF — without those call sites needing to know _extraFees exists.
+function findStudentRow(data, studentId, year, term) {
+  for (var i = 1; i < data.length; i++) {
+    if (!data[i][0]) continue;
+    if (data[i][0].toString() !== studentId.toString()) continue;
+    if (year && String(data[i][4]) !== String(year)) continue;
+    if (term && data[i][5] !== term) continue;
+    return i;
+  }
+  return -1;
+}
+function addExtraFeeToStudent(token, studentId, year, term, feeName, amount) {
+  if (!validateAdminToken(token)) return {success: false, message: 'Unauthorized'};
+  try {
+    var name = (feeName || '').toString().trim();
+    if (!name) return {success: false, message: 'Enter a fee name.'};
+    var amt = Number(amount);
+    if (isNaN(amt) || amt <= 0) return {success: false, message: 'Enter a valid amount.'};
+
+    var ss = SS();
+    var sheet = ss.getSheetByName('Students');
+    var data = sheet.getDataRange().getValues();
+    var row = findStudentRow(data, studentId, year, term);
+    if (row === -1) return {success: false, message: 'Student not found for that year/term.'};
+
+    var fd = {};
+    try { fd = data[row][20] ? JSON.parse(data[row][20]) : {}; } catch(e) { fd = {}; }
+    if (!fd._extraFees) fd._extraFees = [];
+    fd._extraFees.push({name: name, amount: amt, addedAt: new Date().toISOString()});
+    var newNextTerm = Number(data[row][19] || 0) + amt;
+    sheet.getRange(row + 1, 20).setValue(newNextTerm); // NextTermFees
+    sheet.getRange(row + 1, 21).setValue(JSON.stringify(fd)); // FeeData
+    cacheClear(['rpt_' + studentId + '|' + (data[row][4] || '') + '|' + (data[row][5] || '')]);
+    logServerAction(token, 'Add Extra Fee', 'Student: ' + studentId + ', Fee: ' + name + ', Amount: ' + amt);
+    return {success: true, feeData: fd, nextTermFees: newNextTerm};
+  } catch(e) { return {success: false, message: e.message}; }
+}
+function removeExtraFeeFromStudent(token, studentId, year, term, feeIndex) {
+  if (!validateAdminToken(token)) return {success: false, message: 'Unauthorized'};
+  try {
+    var ss = SS();
+    var sheet = ss.getSheetByName('Students');
+    var data = sheet.getDataRange().getValues();
+    var row = findStudentRow(data, studentId, year, term);
+    if (row === -1) return {success: false, message: 'Student not found for that year/term.'};
+
+    var fd = {};
+    try { fd = data[row][20] ? JSON.parse(data[row][20]) : {}; } catch(e) { fd = {}; }
+    var list = fd._extraFees || [];
+    var idx = Number(feeIndex);
+    if (idx < 0 || idx >= list.length) return {success: false, message: 'Fee not found.'};
+    var removed = list.splice(idx, 1)[0];
+    fd._extraFees = list;
+    var newNextTerm = Math.max(0, Number(data[row][19] || 0) - Number(removed.amount || 0));
+    sheet.getRange(row + 1, 20).setValue(newNextTerm);
+    sheet.getRange(row + 1, 21).setValue(JSON.stringify(fd));
+    cacheClear(['rpt_' + studentId + '|' + (data[row][4] || '') + '|' + (data[row][5] || '')]);
+    logServerAction(token, 'Remove Extra Fee', 'Student: ' + studentId + ', Fee: ' + (removed.name || ''));
+    return {success: true, feeData: fd, nextTermFees: newNextTerm};
+  } catch(e) { return {success: false, message: e.message}; }
+}
+
+// ── STUDENT BILL PDF (used by the report-card SMS "attach next term bill") ──
+// Same line-item breakdown as the printable invoice in admin.html (fee components, or
+// Arrears/NextTermFees when no components are configured, plus any per-student extra fees),
+// rendered server-side so it can be turned into a PDF and linked from an SMS — SMS can't attach
+// a file directly, so this uploads the PDF to Drive (link-sharing on) and the message includes
+// the link, the same pattern used for Owner Performance Reports.
+function buildStudentBillHtml(sett, stu) {
+  var schoolName = sett.SCHOOL_NAME || 'School';
+  var logo = fixDriveUrlServer(sett.SCHOOL_LOGO || '');
+  var feeComps = (sett.FEE_COMPONENTS || '').split(',').map(function(s){return s.trim();}).filter(function(s){return s;});
+  var fd = {};
+  if (stu.FeeData) {
+    if (typeof stu.FeeData === 'string') { try { fd = JSON.parse(stu.FeeData); } catch(e) { fd = {}; } }
+    else fd = stu.FeeData;
+  }
+  var rows = [], tot = 0;
+  if (feeComps.length === 0) {
+    var arr = Number(stu.Arrears || 0), nxt = Number(stu.NextTermFees || 0);
+    rows.push(['Previous Arrears', arr]); tot += arr;
+    rows.push(['Next Term Fees', nxt]); tot += nxt;
+  } else {
+    feeComps.forEach(function(fc) {
+      var val = Number(fd[fc] || 0);
+      var fcL = fc.toLowerCase();
+      if (fcL === 'arrears' && !fd[fc]) val = Number(stu.Arrears || 0);
+      if (fcL === 'next term fees' && !fd[fc]) val = Number(stu.NextTermFees || 0);
+      rows.push([fc, val]); tot += val;
+    });
+  }
+  (fd._extraFees || []).forEach(function(x) {
+    rows.push([(x.name || 'Extra Fee') + ' (extra)', Number(x.amount || 0)]);
+    tot += Number(x.amount || 0);
+  });
+
+  var tbody = rows.map(function(r) {
+    return '<tr><td style="padding:10px;border:2px solid #0d1b4b;font-weight:600;color:#0d1b4b">' + r[0] + '</td>'
+      + '<td style="padding:10px;border:2px solid #0d1b4b;text-align:right;font-weight:700;color:#0d1b4b">GHS ' + r[1].toFixed(2) + '</td></tr>';
+  }).join('');
+
+  return '<html><head><meta charset="utf-8"><style>body{font-family:Arial,Helvetica,sans-serif;color:#0d1b4b;padding:24px}</style></head><body>'
+    + '<div style="text-align:center;margin-bottom:20px">'
+    + (logo ? '<img src="' + logo + '" style="height:70px;border-radius:50%;border:2px solid #f0c020">' : '')
+    + '<h2 style="margin:8px 0 0;color:#0d1b4b">' + schoolName + '</h2>'
+    + '<p style="color:#374151;font-size:12px">' + (sett.SCHOOL_ADDRESS || '') + ' | ' + (sett.SCHOOL_PHONE || '') + '</p></div>'
+    + '<h3 style="text-align:center;border-bottom:3px solid #f0c020;display:block;padding-bottom:6px">Next Academic Term Bill</h3>'
+    + '<p><strong>Student:</strong> ' + stu.Name + ' &nbsp; <strong>ID:</strong> ' + stu.ID + ' &nbsp; <strong>Class:</strong> ' + stu.Class + ' &nbsp; <strong>Term:</strong> ' + stu.Term + ' (' + stu.Year + ')</p>'
+    + '<table style="width:100%;border-collapse:collapse;border:3px solid #0d1b4b;margin-top:14px"><thead><tr>'
+    + '<th style="background:#0d1b4b;color:#f0c020;padding:10px;border:2px solid #0d1b4b;text-align:left">Description</th>'
+    + '<th style="background:#0d1b4b;color:#f0c020;padding:10px;border:2px solid #0d1b4b;text-align:right">Amount</th></tr></thead><tbody>'
+    + tbody
+    + '</tbody><tfoot><tr><th style="padding:12px;border:2px solid #0d1b4b;text-align:right;background:#f8fafc">Total Expected</th>'
+    + '<th style="padding:12px;border:2px solid #0d1b4b;text-align:right;background:#f8fafc;color:#c0392b">GHS ' + tot.toFixed(2) + '</th></tr></tfoot></table>'
+    + '<div style="text-align:center;margin-top:30px;font-size:12px;color:#0d1b4b;font-weight:600;border-top:1px dashed #cbd5e1;padding-top:12px">Thank you for your prompt payment!</div>'
+    + '</body></html>';
+}
+function generateStudentBillPdfUrl(sett, stu) {
+  try {
+    var html = buildStudentBillHtml(sett, stu);
+    var htmlBlob = Utilities.newBlob(html, 'text/html', 'bill.html');
+    var pdfBlob = htmlBlob.getAs('application/pdf');
+    pdfBlob.setName('Bill - ' + stu.Name + ' - ' + stu.Term + ' ' + stu.Year + '.pdf');
+    var folder = initReportsFolder(); // shared with Owner Performance Reports — same Drive folder
+    var file = folder ? folder.createFile(pdfBlob) : DriveApp.createFile(pdfBlob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return 'https://drive.google.com/file/d/' + file.getId() + '/view';
+  } catch(e) { Logger.log('generateStudentBillPdfUrl error: ' + e.message); return ''; }
+}
+
 // ── CUMULATIVE RECORD ──────────────────────────────────────
 function getStudentCumulativeRecord(token,studentId,year){
   if(!validateAdminToken(token))return{success:false,message:'Unauthorized'};
@@ -2247,6 +2384,13 @@ function sendReportSMS(token,studentId,year,term){
       var nextTerm = Number(stu.NextTermFees || 0);
       if (nextTerm > 0) {
         msg += 'Bill: GHS ' + nextTerm.toFixed(2) + '\n';
+        // Attach the next academic term bill — SMS can't carry a file directly, so this
+        // generates a PDF (same line-item breakdown as the printable invoice, including any
+        // per-student extra fees) and links to it, the same pattern used for Owner Performance
+        // Reports. Only when there's actually something owed, so a zero-balance student's SMS
+        // doesn't spend time/Drive space generating an empty bill.
+        var billUrl = generateStudentBillPdfUrl(rep.settings || {}, stu);
+        if (billUrl) msg += 'Bill PDF: ' + billUrl + '\n';
       }
       if (arrears > 0) {
         msg += 'Arrears: GHS ' + arrears.toFixed(2) + '\n';
@@ -2302,7 +2446,11 @@ function sendBulkSMS(token, targetType, targetValue, templateText) {
     var sender = props.getProperty(SMS_SEND_PROP) || 'SchoolSMS';
     var provider = (props.getProperty('SMS_PROVIDER') || 'arkesel').toLowerCase();
     if (!apiKey) return {success: false, message: 'SMS API key not configured.'};
-    
+    // Only worth generating a bill PDF per recipient (Drive write + a few seconds each) when the
+    // template actually references it — most bulk sends (announcements, reminders) don't.
+    var templateWantsBillPdf = (templateText || '').indexOf('{BillPDF}') !== -1;
+    var bulkSett = templateWantsBillPdf ? getCachedSettingsMap(ss) : null;
+
     var studentsData = ss.getSheetByName('Students').getDataRange().getValues();
     var headers = studentsData[0];
     
@@ -2372,6 +2520,7 @@ function sendBulkSMS(token, targetType, targetValue, templateText) {
       // Term 3 promotion note (e.g. "promoted from Basic 4 to Basic 5") — blank outside Term 3
       // or when no promotion status has been set for the student yet.
       var promoNote = rep.success ? buildPromotionNote(rep) : '';
+      var billPdfUrl = (templateWantsBillPdf && Number(stu.NextTermFees || 0) > 0) ? generateStudentBillPdfUrl(bulkSett, stu) : '';
 
       var placeholders = {
         '{Name}': stu.Name,
@@ -2386,6 +2535,7 @@ function sendBulkSMS(token, targetType, targetValue, templateText) {
         '{NextTermFees}': stu.NextTermFees !== undefined ? stu.NextTermFees : '0.00',
         '{Grades}': gradeList,
         '{PromotionNote}': promoNote,
+        '{BillPDF}': billPdfUrl,
         '{URL}': url
       };
       
@@ -2449,6 +2599,13 @@ function getCompiledReportSMS(token, studentId, year, term) {
       var nextTerm = Number(stu.NextTermFees || 0);
       if (nextTerm > 0) {
         msg += 'Bill: GHS ' + nextTerm.toFixed(2) + '\n';
+        // Attach the next academic term bill — SMS can't carry a file directly, so this
+        // generates a PDF (same line-item breakdown as the printable invoice, including any
+        // per-student extra fees) and links to it, the same pattern used for Owner Performance
+        // Reports. Only when there's actually something owed, so a zero-balance student's SMS
+        // doesn't spend time/Drive space generating an empty bill.
+        var billUrl = generateStudentBillPdfUrl(rep.settings || {}, stu);
+        if (billUrl) msg += 'Bill PDF: ' + billUrl + '\n';
       }
       if (arrears > 0) {
         msg += 'Arrears: GHS ' + arrears.toFixed(2) + '\n';

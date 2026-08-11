@@ -267,6 +267,42 @@ the existing `.bg-canvas` decoration's placement) so they're no longer trapped i
 - **Sortable columns** — click any sortable column header to sort ascending, click again for
   descending; an indicator arrow shows the active sort.
 
+### 15. Fees & Bills: extra per-student fees, bold-border printing, 2-per-sheet, bill on SMS
+**admin.html** — `openExtraFeeModal`, `submitExtraFee`, `removeExtraFeeUI`, `buildBillRowsForStudent`,
+`buildBillInvoiceHtml`, `BILL_PRINT_CSS`, `printAllBills`, `printFeeInvoice`, **Code.gs** —
+`addExtraFeeToStudent`, `removeExtraFeeFromStudent`, `buildStudentBillHtml`,
+`generateStudentBillPdfUrl`
+
+- **Bill one student for something extra.** A "＋ Extra Fee" button on each row in Fees & Bills
+  opens a small modal to bill just that student for something that doesn't apply to the rest of
+  the class (a damaged textbook, a late fee, an excursion, ...) — without adding a new column
+  every other student in the class would also see. Stored per-student as
+  `FeeData._extraFees = [{name, amount, addedAt}]` and rolled straight into `NextTermFees`, so it
+  automatically flows through everywhere that already reads `NextTermFees`: the row's Total
+  Expected, the printed bill, and the "Bill: GHS…" SMS line — those call sites didn't need to
+  know `_extraFees` exists. Saves immediately (not part of the "Save Billing Data" batch), since
+  it's a deliberate one-off billing action, not a value the admin is still editing.
+- **Print styling: bold borders, high-contrast text.** The printable bill/invoice (single print
+  and bulk) now uses 2-3px solid borders throughout and solid dark text via a shared
+  `BILL_PRINT_CSS` block (plus `-webkit-print-color-adjust:exact` so the header/background colors
+  themselves survive a printer's default "background graphics off" setting) — the previous 1px
+  light-grey grid is exactly what tends to fade out on real printers/toner-saving modes.
+- **1 bill per sheet, or 2 per sheet.** A layout dropdown next to the new "Print All Bills" button
+  in Fees & Bills lets the admin choose: one student's bill per A4 page, or two stacked on one
+  sheet with a dashed "✂ cut here" divider between them — useful for handing out bills without
+  burning a full page per student. The single per-row "Print" button always stays 1-per-sheet
+  (reprinting one specific bill), and both share the exact same bold-border builder so the layout
+  is never inconsistent between single and bulk printing.
+- **Bill attached to the report-card SMS.** SMS can't attach a file directly, so when a student
+  has a nonzero Next Term Fees balance, `sendReportSMS`/`getCompiledReportSMS` now generate a PDF
+  of their current bill (same line-item breakdown as the printable invoice, including any extra
+  fees) and add a "Bill PDF: <link>" line to the message — same Drive-upload-and-link pattern
+  already used for Owner Performance Reports. Only generated when there's actually a balance, so
+  a zero-balance student's SMS doesn't spend time creating an empty bill. `sendBulkSMS` templates
+  can reference the same thing via a new `{BillPDF}` placeholder (only resolved, again, when the
+  student owes something *and* the admin's template text actually uses that placeholder — so a
+  bulk announcement that doesn't mention bills doesn't generate one for every recipient).
+
 ## Deploying these changes
 
 This repo isn't connected to the Apps Script project via `clasp`, so the fastest path is manual:
