@@ -4466,6 +4466,10 @@
                                 <button class="btn bo bsm" onclick="window.print()">Print</button>
                                 <button class="btn bo bsm" onclick="exportStudentsCsv()">Export CSV</button>
                                 <button class="btn bi bsm" onclick="showImportModal()">Import CSV</button>
+                                <div style="position:relative;display:inline-block" class="no-print">
+                                    <button class="btn bo bsm" onclick="toggleColumnsMenu()">Columns</button>
+                                    <div id="stuColumnsMenu" style="display:none;position:absolute;top:100%;right:0;margin-top:4px;background:var(--card-bg,#fff);border:1px solid var(--bd);border-radius:10px;box-shadow:var(--sh, 0 8px 24px rgba(0,0,0,.15));padding:10px;z-index:50;min-width:180px"></div>
+                                </div>
                                 <div class="view-toggle-group" style="display:inline-flex; border:1px solid var(--bd); border-radius:6px; overflow:hidden; margin-left:auto; background:rgba(0,0,0,0.02)">
                                     <button class="btn-toggle active" id="btnViewTable" onclick="changeStudentView('table')" style="background:var(--bl, #0d1b4b); color:#fff; border:none; padding:6px 14px; font-size:12px; font-weight:600; cursor:pointer; transition:all 0.2s;">Table</button>
                                     <button class="btn-toggle" id="btnViewCard" onclick="changeStudentView('card')" style="background:transparent; color:var(--tx); border:none; padding:6px 14px; font-size:12px; font-weight:600; cursor:pointer; transition:all 0.2s;">Cards</button>
@@ -4473,18 +4477,9 @@
                             </div>
                             <div class="tw" id="studentsTableContainer">
                                 <table class="dt">
-                                    <thead>
-                                        <tr>
-                                            <th>Photo</th>
-                                            <th>ID</th>
-                                            <th>Name</th>
-                                            <th>Gender</th>
-                                            <th>Class</th>
-                                            <th>Year</th>
-                                            <th>Term</th>
-                                            <th>Avg</th>
-                                            <th class="no-print">Actions</th>
-                                        </tr>
+                                    <thead id="studentsThead">
+                                        <!-- Built by renderStudentsHeader() — columns are toggleable (see the
+                                             "Columns" button above) and clickable to sort. -->
                                     </thead>
                                     <tbody id="studentsTbody">
                                         <tr>
@@ -7287,6 +7282,26 @@
         var schoolLogoB64 = '', schoolStampB64 = '', schoolSigB64 = '', headmasterName = '';
         var barChartInst = null, lineChartInst = null, genderDoughnutInst = null, classPieInst = null, importFileData = null, notifications = [];
         var stuAllData = [], stuFiltered = [], stuPage = 1;
+        // ── STUDENTS TABLE: columns, visibility toggle, sorting ──
+        // Single source of truth for the students table's columns — renderStudentsHeader() and
+        // renderStudents() both read this instead of duplicating the column list, so toggling
+        // visibility/adding a column only needs to happen in one place.
+        var STUDENT_COLUMNS = [
+            { key: 'Photo', label: 'Photo', sortable: false },
+            { key: 'ID', label: 'ID', sortable: true },
+            { key: 'Name', label: 'Name', sortable: true },
+            { key: 'Gender', label: 'Gender', sortable: true },
+            { key: 'Class', label: 'Class', sortable: true },
+            { key: 'Year', label: 'Year', sortable: true },
+            { key: 'Term', label: 'Term', sortable: true },
+            { key: 'ParentPhone', label: 'Parent Contact', sortable: true },
+            { key: 'Average', label: 'Avg', sortable: true },
+            { key: 'Actions', label: 'Actions', sortable: false, alwaysShown: true, noPrint: true }
+        ];
+        var stuHiddenCols = [];
+        try { stuHiddenCols = JSON.parse(localStorage.getItem('stuHiddenCols') || '[]'); } catch(e) { stuHiddenCols = []; }
+        var stuSortKey = null, stuSortDir = 'asc';
+        function isStudentColVisible(key) { return STUDENT_COLUMNS.find(function(c){return c.key===key;}).alwaysShown || stuHiddenCols.indexOf(key) === -1; }
         var sbaClass = '', sbaYear = '', sbaTerm = '', sbaComps = [], sbaStuds = [], sbaSubjs = [];
         var examClass = '', examYear = '', examTerm = '';
         var sumClass = '', sumYear = '', sumTerm = '', sumData = {};
@@ -8868,15 +8883,24 @@
         }
 
         // ── STUDENTS ──
-        function loadStudents() {
+        // BUGFIX ("saving an edited student on page 2+ dumps admin back to page 1"): loadStudents()
+        // used to unconditionally reset stuPage to 1 on every call, including the reload that
+        // happens right after saving an edit — so an admin editing a student on, say, page 4
+        // would always land back on page 1 the moment they saved, with no way to tell where the
+        // student they just edited actually was. It also always overwrote stuFiltered with the
+        // *unfiltered* full list, silently dropping any active search/class/gender filter on
+        // every reload. `preservePage` lets callers that are just refreshing data in place (a
+        // save, a delete) keep the admin exactly where they were, re-applying whatever filter is
+        // currently active instead of clearing it.
+        function loadStudents(preservePage) {
             var cached = localStorage.getItem('cached_students');
             if (cached) {
                 try {
                     var data = JSON.parse(cached);
                     allStudents = data;
                     stuAllData = data;
-                    stuFiltered = data;
-                    stuPage = 1;
+                    applyStudentFilters();
+                    if (!preservePage) stuPage = 1;
                     renderStudents();
                 } catch(e) {}
             }
@@ -8884,11 +8908,11 @@
                 if (r.success) {
                     allStudents = r.students;
                     stuAllData = r.students;
-                    stuFiltered = r.students;
                     var currentJson = JSON.stringify(r.students);
                     if (currentJson !== cached) {
                         localStorage.setItem('cached_students', currentJson);
-                        stuPage = 1;
+                        applyStudentFilters();
+                        if (!preservePage) stuPage = 1;
                         renderStudents();
                     }
                 } else {
@@ -8896,7 +8920,14 @@
                 }
             }).getAllStudents(adminToken);
         }
-        function filterStudents() { var q = document.getElementById('stuSearch').value.toLowerCase(), cls = document.getElementById('stuClassF').value, gen = document.getElementById('stuGenderF').value; stuFiltered = stuAllData.filter(function (s) { return ((s.Name || '').toLowerCase().includes(q) || s.ID.toString().includes(q) || (s.Class || '').toLowerCase().includes(q)) && (!cls || s.Class === cls) && (!gen || s.Gender === gen); }); stuPage = 1; renderStudents(); }
+        // Recomputes stuFiltered from stuAllData + the current search/class/gender filter
+        // inputs, without touching stuPage — split out of filterStudents() so a data refresh
+        // (loadStudents) can keep whatever filter is active without also forcing back to page 1.
+        function applyStudentFilters() {
+            var q = document.getElementById('stuSearch').value.toLowerCase(), cls = document.getElementById('stuClassF').value, gen = document.getElementById('stuGenderF').value;
+            stuFiltered = stuAllData.filter(function (s) { return ((s.Name || '').toLowerCase().includes(q) || s.ID.toString().includes(q) || (s.Class || '').toLowerCase().includes(q)) && (!cls || s.Class === cls) && (!gen || s.Gender === gen); });
+        }
+        function filterStudents() { applyStudentFilters(); stuPage = 1; renderStudents(); }
         function changeStudentView(mode) {
             window._studentViewMode = mode;
             var tableBtn = document.getElementById('btnViewTable');
@@ -8918,31 +8949,116 @@
             }
             renderStudents();
         }
+        // ── STUDENTS TABLE HEADER (columns are toggleable + sortable — see STUDENT_COLUMNS) ──
+        function renderStudentsHeader() {
+            var thead = document.getElementById('studentsThead');
+            if (!thead) return;
+            var tr = '<tr>';
+            STUDENT_COLUMNS.forEach(function (col) {
+                if (!isStudentColVisible(col.key)) return;
+                var cls = col.noPrint ? ' class="no-print"' : '';
+                if (col.sortable) {
+                    var ind = stuSortKey === col.key ? (stuSortDir === 'asc' ? ' ▲' : ' ▼') : '';
+                    tr += '<th' + cls + ' style="cursor:pointer;user-select:none" onclick="sortStudents(\'' + col.key + '\')" title="Click to sort">' + col.label + '<span style="color:var(--go,#f0c020)">' + ind + '</span></th>';
+                } else {
+                    tr += '<th' + cls + '>' + col.label + '</th>';
+                }
+            });
+            tr += '</tr>';
+            thead.innerHTML = tr;
+        }
+        function visibleStudentColCount() { return STUDENT_COLUMNS.filter(function (c) { return isStudentColVisible(c.key); }).length; }
+        function toggleColumnsMenu() {
+            var menu = document.getElementById('stuColumnsMenu');
+            if (!menu) return;
+            if (menu.style.display === 'block') { menu.style.display = 'none'; return; }
+            menu.innerHTML = '<div style="font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Show Columns</div>' + STUDENT_COLUMNS.filter(function (c) { return !c.alwaysShown; }).map(function (c) {
+                var checked = isStudentColVisible(c.key) ? ' checked' : '';
+                return '<label style="display:flex;align-items:center;gap:8px;padding:5px 4px;font-size:13px;color:var(--tx);cursor:pointer"><input type="checkbox"' + checked + ' onchange="toggleStudentColumn(\'' + c.key + '\')"> ' + c.label + '</label>';
+            }).join('');
+            menu.style.display = 'block';
+        }
+        function toggleStudentColumn(key) {
+            var idx = stuHiddenCols.indexOf(key);
+            if (idx === -1) stuHiddenCols.push(key); else stuHiddenCols.splice(idx, 1);
+            try { localStorage.setItem('stuHiddenCols', JSON.stringify(stuHiddenCols)); } catch(e) {}
+            renderStudentsHeader();
+            renderStudents();
+        }
+        document.addEventListener('click', function (e) {
+            var menu = document.getElementById('stuColumnsMenu');
+            if (!menu || menu.style.display !== 'block') return;
+            var btn = menu.parentElement ? menu.parentElement.querySelector('button') : null;
+            if (!menu.contains(e.target) && e.target !== btn) menu.style.display = 'none';
+        });
+        function sortStudents(key) {
+            if (stuSortKey === key) { stuSortDir = stuSortDir === 'asc' ? 'desc' : 'asc'; }
+            else { stuSortKey = key; stuSortDir = 'asc'; }
+            renderStudentsHeader();
+            renderStudents();
+        }
+        function getSortedStudents(list) {
+            if (!stuSortKey) return list;
+            var key = stuSortKey, dir = stuSortDir === 'asc' ? 1 : -1;
+            var isNumeric = (key === 'Average' || key === 'Year');
+            return list.slice().sort(function (a, b) {
+                var av = a[key], bv = b[key];
+                if (isNumeric) { return ((Number(av) || 0) - (Number(bv) || 0)) * dir; }
+                av = (av || '').toString().toLowerCase(); bv = (bv || '').toString().toLowerCase();
+                if (av < bv) return -1 * dir;
+                if (av > bv) return 1 * dir;
+                return 0;
+            });
+        }
+        function studentCellHtml(colKey, s, btns) {
+            switch (colKey) {
+                case 'Photo':
+                    var phUrl = fixDriveUrl(s.PhotoUrl);
+                    return phUrl ? '<img src="' + phUrl + '" style="width:32px;height:36px;object-fit:cover;border-radius:6px;border:1px solid var(--bd)">'
+                        : '<div style="width:32px;height:36px;background:#f1f5f9;border-radius:6px;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>';
+                case 'ID': return '<span class="bdg bb">' + s.ID + '</span>';
+                case 'Name': return '<strong>' + s.Name + '</strong>';
+                case 'Gender': return '<span class="bdg ' + (s.Gender === 'Female' ? 'bpu' : 'bb') + '">' + s.Gender + '</span>';
+                case 'Class': return '<span class="bdg bgo">' + s.Class + '</span>';
+                case 'Year': return s.Year;
+                case 'Term': return s.Term;
+                case 'ParentPhone': return s.ParentPhone ? s.ParentPhone : '<span style="color:var(--mu)">—</span>';
+                case 'Average': return '<strong>' + Math.round(Number(s.Average || 0)) + '</strong>';
+                case 'Actions': return '<div style="display:flex;gap:5px">' + btns + '</div>';
+                default: return '';
+            }
+        }
+        function studentRowButtons(s) {
+            var btns = '<button class="btn bsm bp" onclick="viewStudentProfile(\'' + s.ID + '\')">Profile</button>' +
+                       '<button class="btn bsm bs" onclick="previewFromStudent(\'' + s.ID + '\')">Preview</button>';
+            if (userRole === 'admin') {
+                btns += '<button class="btn bxs" style="background:#25D366;color:#fff" title="Send WhatsApp Message" onclick="sendWhatsApp(\'' + s.ID + '\',\'' + s.Year + '\',\'' + s.Term + '\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg></button>' +
+                        '<button class="btn bxs" style="background:#0284c7;color:#fff" title="Send Report SMS" onclick="sendReportSMSFromRow(\'' + s.ID + '\',\'' + s.Year + '\',\'' + s.Term + '\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg></button>' +
+                        '<button class="btn bsm bo" onclick="editStudent(\'' + s.ID + '\')">Edit</button>' +
+                        '<button class="btn bsm bd2" onclick="confirmDeleteStudent(\'' + s.ID + '\',\'' + s.Name.replace(/'/g, "\\'") + '\')">Delete</button>';
+            }
+            return btns;
+        }
         function renderStudents() {
-            var perPage = parseInt(document.getElementById('stuPerPage').value) || 20; var total = stuFiltered.length, pages = Math.ceil(total / perPage) || 1; if (stuPage > pages) stuPage = 1; var start = (stuPage - 1) * perPage, end = Math.min(start + perPage, total); var slice = stuFiltered.slice(start, end);
+            renderStudentsHeader();
+            var perPage = parseInt(document.getElementById('stuPerPage').value) || 20; var sortedList = getSortedStudents(stuFiltered); var total = sortedList.length, pages = Math.ceil(total / perPage) || 1; if (stuPage > pages) stuPage = 1; var start = (stuPage - 1) * perPage, end = Math.min(start + perPage, total); var slice = sortedList.slice(start, end);
             var viewMode = window._studentViewMode || 'table';
             var tblCont = document.getElementById('studentsTableContainer');
             var cardCont = document.getElementById('studentsCardsContainer');
-            
+
             if (viewMode === 'table') {
                 if (tblCont) tblCont.style.display = 'block';
                 if (cardCont) cardCont.style.display = 'none';
                 var tb = document.getElementById('studentsTbody');
-                if (!slice.length) { tb.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--mu);padding:24px">No students found.</td></tr>'; }
+                if (!slice.length) { tb.innerHTML = '<tr><td colspan="' + visibleStudentColCount() + '" style="text-align:center;color:var(--mu);padding:24px">No students found.</td></tr>'; }
                 else {
                     tb.innerHTML = slice.map(function (s) {
-                        var phUrl = fixDriveUrl(s.PhotoUrl);
-                        var ph = phUrl ? '<img src="' + phUrl + '" style="width:32px;height:36px;object-fit:cover;border-radius:6px;border:1px solid var(--bd)">'
-                            : '<div style="width:32px;height:36px;background:#f1f5f9;border-radius:6px;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>';
-                        var btns = '<button class="btn bsm bp" onclick="viewStudentProfile(\'' + s.ID + '\')">Profile</button>' +
-                                   '<button class="btn bsm bs" onclick="previewFromStudent(\'' + s.ID + '\')">Preview</button>';
-                        if (userRole === 'admin') {
-                            btns += '<button class="btn bxs" style="background:#25D366;color:#fff" title="Send WhatsApp Message" onclick="sendWhatsApp(\'' + s.ID + '\',\'' + s.Year + '\',\'' + s.Term + '\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg></button>' +
-                                    '<button class="btn bxs" style="background:#0284c7;color:#fff" title="Send Report SMS" onclick="sendReportSMSFromRow(\'' + s.ID + '\',\'' + s.Year + '\',\'' + s.Term + '\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg></button>' +
-                                    '<button class="btn bsm bo" onclick="editStudent(\'' + s.ID + '\')">Edit</button>' +
-                                    '<button class="btn bsm bd2" onclick="confirmDeleteStudent(\'' + s.ID + '\',\'' + s.Name.replace(/'/g, "\\'") + '\')">Delete</button>';
-                        }
-                        return '<tr><td>' + ph + '</td><td><span class="bdg bb">' + s.ID + '</span></td><td><strong>' + s.Name + '</strong></td><td><span class="bdg ' + (s.Gender === 'Female' ? 'bpu' : 'bb') + '">' + s.Gender + '</span></td><td><span class="bdg bgo">' + s.Class + '</span></td><td>' + s.Year + '</td><td>' + s.Term + '</td><td><strong>' + Math.round(Number(s.Average || 0)) + '</strong></td><td class="no-print"><div style="display:flex;gap:5px">' + btns + '</div></td></tr>';
+                        var btns = studentRowButtons(s);
+                        var cells = STUDENT_COLUMNS.filter(function (c) { return isStudentColVisible(c.key); }).map(function (col) {
+                            var cls = col.noPrint ? ' class="no-print"' : '';
+                            return '<td' + cls + '>' + studentCellHtml(col.key, s, btns) + '</td>';
+                        }).join('');
+                        return '<tr>' + cells + '</tr>';
                     }).join('');
                 }
             } else {
@@ -8955,14 +9071,7 @@
                         var phUrl = fixDriveUrl(s.PhotoUrl);
                         var ph = phUrl ? '<img src="' + phUrl + '" style="width:70px;height:80px;object-fit:cover;border-radius:8px;border:2px solid var(--bd)">'
                             : '<div style="width:70px;height:80px;background:#f1f5f9;border-radius:8px;border:2px solid var(--bd);display:flex;align-items:center;justify-content:center"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>';
-                        var btns = '<button class="btn bsm bp" onclick="viewStudentProfile(\'' + s.ID + '\')">Profile</button>' +
-                                   '<button class="btn bsm bs" onclick="previewFromStudent(\'' + s.ID + '\')">Preview</button>';
-                        if (userRole === 'admin') {
-                            btns += '<button class="btn bxs" style="background:#25D366;color:#fff" title="Send WhatsApp Message" onclick="sendWhatsApp(\'' + s.ID + '\',\'' + s.Year + '\',\'' + s.Term + '\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg></button>' +
-                                    '<button class="btn bxs" style="background:#0284c7;color:#fff" title="Send Report SMS" onclick="sendReportSMSFromRow(\'' + s.ID + '\',\'' + s.Year + '\',\'' + s.Term + '\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg></button>' +
-                                    '<button class="btn bsm bo" onclick="editStudent(\'' + s.ID + '\')">Edit</button>' +
-                                    '<button class="btn bsm bd2" onclick="confirmDeleteStudent(\'' + s.ID + '\',\'' + s.Name.replace(/'/g, "\\'") + '\')">Delete</button>';
-                        }
+                        var btns = studentRowButtons(s);
                         ch += '<div class="stu-card" style="background:var(--card-bg, #ffffff); border:1px solid var(--bd); border-radius:var(--rs); padding:16px; display:flex; gap:16px; align-items:flex-start; box-shadow:var(--sh);">'
                             + ph
                             + '<div style="flex:1; display:flex; flex-direction:column; gap:4px; min-width:0;">'
@@ -8970,6 +9079,7 @@
                             + '<div style="font-size:12px; color:var(--mu);">ID: <span class="bdg bb" style="font-size:10px; padding:1px 4px;">' + s.ID + '</span></div>'
                             + '<div style="font-size:12px; color:var(--mu);">Class: <span class="bdg bgo" style="font-size:10px; padding:1px 4px;">' + s.Class + '</span></div>'
                             + '<div style="font-size:12px; color:var(--mu);">Gender: ' + s.Gender + '</div>'
+                            + '<div style="font-size:12px; color:var(--mu);">Parent Contact: ' + (s.ParentPhone || '—') + '</div>'
                             + '<div style="font-size:12px; color:var(--mu);">Average: <strong style="color:var(--bl);">' + Math.round(Number(s.Average || 0)) + '</strong></div>'
                             + '<div style="margin-top:8px; display:flex; flex-wrap:wrap; gap:4px;">' + btns + '</div>'
                             + '</div>'
@@ -8989,7 +9099,7 @@
             document.getElementById('stuPagNav').innerHTML = h;
         }
         function openStudentModal(editId) { editStudentId = editId || null; document.getElementById('stuModalTitle').textContent = editId ? 'Edit Student' : 'Add Student';['m_ID', 'm_Name', 'm_ParentPhone'].forEach(function (f) { var el = document.getElementById(f); if (el) el.value = ''; }); document.getElementById('m_PhotoUrl').value = ''; document.getElementById('photoPreviewWrap').innerHTML = '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><div style="font-size:13px;color:var(--mu)">Click to select photo</div>'; var mc = document.getElementById('m_Class'); mc.innerHTML = '<option value="">Select class…</option>'; allClasses.forEach(function (c) { mc.innerHTML += '<option value="' + c.ClassName + '">' + c.ClassName + '</option>'; }); popYears('m_Year', '2025-2026'); document.getElementById('m_ID').disabled = !!editId; if (!editId) { autoGenerateStudentId(); } if (editId) { var s = allStudents.find(function (x) { return x.ID.toString() === editId.toString(); }); if (s) { document.getElementById('m_ID').value = s.ID; document.getElementById('m_Name').value = s.Name; document.getElementById('m_Gender').value = s.Gender || 'Male'; document.getElementById('m_Class').value = s.Class || ''; document.getElementById('m_LevelGroup').value = s.LevelGroup || 'General'; popYears('m_Year', s.Year || '2025-2026'); document.getElementById('m_Term').value = s.Term || 'Term 1'; document.getElementById('m_ParentPhone').value = s.ParentPhone || ''; document.getElementById('m_PhotoUrl').value = s.PhotoUrl || ''; var phUrl = fixDriveUrl(s.PhotoUrl); if (phUrl) document.getElementById('photoPreviewWrap').innerHTML = '<button class="img-pick-remove-btn" onclick="clearStudentPhoto(event)">&times;</button><img src="' + phUrl + '" style="width:72px;height:84px;object-fit:cover;border-radius:8px;margin:4px auto;display:block;border:2px solid var(--bd)"><div style="font-size:12px;color:#166534;text-align:center;margin-top:4px">Photo saved</div>'; } } document.getElementById('stuModal').classList.add('show'); applyActiveTermYear(); }
-        function editStudent(id) { loadStudents(); openStudentModal(id); }
+        function editStudent(id) { loadStudents(true); openStudentModal(id); }
         function viewStudentProfile(id) {
             var s = allStudents.find(function (x) { return x.ID.toString() === id.toString(); });
             if (!s) return toast('Student not found', 'error');
@@ -9160,9 +9270,55 @@
                 if (wrap) wrap.style.display = 'block';
             }).getAdminStudentReport(adminToken, id, year, term);
         }
-        function handlePhotoSelect(e) { var file = e.target.files[0]; if (!file) return; var reader = new FileReader(); reader.onload = function (ev) { var b64 = ev.target.result; document.getElementById('photoPreviewWrap').innerHTML = '<img src="' + b64 + '" style="width:72px;height:84px;object-fit:cover;border-radius:8px;margin:4px auto;display:block;border:2px solid var(--bd)"><div style="font-size:12px;color:var(--mu);text-align:center">Uploading…</div>'; var sid = document.getElementById('m_ID').value || ('tmp_' + Date.now()); google.script.run.withSuccessHandler(function (r) { if (r.success) { document.getElementById('m_PhotoUrl').value = r.url; document.getElementById('photoPreviewWrap').innerHTML = '<button class="img-pick-remove-btn" onclick="clearStudentPhoto(event)">&times;</button><img src="' + b64 + '" style="width:72px;height:84px;object-fit:cover;border-radius:8px;margin:4px auto;display:block;border:2px solid var(--bd)"><div style="font-size:12px;color:#166534;text-align:center;margin-top:4px">Uploaded</div>'; toast('Photo uploaded!', 'success'); } else toast('Upload failed: ' + r.message, 'error'); }).uploadStudentPhoto(b64, file.name, sid); }; reader.readAsDataURL(file); }
-        function saveStudent() { var d = { ID: document.getElementById('m_ID').value.trim(), Name: document.getElementById('m_Name').value.trim(), Gender: document.getElementById('m_Gender').value, Class: document.getElementById('m_Class').value, LevelGroup: document.getElementById('m_LevelGroup').value, Year: document.getElementById('m_Year').value, Term: document.getElementById('m_Term').value, ParentPhone: document.getElementById('m_ParentPhone').value, PhotoUrl: document.getElementById('m_PhotoUrl').value }; if (!d.ID || !d.Name) { toast('Student ID and Name required.', 'error'); return; } var fn = editStudentId ? 'updateStudent' : 'addStudent'; google.script.run.withSuccessHandler(function (r) { if (r.success) { closeModal('stuModal'); loadStudents(); loadAllData(); toast(r.id ? ('Student saved! ID: ' + r.id) : 'Student saved!', 'success'); addNotif('Student Saved', d.Name + ' saved' + (r.id ? ' (ID: ' + r.id + ')' : '')); } else toast(r.message, 'error'); }).withFailureHandler(function (e) { toast(e.message, 'error'); })[fn](adminToken, d); }
-        function confirmDeleteStudent(id, name) { if (!confirm('Delete "' + name + '" (ID: ' + id + ')? Cannot be undone.')) return; google.script.run.withSuccessHandler(function (r) { if (r.success) { loadStudents(); loadAllData(); toast('Deleted.', 'success'); } else toast(r.message, 'error'); }).deleteStudent(adminToken, id); }
+        // BUGFIX ("uploaded student photo doesn't appear"): the upload to Drive is async
+        // (google.script.run), but the modal shows an instant local preview from the picked
+        // file the moment it's selected — so it LOOKS attached immediately, well before
+        // m_PhotoUrl actually gets the real Drive URL. Clicking "Save Student" in that window
+        // saved the student with whatever m_PhotoUrl held *before* the upload finished (blank,
+        // or the previous photo), silently discarding the new one even though the preview showed
+        // it. studentPhotoUploading tracks that in-flight window so saveStudent() can block (and
+        // explain why) instead of silently saving without the photo.
+        var studentPhotoUploading = false;
+        function handlePhotoSelect(e) {
+            var file = e.target.files[0]; if (!file) return;
+            var reader = new FileReader();
+            reader.onload = function (ev) {
+                var b64 = ev.target.result;
+                studentPhotoUploading = true;
+                document.getElementById('photoPreviewWrap').innerHTML = '<img src="' + b64 + '" style="width:72px;height:84px;object-fit:cover;border-radius:8px;margin:4px auto;display:block;border:2px solid var(--bd)"><div style="font-size:12px;color:var(--mu);text-align:center">Uploading…</div>';
+                var sid = document.getElementById('m_ID').value || ('tmp_' + Date.now());
+                google.script.run.withSuccessHandler(function (r) {
+                    studentPhotoUploading = false;
+                    if (r.success) {
+                        document.getElementById('m_PhotoUrl').value = r.url;
+                        document.getElementById('photoPreviewWrap').innerHTML = '<button class="img-pick-remove-btn" onclick="clearStudentPhoto(event)">&times;</button><img src="' + b64 + '" style="width:72px;height:84px;object-fit:cover;border-radius:8px;margin:4px auto;display:block;border:2px solid var(--bd)"><div style="font-size:12px;color:#166534;text-align:center;margin-top:4px">Uploaded</div>';
+                        toast('Photo uploaded!', 'success');
+                    } else toast('Upload failed: ' + r.message, 'error');
+                }).withFailureHandler(function (err) {
+                    studentPhotoUploading = false;
+                    toast('Upload failed: ' + err.message, 'error');
+                }).uploadStudentPhoto(b64, file.name, sid);
+            };
+            reader.readAsDataURL(file);
+        }
+        function saveStudent() {
+            if (studentPhotoUploading) { toast('The photo is still uploading — please wait a moment, then click Save again.', 'error'); return; }
+            var d = { ID: document.getElementById('m_ID').value.trim(), Name: document.getElementById('m_Name').value.trim(), Gender: document.getElementById('m_Gender').value, Class: document.getElementById('m_Class').value, LevelGroup: document.getElementById('m_LevelGroup').value, Year: document.getElementById('m_Year').value, Term: document.getElementById('m_Term').value, ParentPhone: document.getElementById('m_ParentPhone').value, PhotoUrl: document.getElementById('m_PhotoUrl').value };
+            if (!d.ID || !d.Name) { toast('Student ID and Name required.', 'error'); return; }
+            var fn = editStudentId ? 'updateStudent' : 'addStudent';
+            google.script.run.withSuccessHandler(function (r) {
+                if (r.success) {
+                    closeModal('stuModal');
+                    // preserve page (true): editing/adding a student shouldn't bounce the admin
+                    // back to page 1 of the list — see loadStudents().
+                    loadStudents(true);
+                    loadAllData();
+                    toast(r.id ? ('Student saved! ID: ' + r.id) : 'Student saved!', 'success');
+                    addNotif('Student Saved', d.Name + ' saved' + (r.id ? ' (ID: ' + r.id + ')' : ''));
+                } else toast(r.message, 'error');
+            }).withFailureHandler(function (e) { toast(e.message, 'error'); })[fn](adminToken, d);
+        }
+        function confirmDeleteStudent(id, name) { if (!confirm('Delete "' + name + '" (ID: ' + id + ')? Cannot be undone.')) return; google.script.run.withSuccessHandler(function (r) { if (r.success) { loadStudents(true); loadAllData(); toast('Deleted.', 'success'); } else toast(r.message, 'error'); }).deleteStudent(adminToken, id); }
         function previewFromStudent(id) { showPanel('preview', null); document.getElementById('previewId').value = id; setTimeout(loadPreview, 100); }
         function previewTermFromProfile(id, year, term) {
             closeModal('stuProfileModal');

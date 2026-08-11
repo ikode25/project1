@@ -225,6 +225,48 @@ can't be read back out of a canvas in a given browser (e.g. a CORS restriction o
 hosted), it falls back to the plain color-themed QR rather than failing outright. The printable
 poster's border/logo ring now use the same brand colors instead of a fixed gold.
 
+### 13. Fullscreen carousel covered the Staff Portal button
+**index.html**
+
+Follow-up to #10: the fixed carousel/overlay were nested inside `.landing-hero`, which sets its
+own `z-index: 0` — that pulls its whole subtree (including a negative-z-index fixed child) into a
+layer that CSS stacking rules paint *above* later plain, non-positioned page content (the Staff
+Portal button, its caption, the footer), regardless of the child's own z-index or DOM order.
+Once the carousel became fixed/full-viewport, that meant it permanently covered the button at
+every scroll position — still in the DOM, just hidden underneath. Moved `.hero-carousel` and
+`.hero-carousel-overlay` to be direct children of `<body>` (siblings of `.landing-hero`, matching
+the existing `.bg-canvas` decoration's placement) so they're no longer trapped inside
+`.landing-hero`'s stacking context. Carousel dots stay nested in `.landing-hero` as
+`position:absolute` (not fixed) since they only need to show over the initial photo/intro area.
+
+### 14. Student records: page reset on save, Parent Contact column, photo upload race, sort/hide columns
+**admin.html** — `loadStudents`, `applyStudentFilters`, `saveStudent`, `editStudent`,
+`confirmDeleteStudent`, `STUDENT_COLUMNS`, `renderStudentsHeader`, `sortStudents`,
+`toggleStudentColumn`, **Code.gs** — `updateStudent`
+
+- **Editing a student on page 2+ and saving bounced back to page 1.** `loadStudents()`
+  unconditionally reset the page to 1 and discarded any active search/class/gender filter on
+  every call, including the reload right after a save. It now takes a `preservePage` flag —
+  `saveStudent()`/`editStudent()`/`confirmDeleteStudent()` pass `true` so the admin stays on the
+  same page, with whatever filter was active re-applied to the fresh data instead of cleared.
+- **Parent Contact** (`ParentPhone`) is now a column in the students table and shown on the card
+  view — the field already existed on every student record, it just wasn't displayed anywhere in
+  the list.
+- **Uploaded student photo "didn't appear."** The photo upload to Drive is asynchronous, but the
+  modal shows an instant local preview the moment a file is picked — so it looks attached well
+  before the real Drive URL has actually come back. Clicking Save in that window saved the
+  student with whatever photo URL was there *before* the upload finished (often blank), silently
+  dropping the new photo. `saveStudent()` now blocks (with a clear message) while a photo upload
+  is still in flight. Separately, `updateStudent()`'s PhotoUrl field used `d.PhotoUrl ||
+  <existing>` — since an empty string (from the "remove photo" button) is falsy, `||` silently
+  kept the OLD photo instead of clearing it; fixed to match the explicit-vs-undefined pattern
+  already used for every other field on that record.
+- **Column visibility toggle** — a "Columns" button above the table opens a checklist to
+  show/hide any column (ID, Name, Gender, Class, Year, Term, Parent Contact, Photo, Average);
+  Actions always stays visible. Persisted in `localStorage` per browser.
+- **Sortable columns** — click any sortable column header to sort ascending, click again for
+  descending; an indicator arrow shows the active sort.
+
 ## Deploying these changes
 
 This repo isn't connected to the Apps Script project via `clasp`, so the fastest path is manual:

@@ -1329,7 +1329,11 @@ function updateStudent(token,d){
       d.ClassTeacherRemark!==undefined?d.ClassTeacherRemark:(data[i][13]||''),
       d.HeadTeacherRemark!==undefined?d.HeadTeacherRemark:(data[i][14]||''),
       d.ParentPhone!==undefined?d.ParentPhone:(data[i][15]||''),
-      d.PhotoUrl||data[i][16]||'',
+      // BUGFIX: this used to be `d.PhotoUrl||data[i][16]||''` — an empty string from d.PhotoUrl
+      // (e.g. after "remove photo" clears it client-side) is falsy, so `||` silently fell back
+      // to the OLD photo instead of actually clearing it. Matches the !==undefined pattern
+      // already used for every other field above, so an explicit empty value is respected.
+      d.PhotoUrl!==undefined?d.PhotoUrl:(data[i][16]||''),
       d.LevelGroup||data[i][17]||'General'
     ];
     sheet.getRange(i+1,1,1,18).setValues([row]);
