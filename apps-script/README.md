@@ -303,33 +303,6 @@ the existing `.bg-canvas` decoration's placement) so they're no longer trapped i
   student owes something *and* the admin's template text actually uses that placeholder — so a
   bulk announcement that doesn't mention bills doesn't generate one for every recipient).
 
-### 16. Dashboard: real fee/reporting tiles + chart; toolbar parity on Teachers/Classes
-Requested as "match this other product's dashboard/table design." Rather than copy tiles for
-data this system has no source of truth for (a payments log with dated transactions, staff
-attendance, incident tickets), this pass adds dashboard tiles/charts backed by data SRMS
-actually has, and brings the Students table's search/export/print toolbar pattern to the two
-other list views that lacked it. The navy/gold brand palette was kept throughout, matching the
-report cards, bill invoices, and QR codes.
-
-- **New Dashboard tiles** — Outstanding Fees (GH¢, sum of Arrears + Next Term Fees across every
-  student) and Reports Published (how many report cards are actually live for parents right now)
-  join the existing Total Students/Teachers/Classes/etc. tiles. **Code.gs** `getDashboardData`
-  now returns `outstandingFees`, `reportsPublished`, `feesByClass`.
-- **New chart** — "Outstanding Fees by Class" (`renderFeesBarChart`), a themed bar chart next to
-  the existing Class Performance / Term Trend charts, using the same theme-color rotation as the
-  gender/class-size KPI charts so it re-colors correctly if the admin changes the theme preset.
-- **Teachers table** now has the same search box + Export CSV + Print toolbar the Students table
-  already had (`filterTeachers`, `renderTeachersTable`, `exportTeachersCsv`) — previously just a
-  raw, unfiltered table.
-- **Classes table** gained an Export CSV button (`exportClassesCsv`) alongside its existing
-  search/print.
-
-Not done in this pass, flagged for a follow-up if wanted: applying the same toolbar pattern to
-every remaining list view (Master Sheet, Archive Explorer, etc.), and a literal sidebar-nav/
-color-palette reskin to match the referenced product pixel-for-pixel — the second one touches
-shared CSS used by every page in the app and was deliberately scoped down per your answer to
-keep the existing navy/gold brand intact.
-
 ## Deploying these changes
 
 This repo isn't connected to the Apps Script project via `clasp`, so the fastest path is manual:
