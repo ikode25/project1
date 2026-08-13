@@ -338,7 +338,7 @@ var PERIOD_HEADERS = ['ID','PeriodNumber','StartTime','EndTime','IsBreak','Label
 // matters (Exams, Fee_Structure, Admissions, LessonPlans, etc.) already carries its own
 // AcademicYear/Term columns, so old sessions stay fully queryable forever; this pair only drives
 // which session NEW records default into and what the dashboard banner shows.)
-var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt','ShowOverallPositionOnReportCard','ShowSubjectAverageOnReportCard','SchoolStampURL','HeadteacherSignatureURL','AdminSignatureURL','PublicAppBaseURL','ActiveTerm','DietaryOptions','BursarEmail','BursarPhone','HeadteacherEmail','HeadteacherPhone','UngradedStages'];
+var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt','ShowOverallPositionOnReportCard','ShowSubjectAverageOnReportCard','SchoolStampURL','HeadteacherSignatureURL','AdminSignatureURL','PublicAppBaseURL','ActiveTerm','DietaryOptions','BursarEmail','BursarPhone','HeadteacherEmail','HeadteacherPhone','UngradedStages','ShowInterestTalentOnReportCard','ShowConductOnReportCard','ShowAttitudeOnReportCard','ShowClassTeacherRemarkOnReportCard','ShowHeadteacherRemarkOnReportCard','SessionTimeoutMinutes'];
 // col 40 = DietaryOptions — admin-editable CSV of "value|label" pairs shown as checkboxes on the
 // student form (Ghana-appropriate defaults; the old hardcoded Halal/Kosher/Pescatarian/etc. list
 // is now just the fallback seed, not a fixed enum — see defaultDietaryOptions()).
@@ -668,7 +668,10 @@ function getSubjectsMap() {
       subjectName: data[i][1],
       subjectCode: data[i][2],
       classId: data[i][3],
-      maxMarks: parseInt(data[i][4], 10) || 100
+      maxMarks: parseInt(data[i][4], 10) || 100,
+      subjectType: String(data[i][9] || 'theory').toLowerCase(),
+      theoryMaxMarks: parseInt(data[i][10], 10) || 0,
+      practicalMaxMarks: parseInt(data[i][11], 10) || 0
     };
   }
   return map;
@@ -4844,188 +4847,6 @@ function deleteAdmissionRequirement(id, currentUser, currentRole) {
   }
 }
 
-// ============== Parent / Prospective-Parent Inquiries ==============
-// Submitted from the public (no-login) inquiry page — the app's own web app URL with
-// ?public=inquiry — as well as by logged-in parents from inside the app. Anyone who can load the
-// deployment can call submitInquiry(); it does its own light validation instead of an RBAC check.
-var INQUIRIES_SHEET = 'Inquiries';
-// Online Admission enquiries — status funnel is Pending → Admitted / Rejected ('contacted' is an
-// optional in-between state for "we've followed up but not decided yet"). FollowUpDate/
-// NextFollowUpDate mirror the *latest* entry in InquiryFollowUps for fast list-view display; the
-// full history lives in that sheet.
-var INQUIRY_HEADERS = ['ID', 'FullName', 'Phone', 'Email', 'InquiryType', 'Message', 'Status', 'AdminNotes', 'IsDeleted', 'CreatedAt', 'UpdatedAt', 'FollowUpDate', 'NextFollowUpDate'];
-var INQUIRY_FOLLOWUPS_SHEET = 'InquiryFollowUps';
-var INQUIRY_FOLLOWUP_HEADERS = ['ID', 'InquiryID', 'FollowUpDate', 'NextFollowUpDate', 'Response', 'Note', 'CreatedBy', 'CreatedAt'];
-
-function _ensureInquiriesSheet() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sh = ss.getSheetByName(INQUIRIES_SHEET);
-  if (!sh) {
-    sh = ss.insertSheet(INQUIRIES_SHEET);
-    sh.appendRow(INQUIRY_HEADERS);
-    sh.getRange(1, 1, 1, INQUIRY_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
-    sh.setFrozenRows(1);
-  } else if (sh.getLastColumn() < INQUIRY_HEADERS.length) {
-    // upgrade an existing sheet created before FollowUpDate/NextFollowUpDate existed
-    var addFrom = sh.getLastColumn() + 1;
-    sh.getRange(1, addFrom, 1, INQUIRY_HEADERS.length - sh.getLastColumn()).setValues([INQUIRY_HEADERS.slice(addFrom - 1)])
-      .setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
-  }
-  return sh;
-}
-
-function _ensureInquiryFollowUpsSheet() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sh = ss.getSheetByName(INQUIRY_FOLLOWUPS_SHEET);
-  if (!sh) {
-    sh = ss.insertSheet(INQUIRY_FOLLOWUPS_SHEET);
-    sh.appendRow(INQUIRY_FOLLOWUP_HEADERS);
-    sh.getRange(1, 1, 1, INQUIRY_FOLLOWUP_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
-    sh.setFrozenRows(1);
-  }
-  return sh;
-}
-
-function _rowToInquiry(row) {
-  return {
-    ID: row[0], FullName: row[1] || '', Phone: row[2] || '', Email: row[3] || '',
-    InquiryType: row[4] || 'general', Message: row[5] || '', Status: row[6] || 'pending',
-    AdminNotes: row[7] || '', CreatedAt: toIso(row[9]), UpdatedAt: toIso(row[10]),
-    FollowUpDate: row[11] ? toIso(row[11]) : '', NextFollowUpDate: row[12] ? toIso(row[12]) : ''
-  };
-}
-
-// public — no auth. Anyone who can load the web app (logged in or not) can submit.
-function submitInquiry(d) {
-  try {
-    var fullName = String((d && d.FullName) || '').trim();
-    var phone = String((d && d.Phone) || '').trim();
-    var message = String((d && d.Message) || '').trim();
-    if (!fullName) return { success: false, message: 'Name is required' };
-    if (!phone && !String((d && d.Email) || '').trim()) return { success: false, message: 'A phone number or email is required so the school can reach you' };
-    if (!message) return { success: false, message: 'Please enter your inquiry' };
-
-    var types = ['admission', 'fees', 'general', 'other'];
-    var type = types.indexOf(String((d && d.InquiryType) || '').toLowerCase()) !== -1 ? String(d.InquiryType).toLowerCase() : 'general';
-
-    var sh = _ensureInquiriesSheet();
-    var ts = nowIso(), id = nextRowId(sh);
-    sh.appendRow([id, fullName, phone, String((d && d.Email) || '').trim(), type, message, 'pending', '', '0', ts, ts, '', '']);
-    return { success: true, message: 'Thank you — your enquiry has been received. The school will contact you soon.' };
-  } catch (err) {
-    return { success: false, message: 'Error: ' + err.toString() };
-  }
-}
-
-// admin/clerk — all inquiries, newest first
-function getAllInquiries(currentUser, currentRole) {
-  try {
-    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
-    var sh = _ensureInquiriesSheet();
-    var data = sh.getDataRange().getValues(), out = [];
-    for (var i = 1; i < data.length; i++) {
-      if (String(data[i][8]) === '1') continue;
-      out.push(_rowToInquiry(data[i]));
-    }
-    out.sort(function (a, b) { return String(b.CreatedAt).localeCompare(String(a.CreatedAt)); });
-    return { success: true, data: out };
-  } catch (err) {
-    return { success: false, message: 'Error: ' + err.toString() };
-  }
-}
-
-function updateInquiry(id, d, currentUser, currentRole) {
-  try {
-    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
-    var idn = parseInt(id, 10);
-    var sh = _ensureInquiriesSheet();
-    var data = sh.getDataRange().getValues();
-    var allowedStatuses = ['pending', 'contacted', 'admitted', 'rejected'];
-    for (var i = 1; i < data.length; i++) {
-      if (data[i][0] !== idn || String(data[i][8]) === '1') continue;
-      var row = i + 1;
-      if (d.Status !== undefined && allowedStatuses.indexOf(String(d.Status).toLowerCase()) !== -1) sh.getRange(row, 7).setValue(String(d.Status).toLowerCase());
-      if (d.AdminNotes !== undefined) sh.getRange(row, 8).setValue(String(d.AdminNotes || '').trim());
-      sh.getRange(row, 11).setValue(nowIso());
-      addLog(currentUser, 'Inquiry Updated', '#' + idn + (d.Status ? ' → ' + d.Status : ''));
-      return { success: true, message: 'Enquiry updated' };
-    }
-    return { success: false, message: 'Enquiry not found' };
-  } catch (err) {
-    return { success: false, message: 'Error: ' + err.toString() };
-  }
-}
-
-function deleteInquiry(id, currentUser, currentRole) {
-  try {
-    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
-    var idn = parseInt(id, 10);
-    var sh = _ensureInquiriesSheet();
-    var data = sh.getDataRange().getValues();
-    for (var i = 1; i < data.length; i++) {
-      if (data[i][0] !== idn) continue;
-      sh.getRange(i + 1, 9).setValue('1');
-      sh.getRange(i + 1, 11).setValue(nowIso());
-      addLog(currentUser, 'Inquiry Deleted', '#' + idn);
-      return { success: true, message: 'Enquiry deleted' };
-    }
-    return { success: false, message: 'Enquiry not found' };
-  } catch (err) {
-    return { success: false, message: 'Error: ' + err.toString() };
-  }
-}
-
-// admin/clerk — append a follow-up entry to the history log and mirror the latest dates onto the
-// Inquiry row itself (columns 12/13) so the list view can show "next follow-up" without a join.
-function addInquiryFollowUp(inquiryId, d, currentUser, currentRole) {
-  try {
-    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
-    var idn = parseInt(inquiryId, 10);
-    var insh = _ensureInquiriesSheet();
-    var indata = insh.getDataRange().getValues();
-    var found = false;
-    for (var i = 1; i < indata.length; i++) {
-      if (indata[i][0] !== idn || String(indata[i][8]) === '1') continue;
-      found = true;
-      var row = i + 1;
-      if (d.FollowUpDate !== undefined) insh.getRange(row, 12).setValue(String(d.FollowUpDate || ''));
-      if (d.NextFollowUpDate !== undefined) insh.getRange(row, 13).setValue(String(d.NextFollowUpDate || ''));
-      insh.getRange(row, 11).setValue(nowIso());
-      break;
-    }
-    if (!found) return { success: false, message: 'Enquiry not found' };
-
-    var fsh = _ensureInquiryFollowUpsSheet();
-    var ts = nowIso(), id = nextRowId(fsh);
-    fsh.appendRow([id, idn, String(d.FollowUpDate || ''), String(d.NextFollowUpDate || ''), String(d.Response || '').trim(), String(d.Note || '').trim(), currentUser || '', ts]);
-    addLog(currentUser, 'Enquiry Follow-up Logged', '#' + idn);
-    return { success: true, message: 'Follow-up logged' };
-  } catch (err) {
-    return { success: false, message: 'Error: ' + err.toString() };
-  }
-}
-
-// admin/clerk — full follow-up history for one enquiry, newest first
-function getInquiryFollowUps(inquiryId, currentUser, currentRole) {
-  try {
-    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
-    var idn = parseInt(inquiryId, 10);
-    var sh = _ensureInquiryFollowUpsSheet();
-    var data = sh.getDataRange().getValues(), out = [];
-    for (var i = 1; i < data.length; i++) {
-      if (data[i][1] !== idn) continue;
-      out.push({
-        ID: data[i][0], InquiryID: data[i][1], FollowUpDate: data[i][2] || '', NextFollowUpDate: data[i][3] || '',
-        Response: data[i][4] || '', Note: data[i][5] || '', CreatedBy: data[i][6] || '', CreatedAt: toIso(data[i][7])
-      });
-    }
-    out.sort(function (a, b) { return String(b.CreatedAt).localeCompare(String(a.CreatedAt)); });
-    return { success: true, data: out };
-  } catch (err) {
-    return { success: false, message: 'Error: ' + err.toString() };
-  }
-}
-
 function getAllAdmissions(currentUser, currentRole) {
   try {
     if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
@@ -7873,7 +7694,18 @@ function bulkSaveMarks(examId, subjectId, entries, currentUser, currentRole) {
       }
     }
 
-    var maxMarks = parseFloat(smap[sub].maxMarks) || parseInt(examRow[7], 10) || 100;
+    // The exam's own "Max Marks per Subject" (what the teacher configured for THIS exam, e.g. 20)
+    // always wins for an ordinary theory subject — a subject's own MaxMarks is just its Subjects-list
+    // default, not a per-exam override. Only a subject permanently split into Theory+Practical (or
+    // Practical-only) keeps its own fixed max, since that split isn't expressible by the exam's flat
+    // max. Mirrors the client's getMaxForSubject() in the marks-entry screen.
+    var subMeta = smap[sub];
+    var maxMarks;
+    if (subMeta.subjectType === 'both' || subMeta.subjectType === 'practical') {
+      maxMarks = (subMeta.theoryMaxMarks + subMeta.practicalMaxMarks) || subMeta.maxMarks || 100;
+    } else {
+      maxMarks = parseInt(examRow[7], 10) || subMeta.maxMarks || 100;
+    }
     var examClassMapEntry = getClassesMap()[examClassId];
     var gradeBand = examClassMapEntry ? examClassMapEntry.gradeBand : 'basic'; // preserves an explicit null (ungraded stage)
     var inserted = 0, updated = 0;
@@ -11400,11 +11232,8 @@ function getHallTicketData(examId, studentId, currentUser, currentRole) {
 var QUESTION_BANK_SHEET = 'Question_Bank';
 var QUESTION_BANK_HEADERS = ['ID', 'SubjectID', 'ClassID', 'Topic', 'QuestionType', 'QuestionText', 'OptionA', 'OptionB', 'OptionC', 'OptionD', 'CorrectAnswer', 'Marks', 'Difficulty', 'CreatedBy', 'IsDeleted', 'CreatedAt', 'UpdatedAt', 'PhotoURL', 'VideoURL'];
 var TEST_PAPERS_SHEET = 'Test_Papers';
-var TEST_PAPER_HEADERS = ['ID', 'Title', 'SubjectID', 'ClassID', 'Instructions', 'DurationMinutes', 'TotalMarks', 'QuestionIDs', 'CreatedBy', 'IsDeleted', 'CreatedAt', 'UpdatedAt', 'IsPublished', 'ShareToken'];
+var TEST_PAPER_HEADERS = ['ID', 'Title', 'SubjectID', 'ClassID', 'Instructions', 'DurationMinutes', 'TotalMarks', 'QuestionIDs', 'CreatedBy', 'IsDeleted', 'CreatedAt', 'UpdatedAt'];
 var QUESTION_TYPES = ['mcq', 'true_false', 'short_answer', 'essay'];
-var EXAM_SUBMISSIONS_SHEET = 'Exam_Submissions';
-// AnswersJSON: { "<questionId>": { answer, maxMarks, awarded, correct (true/false/null=pending) } }
-var EXAM_SUBMISSION_HEADERS = ['ID', 'TestPaperID', 'ShareToken', 'StudentName', 'AdmissionNumber', 'StudentContact', 'AnswersJSON', 'Score', 'MaxScore', 'PendingReviewCount', 'GradedBy', 'SubmittedAt', 'UpdatedAt', 'ClassID'];
 var QUESTION_DIFFICULTIES = ['easy', 'medium', 'hard'];
 
 function _ensureQuestionBankSheet() {
@@ -11425,28 +11254,6 @@ function _ensureTestPapersSheet() {
     sh = ss.insertSheet(TEST_PAPERS_SHEET);
     sh.appendRow(TEST_PAPER_HEADERS);
     sh.getRange(1, 1, 1, TEST_PAPER_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
-    sh.setFrozenRows(1);
-  } else if (sh.getLastColumn() < TEST_PAPER_HEADERS.length) {
-    // upgrade an existing sheet created before IsPublished/ShareToken existed
-    var addFrom = sh.getLastColumn() + 1;
-    sh.getRange(1, addFrom, 1, TEST_PAPER_HEADERS.length - sh.getLastColumn()).setValues([TEST_PAPER_HEADERS.slice(addFrom - 1)])
-      .setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
-  }
-  return sh;
-}
-function _ensureExamSubmissionsSheet() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sh = ss.getSheetByName(EXAM_SUBMISSIONS_SHEET);
-  if (!sh) {
-    sh = ss.insertSheet(EXAM_SUBMISSIONS_SHEET);
-    sh.appendRow(EXAM_SUBMISSION_HEADERS);
-    sh.getRange(1, 1, 1, EXAM_SUBMISSION_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
-    sh.setFrozenRows(1);
-  } else if (sh.getLastColumn() < EXAM_SUBMISSION_HEADERS.length) {
-    // upgrade an existing sheet created before ClassID existed
-    var addFrom = sh.getLastColumn() + 1;
-    sh.getRange(1, addFrom, 1, EXAM_SUBMISSION_HEADERS.length - sh.getLastColumn()).setValues([EXAM_SUBMISSION_HEADERS.slice(addFrom - 1)])
-      .setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
     sh.setFrozenRows(1);
   }
   return sh;
@@ -11591,8 +11398,7 @@ function _rowToTestPaper(row, smap, cmap, umap) {
     Instructions: row[4] || '', DurationMinutes: parseInt(row[5], 10) || 60, TotalMarks: parseFloat(row[6]) || 0,
     QuestionIDs: String(row[7] || '').split(',').filter(Boolean).map(function (x) { return parseInt(x, 10); }),
     CreatedBy: cby, CreatedByName: (cby && umap && umap[cby]) ? umap[cby].fullName : '',
-    CreatedAt: toIso(row[10]), UpdatedAt: toIso(row[11]),
-    IsPublished: String(row[12]) === '1', ShareToken: row[13] || ''
+    CreatedAt: toIso(row[10]), UpdatedAt: toIso(row[11])
   };
 }
 
@@ -11667,7 +11473,7 @@ function generateTestPaper(d, currentUser, currentRole) {
 
     var sh = _ensureTestPapersSheet();
     var ts = nowIso(), id = nextRowId(sh);
-    sh.appendRow([id, title, subId, clsId, String(d.Instructions || '').trim(), duration, totalMarks, qIds.join(','), getCurrentUserId(currentUser) || '', '0', ts, ts, '0', '']);
+    sh.appendRow([id, title, subId, clsId, String(d.Instructions || '').trim(), duration, totalMarks, qIds.join(','), getCurrentUserId(currentUser) || '', '0', ts, ts]);
     addLog(currentUser, 'Test Paper Generated', title + ' (' + qIds.length + ' questions, ' + totalMarks + ' marks)');
     return { success: true, message: 'Test paper generated — ' + qIds.length + ' questions, ' + totalMarks + ' marks', id: id };
   } catch (err) {
@@ -11696,239 +11502,133 @@ function deleteTestPaper(id, currentUser, currentRole) {
   }
 }
 
-// ============== Online Exam (public, no-login test taking) ==============
-// Publishing a Test Paper mints a stable ShareToken; anyone with that link (?public=exam&token=...)
-// can attempt it without a portal login — the fallback the user explicitly asked for when a student
-// can't log in. mcq/true_false/short_answer are graded immediately on submit by comparing the
-// student's answer to Question_Bank.CorrectAnswer; essay answers can't be auto-graded, so they're
-// left "pending" (awarded: null) until a teacher opens the submission and grades them by hand.
+// ============== Online Links (external test/resource URLs) ==============
+// Instead of building/hosting an online exam engine of our own, a teacher who already set up a
+// test on Google Forms (or any other external site) just pastes the link here. It shows up as a
+// plain clickable button inside the student/parent's OWN logged-in portal — no separate public
+// no-login URL to break, since the student is already authenticated when they see and click it.
+var EXTERNAL_LINKS_SHEET = 'External_Links';
+var EXTERNAL_LINK_HEADERS = ['ID', 'Title', 'URL', 'ClassID', 'SubjectID', 'Instructions', 'CreatedBy', 'IsDeleted', 'CreatedAt', 'UpdatedAt'];
 
-// admin/teacher (owner) — mint (or reuse) a ShareToken and mark the paper published
-function publishTestPaperOnline(id, currentUser, currentRole) {
-  try {
-    var role = String(currentRole || '').toLowerCase();
-    if (role !== 'admin' && role !== 'teacher') return { success: false, message: 'Forbidden — admin/teacher only' };
-    var idn = parseInt(id, 10);
-    var sh = _ensureTestPapersSheet();
-    var data = sh.getDataRange().getValues();
-    for (var i = 1; i < data.length; i++) {
-      if (data[i][0] !== idn || String(data[i][9]) === '1') continue;
-      if (role === 'teacher' && parseInt(data[i][8], 10) !== getCurrentUserId(currentUser)) return { success: false, message: 'Forbidden — not your test paper' };
-      var row = i + 1;
-      var token = data[i][13] || Utilities.getUuid().replace(/-/g, '');
-      sh.getRange(row, 13).setValue('1');
-      sh.getRange(row, 14).setValue(token);
-      sh.getRange(row, 12).setValue(nowIso());
-      addLog(currentUser, 'Test Paper Published Online', '#' + idn);
-      return { success: true, message: 'Published — share the link with students', url: _publicAppLinkServer('?public=exam&token=' + token), token: token };
-    }
-    return { success: false, message: 'Test paper not found' };
-  } catch (err) {
-    return { success: false, message: 'Error: ' + err.toString() };
+function _ensureExternalLinksSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(EXTERNAL_LINKS_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(EXTERNAL_LINKS_SHEET);
+    sh.appendRow(EXTERNAL_LINK_HEADERS);
+    sh.getRange(1, 1, 1, EXTERNAL_LINK_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+    sh.setFrozenRows(1);
   }
+  return sh;
 }
 
-function unpublishTestPaperOnline(id, currentUser, currentRole) {
-  try {
-    var role = String(currentRole || '').toLowerCase();
-    if (role !== 'admin' && role !== 'teacher') return { success: false, message: 'Forbidden — admin/teacher only' };
-    var idn = parseInt(id, 10);
-    var sh = _ensureTestPapersSheet();
-    var data = sh.getDataRange().getValues();
-    for (var i = 1; i < data.length; i++) {
-      if (data[i][0] !== idn || String(data[i][9]) === '1') continue;
-      if (role === 'teacher' && parseInt(data[i][8], 10) !== getCurrentUserId(currentUser)) return { success: false, message: 'Forbidden — not your test paper' };
-      sh.getRange(i + 1, 13).setValue('0');
-      sh.getRange(i + 1, 12).setValue(nowIso());
-      addLog(currentUser, 'Test Paper Unpublished', '#' + idn);
-      return { success: true, message: 'Unpublished — the link no longer works' };
-    }
-    return { success: false, message: 'Test paper not found' };
-  } catch (err) {
-    return { success: false, message: 'Error: ' + err.toString() };
-  }
-}
-
-// public — no auth. Strips CorrectAnswer from every question before returning.
-function getPublicTestPaper(token) {
-  try {
-    var tok = String(token || '').trim();
-    if (!tok) return { success: false, message: 'Missing exam link' };
-    var sh = _ensureTestPapersSheet();
-    var data = sh.getDataRange().getValues();
-    var smap = getSubjectsMap(), cmap = getClassesMap();
-    for (var i = 1; i < data.length; i++) {
-      if (String(data[i][13]) !== tok || String(data[i][9]) === '1') continue;
-      if (String(data[i][12]) !== '1') return { success: false, message: 'This exam is not currently open.' };
-      var paper = _rowToTestPaper(data[i], smap, cmap, null);
-      var qsh = _ensureQuestionBankSheet();
-      var qdata = qsh.getDataRange().getValues();
-      var qmap = {};
-      for (var q = 1; q < qdata.length; q++) qmap[qdata[q][0]] = qdata[q];
-      paper.questions = paper.QuestionIDs.map(function (qid) {
-        var row = qmap[qid];
-        if (!row) return null;
-        return {
-          ID: row[0], QuestionType: row[4] || 'mcq', QuestionText: row[5] || '',
-          OptionA: row[6] || '', OptionB: row[7] || '', OptionC: row[8] || '', OptionD: row[9] || '',
-          Marks: parseFloat(row[11]) || 1, PhotoURL: row[17] || '', VideoURL: row[18] || ''
-        };
-      }).filter(Boolean);
-      delete paper.QuestionIDs;
-      return { success: true, data: paper };
-    }
-    return { success: false, message: 'Exam link not found or no longer available.' };
-  } catch (err) {
-    return { success: false, message: 'Error: ' + err.toString() };
-  }
-}
-
-function _gradeExamAnswer(qType, correctAnswer, rawAnswer, maxMarks) {
-  var norm = function (x) { return String(x == null ? '' : x).trim().toLowerCase(); };
-  if (qType === 'essay') return { awarded: null, correct: null }; // needs a human
-  var given = norm(rawAnswer), correct = norm(correctAnswer);
-  var isCorrect = given !== '' && given === correct;
-  return { awarded: isCorrect ? maxMarks : 0, correct: isCorrect };
-}
-
-// public — no auth. Student submits { StudentName, ClassID, AdmissionNumber, Answers: {qid: answer} }.
-function submitPublicExam(token, studentInfo, answers, currentUser, currentRole) {
-  try {
-    var tok = String(token || '').trim();
-    var name = String((studentInfo && studentInfo.StudentName) || '').trim();
-    var classId = parseInt(studentInfo && studentInfo.ClassID, 10);
-    var admNo = String((studentInfo && studentInfo.AdmissionNumber) || '').trim();
-    if (!name) return { success: false, message: 'Your name is required' };
-    if (isNaN(classId)) return { success: false, message: 'Please select your class' };
-    if (!admNo) return { success: false, message: 'Your admission number is required' };
-    if (!answers || typeof answers !== 'object') answers = {};
-
-    var sh = _ensureTestPapersSheet();
-    var data = sh.getDataRange().getValues();
-    var paperRow = null, paperId = null;
-    for (var i = 1; i < data.length; i++) {
-      if (String(data[i][13]) === tok && String(data[i][9]) !== '1' && String(data[i][12]) === '1') { paperRow = data[i]; paperId = data[i][0]; break; }
-    }
-    if (!paperRow) return { success: false, message: 'Exam link not found or no longer available.' };
-
-    var qIds = String(paperRow[7] || '').split(',').filter(Boolean).map(function (x) { return parseInt(x, 10); });
-    var qsh = _ensureQuestionBankSheet();
-    var qdata = qsh.getDataRange().getValues();
-    var qmap = {};
-    for (var q = 1; q < qdata.length; q++) qmap[qdata[q][0]] = qdata[q];
-
-    var breakdown = {}, score = 0, maxScore = 0, pendingCount = 0;
-    qIds.forEach(function (qid) {
-      var row = qmap[qid];
-      if (!row) return;
-      var qType = row[4] || 'mcq', marks = parseFloat(row[11]) || 1, correctAnswer = row[10] || '';
-      var rawAnswer = answers[qid] != null ? answers[qid] : answers[String(qid)];
-      var g = _gradeExamAnswer(qType, correctAnswer, rawAnswer, marks);
-      maxScore += marks;
-      if (g.awarded != null) score += g.awarded; else pendingCount++;
-      breakdown[qid] = { answer: rawAnswer || '', maxMarks: marks, awarded: g.awarded, correct: g.correct, correctAnswer: (qType === 'mcq' || qType === 'true_false') ? correctAnswer : undefined };
-    });
-
-    var esh = _ensureExamSubmissionsSheet();
-    var ts = nowIso(), id = nextRowId(esh);
-    esh.appendRow([
-      id, paperId, tok, name, admNo,
-      String((studentInfo && studentInfo.StudentContact) || '').trim(), JSON.stringify(breakdown),
-      score, maxScore, pendingCount, '', ts, ts, classId
-    ]);
-    addLog(name, 'Online Exam Submitted', 'Paper #' + paperId + ' — ' + score + '/' + maxScore);
-
-    return {
-      success: true, message: 'Submitted!',
-      data: { Score: score, MaxScore: maxScore, PendingReviewCount: pendingCount, Breakdown: breakdown }
-    };
-  } catch (err) {
-    return { success: false, message: 'Error: ' + err.toString() };
-  }
-}
-
-function _rowToExamSubmission(row, umap, cmap) {
-  var gb = row[10], clsId = row[13];
-  var breakdown = {};
-  try { breakdown = JSON.parse(row[6] || '{}'); } catch (e) {}
+function _rowToExternalLink(row, smap, cmap, umap) {
+  var clsId = row[3], subId = row[4], cby = row[6];
   return {
-    ID: row[0], TestPaperID: row[1], ShareToken: row[2], StudentName: row[3] || '', AdmissionNumber: row[4] || '',
-    StudentContact: row[5] || '', Breakdown: breakdown, Score: parseFloat(row[7]) || 0, MaxScore: parseFloat(row[8]) || 0,
-    PendingReviewCount: parseInt(row[9], 10) || 0, GradedBy: gb, GradedByName: (gb && umap && umap[gb]) ? umap[gb].fullName : '',
-    SubmittedAt: toIso(row[11]), UpdatedAt: toIso(row[12]),
-    ClassID: clsId || '', ClassLabel: (clsId && cmap && cmap[clsId]) ? cmap[clsId].label : ''
+    ID: row[0], Title: row[1] || '', URL: row[2] || '',
+    ClassID: clsId, ClassLabel: cmap && cmap[clsId] ? cmap[clsId].label : '',
+    SubjectID: subId || null, SubjectName: (subId && smap && smap[subId]) ? smap[subId].subjectName : '',
+    Instructions: row[5] || '', CreatedBy: cby, CreatedByName: (cby && umap && umap[cby]) ? umap[cby].fullName : '',
+    CreatedAt: toIso(row[8]), UpdatedAt: toIso(row[9])
   };
 }
 
-// admin/teacher (owner) — every submission for one test paper, for review + essay grading
-function getExamSubmissions(testPaperId, currentUser, currentRole) {
+// every role — admin sees all; teacher sees links for classes they teach (any subject) plus their
+// own; student/parent see only links for their own class(es)
+function getExternalLinks(currentUser, currentRole) {
   try {
     var role = String(currentRole || '').toLowerCase();
-    if (role !== 'admin' && role !== 'teacher') return { success: false, message: 'Forbidden — admin/teacher only' };
-    var idn = parseInt(testPaperId, 10);
-    var psh = _ensureTestPapersSheet();
-    var pdata = psh.getDataRange().getValues();
-    var owner = null;
-    for (var i = 1; i < pdata.length; i++) { if (pdata[i][0] === idn) { owner = pdata[i][8]; break; } }
-    if (role === 'teacher' && parseInt(owner, 10) !== getCurrentUserId(currentUser)) return { success: false, message: 'Forbidden — not your test paper' };
-
-    var sh = _ensureExamSubmissionsSheet();
+    var sh = _ensureExternalLinksSheet();
     var data = sh.getDataRange().getValues();
-    var umap = getUsersMap(), cmap = getClassesMap();
+    var smap = getSubjectsMap(), cmap = getClassesMap(), umap = getUsersMap();
+
+    var teacherId = null, teacherClassIds = null;
+    if (role === 'teacher') { teacherId = getCurrentUserId(currentUser); teacherClassIds = getTeacherClassIds(currentUser); }
+    var scope = (role === 'student' || role === 'parent') ? getViewerScope(currentUser, currentRole) : null;
+
     var out = [];
-    for (var j = 1; j < data.length; j++) {
-      if (parseInt(data[j][1], 10) !== idn) continue;
-      out.push(_rowToExamSubmission(data[j], umap, cmap));
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][7]) === '1') continue;
+      var clsId = parseInt(data[i][3], 10);
+      if (scope) { if (scope.classIds.indexOf(clsId) === -1) continue; }
+      else if (role === 'teacher') { if (teacherClassIds.indexOf(clsId) === -1 && parseInt(data[i][6], 10) !== teacherId) continue; }
+      out.push(_rowToExternalLink(data[i], smap, cmap, umap));
     }
-    out.sort(function (a, b) { return String(b.SubmittedAt).localeCompare(String(a.SubmittedAt)); });
+    out.sort(function (a, b) { return String(b.CreatedAt).localeCompare(String(a.CreatedAt)); });
     return { success: true, data: out };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
 }
 
-// admin/teacher (owner) — manually award marks for one essay question in one submission, then
-// recompute the submission's total Score/PendingReviewCount
-function gradeEssayAnswer(submissionId, questionId, marksAwarded, currentUser, currentRole) {
+// admin/teacher — teacher restricted to a class they actually teach
+function addExternalLink(d, currentUser, currentRole) {
   try {
     var role = String(currentRole || '').toLowerCase();
     if (role !== 'admin' && role !== 'teacher') return { success: false, message: 'Forbidden — admin/teacher only' };
-    var idn = parseInt(submissionId, 10);
-    var qid = String(questionId);
-    var marks = parseFloat(marksAwarded);
-    if (isNaN(marks) || marks < 0) return { success: false, message: 'Marks must be a non-negative number' };
+    var title = String((d && d.Title) || '').trim();
+    var url = String((d && d.URL) || '').trim();
+    var clsId = parseInt(d && d.ClassID, 10);
+    if (!title) return { success: false, message: 'Title is required' };
+    if (!/^https?:\/\//i.test(url)) return { success: false, message: 'Enter a valid link starting with http:// or https://' };
+    if (isNaN(clsId)) return { success: false, message: 'Class is required' };
+    if (role === 'teacher' && getTeacherClassIds(currentUser).indexOf(clsId) === -1) return { success: false, message: 'You are not assigned to this class' };
+    var subId = parseInt(d && d.SubjectID, 10);
 
-    var sh = _ensureExamSubmissionsSheet();
+    var sh = _ensureExternalLinksSheet();
+    var ts = nowIso(), id = nextRowId(sh);
+    sh.appendRow([id, title, url, clsId, isNaN(subId) ? '' : subId, String((d && d.Instructions) || '').trim(), getCurrentUserId(currentUser) || '', '0', ts, ts]);
+    addLog(currentUser, 'Online Link Shared', title);
+    return { success: true, message: 'Link shared with the class', id: id };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function updateExternalLink(id, d, currentUser, currentRole) {
+  try {
+    var role = String(currentRole || '').toLowerCase();
+    if (role !== 'admin' && role !== 'teacher') return { success: false, message: 'Forbidden — admin/teacher only' };
+    var idn = parseInt(id, 10);
+    var sh = _ensureExternalLinksSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] !== idn || String(data[i][7]) === '1') continue;
+      if (role === 'teacher' && parseInt(data[i][6], 10) !== getCurrentUserId(currentUser)) return { success: false, message: 'Forbidden — not your link' };
+      var title = String((d && d.Title) || '').trim();
+      var url = String((d && d.URL) || '').trim();
+      if (!title) return { success: false, message: 'Title is required' };
+      if (!/^https?:\/\//i.test(url)) return { success: false, message: 'Enter a valid link starting with http:// or https://' };
+      var row = i + 1;
+      sh.getRange(row, 2).setValue(title);
+      sh.getRange(row, 3).setValue(url);
+      if (d.Instructions !== undefined) sh.getRange(row, 6).setValue(String(d.Instructions || '').trim());
+      sh.getRange(row, 10).setValue(nowIso());
+      addLog(currentUser, 'Online Link Updated', title);
+      return { success: true, message: 'Link updated' };
+    }
+    return { success: false, message: 'Link not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function deleteExternalLink(id, currentUser, currentRole) {
+  try {
+    var role = String(currentRole || '').toLowerCase();
+    if (role !== 'admin' && role !== 'teacher') return { success: false, message: 'Forbidden — admin/teacher only' };
+    var idn = parseInt(id, 10);
+    var sh = _ensureExternalLinksSheet();
     var data = sh.getDataRange().getValues();
     for (var i = 1; i < data.length; i++) {
       if (data[i][0] !== idn) continue;
-      if (role === 'teacher') {
-        var psh = _ensureTestPapersSheet(), pdata = psh.getDataRange().getValues(), owner = null;
-        for (var p = 1; p < pdata.length; p++) { if (pdata[p][0] === data[i][1]) { owner = pdata[p][8]; break; } }
-        if (parseInt(owner, 10) !== getCurrentUserId(currentUser)) return { success: false, message: 'Forbidden — not your test paper' };
-      }
-      var breakdown = {};
-      try { breakdown = JSON.parse(data[i][6] || '{}'); } catch (e) {}
-      if (!breakdown[qid]) return { success: false, message: 'Question not found in this submission' };
-      if (marks > breakdown[qid].maxMarks) return { success: false, message: 'Marks can\'t exceed the question\'s max (' + breakdown[qid].maxMarks + ')' };
-      breakdown[qid].awarded = marks;
-      breakdown[qid].correct = marks >= breakdown[qid].maxMarks;
-
-      var score = 0, pending = 0;
-      Object.keys(breakdown).forEach(function (k) {
-        if (breakdown[k].awarded == null) pending++; else score += breakdown[k].awarded;
-      });
-
-      var row = i + 1;
-      sh.getRange(row, 7).setValue(JSON.stringify(breakdown));
-      sh.getRange(row, 8).setValue(score);
-      sh.getRange(row, 10).setValue(pending);
-      sh.getRange(row, 11).setValue(getCurrentUserId(currentUser) || '');
-      sh.getRange(row, 13).setValue(nowIso());
-      addLog(currentUser, 'Essay Answer Graded', 'Submission #' + idn + ' Q#' + qid + ' — ' + marks + ' marks');
-      return { success: true, message: 'Graded', data: { Score: score, PendingReviewCount: pending } };
+      if (role === 'teacher' && parseInt(data[i][6], 10) !== getCurrentUserId(currentUser)) return { success: false, message: 'Forbidden — not your link' };
+      sh.getRange(i + 1, 8).setValue('1');
+      sh.getRange(i + 1, 10).setValue(nowIso());
+      addLog(currentUser, 'Online Link Removed', '#' + idn);
+      return { success: true, message: 'Link removed' };
     }
-    return { success: false, message: 'Submission not found' };
+    return { success: false, message: 'Link not found' };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
@@ -12806,7 +12506,13 @@ function getSchoolSettings() {
             PublicAppBaseURL: _resolvePublicBaseUrl(data[i][37]),
             ActiveTerm: data[i][38] || 'term1',
             DietaryOptions: parseDietaryOptionsCsv(data[i][39]),
-            UngradedStages: String(data[i][44] || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean)
+            UngradedStages: String(data[i][44] || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean),
+            ShowInterestTalentOnReportCard: data[i][45] === '' || data[i][45] == null ? true : String(data[i][45]) === '1',
+            ShowConductOnReportCard: data[i][46] === '' || data[i][46] == null ? true : String(data[i][46]) === '1',
+            ShowAttitudeOnReportCard: data[i][47] === '' || data[i][47] == null ? true : String(data[i][47]) === '1',
+            ShowClassTeacherRemarkOnReportCard: data[i][48] === '' || data[i][48] == null ? true : String(data[i][48]) === '1',
+            ShowHeadteacherRemarkOnReportCard: data[i][49] === '' || data[i][49] == null ? true : String(data[i][49]) === '1',
+            SessionTimeoutMinutes: parseInt(data[i][50], 10) || 60
           }
         };
       }
@@ -12847,7 +12553,13 @@ function defaultSchoolSettings() {
     PublicAppBaseURL: _webAppBaseUrl(),
     ActiveTerm: 'term1',
     DietaryOptions: defaultDietaryOptions(),
-    UngradedStages: []
+    UngradedStages: [],
+    ShowInterestTalentOnReportCard: true,
+    ShowConductOnReportCard: true,
+    ShowAttitudeOnReportCard: true,
+    ShowClassTeacherRemarkOnReportCard: true,
+    ShowHeadteacherRemarkOnReportCard: true,
+    SessionTimeoutMinutes: 60
   };
 }
 
@@ -13857,6 +13569,13 @@ function updateSchoolSettings(d, currentUser, currentRole) {
     var headteacherSigURL = String(d.HeadteacherSignatureURL || '').trim();
     var adminSigURL = String(d.AdminSignatureURL || '').trim();
     var publicAppBaseURL = String(d.PublicAppBaseURL || '').trim().replace(/\/+$/, ''); // no trailing slash
+    var showInterestTalent = (d.ShowInterestTalentOnReportCard === false || d.ShowInterestTalentOnReportCard === '0') ? '0' : '1';
+    var showConduct = (d.ShowConductOnReportCard === false || d.ShowConductOnReportCard === '0') ? '0' : '1';
+    var showAttitude = (d.ShowAttitudeOnReportCard === false || d.ShowAttitudeOnReportCard === '0') ? '0' : '1';
+    var showClassTeacherRemark = (d.ShowClassTeacherRemarkOnReportCard === false || d.ShowClassTeacherRemarkOnReportCard === '0') ? '0' : '1';
+    var showHeadteacherRemark = (d.ShowHeadteacherRemarkOnReportCard === false || d.ShowHeadteacherRemarkOnReportCard === '0') ? '0' : '1';
+    var sessionTimeoutMinutes = parseInt(d.SessionTimeoutMinutes, 10);
+    if (isNaN(sessionTimeoutMinutes) || sessionTimeoutMinutes < 5 || sessionTimeoutMinutes > 1440) sessionTimeoutMinutes = 60;
 
     var values = [
       1,
@@ -13877,13 +13596,19 @@ function updateSchoolSettings(d, currentUser, currentRole) {
 
     if (foundRow === -1) {
       var newRow = values.concat([ts, ts, workingDays, ayStart, ayEnd, hiddenMenuIds, admissionPrefix]);
-      while (newRow.length < 32) newRow.push('');
+      while (newRow.length < 45) newRow.push('');
       newRow[32] = showOverallPosition;
       newRow[33] = showSubjectAverage;
       newRow[34] = schoolStampURL;
       newRow[35] = headteacherSigURL;
       newRow[36] = adminSigURL;
       newRow[37] = publicAppBaseURL;
+      newRow[45] = showInterestTalent;
+      newRow[46] = showConduct;
+      newRow[47] = showAttitude;
+      newRow[48] = showClassTeacherRemark;
+      newRow[49] = showHeadteacherRemark;
+      newRow[50] = sessionTimeoutMinutes;
       sh.appendRow(newRow);
     } else {
       sh.getRange(foundRow, 1, 1, values.length).setValues([values]);
@@ -13899,6 +13624,12 @@ function updateSchoolSettings(d, currentUser, currentRole) {
       sh.getRange(foundRow, 36).setValue(headteacherSigURL);
       sh.getRange(foundRow, 37).setValue(adminSigURL);
       sh.getRange(foundRow, 38).setValue(publicAppBaseURL);
+      sh.getRange(foundRow, 46).setValue(showInterestTalent);
+      sh.getRange(foundRow, 47).setValue(showConduct);
+      sh.getRange(foundRow, 48).setValue(showAttitude);
+      sh.getRange(foundRow, 49).setValue(showClassTeacherRemark);
+      sh.getRange(foundRow, 50).setValue(showHeadteacherRemark);
+      sh.getRange(foundRow, 51).setValue(sessionTimeoutMinutes);
     }
     addLog(currentUser, 'School Settings Updated', d.SchoolName || '');
     return { success: true, message: 'School settings saved successfully' };

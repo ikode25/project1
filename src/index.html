@@ -3959,98 +3959,6 @@
       );
     }
 
-    // ============== Public Inquiry Form (no login — reached via ?public=inquiry) ==============
-    function PublicInquiryForm({ schoolSettings }) {
-      const sch = schoolSettings || {};
-      const schoolName = sch.SchoolName || 'School';
-      const schoolLogo = sch.SchoolLogo || DEFAULT_LOGO;
-      const [formData, setFormData] = useState({ FullName: '', Phone: '', Email: '', InquiryType: 'admission', Message: '' });
-      const [submitting, setSubmitting] = useState(false);
-      const [done, setDone] = useState(false);
-      const [error, setError] = useState('');
-      const set = (k, v) => setFormData({ ...formData, [k]: v });
-
-      const handleSubmit = (e) => {
-        e.preventDefault();
-        setSubmitting(true);
-        setError('');
-        google.script.run
-          .withSuccessHandler((res) => {
-            setSubmitting(false);
-            if (!res) { setError('No response from server — please try again.'); return; }
-            if (res.success) setDone(true);
-            else setError(res.message || 'Could not submit — please try again.');
-          })
-          .withFailureHandler((err) => { setSubmitting(false); setError((err && err.message) || 'Connection error'); })
-          .submitInquiry(formData);
-      };
-
-      return (
-        <div className="login-container">
-          <div className="login-box">
-            <div className="login-logo-ring">
-              <img src={schoolLogo} alt="Logo" className="login-logo" onError={(e) => e.currentTarget.style.display = 'none'} />
-            </div>
-            <h2>{schoolName}</h2>
-            <p className="login-subtitle">Admission &amp; General Inquiries</p>
-
-            {done ? (
-              <div style={{textAlign:'center',padding:'20px 10px'}}>
-                <i className="fas fa-check-circle" style={{fontSize:'40px',color:'#34a853',marginBottom:'12px',display:'block'}}></i>
-                <p style={{fontSize:'14px',color:'#333'}}>Thank you! Your inquiry has been received. The school will get back to you soon.</p>
-                <button className="btn btn-secondary" style={{marginTop:'10px'}} onClick={() => { setDone(false); setFormData({ FullName: '', Phone: '', Email: '', InquiryType: 'admission', Message: '' }); }}>
-                  <i className="fas fa-plus"></i> Submit another inquiry
-                </button>
-              </div>
-            ) : (
-              <form onSubmit={handleSubmit} className="login-form">
-                <div className="form-group">
-                  <label><i className="fas fa-user"></i> Full Name *</label>
-                  <div className="login-input-wrap"><input type="text" value={formData.FullName} onChange={(e) => set('FullName', e.target.value)} required autoFocus maxLength="100" /></div>
-                </div>
-                <div className="form-group">
-                  <label><i className="fas fa-phone"></i> Phone Number</label>
-                  <div className="login-input-wrap"><input type="text" value={formData.Phone} onChange={(e) => set('Phone', e.target.value)} placeholder="e.g. 0244000000" maxLength="20" /></div>
-                </div>
-                <div className="form-group">
-                  <label><i className="fas fa-envelope"></i> Email</label>
-                  <div className="login-input-wrap"><input type="email" value={formData.Email} onChange={(e) => set('Email', e.target.value)} maxLength="120" /></div>
-                </div>
-                <div className="form-group">
-                  <label><i className="fas fa-tag"></i> What is this about?</label>
-                  <select value={formData.InquiryType} onChange={(e) => set('InquiryType', e.target.value)} style={{width:'100%',padding:'10px 12px',border:'1px solid #ccc',fontSize:'14px'}}>
-                    <option value="admission">Admission</option>
-                    <option value="fees">Fees</option>
-                    <option value="general">General</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label><i className="fas fa-comment-dots"></i> Your Message *</label>
-                  <textarea value={formData.Message} onChange={(e) => set('Message', e.target.value)} rows="4" required maxLength="1000" style={{width:'100%',padding:'10px 12px',border:'1px solid #ccc',fontSize:'14px'}}></textarea>
-                </div>
-
-                <button type="submit" className="login-submit" disabled={submitting}>
-                  {submitting ? <><i className="fas fa-spinner fa-spin"></i> Submitting…</> : <><i className="fas fa-paper-plane"></i> Submit Inquiry</>}
-                </button>
-
-                {error && (
-                  <div className="login-error-box">
-                    <i className="fas fa-exclamation-circle"></i>
-                    <span>{error}</span>
-                  </div>
-                )}
-              </form>
-            )}
-
-            <div className="login-footer">
-              <div>{sch.SchoolEmail && <span><i className="fas fa-envelope"></i> {sch.SchoolEmail}</span>}{sch.SchoolEmail && sch.SchoolContact && ' · '}{sch.SchoolContact && <span><i className="fas fa-phone"></i> {sch.SchoolContact}</span>}</div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
     // ============== Public Admission Application Form (no login — reached via ?public=admission) ==============
     function PublicAdmissionForm({ schoolSettings }) {
       const sch = schoolSettings || {};
@@ -4448,218 +4356,6 @@
       );
     }
 
-    // ============== Public Online Exam (no login — reached via ?public=exam&token=...) ==============
-    // A student who can't log in (or has no portal account) can still take a teacher-published test
-    // paper from this raw link, submit, and see their auto-graded result immediately — mcq/true_false/
-    // short_answer are scored on the spot; any essay questions show as "pending teacher review".
-    function PublicExamView({ schoolSettings, token }) {
-      const sch = schoolSettings || {};
-      const schoolName = sch.SchoolName || 'School';
-      const schoolLogo = sch.SchoolLogo || DEFAULT_LOGO;
-      const [paper, setPaper] = useState(null);
-      const [loadError, setLoadError] = useState('');
-      const [loading, setLoading] = useState(true);
-      const [classes, setClasses] = useState([]);
-      const [started, setStarted] = useState(false);
-      const [studentInfo, setStudentInfo] = useState({ StudentName: '', ClassID: '', AdmissionNumber: '' });
-      const [answers, setAnswers] = useState({});
-      const [submitting, setSubmitting] = useState(false);
-      const [error, setError] = useState('');
-      const [result, setResult] = useState(null);
-      const [secondsLeft, setSecondsLeft] = useState(null);
-
-      useEffect(() => {
-        google.script.run
-          .withSuccessHandler((res) => { setLoading(false); if (res && res.success) setPaper(res.data); else setLoadError((res && res.message) || 'Exam not found'); })
-          .withFailureHandler((err) => { setLoading(false); setLoadError((err && err.message) || 'Connection error'); })
-          .getPublicTestPaper(token);
-        google.script.run.withSuccessHandler((res) => { if (res && res.success) setClasses(res.data || []); }).withFailureHandler(() => {}).getPublicClassList();
-      }, [token]);
-
-      const submit = () => {
-        if (submitting) return;
-        setSubmitting(true); setError('');
-        google.script.run
-          .withSuccessHandler((res) => {
-            setSubmitting(false);
-            if (res && res.success) setResult(res.data);
-            else setError((res && res.message) || 'Could not submit — please try again.');
-          })
-          .withFailureHandler((err) => { setSubmitting(false); setError((err && err.message) || 'Connection error'); })
-          .submitPublicExam(token, studentInfo, answers);
-      };
-
-      // countdown once the exam starts — auto-submits when time runs out
-      useEffect(() => {
-        if (!started || !paper || result) return undefined;
-        setSecondsLeft(paper.DurationMinutes * 60);
-        const iv = setInterval(() => {
-          setSecondsLeft((s) => {
-            if (s <= 1) { clearInterval(iv); submit(); return 0; }
-            return s - 1;
-          });
-        }, 1000);
-        return () => clearInterval(iv);
-      }, [started]);
-
-      const startExam = (e) => {
-        e.preventDefault();
-        if (!studentInfo.StudentName.trim()) { setError('Your full name is required.'); return; }
-        if (!studentInfo.ClassID) { setError('Please select your class.'); return; }
-        if (!studentInfo.AdmissionNumber.trim()) { setError('Your admission number is required.'); return; }
-        setError('');
-        setStarted(true);
-      };
-
-      const setAnswer = (qid, val) => setAnswers((p) => ({ ...p, [qid]: val }));
-      const fmtTime = (s) => `${String(Math.floor(s / 60)).padStart(2,'0')}:${String(s % 60).padStart(2,'0')}`;
-
-      if (loading) return <div style={{padding:'60px',textAlign:'center',color:'#888'}}><i className="fas fa-spinner fa-spin"></i> Loading…</div>;
-
-      if (loadError) {
-        return (
-          <div className="login-container">
-            <div className="login-box">
-              <div className="login-logo-ring"><img src={schoolLogo} alt="Logo" className="login-logo" onError={(e) => e.currentTarget.style.display = 'none'} /></div>
-              <h2>{schoolName}</h2>
-              <div className="login-error-box" style={{marginTop:'16px'}}><i className="fas fa-exclamation-circle"></i> <span>{loadError}</span></div>
-            </div>
-          </div>
-        );
-      }
-
-      // ---- Result screen ----
-      if (result) {
-        const pct = result.MaxScore > 0 ? Math.round((result.Score / result.MaxScore) * 100) : 0;
-        return (
-          <div className="login-container">
-            <div className="login-box" style={{maxWidth:'640px'}}>
-              <div className="login-logo-ring"><img src={schoolLogo} alt="Logo" className="login-logo" onError={(e) => e.currentTarget.style.display = 'none'} /></div>
-              <h2>{schoolName}</h2>
-              <p className="login-subtitle">{paper.Title} — Result</p>
-
-              <div style={{textAlign:'center',padding:'10px 0 20px'}}>
-                <div style={{fontSize:'40px',fontWeight:800,color: pct >= 50 ? '#34a853' : '#ea4335'}}>{result.Score} / {result.MaxScore}</div>
-                <div style={{fontSize:'14px',color:'#888'}}>{pct}%</div>
-                {result.PendingReviewCount > 0 && (
-                  <div style={{fontSize:'12.5px',color:'#fb8c00',marginTop:'8px'}}>
-                    <i className="fas fa-hourglass-half"></i> {result.PendingReviewCount} essay answer{result.PendingReviewCount > 1 ? 's are' : ' is'} awaiting teacher review — this score may still change.
-                  </div>
-                )}
-              </div>
-
-              <div style={{textAlign:'left',maxHeight:'360px',overflowY:'auto',border:'1px solid #e0e0e0',borderRadius:'6px'}}>
-                {paper.questions.map((q, idx) => {
-                  const b = result.Breakdown[q.ID] || {};
-                  const color = b.awarded == null ? '#fb8c00' : (b.correct ? '#34a853' : '#ea4335');
-                  return (
-                    <div key={q.ID} style={{padding:'10px 14px',borderBottom: idx < paper.questions.length - 1 ? '1px solid #eee' : 'none'}}>
-                      <div style={{fontSize:'13px',fontWeight:600,marginBottom:'4px'}}>{idx + 1}. {q.QuestionText}</div>
-                      <div style={{fontSize:'12px',color:'#555'}}>Your answer: {b.answer || <span style={{color:'#bbb'}}>(no answer)</span>}</div>
-                      {b.correctAnswer && !b.correct && <div style={{fontSize:'12px',color:'#34a853'}}>Correct answer: {b.correctAnswer}</div>}
-                      <div style={{fontSize:'11.5px',fontWeight:600,color,marginTop:'2px'}}>
-                        {b.awarded == null ? 'Pending review' : `${b.awarded} / ${b.maxMarks} marks`}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        );
-      }
-
-      // ---- Start screen ----
-      if (!started) {
-        return (
-          <div className="login-container">
-            <div className="login-box" style={{maxWidth:'520px'}}>
-              <div className="login-logo-ring"><img src={schoolLogo} alt="Logo" className="login-logo" onError={(e) => e.currentTarget.style.display = 'none'} /></div>
-              <h2>{schoolName}</h2>
-              <p className="login-subtitle">{paper.Title}</p>
-              <div style={{textAlign:'left',background:'#f8f9fa',border:'1px solid #e0e0e0',borderRadius:'6px',padding:'12px 14px',marginBottom:'16px',fontSize:'12.5px',color:'#555'}}>
-                <div><i className="fas fa-book" style={{width:'16px'}}></i> {paper.SubjectName} — {paper.ClassLabel}</div>
-                <div><i className="fas fa-clock" style={{width:'16px'}}></i> {paper.DurationMinutes} minutes</div>
-                <div><i className="fas fa-list-ol" style={{width:'16px'}}></i> {paper.questions.length} questions — {paper.TotalMarks} marks</div>
-                {paper.Instructions && <div style={{marginTop:'6px',whiteSpace:'pre-wrap'}}><b>Instructions:</b> {paper.Instructions}</div>}
-              </div>
-              <form onSubmit={startExam} className="login-form">
-                <div className="form-group">
-                  <label><i className="fas fa-user"></i> Your Full Name *</label>
-                  <div className="login-input-wrap"><input type="text" value={studentInfo.StudentName} onChange={(e) => setStudentInfo({...studentInfo, StudentName: e.target.value})} required autoFocus maxLength="100" /></div>
-                </div>
-                <div className="form-group">
-                  <label><i className="fas fa-school"></i> Your Class *</label>
-                  <select value={studentInfo.ClassID} onChange={(e) => setStudentInfo({...studentInfo, ClassID: e.target.value})} required style={{width:'100%',padding:'10px 12px',border:'1px solid #ccc',fontSize:'14px'}}>
-                    <option value="">Select your class…</option>
-                    {classes.map(c => <option key={c.ID} value={c.ID}>{c.Label}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label><i className="fas fa-id-card"></i> Admission Number *</label>
-                  <div className="login-input-wrap"><input type="text" value={studentInfo.AdmissionNumber} onChange={(e) => setStudentInfo({...studentInfo, AdmissionNumber: e.target.value})} required maxLength="30" /></div>
-                </div>
-                <button type="submit" className="login-submit"><i className="fas fa-play"></i> Open Exam</button>
-                {error && <div className="login-error-box"><i className="fas fa-exclamation-circle"></i> <span>{error}</span></div>}
-              </form>
-            </div>
-          </div>
-        );
-      }
-
-      // ---- Exam-taking screen ----
-      return (
-        <div className="login-container">
-          <div className="login-box" style={{maxWidth:'680px'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}}>
-              <h2 style={{margin:0,fontSize:'18px'}}>{paper.Title}</h2>
-              {secondsLeft != null && (
-                <span style={{fontFamily:'monospace',fontWeight:700,fontSize:'16px',color: secondsLeft < 60 ? '#ea4335' : 'var(--navy-primary)'}}>
-                  <i className="fas fa-clock"></i> {fmtTime(secondsLeft)}
-                </span>
-              )}
-            </div>
-            <div style={{textAlign:'left',maxHeight:'440px',overflowY:'auto',paddingRight:'6px'}}>
-              {paper.questions.map((q, idx) => (
-                <div key={q.ID} style={{marginBottom:'18px',paddingBottom:'14px',borderBottom:'1px solid #eee'}}>
-                  <div style={{fontSize:'13.5px',fontWeight:600,marginBottom:'8px'}}>{idx + 1}. {q.QuestionText} <span style={{color:'#888',fontWeight:400,fontSize:'11px'}}>({q.Marks} mark{q.Marks !== 1 ? 's' : ''})</span></div>
-                  {q.PhotoURL && <img src={q.PhotoURL} alt="" style={{maxWidth:'100%',maxHeight:'200px',display:'block',marginBottom:'8px',borderRadius:'4px'}} />}
-                  {q.VideoURL && <div style={{marginBottom:'8px'}}><a href={q.VideoURL} target="_blank" rel="noopener noreferrer"><i className="fas fa-video"></i> Watch video</a></div>}
-
-                  {q.QuestionType === 'mcq' && ['A','B','C','D'].map(letter => {
-                    const opt = q['Option' + letter];
-                    if (!opt) return null;
-                    return (
-                      <label key={letter} style={{display:'block',fontSize:'13px',padding:'5px 0',cursor:'pointer'}}>
-                        <input type="radio" name={'q' + q.ID} checked={answers[q.ID] === letter} onChange={() => setAnswer(q.ID, letter)} style={{marginRight:'8px'}} />
-                        {letter}. {opt}
-                      </label>
-                    );
-                  })}
-                  {q.QuestionType === 'true_false' && ['True','False'].map(v => (
-                    <label key={v} style={{display:'block',fontSize:'13px',padding:'5px 0',cursor:'pointer'}}>
-                      <input type="radio" name={'q' + q.ID} checked={answers[q.ID] === v} onChange={() => setAnswer(q.ID, v)} style={{marginRight:'8px'}} />
-                      {v}
-                    </label>
-                  ))}
-                  {q.QuestionType === 'short_answer' && (
-                    <input type="text" value={answers[q.ID] || ''} onChange={(e) => setAnswer(q.ID, e.target.value)} maxLength="200" style={{width:'100%',padding:'8px 10px',border:'1px solid #ccc'}} />
-                  )}
-                  {q.QuestionType === 'essay' && (
-                    <textarea value={answers[q.ID] || ''} onChange={(e) => setAnswer(q.ID, e.target.value)} rows="4" maxLength="3000" style={{width:'100%',padding:'8px 10px',border:'1px solid #ccc'}} />
-                  )}
-                </div>
-              ))}
-            </div>
-            <button className="login-submit" disabled={submitting} onClick={submit}>
-              {submitting ? <><i className="fas fa-spinner fa-spin"></i> Submitting…</> : <><i className="fas fa-paper-plane"></i> Submit Answers</>}
-            </button>
-            {error && <div className="login-error-box"><i className="fas fa-exclamation-circle"></i> <span>{error}</span></div>}
-          </div>
-        </div>
-      );
-    }
-
     // Ghana schools call this role "Headteacher" — the internal role string stays 'supervisor'
     // (matches every existing RBAC check and already-created users) but every user-facing label
     // now reads "Headteacher" instead.
@@ -4685,13 +4381,13 @@
       marks:        { icon: 'graduation-cap',   label: 'Results / Marks',    group: 'academic' },
       gradingSystem:{ icon: 'sliders-h',        label: 'Grading System',     group: 'academic' },
       questionBank: { icon: 'question-circle',  label: 'Question Bank',      group: 'academic' },
+      onlineLinks:  { icon: 'link',              label: 'Online Links',       group: 'academic' },
       hallTickets:  { icon: 'id-card-alt',      label: 'Hall Tickets',       group: 'academic' },
       conduct:      { icon: 'award',            label: 'Conduct',            group: 'academic' },
       discipline:   { icon: 'gavel',            label: 'Discipline',         group: 'academic' },
       activities:   { icon: 'trophy',           label: 'Activities',         group: 'academic' },
       admissions:   { icon: 'file-signature',   label: 'Admissions',         group: 'records' },
       admissionReqs:{ icon: 'clipboard-check',  label: 'Admission Requirements', group: 'records' },
-      inquiries:    { icon: 'qrcode',           label: 'Online Admission',   group: 'records' },
       students:     { icon: 'user-graduate',    label: 'Students',           group: 'records' },
       parents:      { icon: 'users',            label: 'Parents',            group: 'records' },
       classes:      { icon: 'school',           label: 'Classes & Sections', group: 'records' },
@@ -4727,18 +4423,18 @@
     //  - student: timetable + attendance + marks + notices first
     //  - parent: notices + child's attendance/marks/fees first
     const MENU_PRIORITY = {
-      admin: ['dashboard','ownerPortal','reports','admissions','admissionReqs','inquiries','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','questionBank','hallTickets','feePayments','accounts','feeStructure','payroll','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','recruitment','account','settings','about'],
+      admin: ['dashboard','ownerPortal','reports','admissions','admissionReqs','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','questionBank','onlineLinks','hallTickets','feePayments','accounts','feeStructure','payroll','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','recruitment','account','settings','about'],
       // headteacher (internal role id stays 'supervisor' — see ROLE_DISPLAY_LABEL) — system-wide
       // oversight: academic operations plus Owner Portal's financial/activity monitoring
       supervisor: ['dashboard','ownerPortal','reports','attendance','substitutes','marks','hallTickets','exams','notices','ptm','calendar','discipline','conduct','helpdesk','complaints','lessonPlans','logbook','activities','students','parents','classes','subjects','assignments','documents','timetable','account','about'],
-      clerk: ['admissions','inquiries','admissionReqs','students','parents','feePayments','accounts','feeStructure','sms','reports','attendance','helpdesk','complaints','documents','assets','inventory','timetable','classes','notices','calendar','account','about'],
+      clerk: ['admissions','admissionReqs','students','parents','feePayments','accounts','feeStructure','sms','reports','attendance','helpdesk','complaints','documents','assets','inventory','timetable','classes','notices','calendar','account','about'],
       // bursar/accountant — finance + asset/stock inventory only, nothing else (per-role scoped portal)
       bursar: ['dashboard','feePayments','feeStructure','accounts','payroll','assets','inventory','account','about'],
-      teacher: ['timetable','attendance','substitutes','marks','questionBank','payroll','hallTickets','exams','lessonPlans','ptm','logbook','students','discipline','conduct','activities','notices','reports','calendar','documents','complaints','classes','subjects','account','about'],
+      teacher: ['timetable','attendance','substitutes','marks','questionBank','onlineLinks','payroll','hallTickets','exams','lessonPlans','ptm','logbook','students','discipline','conduct','activities','notices','reports','calendar','documents','complaints','classes','subjects','account','about'],
       // student: dashboard → own-class academics → own records → support → profile. Read-only everywhere except helpdesk/complaints/account.
-      student: ['dashboard','timetable','attendance','marks','hallTickets','exams','notices','calendar','feePayments','feeStructure','activities','conduct','discipline','documents','helpdesk','complaints','account','about'],
+      student: ['dashboard','timetable','attendance','marks','hallTickets','exams','onlineLinks','notices','calendar','feePayments','feeStructure','activities','conduct','discipline','documents','helpdesk','complaints','account','about'],
       // parent: like student + PTM booking with teachers
-      parent: ['dashboard','notices','ptm','calendar','timetable','attendance','marks','hallTickets','exams','feePayments','feeStructure','conduct','discipline','activities','documents','helpdesk','complaints','account','about'],
+      parent: ['dashboard','notices','ptm','calendar','timetable','attendance','marks','hallTickets','exams','onlineLinks','feePayments','feeStructure','conduct','discipline','activities','documents','helpdesk','complaints','account','about'],
       // owner: read-only monitoring portal — no operational menus
       owner: ['ownerPortal','account','about']
     };
@@ -5156,8 +4852,6 @@
       // parallel call each on every dashboard load for a widget that just links to a hidden page
       const { data: smsStats } =
         useSWR(isMenuHidden('sms') ? null : 'getSmsDashboardStats', () => swrFetcher('getSmsDashboardStats', currentUser, role));
-      const { data: inquiries } =
-        useSWR(isMenuHidden('inquiries') ? null : 'getAllInquiries', () => swrFetcher('getAllInquiries', currentUser, role));
       const { data: onlineStats, refresh: refreshOnline } =
         useSWR('getOnlineUsersCount', () => swrFetcher('getOnlineUsersCount', currentUser, role));
       // live-ish — re-poll every 45s so the "Users Online" count doesn't need a manual refresh
@@ -5165,7 +4859,6 @@
         const iv = setInterval(() => refreshOnline(), 45000);
         return () => clearInterval(iv);
       }, []);
-      const newInquiriesCount = (inquiries || []).filter(i => i.Status === 'pending' || i.Status === 'contacted' || !i.Status).length;
       const syncing = syncS || syncC || syncE;
 
       // chart refs
@@ -5258,9 +4951,6 @@
                 value={smsStats ? (smsStats.balance == null ? 'N/A' : fmt(smsStats.balance)) : '…'}
                 sub={smsStats ? `${fmt(smsStats.totalSent)} sent · ${fmt(smsStats.totalFailed)} failed` : 'loading…'}
                 color="teal" onClick={() => goto('sms')} blink />
-            )}
-            {!isMenuHidden('inquiries') && (
-              <DashKpi icon="qrcode" label="Pending Enquiries" value={newInquiriesCount} sub={`${(inquiries || []).length} total`} color="pink" onClick={() => goto('inquiries')} />
             )}
             <DashKpi icon="circle-nodes" label="Users Online" value={onlineStats ? onlineStats.count : '…'} sub="live · refreshes every 45s" color="green" blink />
           </div>
@@ -8031,30 +7721,7 @@
         PhotoURL: editing?.PhotoURL || ''
       });
       const [saving, setSaving] = useState(false);
-      const [pulledInquiryId, setPulledInquiryId] = useState(null);
-      const [selectedInquiryId, setSelectedInquiryId] = useState('');
       const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
-
-      // new registrations only — lets admin/clerk pull straight from an Online Admission enquiry
-      // instead of re-typing what the parent already submitted.
-      const { data: inquiriesData } = useSWR(editing ? null : 'getAllInquiries', () => swrFetcher('getAllInquiries', currentUser, role));
-      const pullableInquiries = (inquiriesData || []).filter(i => i.Status !== 'admitted' && i.Status !== 'rejected');
-      const inquiryOpts = pullableInquiries.map(i => ({ value: String(i.ID), label: i.FullName + (i.Phone ? ' — ' + i.Phone : '') }));
-
-      const pullFromInquiry = () => {
-        const inq = pullableInquiries.find(i => String(i.ID) === String(selectedInquiryId));
-        if (!inq) return;
-        const nameParts = String(inq.FullName || '').trim().split(/\s+/);
-        setF((p) => ({
-          ...p,
-          FirstName: nameParts[0] || '',
-          LastName: nameParts.length > 1 ? nameParts.slice(1).join(' ') : p.LastName,
-          Mobile: inq.Phone || p.Mobile,
-          Email: inq.Email || p.Email
-        }));
-        setPulledInquiryId(inq.ID);
-        Swal.fire({ icon: 'success', text: 'Pulled ' + inq.FullName + '\'s details from the enquiry.', timer: 1600, showConfirmButton: false });
-      };
 
       const handleSubmit = (e) => {
         e.preventDefault();
@@ -8087,8 +7754,6 @@
           setSaving(false);
           if (res && res.success) {
             Swal.fire({ icon: 'success', title: 'Saved!', text: res.message + (res.registrationNumber ? ' — ' + res.registrationNumber : ''), timer: 2200, showConfirmButton: false });
-            // registered from a pulled enquiry → mark it admitted so the Online Admission funnel stays in sync
-            if (pulledInquiryId) google.script.run.withFailureHandler(() => {}).updateInquiry(pulledInquiryId, { Status: 'admitted' }, currentUser, role);
             onSaved();
           } else Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Failed' });
         };
@@ -8114,18 +7779,6 @@
               <button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button>
             </div>
             <div className="modal-body">
-              {!editing && inquiryOpts.length > 0 && (
-                <div className="settings-info-message" style={{marginBottom:'16px',display:'flex',gap:'10px',alignItems:'flex-end',flexWrap:'wrap'}}>
-                  <div style={{flex:'1 1 260px'}}>
-                    <label style={{display:'block',fontWeight:600,marginBottom:'4px',fontSize:'13px'}}><i className="fas fa-file-import"></i> Pull Data From Enquiry</label>
-                    <SearchableDropdown options={inquiryOpts} value={selectedInquiryId} onChange={setSelectedInquiryId} placeholder="Select an enquiry..." />
-                  </div>
-                  <button type="button" className="btn btn-secondary" disabled={!selectedInquiryId} onClick={pullFromInquiry}>
-                    <i className="fas fa-download"></i> Pull Data
-                  </button>
-                  {pulledInquiryId && <span style={{fontSize:'12px',color:'#34a853'}}><i className="fas fa-check-circle"></i> Data pulled — this enquiry will be marked Admitted on save.</span>}
-                </div>
-              )}
               <form onSubmit={handleSubmit}>
                 <SectionHdr icon="user" label="Applicant" />
                 <PhotoPicker label="Applicant Photo" value={f.PhotoURL} onChange={(url) => set('PhotoURL', url)} currentUser={currentUser} />
@@ -13708,11 +13361,11 @@
             <div className="rc-remarks-block">
               <div className="rc-remarks-hdr">Conduct &amp; Remarks</div>
               <div className="rc-remarks-grid">
-                <div><b>Interest / Talent:</b> {card.remarks.InterestTalent || '—'}</div>
-                <div><b>Conduct:</b> {card.remarks.Conduct || '—'}</div>
-                <div><b>Attitude to Work:</b> {card.remarks.AttitudeToWork || '—'}</div>
-                <div><b>Class Teacher's Remark:</b> {card.remarks.ClassTeacherRemark || '—'}</div>
-                <div><b>Headmaster's Remark:</b> {card.remarks.HeadmasterRemark || '—'}</div>
+                {school?.ShowInterestTalentOnReportCard !== false && <div><b>Interest / Talent:</b> {card.remarks.InterestTalent || '—'}</div>}
+                {school?.ShowConductOnReportCard !== false && <div><b>Conduct:</b> {card.remarks.Conduct || '—'}</div>}
+                {school?.ShowAttitudeOnReportCard !== false && <div><b>Attitude to Work:</b> {card.remarks.AttitudeToWork || '—'}</div>}
+                {school?.ShowClassTeacherRemarkOnReportCard !== false && <div><b>Class Teacher's Remark:</b> {card.remarks.ClassTeacherRemark || '—'}</div>}
+                {school?.ShowHeadteacherRemarkOnReportCard !== false && <div><b>Headmaster's Remark:</b> {card.remarks.HeadmasterRemark || '—'}</div>}
                 {card.remarks.PromotionStatus && <div><b>Promotion:</b> {card.remarks.PromotionStatus.replace(/_/g, ' ')}</div>}
               </div>
             </div>
@@ -23315,263 +22968,6 @@
       );
     }
 
-    // ============== Online Admission enquiries (admin/clerk) — QR/share + admit-pending-reject funnel ==============
-    const INQUIRY_STATUS_COLORS = { pending: '#fb8c00', contacted: '#0074D9', admitted: '#34a853', rejected: '#ea4335' };
-    const INQUIRY_STATUS_LABELS = { pending: 'Pending', contacted: 'Contacted', admitted: 'Admitted', rejected: 'Rejected' };
-    const INQUIRY_TYPE_ICONS = { admission: 'user-graduate', fees: 'money-bill-wave', general: 'comment', other: 'question-circle' };
-
-    function InquiryDetailModal({ inquiry, currentUser, role, onClose, onSave, saving }) {
-      const [status, setStatus] = useState(inquiry.Status || 'pending');
-      const [notes, setNotes] = useState(inquiry.AdminNotes || '');
-      const [fuDate, setFuDate] = useState(inquiry.FollowUpDate ? String(inquiry.FollowUpDate).split('T')[0] : new Date().toISOString().split('T')[0]);
-      const [fuNext, setFuNext] = useState(inquiry.NextFollowUpDate ? String(inquiry.NextFollowUpDate).split('T')[0] : '');
-      const [fuResponse, setFuResponse] = useState('');
-      const [fuNote, setFuNote] = useState('');
-      const [loggingFu, setLoggingFu] = useState(false);
-      const { data: historyData, mutate: reloadHistory } =
-        useSWR('getInquiryFollowUps:' + inquiry.ID, () => swrFetcher('getInquiryFollowUps', inquiry.ID, currentUser, role));
-      const history = historyData || [];
-
-      const logFollowUp = () => {
-        if (!fuResponse.trim() && !fuNote.trim()) {
-          Swal.fire({ icon: 'warning', text: 'Enter a response or a note to log this follow-up.' }); return;
-        }
-        setLoggingFu(true);
-        google.script.run
-          .withSuccessHandler((res) => {
-            setLoggingFu(false);
-            if (res && res.success) { setFuResponse(''); setFuNote(''); reloadHistory(); }
-            else Swal.fire({ icon: 'error', text: (res && res.message) || 'Failed to log follow-up' });
-          })
-          .withFailureHandler((err) => { setLoggingFu(false); Swal.fire({ icon: 'error', text: err.message }); })
-          .addInquiryFollowUp(inquiry.ID, { FollowUpDate: fuDate, NextFollowUpDate: fuNext, Response: fuResponse, Note: fuNote }, currentUser, role);
-      };
-
-      return (
-        <div className="modal-overlay" onClick={onClose}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'620px'}}>
-            <div className="modal-header"><h3><i className={`fas fa-${INQUIRY_TYPE_ICONS[inquiry.InquiryType] || 'comment'}`}></i> Enquiry from {inquiry.FullName}</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
-            <div className="modal-body">
-              <div className="rc-info" style={{marginBottom:'14px'}}>
-                <div><b>Name:</b> {inquiry.FullName}</div>
-                <div><b>Type:</b> <span style={{textTransform:'capitalize'}}>{inquiry.InquiryType}</span></div>
-                {inquiry.Phone && <div><b>Phone:</b> {inquiry.Phone}</div>}
-                {inquiry.Email && <div><b>Email:</b> {inquiry.Email}</div>}
-                <div style={{gridColumn:'1 / -1'}}><b>Received:</b> {new Date(inquiry.CreatedAt).toLocaleString()}</div>
-              </div>
-              <div className="rc-remarks" style={{marginBottom:'14px'}}><b>Message:</b><br />{inquiry.Message}</div>
-
-              <div className="form-group">
-                <label>Decision</label>
-                <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
-                  {['pending', 'contacted', 'admitted', 'rejected'].map(s => (
-                    <button key={s} type="button"
-                      className={`btn btn-sm ${status === s ? '' : 'btn-secondary'}`}
-                      style={status === s ? { background: INQUIRY_STATUS_COLORS[s], color: '#fff', border: 'none' } : {}}
-                      onClick={() => setStatus(s)}>
-                      <i className={`fas fa-${s === 'admitted' ? 'check-circle' : s === 'rejected' ? 'ban' : s === 'contacted' ? 'phone' : 'hourglass-half'}`}></i> {INQUIRY_STATUS_LABELS[s]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="form-group">
-                <label>Admin Notes</label>
-                <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows="2" placeholder="Internal notes — not visible to the parent" />
-              </div>
-              <div className="form-actions">
-                <button className="btn btn-primary" disabled={saving} onClick={() => onSave(inquiry.ID, { Status: status, AdminNotes: notes })}>
-                  <i className="fas fa-save"></i> {saving ? 'Saving…' : 'Save Decision'}
-                </button>
-              </div>
-
-              <h4 style={{color:'var(--navy-primary)',margin:'18px 0 10px',fontSize:'14px',borderBottom:'2px solid var(--navy-primary)',paddingBottom:'6px'}}>
-                <i className="fas fa-clock-rotate-left"></i> Follow Up
-              </h4>
-              <div className="form-grid">
-                <div className="form-group"><label>Follow Up Date</label><input type="date" value={fuDate} onChange={(e) => setFuDate(e.target.value)} /></div>
-                <div className="form-group"><label>Next Follow Up Date</label><input type="date" value={fuNext} onChange={(e) => setFuNext(e.target.value)} /></div>
-              </div>
-              <div className="form-group"><label>Response</label><input type="text" value={fuResponse} onChange={(e) => setFuResponse(e.target.value)} placeholder="e.g. Spoke to parent — visiting campus Friday" maxLength="200" /></div>
-              <div className="form-group"><label>Note</label><textarea value={fuNote} onChange={(e) => setFuNote(e.target.value)} rows="2" placeholder="Optional extra detail..." /></div>
-              <button className="btn btn-secondary btn-sm" disabled={loggingFu} onClick={logFollowUp}>
-                <i className="fas fa-plus"></i> {loggingFu ? 'Logging…' : 'Log Follow Up'}
-              </button>
-
-              {history.length > 0 && (
-                <div style={{marginTop:'14px',maxHeight:'180px',overflowY:'auto',border:'1px solid #e0e0e0',borderRadius:'6px',padding:'8px 10px'}}>
-                  {history.map(h => (
-                    <div key={h.ID} style={{padding:'6px 0',borderBottom:'1px dashed #e0e0e0',fontSize:'12.5px'}}>
-                      <div style={{color:'#888'}}>{new Date(h.CreatedAt).toLocaleString()}{h.NextFollowUpDate && <> · next: {h.NextFollowUpDate}</>}</div>
-                      {h.Response && <div><b>{h.Response}</b></div>}
-                      {h.Note && <div style={{color:'#666'}}>{h.Note}</div>}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="form-actions" style={{marginTop:'14px'}}>
-                <button className="btn btn-secondary" onClick={onClose}><i className="fas fa-times"></i> Close</button>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    function InquiriesView({ currentUser, role }) {
-      const { data: itemsData, error: loadError, isLoading: loading, mutate: load } =
-        useSWR('getAllInquiries', () => swrFetcher('getAllInquiries', currentUser, role));
-      const items = itemsData || [];
-      const [filter, setFilter] = useState('');
-      const [selected, setSelected] = useState(null);
-      const [saving, setSaving] = useState(false);
-      const [showShare, setShowShare] = useState(false);
-
-      const filtered = filter ? items.filter(i => i.Status === filter) : items;
-      const publicUrl = publicAppLink('?public=inquiry');
-      const qrImg = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(publicUrl)}`;
-
-      const stats = {
-        total: items.length,
-        pending: items.filter(i => i.Status === 'pending' || i.Status === 'contacted' || !i.Status).length,
-        admitted: items.filter(i => i.Status === 'admitted').length,
-        rejected: items.filter(i => i.Status === 'rejected').length
-      };
-
-      const copyLink = () => {
-        navigator.clipboard.writeText(publicUrl).then(() => {
-          Swal.fire({ icon: 'success', text: 'Admission form link copied — share it with prospective parents', timer: 1800, showConfirmButton: false });
-        }).catch(() => Swal.fire({ icon: 'info', title: 'Admission Form Link', text: publicUrl }));
-      };
-
-      const shareWhatsApp = () => {
-        const msg = 'Apply for admission online — fill our short enquiry form:\n' + publicUrl;
-        window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
-      };
-
-      const printQr = () => {
-        document.body.classList.add('print-target');
-        setTimeout(() => {
-          window.print();
-          setTimeout(() => document.body.classList.remove('print-target'), 250);
-        }, 60);
-      };
-
-      const handleSave = (id, data) => {
-        setSaving(true);
-        google.script.run
-          .withSuccessHandler((res) => {
-            setSaving(false);
-            if (res.success) { setSelected(null); Swal.fire({ icon: 'success', text: res.message, timer: 1500, showConfirmButton: false }); load(); }
-            else Swal.fire({ icon: 'error', text: res.message });
-          })
-          .withFailureHandler((err) => { setSaving(false); Swal.fire({ icon: 'error', text: err.message }); })
-          .updateInquiry(id, data, currentUser, role);
-      };
-
-      const handleDelete = (i) => {
-        Swal.fire({ icon: 'warning', title: 'Delete enquiry?', text: i.FullName, showCancelButton: true, confirmButtonColor: '#ea4335' })
-          .then((rr) => {
-            if (rr.isConfirmed) {
-              google.script.run.withSuccessHandler((res) => {
-                Swal.fire({ icon: res.success ? 'success' : 'error', text: res.message, timer: 1500, showConfirmButton: false });
-                load();
-              }).deleteInquiry(i.ID, currentUser, role);
-            }
-          });
-      };
-
-      return (
-        <div className="data-section">
-          <div className="section-header no-print">
-            <h2><i className="fas fa-user-plus"></i> Online Admission</h2>
-            <button className="btn btn-secondary" onClick={() => setShowShare(s => !s)}>
-              <i className="fas fa-qrcode"></i> {showShare ? 'Hide' : 'Share'} Admission Form
-            </button>
-          </div>
-
-          {showShare && (
-            <div className="report-card" style={{maxWidth:'420px',margin:'0 0 20px',textAlign:'center',padding:'20px'}}>
-              <h3 style={{color:'var(--navy-primary)',marginBottom:'12px',fontSize:'15px'}}><i className="fas fa-share-nodes"></i> Share Admission Form</h3>
-              <img src={qrImg} alt="Admission Form QR Code" style={{width:'180px',height:'180px',margin:'0 auto 14px',display:'block'}} />
-              <div className="form-group" style={{textAlign:'left'}}>
-                <label>Admission Form URL</label>
-                <input type="text" readOnly value={publicUrl} onClick={(e) => e.target.select()} style={{width:'100%',padding:'8px 10px',border:'1px solid #ccc',fontSize:'12px'}} />
-              </div>
-              <div style={{display:'flex',gap:'8px',justifyContent:'center',marginTop:'12px',flexWrap:'wrap'}}>
-                <button className="btn btn-secondary btn-sm" onClick={copyLink}><i className="fas fa-copy"></i> Copy URL</button>
-                <button className="btn btn-sm" style={{background:'#25D366',color:'#fff',border:'none'}} onClick={shareWhatsApp}><i className="fab fa-whatsapp"></i> Share on WhatsApp</button>
-                <button className="btn btn-secondary btn-sm" onClick={printQr}><i className="fas fa-print"></i> Print QR Code</button>
-              </div>
-            </div>
-          )}
-
-          <div className="no-print" style={{display:'flex',gap:'12px',marginBottom:'18px',flexWrap:'wrap'}}>
-            {[
-              { key: '', label: 'Total', value: stats.total, color: 'var(--navy-primary)', icon: 'users' },
-              { key: 'pending', label: 'Pending', value: stats.pending, color: '#fb8c00', icon: 'hourglass-half' },
-              { key: 'admitted', label: 'Admitted', value: stats.admitted, color: '#34a853', icon: 'check-circle' },
-              { key: 'rejected', label: 'Rejected', value: stats.rejected, color: '#ea4335', icon: 'ban' }
-            ].map(s => (
-              <div key={s.label} onClick={() => setFilter(s.key)}
-                style={{flex:'1 1 120px',cursor:'pointer',background:'#fff',border:filter===s.key?`2px solid ${s.color}`:'1px solid #e0e0e0',borderRadius:'8px',padding:'12px 14px',textAlign:'center'}}>
-                <div style={{fontSize:'22px',fontWeight:700,color:s.color}}><i className={`fas fa-${s.icon}`} style={{marginRight:'6px',fontSize:'16px'}}></i>{s.value}</div>
-                <div style={{fontSize:'12px',color:'#888',textTransform:'uppercase',fontWeight:600}}>{s.label}</div>
-              </div>
-            ))}
-          </div>
-
-          {loadError && !loading && items.length === 0 && (
-            <div className="settings-info-message no-print" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>
-              <i className="fas fa-triangle-exclamation" style={{marginRight:'6px',color:'#ea4335'}}></i>
-              Couldn't load enquiries — {String((loadError && loadError.message) || loadError)}.
-            </div>
-          )}
-
-          {!loading && items.length > 0 && (
-            <div className="no-print" style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
-              {['', 'pending', 'contacted', 'admitted', 'rejected'].map(s => (
-                <button key={s || 'all'} className={`btn btn-sm ${filter === s ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setFilter(s)}>
-                  {s ? INQUIRY_STATUS_LABELS[s] : 'All'} ({s ? items.filter(i => i.Status === s).length : items.length})
-                </button>
-              ))}
-            </div>
-          )}
-
-          {loading && <TableSkeleton rows={5} columns={5} />}
-          {!loading && items.length === 0 && (
-            <div className="no-print" style={{textAlign:'center',padding:'40px',color:'#888',background:'#f8f9fa'}}>No admission enquiries yet.</div>
-          )}
-          {!loading && filtered.length > 0 && (
-            <div className="no-print" style={{overflowX:'auto'}}>
-              <table className="simple-table" style={{width:'100%'}}>
-                <thead><tr><th>Date</th><th>Name</th><th>Type</th><th>Contact</th><th>Message</th><th>Next Follow Up</th><th>Status</th><th>Actions</th></tr></thead>
-                <tbody>
-                  {filtered.map((i) => (
-                    <tr key={i.ID}>
-                      <td style={{whiteSpace:'nowrap',fontSize:'12px',color:'#888'}}>{new Date(i.CreatedAt).toLocaleDateString()}</td>
-                      <td style={{fontWeight:600}}>{i.FullName}</td>
-                      <td><i className={`fas fa-${INQUIRY_TYPE_ICONS[i.InquiryType] || 'comment'}`}></i> <span style={{textTransform:'capitalize'}}>{i.InquiryType}</span></td>
-                      <td style={{fontSize:'12px'}}>{i.Phone}{i.Phone && i.Email && <br />}{i.Email}</td>
-                      <td style={{fontSize:'12px',maxWidth:'220px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{i.Message}</td>
-                      <td style={{fontSize:'12px',whiteSpace:'nowrap'}}>{i.NextFollowUpDate || <span style={{color:'#bbb'}}>—</span>}</td>
-                      <td><span className="role-badge" style={{background:INQUIRY_STATUS_COLORS[i.Status]||'#888',color:'#fff',textTransform:'capitalize'}}>{INQUIRY_STATUS_LABELS[i.Status]||i.Status}</span></td>
-                      <td style={{whiteSpace:'nowrap'}}>
-                        <button className="action-icon edit-icon" title="View / Follow Up" onClick={() => setSelected(i)}><i className="fas fa-eye"></i></button>
-                        <button className="action-icon delete-icon" title="Delete" onClick={() => handleDelete(i)}><i className="fas fa-trash"></i></button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {selected && <InquiryDetailModal inquiry={selected} currentUser={currentUser} role={role} saving={saving} onClose={() => setSelected(null)} onSave={handleSave} />}
-        </div>
-      );
-    }
-
     // ============== Admission Requirements ==============
     function AdmissionRequirementModal({ item, currentUser, role, onClose, onSave, saving }) {
       const [formData, setFormData] = useState({ Title: item?.Title || '', Description: item?.Description || '' });
@@ -24167,9 +23563,6 @@
       const [showBuilder, setShowBuilder] = useState(false);
       const [builderSaving, setBuilderSaving] = useState(false);
       const [printPaperId, setPrintPaperId] = useState(null);
-      const [sharePaper, setSharePaper] = useState(null);
-      const [publishing, setPublishing] = useState(false);
-      const [submissionsPaper, setSubmissionsPaper] = useState(null);
 
       const filteredQuestions = questions.filter(q =>
         (!qFilters.classId || String(q.ClassID) === String(qFilters.classId)) &&
@@ -24226,29 +23619,6 @@
                 loadPapers();
               }).deleteTestPaper(p.ID, currentUser, role);
             }
-          });
-      };
-
-      const handlePublish = (p) => {
-        setPublishing(true);
-        google.script.run
-          .withSuccessHandler((res) => {
-            setPublishing(false);
-            if (res && res.success) { loadPapers(); setSharePaper({ ...p, IsPublished: true, ShareToken: res.token, url: res.url }); }
-            else Swal.fire({ icon: 'error', text: (res && res.message) || 'Failed to publish' });
-          })
-          .withFailureHandler((err) => { setPublishing(false); Swal.fire({ icon: 'error', text: err.message }); })
-          .publishTestPaperOnline(p.ID, currentUser, role);
-      };
-
-      const handleUnpublish = (p) => {
-        Swal.fire({ icon: 'warning', title: 'Unpublish this exam?', text: 'The link students have will stop working.', showCancelButton: true, confirmButtonColor: '#ea4335' })
-          .then((rr) => {
-            if (!rr.isConfirmed) return;
-            google.script.run.withSuccessHandler((res) => {
-              Swal.fire({ icon: res.success ? 'success' : 'error', text: res.message, timer: 1500, showConfirmButton: false });
-              loadPapers();
-            }).withFailureHandler((err) => Swal.fire({ icon: 'error', text: err.message })).unpublishTestPaperOnline(p.ID, currentUser, role);
           });
       };
 
@@ -24331,7 +23701,7 @@
               {!pLoading && papers.length > 0 && (
                 <div style={{overflowX:'auto'}}>
                   <table className="simple-table" style={{width:'100%'}}>
-                    <thead><tr><th>Title</th><th>Class</th><th>Subject</th><th>Questions</th><th>Marks</th><th>Duration</th><th>Online</th><th>Actions</th></tr></thead>
+                    <thead><tr><th>Title</th><th>Class</th><th>Subject</th><th>Questions</th><th>Marks</th><th>Duration</th><th>Actions</th></tr></thead>
                     <tbody>
                       {papers.map((p) => (
                         <tr key={p.ID}>
@@ -24341,21 +23711,7 @@
                           <td>{p.QuestionIDs.length}</td>
                           <td>{p.TotalMarks}</td>
                           <td>{p.DurationMinutes} min</td>
-                          <td>
-                            {p.IsPublished
-                              ? <span className="role-badge" style={{background:'#34a853',color:'#fff'}}>Published</span>
-                              : <span className="role-badge" style={{background:'#888',color:'#fff'}}>Draft</span>}
-                          </td>
                           <td style={{whiteSpace:'nowrap'}}>
-                            {p.IsPublished ? (
-                              <>
-                                <button className="action-icon edit-icon" title="Share Link / QR" onClick={() => setSharePaper({ ...p, url: publicAppLink('?public=exam&token=' + p.ShareToken) })}><i className="fas fa-qrcode"></i></button>
-                                <button className="action-icon edit-icon" title="Unpublish" style={{color:'#ea4335'}} onClick={() => handleUnpublish(p)}><i className="fas fa-eye-slash"></i></button>
-                              </>
-                            ) : (
-                              <button className="action-icon edit-icon" title="Publish Online" style={{color:'#34a853'}} disabled={publishing} onClick={() => handlePublish(p)}><i className="fas fa-globe"></i></button>
-                            )}
-                            <button className="action-icon edit-icon" title="Submissions" onClick={() => setSubmissionsPaper(p)}><i className="fas fa-poll"></i></button>
                             <button className="action-icon edit-icon" title="Print / Download" onClick={() => setPrintPaperId(p.ID)}><i className="fas fa-print"></i></button>
                             <button className="action-icon delete-icon" title="Delete" onClick={() => handleDeletePaper(p)}><i className="fas fa-trash"></i></button>
                           </td>
@@ -24371,135 +23727,150 @@
           {showQModal && <QuestionModal question={editingQ} currentUser={currentUser} role={role} saving={qSaving} onClose={() => { setShowQModal(false); setEditingQ(null); }} onSave={handleSaveQ} />}
           {showBuilder && <TestPaperBuilderModal questions={questions} currentUser={currentUser} role={role} saving={builderSaving} onClose={() => setShowBuilder(false)} onSave={handleGeneratePaper} />}
           {printPaperId && <TestPaperPrintModal paperId={printPaperId} currentUser={currentUser} role={role} onClose={() => setPrintPaperId(null)} />}
-          {sharePaper && <ExamShareModal paper={sharePaper} onClose={() => setSharePaper(null)} />}
-          {submissionsPaper && <ExamSubmissionsModal paper={submissionsPaper} currentUser={currentUser} role={role} onClose={() => setSubmissionsPaper(null)} />}
         </div>
       );
     }
 
-    // QR + copy/WhatsApp/print share panel for a just-published (or already-published) online exam
-    function ExamShareModal({ paper, onClose }) {
-      const qrImg = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(paper.url)}`;
-      const copyLink = () => {
-        navigator.clipboard.writeText(paper.url).then(() => {
-          Swal.fire({ icon: 'success', text: 'Exam link copied', timer: 1500, showConfirmButton: false });
-        }).catch(() => Swal.fire({ icon: 'info', title: 'Exam Link', text: paper.url }));
+    // ============== Online Links (external test/resource URLs — Google Forms etc.) ==============
+    function ExternalLinkModal({ link, currentUser, role, onClose, onSave, saving }) {
+      const [classes, setClasses] = useState([]);
+      const [subjects, setSubjects] = useState([]);
+      const [f, setF] = useState({
+        Title: link?.Title || '', URL: link?.URL || '',
+        ClassID: link?.ClassID ? String(link.ClassID) : '', SubjectID: link?.SubjectID ? String(link.SubjectID) : '',
+        Instructions: link?.Instructions || ''
+      });
+      const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
+
+      useEffect(() => {
+        google.script.run.withSuccessHandler((res) => { if (res.success) setClasses(res.data || []); }).getAllClasses(currentUser, role);
+      }, []);
+      useEffect(() => {
+        if (!f.ClassID) { setSubjects([]); return; }
+        google.script.run.withSuccessHandler((res) => { if (res.success) setSubjects(res.data || []); }).getSubjectsForClass(f.ClassID, currentUser, role);
+      }, [f.ClassID]);
+
+      const classOpts = classes.map(c => ({ value: String(c.ID), label: c.Label }));
+      const subjectOpts = subjects.map(s => ({ value: String(s.ID), label: s.SubjectName }));
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!f.Title.trim()) { Swal.fire({ icon: 'error', text: 'Title is required' }); return; }
+        if (!/^https?:\/\//i.test(f.URL.trim())) { Swal.fire({ icon: 'error', text: 'Enter a valid link starting with http:// or https://' }); return; }
+        if (!f.ClassID) { Swal.fire({ icon: 'error', text: 'Class is required' }); return; }
+        onSave({ Title: f.Title.trim(), URL: f.URL.trim(), ClassID: f.ClassID, SubjectID: f.SubjectID || '', Instructions: f.Instructions.trim() });
       };
-      const shareWhatsApp = () => {
-        const msg = `${paper.Title} — take the online exam here:\n${paper.url}`;
-        window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
-      };
-      const printQr = () => {
-        document.body.classList.add('print-target');
-        setTimeout(() => { window.print(); setTimeout(() => document.body.classList.remove('print-target'), 250); }, 60);
-      };
+
       return (
         <div className="modal-overlay" onClick={onClose}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'440px'}}>
-            <div className="modal-header no-print"><h3><i className="fas fa-qrcode"></i> Share Exam</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header"><h3><i className="fas fa-link"></i> {link ? 'Edit' : 'Share'} Online Link</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
             <div className="modal-body">
-              <div className="report-card" style={{textAlign:'center',padding:'20px'}}>
-                <h3 style={{color:'var(--navy-primary)',marginBottom:'12px',fontSize:'15px'}}>{paper.Title}</h3>
-                <img src={qrImg} alt="Exam QR Code" style={{width:'180px',height:'180px',margin:'0 auto 14px',display:'block'}} />
-                <div className="form-group" style={{textAlign:'left'}}>
-                  <label>Exam URL</label>
-                  <input type="text" readOnly value={paper.url} onClick={(e) => e.target.select()} style={{width:'100%',padding:'8px 10px',border:'1px solid #ccc',fontSize:'12px'}} />
-                </div>
-                <div className="no-print" style={{display:'flex',gap:'8px',justifyContent:'center',marginTop:'12px',flexWrap:'wrap'}}>
-                  <button className="btn btn-secondary btn-sm" onClick={copyLink}><i className="fas fa-copy"></i> Copy URL</button>
-                  <button className="btn btn-sm" style={{background:'#25D366',color:'#fff',border:'none'}} onClick={shareWhatsApp}><i className="fab fa-whatsapp"></i> Share on WhatsApp</button>
-                  <button className="btn btn-secondary btn-sm" onClick={printQr}><i className="fas fa-print"></i> Print QR Code</button>
-                </div>
+              <div className="settings-info-message" style={{marginBottom:'14px'}}>
+                <i className="fas fa-info-circle"></i> Paste a link to a test/quiz/resource set up on another site (e.g. a Google Form) — students and parents for the selected class will see it as a button inside their own portal, no public link needed.
               </div>
+              <form onSubmit={handleSubmit}>
+                <div className="form-grid">
+                  <div className="form-group" style={{gridColumn:'1 / -1'}}>
+                    <label><i className="fas fa-heading"></i> Title *</label>
+                    <input type="text" value={f.Title} onChange={(e) => set('Title', e.target.value)} required maxLength="150" placeholder="e.g. Term 2 Maths Quiz" />
+                  </div>
+                  <div className="form-group" style={{gridColumn:'1 / -1'}}>
+                    <label><i className="fas fa-link"></i> URL *</label>
+                    <input type="url" value={f.URL} onChange={(e) => set('URL', e.target.value)} required placeholder="https://forms.google.com/..." />
+                  </div>
+                  <SearchableDropdown label="Class *" icon="fas fa-school" options={classOpts} value={f.ClassID} onChange={(v) => set('ClassID', v)} placeholder="Select class..." required={true} />
+                  <SearchableDropdown label="Subject (optional)" icon="fas fa-book" options={subjectOpts} value={f.SubjectID} onChange={(v) => set('SubjectID', v)} placeholder="All subjects" />
+                  <div className="form-group" style={{gridColumn:'1 / -1'}}>
+                    <label><i className="fas fa-comment-dots"></i> Instructions (optional)</label>
+                    <textarea value={f.Instructions} onChange={(e) => set('Instructions', e.target.value)} rows="2" maxLength="500" placeholder="e.g. Complete before Friday, 3pm" />
+                  </div>
+                </div>
+                <div className="form-actions">
+                  <button type="submit" className="btn btn-primary" disabled={saving}><i className="fas fa-save"></i> {saving ? 'Saving…' : 'Save'}</button>
+                  <button type="button" className="btn btn-secondary" onClick={onClose}><i className="fas fa-times"></i> Cancel</button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
       );
     }
 
-    // Submissions list for one test paper — score at a glance, drill into a submission to grade
-    // any essay questions (mcq/true_false/short_answer are already auto-graded).
-    function ExamSubmissionsModal({ paper, currentUser, role, onClose }) {
-      const { data, error: loadError, isLoading: loading, mutate: reload } =
-        useSWR('getExamSubmissions:' + paper.ID, () => swrFetcher('getExamSubmissions', paper.ID, currentUser, role));
-      const subs = data || [];
-      const [viewing, setViewing] = useState(null);
-      const [grading, setGrading] = useState({}); // qid -> input value while editing
+    function OnlineLinksView({ currentUser, role }) {
+      const r = String(role).toLowerCase();
+      const canManage = r === 'admin' || r === 'teacher';
+      const { data, error: loadError, isLoading: loading, mutate: load } =
+        useSWR('getExternalLinks', () => swrFetcher('getExternalLinks', currentUser, role));
+      const links = data || [];
+      const [showModal, setShowModal] = useState(false);
+      const [editing, setEditing] = useState(null);
+      const [saving, setSaving] = useState(false);
 
-      const gradeQuestion = (sub, qid) => {
-        const marks = parseFloat(grading[qid]);
-        if (isNaN(marks) || marks < 0) { Swal.fire({ icon: 'warning', text: 'Enter a valid mark' }); return; }
+      const handleSave = (d) => {
+        setSaving(true);
+        const action = editing ? 'updateExternalLink' : 'addExternalLink';
+        const params = editing ? [editing.ID, d, currentUser, role] : [d, currentUser, role];
         google.script.run
           .withSuccessHandler((res) => {
-            if (res && res.success) { reload(); setViewing(null); }
-            else Swal.fire({ icon: 'error', text: (res && res.message) || 'Failed to grade' });
+            setSaving(false);
+            if (res.success) { setShowModal(false); setEditing(null); Swal.fire({ icon: 'success', text: res.message, timer: 1500, showConfirmButton: false }); load(); }
+            else Swal.fire({ icon: 'error', text: res.message });
           })
-          .withFailureHandler((err) => Swal.fire({ icon: 'error', text: err.message }))
-          .gradeEssayAnswer(sub.ID, qid, marks, currentUser, role);
+          .withFailureHandler((err) => { setSaving(false); Swal.fire({ icon: 'error', text: err.message }); })[action](...params);
+      };
+
+      const handleDelete = (l) => {
+        Swal.fire({ icon: 'warning', title: 'Remove this link?', text: l.Title, showCancelButton: true, confirmButtonColor: '#ea4335' })
+          .then((rr) => {
+            if (rr.isConfirmed) {
+              google.script.run.withSuccessHandler((res) => {
+                Swal.fire({ icon: res.success ? 'success' : 'error', text: res.message, timer: 1500, showConfirmButton: false });
+                load();
+              }).deleteExternalLink(l.ID, currentUser, role);
+            }
+          });
       };
 
       return (
-        <div className="modal-overlay" onClick={onClose}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'720px'}}>
-            <div className="modal-header"><h3><i className="fas fa-poll"></i> Submissions — {paper.Title}</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
-            <div className="modal-body">
-              {loadError && !loading && subs.length === 0 && (
-                <div className="settings-info-message" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>Couldn't load submissions — {String((loadError && loadError.message) || loadError)}.</div>
-              )}
-              {loading && <TableSkeleton rows={4} columns={5} />}
-              {!loading && subs.length === 0 && (
-                <div style={{textAlign:'center',padding:'30px',color:'#888',background:'#f8f9fa'}}>No submissions yet.</div>
-              )}
-              {!loading && subs.length > 0 && !viewing && (
-                <div style={{overflowX:'auto'}}>
-                  <table className="simple-table" style={{width:'100%'}}>
-                    <thead><tr><th>Student</th><th>Class</th><th>Admission No</th><th>Score</th><th>Submitted</th><th></th></tr></thead>
-                    <tbody>
-                      {subs.map(s => (
-                        <tr key={s.ID}>
-                          <td style={{fontWeight:600}}>{s.StudentName}</td>
-                          <td>{s.ClassLabel || '—'}</td>
-                          <td>{s.AdmissionNumber || '—'}</td>
-                          <td style={{fontWeight:700}}>
-                            {s.Score} / {s.MaxScore}
-                            {s.PendingReviewCount > 0 && <span style={{color:'#fb8c00',fontWeight:400,fontSize:'11px'}}> ({s.PendingReviewCount} pending)</span>}
-                          </td>
-                          <td style={{fontSize:'12px',color:'#888'}}>{new Date(s.SubmittedAt).toLocaleString()}</td>
-                          <td><button className="action-icon edit-icon" title="View / Grade" onClick={() => setViewing(s)}><i className="fas fa-eye"></i></button></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {viewing && (
-                <div>
-                  <button className="btn btn-secondary btn-sm" style={{marginBottom:'12px'}} onClick={() => setViewing(null)}><i className="fas fa-arrow-left"></i> Back to list</button>
-                  <div style={{fontWeight:700,marginBottom:'10px'}}>{viewing.StudentName} — {viewing.Score} / {viewing.MaxScore}</div>
-                  {Object.keys(viewing.Breakdown).map(qid => {
-                    const b = viewing.Breakdown[qid];
-                    const pending = b.awarded == null;
-                    return (
-                      <div key={qid} style={{padding:'8px 0',borderBottom:'1px solid #eee'}}>
-                        <div style={{fontSize:'12.5px',color:'#555'}}>Answer: {b.answer || <span style={{color:'#bbb'}}>(no answer)</span>}</div>
-                        {pending ? (
-                          <div style={{display:'flex',gap:'8px',alignItems:'center',marginTop:'6px'}}>
-                            <input type="number" min="0" max={b.maxMarks} step="0.5" placeholder={'/ ' + b.maxMarks}
-                              value={grading[qid] || ''} onChange={(e) => setGrading({...grading, [qid]: e.target.value})}
-                              style={{width:'80px',padding:'6px 8px',border:'1px solid #ccc'}} />
-                            <button className="btn btn-primary btn-sm" onClick={() => gradeQuestion(viewing, qid)}><i className="fas fa-check"></i> Award Marks</button>
-                          </div>
-                        ) : (
-                          <div style={{fontSize:'12px',fontWeight:600,color: b.correct ? '#34a853' : '#ea4335',marginTop:'4px'}}>{b.awarded} / {b.maxMarks} marks</div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+        <div className="data-section">
+          <div className="section-header">
+            <h2><i className="fas fa-link"></i> Online Links</h2>
+            {canManage && <button className="btn btn-success" onClick={() => { setEditing(null); setShowModal(true); }}><i className="fas fa-plus"></i> Share Online Link</button>}
           </div>
+          <div className="settings-info-message" style={{marginBottom:'15px'}}>
+            <i className="fas fa-info-circle"></i> {canManage
+              ? 'Already using Google Forms or another site for online tests/resources? Paste the link here and it shows up right inside the class\'s portal — no separate public URL to manage.'
+              : 'Links your teachers have shared for your class. Tap Open to launch them in a new tab.'}
+          </div>
+          {loadError && !loading && links.length === 0 && (
+            <div className="settings-info-message" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>Couldn't load links — {String((loadError && loadError.message) || loadError)}.</div>
+          )}
+          {loading && <TableSkeleton rows={4} columns={4} />}
+          {!loading && links.length === 0 && (
+            <div style={{textAlign:'center',padding:'40px',color:'#888',background:'#f8f9fa'}}>No online links yet.</div>
+          )}
+          {!loading && links.length > 0 && (
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:'14px'}}>
+              {links.map(l => (
+                <div key={l.ID} style={{border:'1px solid #e0e0e0',borderRadius:'8px',padding:'14px',background:'#fff'}}>
+                  <div style={{fontWeight:700,color:'var(--navy-primary)',fontSize:'15px'}}>{l.Title}</div>
+                  <div style={{fontSize:'12px',color:'#888',margin:'4px 0 8px'}}>{l.ClassLabel}{l.SubjectName ? ' · ' + l.SubjectName : ''}</div>
+                  {l.Instructions && <div style={{fontSize:'12.5px',color:'#555',marginBottom:'10px'}}>{l.Instructions}</div>}
+                  <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                    <a href={l.URL} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm"><i className="fas fa-arrow-up-right-from-square"></i> Open</a>
+                    {canManage && (
+                      <>
+                        <button className="action-icon edit-icon" title="Edit" onClick={() => { setEditing(l); setShowModal(true); }}><i className="fas fa-edit"></i></button>
+                        <button className="action-icon delete-icon" title="Remove" onClick={() => handleDelete(l)}><i className="fas fa-trash"></i></button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {showModal && <ExternalLinkModal link={editing} currentUser={currentUser} role={role} saving={saving} onClose={() => { setShowModal(false); setEditing(null); }} onSave={handleSave} />}
         </div>
       );
     }
@@ -28738,6 +28109,12 @@
         AdmissionNumberPrefix: '',
         ShowOverallPositionOnReportCard: true,
         ShowSubjectAverageOnReportCard: false,
+        ShowInterestTalentOnReportCard: true,
+        ShowConductOnReportCard: true,
+        ShowAttitudeOnReportCard: true,
+        ShowClassTeacherRemarkOnReportCard: true,
+        ShowHeadteacherRemarkOnReportCard: true,
+        SessionTimeoutMinutes: 60,
         SchoolStampURL: '', HeadteacherSignatureURL: '', AdminSignatureURL: '',
         PublicAppBaseURL: ''
       });
@@ -28765,6 +28142,12 @@
           AdmissionNumberPrefix: schoolSettings.AdmissionNumberPrefix || '',
           ShowOverallPositionOnReportCard: schoolSettings.ShowOverallPositionOnReportCard !== false,
           ShowSubjectAverageOnReportCard: !!schoolSettings.ShowSubjectAverageOnReportCard,
+          ShowInterestTalentOnReportCard: schoolSettings.ShowInterestTalentOnReportCard !== false,
+          ShowConductOnReportCard: schoolSettings.ShowConductOnReportCard !== false,
+          ShowAttitudeOnReportCard: schoolSettings.ShowAttitudeOnReportCard !== false,
+          ShowClassTeacherRemarkOnReportCard: schoolSettings.ShowClassTeacherRemarkOnReportCard !== false,
+          ShowHeadteacherRemarkOnReportCard: schoolSettings.ShowHeadteacherRemarkOnReportCard !== false,
+          SessionTimeoutMinutes: schoolSettings.SessionTimeoutMinutes || 60,
           SchoolStampURL: schoolSettings.SchoolStampURL || '',
           HeadteacherSignatureURL: schoolSettings.HeadteacherSignatureURL || '',
           AdminSignatureURL: schoolSettings.AdminSignatureURL || '',
@@ -28975,6 +28358,37 @@
                 </label>
               </div>
             </div>
+            <div>
+              <div style={{fontSize:'13px',fontWeight:600,color:'#333',marginBottom:'8px'}}>Conduct &amp; Remarks section (end-of-term report cards only) — tick which fields to include:</div>
+              <div style={{display:'flex',gap:'18px',flexWrap:'wrap'}}>
+                <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px'}}>
+                  <input type="checkbox" checked={data.ShowInterestTalentOnReportCard} onChange={(e) => set('ShowInterestTalentOnReportCard', e.target.checked)} /> Interest / Talent
+                </label>
+                <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px'}}>
+                  <input type="checkbox" checked={data.ShowConductOnReportCard} onChange={(e) => set('ShowConductOnReportCard', e.target.checked)} /> Conduct
+                </label>
+                <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px'}}>
+                  <input type="checkbox" checked={data.ShowAttitudeOnReportCard} onChange={(e) => set('ShowAttitudeOnReportCard', e.target.checked)} /> Attitude to Work
+                </label>
+                <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px'}}>
+                  <input type="checkbox" checked={data.ShowClassTeacherRemarkOnReportCard} onChange={(e) => set('ShowClassTeacherRemarkOnReportCard', e.target.checked)} /> Class Teacher's Remark
+                </label>
+                <label style={{display:'flex',alignItems:'center',gap:'6px',cursor:'pointer',fontSize:'13px'}}>
+                  <input type="checkbox" checked={data.ShowHeadteacherRemarkOnReportCard} onChange={(e) => set('ShowHeadteacherRemarkOnReportCard', e.target.checked)} /> Headteacher's Remark
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <h3 style={{marginTop: '22px', marginBottom: '6px', color: 'var(--navy-primary)', fontSize: '15px', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+            <i className="fas fa-user-clock"></i> Session
+          </h3>
+          <div className="form-grid" style={{marginBottom:'10px'}}>
+            <div className="form-group">
+              <label><i className="fas fa-hourglass-half"></i> Auto-Logout After (minutes)</label>
+              <input type="number" min="5" max="1440" value={data.SessionTimeoutMinutes} onChange={(e) => set('SessionTimeoutMinutes', parseInt(e.target.value, 10) || 60)} />
+              <div style={{fontSize:'11px',color:'#888',marginTop:'4px'}}>Everyone is automatically signed out after this many minutes of an inactive session (5–1440). Default: 60.</div>
+            </div>
           </div>
 
           <h3 style={{marginTop: '22px', marginBottom: '6px', color: 'var(--navy-primary)', fontSize: '15px', textTransform:'uppercase', letterSpacing:'0.5px'}}>
@@ -28993,7 +28407,7 @@
             <i className="fas fa-link"></i> Public Links
           </h3>
           <p style={{color:'#777', fontSize:'13px', marginBottom:'12px'}}>
-            The web address prospective parents/students use to reach this system (the QR/"Copy Link" buttons in Admissions, Online Admission and Online Exams all build on this). Leave blank to always auto-use the current live deployment URL — safest choice unless you have a specific reason to pin it.
+            The web address prospective parents use to reach this system (the "Copy Link" button on Admissions builds on this). Leave blank to always auto-use the current live deployment URL — safest choice unless you have a specific reason to pin it.
           </p>
           <div className="settings-info-message" style={{marginBottom:'10px', fontSize:'12px'}}>
             <i className="fas fa-triangle-exclamation" style={{color:'#fb8c00'}}></i> If shared links suddenly stop working (redirect to the login page or show blank), this field is usually pinned to an <b>old deployment ID</b> — normally after re-deploying via "Deploy → New deployment" instead of "Manage deployments → Edit → New version" (the latter keeps the same /exec URL forever). Click "Detect Current URL" below, compare it to what's saved, and clear the field if they don't match.
@@ -31177,7 +30591,6 @@
       const canSeePayroll = r === 'admin' || r === 'teacher' || isBursar;
       const canSeeRecruitment = r === 'admin';
       const canSeeAdmissionReqs = r === 'admin' || r === 'clerk';
-      const canSeeInquiries = r === 'admin' || r === 'clerk';
       const canSeeOwnerPortal = r === 'admin' || r === 'owner' || r === 'supervisor';
       const canSeeDiscipline = r === 'admin' || r === 'teacher' || r === 'supervisor' || isStudent || isParent;
       const canSeeConduct = r === 'admin' || r === 'teacher' || r === 'supervisor' || isStudent || isParent;
@@ -31262,8 +30675,8 @@
           return canSeeRecruitment ? <RecruitmentView currentUser={user} role={role} /> : denied('Recruitment');
         case 'admissionReqs':
           return canSeeAdmissionReqs ? <AdmissionRequirementsView currentUser={user} role={role} schoolSettings={schoolSettings} /> : denied('Admission Requirements');
-        case 'inquiries':
-          return canSeeInquiries ? <InquiriesView currentUser={user} role={role} /> : denied('Online Admission');
+        case 'onlineLinks':
+          return <OnlineLinksView currentUser={user} role={role} />;
         case 'ownerPortal':
           return canSeeOwnerPortal ? <OwnerPortalView currentUser={user} role={role} /> : denied('Owner Portal');
         case 'discipline':
@@ -31504,7 +30917,7 @@
         return () => clearInterval(iv);
       }, [isLoggedIn, currentUser, userRole]);
 
-      const SESSION_DURATION = 60 * 60 * 1000;
+      // admin-configurable (School Settings > Session) — defaults to 60 minutes until schoolSettings loads
 
       const applyTheme = (mode) => {
         if (mode === 'dark') {
@@ -31534,6 +30947,8 @@
       }, [themeMode, customColors]);
 
       useEffect(() => {
+        // schoolSettings loads async — default to 60 min until it's in, then follow whatever admin set
+        const SESSION_DURATION = ((schoolSettings && schoolSettings.SessionTimeoutMinutes) || 60) * 60 * 1000;
         const checkSession = () => {
           try {
             const session = localStorage.getItem('userSession');
@@ -31591,7 +31006,7 @@
         }, 60000);
 
         return () => clearInterval(sessionCheckInterval);
-      }, []);
+      }, [schoolSettings && schoolSettings.SessionTimeoutMinutes]);
 
       const handleLogin = (result) => {
         const role = String(result.role || '').toLowerCase();
@@ -31700,15 +31115,13 @@
       };
 
       // public (no-login) pages — reached via the app's own URL + a query param, e.g.
-      // https://.../exec?public=inquiry — checked before the login gate so anyone with the link
+      // https://.../exec?public=admission — checked before the login gate so anyone with the link
       // can use them without an account.
       const publicParams = new URLSearchParams(window.location.search);
       const publicPage = publicParams.get('public');
-      if (publicPage === 'inquiry') return <PublicInquiryForm schoolSettings={schoolSettings} />;
       if (publicPage === 'admission') return <PublicAdmissionForm schoolSettings={schoolSettings} />;
       if (publicPage === 'reportcard') return <PublicReportCardPage schoolSettings={schoolSettings} shareToken={publicParams.get('token')} />;
       if (publicPage === 'job') return <PublicJobApplicationForm schoolSettings={schoolSettings} postingId={publicParams.get('postingId')} />;
-      if (publicPage === 'exam') return <PublicExamView schoolSettings={schoolSettings} token={publicParams.get('token')} />;
 
       return (
         <div>
