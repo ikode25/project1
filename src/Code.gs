@@ -716,13 +716,15 @@ function nextStudentId(sh) {
   return max + 1;
 }
 
-// students RBAC: read=admin/clerk(basic)/teacher(own_class)/supervisor + future student/parent
+// students RBAC: read=admin/clerk(basic)/teacher(own_class)/supervisor/bursar(basic) + student/parent
+// (bursar needs the student list to record a fee payment against someone — was missing this
+// entirely, which is why the Record Payment student picker came up empty for that role)
 function canReadStudents(role) {
   var r = String(role || '').toLowerCase();
-  return r === 'admin' || r === 'clerk' || r === 'teacher' || r === 'supervisor' || r === 'student' || r === 'parent';
+  return r === 'admin' || r === 'clerk' || r === 'teacher' || r === 'supervisor' || r === 'bursar' || r === 'student' || r === 'parent';
 }
-// clerk + supervisor get the stripped student view (no Ghana Card/medical/family/contact); admin/teacher see full
-function isClerkBasicView(role) { var r = String(role || '').toLowerCase(); return r === 'clerk' || r === 'supervisor'; }
+// clerk + supervisor + bursar get the stripped student view (no Ghana Card/medical/family/contact); admin/teacher see full
+function isClerkBasicView(role) { var r = String(role || '').toLowerCase(); return r === 'clerk' || r === 'supervisor' || r === 'bursar'; }
 
 // teacher's class_ids — for student own-class filter
 // set of "classId|subjectId" keys a teacher is explicitly assigned to teach (Teacher_Assignments rows).
@@ -759,10 +761,10 @@ function getTeacherClassIds(currentUser) {
   return Object.keys(seen).map(Number);
 }
 
-// parents RBAC: read=admin/clerk/teacher(mobile-bridge to own class)/supervisor + future student/parent
+// parents RBAC: read=admin/clerk/teacher(mobile-bridge to own class)/supervisor/bursar + student/parent
 function canReadParents(role) {
   var r = String(role || '').toLowerCase();
-  return r === 'admin' || r === 'clerk' || r === 'teacher' || r === 'supervisor' || r === 'student' || r === 'parent';
+  return r === 'admin' || r === 'clerk' || r === 'teacher' || r === 'supervisor' || r === 'bursar' || r === 'student' || r === 'parent';
 }
 
 function nextParentId(sh) {
@@ -4786,7 +4788,12 @@ function rowToAdmission(row, cmap, umap) {
 
 // ============== Admission Requirements (documents/items a family must bring for admission) ==============
 var ADMISSION_REQUIREMENTS_SHEET = 'Admission_Requirements';
-var ADMISSION_REQUIREMENTS_HEADERS = ['ID', 'Title', 'Description', 'DisplayOrder', 'IsDeleted', 'CreatedAt', 'UpdatedAt', 'CreatedBy'];
+// ClassID/Term are both optional scoping — blank ClassID = applies to every class, blank Term =
+// applies every term. A school can list something once for "all classes, all terms" (e.g. Birth
+// Certificate) or scope it tightly (e.g. "New PE kit" only for Term 1, only for Basic 4) since
+// requirements genuinely do change mid-year (uniform changes, book lists, revised fees, etc).
+var ADMISSION_REQUIREMENTS_HEADERS = ['ID', 'Title', 'Description', 'DisplayOrder', 'IsDeleted', 'CreatedAt', 'UpdatedAt', 'CreatedBy', 'ClassID', 'Term', 'Category'];
+var ADMISSION_REQ_CATEGORIES = ['document', 'fees', 'uniform', 'books', 'toiletries', 'other'];
 
 function _ensureAdmissionRequirementsSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -4796,22 +4803,41 @@ function _ensureAdmissionRequirementsSheet() {
     sh.appendRow(ADMISSION_REQUIREMENTS_HEADERS);
     sh.getRange(1, 1, 1, ADMISSION_REQUIREMENTS_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
     sh.setFrozenRows(1);
+  } else if (sh.getLastColumn() < ADMISSION_REQUIREMENTS_HEADERS.length) {
+    var addFrom = sh.getLastColumn() + 1;
+    sh.getRange(1, addFrom, 1, ADMISSION_REQUIREMENTS_HEADERS.length - sh.getLastColumn()).setValues([ADMISSION_REQUIREMENTS_HEADERS.slice(addFrom - 1)])
+      .setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
   }
   return sh;
 }
 
-function _rowToAdmissionRequirement(row) {
-  return { ID: row[0], Title: row[1] || '', Description: row[2] || '', DisplayOrder: parseInt(row[3], 10) || 0, CreatedAt: toIso(row[5]), UpdatedAt: toIso(row[6]) };
+function _rowToAdmissionRequirement(row, cmap) {
+  var clsId = row[8];
+  return {
+    ID: row[0], Title: row[1] || '', Description: row[2] || '', DisplayOrder: parseInt(row[3], 10) || 0,
+    CreatedAt: toIso(row[5]), UpdatedAt: toIso(row[6]),
+    ClassID: clsId || '', ClassLabel: (clsId && cmap && cmap[clsId]) ? cmap[clsId].label : 'All Classes',
+    Term: row[9] || '', Category: row[10] || 'document'
+  };
 }
 
-// any role — shown on the admin dashboard and printable for prospective-parent inquiries
-function getAdmissionRequirements(currentUser, currentRole) {
+// any role — shown on the admin dashboard and printable for prospective-parent inquiries.
+// opts: { classId, term } — when given, returns "applies everywhere" items PLUS anything scoped
+// specifically to that class/term (blank ClassID/Term on a row always means "applies to all").
+function getAdmissionRequirements(currentUser, currentRole, opts) {
   try {
     var sh = _ensureAdmissionRequirementsSheet();
     var data = sh.getDataRange().getValues(), out = [];
+    var cmap = getClassesMap();
+    var wantClass = opts && opts.classId ? String(opts.classId) : '';
+    var wantTerm = opts && opts.term ? String(opts.term) : '';
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][4]) === '1') continue;
-      out.push(_rowToAdmissionRequirement(data[i]));
+      var rowClass = String(data[i][8] || '');
+      var rowTerm = String(data[i][9] || '');
+      if (wantClass && rowClass && rowClass !== wantClass) continue;
+      if (wantTerm && rowTerm && rowTerm !== wantTerm) continue;
+      out.push(_rowToAdmissionRequirement(data[i], cmap));
     }
     out.sort(function (a, b) { return a.DisplayOrder - b.DisplayOrder || a.ID - b.ID; });
     return { success: true, data: out };
@@ -4825,12 +4851,17 @@ function addAdmissionRequirement(d, currentUser, currentRole) {
     if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
     var title = String(d.Title || '').trim();
     if (!title) return { success: false, message: 'Title is required' };
+    var cat = String(d.Category || 'document').toLowerCase();
+    if (ADMISSION_REQ_CATEGORIES.indexOf(cat) === -1) cat = 'other';
+    var clsId = parseInt(d.ClassID, 10);
+    var term = String(d.Term || '').trim();
+    if (term && ['term1', 'term2', 'term3'].indexOf(term) === -1) return { success: false, message: 'Invalid term' };
     var sh = _ensureAdmissionRequirementsSheet();
     var data = sh.getDataRange().getValues();
     var maxOrder = 0;
     for (var i = 1; i < data.length; i++) { if (String(data[i][4]) !== '1') maxOrder = Math.max(maxOrder, parseInt(data[i][3], 10) || 0); }
     var ts = nowIso(), id = nextRowId(sh);
-    sh.appendRow([id, title, String(d.Description || '').trim(), maxOrder + 1, '0', ts, ts, currentUser || '']);
+    sh.appendRow([id, title, String(d.Description || '').trim(), maxOrder + 1, '0', ts, ts, currentUser || '', isNaN(clsId) ? '' : clsId, term, cat]);
     addLog(currentUser, 'Admission Requirement Added', title);
     return { success: true, message: 'Requirement added', id: id };
   } catch (err) {
@@ -4850,6 +4881,20 @@ function updateAdmissionRequirement(id, d, currentUser, currentRole) {
       if (d.Title !== undefined) sh.getRange(row, 2).setValue(String(d.Title || '').trim());
       if (d.Description !== undefined) sh.getRange(row, 3).setValue(String(d.Description || '').trim());
       if (d.DisplayOrder !== undefined) sh.getRange(row, 4).setValue(parseInt(d.DisplayOrder, 10) || 0);
+      if (d.ClassID !== undefined) {
+        var clsId = parseInt(d.ClassID, 10);
+        sh.getRange(row, 9).setValue(isNaN(clsId) ? '' : clsId);
+      }
+      if (d.Term !== undefined) {
+        var term = String(d.Term || '').trim();
+        if (term && ['term1', 'term2', 'term3'].indexOf(term) === -1) return { success: false, message: 'Invalid term' };
+        sh.getRange(row, 10).setValue(term);
+      }
+      if (d.Category !== undefined) {
+        var cat = String(d.Category || 'document').toLowerCase();
+        if (ADMISSION_REQ_CATEGORIES.indexOf(cat) === -1) cat = 'other';
+        sh.getRange(row, 11).setValue(cat);
+      }
       sh.getRange(row, 7).setValue(nowIso());
       addLog(currentUser, 'Admission Requirement Updated', '#' + idn);
       return { success: true, message: 'Requirement updated' };

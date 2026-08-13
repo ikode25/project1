@@ -7507,7 +7507,7 @@
                 <button className="btn btn-primary" onClick={handlePrint}><i className="fas fa-print"></i> Print / Save as PDF</button>
               </div>
 
-              <div className="report-card" style={{ maxWidth: '780px', margin: '0 auto', fontFamily: "'Times New Roman', Georgia, serif" }}>
+              <div className="report-card" style={{ maxWidth: '780px', margin: '0 auto', fontFamily: "'Times New Roman', Georgia, serif", border: '4px solid var(--navy-primary)', padding: '22px' }}>
                 <div className="rc-school-hdr" style={{ position: 'relative' }}>
                   <img src={schoolLogo} alt="" onError={(e) => { e.target.style.display = 'none'; }} />
                   <div style={{ flex: 1 }}>
@@ -19461,7 +19461,11 @@
       // load students (student mode default load)
       useEffect(() => {
         google.script.run
-          .withSuccessHandler((res) => { if (res.success) setStudents(res.data || []); })
+          .withSuccessHandler((res) => {
+            if (res.success) setStudents(res.data || []);
+            else Swal.fire({ icon: 'error', title: 'Could not load students', text: res.message || 'Unknown error' });
+          })
+          .withFailureHandler((err) => Swal.fire({ icon: 'error', title: 'Could not load students', text: err.message }))
           .getAllStudents(currentUser, role);
       }, []);
 
@@ -23168,9 +23172,31 @@
     }
 
     // ============== Admission Requirements ==============
+    const ADMISSION_REQ_CATEGORY_OPTS = [
+      { value: 'document', label: 'Document' },
+      { value: 'fees', label: 'Fees' },
+      { value: 'uniform', label: 'Uniform' },
+      { value: 'books', label: 'Books' },
+      { value: 'toiletries', label: 'Toiletries' },
+      { value: 'other', label: 'Other' }
+    ];
+    const ADMISSION_REQ_CATEGORY_ICONS = { document: 'file-alt', fees: 'money-bill-wave', uniform: 'tshirt', books: 'book', toiletries: 'pump-soap', other: 'ellipsis-h' };
+    const TERM_OPTS = [{ value: 'term1', label: 'Term 1' }, { value: 'term2', label: 'Term 2' }, { value: 'term3', label: 'Term 3' }];
+    const TERM_LABELS_CLIENT = { term1: 'Term 1', term2: 'Term 2', term3: 'Term 3' };
+
     function AdmissionRequirementModal({ item, currentUser, role, onClose, onSave, saving }) {
-      const [formData, setFormData] = useState({ Title: item?.Title || '', Description: item?.Description || '' });
+      const [classes, setClasses] = useState([]);
+      const [formData, setFormData] = useState({
+        Title: item?.Title || '', Description: item?.Description || '',
+        ClassID: item?.ClassID ? String(item.ClassID) : '', Term: item?.Term || '', Category: item?.Category || 'document'
+      });
       const set = (k, v) => setFormData({ ...formData, [k]: v });
+
+      useEffect(() => {
+        google.script.run.withSuccessHandler((res) => { if (res.success) setClasses(res.data || []); }).getAllClasses(currentUser, role);
+      }, []);
+      const classOpts = classes.map(c => ({ value: String(c.ID), label: c.Label }));
+
       return (
         <div className="modal-overlay" onClick={onClose}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -23180,6 +23206,9 @@
                 <div className="form-grid">
                   <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Title *</label><input type="text" value={formData.Title} onChange={(e) => set('Title', e.target.value)} required maxLength="150" placeholder="e.g. Birth Certificate (original + copy)" /></div>
                   <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Description</label><textarea value={formData.Description} onChange={(e) => set('Description', e.target.value)} rows="2" placeholder="Optional extra detail..." /></div>
+                  <SearchableDropdown label="Category" icon="fas fa-tag" options={ADMISSION_REQ_CATEGORY_OPTS} value={formData.Category} onChange={(v) => set('Category', v)} placeholder="Select category..." />
+                  <SearchableDropdown label="Class (blank = all classes)" icon="fas fa-school" options={classOpts} value={formData.ClassID} onChange={(v) => set('ClassID', v)} placeholder="All classes..." />
+                  <SearchableDropdown label="Term (blank = all terms)" icon="fas fa-calendar-alt" options={TERM_OPTS} value={formData.Term} onChange={(v) => set('Term', v)} placeholder="All terms..." />
                 </div>
                 <div className="form-actions">
                   <button type="submit" className="btn btn-primary" disabled={saving}><i className="fas fa-save"></i> {saving ? 'Saving…' : 'Save'}</button>
@@ -23193,8 +23222,15 @@
     }
 
     function AdmissionRequirementsView({ currentUser, role, schoolSettings }) {
+      const [filterClass, setFilterClass] = useState('');
+      const [filterTerm, setFilterTerm] = useState('');
+      const [classes, setClasses] = useState([]);
+      useEffect(() => {
+        google.script.run.withSuccessHandler((res) => { if (res.success) setClasses(res.data || []); }).getAllClasses(currentUser, role);
+      }, []);
+      const swrKey = 'getAdmissionRequirements:' + filterClass + ':' + filterTerm;
       const { data: itemsData, error: loadError, isLoading: loading, mutate: load } =
-        useSWR('getAdmissionRequirements', () => swrFetcher('getAdmissionRequirements', currentUser, role));
+        useSWR(swrKey, () => swrFetcher('getAdmissionRequirements', currentUser, role, { classId: filterClass, term: filterTerm }));
       const items = itemsData || [];
       const [showModal, setShowModal] = useState(false);
       const [editing, setEditing] = useState(null);
@@ -23234,6 +23270,14 @@
       };
 
       const schoolName = (schoolSettings && schoolSettings.SchoolName) || 'School';
+      const classOpts = classes.map(c => ({ value: String(c.ID), label: c.Label }));
+      const filterLabel = (filterClass ? (classOpts.find(c => c.value === filterClass)?.label || 'Selected class') : 'All Classes')
+        + ' — ' + (filterTerm ? (TERM_OPTS.find(t => t.value === filterTerm)?.label || filterTerm) : 'All Terms');
+
+      // group the (already class/term-filtered) list by category for the printed/on-screen list,
+      // in the fixed order the categories are declared in (document first, other last) rather than
+      // whatever order they happen to appear in the sheet.
+      const grouped = ADMISSION_REQ_CATEGORY_OPTS.map((c) => ({ ...c, items: items.filter((r) => (r.Category || 'document') === c.value) })).filter((g) => g.items.length > 0);
 
       return (
         <div className="data-section">
@@ -23244,6 +23288,22 @@
               <button className="btn btn-success" onClick={() => { setEditing(null); setShowModal(true); }}><i className="fas fa-plus"></i> Add Requirement</button>
             </div>
           </div>
+          <div className="settings-info-message no-print" style={{marginBottom:'15px'}}>
+            <i className="fas fa-info-circle"></i> Requirements can change during the year (uniform, book list, fees, etc). Scope an item to a specific class and/or term when it only applies there — leave either blank to mean "all classes" / "all terms".
+          </div>
+          <div className="no-print" style={{display:'flex',gap:'12px',flexWrap:'wrap',marginBottom:'16px',alignItems:'flex-end'}}>
+            <div style={{minWidth:'220px'}}>
+              <SearchableDropdown label="Filter by Class" icon="fas fa-school" options={classOpts} value={filterClass} onChange={setFilterClass} placeholder="All classes..." />
+            </div>
+            <div style={{minWidth:'200px'}}>
+              <SearchableDropdown label="Filter by Term" icon="fas fa-calendar-alt" options={TERM_OPTS} value={filterTerm} onChange={setFilterTerm} placeholder="All terms..." />
+            </div>
+            {(filterClass || filterTerm) && (
+              <button className="btn btn-secondary btn-sm" onClick={() => { setFilterClass(''); setFilterTerm(''); }} style={{marginBottom:'2px'}}>
+                <i className="fas fa-times"></i> Clear Filters
+              </button>
+            )}
+          </div>
           {loadError && !loading && items.length === 0 && (
             <div className="settings-info-message no-print" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>
               <i className="fas fa-triangle-exclamation" style={{marginRight:'6px',color:'#ea4335'}}></i>
@@ -23253,25 +23313,41 @@
           {loading && <TableSkeleton rows={5} columns={2} />}
           {!loading && items.length === 0 && (
             <div className="no-print" style={{textAlign:'center',padding:'40px',color:'#888',background:'#f8f9fa'}}>
-              No admission requirements yet. Click "Add Requirement" to list what parents must bring.
+              {(filterClass || filterTerm)
+                ? 'No requirements match this filter. Try clearing the class/term filter, or add one scoped to it.'
+                : 'No admission requirements yet. Click "Add Requirement" to list what parents must bring.'}
             </div>
           )}
 
           {!loading && items.length > 0 && (
             <div className="report-card" style={{maxWidth:'760px',margin:'0 auto'}}>
               <div className="rc-title" style={{background:'transparent',color:'var(--navy-primary)',border:'2px solid var(--navy-primary)'}}>{schoolName} — Admission Requirements</div>
-              <ol style={{fontSize:'14px',lineHeight:1.9,padding:'6px 26px'}}>
-                {items.map((r) => (
-                  <li key={r.ID} style={{marginBottom:'6px'}}>
-                    <strong>{r.Title}</strong>
-                    {r.Description && <div style={{fontSize:'12.5px',color:'#666',marginTop:'2px'}}>{r.Description}</div>}
-                    <span className="no-print" style={{marginLeft:'10px'}}>
-                      <button className="action-icon edit-icon" title="Edit" onClick={() => { setEditing(r); setShowModal(true); }}><i className="fas fa-edit"></i></button>
-                      <button className="action-icon delete-icon" title="Delete" onClick={() => handleDelete(r)}><i className="fas fa-trash"></i></button>
-                    </span>
-                  </li>
-                ))}
-              </ol>
+              <div className="no-print" style={{textAlign:'center',fontSize:'12.5px',color:'#888',marginTop:'-8px',marginBottom:'10px'}}>{filterLabel}</div>
+              {grouped.map((g) => (
+                <div key={g.value} style={{marginBottom:'14px'}}>
+                  <div style={{fontWeight:'700',fontSize:'13.5px',color:'var(--navy-primary)',borderBottom:'1px solid #ddd',padding:'4px 26px',display:'flex',alignItems:'center',gap:'6px'}}>
+                    <i className={'fas fa-' + ADMISSION_REQ_CATEGORY_ICONS[g.value]}></i> {g.label}
+                  </div>
+                  <ol style={{fontSize:'14px',lineHeight:1.9,padding:'6px 26px'}}>
+                    {g.items.map((r) => (
+                      <li key={r.ID} style={{marginBottom:'6px'}}>
+                        <strong>{r.Title}</strong>
+                        {(r.ClassID || r.Term) && (
+                          <span style={{marginLeft:'8px',fontSize:'11px',fontWeight:'600'}}>
+                            {r.ClassID && <span style={{background:'#e8f0fe',color:'#1a56db',padding:'1px 7px',borderRadius:'10px',marginRight:'4px'}}>{r.ClassLabel}</span>}
+                            {r.Term && <span style={{background:'#fef3e0',color:'#b06a00',padding:'1px 7px',borderRadius:'10px'}}>{TERM_LABELS_CLIENT[r.Term] || r.Term}</span>}
+                          </span>
+                        )}
+                        {r.Description && <div style={{fontSize:'12.5px',color:'#666',marginTop:'2px'}}>{r.Description}</div>}
+                        <span className="no-print" style={{marginLeft:'10px'}}>
+                          <button className="action-icon edit-icon" title="Edit" onClick={() => { setEditing(r); setShowModal(true); }}><i className="fas fa-edit"></i></button>
+                          <button className="action-icon delete-icon" title="Delete" onClick={() => handleDelete(r)}><i className="fas fa-trash"></i></button>
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              ))}
             </div>
           )}
 
