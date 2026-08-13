@@ -12656,7 +12656,7 @@
     // ============== Student Drill-down: Fees ==============
     function StudentFeesModal({ student, currentUser, role, onClose }) {
       const r = String(role).toLowerCase();
-      const canPay = r === 'admin' || r === 'clerk';
+      const canPay = r === 'admin' || r === 'clerk' || r === 'bursar';
       const [loading, setLoading] = useState(true);
       const [data, setData] = useState(null);
       const [statusFilter, setStatusFilter] = useState('');
@@ -12841,6 +12841,14 @@
                   </span>
                 )}
               </h4>
+              {!duesLoading && duesSummary.arrears > 0 && (
+                <div style={{padding:'10px 14px',background:'#fdecea',border:'1.5px solid #ea4335',borderRadius:'6px',marginBottom:'12px',display:'flex',alignItems:'center',gap:'8px'}}>
+                  <i className="fas fa-triangle-exclamation" style={{color:'#ea4335',fontSize:'16px'}}></i>
+                  <span style={{fontSize:'13px',color:'#7a1f1f'}}>
+                    <strong>{duesSummary.arrears} arrear{duesSummary.arrears !== 1 ? 's' : ''} owing GH₵{fmt(duesSummary.arrearsAmt)}</strong> from a previous term — shown first below, marked <strong>ARREARS</strong>. Collect these alongside this term's dues.
+                  </span>
+                </div>
+              )}
               {duesLoading ? <TableSkeleton rows={3} columns={4} /> : dues.length === 0 ? (
                 <div style={{textAlign:'center',padding:'18px',background:'#f8f9fa',color:'#888',border:'1px dashed #ccc',marginBottom:'18px'}}>
                   <i className="fas fa-info-circle"></i> No fee dues yet. Set up a Termly (or Monthly) fee structure for this class.
@@ -12907,13 +12915,14 @@
                     {dues.map((d) => {
                       const isPaid = d.Status === 'paid';
                       const isSelected = !!selectedDues[d.ID];
+                      const isArrears = !isPaid && d.IsArrears;
                       return (
                         <div key={d.ID}
                           onClick={() => canPay && !isPaid && toggleDue(d.ID)}
                           style={{
                             padding:'10px 12px',
-                            background: isPaid ? '#f0fbf4' : isSelected ? '#fff8e1' : '#fff',
-                            border: '1.5px solid ' + (isPaid ? '#a4d8b3' : isSelected ? '#fbbc04' : '#e1e6ec'),
+                            background: isPaid ? '#f0fbf4' : isArrears ? '#fdecea' : isSelected ? '#fff8e1' : '#fff',
+                            border: '1.5px solid ' + (isPaid ? '#a4d8b3' : isArrears ? '#ea4335' : isSelected ? '#fbbc04' : '#e1e6ec'),
                             borderRadius:'6px',
                             cursor: (canPay && !isPaid) ? 'pointer' : 'default',
                             position:'relative',
@@ -12931,7 +12940,7 @@
                           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                             <span style={{fontWeight:700,fontSize:'14px',color:isPaid ? '#34a853' : '#ea4335'}}>GH₵{fmt(d.Amount)}</span>
                             <span style={{fontSize:'10px',padding:'2px 7px',borderRadius:'10px',background: isPaid ? '#34a853' : '#ea4335',color:'#fff',fontWeight:700,textTransform:'uppercase'}}>
-                              {isPaid ? 'Paid' : 'Pending'}
+                              {isPaid ? 'Paid' : isArrears ? 'Arrears' : 'Pending'}
                             </span>
                           </div>
                           {isPaid && d.PaidDate && (
@@ -15177,6 +15186,21 @@
         // new fields
         term: '', assessmentType: '', gradingScheme: '', curriculumStage: ''
       });
+      const [activeTerm, setActiveTerm] = useState('');
+
+      // multi-term system: default the list to the school's current active term so exams from
+      // earlier terms don't clutter the day-to-day view; admin/supervisor can pick another term
+      // (or Clear filters) to look back at older exams — nothing is hidden, just not the default.
+      useEffect(() => {
+        google.script.run
+          .withSuccessHandler((res) => {
+            if (res.success && res.data.ActiveTerm) {
+              setActiveTerm(res.data.ActiveTerm);
+              setFilters((f) => ({ ...f, term: res.data.ActiveTerm }));
+            }
+          })
+          .getActiveAcademicSession();
+      }, []);
 
       // labels + colors for new enum cols/dropdowns
       const TERM_LABELS = { term1:'Term 1', term2:'Term 2', term3:'Term 3', semester1:'Semester 1', semester2:'Semester 2', quarter1:'Q1', quarter2:'Q2', quarter3:'Q3', quarter4:'Q4' };
@@ -15571,7 +15595,9 @@
                   <label><i className="fas fa-calendar-week"></i> Term</label>
                   <SearchableDropdown
                     options={[
-                      { value: 'term1', label: 'Term 1' }, { value: 'term2', label: 'Term 2' }, { value: 'term3', label: 'Term 3' }
+                      { value: 'term1', label: 'Term 1' + (activeTerm === 'term1' ? ' (Active)' : '') },
+                      { value: 'term2', label: 'Term 2' + (activeTerm === 'term2' ? ' (Active)' : '') },
+                      { value: 'term3', label: 'Term 3' + (activeTerm === 'term3' ? ' (Active)' : '') }
                     ]}
                     value={filters.term}
                     onChange={(v) => setFilters({...filters, term: v})}
@@ -16420,15 +16446,32 @@
       const exams = examsData || [];
       const [showEntry, setShowEntry] = useState(false);
       const [selectedExam, setSelectedExam] = useState(null);
-      const [filters, setFilters] = useState({ classId: '', published: '', search: '' });
+      const [filters, setFilters] = useState({ classId: '', published: '', search: '', term: '' });
+      const [activeTerm, setActiveTerm] = useState('');
 
-      // honor the deep-link from ExamsView's "Marks" button
+      // this is a multi-term system — default the list to the school's CURRENT active term so
+      // marks entry stays focused on "what's happening now"; admin/supervisor can still pick a
+      // past/future term from the filter (or Clear it) to look back at older results.
+      useEffect(() => {
+        google.script.run
+          .withSuccessHandler((res) => {
+            if (res.success && res.data.ActiveTerm) {
+              setActiveTerm(res.data.ActiveTerm);
+              setFilters((f) => ({ ...f, term: res.data.ActiveTerm }));
+            }
+          })
+          .getActiveAcademicSession();
+      }, []);
+
+      // honor the deep-link from ExamsView's "Marks" button — jumping to a specific exam should
+      // show it even if it's outside the currently-filtered term.
       useEffect(() => {
         if (preSelectExamId && exams.length > 0) {
           const e = exams.find(x => String(x.ID) === String(preSelectExamId));
           if (e) {
             setSelectedExam(e);
             setShowEntry(true);
+            setFilters((f) => ({ ...f, term: '' }));
           }
           if (onConsumePreSelect) onConsumePreSelect();
         }
@@ -16438,6 +16481,7 @@
         if (filters.classId && String(e.ClassID) !== String(filters.classId)) return false;
         if (filters.published === 'yes' && !e.IsPublished) return false;
         if (filters.published === 'no' && e.IsPublished) return false;
+        if (filters.term && String(e.Term || 'term1') !== filters.term) return false;
         if (filters.search) {
           const q = filters.search.toLowerCase();
           const hay = (e.ExamName + ' ' + (e.ExamType || '') + ' ' + (e.ClassLabel || '') + ' ' + (e.AcademicYear || '')).toLowerCase();
@@ -16456,12 +16500,20 @@
       const headerLabel = isAdmin ? 'Results / Marks Entry' :
                           isTeacher ? 'Marks Entry (My Classes)' :
                           isSupervisor ? 'Results (Read-only)' : 'Results';
+      const TERM_LABELS_MV = { term1: 'Term 1', term2: 'Term 2', term3: 'Term 3' };
 
       return (
         <div className="data-section">
           <div className="section-header">
             <h2><i className="fas fa-graduation-cap"></i> {headerLabel}{syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}</h2>
           </div>
+
+          {activeTerm && filters.term === activeTerm && (
+            <div className="settings-info-message" style={{marginBottom:'15px'}}>
+              <i className="fas fa-calendar-check" style={{marginRight:'6px'}}></i>
+              Showing <strong>{TERM_LABELS_MV[activeTerm] || activeTerm}</strong> (the current active term). Use the Term filter below to look back at a previous term, or pick "All Terms".
+            </div>
+          )}
 
           {loadError && !loading && exams.length === 0 && (
             <div className="settings-info-message" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>
@@ -16484,7 +16536,7 @@
             <div className="filters-section">
               <div className="filters-header">
                 <h3><i className="fas fa-filter"></i> Filters</h3>
-                <button className="btn btn-secondary btn-sm" onClick={() => setFilters({ classId: '', published: '', search: '' })}>
+                <button className="btn btn-secondary btn-sm" onClick={() => setFilters({ classId: '', published: '', search: '', term: '' })}>
                   <i className="fas fa-times-circle"></i> Clear
                 </button>
               </div>
@@ -16494,6 +16546,19 @@
                   <input type="text" value={filters.search}
                     onChange={(e) => setFilters({...filters, search: e.target.value})}
                     placeholder="Search exams..." className="filter-input" />
+                </div>
+                <div className="filter-group">
+                  <label><i className="fas fa-calendar-week"></i> Term</label>
+                  <SearchableDropdown
+                    options={[
+                      { value: 'term1', label: 'Term 1' + (activeTerm === 'term1' ? ' (Active)' : '') },
+                      { value: 'term2', label: 'Term 2' + (activeTerm === 'term2' ? ' (Active)' : '') },
+                      { value: 'term3', label: 'Term 3' + (activeTerm === 'term3' ? ' (Active)' : '') }
+                    ]}
+                    value={filters.term}
+                    onChange={(v) => setFilters({...filters, term: v})}
+                    placeholder="All Terms"
+                  />
                 </div>
                 <div className="filter-group">
                   <label><i className="fas fa-school"></i> Class</label>
@@ -18851,6 +18916,15 @@
       const tableInstanceRef = useRef(null);
 
       const [filters, setFilters] = useState({ status: '', mode: '', search: '' });
+      const [arrearsStudent, setArrearsStudent] = useState(null);
+      const [showAllArrears, setShowAllArrears] = useState(false);
+
+      // arrears: students owing from a PREVIOUS term, surfaced right here in the current term's
+      // collection view so bursar/clerk/admin can chase them down without hunting per-student.
+      const { data: arrearsData, mutate: refreshArrears } =
+        useSWR('getArrearsOverview', () => swrFetcher('getArrearsOverview', currentUser, role));
+      const arrears = arrearsData || [];
+      const arrearsTotal = arrears.reduce((s, a) => s + (parseFloat(a.Amount) || 0), 0);
 
       // destroy DataTable on unmount
       useEffect(() => {
@@ -19150,6 +19224,45 @@
             </div>
           )}
 
+          {arrears.length > 0 && (
+            <div style={{marginBottom:'18px',border:'1.5px solid #ea4335',borderRadius:'6px',overflow:'hidden'}}>
+              <div style={{background:'#fdecea',padding:'10px 14px',display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:'8px'}}>
+                <div style={{fontSize:'13.5px',color:'#7a1f1f'}}>
+                  <i className="fas fa-triangle-exclamation" style={{marginRight:'6px',color:'#ea4335'}}></i>
+                  <strong>{arrears.length} student{arrears.length !== 1 ? 's' : ''} owing arrears from a previous term</strong> — GH₵{arrearsTotal.toFixed(2)} outstanding. Collect these alongside this term's fees.
+                </div>
+                {arrears.length > 8 && (
+                  <button className="btn btn-secondary btn-sm" onClick={() => setShowAllArrears(!showAllArrears)}>
+                    {showAllArrears ? 'Show top 8' : `Show all ${arrears.length}`}
+                  </button>
+                )}
+              </div>
+              <div style={{maxHeight: showAllArrears ? '360px' : 'none', overflowY: showAllArrears ? 'auto' : 'visible'}}>
+                <table style={{width:'100%',fontSize:'13px',borderCollapse:'collapse'}}>
+                  <tbody>
+                    {(showAllArrears ? arrears : arrears.slice(0, 8)).map((a) => (
+                      <tr key={a.StudentID} style={{borderTop:'1px solid #f5d5d2'}}>
+                        <td style={{padding:'8px 14px'}}>
+                          <div style={{fontWeight:600,color:'var(--navy-primary)'}}>{a.StudentName}</div>
+                          <div style={{fontSize:'11px',color:'#888'}}><span style={{fontFamily:'monospace'}}>{a.AdmissionNumber}</span> · {a.ClassLabel}</div>
+                        </td>
+                        <td style={{padding:'8px 14px',textAlign:'right'}}>
+                          <span style={{fontWeight:700,color:'#ea4335'}}>GH₵{Number(a.Amount).toFixed(2)}</span>
+                          <div style={{fontSize:'11px',color:'#888'}}>{a.Count} period{a.Count !== 1 ? 's' : ''} owing</div>
+                        </td>
+                        <td style={{padding:'8px 14px',textAlign:'right'}}>
+                          <button className="btn btn-primary btn-sm" onClick={() => setArrearsStudent({ ID: a.StudentID, FullName: a.StudentName, AdmissionNumber: a.AdmissionNumber, ClassLabel: a.ClassLabel })}>
+                            <i className="fas fa-hand-holding-usd"></i> Collect
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
           {!loading && items.length > 0 && (
             <div style={{display:'flex',gap:'12px',marginBottom:'15px',flexWrap:'wrap'}}>
               <div style={{flex:1,minWidth:'200px',padding:'12px 15px',background:'linear-gradient(135deg,#34a853,#0f9d58)',color:'white',borderLeft:'4px solid #0f9d58'}}>
@@ -19270,6 +19383,14 @@
             <FeeReceiptA4Modal
               payment={drillPayment}
               onClose={() => { setShowReceiptModal(false); setDrillPayment(null); }}
+            />
+          )}
+
+          {arrearsStudent && (
+            <StudentFeesModal
+              student={arrearsStudent}
+              currentUser={currentUser} role={role}
+              onClose={() => { setArrearsStudent(null); refreshArrears(); refreshPayments(); }}
             />
           )}
         </div>

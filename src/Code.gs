@@ -20273,6 +20273,28 @@ function getViewerScope(currentUser, currentRole) {
   return { role: role, all: false, classIds: classIds, studentIds: studentIds };
 }
 
+// A due's BillingMonth is either a termly key ("term2-2025/2026") or a legacy monthly key
+// ("2026-08"). "Arrears" = still unpaid AND the period it was billed for has already passed —
+// this is what lets the current term's fee collection view surface "money owed from before"
+// without also flagging dues for a term that hasn't started yet (e.g. Term 3 dues generated
+// ahead of time while the school is still in Term 1).
+var _TERM_ORDER = { term1: 1, term2: 2, term3: 3 };
+function _isPastBillingPeriod(billingMonth, activeTerm, academicYear) {
+  var key = String(billingMonth || '');
+  var termMatch = key.match(/^(term[123])-(.+)$/);
+  if (termMatch) {
+    var term = termMatch[1], year = termMatch[2];
+    if (year !== String(academicYear || '')) return year < String(academicYear || ''); // different year: string-compare "2025/2026" style is safe lexically for consecutive years
+    return (_TERM_ORDER[term] || 0) < (_TERM_ORDER[activeTerm] || 1);
+  }
+  var monthMatch = key.match(/^(\d{4})-(\d{2})$/);
+  if (monthMatch) {
+    var nowYm = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'GMT', 'yyyy-MM');
+    return key < nowYm;
+  }
+  return false;
+}
+
 // Read monthly dues for a student — role-scoped (student=self, parent=linked-only, admin/clerk=any)
 function getStudentMonthlyDues(studentId, currentUser, currentRole) {
   try {
@@ -20297,7 +20319,13 @@ function getStudentMonthlyDues(studentId, currentUser, currentRole) {
     var data = dsh.getDataRange().getValues();
     var fmap = getFeeStructuresLite();
     var out = [];
-    var summary = { total:0, pending:0, paid:0, totalAmt:0, pendingAmt:0, paidAmt:0 };
+    var summary = { total:0, pending:0, paid:0, totalAmt:0, pendingAmt:0, paidAmt:0, arrears:0, arrearsAmt:0 };
+
+    var activeTerm = 'term1', academicYear = '';
+    try {
+      var settingsRes = getSchoolSettings();
+      if (settingsRes.success) { activeTerm = settingsRes.data.ActiveTerm || 'term1'; academicYear = settingsRes.data.AcademicYear || ''; }
+    } catch (e) {}
 
     for (var i = 1; i < data.length; i++) {
       if (parseInt(data[i][1], 10) !== sid) continue;
@@ -20306,21 +20334,72 @@ function getStudentMonthlyDues(studentId, currentUser, currentRole) {
       var paidAmt = parseFloat(data[i][8]) || 0;
       var fsid = data[i][2];
       var fs = fmap[fsid];
+      var billingMonth = data[i][3];
+      var isArrears = status !== 'paid' && _isPastBillingPeriod(billingMonth, activeTerm, academicYear);
       out.push({
         ID: data[i][0], StudentID: data[i][1], FeeStructureID: fsid,
         FeeCategory: fs ? fs.category : '— deleted fee —',
-        BillingMonth: data[i][3], BillingMonthLabel: data[i][4],
-        Amount: amt, Status: status,
+        BillingMonth: billingMonth, BillingMonthLabel: data[i][4],
+        Amount: amt, Status: status, IsArrears: isArrears,
         PaymentID: data[i][7] || '', PaidAmount: paidAmt,
         PaidDate: toIso(data[i][9]), CreatedAt: toIso(data[i][10])
       });
       summary.total++; summary.totalAmt += amt;
       if (status === 'paid') { summary.paid++; summary.paidAmt += paidAmt; }
-      else { summary.pending++; summary.pendingAmt += (amt - paidAmt); }
+      else {
+        summary.pending++; summary.pendingAmt += (amt - paidAmt);
+        if (isArrears) { summary.arrears++; summary.arrearsAmt += (amt - paidAmt); }
+      }
     }
-    out.sort(function(a, b) { return String(b.BillingMonth).localeCompare(String(a.BillingMonth)); });
+    // arrears first (oldest first so the longest-overdue is most visible), then everything else
+    // newest-billing-period-first as before
+    out.sort(function(a, b) {
+      if (a.IsArrears !== b.IsArrears) return a.IsArrears ? -1 : 1;
+      if (a.IsArrears) return String(a.BillingMonth).localeCompare(String(b.BillingMonth));
+      return String(b.BillingMonth).localeCompare(String(a.BillingMonth));
+    });
     return { success: true, data: out, summary: summary };
   } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
+}
+
+// School-wide "who owes arrears" list for the Fees Collection page (admin/clerk/bursar) — this is
+// what puts previous-term unpaid balances in front of whoever is collecting fees THIS term, instead
+// of them only surfacing if someone happens to open that one student's fee history.
+function getArrearsOverview(currentUser, currentRole) {
+  try {
+    if (!isFinanceStaff(currentRole)) return { success: false, message: 'Forbidden — admin/clerk/bursar only' };
+
+    var dsh = _ensureFeeDuesSheet();
+    var data = dsh.getDataRange().getValues();
+    var students = getStudentsLite();
+
+    var activeTerm = 'term1', academicYear = '';
+    try {
+      var settingsRes = getSchoolSettings();
+      if (settingsRes.success) { activeTerm = settingsRes.data.ActiveTerm || 'term1'; academicYear = settingsRes.data.AcademicYear || ''; }
+    } catch (e) {}
+
+    var byStudent = {};
+    for (var i = 1; i < data.length; i++) {
+      var status = String(data[i][6] || 'pending').toLowerCase();
+      if (status === 'paid') continue;
+      if (!_isPastBillingPeriod(data[i][3], activeTerm, academicYear)) continue;
+      var sid = parseInt(data[i][1], 10);
+      var s = students[sid];
+      if (!s || s.status !== 'active') continue; // skip withdrawn/deleted/inactive students
+      var amt = (parseFloat(data[i][5]) || 0) - (parseFloat(data[i][8]) || 0);
+      if (!byStudent[sid]) byStudent[sid] = { StudentID: sid, StudentName: s.fullName, AdmissionNumber: s.admNo, ClassID: s.classId, ClassLabel: s.classLabel, Count: 0, Amount: 0 };
+      byStudent[sid].Count++;
+      byStudent[sid].Amount += amt;
+    }
+
+    var out = Object.keys(byStudent).map(function(k) { return byStudent[k]; });
+    out.sort(function(a, b) { return b.Amount - a.Amount; });
+    var totalAmount = out.reduce(function(s, r) { return s + r.Amount; }, 0);
+    return { success: true, data: out, totalStudents: out.length, totalAmount: totalAmount };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
 }
 
 // Pay multiple month dues at once — creates Fee_Payments row(s), marks dues paid, returns receipts.
