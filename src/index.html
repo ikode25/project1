@@ -4469,7 +4469,7 @@
       activities:   { icon: 'trophy',           label: 'Activities',         group: 'academic' },
       admissions:   { icon: 'file-signature',   label: 'Admissions',         group: 'records' },
       admissionReqs:{ icon: 'clipboard-check',  label: 'Admission Requirements', group: 'records' },
-      inquiries:    { icon: 'comment-dots',     label: 'Parent Inquiries',   group: 'records' },
+      inquiries:    { icon: 'qrcode',           label: 'Online Admission',   group: 'records' },
       students:     { icon: 'user-graduate',    label: 'Students',           group: 'records' },
       parents:      { icon: 'users',            label: 'Parents',            group: 'records' },
       classes:      { icon: 'school',           label: 'Classes & Sections', group: 'records' },
@@ -4509,7 +4509,7 @@
       // headteacher (internal role id stays 'supervisor' — see ROLE_DISPLAY_LABEL) — system-wide
       // oversight: academic operations plus Owner Portal's financial/activity monitoring
       supervisor: ['dashboard','ownerPortal','reports','attendance','substitutes','marks','hallTickets','exams','notices','ptm','calendar','discipline','conduct','helpdesk','complaints','lessonPlans','logbook','activities','students','parents','classes','subjects','assignments','documents','timetable','account','about'],
-      clerk: ['admissions','admissionReqs','students','parents','feePayments','accounts','feeStructure','sms','reports','attendance','helpdesk','complaints','documents','assets','inventory','timetable','classes','notices','calendar','account','about'],
+      clerk: ['admissions','inquiries','admissionReqs','students','parents','feePayments','accounts','feeStructure','sms','reports','attendance','helpdesk','complaints','documents','assets','inventory','timetable','classes','notices','calendar','account','about'],
       // bursar/accountant — finance + asset/stock inventory only, nothing else (per-role scoped portal)
       bursar: ['dashboard','feePayments','feeStructure','accounts','payroll','assets','inventory','account','about'],
       teacher: ['timetable','attendance','substitutes','marks','questionBank','payroll','hallTickets','exams','lessonPlans','ptm','logbook','students','discipline','conduct','activities','notices','reports','calendar','documents','complaints','classes','subjects','account','about'],
@@ -4943,7 +4943,7 @@
         const iv = setInterval(() => refreshOnline(), 45000);
         return () => clearInterval(iv);
       }, []);
-      const newInquiriesCount = (inquiries || []).filter(i => i.Status === 'new').length;
+      const newInquiriesCount = (inquiries || []).filter(i => i.Status === 'pending' || i.Status === 'contacted' || !i.Status).length;
       const syncing = syncS || syncC || syncE;
 
       // chart refs
@@ -5038,7 +5038,7 @@
                 color="teal" onClick={() => goto('sms')} blink />
             )}
             {!isMenuHidden('inquiries') && (
-              <DashKpi icon="comment-dots" label="New Inquiries" value={newInquiriesCount} sub={`${(inquiries || []).length} total`} color="pink" onClick={() => goto('inquiries')} />
+              <DashKpi icon="qrcode" label="Pending Enquiries" value={newInquiriesCount} sub={`${(inquiries || []).length} total`} color="pink" onClick={() => goto('inquiries')} />
             )}
             <DashKpi icon="circle-nodes" label="Users Online" value={onlineStats ? onlineStats.count : '…'} sub="live · refreshes every 45s" color="green" blink />
           </div>
@@ -7809,7 +7809,30 @@
         PhotoURL: editing?.PhotoURL || ''
       });
       const [saving, setSaving] = useState(false);
+      const [pulledInquiryId, setPulledInquiryId] = useState(null);
+      const [selectedInquiryId, setSelectedInquiryId] = useState('');
       const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
+
+      // new registrations only — lets admin/clerk pull straight from an Online Admission enquiry
+      // instead of re-typing what the parent already submitted.
+      const { data: inquiriesData } = useSWR(editing ? null : 'getAllInquiries', () => swrFetcher('getAllInquiries', currentUser, role));
+      const pullableInquiries = (inquiriesData || []).filter(i => i.Status !== 'admitted' && i.Status !== 'rejected');
+      const inquiryOpts = pullableInquiries.map(i => ({ value: String(i.ID), label: i.FullName + (i.Phone ? ' — ' + i.Phone : '') }));
+
+      const pullFromInquiry = () => {
+        const inq = pullableInquiries.find(i => String(i.ID) === String(selectedInquiryId));
+        if (!inq) return;
+        const nameParts = String(inq.FullName || '').trim().split(/\s+/);
+        setF((p) => ({
+          ...p,
+          FirstName: nameParts[0] || '',
+          LastName: nameParts.length > 1 ? nameParts.slice(1).join(' ') : p.LastName,
+          Mobile: inq.Phone || p.Mobile,
+          Email: inq.Email || p.Email
+        }));
+        setPulledInquiryId(inq.ID);
+        Swal.fire({ icon: 'success', text: 'Pulled ' + inq.FullName + '\'s details from the enquiry.', timer: 1600, showConfirmButton: false });
+      };
 
       const handleSubmit = (e) => {
         e.preventDefault();
@@ -7842,6 +7865,8 @@
           setSaving(false);
           if (res && res.success) {
             Swal.fire({ icon: 'success', title: 'Saved!', text: res.message + (res.registrationNumber ? ' — ' + res.registrationNumber : ''), timer: 2200, showConfirmButton: false });
+            // registered from a pulled enquiry → mark it admitted so the Online Admission funnel stays in sync
+            if (pulledInquiryId) google.script.run.withFailureHandler(() => {}).updateInquiry(pulledInquiryId, { Status: 'admitted' }, currentUser, role);
             onSaved();
           } else Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Failed' });
         };
@@ -7867,6 +7892,18 @@
               <button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button>
             </div>
             <div className="modal-body">
+              {!editing && inquiryOpts.length > 0 && (
+                <div className="settings-info-message" style={{marginBottom:'16px',display:'flex',gap:'10px',alignItems:'flex-end',flexWrap:'wrap'}}>
+                  <div style={{flex:'1 1 260px'}}>
+                    <label style={{display:'block',fontWeight:600,marginBottom:'4px',fontSize:'13px'}}><i className="fas fa-file-import"></i> Pull Data From Enquiry</label>
+                    <SearchableDropdown options={inquiryOpts} value={selectedInquiryId} onChange={setSelectedInquiryId} placeholder="Select an enquiry..." />
+                  </div>
+                  <button type="button" className="btn btn-secondary" disabled={!selectedInquiryId} onClick={pullFromInquiry}>
+                    <i className="fas fa-download"></i> Pull Data
+                  </button>
+                  {pulledInquiryId && <span style={{fontSize:'12px',color:'#34a853'}}><i className="fas fa-check-circle"></i> Data pulled — this enquiry will be marked Admitted on save.</span>}
+                </div>
+              )}
               <form onSubmit={handleSubmit}>
                 <SectionHdr icon="user" label="Applicant" />
                 <PhotoPicker label="Applicant Photo" value={f.PhotoURL} onChange={(url) => set('PhotoURL', url)} currentUser={currentUser} />
@@ -23038,17 +23075,42 @@
       );
     }
 
-    // ============== Parent / Prospective-Parent Inquiries (admin) ==============
-    const INQUIRY_STATUS_COLORS = { new: '#ea4335', contacted: '#fb8c00', resolved: '#34a853' };
+    // ============== Online Admission enquiries (admin/clerk) — QR/share + admit-pending-reject funnel ==============
+    const INQUIRY_STATUS_COLORS = { pending: '#fb8c00', contacted: '#0074D9', admitted: '#34a853', rejected: '#ea4335' };
+    const INQUIRY_STATUS_LABELS = { pending: 'Pending', contacted: 'Contacted', admitted: 'Admitted', rejected: 'Rejected' };
     const INQUIRY_TYPE_ICONS = { admission: 'user-graduate', fees: 'money-bill-wave', general: 'comment', other: 'question-circle' };
 
     function InquiryDetailModal({ inquiry, currentUser, role, onClose, onSave, saving }) {
-      const [status, setStatus] = useState(inquiry.Status || 'new');
+      const [status, setStatus] = useState(inquiry.Status || 'pending');
       const [notes, setNotes] = useState(inquiry.AdminNotes || '');
+      const [fuDate, setFuDate] = useState(inquiry.FollowUpDate ? String(inquiry.FollowUpDate).split('T')[0] : new Date().toISOString().split('T')[0]);
+      const [fuNext, setFuNext] = useState(inquiry.NextFollowUpDate ? String(inquiry.NextFollowUpDate).split('T')[0] : '');
+      const [fuResponse, setFuResponse] = useState('');
+      const [fuNote, setFuNote] = useState('');
+      const [loggingFu, setLoggingFu] = useState(false);
+      const { data: historyData, mutate: reloadHistory } =
+        useSWR('getInquiryFollowUps:' + inquiry.ID, () => swrFetcher('getInquiryFollowUps', inquiry.ID, currentUser, role));
+      const history = historyData || [];
+
+      const logFollowUp = () => {
+        if (!fuResponse.trim() && !fuNote.trim()) {
+          Swal.fire({ icon: 'warning', text: 'Enter a response or a note to log this follow-up.' }); return;
+        }
+        setLoggingFu(true);
+        google.script.run
+          .withSuccessHandler((res) => {
+            setLoggingFu(false);
+            if (res && res.success) { setFuResponse(''); setFuNote(''); reloadHistory(); }
+            else Swal.fire({ icon: 'error', text: (res && res.message) || 'Failed to log follow-up' });
+          })
+          .withFailureHandler((err) => { setLoggingFu(false); Swal.fire({ icon: 'error', text: err.message }); })
+          .addInquiryFollowUp(inquiry.ID, { FollowUpDate: fuDate, NextFollowUpDate: fuNext, Response: fuResponse, Note: fuNote }, currentUser, role);
+      };
+
       return (
         <div className="modal-overlay" onClick={onClose}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header"><h3><i className={`fas fa-${INQUIRY_TYPE_ICONS[inquiry.InquiryType] || 'comment'}`}></i> Inquiry from {inquiry.FullName}</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'620px'}}>
+            <div className="modal-header"><h3><i className={`fas fa-${INQUIRY_TYPE_ICONS[inquiry.InquiryType] || 'comment'}`}></i> Enquiry from {inquiry.FullName}</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
             <div className="modal-body">
               <div className="rc-info" style={{marginBottom:'14px'}}>
                 <div><b>Name:</b> {inquiry.FullName}</div>
@@ -23060,21 +23122,54 @@
               <div className="rc-remarks" style={{marginBottom:'14px'}}><b>Message:</b><br />{inquiry.Message}</div>
 
               <div className="form-group">
-                <label>Status</label>
-                <select value={status} onChange={(e) => setStatus(e.target.value)} style={{width:'100%',padding:'10px 12px',border:'1px solid #ccc'}}>
-                  <option value="new">New</option>
-                  <option value="contacted">Contacted</option>
-                  <option value="resolved">Resolved</option>
-                </select>
+                <label>Decision</label>
+                <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+                  {['pending', 'contacted', 'admitted', 'rejected'].map(s => (
+                    <button key={s} type="button"
+                      className={`btn btn-sm ${status === s ? '' : 'btn-secondary'}`}
+                      style={status === s ? { background: INQUIRY_STATUS_COLORS[s], color: '#fff', border: 'none' } : {}}
+                      onClick={() => setStatus(s)}>
+                      <i className={`fas fa-${s === 'admitted' ? 'check-circle' : s === 'rejected' ? 'ban' : s === 'contacted' ? 'phone' : 'hourglass-half'}`}></i> {INQUIRY_STATUS_LABELS[s]}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="form-group">
                 <label>Admin Notes</label>
-                <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows="3" placeholder="Internal notes — not visible to the parent" />
+                <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows="2" placeholder="Internal notes — not visible to the parent" />
               </div>
               <div className="form-actions">
                 <button className="btn btn-primary" disabled={saving} onClick={() => onSave(inquiry.ID, { Status: status, AdminNotes: notes })}>
-                  <i className="fas fa-save"></i> {saving ? 'Saving…' : 'Save'}
+                  <i className="fas fa-save"></i> {saving ? 'Saving…' : 'Save Decision'}
                 </button>
+              </div>
+
+              <h4 style={{color:'var(--navy-primary)',margin:'18px 0 10px',fontSize:'14px',borderBottom:'2px solid var(--navy-primary)',paddingBottom:'6px'}}>
+                <i className="fas fa-clock-rotate-left"></i> Follow Up
+              </h4>
+              <div className="form-grid">
+                <div className="form-group"><label>Follow Up Date</label><input type="date" value={fuDate} onChange={(e) => setFuDate(e.target.value)} /></div>
+                <div className="form-group"><label>Next Follow Up Date</label><input type="date" value={fuNext} onChange={(e) => setFuNext(e.target.value)} /></div>
+              </div>
+              <div className="form-group"><label>Response</label><input type="text" value={fuResponse} onChange={(e) => setFuResponse(e.target.value)} placeholder="e.g. Spoke to parent — visiting campus Friday" maxLength="200" /></div>
+              <div className="form-group"><label>Note</label><textarea value={fuNote} onChange={(e) => setFuNote(e.target.value)} rows="2" placeholder="Optional extra detail..." /></div>
+              <button className="btn btn-secondary btn-sm" disabled={loggingFu} onClick={logFollowUp}>
+                <i className="fas fa-plus"></i> {loggingFu ? 'Logging…' : 'Log Follow Up'}
+              </button>
+
+              {history.length > 0 && (
+                <div style={{marginTop:'14px',maxHeight:'180px',overflowY:'auto',border:'1px solid #e0e0e0',borderRadius:'6px',padding:'8px 10px'}}>
+                  {history.map(h => (
+                    <div key={h.ID} style={{padding:'6px 0',borderBottom:'1px dashed #e0e0e0',fontSize:'12.5px'}}>
+                      <div style={{color:'#888'}}>{new Date(h.CreatedAt).toLocaleString()}{h.NextFollowUpDate && <> · next: {h.NextFollowUpDate}</>}</div>
+                      {h.Response && <div><b>{h.Response}</b></div>}
+                      {h.Note && <div style={{color:'#666'}}>{h.Note}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="form-actions" style={{marginTop:'14px'}}>
                 <button className="btn btn-secondary" onClick={onClose}><i className="fas fa-times"></i> Close</button>
               </div>
             </div>
@@ -23090,14 +23185,36 @@
       const [filter, setFilter] = useState('');
       const [selected, setSelected] = useState(null);
       const [saving, setSaving] = useState(false);
+      const [showShare, setShowShare] = useState(false);
 
       const filtered = filter ? items.filter(i => i.Status === filter) : items;
       const publicUrl = publicAppLink('?public=inquiry');
+      const qrImg = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&data=${encodeURIComponent(publicUrl)}`;
+
+      const stats = {
+        total: items.length,
+        pending: items.filter(i => i.Status === 'pending' || i.Status === 'contacted' || !i.Status).length,
+        admitted: items.filter(i => i.Status === 'admitted').length,
+        rejected: items.filter(i => i.Status === 'rejected').length
+      };
 
       const copyLink = () => {
         navigator.clipboard.writeText(publicUrl).then(() => {
-          Swal.fire({ icon: 'success', text: 'Inquiry link copied — share it with prospective parents', timer: 1800, showConfirmButton: false });
-        }).catch(() => Swal.fire({ icon: 'info', title: 'Inquiry Link', text: publicUrl }));
+          Swal.fire({ icon: 'success', text: 'Admission form link copied — share it with prospective parents', timer: 1800, showConfirmButton: false });
+        }).catch(() => Swal.fire({ icon: 'info', title: 'Admission Form Link', text: publicUrl }));
+      };
+
+      const shareWhatsApp = () => {
+        const msg = 'Apply for admission online — fill our short enquiry form:\n' + publicUrl;
+        window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+      };
+
+      const printQr = () => {
+        document.body.classList.add('print-target');
+        setTimeout(() => {
+          window.print();
+          setTimeout(() => document.body.classList.remove('print-target'), 250);
+        }, 60);
       };
 
       const handleSave = (id, data) => {
@@ -23113,7 +23230,7 @@
       };
 
       const handleDelete = (i) => {
-        Swal.fire({ icon: 'warning', title: 'Delete inquiry?', text: i.FullName, showCancelButton: true, confirmButtonColor: '#ea4335' })
+        Swal.fire({ icon: 'warning', title: 'Delete enquiry?', text: i.FullName, showCancelButton: true, confirmButtonColor: '#ea4335' })
           .then((rr) => {
             if (rr.isConfirmed) {
               google.script.run.withSuccessHandler((res) => {
@@ -23126,25 +23243,56 @@
 
       return (
         <div className="data-section">
-          <div className="section-header">
-            <h2><i className="fas fa-comment-dots"></i> Parent Inquiries</h2>
-            <button className="btn btn-secondary" onClick={copyLink}><i className="fas fa-link"></i> Copy Public Inquiry Link</button>
+          <div className="section-header no-print">
+            <h2><i className="fas fa-user-plus"></i> Online Admission</h2>
+            <button className="btn btn-secondary" onClick={() => setShowShare(s => !s)}>
+              <i className="fas fa-qrcode"></i> {showShare ? 'Hide' : 'Share'} Admission Form
+            </button>
           </div>
-          <div className="settings-info-message" style={{marginBottom:'15px'}}>
-            <i className="fas fa-info-circle"></i> Share the public inquiry link with prospective parents (on your website, WhatsApp, flyers) — no login needed to submit.
+
+          {showShare && (
+            <div className="report-card" style={{maxWidth:'420px',margin:'0 0 20px',textAlign:'center',padding:'20px'}}>
+              <h3 style={{color:'var(--navy-primary)',marginBottom:'12px',fontSize:'15px'}}><i className="fas fa-share-nodes"></i> Share Admission Form</h3>
+              <img src={qrImg} alt="Admission Form QR Code" style={{width:'180px',height:'180px',margin:'0 auto 14px',display:'block'}} />
+              <div className="form-group" style={{textAlign:'left'}}>
+                <label>Admission Form URL</label>
+                <input type="text" readOnly value={publicUrl} onClick={(e) => e.target.select()} style={{width:'100%',padding:'8px 10px',border:'1px solid #ccc',fontSize:'12px'}} />
+              </div>
+              <div style={{display:'flex',gap:'8px',justifyContent:'center',marginTop:'12px',flexWrap:'wrap'}}>
+                <button className="btn btn-secondary btn-sm" onClick={copyLink}><i className="fas fa-copy"></i> Copy URL</button>
+                <button className="btn btn-sm" style={{background:'#25D366',color:'#fff',border:'none'}} onClick={shareWhatsApp}><i className="fab fa-whatsapp"></i> Share on WhatsApp</button>
+                <button className="btn btn-secondary btn-sm" onClick={printQr}><i className="fas fa-print"></i> Print QR Code</button>
+              </div>
+            </div>
+          )}
+
+          <div className="no-print" style={{display:'flex',gap:'12px',marginBottom:'18px',flexWrap:'wrap'}}>
+            {[
+              { key: '', label: 'Total', value: stats.total, color: 'var(--navy-primary)', icon: 'users' },
+              { key: 'pending', label: 'Pending', value: stats.pending, color: '#fb8c00', icon: 'hourglass-half' },
+              { key: 'admitted', label: 'Admitted', value: stats.admitted, color: '#34a853', icon: 'check-circle' },
+              { key: 'rejected', label: 'Rejected', value: stats.rejected, color: '#ea4335', icon: 'ban' }
+            ].map(s => (
+              <div key={s.label} onClick={() => setFilter(s.key)}
+                style={{flex:'1 1 120px',cursor:'pointer',background:'#fff',border:filter===s.key?`2px solid ${s.color}`:'1px solid #e0e0e0',borderRadius:'8px',padding:'12px 14px',textAlign:'center'}}>
+                <div style={{fontSize:'22px',fontWeight:700,color:s.color}}><i className={`fas fa-${s.icon}`} style={{marginRight:'6px',fontSize:'16px'}}></i>{s.value}</div>
+                <div style={{fontSize:'12px',color:'#888',textTransform:'uppercase',fontWeight:600}}>{s.label}</div>
+              </div>
+            ))}
           </div>
+
           {loadError && !loading && items.length === 0 && (
-            <div className="settings-info-message" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>
+            <div className="settings-info-message no-print" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>
               <i className="fas fa-triangle-exclamation" style={{marginRight:'6px',color:'#ea4335'}}></i>
-              Couldn't load inquiries — {String((loadError && loadError.message) || loadError)}.
+              Couldn't load enquiries — {String((loadError && loadError.message) || loadError)}.
             </div>
           )}
 
           {!loading && items.length > 0 && (
-            <div style={{display:'flex',gap:'8px',marginBottom:'14px'}}>
-              {['', 'new', 'contacted', 'resolved'].map(s => (
+            <div className="no-print" style={{display:'flex',gap:'8px',marginBottom:'14px',flexWrap:'wrap'}}>
+              {['', 'pending', 'contacted', 'admitted', 'rejected'].map(s => (
                 <button key={s || 'all'} className={`btn btn-sm ${filter === s ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setFilter(s)}>
-                  {s ? s.charAt(0).toUpperCase() + s.slice(1) : 'All'} ({s ? items.filter(i => i.Status === s).length : items.length})
+                  {s ? INQUIRY_STATUS_LABELS[s] : 'All'} ({s ? items.filter(i => i.Status === s).length : items.length})
                 </button>
               ))}
             </div>
@@ -23152,12 +23300,12 @@
 
           {loading && <TableSkeleton rows={5} columns={5} />}
           {!loading && items.length === 0 && (
-            <div style={{textAlign:'center',padding:'40px',color:'#888',background:'#f8f9fa'}}>No inquiries yet.</div>
+            <div className="no-print" style={{textAlign:'center',padding:'40px',color:'#888',background:'#f8f9fa'}}>No admission enquiries yet.</div>
           )}
           {!loading && filtered.length > 0 && (
-            <div style={{overflowX:'auto'}}>
+            <div className="no-print" style={{overflowX:'auto'}}>
               <table className="simple-table" style={{width:'100%'}}>
-                <thead><tr><th>Date</th><th>Name</th><th>Type</th><th>Contact</th><th>Message</th><th>Status</th><th>Actions</th></tr></thead>
+                <thead><tr><th>Date</th><th>Name</th><th>Type</th><th>Contact</th><th>Message</th><th>Next Follow Up</th><th>Status</th><th>Actions</th></tr></thead>
                 <tbody>
                   {filtered.map((i) => (
                     <tr key={i.ID}>
@@ -23165,10 +23313,11 @@
                       <td style={{fontWeight:600}}>{i.FullName}</td>
                       <td><i className={`fas fa-${INQUIRY_TYPE_ICONS[i.InquiryType] || 'comment'}`}></i> <span style={{textTransform:'capitalize'}}>{i.InquiryType}</span></td>
                       <td style={{fontSize:'12px'}}>{i.Phone}{i.Phone && i.Email && <br />}{i.Email}</td>
-                      <td style={{fontSize:'12px',maxWidth:'260px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{i.Message}</td>
-                      <td><span className="role-badge" style={{background:INQUIRY_STATUS_COLORS[i.Status],color:'#fff',textTransform:'capitalize'}}>{i.Status}</span></td>
+                      <td style={{fontSize:'12px',maxWidth:'220px',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{i.Message}</td>
+                      <td style={{fontSize:'12px',whiteSpace:'nowrap'}}>{i.NextFollowUpDate || <span style={{color:'#bbb'}}>—</span>}</td>
+                      <td><span className="role-badge" style={{background:INQUIRY_STATUS_COLORS[i.Status]||'#888',color:'#fff',textTransform:'capitalize'}}>{INQUIRY_STATUS_LABELS[i.Status]||i.Status}</span></td>
                       <td style={{whiteSpace:'nowrap'}}>
-                        <button className="action-icon edit-icon" title="View / Respond" onClick={() => setSelected(i)}><i className="fas fa-eye"></i></button>
+                        <button className="action-icon edit-icon" title="View / Follow Up" onClick={() => setSelected(i)}><i className="fas fa-eye"></i></button>
                         <button className="action-icon delete-icon" title="Delete" onClick={() => handleDelete(i)}><i className="fas fa-trash"></i></button>
                       </td>
                     </tr>
@@ -28309,7 +28458,7 @@
             <i className="fas fa-link"></i> Public Links
           </h3>
           <p style={{color:'#777', fontSize:'13px', marginBottom:'12px'}}>
-            The web address prospective parents use to reach this system (the "Copy Link" buttons in Admissions/Inquiries build on this). Leave blank to use whatever address is currently open in the browser.
+            The web address prospective parents use to reach this system (the "Copy Link"/QR code buttons in Admissions/Online Admission build on this). Leave blank to use whatever address is currently open in the browser.
           </p>
           <div className="form-grid" style={{marginBottom:'10px'}}>
             <div className="form-group" style={{gridColumn:'1 / -1'}}>
@@ -30478,7 +30627,7 @@
       const canSeePayroll = r === 'admin' || r === 'teacher' || isBursar;
       const canSeeRecruitment = r === 'admin';
       const canSeeAdmissionReqs = r === 'admin' || r === 'clerk';
-      const canSeeInquiries = r === 'admin';
+      const canSeeInquiries = r === 'admin' || r === 'clerk';
       const canSeeOwnerPortal = r === 'admin' || r === 'owner' || r === 'supervisor';
       const canSeeDiscipline = r === 'admin' || r === 'teacher' || r === 'supervisor' || isStudent || isParent;
       const canSeeConduct = r === 'admin' || r === 'teacher' || r === 'supervisor' || isStudent || isParent;
@@ -30564,7 +30713,7 @@
         case 'admissionReqs':
           return canSeeAdmissionReqs ? <AdmissionRequirementsView currentUser={user} role={role} schoolSettings={schoolSettings} /> : denied('Admission Requirements');
         case 'inquiries':
-          return canSeeInquiries ? <InquiriesView currentUser={user} role={role} /> : denied('Parent Inquiries');
+          return canSeeInquiries ? <InquiriesView currentUser={user} role={role} /> : denied('Online Admission');
         case 'ownerPortal':
           return canSeeOwnerPortal ? <OwnerPortalView currentUser={user} role={role} /> : denied('Owner Portal');
         case 'discipline':

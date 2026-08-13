@@ -4812,7 +4812,13 @@ function deleteAdmissionRequirement(id, currentUser, currentRole) {
 // ?public=inquiry — as well as by logged-in parents from inside the app. Anyone who can load the
 // deployment can call submitInquiry(); it does its own light validation instead of an RBAC check.
 var INQUIRIES_SHEET = 'Inquiries';
-var INQUIRY_HEADERS = ['ID', 'FullName', 'Phone', 'Email', 'InquiryType', 'Message', 'Status', 'AdminNotes', 'IsDeleted', 'CreatedAt', 'UpdatedAt'];
+// Online Admission enquiries — status funnel is Pending → Admitted / Rejected ('contacted' is an
+// optional in-between state for "we've followed up but not decided yet"). FollowUpDate/
+// NextFollowUpDate mirror the *latest* entry in InquiryFollowUps for fast list-view display; the
+// full history lives in that sheet.
+var INQUIRY_HEADERS = ['ID', 'FullName', 'Phone', 'Email', 'InquiryType', 'Message', 'Status', 'AdminNotes', 'IsDeleted', 'CreatedAt', 'UpdatedAt', 'FollowUpDate', 'NextFollowUpDate'];
+var INQUIRY_FOLLOWUPS_SHEET = 'InquiryFollowUps';
+var INQUIRY_FOLLOWUP_HEADERS = ['ID', 'InquiryID', 'FollowUpDate', 'NextFollowUpDate', 'Response', 'Note', 'CreatedBy', 'CreatedAt'];
 
 function _ensureInquiriesSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -4822,6 +4828,23 @@ function _ensureInquiriesSheet() {
     sh.appendRow(INQUIRY_HEADERS);
     sh.getRange(1, 1, 1, INQUIRY_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
     sh.setFrozenRows(1);
+  } else if (sh.getLastColumn() < INQUIRY_HEADERS.length) {
+    // upgrade an existing sheet created before FollowUpDate/NextFollowUpDate existed
+    var addFrom = sh.getLastColumn() + 1;
+    sh.getRange(1, addFrom, 1, INQUIRY_HEADERS.length - sh.getLastColumn()).setValues([INQUIRY_HEADERS.slice(addFrom - 1)])
+      .setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+  }
+  return sh;
+}
+
+function _ensureInquiryFollowUpsSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(INQUIRY_FOLLOWUPS_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(INQUIRY_FOLLOWUPS_SHEET);
+    sh.appendRow(INQUIRY_FOLLOWUP_HEADERS);
+    sh.getRange(1, 1, 1, INQUIRY_FOLLOWUP_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+    sh.setFrozenRows(1);
   }
   return sh;
 }
@@ -4829,8 +4852,9 @@ function _ensureInquiriesSheet() {
 function _rowToInquiry(row) {
   return {
     ID: row[0], FullName: row[1] || '', Phone: row[2] || '', Email: row[3] || '',
-    InquiryType: row[4] || 'general', Message: row[5] || '', Status: row[6] || 'new',
-    AdminNotes: row[7] || '', CreatedAt: toIso(row[9]), UpdatedAt: toIso(row[10])
+    InquiryType: row[4] || 'general', Message: row[5] || '', Status: row[6] || 'pending',
+    AdminNotes: row[7] || '', CreatedAt: toIso(row[9]), UpdatedAt: toIso(row[10]),
+    FollowUpDate: row[11] ? toIso(row[11]) : '', NextFollowUpDate: row[12] ? toIso(row[12]) : ''
   };
 }
 
@@ -4849,17 +4873,17 @@ function submitInquiry(d) {
 
     var sh = _ensureInquiriesSheet();
     var ts = nowIso(), id = nextRowId(sh);
-    sh.appendRow([id, fullName, phone, String((d && d.Email) || '').trim(), type, message, 'new', '', '0', ts, ts]);
-    return { success: true, message: 'Thank you — your inquiry has been received. The school will contact you soon.' };
+    sh.appendRow([id, fullName, phone, String((d && d.Email) || '').trim(), type, message, 'pending', '', '0', ts, ts, '', '']);
+    return { success: true, message: 'Thank you — your enquiry has been received. The school will contact you soon.' };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
 }
 
-// admin only — all inquiries, newest first
+// admin/clerk — all inquiries, newest first
 function getAllInquiries(currentUser, currentRole) {
   try {
-    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
     var sh = _ensureInquiriesSheet();
     var data = sh.getDataRange().getValues(), out = [];
     for (var i = 1; i < data.length; i++) {
@@ -4875,21 +4899,21 @@ function getAllInquiries(currentUser, currentRole) {
 
 function updateInquiry(id, d, currentUser, currentRole) {
   try {
-    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
     var idn = parseInt(id, 10);
     var sh = _ensureInquiriesSheet();
     var data = sh.getDataRange().getValues();
-    var allowedStatuses = ['new', 'contacted', 'resolved'];
+    var allowedStatuses = ['pending', 'contacted', 'admitted', 'rejected'];
     for (var i = 1; i < data.length; i++) {
       if (data[i][0] !== idn || String(data[i][8]) === '1') continue;
       var row = i + 1;
       if (d.Status !== undefined && allowedStatuses.indexOf(String(d.Status).toLowerCase()) !== -1) sh.getRange(row, 7).setValue(String(d.Status).toLowerCase());
       if (d.AdminNotes !== undefined) sh.getRange(row, 8).setValue(String(d.AdminNotes || '').trim());
       sh.getRange(row, 11).setValue(nowIso());
-      addLog(currentUser, 'Inquiry Updated', '#' + idn);
-      return { success: true, message: 'Inquiry updated' };
+      addLog(currentUser, 'Inquiry Updated', '#' + idn + (d.Status ? ' → ' + d.Status : ''));
+      return { success: true, message: 'Enquiry updated' };
     }
-    return { success: false, message: 'Inquiry not found' };
+    return { success: false, message: 'Enquiry not found' };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
@@ -4897,7 +4921,7 @@ function updateInquiry(id, d, currentUser, currentRole) {
 
 function deleteInquiry(id, currentUser, currentRole) {
   try {
-    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
     var idn = parseInt(id, 10);
     var sh = _ensureInquiriesSheet();
     var data = sh.getDataRange().getValues();
@@ -4906,9 +4930,60 @@ function deleteInquiry(id, currentUser, currentRole) {
       sh.getRange(i + 1, 9).setValue('1');
       sh.getRange(i + 1, 11).setValue(nowIso());
       addLog(currentUser, 'Inquiry Deleted', '#' + idn);
-      return { success: true, message: 'Inquiry deleted' };
+      return { success: true, message: 'Enquiry deleted' };
     }
-    return { success: false, message: 'Inquiry not found' };
+    return { success: false, message: 'Enquiry not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// admin/clerk — append a follow-up entry to the history log and mirror the latest dates onto the
+// Inquiry row itself (columns 12/13) so the list view can show "next follow-up" without a join.
+function addInquiryFollowUp(inquiryId, d, currentUser, currentRole) {
+  try {
+    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
+    var idn = parseInt(inquiryId, 10);
+    var insh = _ensureInquiriesSheet();
+    var indata = insh.getDataRange().getValues();
+    var found = false;
+    for (var i = 1; i < indata.length; i++) {
+      if (indata[i][0] !== idn || String(indata[i][8]) === '1') continue;
+      found = true;
+      var row = i + 1;
+      if (d.FollowUpDate !== undefined) insh.getRange(row, 12).setValue(String(d.FollowUpDate || ''));
+      if (d.NextFollowUpDate !== undefined) insh.getRange(row, 13).setValue(String(d.NextFollowUpDate || ''));
+      insh.getRange(row, 11).setValue(nowIso());
+      break;
+    }
+    if (!found) return { success: false, message: 'Enquiry not found' };
+
+    var fsh = _ensureInquiryFollowUpsSheet();
+    var ts = nowIso(), id = nextRowId(fsh);
+    fsh.appendRow([id, idn, String(d.FollowUpDate || ''), String(d.NextFollowUpDate || ''), String(d.Response || '').trim(), String(d.Note || '').trim(), currentUser || '', ts]);
+    addLog(currentUser, 'Enquiry Follow-up Logged', '#' + idn);
+    return { success: true, message: 'Follow-up logged' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// admin/clerk — full follow-up history for one enquiry, newest first
+function getInquiryFollowUps(inquiryId, currentUser, currentRole) {
+  try {
+    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
+    var idn = parseInt(inquiryId, 10);
+    var sh = _ensureInquiryFollowUpsSheet();
+    var data = sh.getDataRange().getValues(), out = [];
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][1] !== idn) continue;
+      out.push({
+        ID: data[i][0], InquiryID: data[i][1], FollowUpDate: data[i][2] || '', NextFollowUpDate: data[i][3] || '',
+        Response: data[i][4] || '', Note: data[i][5] || '', CreatedBy: data[i][6] || '', CreatedAt: toIso(data[i][7])
+      });
+    }
+    out.sort(function (a, b) { return String(b.CreatedAt).localeCompare(String(a.CreatedAt)); });
+    return { success: true, data: out };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
