@@ -4438,6 +4438,211 @@
       );
     }
 
+    // ============== Public Online Exam (no login — reached via ?public=exam&token=...) ==============
+    // A student who can't log in (or has no portal account) can still take a teacher-published test
+    // paper from this raw link, submit, and see their auto-graded result immediately — mcq/true_false/
+    // short_answer are scored on the spot; any essay questions show as "pending teacher review".
+    function PublicExamView({ schoolSettings, token }) {
+      const sch = schoolSettings || {};
+      const schoolName = sch.SchoolName || 'School';
+      const schoolLogo = sch.SchoolLogo || DEFAULT_LOGO;
+      const [paper, setPaper] = useState(null);
+      const [loadError, setLoadError] = useState('');
+      const [loading, setLoading] = useState(true);
+      const [started, setStarted] = useState(false);
+      const [studentInfo, setStudentInfo] = useState({ StudentName: '', AdmissionNumber: '', StudentContact: '' });
+      const [answers, setAnswers] = useState({});
+      const [submitting, setSubmitting] = useState(false);
+      const [error, setError] = useState('');
+      const [result, setResult] = useState(null);
+      const [secondsLeft, setSecondsLeft] = useState(null);
+
+      useEffect(() => {
+        google.script.run
+          .withSuccessHandler((res) => { setLoading(false); if (res && res.success) setPaper(res.data); else setLoadError((res && res.message) || 'Exam not found'); })
+          .withFailureHandler((err) => { setLoading(false); setLoadError((err && err.message) || 'Connection error'); })
+          .getPublicTestPaper(token);
+      }, [token]);
+
+      const submit = () => {
+        if (submitting) return;
+        setSubmitting(true); setError('');
+        google.script.run
+          .withSuccessHandler((res) => {
+            setSubmitting(false);
+            if (res && res.success) setResult(res.data);
+            else setError((res && res.message) || 'Could not submit — please try again.');
+          })
+          .withFailureHandler((err) => { setSubmitting(false); setError((err && err.message) || 'Connection error'); })
+          .submitPublicExam(token, studentInfo, answers);
+      };
+
+      // countdown once the exam starts — auto-submits when time runs out
+      useEffect(() => {
+        if (!started || !paper || result) return undefined;
+        setSecondsLeft(paper.DurationMinutes * 60);
+        const iv = setInterval(() => {
+          setSecondsLeft((s) => {
+            if (s <= 1) { clearInterval(iv); submit(); return 0; }
+            return s - 1;
+          });
+        }, 1000);
+        return () => clearInterval(iv);
+      }, [started]);
+
+      const startExam = (e) => {
+        e.preventDefault();
+        if (!studentInfo.StudentName.trim()) { setError('Your full name is required.'); return; }
+        setError('');
+        setStarted(true);
+      };
+
+      const setAnswer = (qid, val) => setAnswers((p) => ({ ...p, [qid]: val }));
+      const fmtTime = (s) => `${String(Math.floor(s / 60)).padStart(2,'0')}:${String(s % 60).padStart(2,'0')}`;
+
+      if (loading) return <div style={{padding:'60px',textAlign:'center',color:'#888'}}><i className="fas fa-spinner fa-spin"></i> Loading…</div>;
+
+      if (loadError) {
+        return (
+          <div className="login-container">
+            <div className="login-box">
+              <div className="login-logo-ring"><img src={schoolLogo} alt="Logo" className="login-logo" onError={(e) => e.currentTarget.style.display = 'none'} /></div>
+              <h2>{schoolName}</h2>
+              <div className="login-error-box" style={{marginTop:'16px'}}><i className="fas fa-exclamation-circle"></i> <span>{loadError}</span></div>
+            </div>
+          </div>
+        );
+      }
+
+      // ---- Result screen ----
+      if (result) {
+        const pct = result.MaxScore > 0 ? Math.round((result.Score / result.MaxScore) * 100) : 0;
+        return (
+          <div className="login-container">
+            <div className="login-box" style={{maxWidth:'640px'}}>
+              <div className="login-logo-ring"><img src={schoolLogo} alt="Logo" className="login-logo" onError={(e) => e.currentTarget.style.display = 'none'} /></div>
+              <h2>{schoolName}</h2>
+              <p className="login-subtitle">{paper.Title} — Result</p>
+
+              <div style={{textAlign:'center',padding:'10px 0 20px'}}>
+                <div style={{fontSize:'40px',fontWeight:800,color: pct >= 50 ? '#34a853' : '#ea4335'}}>{result.Score} / {result.MaxScore}</div>
+                <div style={{fontSize:'14px',color:'#888'}}>{pct}%</div>
+                {result.PendingReviewCount > 0 && (
+                  <div style={{fontSize:'12.5px',color:'#fb8c00',marginTop:'8px'}}>
+                    <i className="fas fa-hourglass-half"></i> {result.PendingReviewCount} essay answer{result.PendingReviewCount > 1 ? 's are' : ' is'} awaiting teacher review — this score may still change.
+                  </div>
+                )}
+              </div>
+
+              <div style={{textAlign:'left',maxHeight:'360px',overflowY:'auto',border:'1px solid #e0e0e0',borderRadius:'6px'}}>
+                {paper.questions.map((q, idx) => {
+                  const b = result.Breakdown[q.ID] || {};
+                  const color = b.awarded == null ? '#fb8c00' : (b.correct ? '#34a853' : '#ea4335');
+                  return (
+                    <div key={q.ID} style={{padding:'10px 14px',borderBottom: idx < paper.questions.length - 1 ? '1px solid #eee' : 'none'}}>
+                      <div style={{fontSize:'13px',fontWeight:600,marginBottom:'4px'}}>{idx + 1}. {q.QuestionText}</div>
+                      <div style={{fontSize:'12px',color:'#555'}}>Your answer: {b.answer || <span style={{color:'#bbb'}}>(no answer)</span>}</div>
+                      {b.correctAnswer && !b.correct && <div style={{fontSize:'12px',color:'#34a853'}}>Correct answer: {b.correctAnswer}</div>}
+                      <div style={{fontSize:'11.5px',fontWeight:600,color,marginTop:'2px'}}>
+                        {b.awarded == null ? 'Pending review' : `${b.awarded} / ${b.maxMarks} marks`}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // ---- Start screen ----
+      if (!started) {
+        return (
+          <div className="login-container">
+            <div className="login-box" style={{maxWidth:'520px'}}>
+              <div className="login-logo-ring"><img src={schoolLogo} alt="Logo" className="login-logo" onError={(e) => e.currentTarget.style.display = 'none'} /></div>
+              <h2>{schoolName}</h2>
+              <p className="login-subtitle">{paper.Title}</p>
+              <div style={{textAlign:'left',background:'#f8f9fa',border:'1px solid #e0e0e0',borderRadius:'6px',padding:'12px 14px',marginBottom:'16px',fontSize:'12.5px',color:'#555'}}>
+                <div><i className="fas fa-book" style={{width:'16px'}}></i> {paper.SubjectName} — {paper.ClassLabel}</div>
+                <div><i className="fas fa-clock" style={{width:'16px'}}></i> {paper.DurationMinutes} minutes</div>
+                <div><i className="fas fa-list-ol" style={{width:'16px'}}></i> {paper.questions.length} questions — {paper.TotalMarks} marks</div>
+                {paper.Instructions && <div style={{marginTop:'6px',whiteSpace:'pre-wrap'}}><b>Instructions:</b> {paper.Instructions}</div>}
+              </div>
+              <form onSubmit={startExam} className="login-form">
+                <div className="form-group">
+                  <label><i className="fas fa-user"></i> Your Full Name *</label>
+                  <div className="login-input-wrap"><input type="text" value={studentInfo.StudentName} onChange={(e) => setStudentInfo({...studentInfo, StudentName: e.target.value})} required autoFocus maxLength="100" /></div>
+                </div>
+                <div className="form-group">
+                  <label><i className="fas fa-id-card"></i> Admission Number</label>
+                  <div className="login-input-wrap"><input type="text" value={studentInfo.AdmissionNumber} onChange={(e) => setStudentInfo({...studentInfo, AdmissionNumber: e.target.value})} maxLength="30" /></div>
+                </div>
+                <div className="form-group">
+                  <label><i className="fas fa-phone"></i> Phone (optional)</label>
+                  <div className="login-input-wrap"><input type="text" value={studentInfo.StudentContact} onChange={(e) => setStudentInfo({...studentInfo, StudentContact: e.target.value})} maxLength="20" /></div>
+                </div>
+                <button type="submit" className="login-submit"><i className="fas fa-play"></i> Start Exam</button>
+                {error && <div className="login-error-box"><i className="fas fa-exclamation-circle"></i> <span>{error}</span></div>}
+              </form>
+            </div>
+          </div>
+        );
+      }
+
+      // ---- Exam-taking screen ----
+      return (
+        <div className="login-container">
+          <div className="login-box" style={{maxWidth:'680px'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'10px'}}>
+              <h2 style={{margin:0,fontSize:'18px'}}>{paper.Title}</h2>
+              {secondsLeft != null && (
+                <span style={{fontFamily:'monospace',fontWeight:700,fontSize:'16px',color: secondsLeft < 60 ? '#ea4335' : 'var(--navy-primary)'}}>
+                  <i className="fas fa-clock"></i> {fmtTime(secondsLeft)}
+                </span>
+              )}
+            </div>
+            <div style={{textAlign:'left',maxHeight:'440px',overflowY:'auto',paddingRight:'6px'}}>
+              {paper.questions.map((q, idx) => (
+                <div key={q.ID} style={{marginBottom:'18px',paddingBottom:'14px',borderBottom:'1px solid #eee'}}>
+                  <div style={{fontSize:'13.5px',fontWeight:600,marginBottom:'8px'}}>{idx + 1}. {q.QuestionText} <span style={{color:'#888',fontWeight:400,fontSize:'11px'}}>({q.Marks} mark{q.Marks !== 1 ? 's' : ''})</span></div>
+                  {q.PhotoURL && <img src={q.PhotoURL} alt="" style={{maxWidth:'100%',maxHeight:'200px',display:'block',marginBottom:'8px',borderRadius:'4px'}} />}
+                  {q.VideoURL && <div style={{marginBottom:'8px'}}><a href={q.VideoURL} target="_blank" rel="noopener noreferrer"><i className="fas fa-video"></i> Watch video</a></div>}
+
+                  {q.QuestionType === 'mcq' && ['A','B','C','D'].map(letter => {
+                    const opt = q['Option' + letter];
+                    if (!opt) return null;
+                    return (
+                      <label key={letter} style={{display:'block',fontSize:'13px',padding:'5px 0',cursor:'pointer'}}>
+                        <input type="radio" name={'q' + q.ID} checked={answers[q.ID] === letter} onChange={() => setAnswer(q.ID, letter)} style={{marginRight:'8px'}} />
+                        {letter}. {opt}
+                      </label>
+                    );
+                  })}
+                  {q.QuestionType === 'true_false' && ['True','False'].map(v => (
+                    <label key={v} style={{display:'block',fontSize:'13px',padding:'5px 0',cursor:'pointer'}}>
+                      <input type="radio" name={'q' + q.ID} checked={answers[q.ID] === v} onChange={() => setAnswer(q.ID, v)} style={{marginRight:'8px'}} />
+                      {v}
+                    </label>
+                  ))}
+                  {q.QuestionType === 'short_answer' && (
+                    <input type="text" value={answers[q.ID] || ''} onChange={(e) => setAnswer(q.ID, e.target.value)} maxLength="200" style={{width:'100%',padding:'8px 10px',border:'1px solid #ccc'}} />
+                  )}
+                  {q.QuestionType === 'essay' && (
+                    <textarea value={answers[q.ID] || ''} onChange={(e) => setAnswer(q.ID, e.target.value)} rows="4" maxLength="3000" style={{width:'100%',padding:'8px 10px',border:'1px solid #ccc'}} />
+                  )}
+                </div>
+              ))}
+            </div>
+            <button className="login-submit" disabled={submitting} onClick={submit}>
+              {submitting ? <><i className="fas fa-spinner fa-spin"></i> Submitting…</> : <><i className="fas fa-paper-plane"></i> Submit Answers</>}
+            </button>
+            {error && <div className="login-error-box"><i className="fas fa-exclamation-circle"></i> <span>{error}</span></div>}
+          </div>
+        </div>
+      );
+    }
+
     // Ghana schools call this role "Headteacher" — the internal role string stays 'supervisor'
     // (matches every existing RBAC check and already-created users) but every user-facing label
     // now reads "Headteacher" instead.
@@ -13512,9 +13717,9 @@
             {/* server-computed to reflect the school's actual grading system (custom scale if the
                 admin set one on the Grading System page, else the automatic NaCCA/WAEC default) —
                 falls back to the hardcoded table only for older cached payloads without it */}
-            {(card.gradeKeyRows && card.gradeKeyRows.length ? card.gradeKeyRows.map(r => ({ min: r.MinPercent, code: r.Grade, label: r.Label })) : gradeTableFor(card.class.GradeBand))
+            {(card.gradeKeyRows && card.gradeKeyRows.length ? card.gradeKeyRows.map(r => ({ min: r.MinPercent, max: r.MaxPercent, code: r.Grade, label: r.Label })) : gradeTableFor(card.class.GradeBand))
               .map((r, i, arr) => {
-                const max = i === 0 ? 100 : arr[i - 1].min - 1;
+                const max = r.max != null ? r.max : (i === 0 ? 100 : arr[i - 1].min - 1);
                 return <React.Fragment key={r.code}>{i > 0 && <>&nbsp;·&nbsp;</>}{r.code} = {r.label} ({r.min}–{max})</React.Fragment>;
               })}
           </div>
@@ -23449,24 +23654,11 @@
     const GRADING_BAND_LABELS = { basic: 'Basic (Creche – Basic 6)', jhs: 'JHS (Basic 7 – 9)' };
 
     function GradingBandEditModal({ band, rows, currentUser, role, onClose, onSave, saving }) {
-      const blankRow = () => ({ MinPercent: '', Grade: '', Label: '' });
-      const [editRows, setEditRows] = useState(rows && rows.length ? rows.map(r => ({ ...r, MinPercent: String(r.MinPercent) })) : [blankRow()]);
+      const blankRow = () => ({ MinPercent: '', MaxPercent: '', Grade: '', Label: '' });
+      const [editRows, setEditRows] = useState(rows && rows.length ? rows.map(r => ({ ...r, MinPercent: String(r.MinPercent), MaxPercent: r.MaxPercent != null ? String(r.MaxPercent) : '' })) : [blankRow()]);
       const setRow = (i, k, v) => setEditRows(prev => prev.map((r, idx) => idx === i ? { ...r, [k]: v } : r));
       const addRow = () => setEditRows(prev => [...prev, blankRow()]);
       const removeRow = (i) => setEditRows(prev => prev.filter((_, idx) => idx !== i));
-
-      // Max % is never independently editable — it's always "the next-highest row's Min % minus
-      // one" (or 100 for the top row), which is exactly how grading already resolves ranges. Shown
-      // read-only here purely so admin can see the resulting range while setting each Min %.
-      const maxByIndex = (() => {
-        const withMin = editRows
-          .map((r, i) => ({ i, min: parseFloat(r.MinPercent) }))
-          .filter(r => !isNaN(r.min))
-          .sort((a, b) => b.min - a.min);
-        const out = {};
-        withMin.forEach((r, idx) => { out[r.i] = idx === 0 ? 100 : withMin[idx - 1].min - 1; });
-        return out;
-      })();
 
       const handleSubmit = (e) => {
         e.preventDefault();
@@ -23475,32 +23667,32 @@
 
       return (
         <div className="modal-overlay" onClick={onClose}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'560px'}}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'620px'}}>
             <div className="modal-header">
               <h3><i className="fas fa-sliders-h"></i> {GRADING_BAND_LABELS[band]} — Custom Scale</h3>
               <button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button>
             </div>
             <div className="modal-body">
               <div className="settings-info-message" style={{marginBottom:'14px'}}>
-                <i className="fas fa-info-circle"></i> One row must start at Minimum % = 0 so every score maps to a grade. Rows are matched from highest minimum down.
+                <i className="fas fa-info-circle"></i> One row must start at Minimum % = 0 so every score maps to a grade. Grading is matched from the highest Minimum % down, so make sure each row's Maximum % lines up with the next row's Minimum %.
               </div>
               <form onSubmit={handleSubmit}>
                 {editRows.map((r, i) => (
                   <div key={i} style={{display:'flex',gap:'8px',alignItems:'flex-end',marginBottom:'10px'}}>
-                    <div className="form-group" style={{flex:'0 0 90px',margin:0}}>
+                    <div className="form-group" style={{flex:'0 0 80px',margin:0}}>
                       <label>Min %</label>
                       <input type="number" min="0" max="100" value={r.MinPercent} onChange={(e) => setRow(i, 'MinPercent', e.target.value)} required />
                     </div>
-                    <div className="form-group" style={{flex:'0 0 70px',margin:0}}>
+                    <div className="form-group" style={{flex:'0 0 80px',margin:0}}>
                       <label>Max %</label>
-                      <input type="text" value={maxByIndex[i] != null ? maxByIndex[i] : '—'} disabled title="Derived automatically from the next row's Min %" style={{background:'#f0f0f0',color:'#888',textAlign:'center'}} />
+                      <input type="number" min="0" max="100" value={r.MaxPercent} onChange={(e) => setRow(i, 'MaxPercent', e.target.value)} required />
                     </div>
                     <div className="form-group" style={{flex:'0 0 90px',margin:0}}>
                       <label>Grade</label>
                       <input type="text" value={r.Grade} onChange={(e) => setRow(i, 'Grade', e.target.value)} maxLength="6" required placeholder="e.g. A" />
                     </div>
                     <div className="form-group" style={{flex:1,margin:0}}>
-                      <label>Label</label>
+                      <label>Remarks</label>
                       <input type="text" value={r.Label} onChange={(e) => setRow(i, 'Label', e.target.value)} maxLength="40" placeholder="e.g. Excellent" />
                     </div>
                     <button type="button" className="action-icon delete-icon" title="Remove row" onClick={() => removeRow(i)} disabled={editRows.length === 1}>
@@ -23616,7 +23808,7 @@
                       </span>
                     </div>
                     <table className="simple-table" style={{width:'100%'}}>
-                      <thead><tr><th>Marks</th><th>Grade</th><th>Label</th></tr></thead>
+                      <thead><tr><th>Marks</th><th>Grade</th><th>Remarks</th></tr></thead>
                       <tbody>
                         {b.rows.map((r, i) => (
                           <tr key={i}><td>{r.MinPercent}–{r.MaxPercent}%</td><td style={{fontWeight:700}}>{r.Grade}</td><td>{r.Label}</td></tr>
@@ -23940,6 +24132,9 @@
       const [showBuilder, setShowBuilder] = useState(false);
       const [builderSaving, setBuilderSaving] = useState(false);
       const [printPaperId, setPrintPaperId] = useState(null);
+      const [sharePaper, setSharePaper] = useState(null);
+      const [publishing, setPublishing] = useState(false);
+      const [submissionsPaper, setSubmissionsPaper] = useState(null);
 
       const filteredQuestions = questions.filter(q =>
         (!qFilters.classId || String(q.ClassID) === String(qFilters.classId)) &&
@@ -23996,6 +24191,29 @@
                 loadPapers();
               }).deleteTestPaper(p.ID, currentUser, role);
             }
+          });
+      };
+
+      const handlePublish = (p) => {
+        setPublishing(true);
+        google.script.run
+          .withSuccessHandler((res) => {
+            setPublishing(false);
+            if (res && res.success) { loadPapers(); setSharePaper({ ...p, IsPublished: true, ShareToken: res.token, url: res.url }); }
+            else Swal.fire({ icon: 'error', text: (res && res.message) || 'Failed to publish' });
+          })
+          .withFailureHandler((err) => { setPublishing(false); Swal.fire({ icon: 'error', text: err.message }); })
+          .publishTestPaperOnline(p.ID, currentUser, role);
+      };
+
+      const handleUnpublish = (p) => {
+        Swal.fire({ icon: 'warning', title: 'Unpublish this exam?', text: 'The link students have will stop working.', showCancelButton: true, confirmButtonColor: '#ea4335' })
+          .then((rr) => {
+            if (!rr.isConfirmed) return;
+            google.script.run.withSuccessHandler((res) => {
+              Swal.fire({ icon: res.success ? 'success' : 'error', text: res.message, timer: 1500, showConfirmButton: false });
+              loadPapers();
+            }).withFailureHandler((err) => Swal.fire({ icon: 'error', text: err.message })).unpublishTestPaperOnline(p.ID, currentUser, role);
           });
       };
 
@@ -24078,7 +24296,7 @@
               {!pLoading && papers.length > 0 && (
                 <div style={{overflowX:'auto'}}>
                   <table className="simple-table" style={{width:'100%'}}>
-                    <thead><tr><th>Title</th><th>Class</th><th>Subject</th><th>Questions</th><th>Marks</th><th>Duration</th><th>Actions</th></tr></thead>
+                    <thead><tr><th>Title</th><th>Class</th><th>Subject</th><th>Questions</th><th>Marks</th><th>Duration</th><th>Online</th><th>Actions</th></tr></thead>
                     <tbody>
                       {papers.map((p) => (
                         <tr key={p.ID}>
@@ -24088,7 +24306,21 @@
                           <td>{p.QuestionIDs.length}</td>
                           <td>{p.TotalMarks}</td>
                           <td>{p.DurationMinutes} min</td>
+                          <td>
+                            {p.IsPublished
+                              ? <span className="role-badge" style={{background:'#34a853',color:'#fff'}}>Published</span>
+                              : <span className="role-badge" style={{background:'#888',color:'#fff'}}>Draft</span>}
+                          </td>
                           <td style={{whiteSpace:'nowrap'}}>
+                            {p.IsPublished ? (
+                              <>
+                                <button className="action-icon edit-icon" title="Share Link / QR" onClick={() => setSharePaper({ ...p, url: publicAppLink('?public=exam&token=' + p.ShareToken) })}><i className="fas fa-qrcode"></i></button>
+                                <button className="action-icon edit-icon" title="Unpublish" style={{color:'#ea4335'}} onClick={() => handleUnpublish(p)}><i className="fas fa-eye-slash"></i></button>
+                              </>
+                            ) : (
+                              <button className="action-icon edit-icon" title="Publish Online" style={{color:'#34a853'}} disabled={publishing} onClick={() => handlePublish(p)}><i className="fas fa-globe"></i></button>
+                            )}
+                            <button className="action-icon edit-icon" title="Submissions" onClick={() => setSubmissionsPaper(p)}><i className="fas fa-poll"></i></button>
                             <button className="action-icon edit-icon" title="Print / Download" onClick={() => setPrintPaperId(p.ID)}><i className="fas fa-print"></i></button>
                             <button className="action-icon delete-icon" title="Delete" onClick={() => handleDeletePaper(p)}><i className="fas fa-trash"></i></button>
                           </td>
@@ -24104,6 +24336,134 @@
           {showQModal && <QuestionModal question={editingQ} currentUser={currentUser} role={role} saving={qSaving} onClose={() => { setShowQModal(false); setEditingQ(null); }} onSave={handleSaveQ} />}
           {showBuilder && <TestPaperBuilderModal questions={questions} currentUser={currentUser} role={role} saving={builderSaving} onClose={() => setShowBuilder(false)} onSave={handleGeneratePaper} />}
           {printPaperId && <TestPaperPrintModal paperId={printPaperId} currentUser={currentUser} role={role} onClose={() => setPrintPaperId(null)} />}
+          {sharePaper && <ExamShareModal paper={sharePaper} onClose={() => setSharePaper(null)} />}
+          {submissionsPaper && <ExamSubmissionsModal paper={submissionsPaper} currentUser={currentUser} role={role} onClose={() => setSubmissionsPaper(null)} />}
+        </div>
+      );
+    }
+
+    // QR + copy/WhatsApp/print share panel for a just-published (or already-published) online exam
+    function ExamShareModal({ paper, onClose }) {
+      const qrImg = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(paper.url)}`;
+      const copyLink = () => {
+        navigator.clipboard.writeText(paper.url).then(() => {
+          Swal.fire({ icon: 'success', text: 'Exam link copied', timer: 1500, showConfirmButton: false });
+        }).catch(() => Swal.fire({ icon: 'info', title: 'Exam Link', text: paper.url }));
+      };
+      const shareWhatsApp = () => {
+        const msg = `${paper.Title} — take the online exam here:\n${paper.url}`;
+        window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+      };
+      const printQr = () => {
+        document.body.classList.add('print-target');
+        setTimeout(() => { window.print(); setTimeout(() => document.body.classList.remove('print-target'), 250); }, 60);
+      };
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'440px'}}>
+            <div className="modal-header no-print"><h3><i className="fas fa-qrcode"></i> Share Exam</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
+            <div className="modal-body">
+              <div className="report-card" style={{textAlign:'center',padding:'20px'}}>
+                <h3 style={{color:'var(--navy-primary)',marginBottom:'12px',fontSize:'15px'}}>{paper.Title}</h3>
+                <img src={qrImg} alt="Exam QR Code" style={{width:'180px',height:'180px',margin:'0 auto 14px',display:'block'}} />
+                <div className="form-group" style={{textAlign:'left'}}>
+                  <label>Exam URL</label>
+                  <input type="text" readOnly value={paper.url} onClick={(e) => e.target.select()} style={{width:'100%',padding:'8px 10px',border:'1px solid #ccc',fontSize:'12px'}} />
+                </div>
+                <div className="no-print" style={{display:'flex',gap:'8px',justifyContent:'center',marginTop:'12px',flexWrap:'wrap'}}>
+                  <button className="btn btn-secondary btn-sm" onClick={copyLink}><i className="fas fa-copy"></i> Copy URL</button>
+                  <button className="btn btn-sm" style={{background:'#25D366',color:'#fff',border:'none'}} onClick={shareWhatsApp}><i className="fab fa-whatsapp"></i> Share on WhatsApp</button>
+                  <button className="btn btn-secondary btn-sm" onClick={printQr}><i className="fas fa-print"></i> Print QR Code</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Submissions list for one test paper — score at a glance, drill into a submission to grade
+    // any essay questions (mcq/true_false/short_answer are already auto-graded).
+    function ExamSubmissionsModal({ paper, currentUser, role, onClose }) {
+      const { data, error: loadError, isLoading: loading, mutate: reload } =
+        useSWR('getExamSubmissions:' + paper.ID, () => swrFetcher('getExamSubmissions', paper.ID, currentUser, role));
+      const subs = data || [];
+      const [viewing, setViewing] = useState(null);
+      const [grading, setGrading] = useState({}); // qid -> input value while editing
+
+      const gradeQuestion = (sub, qid) => {
+        const marks = parseFloat(grading[qid]);
+        if (isNaN(marks) || marks < 0) { Swal.fire({ icon: 'warning', text: 'Enter a valid mark' }); return; }
+        google.script.run
+          .withSuccessHandler((res) => {
+            if (res && res.success) { reload(); setViewing(null); }
+            else Swal.fire({ icon: 'error', text: (res && res.message) || 'Failed to grade' });
+          })
+          .withFailureHandler((err) => Swal.fire({ icon: 'error', text: err.message }))
+          .gradeEssayAnswer(sub.ID, qid, marks, currentUser, role);
+      };
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'720px'}}>
+            <div className="modal-header"><h3><i className="fas fa-poll"></i> Submissions — {paper.Title}</h3><button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button></div>
+            <div className="modal-body">
+              {loadError && !loading && subs.length === 0 && (
+                <div className="settings-info-message" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>Couldn't load submissions — {String((loadError && loadError.message) || loadError)}.</div>
+              )}
+              {loading && <TableSkeleton rows={4} columns={4} />}
+              {!loading && subs.length === 0 && (
+                <div style={{textAlign:'center',padding:'30px',color:'#888',background:'#f8f9fa'}}>No submissions yet.</div>
+              )}
+              {!loading && subs.length > 0 && !viewing && (
+                <div style={{overflowX:'auto'}}>
+                  <table className="simple-table" style={{width:'100%'}}>
+                    <thead><tr><th>Student</th><th>Admission No</th><th>Score</th><th>Submitted</th><th></th></tr></thead>
+                    <tbody>
+                      {subs.map(s => (
+                        <tr key={s.ID}>
+                          <td style={{fontWeight:600}}>{s.StudentName}</td>
+                          <td>{s.AdmissionNumber || '—'}</td>
+                          <td style={{fontWeight:700}}>
+                            {s.Score} / {s.MaxScore}
+                            {s.PendingReviewCount > 0 && <span style={{color:'#fb8c00',fontWeight:400,fontSize:'11px'}}> ({s.PendingReviewCount} pending)</span>}
+                          </td>
+                          <td style={{fontSize:'12px',color:'#888'}}>{new Date(s.SubmittedAt).toLocaleString()}</td>
+                          <td><button className="action-icon edit-icon" title="View / Grade" onClick={() => setViewing(s)}><i className="fas fa-eye"></i></button></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {viewing && (
+                <div>
+                  <button className="btn btn-secondary btn-sm" style={{marginBottom:'12px'}} onClick={() => setViewing(null)}><i className="fas fa-arrow-left"></i> Back to list</button>
+                  <div style={{fontWeight:700,marginBottom:'10px'}}>{viewing.StudentName} — {viewing.Score} / {viewing.MaxScore}</div>
+                  {Object.keys(viewing.Breakdown).map(qid => {
+                    const b = viewing.Breakdown[qid];
+                    const pending = b.awarded == null;
+                    return (
+                      <div key={qid} style={{padding:'8px 0',borderBottom:'1px solid #eee'}}>
+                        <div style={{fontSize:'12.5px',color:'#555'}}>Answer: {b.answer || <span style={{color:'#bbb'}}>(no answer)</span>}</div>
+                        {pending ? (
+                          <div style={{display:'flex',gap:'8px',alignItems:'center',marginTop:'6px'}}>
+                            <input type="number" min="0" max={b.maxMarks} step="0.5" placeholder={'/ ' + b.maxMarks}
+                              value={grading[qid] || ''} onChange={(e) => setGrading({...grading, [qid]: e.target.value})}
+                              style={{width:'80px',padding:'6px 8px',border:'1px solid #ccc'}} />
+                            <button className="btn btn-primary btn-sm" onClick={() => gradeQuestion(viewing, qid)}><i className="fas fa-check"></i> Award Marks</button>
+                          </div>
+                        ) : (
+                          <div style={{fontSize:'12px',fontWeight:600,color: b.correct ? '#34a853' : '#ea4335',marginTop:'4px'}}>{b.awarded} / {b.maxMarks} marks</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       );
     }
@@ -24240,6 +24600,11 @@
                   NET PAY: <b>GH₵{p.NetPay.toFixed(2)}</b>
                 </div>
 
+                {p.SSNITEmployerContribution > 0 && (
+                  <div style={{fontSize:'11.5px',color:'#888',padding:'4px 14px 0',fontStyle:'italic'}}>
+                    Employer SSNIT contribution for this period (Tier 1, 8.5% of basic — paid by the school on top of net pay, not deducted here): GH₵{p.SSNITEmployerContribution.toFixed(2)}
+                  </div>
+                )}
                 {p.Notes && <div className="rc-remarks" style={{marginBottom:'14px'}}><b>Notes:</b> {p.Notes}</div>}
 
                 <div className="rc-sign">
@@ -24261,7 +24626,7 @@
       const isBursar = r === 'bursar';
       const canManage = isAdmin || isBursar;
       const canSeeRegister = isAdmin || isClerk || isBursar;
-      const [tab, setTab] = useState('payslips'); // 'payslips' | 'ssnit'
+      const [tab, setTab] = useState('payslips'); // 'payslips' | 'ssnit' | 'ssnitFiling'
 
       const { data: payslipsData, error: pError, isLoading: pLoading, mutate: loadPayslips } =
         useSWR('getAllPayslips', () => swrFetcher('getAllPayslips', currentUser, role));
@@ -24312,7 +24677,8 @@
           {canSeeRegister && (
             <div style={{display:'flex',gap:'8px',marginBottom:'16px'}}>
               <button className={`btn btn-sm ${tab === 'payslips' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('payslips')}><i className="fas fa-file-invoice-dollar"></i> Payslips</button>
-              <button className={`btn btn-sm ${tab === 'ssnit' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('ssnit')}><i className="fas fa-shield-alt"></i> SSNIT Register</button>
+              <button className={`btn btn-sm ${tab === 'ssnit' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('ssnit')}><i className="fas fa-shield-alt"></i> SSNIT Summary</button>
+              <button className={`btn btn-sm ${tab === 'ssnitFiling' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTab('ssnitFiling')}><i className="fas fa-file-invoice"></i> SSNIT Filing (Monthly/Yearly)</button>
             </div>
           )}
 
@@ -24355,16 +24721,16 @@
           {tab === 'ssnit' && canSeeRegister && (
             <>
               <div className="settings-info-message" style={{marginBottom:'14px'}}>
-                <i className="fas fa-info-circle"></i> Running totals come from generated payslips — the Tier 1 SSNIT contribution on each payslip (5.5% of basic salary) accumulates here per staff member.
+                <i className="fas fa-info-circle"></i> Running totals come from generated payslips — the Tier 1 SSNIT contributions on each payslip (employee 5.5% + employer 8.5% of basic salary = 13.5% total remitted to SSNIT) accumulate here per staff member. For a specific month or year to file, use "SSNIT Filing" instead.
               </div>
               {sError && !sLoading && ssnitRows.length === 0 && (
                 <div className="settings-info-message" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>Couldn't load the SSNIT register — {String((sError && sError.message) || sError)}.</div>
               )}
-              {sLoading && <TableSkeleton rows={5} columns={5} />}
+              {sLoading && <TableSkeleton rows={5} columns={7} />}
               {!sLoading && ssnitRows.length > 0 && (
                 <div style={{overflowX:'auto'}}>
                   <table className="simple-table" style={{width:'100%'}}>
-                    <thead><tr><th>Staff</th><th>Role</th><th>SSNIT Number</th><th>Payslips</th><th>Total Contributed</th></tr></thead>
+                    <thead><tr><th>Staff</th><th>Role</th><th>SSNIT Number</th><th>Payslips</th><th>Employee (5.5%)</th><th>Employer (8.5%)</th><th>Total to SSNIT</th></tr></thead>
                     <tbody>
                       {ssnitRows.map((s) => (
                         <tr key={s.ID}>
@@ -24372,18 +24738,151 @@
                           <td style={{textTransform:'capitalize'}}>{s.Role}</td>
                           <td style={{fontFamily:'monospace'}}>{s.SSNITNumber || <span style={{color:'#ea4335'}}>Not on file</span>}</td>
                           <td>{s.PayslipCount}</td>
+                          <td>GH₵{s.TotalEmployeeContributed.toFixed(2)}</td>
+                          <td>GH₵{s.TotalEmployerContributed.toFixed(2)}</td>
                           <td style={{fontWeight:700}}>GH₵{s.TotalContributed.toFixed(2)}</td>
                         </tr>
                       ))}
                     </tbody>
+                    <tfoot>
+                      <tr style={{fontWeight:700,background:'#f8f9fa'}}>
+                        <td colSpan="4">Grand Total (all time)</td>
+                        <td>GH₵{ssnitRows.reduce((s,r)=>s+r.TotalEmployeeContributed,0).toFixed(2)}</td>
+                        <td>GH₵{ssnitRows.reduce((s,r)=>s+r.TotalEmployerContributed,0).toFixed(2)}</td>
+                        <td>GH₵{ssnitRows.reduce((s,r)=>s+r.TotalContributed,0).toFixed(2)}</td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               )}
             </>
           )}
 
+          {tab === 'ssnitFiling' && canSeeRegister && <SsnitFilingReport currentUser={currentUser} role={role} />}
+
           {showGenerate && <PayslipGenerateModal staff={staff} currentUser={currentUser} role={role} saving={generating} onClose={() => setShowGenerate(false)} onSave={handleGenerate} />}
           {printing && <PayslipPrintModal payslip={printing} onClose={() => setPrinting(null)} />}
+        </div>
+      );
+    }
+
+    // Monthly / Yearly SSNIT filing report — what admin hands to (or enters into) SSNIT's own
+    // e-filing system: per-staff employee + employer contribution for the chosen period, plus the
+    // single grand total the school actually remits.
+    function SsnitFilingReport({ currentUser, role }) {
+      const now = new Date();
+      const [periodType, setPeriodType] = useState('monthly'); // 'monthly' | 'yearly'
+      const [month, setMonth] = useState(now.getMonth() + 1);
+      const [year, setYear] = useState(now.getFullYear());
+      const [report, setReport] = useState(null);
+      const [loading, setLoading] = useState(false);
+
+      const runReport = () => {
+        setLoading(true);
+        const period = periodType === 'monthly' ? { month, year } : { year };
+        google.script.run
+          .withSuccessHandler((res) => {
+            setLoading(false);
+            if (res && res.success) setReport(res.data);
+            else Swal.fire({ icon: 'error', text: (res && res.message) || 'Failed to build report' });
+          })
+          .withFailureHandler((err) => { setLoading(false); Swal.fire({ icon: 'error', text: err.message }); })
+          .getSsnitFilingReport(period, currentUser, role);
+      };
+
+      useEffect(() => { runReport(); }, []);
+
+      const sch = window.SMS_SCHOOL || {};
+      const periodLabel = report ? (report.period.month ? PAY_MONTH_NAMES[report.period.month - 1] + ' ' + report.period.year : 'Year ' + report.period.year) : '';
+
+      const downloadPdf = () => {
+        if (!report) return;
+        const body = [[
+          { text: 'Staff', bold: true }, { text: 'SSNIT No', bold: true }, { text: 'Payslips', bold: true },
+          { text: 'Employee (5.5%)', bold: true }, { text: 'Employer (8.5%)', bold: true }, { text: 'Total', bold: true }
+        ]];
+        report.rows.forEach(r => body.push([r.FullName, r.SSNITNumber || '—', String(r.PayslipCount), 'GH₵' + r.Employee.toFixed(2), 'GH₵' + r.Employer.toFixed(2), 'GH₵' + r.Total.toFixed(2)]));
+        body.push([{ text: 'Grand Total', bold: true, colSpan: 3 }, {}, {}, { text: 'GH₵' + report.totals.Employee.toFixed(2), bold: true }, { text: 'GH₵' + report.totals.Employer.toFixed(2), bold: true }, { text: 'GH₵' + report.totals.Total.toFixed(2), bold: true }]);
+        const doc = {
+          pageSize: 'A4', pageMargins: [30, 30, 30, 30],
+          content: [
+            { text: (sch.SchoolName || 'School') + ' — SSNIT Filing Report', style: 'title' },
+            { text: periodLabel, style: 'sub', margin: [0, 0, 0, 12] },
+            { table: { headerRows: 1, widths: ['*', 'auto', 'auto', 'auto', 'auto', 'auto'], body }, layout: 'lightHorizontalLines', fontSize: 9 }
+          ],
+          styles: { title: { fontSize: 15, bold: true, color: '#001f3f' }, sub: { fontSize: 10, color: '#666' } }
+        };
+        pdfMake.createPdf(doc).download('SSNIT-Filing-' + periodLabel.replace(/\s+/g, '-') + '.pdf');
+      };
+
+      return (
+        <div>
+          <div className="settings-info-message" style={{marginBottom:'14px'}}>
+            <i className="fas fa-info-circle"></i> Tier 1 only — the 13.5% of basic salary the school remits to SSNIT (employee 5.5% + employer 8.5%). Use this to fill in SSNIT's monthly/yearly e-filing.
+          </div>
+          <div style={{display:'flex',gap:'10px',alignItems:'flex-end',flexWrap:'wrap',marginBottom:'16px'}}>
+            <div className="form-group" style={{margin:0}}>
+              <label>Period</label>
+              <div style={{display:'flex',gap:'6px'}}>
+                <button className={`btn btn-sm ${periodType==='monthly'?'btn-primary':'btn-secondary'}`} onClick={() => setPeriodType('monthly')}>Monthly</button>
+                <button className={`btn btn-sm ${periodType==='yearly'?'btn-primary':'btn-secondary'}`} onClick={() => setPeriodType('yearly')}>Yearly</button>
+              </div>
+            </div>
+            {periodType === 'monthly' && (
+              <div className="form-group" style={{margin:0}}>
+                <label>Month</label>
+                <select value={month} onChange={(e) => setMonth(parseInt(e.target.value,10))} style={{padding:'8px 10px',border:'1px solid #ccc'}}>
+                  {PAY_MONTH_NAMES.map((m, i) => <option key={m} value={i+1}>{m}</option>)}
+                </select>
+              </div>
+            )}
+            <div className="form-group" style={{margin:0}}>
+              <label>Year</label>
+              <input type="number" value={year} onChange={(e) => setYear(parseInt(e.target.value,10) || now.getFullYear())} style={{width:'100px',padding:'8px 10px',border:'1px solid #ccc'}} />
+            </div>
+            <button className="btn btn-primary" disabled={loading} onClick={runReport}><i className="fas fa-sync"></i> {loading ? 'Loading…' : 'Run Report'}</button>
+            {report && report.rows.length > 0 && <button className="btn btn-secondary" onClick={downloadPdf}><i className="fas fa-file-pdf"></i> Download PDF</button>}
+          </div>
+
+          {loading && <TableSkeleton rows={5} columns={6} />}
+          {!loading && report && report.rows.length === 0 && (
+            <div style={{textAlign:'center',padding:'40px',color:'#888',background:'#f8f9fa'}}>No payslips found for {periodLabel}.</div>
+          )}
+          {!loading && report && report.rows.length > 0 && (
+            <>
+              <div style={{display:'flex',gap:'12px',marginBottom:'16px',flexWrap:'wrap'}}>
+                <div style={{flex:'1 1 160px',background:'#fff',border:'1px solid #e0e0e0',borderRadius:'8px',padding:'12px 14px',textAlign:'center'}}>
+                  <div style={{fontSize:'20px',fontWeight:700,color:'var(--navy-primary)'}}>GH₵{report.totals.Employee.toFixed(2)}</div>
+                  <div style={{fontSize:'12px',color:'#888'}}>Employee Total</div>
+                </div>
+                <div style={{flex:'1 1 160px',background:'#fff',border:'1px solid #e0e0e0',borderRadius:'8px',padding:'12px 14px',textAlign:'center'}}>
+                  <div style={{fontSize:'20px',fontWeight:700,color:'var(--navy-primary)'}}>GH₵{report.totals.Employer.toFixed(2)}</div>
+                  <div style={{fontSize:'12px',color:'#888'}}>Employer Total</div>
+                </div>
+                <div style={{flex:'1 1 160px',background:'var(--navy-primary)',border:'1px solid var(--navy-primary)',borderRadius:'8px',padding:'12px 14px',textAlign:'center'}}>
+                  <div style={{fontSize:'20px',fontWeight:700,color:'#fff'}}>GH₵{report.totals.Total.toFixed(2)}</div>
+                  <div style={{fontSize:'12px',color:'#ddd'}}>Total to Remit to SSNIT</div>
+                </div>
+              </div>
+              <div style={{overflowX:'auto'}}>
+                <table className="simple-table" style={{width:'100%'}}>
+                  <thead><tr><th>Staff</th><th>SSNIT Number</th><th>Payslips</th><th>Employee</th><th>Employer</th><th>Total</th></tr></thead>
+                  <tbody>
+                    {report.rows.map(r => (
+                      <tr key={r.ID}>
+                        <td style={{fontWeight:600}}>{r.FullName}</td>
+                        <td style={{fontFamily:'monospace'}}>{r.SSNITNumber || <span style={{color:'#ea4335'}}>Not on file</span>}</td>
+                        <td>{r.PayslipCount}</td>
+                        <td>GH₵{r.Employee.toFixed(2)}</td>
+                        <td>GH₵{r.Employer.toFixed(2)}</td>
+                        <td style={{fontWeight:700}}>GH₵{r.Total.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       );
     }
@@ -28458,12 +28957,27 @@
             <i className="fas fa-link"></i> Public Links
           </h3>
           <p style={{color:'#777', fontSize:'13px', marginBottom:'12px'}}>
-            The web address prospective parents use to reach this system (the "Copy Link"/QR code buttons in Admissions/Online Admission build on this). Leave blank to use whatever address is currently open in the browser.
+            The web address prospective parents/students use to reach this system (the QR/"Copy Link" buttons in Admissions, Online Admission and Online Exams all build on this). Leave blank to always auto-use the current live deployment URL — safest choice unless you have a specific reason to pin it.
           </p>
+          <div className="settings-info-message" style={{marginBottom:'10px', fontSize:'12px'}}>
+            <i className="fas fa-triangle-exclamation" style={{color:'#fb8c00'}}></i> If shared links suddenly stop working (redirect to the login page or show blank), this field is usually pinned to an <b>old deployment ID</b> — normally after re-deploying via "Deploy → New deployment" instead of "Manage deployments → Edit → New version" (the latter keeps the same /exec URL forever). Click "Detect Current URL" below, compare it to what's saved, and clear the field if they don't match.
+          </div>
           <div className="form-grid" style={{marginBottom:'10px'}}>
             <div className="form-group" style={{gridColumn:'1 / -1'}}>
               <label>Public Web App URL</label>
-              <input type="text" value={data.PublicAppBaseURL} onChange={(e) => set('PublicAppBaseURL', e.target.value.trim())} placeholder="https://script.google.com/macros/s/XXXXX/exec" />
+              <div style={{display:'flex',gap:'8px'}}>
+                <input type="text" value={data.PublicAppBaseURL} onChange={(e) => set('PublicAppBaseURL', e.target.value.trim())} placeholder="https://script.google.com/macros/s/XXXXX/exec" style={{flex:1}} />
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => {
+                  google.script.run
+                    .withSuccessHandler((res) => {
+                      if (res && res.success) Swal.fire({ icon: 'info', title: 'Current Live Deployment URL', html: `<div style="word-break:break-all;font-family:monospace;font-size:12px">${res.data}</div><div style="margin-top:10px;font-size:12px;color:#777">Click below to use it, or Cancel to leave the saved value as-is.</div>`, showCancelButton: true, confirmButtonText: 'Use This URL' })
+                        .then((rr) => { if (rr.isConfirmed) set('PublicAppBaseURL', res.data); });
+                      else Swal.fire({ icon: 'error', text: (res && res.message) || 'Failed to detect URL' });
+                    })
+                    .withFailureHandler((err) => Swal.fire({ icon: 'error', text: err.message }))
+                    .getLiveWebAppUrl(currentUser, role);
+                }}><i className="fas fa-satellite-dish"></i> Detect Current URL</button>
+              </div>
             </div>
           </div>
 
@@ -31158,6 +31672,7 @@
       if (publicPage === 'admission') return <PublicAdmissionForm schoolSettings={schoolSettings} />;
       if (publicPage === 'reportcard') return <PublicReportCardPage schoolSettings={schoolSettings} shareToken={publicParams.get('token')} />;
       if (publicPage === 'job') return <PublicJobApplicationForm schoolSettings={schoolSettings} postingId={publicParams.get('postingId')} />;
+      if (publicPage === 'exam') return <PublicExamView schoolSettings={schoolSettings} token={publicParams.get('token')} />;
 
       return (
         <div>

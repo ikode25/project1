@@ -895,7 +895,7 @@ function _normalizeJhsGrade(g) {
 // aggregate scoring (computeBeceGrade/computeBeceAggregate) intentionally stays on the fixed WAEC
 // scale — that's a national exam standard, not something a school should be able to reconfigure.
 var GRADING_BANDS_SHEET = 'Grading_Bands';
-var GRADING_BANDS_HEADERS = ['ID', 'Band', 'MinPercent', 'Grade', 'Label', 'DisplayOrder', 'IsDeleted', 'CreatedAt', 'UpdatedAt'];
+var GRADING_BANDS_HEADERS = ['ID', 'Band', 'MinPercent', 'Grade', 'Label', 'DisplayOrder', 'IsDeleted', 'CreatedAt', 'UpdatedAt', 'MaxPercent'];
 
 function _ensureGradingBandsSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -905,6 +905,11 @@ function _ensureGradingBandsSheet() {
     sh.appendRow(GRADING_BANDS_HEADERS);
     sh.getRange(1, 1, 1, GRADING_BANDS_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
     sh.setFrozenRows(1);
+  } else if (sh.getLastColumn() < GRADING_BANDS_HEADERS.length) {
+    // upgrade an existing sheet created before MaxPercent existed
+    var addFrom = sh.getLastColumn() + 1;
+    sh.getRange(1, addFrom, 1, GRADING_BANDS_HEADERS.length - sh.getLastColumn()).setValues([GRADING_BANDS_HEADERS.slice(addFrom - 1)])
+      .setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
   }
   return sh;
 }
@@ -923,7 +928,11 @@ function _getCustomGradingBands() {
         if (String(data[i][6]) === '1') continue; // IsDeleted
         var band = String(data[i][1] || '').toLowerCase();
         if (band !== 'basic' && band !== 'jhs') continue;
-        _customGradingBandsCache[band].push({ min: parseFloat(data[i][2]) || 0, grade: String(data[i][3] || ''), label: String(data[i][4] || '') });
+        var maxRaw = data[i][9]; // blank on rows saved before MaxPercent existed
+        _customGradingBandsCache[band].push({
+          min: parseFloat(data[i][2]) || 0, grade: String(data[i][3] || ''), label: String(data[i][4] || ''),
+          max: (maxRaw !== '' && maxRaw != null && !isNaN(parseFloat(maxRaw))) ? parseFloat(maxRaw) : null
+        });
       }
       _customGradingBandsCache.basic.sort(function (a, b) { return b.min - a.min; });
       _customGradingBandsCache.jhs.sort(function (a, b) { return b.min - a.min; });
@@ -967,10 +976,16 @@ function sbaGradeDescriptor(grade, band) {
   return BASIC_GRADE_DESCRIPTORS[g] || '';
 }
 
-// derives each row's MaxPercent from the next-highest row's MinPercent (rows must already be
-// sorted descending by MinPercent) — e.g. Min 90/Min 80 next-down means the 90 row covers 90-100.
+// fills in MaxPercent for any row missing one: rows must already be sorted descending by
+// MinPercent — a blank Max derives from the next-highest row's Min (e.g. Min 90/Min 80 next-down
+// means the 90 row covers 90-100). Custom rows normally carry an admin-entered Max already; this
+// fallback only kicks in for legacy rows saved before Max became editable, and for the automatic
+// default scale (which has no stored Max at all).
 function _withMaxPercent(rows) {
-  return rows.map(function (r, i) { return { MinPercent: r.MinPercent, MaxPercent: i === 0 ? 100 : rows[i - 1].MinPercent - 1, Grade: r.Grade, Label: r.Label }; });
+  return rows.map(function (r, i) {
+    var max = (r.MaxPercent != null) ? r.MaxPercent : (i === 0 ? 100 : rows[i - 1].MinPercent - 1);
+    return { MinPercent: r.MinPercent, MaxPercent: max, Grade: r.Grade, Label: r.Label };
+  });
 }
 
 // any logged-in role — returns both bands, each flagged isCustom (false = using the automatic default)
@@ -980,7 +995,7 @@ function getGradingBands(currentUser, currentRole) {
     var out = {};
     ['basic', 'jhs'].forEach(function (band) {
       if (custom[band].length) {
-        out[band] = { isCustom: true, rows: _withMaxPercent(custom[band].map(function (r) { return { MinPercent: r.min, Grade: r.grade, Label: r.label }; })) };
+        out[band] = { isCustom: true, rows: _withMaxPercent(custom[band].map(function (r) { return { MinPercent: r.min, MaxPercent: r.max, Grade: r.grade, Label: r.label }; })) };
       } else {
         var defaults = band === 'jhs' ? JHS_GRADE_TABLE.map(function (r) { return { MinPercent: r.min, Grade: String(r.number), Label: r.label }; })
           : [{ min: 80, code: 'HP' }, { min: 68, code: 'P' }, { min: 54, code: 'AP' }, { min: 40, code: 'D' }, { min: 0, code: 'E' }]
@@ -1007,11 +1022,14 @@ function saveGradingBands(band, rows, currentUser, currentRole) {
     var clean = [];
     for (var i = 0; i < rows.length; i++) {
       var min = parseFloat(rows[i].MinPercent);
+      var max = parseFloat(rows[i].MaxPercent);
       var grade = String(rows[i].Grade || '').trim();
       var label = String(rows[i].Label || '').trim();
       if (isNaN(min) || min < 0 || min > 100) return { success: false, message: 'Row ' + (i + 1) + ': Minimum % must be 0-100' };
+      if (isNaN(max) || max < 0 || max > 100) return { success: false, message: 'Row ' + (i + 1) + ': Maximum % must be 0-100' };
+      if (max < min) return { success: false, message: 'Row ' + (i + 1) + ': Maximum % can\'t be less than Minimum %' };
       if (!grade) return { success: false, message: 'Row ' + (i + 1) + ': Grade is required' };
-      clean.push({ min: min, grade: grade, label: label });
+      clean.push({ min: min, max: max, grade: grade, label: label });
     }
     if (clean.length) {
       var mins = clean.map(function (r) { return r.min; });
@@ -1031,7 +1049,7 @@ function saveGradingBands(band, rows, currentUser, currentRole) {
     clean.sort(function (a, b) { return b.min - a.min; });
     clean.forEach(function (row, idx) {
       var id = nextRowId(sh);
-      sh.appendRow([id, bandKey, row.min, row.grade, row.label, idx, '0', ts, ts]);
+      sh.appendRow([id, bandKey, row.min, row.grade, row.label, idx, '0', ts, ts, row.max]);
     });
 
     _customGradingBandsCache = null; // invalidate — next computeGrade() call re-reads
@@ -11363,8 +11381,11 @@ function getHallTicketData(examId, studentId, currentUser, currentRole) {
 var QUESTION_BANK_SHEET = 'Question_Bank';
 var QUESTION_BANK_HEADERS = ['ID', 'SubjectID', 'ClassID', 'Topic', 'QuestionType', 'QuestionText', 'OptionA', 'OptionB', 'OptionC', 'OptionD', 'CorrectAnswer', 'Marks', 'Difficulty', 'CreatedBy', 'IsDeleted', 'CreatedAt', 'UpdatedAt', 'PhotoURL', 'VideoURL'];
 var TEST_PAPERS_SHEET = 'Test_Papers';
-var TEST_PAPER_HEADERS = ['ID', 'Title', 'SubjectID', 'ClassID', 'Instructions', 'DurationMinutes', 'TotalMarks', 'QuestionIDs', 'CreatedBy', 'IsDeleted', 'CreatedAt', 'UpdatedAt'];
+var TEST_PAPER_HEADERS = ['ID', 'Title', 'SubjectID', 'ClassID', 'Instructions', 'DurationMinutes', 'TotalMarks', 'QuestionIDs', 'CreatedBy', 'IsDeleted', 'CreatedAt', 'UpdatedAt', 'IsPublished', 'ShareToken'];
 var QUESTION_TYPES = ['mcq', 'true_false', 'short_answer', 'essay'];
+var EXAM_SUBMISSIONS_SHEET = 'Exam_Submissions';
+// AnswersJSON: { "<questionId>": { answer, maxMarks, awarded, correct (true/false/null=pending) } }
+var EXAM_SUBMISSION_HEADERS = ['ID', 'TestPaperID', 'ShareToken', 'StudentName', 'AdmissionNumber', 'StudentContact', 'AnswersJSON', 'Score', 'MaxScore', 'PendingReviewCount', 'GradedBy', 'SubmittedAt', 'UpdatedAt'];
 var QUESTION_DIFFICULTIES = ['easy', 'medium', 'hard'];
 
 function _ensureQuestionBankSheet() {
@@ -11385,6 +11406,22 @@ function _ensureTestPapersSheet() {
     sh = ss.insertSheet(TEST_PAPERS_SHEET);
     sh.appendRow(TEST_PAPER_HEADERS);
     sh.getRange(1, 1, 1, TEST_PAPER_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+    sh.setFrozenRows(1);
+  } else if (sh.getLastColumn() < TEST_PAPER_HEADERS.length) {
+    // upgrade an existing sheet created before IsPublished/ShareToken existed
+    var addFrom = sh.getLastColumn() + 1;
+    sh.getRange(1, addFrom, 1, TEST_PAPER_HEADERS.length - sh.getLastColumn()).setValues([TEST_PAPER_HEADERS.slice(addFrom - 1)])
+      .setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+  }
+  return sh;
+}
+function _ensureExamSubmissionsSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(EXAM_SUBMISSIONS_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(EXAM_SUBMISSIONS_SHEET);
+    sh.appendRow(EXAM_SUBMISSION_HEADERS);
+    sh.getRange(1, 1, 1, EXAM_SUBMISSION_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
     sh.setFrozenRows(1);
   }
   return sh;
@@ -11529,7 +11566,8 @@ function _rowToTestPaper(row, smap, cmap, umap) {
     Instructions: row[4] || '', DurationMinutes: parseInt(row[5], 10) || 60, TotalMarks: parseFloat(row[6]) || 0,
     QuestionIDs: String(row[7] || '').split(',').filter(Boolean).map(function (x) { return parseInt(x, 10); }),
     CreatedBy: cby, CreatedByName: (cby && umap && umap[cby]) ? umap[cby].fullName : '',
-    CreatedAt: toIso(row[10]), UpdatedAt: toIso(row[11])
+    CreatedAt: toIso(row[10]), UpdatedAt: toIso(row[11]),
+    IsPublished: String(row[12]) === '1', ShareToken: row[13] || ''
   };
 }
 
@@ -11604,7 +11642,7 @@ function generateTestPaper(d, currentUser, currentRole) {
 
     var sh = _ensureTestPapersSheet();
     var ts = nowIso(), id = nextRowId(sh);
-    sh.appendRow([id, title, subId, clsId, String(d.Instructions || '').trim(), duration, totalMarks, qIds.join(','), getCurrentUserId(currentUser) || '', '0', ts, ts]);
+    sh.appendRow([id, title, subId, clsId, String(d.Instructions || '').trim(), duration, totalMarks, qIds.join(','), getCurrentUserId(currentUser) || '', '0', ts, ts, '0', '']);
     addLog(currentUser, 'Test Paper Generated', title + ' (' + qIds.length + ' questions, ' + totalMarks + ' marks)');
     return { success: true, message: 'Test paper generated — ' + qIds.length + ' questions, ' + totalMarks + ' marks', id: id };
   } catch (err) {
@@ -11633,6 +11671,239 @@ function deleteTestPaper(id, currentUser, currentRole) {
   }
 }
 
+// ============== Online Exam (public, no-login test taking) ==============
+// Publishing a Test Paper mints a stable ShareToken; anyone with that link (?public=exam&token=...)
+// can attempt it without a portal login — the fallback the user explicitly asked for when a student
+// can't log in. mcq/true_false/short_answer are graded immediately on submit by comparing the
+// student's answer to Question_Bank.CorrectAnswer; essay answers can't be auto-graded, so they're
+// left "pending" (awarded: null) until a teacher opens the submission and grades them by hand.
+
+// admin/teacher (owner) — mint (or reuse) a ShareToken and mark the paper published
+function publishTestPaperOnline(id, currentUser, currentRole) {
+  try {
+    var role = String(currentRole || '').toLowerCase();
+    if (role !== 'admin' && role !== 'teacher') return { success: false, message: 'Forbidden — admin/teacher only' };
+    var idn = parseInt(id, 10);
+    var sh = _ensureTestPapersSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] !== idn || String(data[i][9]) === '1') continue;
+      if (role === 'teacher' && parseInt(data[i][8], 10) !== getCurrentUserId(currentUser)) return { success: false, message: 'Forbidden — not your test paper' };
+      var row = i + 1;
+      var token = data[i][13] || Utilities.getUuid().replace(/-/g, '');
+      sh.getRange(row, 13).setValue('1');
+      sh.getRange(row, 14).setValue(token);
+      sh.getRange(row, 12).setValue(nowIso());
+      addLog(currentUser, 'Test Paper Published Online', '#' + idn);
+      return { success: true, message: 'Published — share the link with students', url: _publicAppLinkServer('?public=exam&token=' + token), token: token };
+    }
+    return { success: false, message: 'Test paper not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function unpublishTestPaperOnline(id, currentUser, currentRole) {
+  try {
+    var role = String(currentRole || '').toLowerCase();
+    if (role !== 'admin' && role !== 'teacher') return { success: false, message: 'Forbidden — admin/teacher only' };
+    var idn = parseInt(id, 10);
+    var sh = _ensureTestPapersSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] !== idn || String(data[i][9]) === '1') continue;
+      if (role === 'teacher' && parseInt(data[i][8], 10) !== getCurrentUserId(currentUser)) return { success: false, message: 'Forbidden — not your test paper' };
+      sh.getRange(i + 1, 13).setValue('0');
+      sh.getRange(i + 1, 12).setValue(nowIso());
+      addLog(currentUser, 'Test Paper Unpublished', '#' + idn);
+      return { success: true, message: 'Unpublished — the link no longer works' };
+    }
+    return { success: false, message: 'Test paper not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// public — no auth. Strips CorrectAnswer from every question before returning.
+function getPublicTestPaper(token) {
+  try {
+    var tok = String(token || '').trim();
+    if (!tok) return { success: false, message: 'Missing exam link' };
+    var sh = _ensureTestPapersSheet();
+    var data = sh.getDataRange().getValues();
+    var smap = getSubjectsMap(), cmap = getClassesMap();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][13]) !== tok || String(data[i][9]) === '1') continue;
+      if (String(data[i][12]) !== '1') return { success: false, message: 'This exam is not currently open.' };
+      var paper = _rowToTestPaper(data[i], smap, cmap, null);
+      var qsh = _ensureQuestionBankSheet();
+      var qdata = qsh.getDataRange().getValues();
+      var qmap = {};
+      for (var q = 1; q < qdata.length; q++) qmap[qdata[q][0]] = qdata[q];
+      paper.questions = paper.QuestionIDs.map(function (qid) {
+        var row = qmap[qid];
+        if (!row) return null;
+        return {
+          ID: row[0], QuestionType: row[4] || 'mcq', QuestionText: row[5] || '',
+          OptionA: row[6] || '', OptionB: row[7] || '', OptionC: row[8] || '', OptionD: row[9] || '',
+          Marks: parseFloat(row[11]) || 1, PhotoURL: row[17] || '', VideoURL: row[18] || ''
+        };
+      }).filter(Boolean);
+      delete paper.QuestionIDs;
+      return { success: true, data: paper };
+    }
+    return { success: false, message: 'Exam link not found or no longer available.' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function _gradeExamAnswer(qType, correctAnswer, rawAnswer, maxMarks) {
+  var norm = function (x) { return String(x == null ? '' : x).trim().toLowerCase(); };
+  if (qType === 'essay') return { awarded: null, correct: null }; // needs a human
+  var given = norm(rawAnswer), correct = norm(correctAnswer);
+  var isCorrect = given !== '' && given === correct;
+  return { awarded: isCorrect ? maxMarks : 0, correct: isCorrect };
+}
+
+// public — no auth. Student submits { StudentName, AdmissionNumber, StudentContact, Answers: {qid: answer} }.
+function submitPublicExam(token, studentInfo, answers, currentUser, currentRole) {
+  try {
+    var tok = String(token || '').trim();
+    var name = String((studentInfo && studentInfo.StudentName) || '').trim();
+    if (!name) return { success: false, message: 'Your name is required' };
+    if (!answers || typeof answers !== 'object') answers = {};
+
+    var sh = _ensureTestPapersSheet();
+    var data = sh.getDataRange().getValues();
+    var paperRow = null, paperId = null;
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][13]) === tok && String(data[i][9]) !== '1' && String(data[i][12]) === '1') { paperRow = data[i]; paperId = data[i][0]; break; }
+    }
+    if (!paperRow) return { success: false, message: 'Exam link not found or no longer available.' };
+
+    var qIds = String(paperRow[7] || '').split(',').filter(Boolean).map(function (x) { return parseInt(x, 10); });
+    var qsh = _ensureQuestionBankSheet();
+    var qdata = qsh.getDataRange().getValues();
+    var qmap = {};
+    for (var q = 1; q < qdata.length; q++) qmap[qdata[q][0]] = qdata[q];
+
+    var breakdown = {}, score = 0, maxScore = 0, pendingCount = 0;
+    qIds.forEach(function (qid) {
+      var row = qmap[qid];
+      if (!row) return;
+      var qType = row[4] || 'mcq', marks = parseFloat(row[11]) || 1, correctAnswer = row[10] || '';
+      var rawAnswer = answers[qid] != null ? answers[qid] : answers[String(qid)];
+      var g = _gradeExamAnswer(qType, correctAnswer, rawAnswer, marks);
+      maxScore += marks;
+      if (g.awarded != null) score += g.awarded; else pendingCount++;
+      breakdown[qid] = { answer: rawAnswer || '', maxMarks: marks, awarded: g.awarded, correct: g.correct, correctAnswer: (qType === 'mcq' || qType === 'true_false') ? correctAnswer : undefined };
+    });
+
+    var esh = _ensureExamSubmissionsSheet();
+    var ts = nowIso(), id = nextRowId(esh);
+    esh.appendRow([
+      id, paperId, tok, name, String((studentInfo && studentInfo.AdmissionNumber) || '').trim(),
+      String((studentInfo && studentInfo.StudentContact) || '').trim(), JSON.stringify(breakdown),
+      score, maxScore, pendingCount, '', ts, ts
+    ]);
+    addLog(name, 'Online Exam Submitted', 'Paper #' + paperId + ' — ' + score + '/' + maxScore);
+
+    return {
+      success: true, message: 'Submitted!',
+      data: { Score: score, MaxScore: maxScore, PendingReviewCount: pendingCount, Breakdown: breakdown }
+    };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function _rowToExamSubmission(row, umap) {
+  var gb = row[10];
+  var breakdown = {};
+  try { breakdown = JSON.parse(row[6] || '{}'); } catch (e) {}
+  return {
+    ID: row[0], TestPaperID: row[1], ShareToken: row[2], StudentName: row[3] || '', AdmissionNumber: row[4] || '',
+    StudentContact: row[5] || '', Breakdown: breakdown, Score: parseFloat(row[7]) || 0, MaxScore: parseFloat(row[8]) || 0,
+    PendingReviewCount: parseInt(row[9], 10) || 0, GradedBy: gb, GradedByName: (gb && umap && umap[gb]) ? umap[gb].fullName : '',
+    SubmittedAt: toIso(row[11]), UpdatedAt: toIso(row[12])
+  };
+}
+
+// admin/teacher (owner) — every submission for one test paper, for review + essay grading
+function getExamSubmissions(testPaperId, currentUser, currentRole) {
+  try {
+    var role = String(currentRole || '').toLowerCase();
+    if (role !== 'admin' && role !== 'teacher') return { success: false, message: 'Forbidden — admin/teacher only' };
+    var idn = parseInt(testPaperId, 10);
+    var psh = _ensureTestPapersSheet();
+    var pdata = psh.getDataRange().getValues();
+    var owner = null;
+    for (var i = 1; i < pdata.length; i++) { if (pdata[i][0] === idn) { owner = pdata[i][8]; break; } }
+    if (role === 'teacher' && parseInt(owner, 10) !== getCurrentUserId(currentUser)) return { success: false, message: 'Forbidden — not your test paper' };
+
+    var sh = _ensureExamSubmissionsSheet();
+    var data = sh.getDataRange().getValues();
+    var umap = getUsersMap();
+    var out = [];
+    for (var j = 1; j < data.length; j++) {
+      if (parseInt(data[j][1], 10) !== idn) continue;
+      out.push(_rowToExamSubmission(data[j], umap));
+    }
+    out.sort(function (a, b) { return String(b.SubmittedAt).localeCompare(String(a.SubmittedAt)); });
+    return { success: true, data: out };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// admin/teacher (owner) — manually award marks for one essay question in one submission, then
+// recompute the submission's total Score/PendingReviewCount
+function gradeEssayAnswer(submissionId, questionId, marksAwarded, currentUser, currentRole) {
+  try {
+    var role = String(currentRole || '').toLowerCase();
+    if (role !== 'admin' && role !== 'teacher') return { success: false, message: 'Forbidden — admin/teacher only' };
+    var idn = parseInt(submissionId, 10);
+    var qid = String(questionId);
+    var marks = parseFloat(marksAwarded);
+    if (isNaN(marks) || marks < 0) return { success: false, message: 'Marks must be a non-negative number' };
+
+    var sh = _ensureExamSubmissionsSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] !== idn) continue;
+      if (role === 'teacher') {
+        var psh = _ensureTestPapersSheet(), pdata = psh.getDataRange().getValues(), owner = null;
+        for (var p = 1; p < pdata.length; p++) { if (pdata[p][0] === data[i][1]) { owner = pdata[p][8]; break; } }
+        if (parseInt(owner, 10) !== getCurrentUserId(currentUser)) return { success: false, message: 'Forbidden — not your test paper' };
+      }
+      var breakdown = {};
+      try { breakdown = JSON.parse(data[i][6] || '{}'); } catch (e) {}
+      if (!breakdown[qid]) return { success: false, message: 'Question not found in this submission' };
+      if (marks > breakdown[qid].maxMarks) return { success: false, message: 'Marks can\'t exceed the question\'s max (' + breakdown[qid].maxMarks + ')' };
+      breakdown[qid].awarded = marks;
+      breakdown[qid].correct = marks >= breakdown[qid].maxMarks;
+
+      var score = 0, pending = 0;
+      Object.keys(breakdown).forEach(function (k) {
+        if (breakdown[k].awarded == null) pending++; else score += breakdown[k].awarded;
+      });
+
+      var row = i + 1;
+      sh.getRange(row, 7).setValue(JSON.stringify(breakdown));
+      sh.getRange(row, 8).setValue(score);
+      sh.getRange(row, 10).setValue(pending);
+      sh.getRange(row, 11).setValue(getCurrentUserId(currentUser) || '');
+      sh.getRange(row, 13).setValue(nowIso());
+      addLog(currentUser, 'Essay Answer Graded', 'Submission #' + idn + ' Q#' + qid + ' — ' + marks + ' marks');
+      return { success: true, message: 'Graded', data: { Score: score, PendingReviewCount: pending } };
+    }
+    return { success: false, message: 'Submission not found' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
 // ============== Payslips & SSNIT ==============
 // Ghana-format monthly payslip per staff member. SSNIT (Tier 1) employee contribution is the
 // standard 5.5% of basic salary, computed automatically — but only once the staff member has an
@@ -11640,8 +11911,12 @@ function deleteTestPaper(id, currentUser, currentRole) {
 // without one. Income tax / other deductions are admin-entered (Ghana PAYE bands change too often
 // and vary by allowance treatment to safely hardcode into a school admin tool).
 var PAYSLIPS_SHEET = 'Payslips';
-var PAYSLIP_HEADERS = ['ID', 'TeacherID', 'PayPeriodMonth', 'PayPeriodYear', 'BasicSalary', 'Allowances', 'GrossPay', 'SSNITContribution', 'IncomeTax', 'OtherDeductions', 'TotalDeductions', 'NetPay', 'Notes', 'GeneratedBy', 'IsDeleted', 'CreatedAt', 'UpdatedAt'];
+var PAYSLIP_HEADERS = ['ID', 'TeacherID', 'PayPeriodMonth', 'PayPeriodYear', 'BasicSalary', 'Allowances', 'GrossPay', 'SSNITContribution', 'IncomeTax', 'OtherDeductions', 'TotalDeductions', 'NetPay', 'Notes', 'GeneratedBy', 'IsDeleted', 'CreatedAt', 'UpdatedAt', 'SSNITEmployerContribution'];
 var SSNIT_EMPLOYEE_RATE = 0.055; // Tier 1 mandatory employee contribution, 5.5% of basic salary
+// Tier 1 employer contribution, 8.5% of basic salary — together with the employee's 5.5% this is
+// the 13.5% of basic salary the school actually remits TO SSNIT each month (the employer's other
+// 5% Tier 2 contribution goes to a private pension trustee, not SSNIT, so it's out of scope here).
+var SSNIT_EMPLOYER_RATE = 0.085;
 
 function _ensurePayslipsSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -11651,6 +11926,11 @@ function _ensurePayslipsSheet() {
     sh.appendRow(PAYSLIP_HEADERS);
     sh.getRange(1, 1, 1, PAYSLIP_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
     sh.setFrozenRows(1);
+  } else if (sh.getLastColumn() < PAYSLIP_HEADERS.length) {
+    // upgrade an existing sheet created before SSNITEmployerContribution existed
+    var addFrom = sh.getLastColumn() + 1;
+    sh.getRange(1, addFrom, 1, PAYSLIP_HEADERS.length - sh.getLastColumn()).setValues([PAYSLIP_HEADERS.slice(addFrom - 1)])
+      .setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
   }
   return sh;
 }
@@ -11665,7 +11945,8 @@ function _rowToPayslip(row, umap) {
     SSNITContribution: parseFloat(row[7]) || 0, IncomeTax: parseFloat(row[8]) || 0, OtherDeductions: parseFloat(row[9]) || 0,
     TotalDeductions: parseFloat(row[10]) || 0, NetPay: parseFloat(row[11]) || 0, Notes: row[12] || '',
     GeneratedBy: gb, GeneratedByName: (gb && umap && umap[gb]) ? umap[gb].fullName : '',
-    CreatedAt: toIso(row[15]), UpdatedAt: toIso(row[16])
+    CreatedAt: toIso(row[15]), UpdatedAt: toIso(row[16]),
+    SSNITEmployerContribution: parseFloat(row[17]) || 0
   };
 }
 
@@ -11725,6 +12006,7 @@ function generatePayslip(d, currentUser, currentRole) {
     }
 
     var ssnit = hasSsnit ? Math.round(basic * SSNIT_EMPLOYEE_RATE * 100) / 100 : 0;
+    var ssnitEmployer = hasSsnit ? Math.round(basic * SSNIT_EMPLOYER_RATE * 100) / 100 : 0;
     var gross = basic + allowances;
     var totalDeductions = ssnit + incomeTax + otherDeductions;
     var net = gross - totalDeductions;
@@ -11732,7 +12014,7 @@ function generatePayslip(d, currentUser, currentRole) {
     var ts = nowIso(), id = nextRowId(sh);
     sh.appendRow([
       id, tid, month, year, basic, allowances, gross, ssnit, incomeTax, otherDeductions, totalDeductions, net,
-      String(d.Notes || '').trim(), getCurrentUserId(currentUser) || '', '0', ts, ts
+      String(d.Notes || '').trim(), getCurrentUserId(currentUser) || '', '0', ts, ts, ssnitEmployer
     ]);
     addLog(currentUser, 'Payslip Generated', teacher.fullName + ' — ' + month + '/' + year);
     return { success: true, message: 'Payslip generated for ' + teacher.fullName, id: id };
@@ -11760,9 +12042,10 @@ function deletePayslip(id, currentUser, currentRole) {
   }
 }
 
-// admin/clerk — every staff member's SSNIT number + running total contributed to date (from
-// their generated payslips), so admin always has an at-a-glance SSNIT register without a second
-// parallel data model — Payslips.SSNITContribution stays the single source of truth.
+// admin/clerk — every staff member's SSNIT number + running employee/employer/total contributed
+// to date (from their generated payslips), so admin always has an at-a-glance SSNIT summary
+// without a second parallel data model — Payslips.SSNITContribution/SSNITEmployerContribution
+// stay the single source of truth. This IS the "summary report" of the SSNIT module.
 function getSsnitRegister(currentUser, currentRole) {
   try {
     if (!isFinanceStaff(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
@@ -11774,7 +12057,7 @@ function getSsnitRegister(currentUser, currentRole) {
       if (String(udata[i][16]) === '1') continue; // IsDeleted
       var role = String(udata[i][6] || '').toLowerCase();
       if (role !== 'teacher' && role !== 'admin' && role !== 'supervisor' && role !== 'clerk' && role !== 'bursar') continue;
-      staff[udata[i][0]] = { FullName: udata[i][2], Role: role, EmployeeCode: udata[i][23] || '', SSNITNumber: udata[i][26] || '', TotalContributed: 0, PayslipCount: 0 };
+      staff[udata[i][0]] = { FullName: udata[i][2], Role: role, EmployeeCode: udata[i][23] || '', SSNITNumber: udata[i][26] || '', TotalEmployeeContributed: 0, TotalEmployerContributed: 0, TotalContributed: 0, PayslipCount: 0 };
     }
 
     var psh = getSheet(PAYSLIPS_SHEET);
@@ -11784,7 +12067,10 @@ function getSsnitRegister(currentUser, currentRole) {
         if (String(pdata[j][14]) === '1') continue;
         var tid = pdata[j][1];
         if (!staff[tid]) continue;
-        staff[tid].TotalContributed += parseFloat(pdata[j][7]) || 0;
+        var emp = parseFloat(pdata[j][7]) || 0, empr = parseFloat(pdata[j][17]) || 0;
+        staff[tid].TotalEmployeeContributed += emp;
+        staff[tid].TotalEmployerContributed += empr;
+        staff[tid].TotalContributed += emp + empr;
         staff[tid].PayslipCount++;
       }
     }
@@ -11792,6 +12078,46 @@ function getSsnitRegister(currentUser, currentRole) {
     var out = Object.keys(staff).map(function (id) { return Object.assign({ ID: parseInt(id, 10) }, staff[id]); });
     out.sort(function (a, b) { return String(a.FullName).localeCompare(String(b.FullName)); });
     return { success: true, data: out };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// admin/clerk/bursar — per-staff SSNIT breakdown for a single filing period, for handing to
+// SSNIT's own e-filing system. period: { month, year } for a monthly filing, or just { year } for
+// a full-year filing (aggregates every month of that year in one go).
+function getSsnitFilingReport(period, currentUser, currentRole) {
+  try {
+    if (!isFinanceStaff(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
+    var year = parseInt(period && period.year, 10);
+    if (isNaN(year)) return { success: false, message: 'Year is required' };
+    var month = (period && period.month) ? parseInt(period.month, 10) : null;
+
+    var umap = getUsersMap();
+    var psh = getSheet(PAYSLIPS_SHEET);
+    var staff = {}; // tid -> { FullName, EmployeeCode, SSNITNumber, Employee, Employer, Total, PayslipCount }
+    if (psh) {
+      var pdata = psh.getDataRange().getValues();
+      for (var j = 1; j < pdata.length; j++) {
+        if (String(pdata[j][14]) === '1') continue;
+        if (parseInt(pdata[j][3], 10) !== year) continue;
+        if (month && parseInt(pdata[j][2], 10) !== month) continue;
+        var tid = pdata[j][1];
+        var t = umap[tid];
+        if (!staff[tid]) staff[tid] = { ID: tid, FullName: t ? t.fullName : '— deleted user —', EmployeeCode: t ? t.employeeCode : '', SSNITNumber: t ? t.ssnitNumber : '', Employee: 0, Employer: 0, Total: 0, PayslipCount: 0 };
+        var emp = parseFloat(pdata[j][7]) || 0, empr = parseFloat(pdata[j][17]) || 0;
+        staff[tid].Employee += emp;
+        staff[tid].Employer += empr;
+        staff[tid].Total += emp + empr;
+        staff[tid].PayslipCount++;
+      }
+    }
+
+    var rows = Object.keys(staff).map(function (id) { return staff[id]; });
+    rows.sort(function (a, b) { return String(a.FullName).localeCompare(String(b.FullName)); });
+    var totals = rows.reduce(function (acc, r) { acc.Employee += r.Employee; acc.Employer += r.Employer; acc.Total += r.Total; return acc; }, { Employee: 0, Employer: 0, Total: 0 });
+
+    return { success: true, data: { period: month ? { month: month, year: year } : { year: year }, rows: rows, totals: totals } };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
@@ -11844,6 +12170,19 @@ function _webAppBaseUrl() {
     return ScriptApp.getService().getUrl() || '';
   } catch (e) {
     return '';
+  }
+}
+
+// admin — the ACTUAL live deployment URL right now, ignoring any manually-saved PublicAppBaseURL
+// override. Used by the Settings UI's "Detect Current URL" button so admin can tell when a saved
+// override has gone stale (e.g. after creating a brand-new deployment instead of a new version of
+// the same one, which changes the /exec URL's deployment ID).
+function getLiveWebAppUrl(currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    return { success: true, data: _webAppBaseUrl() };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
   }
 }
 
