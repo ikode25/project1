@@ -338,7 +338,7 @@ var PERIOD_HEADERS = ['ID','PeriodNumber','StartTime','EndTime','IsBreak','Label
 // matters (Exams, Fee_Structure, Admissions, LessonPlans, etc.) already carries its own
 // AcademicYear/Term columns, so old sessions stay fully queryable forever; this pair only drives
 // which session NEW records default into and what the dashboard banner shows.)
-var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt','ShowOverallPositionOnReportCard','ShowSubjectAverageOnReportCard','SchoolStampURL','HeadteacherSignatureURL','AdminSignatureURL','PublicAppBaseURL','ActiveTerm','DietaryOptions','BursarEmail','BursarPhone','HeadteacherEmail','HeadteacherPhone','UngradedStages','ShowInterestTalentOnReportCard','ShowConductOnReportCard','ShowAttitudeOnReportCard','ShowClassTeacherRemarkOnReportCard','ShowHeadteacherRemarkOnReportCard','SessionTimeoutMinutes'];
+var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt','ShowOverallPositionOnReportCard','ShowSubjectAverageOnReportCard','SchoolStampURL','HeadteacherSignatureURL','AdminSignatureURL','PublicAppBaseURL','ActiveTerm','DietaryOptions','BursarEmail','BursarPhone','HeadteacherEmail','HeadteacherPhone','UngradedStages','ShowInterestTalentOnReportCard','ShowConductOnReportCard','ShowAttitudeOnReportCard','ShowClassTeacherRemarkOnReportCard','ShowHeadteacherRemarkOnReportCard','SessionTimeoutMinutes','UseUnifiedGrading','ReportCardTemplate'];
 // col 40 = DietaryOptions — admin-editable CSV of "value|label" pairs shown as checkboxes on the
 // student form (Ghana-appropriate defaults; the old hardcoded Halal/Kosher/Pescatarian/etc. list
 // is now just the fallback seed, not a fixed enum — see defaultDietaryOptions()).
@@ -440,6 +440,37 @@ function updateUngradedStages(stages, currentUser, currentRole) {
     sh.getRange(foundRow, 16).setValue(ts);   // col 16 = UpdatedAt
     addLog(currentUser, 'Ungraded Stages Updated', csv || '(none)');
     return { success: true, message: 'Grading scope updated', data: clean };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// admin only — turns the single unified grading scale on/off school-wide. Requires the Unified
+// custom scale to already be saved (via saveGradingBands('unified', rows, ...)) before it can be
+// switched on — flipping it on with nothing configured would silently leave every class ungraded.
+function updateUseUnifiedGrading(enabled, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var on = !!enabled;
+    if (on && !_getCustomGradingBands().unified.length) {
+      return { success: false, message: 'Set the Unified custom grading scale first, then turn this on.' };
+    }
+    var sh = getSheet(SETTINGS_SHEET);
+    if (!sh) return { success: false, message: 'Settings sheet not found. Run setup() first.' };
+    var data = sh.getDataRange().getValues();
+    var foundRow = -1;
+    for (var i = 1; i < data.length; i++) { if (parseInt(data[i][0], 10) === 1) { foundRow = i + 1; break; } }
+    var ts = nowIso();
+    if (foundRow === -1) {
+      var blank = new Array(SETTINGS_HEADERS.length).fill('');
+      blank[0] = 1; blank[14] = ts; blank[15] = ts;
+      sh.appendRow(blank);
+      foundRow = sh.getLastRow();
+    }
+    sh.getRange(foundRow, 52).setValue(on ? '1' : '0'); // col 52 = UseUnifiedGrading
+    sh.getRange(foundRow, 16).setValue(ts);              // col 16 = UpdatedAt
+    addLog(currentUser, 'Unified Grading ' + (on ? 'Enabled' : 'Disabled'), '');
+    return { success: true, message: on ? 'Unified grading is now used for every class' : 'Reverted to automatic Basic/JHS grading', data: on };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
@@ -628,6 +659,7 @@ function _buildClassesMap() {
   var data = sh.getDataRange().getValues(), map = {};
   var settingsRes = getSchoolSettings();
   var ungradedStages = (settingsRes.data && settingsRes.data.UngradedStages) || [];
+  var useUnifiedGrading = !!(settingsRes.data && settingsRes.data.UseUnifiedGrading);
 
   // count active classes per (className+academicYear) to know which levels are single-stream
   var streamCount = {};
@@ -651,7 +683,7 @@ function _buildClassesMap() {
       shortLabel: classLabel,
       curriculumStage: String(data[j][11] || 'lower_primary').toLowerCase(),
       gradeLevel: parseInt(data[j][9], 10) || 0,
-      gradeBand: gradeBandForStage(data[j][11], ungradedStages)
+      gradeBand: gradeBandForStage(data[j][11], ungradedStages, useUnifiedGrading)
     };
   }
   return map;
@@ -843,13 +875,16 @@ function getTeacherAssignmentsMap(teacherUserId) {
 //  - 'basic' (Creche..Basic 6): NaCCA 5-band SBA proficiency scale
 //  - 'jhs'   (Basic 7-9): 9-grade WAEC-style scale (used for class tests, mid-terms,
 //     end-of-term exams AND BECE mocks — they all share this one table)
+// Admin can instead opt every class into ONE custom scale (Settings.UseUnifiedGrading) — see
+// "Grading System (admin: automatic default...)" below for how that scale itself is stored.
 // gradeBandForStage(curriculumStage) resolves which table to use.
 // pass ungradedStages (Settings.UngradedStages, e.g. ['creche','nursery']) to exclude those
 // stages from grading entirely — returns null, which computeGrade() treats as "no grade computed"
-function gradeBandForStage(curriculumStage, ungradedStages) {
+function gradeBandForStage(curriculumStage, ungradedStages, useUnified) {
   var stage = String(curriculumStage || '').toLowerCase();
-  if (stage === 'jhs') return 'jhs';
   if (Array.isArray(ungradedStages) && ungradedStages.indexOf(stage) !== -1) return null;
+  if (useUnified) return 'unified';
+  if (stage === 'jhs') return 'jhs';
   return 'basic';
 }
 
@@ -924,7 +959,7 @@ function _ensureGradingBandsSheet() {
 var _customGradingBandsCache = null;
 function _getCustomGradingBands() {
   if (_customGradingBandsCache !== null) return _customGradingBandsCache;
-  _customGradingBandsCache = { basic: [], jhs: [] };
+  _customGradingBandsCache = { basic: [], jhs: [], unified: [] };
   try {
     var sh = getSheet(GRADING_BANDS_SHEET);
     if (sh) {
@@ -932,7 +967,7 @@ function _getCustomGradingBands() {
       for (var i = 1; i < data.length; i++) {
         if (String(data[i][6]) === '1') continue; // IsDeleted
         var band = String(data[i][1] || '').toLowerCase();
-        if (band !== 'basic' && band !== 'jhs') continue;
+        if (band !== 'basic' && band !== 'jhs' && band !== 'unified') continue;
         var maxRaw = data[i][9]; // blank on rows saved before MaxPercent existed
         _customGradingBandsCache[band].push({
           min: parseFloat(data[i][2]) || 0, grade: String(data[i][3] || ''), label: String(data[i][4] || ''),
@@ -941,24 +976,28 @@ function _getCustomGradingBands() {
       }
       _customGradingBandsCache.basic.sort(function (a, b) { return b.min - a.min; });
       _customGradingBandsCache.jhs.sort(function (a, b) { return b.min - a.min; });
+      _customGradingBandsCache.unified.sort(function (a, b) { return b.min - a.min; });
     }
   } catch (e) { Logger.log('_getCustomGradingBands failed: ' + e.toString()); }
   return _customGradingBandsCache;
 }
 
-// obtained/max -> short grade code for the given band ('basic'|'jhs'); returns 'AB' for absent.
+// obtained/max -> short grade code for the given band ('basic'|'jhs'|'unified'); returns 'AB' for absent.
 function computeGrade(obtained, max, isAbsent, band) {
   if (isAbsent === true || String(isAbsent) === '1' || isAbsent === 1) return 'AB';
   if (band === null) return ''; // stage excluded from grading entirely (see gradeBandForStage)
   var o = parseFloat(obtained), m = parseFloat(max);
   if (isNaN(o) || isNaN(m) || m <= 0) return '';
   var pct = (o / m) * 100;
-  var bandKey = String(band).toLowerCase() === 'jhs' ? 'jhs' : 'basic';
+  var bandRaw = String(band).toLowerCase();
+  var bandKey = bandRaw === 'jhs' ? 'jhs' : bandRaw === 'unified' ? 'unified' : 'basic';
   var custom = _getCustomGradingBands()[bandKey];
   if (custom.length) {
     for (var i = 0; i < custom.length; i++) { if (pct >= custom[i].min) return custom[i].grade; }
     return custom[custom.length - 1].grade;
   }
+  // 'unified' with no rows saved shouldn't happen (updateUseUnifiedGrading blocks turning it on
+  // without a scale), but fall back to the basic scale rather than crash if it ever does.
   // JHS/BECE uses the official WAEC numeric grade (1=best..9=weakest) as the printed "Grade",
   // not a letter — matches the actual BECE results slip format.
   return bandKey === 'jhs' ? String(jhsGradeInfo(pct).number) : basicGradeFromPercent(pct);
@@ -968,7 +1007,8 @@ function computeGrade(obtained, max, isAbsent, band) {
 function sbaGradeDescriptor(grade, band) {
   var g = String(grade || '').toUpperCase();
   if (g === 'AB') return 'Absent';
-  var bandKey = String(band).toLowerCase() === 'jhs' ? 'jhs' : 'basic';
+  var bandRaw = String(band).toLowerCase();
+  var bandKey = bandRaw === 'jhs' ? 'jhs' : bandRaw === 'unified' ? 'unified' : 'basic';
   var custom = _getCustomGradingBands()[bandKey];
   if (custom.length) {
     var crow = custom.filter(function (r) { return String(r.grade).toUpperCase() === g; })[0];
@@ -993,7 +1033,9 @@ function _withMaxPercent(rows) {
   });
 }
 
-// any logged-in role — returns both bands, each flagged isCustom (false = using the automatic default)
+// any logged-in role — returns basic/jhs/unified bands, each flagged isCustom (false = using the
+// automatic default; 'unified' has no automatic default, so it's isCustom:false + empty rows until
+// admin sets one). Also returns whether Unified grading is currently switched ON school-wide.
 function getGradingBands(currentUser, currentRole) {
   try {
     var custom = _getCustomGradingBands();
@@ -1008,7 +1050,10 @@ function getGradingBands(currentUser, currentRole) {
         out[band] = { isCustom: false, rows: _withMaxPercent(defaults) };
       }
     });
-    return { success: true, data: out };
+    out.unified = { isCustom: custom.unified.length > 0, rows: custom.unified.length ? _withMaxPercent(custom.unified.map(function (r) { return { MinPercent: r.min, MaxPercent: r.max, Grade: r.grade, Label: r.label }; })) : [] };
+    var settingsRes = getSchoolSettings();
+    var useUnified = !!(settingsRes.success && settingsRes.data.UseUnifiedGrading);
+    return { success: true, data: out, useUnifiedGrading: useUnified };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
@@ -1016,12 +1061,13 @@ function getGradingBands(currentUser, currentRole) {
 
 // admin only — replaces the ENTIRE custom scale for one band in one call (simpler/safer than
 // per-row CRUD for a small fixed table the admin edits as a whole). Pass an empty rows array to
-// revert that band to the automatic default.
+// revert that band to the automatic default (or, for 'unified', to clear it — which also switches
+// Unified grading back off, since there'd be nothing left for it to grade with).
 function saveGradingBands(band, rows, currentUser, currentRole) {
   try {
     if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
     var bandKey = String(band || '').toLowerCase();
-    if (bandKey !== 'basic' && bandKey !== 'jhs') return { success: false, message: 'Band must be "basic" or "jhs"' };
+    if (bandKey !== 'basic' && bandKey !== 'jhs' && bandKey !== 'unified') return { success: false, message: 'Band must be "basic", "jhs" or "unified"' };
     rows = Array.isArray(rows) ? rows : [];
 
     var clean = [];
@@ -1058,8 +1104,15 @@ function saveGradingBands(band, rows, currentUser, currentRole) {
     });
 
     _customGradingBandsCache = null; // invalidate — next computeGrade() call re-reads
+    var revertedNote = '';
+    if (bandKey === 'unified' && clean.length === 0) {
+      // nothing left to grade with — switch Unified off rather than leave it pointing at an
+      // empty scale (computeGrade would silently fall back to the basic scale otherwise)
+      updateUseUnifiedGrading(false, currentUser, currentRole);
+      revertedNote = ' — Unified grading switched off';
+    }
     addLog(currentUser, 'Grading Bands Saved', bandKey + ' (' + clean.length + ' band(s))' + (clean.length ? '' : ' — reverted to automatic'));
-    return { success: true, message: clean.length ? 'Custom ' + bandKey.toUpperCase() + ' grading scale saved' : bandKey.toUpperCase() + ' reverted to the automatic default scale' };
+    return { success: true, message: (clean.length ? 'Custom ' + bandKey.toUpperCase() + ' grading scale saved' : bandKey.toUpperCase() + ' reverted to the automatic default scale') + revertedNote };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
@@ -12625,7 +12678,9 @@ function getSchoolSettings() {
             ShowAttitudeOnReportCard: data[i][47] === '' || data[i][47] == null ? true : String(data[i][47]) === '1',
             ShowClassTeacherRemarkOnReportCard: data[i][48] === '' || data[i][48] == null ? true : String(data[i][48]) === '1',
             ShowHeadteacherRemarkOnReportCard: data[i][49] === '' || data[i][49] == null ? true : String(data[i][49]) === '1',
-            SessionTimeoutMinutes: parseInt(data[i][50], 10) || 60
+            SessionTimeoutMinutes: parseInt(data[i][50], 10) || 60,
+            UseUnifiedGrading: String(data[i][51]) === '1',
+            ReportCardTemplate: data[i][52] || 'classic'
           }
         };
       }
@@ -12672,7 +12727,9 @@ function defaultSchoolSettings() {
     ShowAttitudeOnReportCard: true,
     ShowClassTeacherRemarkOnReportCard: true,
     ShowHeadteacherRemarkOnReportCard: true,
-    SessionTimeoutMinutes: 60
+    SessionTimeoutMinutes: 60,
+    UseUnifiedGrading: false,
+    ReportCardTemplate: 'classic'
   };
 }
 
@@ -19058,9 +19115,18 @@ function getExamDistribution(examId, currentUser, currentRole) {
     var subjMap = getSubjectsMap();
     var subjectStats = {};
     var byStudent = {};
-    var grades = gradeBand === 'jhs'
-      ? { '1':0, '2':0, '3':0, '4':0, '5':0, '6':0, '7':0, '8':0, '9':0 }
-      : { 'HP':0, 'P':0, 'AP':0, 'D':0, 'E':0 };
+    // grade codes vary once a band has a custom (or Unified) scale — build the histogram's
+    // buckets from whatever's actually configured for this band, falling back to the fixed
+    // automatic-scale codes only when no custom scale applies
+    var customForHisto = _getCustomGradingBands()[gradeBand === 'jhs' ? 'jhs' : gradeBand === 'unified' ? 'unified' : 'basic'];
+    var grades = {};
+    if (customForHisto.length) {
+      customForHisto.forEach(function (r) { grades[String(r.grade).toUpperCase()] = 0; });
+    } else if (gradeBand === 'jhs') {
+      grades = { '1':0, '2':0, '3':0, '4':0, '5':0, '6':0, '7':0, '8':0, '9':0 };
+    } else {
+      grades = { 'HP':0, 'P':0, 'AP':0, 'D':0, 'E':0 };
+    }
     var totalCount = 0, absentCount = 0;
 
     var msh = getSheet(MARKS_SHEET);
@@ -19555,7 +19621,7 @@ function getStudentReportCard(studentId, examId, currentUser, currentRole) {
     var curriculumStage = String(classRow[11] || 'lower_primary').toLowerCase();
     var isJhs = curriculumStage === 'jhs';
     var ungradedStagesRes = getSchoolSettings();
-    var gradeBand = gradeBandForStage(curriculumStage, (ungradedStagesRes.data && ungradedStagesRes.data.UngradedStages) || []);
+    var gradeBand = gradeBandForStage(curriculumStage, (ungradedStagesRes.data && ungradedStagesRes.data.UngradedStages) || [], !!(ungradedStagesRes.data && ungradedStagesRes.data.UseUnifiedGrading));
     var examType = String(examRow[2] || '').toLowerCase();
     var isSplitScore = examType === 'end_of_term'; // SBA + Exam columns vs a single Score column
     var sbaMax = parseFloat(examRow[29]) || 0, examMax = parseFloat(examRow[30]) || 0;
