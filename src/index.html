@@ -3099,6 +3099,57 @@
     .rc-sign > div { border-top: 1px solid #555; padding-top: 4px; }
     .rc-foot { text-align: center; font-size: 10px; color: #888; border-top: 1px solid #e0e0e0; margin-top: 14px; padding-top: 6px; }
 
+    /* ============== Report Card template: "Aurora" (rc-modern) — gradient/card-based ============== */
+    .rc-modern { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; border: none; border-radius: 14px; overflow: hidden; box-shadow: 0 8px 28px rgba(0,31,63,0.14); }
+    .rc-modern .rcm-hdr { background: linear-gradient(120deg, #001f3f 0%, #0a3d6b 55%, #0074D9 100%); color: #fff; padding: 26px 30px; display: flex; align-items: center; gap: 18px; }
+    .rc-modern .rcm-hdr img { width: 62px; height: 62px; object-fit: contain; background: #fff; border-radius: 50%; padding: 6px; }
+    .rc-modern .rcm-sname { font-size: 22px; font-weight: 800; letter-spacing: 0.3px; }
+    .rc-modern .rcm-sline { font-size: 11.5px; opacity: 0.85; margin-top: 2px; }
+    .rc-modern .rcm-badge { margin-left: auto; text-align: right; }
+    .rc-modern .rcm-badge .rcm-badge-lbl { font-size: 9.5px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.75; }
+    .rc-modern .rcm-badge .rcm-badge-val { font-size: 13px; font-weight: 700; font-family: monospace; background: rgba(255,255,255,0.16); padding: 3px 10px; border-radius: 20px; margin-top: 3px; display: inline-block; }
+    .rc-modern .rcm-body { padding: 24px 30px 6px; }
+    .rc-modern .rcm-info { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 20px; font-size: 12.5px; margin-bottom: 18px; }
+    .rc-modern .rcm-info-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #f4f8fc; border-radius: 8px; }
+    .rc-modern .rcm-info-item i { color: #0074D9; width: 14px; text-align: center; }
+    .rc-modern .rcm-info-item b { color: #001f3f; }
+    .rc-modern table.rc-mtable { border-collapse: separate; border-spacing: 0; border-radius: 10px; overflow: hidden; border: 1px solid #e2e8f0; }
+    .rc-modern table.rc-mtable th { background: #001f3f; border: none; }
+    .rc-modern table.rc-mtable td { border: none; border-bottom: 1px solid #eef2f7; }
+    .rc-modern table.rc-mtable tbody tr:nth-child(even) td { background: #f7fafd; }
+    .rc-modern table.rc-mtable tfoot td { background: linear-gradient(90deg, #e8f0fa, #dbe9f8); border: none; }
+    .rc-modern .rc-grade-pill { border-radius: 20px; padding: 3px 11px; }
+    .rc-modern .rcm-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 18px 0; }
+    .rc-modern .rcm-stat { border-radius: 10px; padding: 12px; text-align: center; color: #fff; }
+    .rc-modern .rcm-stat .rcm-stat-lbl { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.6px; opacity: 0.85; }
+    .rc-modern .rcm-stat .rcm-stat-val { font-size: 19px; font-weight: 800; margin-top: 3px; }
+    .rc-modern .rc-position-bar, .rc-modern .rc-bece-bar { border-radius: 8px; }
+    .rc-modern .rc-remarks-block { border: none; border-radius: 10px; background: #f4f8fc; overflow: hidden; }
+    .rc-modern .rc-remarks-hdr { background: #e3edf9; border-radius: 10px 10px 0 0; }
+    .rc-modern .rc-sign > div { border-top: none; border-top: 2px dashed #b8c9dc; }
+    .rc-modern .rc-grade-key { border-radius: 8px; border: 1px solid #e2e8f0; background: #f4f8fc; }
+
+    /* ============== Report Card template: "Prestige" (rc-elegant) — minimalist/refined ============== */
+    .rc-elegant { font-family: 'Georgia', 'Times New Roman', serif; border: 1px solid #d8cdb8; padding-top: 22px; }
+    .rc-elegant .rce-hdr { text-align: center; border-bottom: none; padding-bottom: 10px; margin-bottom: 6px; display: block; }
+    .rc-elegant .rce-hdr img { width: 56px; height: 56px; object-fit: contain; margin: 0 auto 8px; display: block; }
+    .rc-elegant .rce-sname { font-size: 24px; font-weight: 700; color: #3a2f1c; letter-spacing: 2px; text-transform: uppercase; }
+    .rc-elegant .rce-sline { font-size: 11px; color: #7a6f5a; margin-top: 3px; }
+    .rc-elegant .rce-rule { height: 3px; margin: 12px 0 16px; background: linear-gradient(90deg, transparent, #b08d3e, transparent); }
+    .rc-elegant .rc-title { background: transparent; color: #3a2f1c; border-top: 1px solid #b08d3e; border-bottom: 1px solid #b08d3e; letter-spacing: 3px; }
+    .rc-elegant .rc-info { border: none; background: transparent; border-top: 1px dotted #cfc3a6; border-bottom: 1px dotted #cfc3a6; border-radius: 0; }
+    .rc-elegant .rc-info b { color: #3a2f1c; }
+    .rc-elegant table.rc-mtable th { background: #3a2f1c; }
+    .rc-elegant table.rc-mtable tfoot td { background: #f6f1e6; color: #3a2f1c; }
+    .rc-elegant table.rc-mtable tbody tr:nth-child(even) td { background: #fbf8f1; }
+    .rc-elegant .rc-summary > div { border: 1px solid #d8cdb8; background: #fbf8f1; }
+    .rc-elegant .rc-summary .rc-val { color: #3a2f1c; }
+    .rc-elegant .rc-position-bar { background: #3a2f1c; }
+    .rc-elegant .rc-bece-bar { background: #6b4a1e; }
+    .rc-elegant .rc-remarks-block { border: 1px solid #d8cdb8; background: #fbf8f1; }
+    .rc-elegant .rc-remarks-hdr { background: #f0e9d6; color: #3a2f1c; }
+    .rc-elegant .rc-grade-key { border: 1px dotted #cfc3a6; background: #fbf8f1; }
+
     @media print {
       /* visibility-hide is SCOPED to body.print-target — set only when an explicit
          "Print" button runs handlePrint. Browser Ctrl+P on any normal page falls
@@ -3121,7 +3172,8 @@
         box-sizing: border-box !important;
         -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
       }
-      .rc-mtable th, .rc-title, .rc-mtable tfoot td, .rc-grade-pill {
+      .rc-mtable th, .rc-title, .rc-mtable tfoot td, .rc-grade-pill,
+      .rcm-hdr, .rcm-stat, .rc-modern table.rc-mtable tfoot td, .rc-elegant .rce-rule {
         -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
       }
       @page { size: auto; margin: 12mm; }
@@ -13394,22 +13446,37 @@
       return row ? row.color : '#888';
     }
 
+    // shared by all report card templates below
+    const rcFmtDate = (d) => {
+      if (!d) return '';
+      try {
+        const dt = new Date(d);
+        if (isNaN(dt.getTime())) return String(d).split('T')[0];
+        return dt.toLocaleDateString('en-US', { day:'2-digit', month:'short', year:'numeric' });
+      } catch { return String(d).split('T')[0]; }
+    };
+    const rcOrdinal = (n) => {
+      const s = ['th','st','nd','rd'], v = n % 100;
+      return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    };
+    const rcTermLabel = (t) => ({ term1: 'Term 1', term2: 'Term 2', term3: 'Term 3' }[String(t || '').toLowerCase()] || t || '—');
+
+    // Report Card templates — admin picks one on the School Settings page (School.ReportCardTemplate);
+    // all three consume the exact same `card`/`school` payload from getStudentReportCard/
+    // getClassReportCards, they just lay it out differently. This is the dispatcher every call site
+    // renders — swap the template school-wide without touching any of the places that use it.
+    function ReportCardStatic({ card, school }) {
+      if (!card) return null;
+      const tpl = (school && school.ReportCardTemplate) || 'classic';
+      if (tpl === 'aurora') return <ReportCardAurora card={card} school={school} />;
+      if (tpl === 'prestige') return <ReportCardPrestige card={card} school={school} />;
+      return <ReportCardClassic card={card} school={school} />;
+    }
+
     // read-only report card markup — shared by the single-student preview print button
     // (StudentResultsModal) and the admin bulk report-card preview/print modal (BulkReportCardsModal)
-    function ReportCardStatic({ card, school }) {
-      const fmtDate = (d) => {
-        if (!d) return '';
-        try {
-          const dt = new Date(d);
-          if (isNaN(dt.getTime())) return String(d).split('T')[0];
-          return dt.toLocaleDateString('en-US', { day:'2-digit', month:'short', year:'numeric' });
-        } catch { return String(d).split('T')[0]; }
-      };
-      const ordinal = (n) => {
-        const s = ['th','st','nd','rd'], v = n % 100;
-        return n + (s[(v - 20) % 10] || s[v] || s[0]);
-      };
-      const termLabel = (t) => ({ term1: 'Term 1', term2: 'Term 2', term3: 'Term 3' }[String(t || '').toLowerCase()] || t || '—');
+    function ReportCardClassic({ card, school }) {
+      const fmtDate = rcFmtDate, ordinal = rcOrdinal, termLabel = rcTermLabel;
 
       const schoolName = (school && school.SchoolName) || 'School Name';
       const schoolAddr = (school && school.SchoolAddress) || '';
@@ -13580,6 +13647,377 @@
             {/* server-computed to reflect the school's actual grading system (custom scale if the
                 admin set one on the Grading System page, else the automatic NaCCA/WAEC default) —
                 falls back to the hardcoded table only for older cached payloads without it */}
+            {(card.gradeKeyRows && card.gradeKeyRows.length ? card.gradeKeyRows.map(r => ({ min: r.MinPercent, max: r.MaxPercent, code: r.Grade, label: r.Label })) : gradeTableFor(card.class.GradeBand))
+              .map((r, i, arr) => {
+                const max = r.max != null ? r.max : (i === 0 ? 100 : arr[i - 1].min - 1);
+                return <React.Fragment key={r.code}>{i > 0 && <>&nbsp;·&nbsp;</>}{r.code} = {r.label} ({r.min}–{max})</React.Fragment>;
+              })}
+          </div>
+
+          <div className="rc-foot">
+            Generated by {schoolName} on {new Date().toLocaleDateString('en-US', { day:'2-digit', month:'short', year:'numeric' })}
+            {' · '}{card.class.Label} · {termLabel(card.exam.Term)} · {card.exam.AcademicYear}
+            {card.exam.IsPublished ? '' : ' · DRAFT (results not yet published)'}
+          </div>
+        </div>
+      );
+    }
+
+    // ============== Report Card template: "Aurora" — gradient/card-based, ultra modern ==============
+    function ReportCardAurora({ card, school }) {
+      const fmtDate = rcFmtDate, ordinal = rcOrdinal, termLabel = rcTermLabel;
+      const schoolName = (school && school.SchoolName) || 'School Name';
+      const schoolAddr = (school && school.SchoolAddress) || '';
+      const schoolPhone = (school && school.SchoolContact) || '';
+      const schoolLogo = (school && school.SchoolLogo) || DEFAULT_LOGO;
+      if (!card) return null;
+
+      const statGrad = { total: 'linear-gradient(135deg,#0074D9,#005fb3)', avg: 'linear-gradient(135deg,#34a853,#1e7e34)', att: 'linear-gradient(135deg,#fb8c00,#d97400)', subj: 'linear-gradient(135deg,#6a1b9a,#4a1270)' };
+
+      return (
+        <div className="report-card rc-modern">
+          <div className="rcm-hdr">
+            {schoolLogo && <img src={schoolLogo} alt="" onError={(e) => { e.target.style.display = 'none'; }} />}
+            <div>
+              <div className="rcm-sname">{schoolName}</div>
+              {schoolAddr && <div className="rcm-sline"><i className="fas fa-map-marker-alt"></i> {schoolAddr}</div>}
+              {schoolPhone && <div className="rcm-sline"><i className="fas fa-phone"></i> {schoolPhone}</div>}
+            </div>
+            <div className="rcm-badge">
+              <div className="rcm-badge-lbl">Student ID</div>
+              <div className="rcm-badge-val">{card.student.AdmissionNumber || '—'}</div>
+            </div>
+          </div>
+
+          <div className="rcm-body">
+            <div style={{display:'flex',gap:'16px',alignItems:'stretch',marginBottom:'2px'}}>
+              <div className="rcm-info" style={{flex:1}}>
+                <div className="rcm-info-item"><i className="fas fa-user"></i> <b>Name:</b>&nbsp;{card.student.FullName || ''}</div>
+                <div className="rcm-info-item"><i className="fas fa-school"></i> <b>Class:</b>&nbsp;{card.class.Label || '—'}</div>
+                <div className="rcm-info-item"><i className="fas fa-venus-mars"></i> <b>Gender:</b>&nbsp;{String(card.student.Gender || '').replace(/^./, c => c.toUpperCase()) || '—'}</div>
+                <div className="rcm-info-item"><i className="fas fa-calendar-week"></i> <b>Term:</b>&nbsp;{termLabel(card.exam.Term)}</div>
+                <div className="rcm-info-item"><i className="fas fa-users"></i> <b>Class Size:</b>&nbsp;{card.class.Size}</div>
+                <div className="rcm-info-item"><i className="fas fa-calendar"></i> <b>Year:</b>&nbsp;{card.exam.AcademicYear || '—'}</div>
+                <div className="rcm-info-item"><i className="fas fa-plane-departure"></i> <b>Vacation:</b>&nbsp;{fmtDate(card.exam.VacationDate) || '—'}</div>
+                <div className="rcm-info-item"><i className="fas fa-door-open"></i> <b>Reopening:</b>&nbsp;{fmtDate(card.exam.ReopeningDate) || '—'}</div>
+              </div>
+              {card.student.PhotoURL && (
+                <div style={{flex:'0 0 90px'}}>
+                  <img src={card.student.PhotoURL} alt="" onError={(e) => { e.target.style.display = 'none'; }}
+                    style={{width:'90px',height:'104px',objectFit:'cover',borderRadius:'10px',border:'3px solid #fff',boxShadow:'0 2px 10px rgba(0,0,0,0.15)'}} />
+                </div>
+              )}
+            </div>
+
+            <table className="rc-mtable">
+              <thead>
+                <tr>
+                  <th style={{width:'30px'}}>#</th>
+                  <th>Subject</th>
+                  {card.exam.IsSplitScore ? (
+                    <>
+                      <th style={{width:'60px',textAlign:'center'}}>SBA<br/>/{card.exam.SbaMaxMarks || 50}</th>
+                      <th style={{width:'60px',textAlign:'center'}}>Exam<br/>/{card.exam.ExamMaxMarks || 50}</th>
+                    </>
+                  ) : (
+                    <th style={{width:'70px',textAlign:'center'}}>Score<br/>/{card.subjects[0] ? card.subjects[0].MaxMarks : 100}</th>
+                  )}
+                  <th style={{width:'60px',textAlign:'center'}}>Total</th>
+                  <th style={{width:'55px',textAlign:'center'}}>Grade</th>
+                  <th style={{width:'55px',textAlign:'center'}}>Pos.</th>
+                  {card.displaySettings?.ShowSubjectAverage && <th style={{width:'65px',textAlign:'center'}}>Class Avg</th>}
+                  <th>Remarks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {card.subjects.map((s, i) => (
+                  <tr key={s.SubjectID}>
+                    <td>{i + 1}</td>
+                    <td>{s.SubjectName}</td>
+                    {card.exam.IsSplitScore ? (
+                      <>
+                        <td style={{textAlign:'center'}}>{s.IsAbsent ? '—' : s.SBA}</td>
+                        <td style={{textAlign:'center'}}>{s.IsAbsent ? '—' : s.Exam}</td>
+                      </>
+                    ) : null}
+                    <td style={{textAlign:'center',fontWeight:700,color:'#001f3f'}}>
+                      {s.IsAbsent ? <span style={{color:'#888',fontStyle:'italic'}}>Absent</span> : (s.Total != null ? s.Total : '—')}
+                    </td>
+                    <td style={{textAlign:'center'}}>
+                      <span className="rc-grade-pill" style={{background: sbaGradeColor(s.Grade, card.class.GradeBand)}}>{s.Grade || '—'}</span>
+                    </td>
+                    <td style={{textAlign:'center'}}>{s.Position ? ordinal(s.Position) : '—'}</td>
+                    {card.displaySettings?.ShowSubjectAverage && <td style={{textAlign:'center',color:'#666'}}>{s.ClassAverage != null ? s.ClassAverage : '—'}</td>}
+                    <td style={{fontSize:'12px',color:'#444'}}>{s.Remarks || ''}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colSpan="2" style={{textAlign:'right'}}>GRAND TOTAL</td>
+                  {card.exam.IsSplitScore && <>
+                    <td style={{textAlign:'center'}}>{card.grandTotal.SBA}</td>
+                    <td style={{textAlign:'center'}}>{card.grandTotal.Exam}</td>
+                  </>}
+                  <td style={{textAlign:'center'}}>{card.grandTotal.Total}</td>
+                  <td colSpan={card.displaySettings?.ShowSubjectAverage ? 4 : 3}></td>
+                </tr>
+              </tfoot>
+            </table>
+
+            <div className="rcm-stats">
+              <div className="rcm-stat" style={{background: statGrad.att}}>
+                <div className="rcm-stat-lbl">Attendance</div>
+                <div className="rcm-stat-val">{card.attendance.present}/{card.attendance.total}</div>
+              </div>
+              <div className="rcm-stat" style={{background: statGrad.total}}>
+                <div className="rcm-stat-lbl">Total Score</div>
+                <div className="rcm-stat-val">{card.grandTotal.Total}</div>
+              </div>
+              <div className="rcm-stat" style={{background: statGrad.avg}}>
+                <div className="rcm-stat-lbl">Average</div>
+                <div className="rcm-stat-val">{card.average}</div>
+              </div>
+              <div className="rcm-stat" style={{background: statGrad.subj}}>
+                <div className="rcm-stat-lbl">Subjects</div>
+                <div className="rcm-stat-val">{card.subjectsCount}</div>
+              </div>
+            </div>
+
+            {card.displaySettings?.ShowOverallPosition !== false && (
+              <div className="rc-position-bar">
+                Overall Class Position: <b>{card.overallClassPosition ? ordinal(card.overallClassPosition) + ' / ' + card.class.Size : '—'}</b>
+              </div>
+            )}
+
+            {card.class.IsJhs && (
+              <div className="rc-position-bar rc-bece-bar">
+                {card.beceAggregate ? (() => {
+                  const core = card.beceAggregate.breakdown.slice(0, 4);
+                  const electives = card.beceAggregate.breakdown.slice(4, 6);
+                  const coreTotal = core.reduce((s, b) => s + Number(b.grade || 0), 0);
+                  const electiveTotal = electives.reduce((s, b) => s + Number(b.grade || 0), 0);
+                  return (
+                    <>
+                      Core Subject Total Marks: <b>{coreTotal}</b>
+                      {' · '}Best Two Elective Subject: <b>{electiveTotal}</b> ({electives.map(b => b.subjectName).join(', ')})
+                      {' · '}Aggregate: <b>{card.beceAggregate.aggregate}</b>
+                    </>
+                  );
+                })() : 'BECE Aggregate: not enough graded core + elective subjects yet'}
+              </div>
+            )}
+
+            {card.exam.Type === 'end_of_term' && (
+              <div className="rc-remarks-block">
+                <div className="rc-remarks-hdr">Conduct &amp; Remarks</div>
+                <div className="rc-remarks-grid">
+                  {school?.ShowInterestTalentOnReportCard !== false && <div><b>Interest / Talent:</b> {card.remarks.InterestTalent || '—'}</div>}
+                  {school?.ShowConductOnReportCard !== false && <div><b>Conduct:</b> {card.remarks.Conduct || '—'}</div>}
+                  {school?.ShowAttitudeOnReportCard !== false && <div><b>Attitude to Work:</b> {card.remarks.AttitudeToWork || '—'}</div>}
+                  {school?.ShowClassTeacherRemarkOnReportCard !== false && <div><b>Class Teacher's Remark:</b> {card.remarks.ClassTeacherRemark || '—'}</div>}
+                  {school?.ShowHeadteacherRemarkOnReportCard !== false && <div><b>Headmaster's Remark:</b> {card.remarks.HeadmasterRemark || '—'}</div>}
+                  {card.remarks.PromotionStatus && <div><b>Promotion:</b> {card.remarks.PromotionStatus.replace(/_/g, ' ')}</div>}
+                </div>
+              </div>
+            )}
+
+            <div className="rc-sign" style={{gridTemplateColumns:'1fr 1fr'}}>
+              <div>
+                {school?.SchoolStampURL && <img src={school.SchoolStampURL} alt="" style={{height:'46px',objectFit:'contain',marginBottom:'2px'}} onError={(e) => { e.target.style.display = 'none'; }} />}
+                <div>Official School Stamp</div>
+              </div>
+              <div>
+                {school?.HeadteacherSignatureURL && <img src={school.HeadteacherSignatureURL} alt="" style={{height:'36px',objectFit:'contain',marginBottom:'2px'}} onError={(e) => { e.target.style.display = 'none'; }} />}
+                <div>Headmaster / Headmistress Signature</div>
+              </div>
+            </div>
+
+            <div className="rc-grade-key">
+              <b>Grade Interpretation Key:</b>{' '}
+              {(card.gradeKeyRows && card.gradeKeyRows.length ? card.gradeKeyRows.map(r => ({ min: r.MinPercent, max: r.MaxPercent, code: r.Grade, label: r.Label })) : gradeTableFor(card.class.GradeBand))
+                .map((r, i, arr) => {
+                  const max = r.max != null ? r.max : (i === 0 ? 100 : arr[i - 1].min - 1);
+                  return <React.Fragment key={r.code}>{i > 0 && <>&nbsp;·&nbsp;</>}{r.code} = {r.label} ({r.min}–{max})</React.Fragment>;
+                })}
+            </div>
+
+            <div className="rc-foot">
+              Generated by {schoolName} on {new Date().toLocaleDateString('en-US', { day:'2-digit', month:'short', year:'numeric' })}
+              {' · '}{card.class.Label} · {termLabel(card.exam.Term)} · {card.exam.AcademicYear}
+              {card.exam.IsPublished ? '' : ' · DRAFT (results not yet published)'}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ============== Report Card template: "Prestige" — minimalist/refined, ultra modern ==============
+    function ReportCardPrestige({ card, school }) {
+      const fmtDate = rcFmtDate, ordinal = rcOrdinal, termLabel = rcTermLabel;
+      const schoolName = (school && school.SchoolName) || 'School Name';
+      const schoolAddr = (school && school.SchoolAddress) || '';
+      const schoolPhone = (school && school.SchoolContact) || '';
+      const schoolLogo = (school && school.SchoolLogo) || DEFAULT_LOGO;
+      if (!card) return null;
+
+      return (
+        <div className="report-card rc-elegant">
+          <div className="rce-hdr">
+            {schoolLogo && <img src={schoolLogo} alt="" onError={(e) => { e.target.style.display = 'none'; }} />}
+            <div className="rce-sname">{schoolName}</div>
+            {schoolAddr && <div className="rce-sline"><i className="fas fa-map-marker-alt"></i> {schoolAddr}</div>}
+            {schoolPhone && <div className="rce-sline"><i className="fas fa-phone"></i> Tel: {schoolPhone}</div>}
+          </div>
+          <div className="rce-rule"></div>
+
+          <div className="rc-title">Academic Report — {card.student.AdmissionNumber || '—'}</div>
+
+          <div style={{display:'flex',gap:'14px',alignItems:'stretch'}}>
+            <div className="rc-info" style={{flex:1}}>
+              <div><b>Name:</b> {card.student.FullName || ''}</div>
+              <div><b>Class:</b> {card.class.Label || '—'}</div>
+              <div><b>Gender:</b> {String(card.student.Gender || '').replace(/^./, c => c.toUpperCase()) || '—'}</div>
+              <div><b>Term:</b> {termLabel(card.exam.Term)}</div>
+              <div><b>Class Size:</b> {card.class.Size}</div>
+              <div><b>Year:</b> {card.exam.AcademicYear || '—'}</div>
+              <div><b>Vacation:</b> {fmtDate(card.exam.VacationDate) || '—'}</div>
+              <div><b>Reopening:</b> {fmtDate(card.exam.ReopeningDate) || '—'}</div>
+            </div>
+            {card.student.PhotoURL && (
+              <div style={{flex:'0 0 90px'}}>
+                <img src={card.student.PhotoURL} alt="" onError={(e) => { e.target.style.display = 'none'; }}
+                  style={{width:'90px',height:'104px',objectFit:'cover',border:'2px solid #b08d3e',background:'#fafafa'}} />
+              </div>
+            )}
+          </div>
+
+          <table className="rc-mtable">
+            <thead>
+              <tr>
+                <th style={{width:'30px'}}>#</th>
+                <th>Subject</th>
+                {card.exam.IsSplitScore ? (
+                  <>
+                    <th style={{width:'60px',textAlign:'center'}}>SBA<br/>/{card.exam.SbaMaxMarks || 50}</th>
+                    <th style={{width:'60px',textAlign:'center'}}>Exam<br/>/{card.exam.ExamMaxMarks || 50}</th>
+                    <th style={{width:'60px',textAlign:'center'}}>Total</th>
+                  </>
+                ) : (
+                  <th style={{width:'70px',textAlign:'center'}}>Score<br/>/{card.subjects[0] ? card.subjects[0].MaxMarks : 100}</th>
+                )}
+                <th style={{width:'55px',textAlign:'center'}}>Grade</th>
+                <th style={{width:'55px',textAlign:'center'}}>Pos.</th>
+                {card.displaySettings?.ShowSubjectAverage && <th style={{width:'65px',textAlign:'center'}}>Class Avg</th>}
+                <th>Remarks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {card.subjects.map((s, i) => (
+                <tr key={s.SubjectID}>
+                  <td>{i + 1}</td>
+                  <td>{s.SubjectName}</td>
+                  {card.exam.IsSplitScore ? (
+                    <>
+                      <td style={{textAlign:'center'}}>{s.IsAbsent ? '—' : s.SBA}</td>
+                      <td style={{textAlign:'center'}}>{s.IsAbsent ? '—' : s.Exam}</td>
+                    </>
+                  ) : null}
+                  <td style={{textAlign:'center',fontWeight:600}}>
+                    {s.IsAbsent ? <span style={{color:'#888',fontStyle:'italic'}}>Absent</span> : (s.Total != null ? s.Total : '—')}
+                  </td>
+                  <td style={{textAlign:'center'}}>
+                    <span className="rc-grade-pill" style={{background: sbaGradeColor(s.Grade, card.class.GradeBand), borderRadius:'50%',width:'22px',height:'22px',display:'inline-flex',alignItems:'center',justifyContent:'center',padding:0}}>{s.Grade || '—'}</span>
+                  </td>
+                  <td style={{textAlign:'center'}}>{s.Position ? ordinal(s.Position) : '—'}</td>
+                  {card.displaySettings?.ShowSubjectAverage && <td style={{textAlign:'center',color:'#666'}}>{s.ClassAverage != null ? s.ClassAverage : '—'}</td>}
+                  <td style={{fontSize:'12px',color:'#444'}}>{s.Remarks || ''}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan="2" style={{textAlign:'right'}}>GRAND TOTAL</td>
+                {card.exam.IsSplitScore && <>
+                  <td style={{textAlign:'center'}}>{card.grandTotal.SBA}</td>
+                  <td style={{textAlign:'center'}}>{card.grandTotal.Exam}</td>
+                </>}
+                <td style={{textAlign:'center'}}>{card.grandTotal.Total}</td>
+                <td colSpan={card.displaySettings?.ShowSubjectAverage ? 4 : 3}></td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <div className="rc-summary">
+            <div>
+              <div className="rc-lbl">Attendance</div>
+              <div className="rc-val">{card.attendance.present} / {card.attendance.total}</div>
+            </div>
+            <div>
+              <div className="rc-lbl">Total Score</div>
+              <div className="rc-val">{card.grandTotal.Total}</div>
+            </div>
+            <div>
+              <div className="rc-lbl">Average</div>
+              <div className="rc-val">{card.average}</div>
+            </div>
+            <div>
+              <div className="rc-lbl">Subjects</div>
+              <div className="rc-val">{card.subjectsCount}</div>
+            </div>
+          </div>
+
+          {card.displaySettings?.ShowOverallPosition !== false && (
+            <div className="rc-position-bar">
+              Overall Class Position: <b>{card.overallClassPosition ? ordinal(card.overallClassPosition) + ' / ' + card.class.Size : '—'}</b>
+            </div>
+          )}
+
+          {card.class.IsJhs && (
+            <div className="rc-position-bar rc-bece-bar">
+              {card.beceAggregate ? (() => {
+                const core = card.beceAggregate.breakdown.slice(0, 4);
+                const electives = card.beceAggregate.breakdown.slice(4, 6);
+                const coreTotal = core.reduce((s, b) => s + Number(b.grade || 0), 0);
+                const electiveTotal = electives.reduce((s, b) => s + Number(b.grade || 0), 0);
+                return (
+                  <>
+                    Core Subject Total Marks: <b>{coreTotal}</b>
+                    {' · '}Best Two Elective Subject: <b>{electiveTotal}</b> ({electives.map(b => b.subjectName).join(', ')})
+                    {' · '}Aggregate: <b>{card.beceAggregate.aggregate}</b>
+                  </>
+                );
+              })() : 'BECE Aggregate: not enough graded core + elective subjects yet'}
+            </div>
+          )}
+
+          {card.exam.Type === 'end_of_term' && (
+            <div className="rc-remarks-block">
+              <div className="rc-remarks-hdr">Conduct &amp; Remarks</div>
+              <div className="rc-remarks-grid">
+                {school?.ShowInterestTalentOnReportCard !== false && <div><b>Interest / Talent:</b> {card.remarks.InterestTalent || '—'}</div>}
+                {school?.ShowConductOnReportCard !== false && <div><b>Conduct:</b> {card.remarks.Conduct || '—'}</div>}
+                {school?.ShowAttitudeOnReportCard !== false && <div><b>Attitude to Work:</b> {card.remarks.AttitudeToWork || '—'}</div>}
+                {school?.ShowClassTeacherRemarkOnReportCard !== false && <div><b>Class Teacher's Remark:</b> {card.remarks.ClassTeacherRemark || '—'}</div>}
+                {school?.ShowHeadteacherRemarkOnReportCard !== false && <div><b>Headmaster's Remark:</b> {card.remarks.HeadmasterRemark || '—'}</div>}
+                {card.remarks.PromotionStatus && <div><b>Promotion:</b> {card.remarks.PromotionStatus.replace(/_/g, ' ')}</div>}
+              </div>
+            </div>
+          )}
+
+          <div className="rc-sign" style={{gridTemplateColumns:'1fr 1fr'}}>
+            <div>
+              {school?.SchoolStampURL && <img src={school.SchoolStampURL} alt="" style={{height:'46px',objectFit:'contain',marginBottom:'2px'}} onError={(e) => { e.target.style.display = 'none'; }} />}
+              <div>Official School Stamp</div>
+            </div>
+            <div>
+              {school?.HeadteacherSignatureURL && <img src={school.HeadteacherSignatureURL} alt="" style={{height:'36px',objectFit:'contain',marginBottom:'2px'}} onError={(e) => { e.target.style.display = 'none'; }} />}
+              <div>Headmaster / Headmistress Signature</div>
+            </div>
+          </div>
+
+          <div className="rc-grade-key">
+            <b>Grade Interpretation Key:</b>{' '}
             {(card.gradeKeyRows && card.gradeKeyRows.length ? card.gradeKeyRows.map(r => ({ min: r.MinPercent, max: r.MaxPercent, code: r.Grade, label: r.Label })) : gradeTableFor(card.class.GradeBand))
               .map((r, i, arr) => {
                 const max = r.max != null ? r.max : (i === 0 ? 100 : arr[i - 1].min - 1);
@@ -28547,6 +28985,69 @@
       );
     }
 
+    // instant-apply (no Save button) — same pattern as the Unified Grading toggle: picking a card
+    // saves immediately via updateReportCardTemplate and refreshes schoolSettings school-wide, so
+    // every report card view (preview, bulk print, public share links) picks up the new look at once
+    const REPORT_CARD_TEMPLATE_OPTS = [
+      { value: 'classic', label: 'Classic', desc: 'Traditional navy/serif — the original official-document look.',
+        swatch: <div style={{height:'46px',borderRadius:'4px',background:'#fff',border:'1px solid #d0d0d0',padding:'5px',fontFamily:"'Times New Roman',serif"}}>
+          <div style={{height:'8px',background:'#001f3f',borderRadius:'1px',marginBottom:'4px'}}></div>
+          <div style={{display:'flex',gap:'2px'}}><div style={{flex:1,height:'4px',background:'#e2e2e2'}}></div><div style={{flex:1,height:'4px',background:'#e2e2e2'}}></div></div>
+        </div> },
+      { value: 'aurora', label: 'Aurora', desc: 'Gradient header, rounded cards, colorful stat tiles — ultra modern.',
+        swatch: <div style={{height:'46px',borderRadius:'8px',overflow:'hidden',border:'1px solid #d0d0d0'}}>
+          <div style={{height:'16px',background:'linear-gradient(120deg,#001f3f,#0074D9)'}}></div>
+          <div style={{display:'flex',gap:'2px',padding:'4px 5px'}}>
+            <div style={{flex:1,height:'12px',borderRadius:'3px',background:'linear-gradient(135deg,#0074D9,#005fb3)'}}></div>
+            <div style={{flex:1,height:'12px',borderRadius:'3px',background:'linear-gradient(135deg,#34a853,#1e7e34)'}}></div>
+            <div style={{flex:1,height:'12px',borderRadius:'3px',background:'linear-gradient(135deg,#fb8c00,#d97400)'}}></div>
+          </div>
+        </div> },
+      { value: 'prestige', label: 'Prestige', desc: 'Minimalist gold-accented layout with circular grade badges — elegant.',
+        swatch: <div style={{height:'46px',borderRadius:'4px',background:'#fbf8f1',border:'1px solid #d8cdb8',padding:'5px',textAlign:'center'}}>
+          <div style={{width:'40%',height:'3px',background:'#b08d3e',margin:'0 auto 5px'}}></div>
+          <div style={{fontSize:'9px',color:'#3a2f1c',fontFamily:'Georgia,serif',letterSpacing:'1px'}}>SCHOOL NAME</div>
+        </div> }
+    ];
+    function ReportCardTemplatePicker({ schoolSettings, currentUser, role, onSaved }) {
+      const current = (schoolSettings && schoolSettings.ReportCardTemplate) || 'classic';
+      const [applying, setApplying] = useState('');
+
+      const apply = (tpl) => {
+        if (tpl === current || applying) return;
+        setApplying(tpl);
+        google.script.run
+          .withSuccessHandler((res) => {
+            setApplying('');
+            if (res.success) { Swal.fire({ icon: 'success', text: res.message, timer: 1400, showConfirmButton: false }); if (onSaved) onSaved(); }
+            else Swal.fire({ icon: 'error', text: res.message });
+          })
+          .withFailureHandler((err) => { setApplying(''); Swal.fire({ icon: 'error', text: err.message }); })
+          .updateReportCardTemplate(tpl, currentUser, role);
+      };
+
+      return (
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'12px'}}>
+          {REPORT_CARD_TEMPLATE_OPTS.map((t) => (
+            <div key={t.value} onClick={() => apply(t.value)}
+              style={{
+                border: '2px solid ' + (current === t.value ? 'var(--navy-primary)' : '#e2e2e2'),
+                borderRadius:'8px', padding:'10px', cursor: applying ? 'wait' : 'pointer',
+                background: current === t.value ? '#f4f8fc' : '#fff', position:'relative', transition:'all 0.15s'
+              }}>
+              {t.swatch}
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginTop:'8px'}}>
+                <div style={{fontWeight:700,fontSize:'13px',color:'var(--navy-primary)'}}>{t.label}</div>
+                {applying === t.value ? <i className="fas fa-spinner fa-spin" style={{color:'#888'}}></i>
+                  : current === t.value ? <i className="fas fa-check-circle" style={{color:'#34a853'}}></i> : null}
+              </div>
+              <div style={{fontSize:'11px',color:'#777',marginTop:'3px'}}>{t.desc}</div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
     function SchoolSettingsForm({ schoolSettings, currentUser, role, onSaved }) {
       const [data, setData] = useState({
         SchoolName: '', SchoolShortName: '', SchoolLogo: '',
@@ -28781,6 +29282,16 @@
               <input type="text" value={data.AdmissionNumberPrefix} onChange={(e) => set('AdmissionNumberPrefix', e.target.value.toUpperCase())} maxLength="10" placeholder="e.g. RES" style={{fontFamily:'monospace',textTransform:'uppercase'}} />
               <div style={{fontSize:'11px',color:'#888',marginTop:'4px'}}>New Student IDs auto-generate as PREFIX + YEAR + sequence (e.g. RES20260001).</div>
             </div>
+          </div>
+
+          <h3 style={{marginTop: '22px', marginBottom: '6px', color: 'var(--navy-primary)', fontSize: '15px', textTransform:'uppercase', letterSpacing:'0.5px'}}>
+            <i className="fas fa-id-card-alt"></i> Report Card Template
+          </h3>
+          <p style={{color:'#777', fontSize:'13px', marginBottom:'12px'}}>
+            Applies instantly, school-wide — every report card preview, bulk print, and public share link picks it up right away.
+          </p>
+          <div style={{marginBottom:'20px'}}>
+            <ReportCardTemplatePicker schoolSettings={schoolSettings} currentUser={currentUser} role={role} onSaved={onSaved} />
           </div>
 
           <h3 style={{marginTop: '22px', marginBottom: '6px', color: 'var(--navy-primary)', fontSize: '15px', textTransform:'uppercase', letterSpacing:'0.5px'}}>

@@ -445,6 +445,37 @@ function updateUngradedStages(stages, currentUser, currentRole) {
   }
 }
 
+var REPORT_CARD_TEMPLATES = ['classic', 'aurora', 'prestige'];
+// admin only — switches which of the 3 report card visual templates is used school-wide
+// (Classic = original serif/navy layout; Aurora = gradient/card-based; Prestige = minimalist/
+// gold-accented). All three render the exact same getStudentReportCard/getClassReportCards data,
+// this only changes SchoolSettings.ReportCardTemplate which the frontend reads to pick a layout.
+function updateReportCardTemplate(template, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var tpl = String(template || '').toLowerCase();
+    if (REPORT_CARD_TEMPLATES.indexOf(tpl) === -1) return { success: false, message: 'Template must be one of: ' + REPORT_CARD_TEMPLATES.join(', ') };
+    var sh = getSheet(SETTINGS_SHEET);
+    if (!sh) return { success: false, message: 'Settings sheet not found. Run setup() first.' };
+    var data = sh.getDataRange().getValues();
+    var foundRow = -1;
+    for (var i = 1; i < data.length; i++) { if (parseInt(data[i][0], 10) === 1) { foundRow = i + 1; break; } }
+    var ts = nowIso();
+    if (foundRow === -1) {
+      var blank = new Array(SETTINGS_HEADERS.length).fill('');
+      blank[0] = 1; blank[14] = ts; blank[15] = ts;
+      sh.appendRow(blank);
+      foundRow = sh.getLastRow();
+    }
+    sh.getRange(foundRow, 53).setValue(tpl); // col 53 = ReportCardTemplate
+    sh.getRange(foundRow, 16).setValue(ts);   // col 16 = UpdatedAt
+    addLog(currentUser, 'Report Card Template Changed', tpl);
+    return { success: true, message: 'Report card template updated', data: tpl };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
 // admin only — turns the single unified grading scale on/off school-wide. Requires the Unified
 // custom scale to already be saved (via saveGradingBands('unified', rows, ...)) before it can be
 // switched on — flipping it on with nothing configured would silently leave every class ungraded.
