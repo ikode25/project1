@@ -3235,6 +3235,16 @@
       return base.replace(/\/+$/, '') + queryString;
     }
 
+    // shared stateSave filter for every DataTable on the site: persist ONLY which columns are
+    // shown/hidden (the colvis toggle) to localStorage, per table — not search text, page number,
+    // or sort order, so admin's column choices survive a reload/redeploy without stale filters or
+    // page positions lingering from a previous visit.
+    function dtStateSaveParams(settings, data) {
+      var cols = (data.columns || []).map(function (c) { return { visible: c.visible }; });
+      for (var k in data) delete data[k];
+      data.columns = cols;
+    }
+
     // reusable DataTables pdf button — landscape A4, navy header, auto-fit cols
     function dtPdfButton(title) {
       return {
@@ -4449,8 +4459,9 @@
       const [paper, setPaper] = useState(null);
       const [loadError, setLoadError] = useState('');
       const [loading, setLoading] = useState(true);
+      const [classes, setClasses] = useState([]);
       const [started, setStarted] = useState(false);
-      const [studentInfo, setStudentInfo] = useState({ StudentName: '', AdmissionNumber: '', StudentContact: '' });
+      const [studentInfo, setStudentInfo] = useState({ StudentName: '', ClassID: '', AdmissionNumber: '' });
       const [answers, setAnswers] = useState({});
       const [submitting, setSubmitting] = useState(false);
       const [error, setError] = useState('');
@@ -4462,6 +4473,7 @@
           .withSuccessHandler((res) => { setLoading(false); if (res && res.success) setPaper(res.data); else setLoadError((res && res.message) || 'Exam not found'); })
           .withFailureHandler((err) => { setLoading(false); setLoadError((err && err.message) || 'Connection error'); })
           .getPublicTestPaper(token);
+        google.script.run.withSuccessHandler((res) => { if (res && res.success) setClasses(res.data || []); }).withFailureHandler(() => {}).getPublicClassList();
       }, [token]);
 
       const submit = () => {
@@ -4493,6 +4505,8 @@
       const startExam = (e) => {
         e.preventDefault();
         if (!studentInfo.StudentName.trim()) { setError('Your full name is required.'); return; }
+        if (!studentInfo.ClassID) { setError('Please select your class.'); return; }
+        if (!studentInfo.AdmissionNumber.trim()) { setError('Your admission number is required.'); return; }
         setError('');
         setStarted(true);
       };
@@ -4575,14 +4589,17 @@
                   <div className="login-input-wrap"><input type="text" value={studentInfo.StudentName} onChange={(e) => setStudentInfo({...studentInfo, StudentName: e.target.value})} required autoFocus maxLength="100" /></div>
                 </div>
                 <div className="form-group">
-                  <label><i className="fas fa-id-card"></i> Admission Number</label>
-                  <div className="login-input-wrap"><input type="text" value={studentInfo.AdmissionNumber} onChange={(e) => setStudentInfo({...studentInfo, AdmissionNumber: e.target.value})} maxLength="30" /></div>
+                  <label><i className="fas fa-school"></i> Your Class *</label>
+                  <select value={studentInfo.ClassID} onChange={(e) => setStudentInfo({...studentInfo, ClassID: e.target.value})} required style={{width:'100%',padding:'10px 12px',border:'1px solid #ccc',fontSize:'14px'}}>
+                    <option value="">Select your class…</option>
+                    {classes.map(c => <option key={c.ID} value={c.ID}>{c.Label}</option>)}
+                  </select>
                 </div>
                 <div className="form-group">
-                  <label><i className="fas fa-phone"></i> Phone (optional)</label>
-                  <div className="login-input-wrap"><input type="text" value={studentInfo.StudentContact} onChange={(e) => setStudentInfo({...studentInfo, StudentContact: e.target.value})} maxLength="20" /></div>
+                  <label><i className="fas fa-id-card"></i> Admission Number *</label>
+                  <div className="login-input-wrap"><input type="text" value={studentInfo.AdmissionNumber} onChange={(e) => setStudentInfo({...studentInfo, AdmissionNumber: e.target.value})} required maxLength="30" /></div>
                 </div>
-                <button type="submit" className="login-submit"><i className="fas fa-play"></i> Start Exam</button>
+                <button type="submit" className="login-submit"><i className="fas fa-play"></i> Open Exam</button>
                 {error && <div className="login-error-box"><i className="fas fa-exclamation-circle"></i> <span>{error}</span></div>}
               </form>
             </div>
@@ -6150,7 +6167,7 @@
 
             const table = $('#usersTable').DataTable({
               data: data,
-              destroy: true,
+              destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams,
               columns: [
                 {
                   data: 'ID',
@@ -6711,7 +6728,7 @@
             try { tableRef.current.destroy(); tableRef.current = null; $('#teacherAssnTable').empty(); } catch (e) {}
           }
           tableRef.current = $('#teacherAssnTable').DataTable({
-            data: items, destroy: true, pageLength: 10,
+            data: items, destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams, pageLength: 10,
             lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'All']],
             responsive: true, dom: 'Blfrtip',
             buttons: [
@@ -6834,7 +6851,7 @@
             try { tableRef.current.destroy(); tableRef.current = null; $('#teacherLogTable').empty(); } catch (e) {}
           }
           tableRef.current = $('#teacherLogTable').DataTable({
-            data: items, destroy: true, pageLength: 10,
+            data: items, destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams, pageLength: 10,
             lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'All']],
             responsive: true, dom: 'Blfrtip', order: [[0, 'desc']],
             buttons: [
@@ -7389,7 +7406,7 @@
 
             const table = $('#admissionsTable').DataTable({
               data: data,
-              destroy: true,
+              destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams,
               columns: cols,
               pageLength: 10,
               lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
@@ -8681,7 +8698,7 @@
             const dtCols = colDefs.map(c => ({ data: c.key, title: c.label, render: (v) => renderCell(v, c.type), defaultContent: dash }));
             const table = $('#reportTable').DataTable({
               data: dataRows,
-              destroy: true,
+              destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams,
               columns: dtCols,
               pageLength: 10,
               lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
@@ -8976,7 +8993,7 @@
 
             const table = $('#classesTable').DataTable({
               data: data,
-              destroy: true,
+              destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams,
               columns: cols,
               pageLength: 10,
               lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
@@ -10318,7 +10335,7 @@
 
             const table = $('#subjectsTable').DataTable({
               data: data,
-              destroy: true,
+              destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams,
               columns: cols,
               pageLength: 10,
               lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
@@ -10967,7 +10984,7 @@
 
             const table = $('#teachersTable').DataTable({
               data: data,
-              destroy: true,
+              destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams,
               columns: cols,
               pageLength: 10,
               lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
@@ -11627,7 +11644,7 @@
 
             const table = $('#studentsTable').DataTable({
               data: data,
-              destroy: true,
+              destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams,
               columns: cols,
               pageLength: 10,
               lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
@@ -12924,7 +12941,7 @@
         try {
           tableRef.current = $('#studentPayHistTable').DataTable({
             data: rows,
-            destroy: true,
+            destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams,
             pageLength: 10,
             lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'All']],
             responsive: true,
@@ -13241,7 +13258,7 @@
         try {
           tableRef.current = $('#studentAttHistTable').DataTable({
             data: rows,
-            destroy: true,
+            destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams,
             pageLength: 10,
             lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'All']],
             responsive: true,
@@ -14222,7 +14239,7 @@
 
             const table = $('#parentsTable').DataTable({
               data: data,
-              destroy: true,
+              destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams,
               columns: cols,
               pageLength: 10,
               lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
@@ -15474,7 +15491,7 @@
 
             const table = $('#examsTable').DataTable({
               data: data,
-              destroy: true,
+              destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams,
               columns: cols,
               pageLength: 10,
               lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
@@ -15822,7 +15839,7 @@
           if (!$('#examToppersTable').length) return;
           if (tableRef.current) { try { tableRef.current.destroy(); tableRef.current = null; $('#examToppersTable').empty(); } catch (e) {} }
           tableRef.current = $('#examToppersTable').DataTable({
-            data: items, destroy: true, pageLength: 25, lengthChange: false, paging: false, info: false, searching: false,
+            data: items, destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams, pageLength: 25, lengthChange: false, paging: false, info: false, searching: false,
             responsive: true, dom: 'Bfrtip',
             buttons: [
               { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
@@ -16261,7 +16278,7 @@
       useEffect(() => {
         google.script.run
           .withSuccessHandler((res) => { if (res.success) setClasses(res.data || []); })
-          .getAllClasses(currentUser, role);
+          .getMyClassTeacherClasses(currentUser, role);
       }, []);
 
       const handleSubmit = (e) => {
@@ -16371,6 +16388,11 @@
                     onChange={(v) => set('ExamType', v)}
                     placeholder="Select type..."
                   />
+                  {String(role).toLowerCase() === 'teacher' && classes.length === 0 && (
+                    <div className="settings-info-message" style={{gridColumn:'span 2',marginBottom:0}}>
+                      <i className="fas fa-info-circle"></i> You're not set as the Class Teacher for any class, so there's nothing to pick here — ask admin to assign you as Class Teacher first.
+                    </div>
+                  )}
                   {multiClassMode ? (
                     <div className="form-group" style={{gridColumn:'span 2'}}>
                       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'4px'}}>
@@ -16829,9 +16851,20 @@
         });
       };
 
+      // The exam itself sets the max marks every subject is worth IN THIS EXAM (what the teacher
+      // typed into "Max Marks per Subject" / SBA+Exam when creating it) — that always wins over a
+      // subject's own default MaxMarks, which is just a fallback used when configuring the Subjects
+      // list, not a per-exam override. The one exception is a subject permanently split into
+      // Theory+Practical (or Practical-only) components — that split is a fixed structural property
+      // of the subject and isn't something an exam's flat max marks can express.
       const getMaxForSubject = () => {
         const sub = subjects.find(s => String(s.ID) === String(pickedSubjectId));
-        return sub ? sub.MaxMarks : (exam.MaxMarksPerSubject || 100);
+        const subType = String(sub?.SubjectType || 'theory').toLowerCase();
+        if (subType === 'both' || subType === 'practical') {
+          const t = parseFloat(sub?.TheoryMaxMarks) || 0, p = parseFloat(sub?.PracticalMaxMarks) || 0;
+          return (t + p) || (sub ? sub.MaxMarks : 100);
+        }
+        return exam.MaxMarksPerSubject || (sub ? sub.MaxMarks : 100);
       };
 
       const computeGradeClient = (obtained, max, isAbsent) => computeGradeClientBand(obtained, max, isAbsent, gradeBand);
@@ -17017,7 +17050,9 @@
                       >
                         <i className="fas fa-book" style={{fontSize:'18px',marginBottom:'6px',display:'block',color: active ? '#ffd166' : 'var(--navy-primary)'}}></i>
                         <div style={{fontWeight:700,fontSize:'12.5px',lineHeight:1.3}}>{s.SubjectName}</div>
-                        <div style={{fontSize:'10.5px',opacity:0.8,marginTop:'2px'}}>{s.SubjectCode} · max {s.MaxMarks}</div>
+                        <div style={{fontSize:'10.5px',opacity:0.8,marginTop:'2px'}}>
+                          {s.SubjectCode} · max {(String(s.SubjectType || 'theory').toLowerCase() === 'both' || String(s.SubjectType || '').toLowerCase() === 'practical') ? s.MaxMarks : (exam.MaxMarksPerSubject || s.MaxMarks)}
+                        </div>
                         {s.SubjectType && s.SubjectType !== 'theory' && (
                           <div style={{fontSize:'9.5px',marginTop:'4px',textTransform:'uppercase',opacity:0.75}}>{s.SubjectType}</div>
                         )}
@@ -17911,7 +17946,7 @@
 
             const table = $('#feeStructureTable').DataTable({
               data: data,
-              destroy: true,
+              destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams,
               columns: cols,
               pageLength: 10,
               lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
@@ -18623,7 +18658,7 @@
 
             const table = $('#accountsTable').DataTable({
               data: data,
-              destroy: true,
+              destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams,
               columns: cols,
               pageLength: 10,
               lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
@@ -19050,7 +19085,7 @@
 
             const table = $('#paymentsTable').DataTable({
               data: data,
-              destroy: true,
+              destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams,
               columns: cols,
               pageLength: 10,
               lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
@@ -20256,7 +20291,7 @@
             });
 
             const table = $('#disciplineTable').DataTable({
-              data: data, destroy: true, columns: cols,
+              data: data, destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams, columns: cols,
               pageLength: 10,
               lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
               responsive: true, dom: 'Blfrtip',
@@ -20502,7 +20537,7 @@
           if (!$('#studentDisciplineTable').length) return;
           if (tableRef.current) { try { tableRef.current.destroy(); tableRef.current = null; $('#studentDisciplineTable').empty(); } catch (e) {} }
           tableRef.current = $('#studentDisciplineTable').DataTable({
-            data: items, destroy: true, pageLength: 10,
+            data: items, destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams, pageLength: 10,
             lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'All']],
             responsive: true, dom: 'Blfrtip', order: [[0, 'desc']],
             buttons: [
@@ -20888,7 +20923,7 @@
             });
 
             const table = $('#conductTable').DataTable({
-              data: data, destroy: true, columns: cols,
+              data: data, destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams, columns: cols,
               pageLength: 10,
               lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
               responsive: true, dom: 'Blfrtip',
@@ -21333,7 +21368,7 @@
             }
           });
           const t = $('#activitiesTable').DataTable({
-            data, destroy: true, columns: cols, pageLength: 10,
+            data, destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams, columns: cols, pageLength: 10,
             lengthMenu: [[10,25,50,-1],[10,25,50,'All']],
             responsive: true, dom: 'Blfrtip',
             buttons: [{ extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' }, { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', exportOptions: { columns: ':not(:last-child)' } }],
@@ -21597,7 +21632,7 @@
 
             const table = $('#complaintsTable').DataTable({
               data: data,
-              destroy: true,
+              destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams,
               columns: cols,
               pageLength: 10,
               lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
@@ -21919,7 +21954,7 @@
             }
             const exportCols = canWrite ? ':not(:last-child)' : ':visible';
             const table = $('#calendarTable').DataTable({
-              data: data, destroy: true, columns: cols, pageLength: 10,
+              data: data, destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams, columns: cols, pageLength: 10,
               lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
               responsive: true, dom: 'Blfrtip',
               buttons: [
@@ -22842,7 +22877,7 @@
 
             const table = $('#noticesTable').DataTable({
               data: data,
-              destroy: true,
+              destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams,
               columns: cols,
               pageLength: 10,
               lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
@@ -24411,18 +24446,19 @@
               {loadError && !loading && subs.length === 0 && (
                 <div className="settings-info-message" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>Couldn't load submissions — {String((loadError && loadError.message) || loadError)}.</div>
               )}
-              {loading && <TableSkeleton rows={4} columns={4} />}
+              {loading && <TableSkeleton rows={4} columns={5} />}
               {!loading && subs.length === 0 && (
                 <div style={{textAlign:'center',padding:'30px',color:'#888',background:'#f8f9fa'}}>No submissions yet.</div>
               )}
               {!loading && subs.length > 0 && !viewing && (
                 <div style={{overflowX:'auto'}}>
                   <table className="simple-table" style={{width:'100%'}}>
-                    <thead><tr><th>Student</th><th>Admission No</th><th>Score</th><th>Submitted</th><th></th></tr></thead>
+                    <thead><tr><th>Student</th><th>Class</th><th>Admission No</th><th>Score</th><th>Submitted</th><th></th></tr></thead>
                     <tbody>
                       {subs.map(s => (
                         <tr key={s.ID}>
                           <td style={{fontWeight:600}}>{s.StudentName}</td>
+                          <td>{s.ClassLabel || '—'}</td>
                           <td>{s.AdmissionNumber || '—'}</td>
                           <td style={{fontWeight:700}}>
                             {s.Score} / {s.MaxScore}
@@ -25327,7 +25363,7 @@
 
             const table = $('#helpdeskTable').DataTable({
               data: data,
-              destroy: true,
+              destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams,
               columns: cols,
               pageLength: 10,
               lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
@@ -25659,7 +25695,7 @@
 
             const table = $('#lessonPlansTable').DataTable({
               data: data,
-              destroy: true,
+              destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams,
               columns: cols,
               pageLength: 10,
               lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
@@ -25999,7 +26035,7 @@
             });
 
             const table = $('#logbookTable').DataTable({
-              data: data, destroy: true, columns: cols,
+              data: data, destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams, columns: cols,
               pageLength: 10,
               lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
               responsive: true, dom: 'Blfrtip',
@@ -29165,7 +29201,7 @@
         setTimeout(() => {
           try {
             const t = $(tableId).DataTable({
-              data: data, destroy: true, columns: cols, pageLength: 10,
+              data: data, destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams, columns: cols, pageLength: 10,
               lengthMenu: [[10,25,50,-1],[10,25,50,'All']],
               responsive: true, dom: 'Blfrtip',
               buttons: [
@@ -29247,7 +29283,7 @@
         setTimeout(() => {
           try {
             const t = $(tableId).DataTable({
-              data: data, destroy: true, columns: cols, pageLength: 10,
+              data: data, destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams, columns: cols, pageLength: 10,
               lengthMenu: [[10,25,50,-1],[10,25,50,'All']],
               responsive: true, dom: 'Blfrtip',
               buttons: [
@@ -29681,7 +29717,7 @@
         setTimeout(() => {
           try {
             const t = $(id).DataTable({
-              data: data, destroy: true, columns: cols, pageLength: 10,
+              data: data, destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams, columns: cols, pageLength: 10,
               lengthMenu: [[10,25,50,-1],[10,25,50,'All']],
               responsive: true, dom: 'Blfrtip',
               buttons: [
@@ -29739,7 +29775,7 @@
         setTimeout(() => {
           try {
             myTableRef.current = $(id).DataTable({
-              data: data, destroy: true, columns: cols, pageLength: 10,
+              data: data, destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams, columns: cols, pageLength: 10,
               lengthMenu: [[10,25,50,-1],[10,25,50,'All']],
               responsive: true, dom: 'Blfrtip',
               buttons: [
@@ -30088,7 +30124,7 @@
         setTimeout(() => {
           try {
             const t = $(id).DataTable({
-              data: data, destroy: true, columns: cols, pageLength: 10,
+              data: data, destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams, columns: cols, pageLength: 10,
               lengthMenu: [[10,25,50,-1],[10,25,50,'All']],
               responsive: true, dom: 'Blfrtip',
               buttons: [
@@ -30583,7 +30619,7 @@
         setTimeout(() => {
           try {
             const t = $(id).DataTable({
-              data: data, destroy: true, columns: cols, pageLength: 10,
+              data: data, destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams, columns: cols, pageLength: 10,
               lengthMenu: [[10,25,50,-1],[10,25,50,'All']],
               responsive: true, dom: 'Blfrtip',
               buttons: [

@@ -2571,6 +2571,25 @@ function getAllClasses(currentUser, currentRole) {
   }
 }
 
+// teacher only — classes where THIS teacher is the actual Class Teacher (homeroom), a strictly
+// narrower list than getAllClasses()'s "every class I teach any subject in". Used by the Add Exam
+// class picker: creating an exam is a class-teacher-level action, not something every subject
+// teacher assigned to a class should be doing.
+function getMyClassTeacherClasses(currentUser, currentRole) {
+  try {
+    if (String(currentRole || '').toLowerCase() !== 'teacher') return getAllClasses(currentUser, currentRole);
+    var teacherId = getCurrentUserId(currentUser);
+    if (!teacherId) return { success: true, data: [] };
+
+    var all = getAllClasses(currentUser, currentRole);
+    if (!all.success) return all;
+    var mine = all.data.filter(function (c) { return parseInt(c.ClassTeacherID, 10) === teacherId; });
+    return { success: true, data: mine };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
 // active teachers list — for class_teacher dropdown (admin only, used inside modal)
 function getActiveTeachers(currentUser, currentRole) {
   try {
@@ -11385,7 +11404,7 @@ var TEST_PAPER_HEADERS = ['ID', 'Title', 'SubjectID', 'ClassID', 'Instructions',
 var QUESTION_TYPES = ['mcq', 'true_false', 'short_answer', 'essay'];
 var EXAM_SUBMISSIONS_SHEET = 'Exam_Submissions';
 // AnswersJSON: { "<questionId>": { answer, maxMarks, awarded, correct (true/false/null=pending) } }
-var EXAM_SUBMISSION_HEADERS = ['ID', 'TestPaperID', 'ShareToken', 'StudentName', 'AdmissionNumber', 'StudentContact', 'AnswersJSON', 'Score', 'MaxScore', 'PendingReviewCount', 'GradedBy', 'SubmittedAt', 'UpdatedAt'];
+var EXAM_SUBMISSION_HEADERS = ['ID', 'TestPaperID', 'ShareToken', 'StudentName', 'AdmissionNumber', 'StudentContact', 'AnswersJSON', 'Score', 'MaxScore', 'PendingReviewCount', 'GradedBy', 'SubmittedAt', 'UpdatedAt', 'ClassID'];
 var QUESTION_DIFFICULTIES = ['easy', 'medium', 'hard'];
 
 function _ensureQuestionBankSheet() {
@@ -11422,6 +11441,12 @@ function _ensureExamSubmissionsSheet() {
     sh = ss.insertSheet(EXAM_SUBMISSIONS_SHEET);
     sh.appendRow(EXAM_SUBMISSION_HEADERS);
     sh.getRange(1, 1, 1, EXAM_SUBMISSION_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+    sh.setFrozenRows(1);
+  } else if (sh.getLastColumn() < EXAM_SUBMISSION_HEADERS.length) {
+    // upgrade an existing sheet created before ClassID existed
+    var addFrom = sh.getLastColumn() + 1;
+    sh.getRange(1, addFrom, 1, EXAM_SUBMISSION_HEADERS.length - sh.getLastColumn()).setValues([EXAM_SUBMISSION_HEADERS.slice(addFrom - 1)])
+      .setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
     sh.setFrozenRows(1);
   }
   return sh;
@@ -11766,12 +11791,16 @@ function _gradeExamAnswer(qType, correctAnswer, rawAnswer, maxMarks) {
   return { awarded: isCorrect ? maxMarks : 0, correct: isCorrect };
 }
 
-// public — no auth. Student submits { StudentName, AdmissionNumber, StudentContact, Answers: {qid: answer} }.
+// public — no auth. Student submits { StudentName, ClassID, AdmissionNumber, Answers: {qid: answer} }.
 function submitPublicExam(token, studentInfo, answers, currentUser, currentRole) {
   try {
     var tok = String(token || '').trim();
     var name = String((studentInfo && studentInfo.StudentName) || '').trim();
+    var classId = parseInt(studentInfo && studentInfo.ClassID, 10);
+    var admNo = String((studentInfo && studentInfo.AdmissionNumber) || '').trim();
     if (!name) return { success: false, message: 'Your name is required' };
+    if (isNaN(classId)) return { success: false, message: 'Please select your class' };
+    if (!admNo) return { success: false, message: 'Your admission number is required' };
     if (!answers || typeof answers !== 'object') answers = {};
 
     var sh = _ensureTestPapersSheet();
@@ -11803,9 +11832,9 @@ function submitPublicExam(token, studentInfo, answers, currentUser, currentRole)
     var esh = _ensureExamSubmissionsSheet();
     var ts = nowIso(), id = nextRowId(esh);
     esh.appendRow([
-      id, paperId, tok, name, String((studentInfo && studentInfo.AdmissionNumber) || '').trim(),
+      id, paperId, tok, name, admNo,
       String((studentInfo && studentInfo.StudentContact) || '').trim(), JSON.stringify(breakdown),
-      score, maxScore, pendingCount, '', ts, ts
+      score, maxScore, pendingCount, '', ts, ts, classId
     ]);
     addLog(name, 'Online Exam Submitted', 'Paper #' + paperId + ' — ' + score + '/' + maxScore);
 
@@ -11818,15 +11847,16 @@ function submitPublicExam(token, studentInfo, answers, currentUser, currentRole)
   }
 }
 
-function _rowToExamSubmission(row, umap) {
-  var gb = row[10];
+function _rowToExamSubmission(row, umap, cmap) {
+  var gb = row[10], clsId = row[13];
   var breakdown = {};
   try { breakdown = JSON.parse(row[6] || '{}'); } catch (e) {}
   return {
     ID: row[0], TestPaperID: row[1], ShareToken: row[2], StudentName: row[3] || '', AdmissionNumber: row[4] || '',
     StudentContact: row[5] || '', Breakdown: breakdown, Score: parseFloat(row[7]) || 0, MaxScore: parseFloat(row[8]) || 0,
     PendingReviewCount: parseInt(row[9], 10) || 0, GradedBy: gb, GradedByName: (gb && umap && umap[gb]) ? umap[gb].fullName : '',
-    SubmittedAt: toIso(row[11]), UpdatedAt: toIso(row[12])
+    SubmittedAt: toIso(row[11]), UpdatedAt: toIso(row[12]),
+    ClassID: clsId || '', ClassLabel: (clsId && cmap && cmap[clsId]) ? cmap[clsId].label : ''
   };
 }
 
@@ -11844,11 +11874,11 @@ function getExamSubmissions(testPaperId, currentUser, currentRole) {
 
     var sh = _ensureExamSubmissionsSheet();
     var data = sh.getDataRange().getValues();
-    var umap = getUsersMap();
+    var umap = getUsersMap(), cmap = getClassesMap();
     var out = [];
     for (var j = 1; j < data.length; j++) {
       if (parseInt(data[j][1], 10) !== idn) continue;
-      out.push(_rowToExamSubmission(data[j], umap));
+      out.push(_rowToExamSubmission(data[j], umap, cmap));
     }
     out.sort(function (a, b) { return String(b.SubmittedAt).localeCompare(String(a.SubmittedAt)); });
     return { success: true, data: out };
@@ -12186,8 +12216,26 @@ function getLiveWebAppUrl(currentUser, currentRole) {
   }
 }
 
+// self-healing resolver for the admin-configurable "Public Web App URL" override: a genuine custom
+// domain (anything that ISN'T a script.google.com Apps Script URL) is always respected — that's
+// the whole point of letting admin set one. But a *stale* script.google.com/macros/.../exec value
+// (left over from an old "Deploy > New deployment" that minted a different /exec ID) is worse than
+// useless — every shared QR code/link built from it silently 404s or bounces to a login page. So
+// when the saved override still looks like an Apps Script URL but no longer matches the live one,
+// auto-fall-back to the live URL instead of perpetuating the stale link. This is the actual fix for
+// "my admission/exam link redirects to the login page" — the link was built from an old override.
+function _resolvePublicBaseUrl(savedOverride) {
+  var live = _webAppBaseUrl();
+  var saved = String(savedOverride || '').trim();
+  if (!saved) return live;
+  var looksLikeAppsScriptUrl = /^https?:\/\/script\.google\.com\/macros\//i.test(saved);
+  if (looksLikeAppsScriptUrl && saved.replace(/\/+$/, '') !== live.replace(/\/+$/, '')) return live; // stale — self-heal
+  return saved; // custom domain, or matches live — respect it
+}
+
 // prefers the admin-configured PublicAppBaseURL (School Settings > Public Links) over the live
-// deployment URL, mirroring the frontend's publicAppLink() helper
+// deployment URL, mirroring the frontend's publicAppLink() helper — getSchoolSettings() already
+// runs this through _resolvePublicBaseUrl(), so it's never a stale Apps Script URL here.
 function _publicAppLinkServer(queryString) {
   var settingsRes = getSchoolSettings();
   var base = (settingsRes.data && settingsRes.data.PublicAppBaseURL) || _webAppBaseUrl();
@@ -12755,7 +12803,7 @@ function getSchoolSettings() {
             SchoolStampURL: data[i][34] || '',
             HeadteacherSignatureURL: data[i][35] || '',
             AdminSignatureURL: data[i][36] || '',
-            PublicAppBaseURL: data[i][37] || _webAppBaseUrl(),
+            PublicAppBaseURL: _resolvePublicBaseUrl(data[i][37]),
             ActiveTerm: data[i][38] || 'term1',
             DietaryOptions: parseDietaryOptionsCsv(data[i][39]),
             UngradedStages: String(data[i][44] || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean)
