@@ -338,7 +338,7 @@ var PERIOD_HEADERS = ['ID','PeriodNumber','StartTime','EndTime','IsBreak','Label
 // matters (Exams, Fee_Structure, Admissions, LessonPlans, etc.) already carries its own
 // AcademicYear/Term columns, so old sessions stay fully queryable forever; this pair only drives
 // which session NEW records default into and what the dashboard banner shows.)
-var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt','ShowOverallPositionOnReportCard','ShowSubjectAverageOnReportCard','SchoolStampURL','HeadteacherSignatureURL','AdminSignatureURL','PublicAppBaseURL','ActiveTerm','DietaryOptions','BursarEmail','BursarPhone','HeadteacherEmail','HeadteacherPhone'];
+var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt','ShowOverallPositionOnReportCard','ShowSubjectAverageOnReportCard','SchoolStampURL','HeadteacherSignatureURL','AdminSignatureURL','PublicAppBaseURL','ActiveTerm','DietaryOptions','BursarEmail','BursarPhone','HeadteacherEmail','HeadteacherPhone','UngradedStages'];
 // col 40 = DietaryOptions — admin-editable CSV of "value|label" pairs shown as checkboxes on the
 // student form (Ghana-appropriate defaults; the old hardcoded Halal/Kosher/Pescatarian/etc. list
 // is now just the fallback seed, not a fixed enum — see defaultDietaryOptions()).
@@ -407,6 +407,39 @@ function updateDietaryOptions(list, currentUser, currentRole) {
     sh.getRange(foundRow, 16).setValue(ts);   // col 16 = UpdatedAt
     addLog(currentUser, 'Dietary Options Updated', String(list.length) + ' options');
     return { success: true, message: 'Dietary options updated', data: parseDietaryOptionsCsv(csv) };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// which curriculum stages sit OUTSIDE the graded scale entirely (no letter/proficiency grade
+// computed at all, report card shows '—') — lets admin exclude Creche/Nursery from formal
+// grading in schools/years that don't want it, without touching the actual "basic vs jhs" scale
+// used for every other class. Defaults to empty (nothing excluded) so this is purely opt-in and
+// never silently changes behavior for schools that already have grades on file for those levels.
+var UNGRADEABLE_STAGES = ['creche', 'nursery'];
+function updateUngradedStages(stages, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var clean = (Array.isArray(stages) ? stages : []).map(function(s) { return String(s || '').toLowerCase().trim(); })
+      .filter(function(s) { return UNGRADEABLE_STAGES.indexOf(s) !== -1; });
+    var csv = clean.join(',');
+    var sh = getSheet(SETTINGS_SHEET);
+    if (!sh) return { success: false, message: 'Settings sheet not found. Run setup() first.' };
+    var data = sh.getDataRange().getValues();
+    var foundRow = -1;
+    for (var i = 1; i < data.length; i++) { if (parseInt(data[i][0], 10) === 1) { foundRow = i + 1; break; } }
+    var ts = nowIso();
+    if (foundRow === -1) {
+      var blank = new Array(SETTINGS_HEADERS.length).fill('');
+      blank[0] = 1; blank[14] = ts; blank[15] = ts;
+      sh.appendRow(blank);
+      foundRow = sh.getLastRow();
+    }
+    sh.getRange(foundRow, 45).setValue(csv);  // col 45 = UngradedStages
+    sh.getRange(foundRow, 16).setValue(ts);   // col 16 = UpdatedAt
+    addLog(currentUser, 'Ungraded Stages Updated', csv || '(none)');
+    return { success: true, message: 'Grading scope updated', data: clean };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
@@ -593,6 +626,8 @@ function _buildClassesMap() {
   var sh = getSheet(CLASSES_SHEET);
   if (!sh) return {};
   var data = sh.getDataRange().getValues(), map = {};
+  var settingsRes = getSchoolSettings();
+  var ungradedStages = (settingsRes.data && settingsRes.data.UngradedStages) || [];
 
   // count active classes per (className+academicYear) to know which levels are single-stream
   var streamCount = {};
@@ -616,7 +651,7 @@ function _buildClassesMap() {
       shortLabel: classLabel,
       curriculumStage: String(data[j][11] || 'lower_primary').toLowerCase(),
       gradeLevel: parseInt(data[j][9], 10) || 0,
-      gradeBand: gradeBandForStage(data[j][11])
+      gradeBand: gradeBandForStage(data[j][11], ungradedStages)
     };
   }
   return map;
@@ -804,8 +839,13 @@ function getTeacherAssignmentsMap(teacherUserId) {
 //  - 'jhs'   (Basic 7-9): 9-grade WAEC-style scale (used for class tests, mid-terms,
 //     end-of-term exams AND BECE mocks — they all share this one table)
 // gradeBandForStage(curriculumStage) resolves which table to use.
-function gradeBandForStage(curriculumStage) {
-  return String(curriculumStage || '').toLowerCase() === 'jhs' ? 'jhs' : 'basic';
+// pass ungradedStages (Settings.UngradedStages, e.g. ['creche','nursery']) to exclude those
+// stages from grading entirely — returns null, which computeGrade() treats as "no grade computed"
+function gradeBandForStage(curriculumStage, ungradedStages) {
+  var stage = String(curriculumStage || '').toLowerCase();
+  if (stage === 'jhs') return 'jhs';
+  if (Array.isArray(ungradedStages) && ungradedStages.indexOf(stage) !== -1) return null;
+  return 'basic';
 }
 
 // NaCCA Standards-Based Curriculum 5-band proficiency scale (Creche through Basic 6).
@@ -895,6 +935,7 @@ function _getCustomGradingBands() {
 // obtained/max -> short grade code for the given band ('basic'|'jhs'); returns 'AB' for absent.
 function computeGrade(obtained, max, isAbsent, band) {
   if (isAbsent === true || String(isAbsent) === '1' || isAbsent === 1) return 'AB';
+  if (band === null) return ''; // stage excluded from grading entirely (see gradeBandForStage)
   var o = parseFloat(obtained), m = parseFloat(max);
   if (isNaN(o) || isNaN(m) || m <= 0) return '';
   var pct = (o / m) * 100;
@@ -6106,7 +6147,8 @@ function getExamResultReport(p, currentUser, currentRole) {
     if (String(currentRole).toLowerCase() === 'teacher' && getTeacherClassIds(currentUser).indexOf(classId) === -1) {
       return { success: false, message: 'Forbidden — that exam is not in your assigned classes' };
     }
-    var gradeBand = (getClassesMap()[classId] || {}).gradeBand || 'basic';
+    var classMapEntry = getClassesMap()[classId];
+    var gradeBand = classMapEntry ? classMapEntry.gradeBand : 'basic'; // preserves an explicit null (ungraded stage) — only defaults when the class itself isn't found
 
     // students in class (getStudentsLite already excludes deleted)
     var slite = getStudentsLite(), studentsArr = [];
@@ -7720,7 +7762,8 @@ function bulkSaveMarks(examId, subjectId, entries, currentUser, currentRole) {
     }
 
     var maxMarks = parseFloat(smap[sub].maxMarks) || parseInt(examRow[7], 10) || 100;
-    var gradeBand = (getClassesMap()[examClassId] || {}).gradeBand || 'basic';
+    var examClassMapEntry = getClassesMap()[examClassId];
+    var gradeBand = examClassMapEntry ? examClassMapEntry.gradeBand : 'basic'; // preserves an explicit null (ungraded stage)
     var inserted = 0, updated = 0;
     var ts = nowIso();
 
@@ -12300,7 +12343,8 @@ function getSchoolSettings() {
             AdminSignatureURL: data[i][36] || '',
             PublicAppBaseURL: data[i][37] || _webAppBaseUrl(),
             ActiveTerm: data[i][38] || 'term1',
-            DietaryOptions: parseDietaryOptionsCsv(data[i][39])
+            DietaryOptions: parseDietaryOptionsCsv(data[i][39]),
+            UngradedStages: String(data[i][44] || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean)
           }
         };
       }
@@ -12340,7 +12384,8 @@ function defaultSchoolSettings() {
     AdminSignatureURL: '',
     PublicAppBaseURL: _webAppBaseUrl(),
     ActiveTerm: 'term1',
-    DietaryOptions: defaultDietaryOptions()
+    DietaryOptions: defaultDietaryOptions(),
+    UngradedStages: []
   };
 }
 
@@ -18701,7 +18746,8 @@ function getExamDistribution(examId, currentUser, currentRole) {
     var examRow = getExamRow(eid);
     if (!examRow) return { success: false, message: 'Exam not found' };
     var passingPct = parseFloat(examRow[26]) || 50;
-    var gradeBand = (getClassesMap()[parseInt(examRow[3], 10)] || {}).gradeBand || 'basic';
+    var examRowClassMapEntry = getClassesMap()[parseInt(examRow[3], 10)];
+    var gradeBand = examRowClassMapEntry ? examRowClassMapEntry.gradeBand : 'basic'; // preserves an explicit null (ungraded stage)
 
     var subjMap = getSubjectsMap();
     var subjectStats = {};
@@ -18799,7 +18845,8 @@ function getExamClassMarksheet(examId, currentUser, currentRole) {
     var classId = parseInt(examRow[3], 10);
     var passingPct = parseFloat(examRow[26]) || 50;
     var cmap = getClassesMap();
-    var gradeBand = (cmap[classId] || {}).gradeBand || 'basic';
+    var thisClassMapEntry = cmap[classId];
+    var gradeBand = thisClassMapEntry ? thisClassMapEntry.gradeBand : 'basic'; // preserves an explicit null (ungraded stage)
 
     var _role = String(currentRole).toLowerCase();
     var _scope = getViewerScope(currentUser, currentRole);
@@ -19080,7 +19127,8 @@ function getStudentResults(studentId, currentUser, currentRole) {
           ExamCode: edata[e][16] || '',
           PassingPct: parseFloat(edata[e][26]) || 0
         };
-        emap[exId] = { name: exObj.Name, type: exObj.Type, year: exObj.AcademicYear, isPublished: exObj.IsPublished, gradeBand: (cmap[exClassId] || {}).gradeBand || 'basic' };
+        var exClassMapEntry = cmap[exClassId];
+        emap[exId] = { name: exObj.Name, type: exObj.Type, year: exObj.AcademicYear, isPublished: exObj.IsPublished, gradeBand: exClassMapEntry ? exClassMapEntry.gradeBand : 'basic' }; // preserves an explicit null (ungraded stage)
         examsOut[exId] = exObj;
       }
     }
@@ -19200,7 +19248,8 @@ function getStudentReportCard(studentId, examId, currentUser, currentRole) {
     var classLabel = classRow[1] + ' ' + classRow[2];
     var curriculumStage = String(classRow[11] || 'lower_primary').toLowerCase();
     var isJhs = curriculumStage === 'jhs';
-    var gradeBand = gradeBandForStage(curriculumStage);
+    var ungradedStagesRes = getSchoolSettings();
+    var gradeBand = gradeBandForStage(curriculumStage, (ungradedStagesRes.data && ungradedStagesRes.data.UngradedStages) || []);
     var examType = String(examRow[2] || '').toLowerCase();
     var isSplitScore = examType === 'end_of_term'; // SBA + Exam columns vs a single Score column
     var sbaMax = parseFloat(examRow[29]) || 0, examMax = parseFloat(examRow[30]) || 0;

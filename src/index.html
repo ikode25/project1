@@ -25,6 +25,7 @@
   <script src="https://cdn.datatables.net/buttons/2.4.2/js/dataTables.buttons.min.js"></script>
   <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.html5.min.js"></script>
   <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.print.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.2/js/buttons.colVis.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
@@ -6021,6 +6022,7 @@
               responsive: true,
               dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 {
                   extend: 'csv',
                   text: '<i class="fas fa-file-csv"></i> CSV',
@@ -6508,6 +6510,7 @@
             lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'All']],
             responsive: true, dom: 'Blfrtip',
             buttons: [
+              { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
               { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', title: 'assignments_' + (teacher.Username || teacher.ID) },
               dtPdfButton('Teaching Assignments - ' + (teacher.Username || teacher.ID)),
               { extend: 'print', text: '<i class="fas fa-print"></i> Print' }
@@ -6630,6 +6633,7 @@
             lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'All']],
             responsive: true, dom: 'Blfrtip', order: [[0, 'desc']],
             buttons: [
+              { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
               { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', title: 'logbook_' + (teacher.Username || teacher.ID) },
               dtPdfButton('Teaching Logbook - ' + (teacher.Username || teacher.ID)),
               { extend: 'print', text: '<i class="fas fa-print"></i> Print' }
@@ -7187,6 +7191,7 @@
               responsive: true,
               dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', exportOptions: { columns: ':not(:last-child)' } },
                 dtPdfButton('Admissions'),
                 { extend: 'print', text: '<i class="fas fa-print"></i> Print', exportOptions: { columns: ':not(:last-child)' } }
@@ -8441,6 +8446,7 @@
               responsive: true,
               dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', exportOptions: { columns: ':visible' } },
                 { ...dtPdfButton(report.title), exportOptions: { columns: ':visible', stripHtml: true } },
                 { extend: 'print', text: '<i class="fas fa-print"></i> Print', exportOptions: { columns: ':visible' } }
@@ -8735,6 +8741,7 @@
               responsive: true,
               dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', exportOptions: { columns: ':not(:last-child)' } },
                 dtPdfButton('Classes & Sections'),
                 { extend: 'print', text: '<i class="fas fa-print"></i> Print', exportOptions: { columns: ':not(:last-child)' } }
@@ -9406,8 +9413,20 @@
                 </div>
 
                 <div className="form-group">
-                  <label><i className="fas fa-stream"></i> Streams per level <span style={{fontWeight:400,color:'#888',fontSize:'11px'}}>(1 = single-stream, 2+ = multi-stream A, B, C…)</span></label>
-                  <input type="number" min="1" max="10" value={defaultStreams} onChange={(e) => applyDefaultToAll(parseInt(e.target.value, 10) || 1)} style={{maxWidth:'120px'}} />
+                  <label><i className="fas fa-stream"></i> Stream Type for all levels below</label>
+                  <div style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap'}}>
+                    <button type="button" className={`btn btn-sm ${defaultStreams === 1 ? 'btn-primary' : 'btn-secondary'}`} onClick={() => applyDefaultToAll(1)}>
+                      <i className="fas fa-minus"></i> Single-stream <small style={{fontWeight:400,opacity:0.85}}>(e.g. Basic 1)</small>
+                    </button>
+                    <button type="button" className={`btn btn-sm ${defaultStreams > 1 ? 'btn-primary' : 'btn-secondary'}`} onClick={() => applyDefaultToAll(Math.max(2, defaultStreams))}>
+                      <i className="fas fa-layer-group"></i> Multi-stream <small style={{fontWeight:400,opacity:0.85}}>(e.g. Basic 1 A, B, C…)</small>
+                    </button>
+                    {defaultStreams > 1 && (
+                      <label style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'12px',color:'#666'}}>
+                        How many streams? <input type="number" min="2" max="10" value={defaultStreams} onChange={(e) => applyDefaultToAll(Math.max(2, parseInt(e.target.value, 10) || 2))} style={{width:'56px',padding:'4px 6px'}} />
+                      </label>
+                    )}
+                  </div>
                   <div style={{fontSize:'11px',color:'#888',marginTop:'4px'}}>Sets the default for every level below — you can still fine-tune each one individually.</div>
                 </div>
 
@@ -9421,11 +9440,12 @@
                         <div key={l.name} style={{display:'flex',alignItems:'center',gap:'10px',padding:'8px 12px',borderBottom:'1px solid #f0f0f0'}}>
                           <input type="checkbox" checked={l.checked} onChange={() => toggleLevel(idx)} />
                           <span style={{flex:1,fontWeight:600}}>{l.name}</span>
-                          <span style={{fontSize:'11px',color:'#888'}}>Streams</span>
+                          <span style={{fontSize:'11px',color:'#888'}}>{l.streams > 1 ? `Multi — ${l.streams} streams` : 'Single-stream'}</span>
                           <input
                             type="number" min="1" max="10" value={l.streams} disabled={!l.checked}
                             onChange={(e) => setStreams(idx, e.target.value)}
                             style={{width:'56px',padding:'4px 6px'}}
+                            title="1 = single-stream, 2+ = multi-stream"
                           />
                         </div>
                       ))}
@@ -9558,7 +9578,17 @@
       );
     }
 
+    const STREAM_LETTERS = ['A','B','C','D','E','F','G','H','I','J'];
+
     function ClassModal({ cls, currentUser, role, onClose, onSave }) {
+      // single-stream schools (Basic 1, Basic 2…) never need a section letter; multi-stream
+      // schools (Basic 1 A/B/C…) do. Asking up front — rather than a free-text "Section" field
+      // admin has to guess how to fill in — keeps single-stream schools from ever having to think
+      // about it, and gives multi-stream schools a proper A/B/C/… picker instead.
+      const [streamType, setStreamType] = useState(() => {
+        if (!cls) return 'single';
+        return cls.IsSingleStream === false ? 'multi' : 'single';
+      });
       const [formData, setFormData] = useState({
         ClassName: cls?.ClassName || '',
         Section: cls?.Section || 'A',
@@ -9629,7 +9659,10 @@
           return;
         }
         setSaving(true);
-        onSave(formData);
+        // single-stream: section letter is irrelevant to the school, but the backend still needs
+        // a non-empty value to store — 'A' is invisible either way since the display logic only
+        // shows the section when 2+ classes share this name+year (see isSingleStream elsewhere)
+        onSave(streamType === 'single' ? { ...formData, Section: 'A' } : formData);
       };
 
       // ~6 academic year suggestions
@@ -9672,6 +9705,21 @@
                 <h4 style={{margin:'0 0 12px',color:'var(--navy-primary)',fontSize:'15px',borderBottom:'2px solid var(--navy-primary)',paddingBottom:'6px'}}>
                   <i className="fas fa-info-circle"></i> Basics
                 </h4>
+                <div className="form-group" style={{marginBottom:'16px'}}>
+                  <label><i className="fas fa-stream"></i> Stream Type *</label>
+                  <div style={{display:'flex',gap:'8px'}}>
+                    <button type="button" className={`btn btn-sm ${streamType === 'single' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setStreamType('single')}>
+                      <i className="fas fa-minus"></i> Single-stream <small style={{fontWeight:400,opacity:0.85}}>(e.g. Basic 1)</small>
+                    </button>
+                    <button type="button" className={`btn btn-sm ${streamType === 'multi' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setStreamType('multi')}>
+                      <i className="fas fa-layer-group"></i> Multi-stream <small style={{fontWeight:400,opacity:0.85}}>(e.g. Basic 1 A, B, C…)</small>
+                    </button>
+                  </div>
+                  {streamType === 'multi' && (
+                    <div style={{fontSize:'11px',color:'#888',marginTop:'4px'}}>Creating multiple streams for the same class? Add each one separately, or use "Auto-Generate" from the Classes page for the whole school at once.</div>
+                  )}
+                </div>
+
                 <div className="form-grid">
                   <div className="form-group">
                     <label><i className="fas fa-graduation-cap"></i> Class Name *</label>
@@ -9684,17 +9732,16 @@
                       placeholder="e.g. Creche, KG 1, Basic 4, JHS 2"
                     />
                   </div>
-                  <div className="form-group">
-                    <label><i className="fas fa-layer-group"></i> Section (Stream) *</label>
-                    <input
-                      type="text"
+                  {streamType === 'multi' && (
+                    <SearchableDropdown
+                      label="Section (Stream) *" icon="fas fa-layer-group"
+                      options={STREAM_LETTERS.map(l => ({ value: l, label: 'Stream ' + l }))}
                       value={formData.Section}
-                      onChange={(e) => set('Section', e.target.value.toUpperCase())}
-                      required
-                      maxLength="10"
-                      placeholder="A (single-stream) or A/B/C (multi-stream)"
+                      onChange={(v) => set('Section', v)}
+                      placeholder="Select stream..."
+                      required={true}
                     />
-                  </div>
+                  )}
                   <SearchableDropdown
                     label="Academic Year"
                     icon="fas fa-calendar-alt"
@@ -10036,6 +10083,7 @@
               responsive: true,
               dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', exportOptions: { columns: isAdmin ? ':not(:last-child)' : ':visible' } },
                 dtPdfButton('Subjects'),
                 { extend: 'print', text: '<i class="fas fa-print"></i> Print', exportOptions: { columns: isAdmin ? ':not(:last-child)' : ':visible' } }
@@ -10684,6 +10732,7 @@
               responsive: true,
               dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', exportOptions: { columns: ':not(:last-child)' } },
                 dtPdfButton('Teachers'),
                 { extend: 'print', text: '<i class="fas fa-print"></i> Print', exportOptions: { columns: ':not(:last-child)' } }
@@ -11343,6 +11392,7 @@
               responsive: true,
               dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', exportOptions: { columns: ':not(:last-child)' } },
                 dtPdfButton('Students'),
                 { extend: 'print', text: '<i class="fas fa-print"></i> Print', exportOptions: { columns: ':not(:last-child)' } }
@@ -12639,6 +12689,7 @@
             dom: 'Blfrtip',
             order: [[0, 'desc']],
             buttons: [
+              { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
               { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', exportOptions: { columns: ':not(:last-child)' }, title: 'fees_' + (student.AdmissionNumber || student.ID) },
               dtPdfButton('Fees - ' + (student.AdmissionNumber || student.ID)),
               { extend: 'print', text: '<i class="fas fa-print"></i> Print', exportOptions: { columns: ':not(:last-child)' } }
@@ -12955,6 +13006,7 @@
             dom: 'Blfrtip',
             order: [[0, 'desc']],
             buttons: [
+              { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
               { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', title: 'attendance_' + (student.AdmissionNumber || student.ID) },
               dtPdfButton('Attendance - ' + (student.AdmissionNumber || student.ID)),
               { extend: 'print', text: '<i class="fas fa-print"></i> Print' }
@@ -13935,6 +13987,7 @@
               responsive: true,
               dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', exportOptions: { columns: ':not(:last-child)' } },
                 dtPdfButton('Parents'),
                 { extend: 'print', text: '<i class="fas fa-print"></i> Print', exportOptions: { columns: ':not(:last-child)' } }
@@ -15186,6 +15239,7 @@
               responsive: true,
               dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', exportOptions: { columns: ':not(:last-child)' } },
                 dtPdfButton('Exams'),
                 { extend: 'print', text: '<i class="fas fa-print"></i> Print', exportOptions: { columns: ':not(:last-child)' } }
@@ -15243,6 +15297,38 @@
       }, [filters]);
 
       const handleSave = (data) => {
+        // multi-class create — ExamModal hands back an array (one payload per selected class);
+        // add them one at a time and report a combined result
+        if (Array.isArray(data)) {
+          let done = 0, okCount = 0, firstError = '';
+          data.forEach((payload) => {
+            google.script.run
+              .withSuccessHandler((res) => {
+                done++;
+                if (res.success) okCount++; else if (!firstError) firstError = res.message;
+                if (done === data.length) {
+                  setShowModal(false); setEditing(null);
+                  if (okCount === data.length) {
+                    Swal.fire({ icon: 'success', title: 'Success!', text: `Created ${okCount} exam(s), one per class.`, timer: 2500, showConfirmButton: false });
+                  } else {
+                    Swal.fire({ icon: okCount > 0 ? 'warning' : 'error', title: `${okCount} of ${data.length} created`, text: firstError || 'Some exams could not be created.' });
+                  }
+                  setTimeout(() => load(), 100);
+                }
+              })
+              .withFailureHandler((err) => {
+                done++;
+                if (!firstError) firstError = err.message;
+                if (done === data.length) {
+                  setShowModal(false); setEditing(null);
+                  Swal.fire({ icon: okCount > 0 ? 'warning' : 'error', title: `${okCount} of ${data.length} created`, text: firstError });
+                  setTimeout(() => load(), 100);
+                }
+              })
+              .addExam(payload, currentUser, role);
+          });
+          return;
+        }
         const action = editing ? 'updateExam' : 'addExam';
         const params = editing ? [editing.ID, data, currentUser, role] : [data, currentUser, role];
         google.script.run
@@ -15497,6 +15583,7 @@
             data: items, destroy: true, pageLength: 25, lengthChange: false, paging: false, info: false, searching: false,
             responsive: true, dom: 'Bfrtip',
             buttons: [
+              { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
               { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', title: 'toppers_' + exam.ID },
               dtPdfButton('Exam Toppers - ' + exam.ID),
               { extend: 'print', text: '<i class="fas fa-print"></i> Print' }
@@ -15884,6 +15971,10 @@
         ExamName: exam?.ExamName || '',
         ExamType: exam?.ExamType || 'end_of_term',
         ClassID: exam?.ClassID ? String(exam.ClassID) : '',
+        // multi-class create only — class_test/mid_term/mock let admin pick several classes (or
+        // "All Classes") at once, which creates one exam per class. Editing an existing exam, or
+        // creating an end_of_term exam, always stays single-class (ClassID above).
+        ClassIDs: [],
         AcademicYear: exam?.AcademicYear || (() => {
           const y = new Date().getFullYear();
           return `${y}-${y + 1}`;
@@ -15919,6 +16010,11 @@
         const stage = cls ? cls.CurriculumStage : formData.CurriculumStage;
         setFormData({ ...formData, ClassID: v, CurriculumStage: stage, GradingScheme: stage === 'jhs' ? 'bece_9grade' : 'sba_5band' });
       };
+      // multi-class picker only applies to a brand-new class_test/mid_term/mock exam — editing
+      // always targets one already-existing exam record, and end_of_term stays single-class
+      const multiClassMode = !exam && ['class_test', 'mid_term', 'mock'].includes(formData.ExamType);
+      const classOptions = classes.map(c => ({ value: String(c.ID), label: c.Label }));
+      const selectAllClasses = () => set('ClassIDs', classOptions.map(o => o.value));
 
       useEffect(() => {
         google.script.run
@@ -15928,8 +16024,8 @@
 
       const handleSubmit = (e) => {
         e.preventDefault();
-        if (!formData.ClassID) {
-          Swal.fire({ icon: 'error', title: 'Class required' });
+        if (multiClassMode ? formData.ClassIDs.length === 0 : !formData.ClassID) {
+          Swal.fire({ icon: 'error', title: 'Class required', text: multiClassMode ? 'Pick at least one class, or use "All Classes".' : undefined });
           return;
         }
         if (new Date(formData.StartDate) > new Date(formData.EndDate)) {
@@ -15975,7 +16071,22 @@
           toSave = { ...formData, MaxMarksPerSubject: sba + ex };
         }
         setSaving(true);
-        onSave(toSave);
+        if (multiClassMode && formData.ClassIDs.length > 1) {
+          // one exam per selected class — each keeps its own class's actual grading band rather
+          // than the single CurriculumStage/GradingScheme the form derived from whichever class
+          // was picked last, since a multi-class pick can span both primary and JHS classes
+          const payloads = formData.ClassIDs.map((cid) => {
+            const cls = classes.find(c => String(c.ID) === String(cid));
+            const stage = cls ? cls.CurriculumStage : formData.CurriculumStage;
+            return { ...toSave, ClassID: cid, CurriculumStage: stage, GradingScheme: stage === 'jhs' ? 'bece_9grade' : 'sba_5band' };
+          });
+          onSave(payloads);
+        } else {
+          // single class — either the normal single-select flow, or a multi-select with exactly
+          // one class picked (behaves identically to picking it via the single dropdown)
+          const singleId = multiClassMode ? formData.ClassIDs[0] : formData.ClassID;
+          onSave({ ...toSave, ClassID: singleId });
+        }
       };
 
       const yearOptions = (() => {
@@ -16018,17 +16129,31 @@
                     onChange={(v) => set('ExamType', v)}
                     placeholder="Select type..."
                   />
-                  <SearchableDropdown
-                    label="Class" icon="fas fa-school"
-                    options={classes.map(c => ({
-                      value: String(c.ID),
-                      label: c.Label
-                    }))}
-                    value={formData.ClassID}
-                    onChange={setClassId}
-                    placeholder="Select class..."
-                    required={true}
-                  />
+                  {multiClassMode ? (
+                    <div className="form-group" style={{gridColumn:'span 2'}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'4px'}}>
+                        <label style={{margin:0}}><i className="fas fa-school"></i> Classes * <small style={{color:'#888',fontWeight:400}}>(pick several, or all)</small></label>
+                        <button type="button" className="btn btn-sm btn-secondary" onClick={selectAllClasses}>
+                          <i className="fas fa-check-double"></i> All Classes
+                        </button>
+                      </div>
+                      <SearchableMultiSelect
+                        options={classOptions}
+                        values={formData.ClassIDs}
+                        onChange={(v) => set('ClassIDs', v)}
+                        placeholder="Select one or more classes..."
+                      />
+                    </div>
+                  ) : (
+                    <SearchableDropdown
+                      label="Class" icon="fas fa-school"
+                      options={classOptions}
+                      value={formData.ClassID}
+                      onChange={setClassId}
+                      placeholder="Select class..."
+                      required={true}
+                    />
+                  )}
                   <SearchableDropdown
                     label="Term" icon="fas fa-calendar-week"
                     options={[
@@ -17551,6 +17676,7 @@
               responsive: true,
               dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', exportOptions: { columns: isAdmin ? ':not(:last-child)' : ':visible' } },
                 dtPdfButton('Fee Structure'),
                 { extend: 'print', text: '<i class="fas fa-print"></i> Print', exportOptions: { columns: isAdmin ? ':not(:last-child)' : ':visible' } }
@@ -18262,6 +18388,7 @@
               responsive: true,
               dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', exportOptions: { columns: ':not(:last-child)' } },
                 dtPdfButton('Daily Accounts'),
                 { extend: 'print', text: '<i class="fas fa-print"></i> Print', exportOptions: { columns: ':not(:last-child)' } }
@@ -18688,6 +18815,7 @@
               responsive: true,
               dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', exportOptions: { columns: ':not(:last-child)' } },
                 dtPdfButton('Fees Collection'),
                 { extend: 'print', text: '<i class="fas fa-print"></i> Print', exportOptions: { columns: ':not(:last-child)' } }
@@ -19891,6 +20019,7 @@
               lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
               responsive: true, dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', exportOptions: { columns: ':not(:last-child)' } },
                 dtPdfButton('Discipline'),
                 { extend: 'print', text: '<i class="fas fa-print"></i> Print', exportOptions: { columns: ':not(:last-child)' } }
@@ -20135,6 +20264,7 @@
             lengthMenu: [[10, 25, 50, -1], [10, 25, 50, 'All']],
             responsive: true, dom: 'Blfrtip', order: [[0, 'desc']],
             buttons: [
+              { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
               { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', title: 'discipline_' + (student.AdmissionNumber || student.ID) },
               dtPdfButton('Discipline History - ' + (student.AdmissionNumber || student.ID)),
               { extend: 'print', text: '<i class="fas fa-print"></i> Print' }
@@ -20521,6 +20651,7 @@
               lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
               responsive: true, dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', exportOptions: { columns: ':not(:last-child)' } },
                 dtPdfButton('Conduct'),
                 { extend: 'print', text: '<i class="fas fa-print"></i> Print', exportOptions: { columns: ':not(:last-child)' } }
@@ -20963,7 +21094,7 @@
             data, destroy: true, columns: cols, pageLength: 10,
             lengthMenu: [[10,25,50,-1],[10,25,50,'All']],
             responsive: true, dom: 'Blfrtip',
-            buttons: [{ extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', exportOptions: { columns: ':not(:last-child)' } }],
+            buttons: [{ extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' }, { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', exportOptions: { columns: ':not(:last-child)' } }],
             order: [[0, 'desc']]
           });
           $('#activitiesTable').off('click', '.action-icon').on('click', '.action-icon', function() {
@@ -21231,6 +21362,7 @@
               responsive: true,
               dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', exportOptions: { columns: exportCols } },
                 dtPdfButton('Complaints'),
                 { extend: 'print', text: '<i class="fas fa-print"></i> Print', exportOptions: { columns: exportCols } }
@@ -21549,6 +21681,7 @@
               lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
               responsive: true, dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', exportOptions: { columns: exportCols } },
                 dtPdfButton('School Calendar'),
                 { extend: 'print', text: '<i class="fas fa-print"></i> Print', exportOptions: { columns: exportCols } }
@@ -22474,6 +22607,7 @@
               responsive: true,
               dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', exportOptions: { columns: exportCols } },
                 dtPdfButton('School Notices'),
                 { extend: 'print', text: '<i class="fas fa-print"></i> Print', exportOptions: { columns: exportCols } }
@@ -23172,6 +23306,19 @@
       const addRow = () => setEditRows(prev => [...prev, blankRow()]);
       const removeRow = (i) => setEditRows(prev => prev.filter((_, idx) => idx !== i));
 
+      // Max % is never independently editable — it's always "the next-highest row's Min % minus
+      // one" (or 100 for the top row), which is exactly how grading already resolves ranges. Shown
+      // read-only here purely so admin can see the resulting range while setting each Min %.
+      const maxByIndex = (() => {
+        const withMin = editRows
+          .map((r, i) => ({ i, min: parseFloat(r.MinPercent) }))
+          .filter(r => !isNaN(r.min))
+          .sort((a, b) => b.min - a.min);
+        const out = {};
+        withMin.forEach((r, idx) => { out[r.i] = idx === 0 ? 100 : withMin[idx - 1].min - 1; });
+        return out;
+      })();
+
       const handleSubmit = (e) => {
         e.preventDefault();
         onSave(band, editRows);
@@ -23194,6 +23341,10 @@
                     <div className="form-group" style={{flex:'0 0 90px',margin:0}}>
                       <label>Min %</label>
                       <input type="number" min="0" max="100" value={r.MinPercent} onChange={(e) => setRow(i, 'MinPercent', e.target.value)} required />
+                    </div>
+                    <div className="form-group" style={{flex:'0 0 70px',margin:0}}>
+                      <label>Max %</label>
+                      <input type="text" value={maxByIndex[i] != null ? maxByIndex[i] : '—'} disabled title="Derived automatically from the next row's Min %" style={{background:'#f0f0f0',color:'#888',textAlign:'center'}} />
                     </div>
                     <div className="form-group" style={{flex:'0 0 90px',margin:0}}>
                       <label>Grade</label>
@@ -23227,6 +23378,28 @@
         useSWR('getGradingBands', () => swrFetcher('getGradingBands', currentUser, role));
       const [editingBand, setEditingBand] = useState(null); // 'basic' | 'jhs' | null
       const [saving, setSaving] = useState(false);
+      const [ungradedStages, setUngradedStages] = useState(null); // ['creche','nursery'] subset, or []
+      const [savingScope, setSavingScope] = useState(false);
+
+      useEffect(() => {
+        google.script.run
+          .withSuccessHandler((res) => { if (res && res.data) setUngradedStages(res.data.UngradedStages || []); })
+          .withFailureHandler(() => setUngradedStages([]))
+          .getSchoolSettings();
+      }, []);
+
+      const toggleUngradedStage = (stage) => {
+        const next = ungradedStages.includes(stage) ? ungradedStages.filter(s => s !== stage) : [...ungradedStages, stage];
+        setSavingScope(true);
+        google.script.run
+          .withSuccessHandler((res) => {
+            setSavingScope(false);
+            if (res.success) setUngradedStages(res.data);
+            else Swal.fire({ icon: 'error', text: res.message });
+          })
+          .withFailureHandler((err) => { setSavingScope(false); Swal.fire({ icon: 'error', text: err.message }); })
+          .updateUngradedStages(next, currentUser, role);
+      };
 
       const handleSave = (band, rows) => {
         setSaving(true);
@@ -23253,6 +23426,28 @@
           <div className="settings-info-message" style={{marginBottom:'16px'}}>
             <i className="fas fa-info-circle"></i> By default, marks are graded automatically using Ghana's NaCCA 5-band scale (Basic) and WAEC 9-grade scale (JHS). Set a custom scale below to override either one school-wide.
           </div>
+
+          <div style={{border:'1px solid #e2e2e2',borderRadius:'6px',padding:'12px 16px',marginBottom:'18px',background:'#fafbfc'}}>
+            <div style={{fontWeight:700,color:'var(--navy-primary)',fontSize:'13px',marginBottom:'6px'}}>
+              <i className="fas fa-child"></i> Basic Grading Scope
+            </div>
+            <div style={{fontSize:'12px',color:'#666',marginBottom:'10px'}}>
+              The Basic scale applies to every class from KG1 to Basic 6 by default. Some schools don't give Creche and Nursery a formal grade — turn either on below if this school wants them graded under the Basic scale too (report cards show "—" for anything left off).
+            </div>
+            {ungradedStages === null ? (
+              <div style={{color:'#888',fontSize:'12px'}}><i className="fas fa-spinner fa-spin"></i> Loading…</div>
+            ) : (
+              <div style={{display:'flex',gap:'16px',flexWrap:'wrap'}}>
+                {['creche', 'nursery'].map(stage => (
+                  <label key={stage} style={{display:'flex',alignItems:'center',gap:'6px',fontSize:'13px',cursor:'pointer'}}>
+                    <input type="checkbox" disabled={savingScope} checked={!ungradedStages.includes(stage)} onChange={() => toggleUngradedStage(stage)} />
+                    Grade {stage.charAt(0).toUpperCase() + stage.slice(1)}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
           {loadError && (
             <div className="settings-info-message" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>
               <i className="fas fa-triangle-exclamation" style={{marginRight:'6px',color:'#ea4335'}}></i>
@@ -24491,6 +24686,7 @@
               responsive: true,
               dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', exportOptions: { columns: exportCols } },
                 dtPdfButton('Helpdesk'),
                 { extend: 'print', text: '<i class="fas fa-print"></i> Print', exportOptions: { columns: exportCols } }
@@ -24822,6 +25018,7 @@
               responsive: true,
               dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', exportOptions: { columns: exportCols } },
                 dtPdfButton('Lesson Planning'),
                 { extend: 'print', text: '<i class="fas fa-print"></i> Print', exportOptions: { columns: exportCols } }
@@ -25159,6 +25356,7 @@
               lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, 'All']],
               responsive: true, dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend: 'csv', text: '<i class="fas fa-file-csv"></i> CSV', exportOptions: { columns: ':not(:last-child)' } },
                 dtPdfButton('Teaching Logbook'),
                 { extend: 'print', text: '<i class="fas fa-print"></i> Print', exportOptions: { columns: ':not(:last-child)' } }
@@ -28308,6 +28506,7 @@
               lengthMenu: [[10,25,50,-1],[10,25,50,'All']],
               responsive: true, dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend:'csv',  text:'<i class="fas fa-file-csv"></i> CSV',   exportOptions:{ columns: exportCols } },
                 dtPdfButton('PTM Slots'),
                 { extend:'print',text:'<i class="fas fa-print"></i> Print',    exportOptions:{ columns: exportCols } }
@@ -28389,6 +28588,7 @@
               lengthMenu: [[10,25,50,-1],[10,25,50,'All']],
               responsive: true, dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend:'csv',  text:'<i class="fas fa-file-csv"></i> CSV',  exportOptions:{ columns: exportCols } },
                 dtPdfButton('PTM Bookings'),
                 { extend:'print',text:'<i class="fas fa-print"></i> Print',   exportOptions:{ columns: exportCols } }
@@ -28822,6 +29022,7 @@
               lengthMenu: [[10,25,50,-1],[10,25,50,'All']],
               responsive: true, dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend:'csv', text:'<i class="fas fa-file-csv"></i> CSV', exportOptions:{ columns: exportCols } },
                 dtPdfButton('Substitute Allocations'),
                 { extend:'print', text:'<i class="fas fa-print"></i> Print', exportOptions:{ columns: exportCols } }
@@ -28879,6 +29080,7 @@
               lengthMenu: [[10,25,50,-1],[10,25,50,'All']],
               responsive: true, dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend:'csv', text:'<i class="fas fa-file-csv"></i> CSV' },
                 dtPdfButton('My Substitute Duties'),
                 { extend:'print', text:'<i class="fas fa-print"></i> Print' }
@@ -29227,6 +29429,7 @@
               lengthMenu: [[10,25,50,-1],[10,25,50,'All']],
               responsive: true, dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend:'csv', text:'<i class="fas fa-file-csv"></i> CSV', exportOptions:{ columns: exportCols } },
                 dtPdfButton('Asset Inventory'),
                 { extend:'print', text:'<i class="fas fa-print"></i> Print', exportOptions:{ columns: exportCols } }
@@ -29721,6 +29924,7 @@
               lengthMenu: [[10,25,50,-1],[10,25,50,'All']],
               responsive: true, dom: 'Blfrtip',
               buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
                 { extend:'csv', text:'<i class="fas fa-file-csv"></i> CSV', exportOptions:{ columns: exportCols } },
                 dtPdfButton('Stock / Inventory'),
                 { extend:'print', text:'<i class="fas fa-print"></i> Print', exportOptions:{ columns: exportCols } }
