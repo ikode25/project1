@@ -8712,7 +8712,13 @@ function _buildFeeStructuresLite() {
   return map;
 }
 
-function getAllPayments(currentUser, currentRole) {
+// yearFilter: '' (default) = current academic year only (small, fast payload — this is what fixes
+// "Fee Payments not loading": a school with years of accumulated payment history was shipping its
+// ENTIRE history over google.script.run on every single page load, which is slow/flaky-to-null on
+// Apps Script's bridge for a large payload even with the roster-map caching already in place.
+// 'all' = every year, unfiltered (explicit opt-in via the "All Years" toggle). Any other value =
+// that specific AcademicYear only.
+function getAllPayments(currentUser, currentRole, yearFilter) {
   try {
     if (!canReadPayments(currentRole)) return { success: false, message: 'Forbidden — no access' };
     var sh = getSheet(FEE_PAYMENTS_SHEET);
@@ -8722,14 +8728,44 @@ function getAllPayments(currentUser, currentRole) {
     var fmap = getFeeStructuresLite();
     var umap = getUsersMap();
     var scope = getViewerScope(currentUser, currentRole);
+
+    var yf = String(yearFilter || '').trim();
+    if (!yf) {
+      var settingsRes = getSchoolSettings();
+      yf = (settingsRes.data && settingsRes.data.AcademicYear) || '';
+    }
+    var wantAll = yf.toLowerCase() === 'all' || !yf;
+
     var out = [];
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][15]) === '1') continue;
       // student/parent: only their own (own child's) payments
       if (!scope.all && scope.studentIds.indexOf(parseInt(data[i][1], 10)) === -1) continue;
+      if (!wantAll && String(data[i][18] || '') !== yf) continue;
       out.push(rowToPayment(data[i], students, fmap, umap));
     }
-    return { success: true, data: out };
+    return { success: true, data: out, yearFilter: wantAll ? 'all' : yf };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// distinct AcademicYear values actually present in Fee_Payments, for the "This Year / All Years /
+// pick a year" filter — cheap: one column read, no per-row object building.
+function getPaymentYears(currentUser, currentRole) {
+  try {
+    if (!canReadPayments(currentRole)) return { success: false, message: 'Forbidden — no access' };
+    var sh = getSheet(FEE_PAYMENTS_SHEET);
+    if (!sh) return { success: true, data: [] };
+    var data = sh.getDataRange().getValues();
+    var seen = {}, years = [];
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][15]) === '1') continue;
+      var y = String(data[i][18] || '').trim();
+      if (y && !seen[y]) { seen[y] = true; years.push(y); }
+    }
+    years.sort().reverse();
+    return { success: true, data: years };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }

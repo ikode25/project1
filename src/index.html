@@ -18644,9 +18644,17 @@
       const isClerk = r === 'clerk';
       const todayStr = new Date().toISOString().split('T')[0];
 
-      // SWR: cached payments render instantly; refetches silently in the background
+      // year scope — '' = server default (current academic year only, small/fast payload); this is
+      // what actually fixes "not loading": a school with years of history was shipping every payment
+      // ever recorded on every page load. "All Years" is an explicit, deliberate opt-in.
+      const [yearFilter, setYearFilter] = useState('');
+      const { data: paymentYears } = useSWR('getPaymentYears', () => swrFetcher('getPaymentYears', currentUser, role));
+
+      // SWR: cached payments render instantly; refetches silently in the background. Default
+      // (yearFilter='') deliberately shares its cache key with other pages' unscoped getAllPayments
+      // calls (e.g. the SMS composer) so switching between them doesn't trigger a duplicate fetch.
       const { data: itemsData, error: loadError, isLoading: loading, isValidating: syncing, mutate: refreshPayments } =
-        useSWR('getAllPayments', () => swrFetcher('getAllPayments', currentUser, role));
+        useSWR(yearFilter ? 'getAllPayments:' + yearFilter : 'getAllPayments', () => swrFetcher('getAllPayments', currentUser, role, yearFilter));
       const items = itemsData || [];
       const [showModal, setShowModal] = useState(false);
       const [editing, setEditing] = useState(null);
@@ -18921,7 +18929,12 @@
         <div className="data-section">
           <div className="section-header">
             <h2><i className="fas fa-money-bill-wave"></i> {isAdmin ? 'Fees Collection' : 'Fees Collection (Read-only)'}{syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}</h2>
-            <div style={{display:'flex',gap:'10px'}}>
+            <div style={{display:'flex',gap:'10px',alignItems:'center',flexWrap:'wrap'}}>
+              <select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)} style={{padding:'8px 10px',border:'1px solid #ccc',fontSize:'13px'}} title="A smaller year scope loads much faster than All Years">
+                <option value="">Current Year</option>
+                <option value="all">All Years</option>
+                {(paymentYears || []).map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
               <ViewToggle mode={viewMode} onChange={setViewMode} />
               {(isAdmin || isClerk) && (
                 <button className="btn btn-success" onClick={() => { setEditing(null); setShowModal('add'); }}>
@@ -18934,7 +18947,7 @@
           {loadError && !loading && items.length === 0 && (
             <div className="settings-info-message" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>
               <i className="fas fa-triangle-exclamation" style={{marginRight:'6px',color:'#ea4335'}}></i>
-              Couldn't load payments — {String((loadError && loadError.message) || loadError)}. Use the <i className="fas fa-arrows-rotate"></i> refresh button to retry.
+              Couldn't load payments — {String((loadError && loadError.message) || loadError)}. {yearFilter === 'all' ? 'All Years can be a large, slow load — try Current Year instead, or use the ' : 'Use the '}<i className="fas fa-arrows-rotate"></i> refresh button to retry.
             </div>
           )}
 
