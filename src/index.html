@@ -3245,6 +3245,21 @@
       data.columns = cols;
     }
 
+    // DataTables' colvis (and other button-collection) dropdowns append an invisible full-page
+    // "closer" to <body> with a z-index above our custom modals, so a click meant to dismiss the
+    // dropdown AND close the modal underneath only ever does the former — the modal is left looking
+    // stuck open until a second click. Closing the dropdown "for" the user should also let that same
+    // click close whatever modal it landed on. Capture phase = runs before DataTables' own bubble-
+    // phase dismiss handler, so this fires on the very click that's about to be swallowed.
+    document.addEventListener('click', function (e) {
+      var t = e.target;
+      if (!t || !t.classList || !(t.classList.contains('dt-button-background') || t.classList.contains('dtb-collection-closer'))) return;
+      var overlay = document.querySelector('.modal-overlay');
+      if (!overlay) return;
+      var closeBtn = overlay.querySelector('.close-btn');
+      if (closeBtn) closeBtn.click();
+    }, true);
+
     // reusable DataTables pdf button — landscape A4, navy header, auto-fit cols
     function dtPdfButton(title) {
       return {
@@ -6977,6 +6992,7 @@
       const [showPrintModal, setShowPrintModal] = useState(false);
       const [printTarget, setPrintTarget] = useState(null);
       const [showDigestModal, setShowDigestModal] = useState(false);
+      const [showBlankForm, setShowBlankForm] = useState(false);
       const [viewMode, setViewMode] = useState('table');
       const tableInstanceRef = useRef(null);
       const isAdminRole = String(role).toLowerCase() === 'admin';
@@ -7281,6 +7297,7 @@
             <div style={{display:'flex',gap:'10px'}}>
               <ViewToggle mode={viewMode} onChange={setViewMode} />
               {canEdit && <button className="btn btn-secondary" onClick={copyAdmissionLink}><i className="fas fa-link"></i> Copy Online Application Link</button>}
+              {canEdit && <button className="btn btn-secondary" onClick={() => setShowBlankForm(true)}><i className="fas fa-file-alt"></i> Print Blank Form</button>}
               {isAdminRole && <button className="btn btn-secondary" onClick={() => setShowDigestModal(true)}><i className="fas fa-file-pdf"></i> Send Today's Report</button>}
               <button className="btn btn-success" onClick={() => { setEditingReg(null); setShowRegModal(true); }}>
                 <i className="fas fa-plus"></i> New Registration
@@ -7438,6 +7455,148 @@
           {showDigestModal && (
             <AdmissionsDigestModal currentUser={currentUser} role={role} onClose={() => setShowDigestModal(false)} />
           )}
+          {showBlankForm && <BlankAdmissionFormModal onClose={() => setShowBlankForm(false)} />}
+        </div>
+      );
+    }
+
+    // ============== Blank Admission Form — for admin to print and hand to a parent to fill by hand ==============
+    function BlankAdmissionFormModal({ onClose }) {
+      const sch = window.SMS_SCHOOL || {};
+      const schoolName = sch.SchoolName || 'School';
+      const schoolLogo = sch.SchoolLogo || DEFAULT_LOGO;
+
+      const handlePrint = () => {
+        document.body.classList.add('print-target');
+        setTimeout(() => {
+          window.print();
+          setTimeout(() => document.body.classList.remove('print-target'), 250);
+        }, 60);
+      };
+
+      const Line = ({ label, flex }) => (
+        <div style={{ flex: flex || 1, minWidth: '140px' }}>
+          <div style={{ borderBottom: '1px solid #333', height: '22px' }}></div>
+          <div style={{ fontSize: '10.5px', color: '#666', marginTop: '2px' }}>{label}</div>
+        </div>
+      );
+      const Row = ({ children }) => <div style={{ display: 'flex', gap: '14px', marginBottom: '14px', flexWrap: 'wrap' }}>{children}</div>;
+      const SectionHdr = ({ icon, label }) => (
+        <div style={{ color: 'var(--navy-primary)', margin: '18px 0 12px', fontSize: '13px', fontWeight: 700, borderBottom: '2px solid var(--navy-primary)', paddingBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          <i className={`fas fa-${icon}`}></i> {label}
+        </div>
+      );
+      const Check = ({ label }) => (
+        <span style={{ fontSize: '12px', marginRight: '18px' }}>
+          <span style={{ display: 'inline-block', width: '14px', height: '14px', border: '1px solid #333', marginRight: '5px', verticalAlign: 'middle' }}></span>{label}
+        </span>
+      );
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '860px' }}>
+            <div className="modal-header no-print">
+              <h3><i className="fas fa-file-alt"></i> Blank Admission Form</h3>
+              <button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button>
+            </div>
+            <div className="modal-body">
+              <div className="no-print settings-info-message" style={{ marginBottom: '14px' }}>
+                <i className="fas fa-info-circle"></i> Print this and hand it to a parent to fill by hand — office staff then enter it into New Registration.
+              </div>
+              <div className="no-print" style={{ marginBottom: '14px' }}>
+                <button className="btn btn-primary" onClick={handlePrint}><i className="fas fa-print"></i> Print / Save as PDF</button>
+              </div>
+
+              <div className="report-card" style={{ maxWidth: '780px', margin: '0 auto', fontFamily: "'Times New Roman', Georgia, serif" }}>
+                <div className="rc-school-hdr" style={{ position: 'relative' }}>
+                  <img src={schoolLogo} alt="" onError={(e) => { e.target.style.display = 'none'; }} />
+                  <div style={{ flex: 1 }}>
+                    <div className="rc-sname">{schoolName}</div>
+                    {sch.SchoolAddress && <div className="rc-sline"><i className="fas fa-map-marker-alt"></i> {sch.SchoolAddress}</div>}
+                    <div className="rc-sline">
+                      {sch.SchoolContact && <><i className="fas fa-phone"></i> {sch.SchoolContact}</>}
+                      {sch.SchoolContact && sch.SchoolEmail && ' · '}
+                      {sch.SchoolEmail && <><i className="fas fa-envelope"></i> {sch.SchoolEmail}</>}
+                    </div>
+                  </div>
+                  <div style={{ width: '80px', height: '96px', border: '1px solid #999', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', color: '#999', textAlign: 'center' }}>
+                    Affix Passport Photo
+                  </div>
+                </div>
+
+                <div className="rc-title">Admission Application Form</div>
+
+                <Row>
+                  <div style={{ flex: '0 0 220px' }}>
+                    <div style={{ borderBottom: '1px solid #333', height: '22px' }}></div>
+                    <div style={{ fontSize: '10.5px', color: '#666', marginTop: '2px' }}>Date</div>
+                  </div>
+                  <div style={{ flex: '0 0 220px' }}>
+                    <div style={{ borderBottom: '1px solid #333', height: '22px' }}></div>
+                    <div style={{ fontSize: '10.5px', color: '#666', marginTop: '2px' }}>Registration No. (office use)</div>
+                  </div>
+                  <div style={{ flex: 1, minWidth: '220px' }}>
+                    <Check label="New" /><Check label="Transfer" /><Check label="Re-Admission" />
+                  </div>
+                </Row>
+
+                <SectionHdr icon="user" label="Pupil's Details" />
+                <Row><Line label="First Name" /><Line label="Middle Name" /><Line label="Last Name" /></Row>
+                <Row>
+                  <Line label="Date of Birth (DD / MM / YYYY)" />
+                  <div style={{ flex: 1, minWidth: '140px' }}>
+                    <div style={{ borderBottom: '1px solid #333', height: '22px' }}></div>
+                    <div style={{ fontSize: '10.5px', color: '#666', marginTop: '2px' }}><Check label="Male" /><Check label="Female" /></div>
+                  </div>
+                  <Line label="Blood Group" />
+                  <Line label="Religion" />
+                </Row>
+                <Row><Line label="Class Applying For" flex={1} /><Line label="Previous School (if any)" flex={2} /></Row>
+                <Row><Line label="Transfer Certificate No. (if transfer)" /><Line label="Last Class Attended" /></Row>
+
+                <SectionHdr icon="map-marker-alt" label="Home Address" />
+                <Row><Line label="Address Line" flex={2} /><Line label="City / Town" /></Row>
+                <Row><Line label="Region" /><Line label="Digital Address (GhanaPost GPS)" /></Row>
+
+                <SectionHdr icon="users" label="Parent / Guardian Details" />
+                <Row><Line label="Father's Name" flex={2} /><Line label="Father's Mobile" /></Row>
+                <Row><Line label="Father's Occupation" flex={2} /><Line label="" flex={0.001} /></Row>
+                <Row><Line label="Mother's Name" flex={2} /><Line label="Mother's Mobile" /></Row>
+                <Row><Line label="Mother's Occupation" flex={2} /><Line label="" flex={0.001} /></Row>
+                <Row><Line label="Guardian's Name (if not parent)" flex={2} /><Line label="Relationship" /><Line label="Guardian's Mobile" /></Row>
+                <Row><Line label="Email Address" flex={2} /><Line label="Alternate Contact Number" /></Row>
+
+                <SectionHdr icon="notes-medical" label="Additional Information" />
+                <Row><Line label="Any Medical Condition / Allergy" flex={3} /></Row>
+                <Row>
+                  <div style={{ flex: 1, minWidth: '220px' }}>
+                    <div style={{ borderBottom: '1px solid #333', height: '22px' }}></div>
+                    <div style={{ fontSize: '10.5px', color: '#666', marginTop: '2px' }}>School Transport Required? <Check label="Yes" /><Check label="No" /></div>
+                  </div>
+                  <Line label="If Yes, Pick-up Location / Route" flex={2} />
+                </Row>
+
+                <div style={{ fontSize: '11px', color: '#555', margin: '18px 0 10px', lineHeight: 1.6, border: '1px solid #ccc', padding: '10px 12px', background: '#fafafa' }}>
+                  I declare that the information given above is true and correct to the best of my knowledge, and I agree to abide by the rules and regulations of {schoolName}.
+                </div>
+
+                <Row>
+                  <Line label="Parent / Guardian Signature" />
+                  <Line label="Date" flex={0.6} />
+                </Row>
+
+                <SectionHdr icon="user-tie" label="For Office Use Only" />
+                <Row>
+                  <Line label="Registration Fee Paid (GH₵)" />
+                  <Line label="Receipt No." />
+                  <Line label="Received By" />
+                </Row>
+                <Row><Line label="Admission Officer's Signature" /><Line label="Date" flex={0.6} /></Row>
+
+                <div className="rc-foot">{schoolName} · Admission Application Form</div>
+              </div>
+            </div>
+          </div>
         </div>
       );
     }
@@ -8052,11 +8211,10 @@
     // ============== Admissions — Enroll to Class Modal ==============
     function EnrollStudentModal({ open, target, classes, onClose, onSaved, currentUser, role }) {
       const appliedFor = target.AppliedForClassLabel || (target.AppliedForGrade ? 'Grade ' + target.AppliedForGrade : '—');
-      const suggestedAdmNo = 'ADM-' + new Date().getFullYear() + '-' + String(target.ID || '').toString().padStart(4, '0');
       const [f, setF] = useState({
         AllottedClassID: target.AllottedClassID ? String(target.AllottedClassID) : (target.AppliedForClassID ? String(target.AppliedForClassID) : ''),
         RollNumber: target.RollNumber || '',
-        AdmissionNumber: target.AdmissionNumber || suggestedAdmNo,
+        AdmissionNumber: target.AdmissionNumber || '',
         LoginPassword: 'school123',
         AdmissionDate: target.AdmissionDate ? String(target.AdmissionDate).split('T')[0] : new Date().toISOString().split('T')[0],
         EntryPoint: target.EntryPoint || 'mid_session',
@@ -8065,6 +8223,23 @@
       });
       const [saving, setSaving] = useState(false);
       const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
+
+      // preview the real admin-prefixed Admission Number the same way the direct Add Student form
+      // does — the placeholder this used to build client-side ignored the configured prefix entirely.
+      useEffect(() => {
+        if (target.AdmissionNumber) return; // already assigned earlier in the pipeline — don't overwrite
+        google.script.run
+          .withSuccessHandler((res) => { if (res.success) set('AdmissionNumber', res.admissionNumber); })
+          .getNextAdmissionNumber(currentUser, role);
+      }, []);
+
+      // Roll Number previews from the allotted class, re-fetched whenever that class changes
+      useEffect(() => {
+        if (target.RollNumber || !f.AllottedClassID) return;
+        google.script.run
+          .withSuccessHandler((res) => { if (res.success) set('RollNumber', res.rollNumber); })
+          .getNextRollNumber(f.AllottedClassID, currentUser, role);
+      }, [f.AllottedClassID]);
 
       const handleSubmit = (e) => {
         e.preventDefault();
@@ -8125,11 +8300,11 @@
                   <SearchableDropdown label="Allotted Class / Section" icon="fas fa-school"
                     options={classOpts} value={f.AllottedClassID} onChange={(v) => set('AllottedClassID', v)} placeholder="Select class..." required={true} />
                   <div className="form-group">
-                    <label><i className="fas fa-list-ol"></i> Roll Number</label>
+                    <label><i className="fas fa-list-ol"></i> Roll Number <span style={{fontWeight:400,color:'#888',fontSize:'11px'}}>(auto-filled from class — edit if needed)</span></label>
                     <input type="text" value={f.RollNumber} onChange={(e) => set('RollNumber', e.target.value)} maxLength="20" />
                   </div>
                   <div className="form-group">
-                    <label><i className="fas fa-hashtag"></i> Admission Number <span style={{fontWeight:400,color:'#888',fontSize:'11px'}}>(blank = auto-generate)</span></label>
+                    <label><i className="fas fa-hashtag"></i> Admission Number <span style={{fontWeight:400,color:'#888',fontSize:'11px'}}>(auto-generated from prefix — edit if needed)</span></label>
                     <input type="text" value={f.AdmissionNumber} onChange={(e) => set('AdmissionNumber', e.target.value)} maxLength="50" />
                   </div>
                   <div className="form-group">
@@ -11770,6 +11945,15 @@
         }
       }, []);
 
+      // Roll Number auto-fills (and re-fills) from the selected class for brand-new students —
+      // rolls are scoped per class, so it has to re-preview whenever the class picker changes.
+      useEffect(() => {
+        if (student || !formData.ClassID) return;
+        google.script.run
+          .withSuccessHandler((res) => { if (res.success) set('RollNumber', res.rollNumber); })
+          .getNextRollNumber(formData.ClassID, currentUser, role);
+      }, [formData.ClassID]);
+
       const handleSubmit = (e) => {
         e.preventDefault();
         // intl date validations
@@ -12648,9 +12832,9 @@
                 </div>
               </div>
 
-              {/* === Monthly Dues Panel — auto-generated from admission month === */}
+              {/* === Fee Dues Panel — auto-generated per term (or per month, for schools using that) === */}
               <h4 style={{color:'var(--navy-primary)',marginBottom:'10px',fontSize:'15px',borderBottom:'2px solid var(--navy-primary)',paddingBottom:'6px'}}>
-                <i className="fas fa-calendar-alt"></i> Monthly Fee Dues
+                <i className="fas fa-calendar-alt"></i> Fee Dues
                 {!duesLoading && (
                   <span style={{marginLeft:'10px',fontSize:'12px',fontWeight:500,color:'#888'}}>
                     {duesSummary.pending} pending · {duesSummary.paid} paid · GH₵{fmt(duesSummary.pendingAmt)} outstanding
@@ -12659,7 +12843,7 @@
               </h4>
               {duesLoading ? <TableSkeleton rows={3} columns={4} /> : dues.length === 0 ? (
                 <div style={{textAlign:'center',padding:'18px',background:'#f8f9fa',color:'#888',border:'1px dashed #ccc',marginBottom:'18px'}}>
-                  <i className="fas fa-info-circle"></i> No monthly dues yet. Configure monthly fee structure for this class.
+                  <i className="fas fa-info-circle"></i> No fee dues yet. Set up a Termly (or Monthly) fee structure for this class.
                 </div>
               ) : (
                 <>
@@ -17787,6 +17971,7 @@
                   <label><i className="fas fa-clock"></i> Frequency</label>
                   <SearchableDropdown
                     options={[
+                      { value: 'termly', label: 'Termly (per term — recommended)' },
                       { value: 'monthly', label: 'Monthly' },
                       { value: 'quarterly', label: 'Quarterly' },
                       { value: 'half_yearly', label: 'Half Yearly' },
@@ -17891,7 +18076,7 @@
       const [sharedAmount, setSharedAmount] = useState('');
       const [perClassAmounts, setPerClassAmounts] = useState({}); // classId -> amount string
       const [meta, setMeta] = useState({
-        FeeCategory: 'tuition', Frequency: 'monthly', AcademicYear: defaultYear,
+        FeeCategory: 'tuition', Frequency: 'termly', AcademicYear: defaultYear,
         DueDay: '10', LateFeePerDay: '0', InstallmentsAllowed: '0', InstallmentCount: '1',
         TaxPercent: '0', Description: ''
       });
@@ -18001,7 +18186,7 @@
         ClassID: feeItem?.ClassID ? String(feeItem.ClassID) : '',
         FeeCategory: feeItem?.FeeCategory || 'tuition',
         Amount: feeItem?.Amount != null ? feeItem.Amount : 1500,
-        Frequency: feeItem?.Frequency || 'monthly',
+        Frequency: feeItem?.Frequency || 'termly',
         AcademicYear: feeItem?.AcademicYear || (() => {
           const y = new Date().getFullYear();
           return `${y}-${y + 1}`;
@@ -18088,6 +18273,7 @@
                   <SearchableDropdown
                     label="Frequency" icon="fas fa-clock"
                     options={[
+                      { value: 'termly', label: 'Termly (per term — recommended)' },
                       { value: 'monthly', label: 'Monthly' },
                       { value: 'quarterly', label: 'Quarterly' },
                       { value: 'half_yearly', label: 'Half Yearly' },

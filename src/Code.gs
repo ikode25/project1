@@ -3951,13 +3951,45 @@ function generateNextAdmissionNumber(sh) {
   return base + String(maxSeq + 1).padStart(4, '0');
 }
 
-// exposed for the frontend to preview the next AdmissionNumber before saving
+// exposed for the frontend to preview the next AdmissionNumber before saving — used by both the
+// direct Add Student form and the Admissions "Enroll" step (both actually create the Student row).
 function getNextAdmissionNumber(currentUser, currentRole) {
   try {
-    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
     var sh = getSheet(STUDENTS_SHEET);
     if (!sh) return { success: false, message: 'Students sheet not found' };
     return { success: true, admissionNumber: generateNextAdmissionNumber(sh) };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// next Roll Number for a class — simple "highest existing numeric roll in this class, plus one"
+// (falls back to student-count+1 if the class has no purely-numeric rolls yet, e.g. a brand-new
+// class). Roll numbers reset per class, so this is always scoped to one ClassID.
+function generateNextRollNumber(classId) {
+  var sh = getSheet(STUDENTS_SHEET);
+  if (!sh) return '1';
+  var cid = parseInt(classId, 10);
+  var data = sh.getDataRange().getValues();
+  var maxRoll = 0, count = 0;
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][36]) === '1') continue; // IsDeleted
+    if (parseInt(data[i][25], 10) !== cid) continue; // ClassID
+    count++;
+    var roll = parseInt(String(data[i][26] || '').trim(), 10);
+    if (!isNaN(roll) && roll > maxRoll) maxRoll = roll;
+  }
+  return String(maxRoll > 0 ? maxRoll + 1 : count + 1);
+}
+
+// exposed for the frontend to preview the next Roll Number for a class before saving
+function getNextRollNumber(classId, currentUser, currentRole) {
+  try {
+    if (!isAdminOrClerk(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
+    var cid = parseInt(classId, 10);
+    if (isNaN(cid)) return { success: false, message: 'Invalid class id' };
+    return { success: true, rollNumber: generateNextRollNumber(cid) };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
@@ -8406,7 +8438,7 @@ function addFeeStructure(data, currentUser, currentRole) {
     var allowedCats = ['tuition','admission','transport','exam','library','sports','lab','annual','arrears','other'];
     var cat = String(data.FeeCategory).toLowerCase();
     if (allowedCats.indexOf(cat) === -1) return { success: false, message: 'Invalid fee category' };
-    var allowedFreq = ['monthly','quarterly','half_yearly','annual','one_time'];
+    var allowedFreq = ['monthly','termly','quarterly','half_yearly','annual','one_time'];
     var fr = String(data.Frequency).toLowerCase();
     if (allowedFreq.indexOf(fr) === -1) return { success: false, message: 'Invalid frequency' };
     if (!validAcademicYear(data.AcademicYear)) return { success: false, message: 'AcademicYear must be YYYY-YYYY' };
@@ -8465,7 +8497,7 @@ function addFeeTypeBulk(d, currentUser, currentRole) {
     var allowedCats = ['tuition','admission','transport','exam','library','sports','lab','annual','arrears','other'];
     var cat = String(d.FeeCategory || '').toLowerCase();
     if (allowedCats.indexOf(cat) === -1) return { success: false, message: 'Invalid fee category' };
-    var allowedFreq = ['monthly','quarterly','half_yearly','annual','one_time'];
+    var allowedFreq = ['monthly','termly','quarterly','half_yearly','annual','one_time'];
     var fr = String(d.Frequency || '').toLowerCase();
     if (allowedFreq.indexOf(fr) === -1) return { success: false, message: 'Invalid frequency' };
     if (!validAcademicYear(d.AcademicYear)) return { success: false, message: 'AcademicYear must be YYYY-YYYY' };
@@ -8524,7 +8556,7 @@ function updateFeeStructure(id, data, currentUser, currentRole) {
     var allowedCats = ['tuition','admission','transport','exam','library','sports','lab','annual','arrears','other'];
     var cat = String(data.FeeCategory).toLowerCase();
     if (allowedCats.indexOf(cat) === -1) return { success: false, message: 'Invalid fee category' };
-    var allowedFreq = ['monthly','quarterly','half_yearly','annual','one_time'];
+    var allowedFreq = ['monthly','termly','quarterly','half_yearly','annual','one_time'];
     var fr = String(data.Frequency).toLowerCase();
     if (allowedFreq.indexOf(fr) === -1) return { success: false, message: 'Invalid frequency' };
     if (!validAcademicYear(data.AcademicYear)) return { success: false, message: 'AcademicYear must be YYYY-YYYY' };
@@ -19973,6 +20005,7 @@ function getStudentParents(studentId, currentUser, currentRole) {
 // ============== Monthly Fee Dues (auto-generated from admission month) ==============
 
 var _MONTH_LABELS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+var TERM_LABELS = { term1: 'Term 1', term2: 'Term 2', term3: 'Term 3' };
 
 function _ensureFeeDuesSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -20008,15 +20041,16 @@ function generateStudentDues(studentId, currentUser) {
     var fsh = getSheet(FEE_STRUCTURE_SHEET);
     if (!fsh) return { success: false, message: 'Fee_Structure sheet not found' };
     var fsdata = fsh.getDataRange().getValues();
-    var monthlyFees = [];
+    var monthlyFees = [], termlyFees = [];
     for (var f = 1; f < fsdata.length; f++) {
       if (String(fsdata[f][9]) === '1') continue;
       if (parseInt(fsdata[f][1], 10) !== classId) continue;
       if (String(fsdata[f][8]) !== '1' && fsdata[f][8] !== 1 && fsdata[f][8] !== true) continue;
-      if (String(fsdata[f][4] || '').toLowerCase() !== 'monthly') continue;
-      monthlyFees.push({ id: fsdata[f][0], amount: parseFloat(fsdata[f][3]) || 0 });
+      var freq = String(fsdata[f][4] || '').toLowerCase();
+      if (freq === 'monthly') monthlyFees.push({ id: fsdata[f][0], amount: parseFloat(fsdata[f][3]) || 0 });
+      else if (freq === 'termly') termlyFees.push({ id: fsdata[f][0], amount: parseFloat(fsdata[f][3]) || 0, academicYear: fsdata[f][5] });
     }
-    if (monthlyFees.length === 0) return { success: true, generated: 0, message: 'No monthly fees configured for this class' };
+    if (monthlyFees.length === 0 && termlyFees.length === 0) return { success: true, generated: 0, message: 'No monthly or termly fees configured for this class' };
 
     var dsh = _ensureFeeDuesSheet();
     var ddata = dsh.getDataRange().getValues();
@@ -20025,22 +20059,45 @@ function generateStudentDues(studentId, currentUser) {
       if (parseInt(ddata[d][1], 10) === sid) existing[ddata[d][2] + '|' + ddata[d][3]] = true;
     }
 
-    var today = new Date();
-    var year = admDate.getFullYear(), month = admDate.getMonth() + 1;
-    var endY = today.getFullYear(), endM = today.getMonth() + 1;
     var ts = nowIso();
     var nextId = nextRowId(dsh);
     var newRows = [];
 
-    while (year < endY || (year === endY && month <= endM)) {
-      var ym = year + '-' + (month < 10 ? '0' : '') + month;
-      var label = _MONTH_LABELS[month - 1] + ' ' + year;
-      monthlyFees.forEach(function(fee) {
-        if (existing[fee.id + '|' + ym]) return;
-        newRows.push([nextId++, sid, fee.id, ym, label, fee.amount, 'pending', '', 0, '', ts, ts]);
+    if (monthlyFees.length) {
+      var today = new Date();
+      var year = admDate.getFullYear(), month = admDate.getMonth() + 1;
+      var endY = today.getFullYear(), endM = today.getMonth() + 1;
+      while (year < endY || (year === endY && month <= endM)) {
+        var ym = year + '-' + (month < 10 ? '0' : '') + month;
+        var label = _MONTH_LABELS[month - 1] + ' ' + year;
+        monthlyFees.forEach(function(fee) {
+          if (existing[fee.id + '|' + ym]) return;
+          newRows.push([nextId++, sid, fee.id, ym, label, fee.amount, 'pending', '', 0, '', ts, ts]);
+        });
+        month++;
+        if (month > 12) { month = 1; year++; }
+      }
+    }
+
+    // termly fees — Ghana basic schools bill per-term (term1/term2/term3), not monthly, so one
+    // fee structure row of Frequency='termly' generates all 3 terms' dues at once for the school's
+    // current academic year (every term is already known/plannable upfront, unlike calendar months
+    // that roll forward incrementally from admission date).
+    if (termlyFees.length) {
+      var curYear = '';
+      try {
+        var settingsRes = getSchoolSettings();
+        curYear = (settingsRes.data && settingsRes.data.AcademicYear) || '';
+      } catch (e) {}
+      ['term1', 'term2', 'term3'].forEach(function(term) {
+        termlyFees.forEach(function(fee) {
+          var ay = fee.academicYear || curYear;
+          var key = term + '-' + ay;
+          if (existing[fee.id + '|' + key]) return;
+          var label = TERM_LABELS[term] + ' ' + ay;
+          newRows.push([nextId++, sid, fee.id, key, label, fee.amount, 'pending', '', 0, '', ts, ts]);
+        });
       });
-      month++;
-      if (month > 12) { month = 1; year++; }
     }
 
     if (newRows.length > 0) {
