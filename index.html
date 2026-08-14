@@ -40,6 +40,7 @@
         <a href="#" onclick="showLoginForm();return false;" id="loginMenu" class="hover:underline text-sm"><i class="fas fa-sign-in-alt mr-1"></i>Sign In</a>
         <span id="loggedInName" class="hidden text-sm"></span>
         <a href="#" onclick="logout();return false;" id="logoutMenu" class="hover:underline hidden text-sm"><i class="fas fa-sign-out-alt mr-1"></i>Logout</a>
+        <a href="?page=admin" id="adminLink" target="_top" title="Admin Portal" class="hover:text-yellow-300 text-lg" aria-label="Admin Portal"><i class="fas fa-user-shield"></i></a>
         <button id="cartButton" class="relative bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-full" onclick="openCheckout()">
           <i class="fas fa-shopping-cart"></i>
           <span id="cartCount" class="absolute -top-2 -right-2 bg-yellow-400 text-black rounded-full px-2 text-xs">0</span>
@@ -84,6 +85,7 @@
 
   <footer class="bg-gray-800 text-white text-center py-3 fixed bottom-0 left-0 right-0 text-sm z-30">
     <p id="footerText">&copy; <span id="footerYear"></span> Multi-Business Store. All rights reserved.</p>
+    <a href="?page=admin" id="adminLinkFooter" target="_top" class="text-gray-400 hover:text-white text-xs"><i class="fas fa-user-shield mr-1"></i>Admin Portal</a>
   </footer>
 
   <!-- Floating WhatsApp Button -->
@@ -253,12 +255,16 @@
 
     function onStoreLoadFailed(err) {
       hideLoadingSpinner();
+      setupAdminLinks('');
       toast('error', 'Could not load store', String(err));
     }
 
     function onStoreLoaded(data) {
       hideLoadingSpinner();
       store = data;
+      setupAdminLinks(data.adminUrl);
+      // An empty store is a normal first-run state, not an error worth a modal.
+      if (data.loadError) console.warn('Store loaded with errors:', data.loadError);
       applyBranding();
       renderBanners();
       renderBusinessNav();
@@ -268,6 +274,15 @@
       setupWhatsapp();
       setupChatbot();
       reconcileCartWithCatalog();
+    }
+
+    // Relative hrefs don't resolve to the web app from inside the Apps Script
+    // sandbox iframe, so point the admin links at the real deployment URL.
+    function setupAdminLinks(baseUrl) {
+      if (!baseUrl) return;
+      var href = baseUrl + (baseUrl.indexOf('?') === -1 ? '?' : '&') + 'page=admin';
+      document.getElementById('adminLink').href = href;
+      document.getElementById('adminLinkFooter').href = href;
     }
 
     function applyBranding() {

@@ -19,34 +19,23 @@ admin portal (sales, income, expenses, reports).
 
 > Standalone script instead of bound? Set a `SPREADSHEET_ID` Script Property (see step 3 below) pointing at your sheet; `getSS_()` falls back to it automatically.
 
-## 2. (Optional but recommended) Set your initial admin credentials
+## 2. Setup — there isn't one
 
-Before running setup, open **Project Settings → Script Properties** and add:
+**You don't need to run anything.** The first time the web app is opened it
+builds itself: every sheet/tab is created with the right headers, and defaults
+are seeded:
 
-| Property | Value |
-|---|---|
-| `ADMIN_USERNAME` | e.g. `owner` |
-| `ADMIN_PASSWORD` | a strong password |
+- **Settings** — site name, currency `GHS`, WhatsApp number, chatbot text (all editable in Admin → Settings)
+- **Payment Method** — Mobile Money: `Emmanuel Darkoh`, `0547359015` (edit/replace in Admin → Payment Methods; add more anytime)
+- A sample catalog: **Data Bundles**, **Picture Frames & Gifts**, **Security & Alarm Systems** (School Siren, flagged to route to WhatsApp instead of Add to Cart), **Scripts & Source Code** — delete or edit these once you add your real products.
 
-If you skip this, `setupSheets()` generates a random temporary password and
-prints it to the execution log (`View → Logs`) — copy it immediately and
-change it from the Admin Portal's "Admin Users" tab afterwards.
+Seeding is skipped for anything that already has rows, so it never overwrites
+your data, and it's safe for the app to re-check on every load.
 
-## 3. Run setup
+There's also a `setupSheets()` function you can run manually from the editor if
+you ever delete a tab by accident and want it rebuilt immediately.
 
-In the Apps Script editor, select the function `setupSheets` from the
-dropdown next to **Run**, and click **Run**. Grant the requested
-permissions (Sheets + Drive, for image uploads).
-
-This creates every sheet/tab with the right headers, and seeds:
-- Default **Settings** (site name, currency `GHS`, a WhatsApp number, chatbot text — edit these in Admin → Settings)
-- One **Admin** account (see step 2)
-- One **Payment Method**: Mobile Money — `Emmanuel Darkoh`, `0547359015` (edit/replace in Admin → Payment Methods; add more anytime)
-- A sample catalog: **Data Bundles**, **Picture Frames & Gifts**, **Security & Alarm Systems** (School Siren, flagged to route to WhatsApp instead of Add to Cart), **Scripts & Source Code** — delete/edit these from the admin portal once you add your real products.
-
-It's safe to re-run `setupSheets()` later — it only fills in what's missing, it never overwrites existing data.
-
-## 4. Deploy the web app
+## 3. Deploy the web app
 
 **Deploy → New deployment → Web app**
 - Execute as: **Me**
@@ -54,14 +43,25 @@ It's safe to re-run `setupSheets()` later — it only fills in what's missing, i
 - Click **Deploy**, copy the web app URL.
 
 That URL is your **storefront**: `https://script.google.com/macros/s/XXXX/exec`
-Your **admin portal** is the same URL with `?page=admin` appended:
-`https://script.google.com/macros/s/XXXX/exec?page=admin`
 
 Whenever you edit the code, use **Deploy → Manage deployments → Edit (pencil) → New version** to push changes live.
 
-## 5. Log in to the Admin Portal and finish configuring
+## 4. Create your admin account
 
-Go to `...exec?page=admin`, log in, then:
+Get to the admin portal either way:
+
+- Click the **shield icon** (🛡) in the top-right of the storefront header, or the **Admin Portal** link in the footer, or
+- Append `?page=admin` to your web app URL.
+
+The **first** time you open it, it shows a one-time **"Create your admin
+account"** form — pick your own name, username and password. That form
+disappears permanently once an account exists, and from then on the same page
+shows a normal login. No default password is ever created, so there's nothing
+to look up in a log and nothing insecure left lying around.
+
+## 5. Finish configuring
+
+Log in to the admin portal, then:
 - **Settings** — set your Site Name, WhatsApp number (used for the floating WhatsApp button and for "Enquire on WhatsApp" products), chatbot greeting.
 - **Payment Methods** — edit the seeded Mobile Money entry or add Bank Transfer / Cash on Delivery / other Mobile Money numbers. Customers pick one at checkout.
 - **Businesses** — add/edit your real businesses (name, description, logo — upload an image or paste a URL).
@@ -103,4 +103,5 @@ key in Script Properties (never in the HTML/JS).
 
 - Ghana Mobile Money numbers are auto-formatted for WhatsApp links (`0XXXXXXXXX` → `233XXXXXXXX`); adjust `formatWaNumber()` in `index.html` if you operate in a different country.
 - Apps Script web apps are rate-limited and not meant for very high traffic; fine for a small/medium multi-business shop.
-- Change the seeded admin password immediately (Admin Portal → Admin Users → Change My Password).
+- Admin sessions last 6 hours, then the portal returns you to the login screen.
+- Sheet tabs are matched case-insensitively and ignoring stray spaces, so renaming `Products` to `products` won't break the app — but don't create two tabs whose names differ only by case.

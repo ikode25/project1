@@ -36,8 +36,13 @@ var ADMIN_TOKEN_TTL_SECONDS = 21600; // 6 hours (CacheService max)
 // ---------------------------------------------------------------------------
 function doGet(e) {
   var page = (e && e.parameter && e.parameter.page === 'admin') ? 'admin' : 'index';
+
+  // Builds/repairs the spreadsheet on first visit so there is no manual setup
+  // step. Never let a setup hiccup block the page from rendering.
+  try { ensureSetup_(); } catch (err) { Logger.log('ensureSetup_ failed: ' + err); }
+
   var siteName = 'My Multi-Business Store';
-  try { siteName = getSettingValue_('SiteName', siteName); } catch (err) { /* sheet may not be set up yet */ }
+  try { siteName = getSettingValue_('SiteName', siteName); } catch (err) { /* not set up yet */ }
 
   return HtmlService.createTemplateFromFile(page)
     .evaluate()
@@ -48,6 +53,16 @@ function doGet(e) {
 
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+// The pages run inside a sandboxed iframe, so links between the storefront and
+// the admin portal need the real deployment URL plus target="_top".
+function getWebAppUrl() {
+  try {
+    return ScriptApp.getService().getUrl() || '';
+  } catch (err) {
+    return '';
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -62,44 +77,105 @@ function getSS_() {
   return SpreadsheetApp.openById(id);
 }
 
-function getSheet_(name) {
-  var ss = getSS_();
+// Sheet-name uniqueness in Google Sheets is case-insensitive, but
+// getSheetByName() is case-sensitive — and a stray leading/trailing space in a
+// hand-created tab hides it too. Either case makes a lookup miss while
+// insertSheet() still refuses with "a sheet with that name already exists", so
+// always fall back to a normalized scan before creating anything.
+function normalizeSheetName_(name) {
+  return String(name == null ? '' : name).trim().toLowerCase();
+}
+
+function findSheet_(ss, name) {
   var sheet = ss.getSheetByName(name);
-  if (!sheet) {
-    sheet = ss.insertSheet(name);
-    sheet.getRange(1, 1, 1, SHEETS[name].length).setValues([SHEETS[name]]);
-    sheet.setFrozenRows(1);
+  if (sheet) return sheet;
+  var target = normalizeSheetName_(name);
+  var all = ss.getSheets();
+  for (var i = 0; i < all.length; i++) {
+    if (normalizeSheetName_(all[i].getName()) === target) return all[i];
   }
+  return null;
+}
+
+// create === false makes this a pure lookup (returns null when absent) so that
+// read paths can never fail or mutate the spreadsheet.
+function getSheet_(name, create) {
+  var ss = getSS_();
+  var sheet = findSheet_(ss, name);
+  if (sheet) {
+    if (create !== false) ensureHeaders_(sheet, name);
+    return sheet;
+  }
+  if (create === false) return null;
+
+  try {
+    sheet = ss.insertSheet(name);
+  } catch (err) {
+    // Lost a race, or the tab exists under a name the scan didn't match.
+    // Re-scan rather than letting the whole request fail.
+    sheet = findSheet_(ss, name);
+    if (!sheet) throw err;
+  }
+  ensureHeaders_(sheet, name);
+  return sheet;
+}
+
+function ensureHeaders_(sheet, name) {
+  var headers = SHEETS[name];
+  if (!headers) return sheet;
+  var width = Math.max(sheet.getLastColumn(), headers.length);
+  var firstRow = sheet.getRange(1, 1, 1, width).getValues()[0];
+  if (firstRow.join('') !== '') return sheet; // already has a header row
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  sheet.setFrozenRows(1);
   return sheet;
 }
 
 // ---------------------------------------------------------------------------
-// One-time setup: creates every sheet with headers (if missing) and seeds
-// sensible defaults so the store isn't empty on first load.
-// Run this once manually from the Apps Script editor (select setupSheets,
-// click Run), or open the sheet and use a custom menu if you add one.
+// Locking. Apps Script locks are not re-entrant: a second waitLock() inside the
+// same execution blocks until it times out. Track depth so nested writes (a
+// seed routine calling appendRowObject_, say) reuse the lock already held.
 // ---------------------------------------------------------------------------
-function setupSheets() {
-  Object.keys(SHEETS).forEach(function (name) {
-    var sheet = getSS_().getSheetByName(name);
-    if (!sheet) {
-      sheet = getSS_().insertSheet(name);
-    }
-    var headers = SHEETS[name];
-    var existing = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
-    var needsHeaders = existing.join('') === '';
-    if (needsHeaders) {
-      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-      sheet.setFrozenRows(1);
-    }
+var _lockDepth = 0;
+
+function withLock_(fn) {
+  if (_lockDepth > 0) return fn();
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  _lockDepth++;
+  try {
+    return fn();
+  } finally {
+    _lockDepth--;
+    try { lock.releaseLock(); } catch (err) { /* already released */ }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Setup runs itself. Every page load calls ensureSetup_(), which creates any
+// missing sheet with its headers and seeds defaults, so a fresh spreadsheet
+// becomes a working store with no manual step. It is idempotent and skips
+// seeding anything that already has rows, so it never clobbers real data.
+// ---------------------------------------------------------------------------
+function ensureSetup_() {
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty('SETUP_COMPLETE') === 'true') return;
+  withLock_(function () {
+    if (props.getProperty('SETUP_COMPLETE') === 'true') return;
+    Object.keys(SHEETS).forEach(function (name) { getSheet_(name); });
+    seedDefaultSettings_();
+    seedDefaultPaymentMethod_();
+    seedSampleCatalog_();
+    props.setProperty('SETUP_COMPLETE', 'true');
   });
+}
 
-  seedDefaultSettings_();
-  seedDefaultAdmin_();
-  seedDefaultPaymentMethod_();
-  seedSampleCatalog_();
-
-  return 'Setup complete. Check the Admins sheet / execution log for the initial admin login.';
+// Manual entry point, kept for running from the Apps Script editor. Repairs
+// missing sheets/headers even after the auto-setup flag has been set.
+function setupSheets() {
+  PropertiesService.getScriptProperties().deleteProperty('SETUP_COMPLETE');
+  ensureSetup_();
+  return 'Setup complete. Open the web app with ?page=admin to create your admin account.';
 }
 
 function seedDefaultSettings_() {
@@ -120,31 +196,10 @@ function seedDefaultSettings_() {
   });
 }
 
-function seedDefaultAdmin_() {
-  var sheet = getSheet_('Admins');
-  if (sheet.getLastRow() > 1) return; // already has an admin
-  var props = PropertiesService.getScriptProperties();
-  var username = props.getProperty('ADMIN_USERNAME') || 'admin';
-  var password = props.getProperty('ADMIN_PASSWORD') || generateTempPassword_();
-  appendRowObject_('Admins', {
-    AdminID: genId_('ADM'),
-    Username: username.toLowerCase(),
-    PasswordHash: hashPassword_(password),
-    Name: 'Store Owner',
-    Role: 'owner',
-    CreatedAt: new Date()
-  });
-  Logger.log('==============================================');
-  Logger.log('Initial admin account created.');
-  Logger.log('Username: ' + username);
-  Logger.log('Password: ' + password);
-  Logger.log('Log in at your web app URL with ?page=admin and CHANGE this password immediately.');
-  Logger.log('==============================================');
-}
-
-function generateTempPassword_() {
-  return 'Change-' + Math.random().toString(36).slice(2, 8) + '!1';
-}
+// No admin account is seeded with a default/generated password — there would be
+// no safe way to hand it to you. Instead the admin page shows a one-time
+// "create your admin account" form while the Admins sheet is empty; see
+// adminNeedsFirstAccount() / adminCreateFirstAccount() below.
 
 function seedDefaultPaymentMethod_() {
   var sheet = getSheet_('PaymentMethods');
@@ -201,7 +256,10 @@ function seedSampleCatalog_() {
 // Generic sheet <-> object helpers (header-driven, order independent)
 // ---------------------------------------------------------------------------
 function sheetToObjects_(name) {
-  var sheet = getSheet_(name);
+  // Reads never create or repair a sheet — a missing tab yields an empty list
+  // instead of taking the whole page down.
+  var sheet = getSheet_(name, false);
+  if (!sheet) return [];
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
   var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
@@ -218,9 +276,7 @@ function sheetToObjects_(name) {
 }
 
 function appendRowObject_(name, obj) {
-  var lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
+  return withLock_(function () {
     var sheet = getSheet_(name);
     var headers = SHEETS[name];
     var row = headers.map(function (h) {
@@ -229,15 +285,11 @@ function appendRowObject_(name, obj) {
     });
     sheet.appendRow(row);
     return obj;
-  } finally {
-    lock.releaseLock();
-  }
+  });
 }
 
 function updateRowById_(name, idField, idValue, patch) {
-  var lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
+  return withLock_(function () {
     var sheet = getSheet_(name);
     var lastRow = sheet.getLastRow();
     if (lastRow < 2) return false;
@@ -256,15 +308,11 @@ function updateRowById_(name, idField, idValue, patch) {
       }
     }
     return false;
-  } finally {
-    lock.releaseLock();
-  }
+  });
 }
 
 function deleteRowById_(name, idField, idValue) {
-  var lock = LockService.getScriptLock();
-  lock.waitLock(10000);
-  try {
+  return withLock_(function () {
     var sheet = getSheet_(name);
     var lastRow = sheet.getLastRow();
     if (lastRow < 2) return false;
@@ -279,9 +327,7 @@ function deleteRowById_(name, idField, idValue) {
       }
     }
     return false;
-  } finally {
-    lock.releaseLock();
-  }
+  });
 }
 
 function genId_(prefix) {
@@ -360,6 +406,22 @@ function bestDiscountFor_(product, discounts) {
 // Storefront (public) API
 // ---------------------------------------------------------------------------
 function getStorefrontData() {
+  // A broken/empty sheet should degrade to an empty store, never to an error
+  // dialog over the whole page.
+  try {
+    return buildStorefrontData_();
+  } catch (err) {
+    Logger.log('getStorefrontData failed: ' + err);
+    return {
+      businesses: [], products: [], banners: [], paymentMethods: [],
+      settings: { SiteName: 'My Multi-Business Store', CurrencySymbol: 'GHS ' },
+      adminUrl: getWebAppUrl(),
+      loadError: String(err && err.message ? err.message : err)
+    };
+  }
+}
+
+function buildStorefrontData_() {
   var businesses = sheetToObjects_('Businesses').filter(function (b) { return toBool_(b.Active); })
     .sort(function (a, b) { return toNum_(a.SortOrder) - toNum_(b.SortOrder); })
     .map(function (b) {
@@ -409,7 +471,8 @@ function getStorefrontData() {
     products: products,
     banners: banners,
     paymentMethods: paymentMethods,
-    settings: getPublicSettings_()
+    settings: getPublicSettings_(),
+    adminUrl: getWebAppUrl()
   };
 }
 
@@ -585,6 +648,37 @@ function requireAdmin_(token) {
   var raw = token ? cache.get('admtok_' + token) : null;
   if (!raw) throw new Error('Your admin session has expired. Please log in again.');
   return JSON.parse(raw);
+}
+
+// True while the Admins sheet is empty — the admin page then shows a "create
+// your account" form instead of a login form.
+function adminNeedsFirstAccount() {
+  try { ensureSetup_(); } catch (err) { Logger.log('ensureSetup_ failed: ' + err); }
+  return sheetToObjects_('Admins').length === 0;
+}
+
+// Deliberately unauthenticated, but only ever succeeds while no admin exists,
+// so it closes permanently the moment the first account is created.
+function adminCreateFirstAccount(name, username, password) {
+  try { ensureSetup_(); } catch (err) { Logger.log('ensureSetup_ failed: ' + err); }
+
+  name = String(name || '').trim();
+  username = String(username || '').trim().toLowerCase();
+  password = String(password || '');
+
+  if (!name || !username || !password) return { success: false, message: 'Please fill in all fields.' };
+  if (password.length < 6) return { success: false, message: 'Password must be at least 6 characters.' };
+
+  return withLock_(function () {
+    if (sheetToObjects_('Admins').length > 0) {
+      return { success: false, message: 'An admin account already exists. Please log in instead.' };
+    }
+    appendRowObject_('Admins', {
+      AdminID: genId_('ADM'), Username: username, PasswordHash: hashPassword_(password),
+      Name: name, Role: 'owner', CreatedAt: new Date()
+    });
+    return { success: true };
+  });
 }
 
 function adminLogin(username, password) {

@@ -22,15 +22,30 @@
 <body class="min-h-screen">
 
   <!-- Login Screen -->
-  <div id="loginScreen" class="min-h-screen flex items-center justify-center">
+  <div id="loginScreen" class="min-h-screen flex items-center justify-center hidden">
     <div class="bg-white w-full max-w-sm p-8 rounded-xl shadow-lg">
       <h1 class="text-2xl font-bold text-center mb-1"><i class="fas fa-user-shield text-blue-600 mr-2"></i>Admin Portal</h1>
       <p class="text-center text-gray-500 text-sm mb-6">Sign in to manage your businesses</p>
-      <input id="loginUsername" type="text" placeholder="Username" class="w-full p-3 border rounded-lg mb-3">
-      <input id="loginPassword" type="password" placeholder="Password" class="w-full p-3 border rounded-lg mb-4">
-      <button onclick="adminDoLogin()" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700">Login</button>
-      <p class="text-xs text-gray-400 mt-4 text-center">First time? Run <code>setupSheets()</code> from the Apps Script editor and check the execution log for your initial credentials.</p>
-      <p class="text-center mt-4"><a href="?" class="text-blue-500 text-sm hover:underline"><i class="fas fa-arrow-left mr-1"></i>Back to store</a></p>
+      <form onsubmit="adminDoLogin(event)">
+        <input id="loginUsername" type="text" placeholder="Username" class="w-full p-3 border rounded-lg mb-3">
+        <input id="loginPassword" type="password" placeholder="Password" class="w-full p-3 border rounded-lg mb-4">
+        <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700">Login</button>
+      </form>
+      <p class="text-center mt-4"><a href="?" id="backToStore" target="_top" class="text-blue-500 text-sm hover:underline"><i class="fas fa-arrow-left mr-1"></i>Back to store</a></p>
+    </div>
+  </div>
+
+  <!-- First-Run Setup Screen (only while no admin account exists) -->
+  <div id="setupScreen" class="min-h-screen flex items-center justify-center hidden">
+    <div class="bg-white w-full max-w-sm p-8 rounded-xl shadow-lg">
+      <h1 class="text-2xl font-bold text-center mb-1"><i class="fas fa-wand-magic-sparkles text-blue-600 mr-2"></i>Welcome!</h1>
+      <p class="text-center text-gray-500 text-sm mb-6">Create your admin account to get started. This form only appears once.</p>
+      <form onsubmit="createFirstAccount(event)">
+        <input id="setupName" type="text" placeholder="Your Full Name" class="w-full p-3 border rounded-lg mb-3" required>
+        <input id="setupUsername" type="text" placeholder="Choose a Username" class="w-full p-3 border rounded-lg mb-3" required>
+        <input id="setupPassword" type="password" placeholder="Choose a Password (min 6 characters)" class="w-full p-3 border rounded-lg mb-4" required>
+        <button type="submit" class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700">Create Admin Account</button>
+      </form>
     </div>
   </div>
 
@@ -56,7 +71,7 @@
         <a class="nav-item flex items-center gap-3 px-4 py-3 cursor-pointer" data-tab="admins"><i class="fas fa-user-shield w-4"></i>Admin Users</a>
       </nav>
       <div class="p-4 border-t border-slate-700">
-        <a href="?" target="_top" class="text-slate-300 text-sm hover:underline block mb-2"><i class="fas fa-store mr-1"></i>View Store</a>
+        <a href="?" id="viewStoreLink" target="_top" class="text-slate-300 text-sm hover:underline block mb-2"><i class="fas fa-store mr-1"></i>View Store</a>
         <button onclick="adminDoLogout()" class="text-red-400 text-sm hover:underline"><i class="fas fa-sign-out-alt mr-1"></i>Logout</button>
       </div>
     </aside>
@@ -341,16 +356,68 @@
     function currency(n) { return ((cache.settings && cache.settings.CurrencySymbol) || 'GHS ') + Number(n || 0).toFixed(2); }
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
-    function runFail(err) { hideLoadingSpinner(); toast('error', 'Error', String(err)); }
+    function runFail(err) {
+      hideLoadingSpinner();
+      var msg = String(err && err.message ? err.message : err);
+      // Admin tokens live 6 hours; when one lapses, send the user back to the
+      // login screen rather than leaving the portal erroring on every action.
+      if (msg.indexOf('session has expired') !== -1) {
+        sessionStorage.removeItem('mb_admin_token');
+        sessionStorage.removeItem('mb_admin_info');
+        adminToken = null; adminInfo = null;
+        document.getElementById('adminApp').classList.add('hidden');
+        document.getElementById('loginScreen').classList.remove('hidden');
+        toast('warning', 'Session expired', 'Please sign in again.');
+        return;
+      }
+      toast('error', 'Error', msg);
+    }
 
     // -------------------------------------------------------------------
     // Auth
     // -------------------------------------------------------------------
     window.onload = function () {
-      if (adminToken) { enterApp(); } else { document.getElementById('loginScreen').classList.remove('hidden'); }
+      google.script.run.withSuccessHandler(function (url) {
+        if (!url) return;
+        document.getElementById('backToStore').href = url;
+        document.getElementById('viewStoreLink').href = url;
+      }).getWebAppUrl();
+
+      if (adminToken) { enterApp(); return; }
+
+      // Ask the server whether this deployment has any admin yet, so a brand
+      // new store lands on account creation instead of an unusable login form.
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (needsSetup) {
+        hideLoadingSpinner();
+        document.getElementById(needsSetup ? 'setupScreen' : 'loginScreen').classList.remove('hidden');
+      }).withFailureHandler(function (err) {
+        hideLoadingSpinner();
+        document.getElementById('loginScreen').classList.remove('hidden');
+        toast('error', 'Error', String(err));
+      }).adminNeedsFirstAccount();
     };
 
-    function adminDoLogin() {
+    function createFirstAccount(e) {
+      e.preventDefault();
+      var name = document.getElementById('setupName').value.trim();
+      var username = document.getElementById('setupUsername').value.trim();
+      var password = document.getElementById('setupPassword').value;
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (res) {
+        hideLoadingSpinner();
+        if (!res.success) { toast('error', 'Could not create account', res.message || ''); return; }
+        Swal.fire({ icon: 'success', title: 'Admin account created', text: 'You can now sign in.' }).then(function () {
+          document.getElementById('setupScreen').classList.add('hidden');
+          document.getElementById('loginScreen').classList.remove('hidden');
+          document.getElementById('loginUsername').value = username;
+          document.getElementById('loginPassword').focus();
+        });
+      }).withFailureHandler(runFail).adminCreateFirstAccount(name, username, password);
+    }
+
+    function adminDoLogin(e) {
+      if (e) e.preventDefault();
       var username = document.getElementById('loginUsername').value.trim();
       var password = document.getElementById('loginPassword').value;
       if (!username || !password) { toast('warning', 'Missing Fields', 'Enter username and password.'); return; }
@@ -373,11 +440,16 @@
       google.script.run.adminLogout(adminToken);
       sessionStorage.removeItem('mb_admin_token');
       sessionStorage.removeItem('mb_admin_info');
-      location.reload();
+      adminToken = null; adminInfo = null;
+      // Swap panels directly — reloading the sandboxed iframe is unreliable.
+      document.getElementById('adminApp').classList.add('hidden');
+      document.getElementById('loginScreen').classList.remove('hidden');
+      document.getElementById('loginPassword').value = '';
     }
 
     function enterApp() {
       document.getElementById('loginScreen').classList.add('hidden');
+      document.getElementById('setupScreen').classList.add('hidden');
       document.getElementById('adminApp').classList.remove('hidden');
       document.getElementById('adminNameLabel').textContent = adminInfo.name + ' (' + adminInfo.role + ')';
       document.querySelectorAll('.nav-item').forEach(function (el) {
