@@ -4,102 +4,137 @@
 <head>
   <meta charset="UTF-8">
   <title>Admin Portal</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <style>
-    body { background:#f1f5f9; }
-    .nav-item.active { background:#2563eb; color:#fff; }
-    .nav-item.active i { color:#fff; }
-    table.admin-table th, table.admin-table td { padding:.5rem .75rem; border:1px solid #e2e8f0; font-size:.85rem; }
-    table.admin-table th { background:#f8fafc; text-align:left; }
-    .loader { border-top-color:#3498db; animation: spin 1s ease-in-out infinite; }
+    :root {
+      --primary: #2563eb; --primary-dark: #1d4ed8; --primary-contrast: #fff;
+      --bg: #f1f5f9; --surface: #fff; --surface-2: #f8fafc;
+      --text: #0f172a; --muted: #64748b; --border: #e2e8f0;
+      --side-bg: #0f172a; --side-text: #cbd5e1;
+    }
+    body.theme-dark {
+      --bg: #0b1220; --surface: #1e293b; --surface-2: #172033;
+      --text: #e2e8f0; --muted: #94a3b8; --border: #334155;
+      --side-bg: #020617; --side-text: #cbd5e1;
+    }
+    body { background: var(--bg); color: var(--text); }
+    .surface { background: var(--surface); color: var(--text); }
+    .surface-2 { background: var(--surface-2); }
+    .bordered { border: 1px solid var(--border); }
+    .muted { color: var(--muted); }
+    .bg-primary { background: var(--primary); color: var(--primary-contrast); }
+    .bg-primary:hover { background: var(--primary-dark); }
+    .text-primary { color: var(--primary); }
+    input, textarea, select { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    input::placeholder, textarea::placeholder { color: var(--muted); }
+    input[type="checkbox"] { width: 1rem; height: 1rem; }
+
+    aside.sidebar { background: var(--side-bg); color: var(--side-text); }
+    .nav-item { cursor: pointer; }
+    .nav-item.active { background: var(--primary); color: var(--primary-contrast); }
+
+    table.admin-table { width: 100%; border-collapse: collapse; }
+    table.admin-table th, table.admin-table td { padding: .5rem .75rem; border: 1px solid var(--border); font-size: .85rem; text-align: left; vertical-align: top; }
+    table.admin-table th { background: var(--surface-2); white-space: nowrap; }
+    .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+    .loader { border-top-color: var(--primary); animation: spin 1s ease-in-out infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    .kpi-card { background:#fff; border-radius:.75rem; padding:1rem 1.25rem; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+    .kpi-card { background: var(--surface); border-radius: .75rem; padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+
+    /* Off-canvas sidebar on phones */
+    @media (max-width: 1023px) {
+      aside.sidebar {
+        position: fixed; inset: 0 auto 0 0; width: 16rem; z-index: 50;
+        transform: translateX(-100%); transition: transform .25s ease;
+      }
+      aside.sidebar.open { transform: translateX(0); }
+      button, .tap { min-height: 42px; }
+    }
   </style>
 </head>
 <body class="min-h-screen">
 
   <!-- Login Screen -->
-  <div id="loginScreen" class="min-h-screen flex items-center justify-center hidden">
-    <div class="bg-white w-full max-w-sm p-8 rounded-xl shadow-lg">
-      <h1 class="text-2xl font-bold text-center mb-1"><i class="fas fa-user-shield text-blue-600 mr-2"></i>Admin Portal</h1>
-      <p class="text-center text-gray-500 text-sm mb-6">Sign in to manage your businesses</p>
+  <div id="loginScreen" class="min-h-screen flex items-center justify-center p-4 hidden">
+    <div class="surface w-full max-w-sm p-8 rounded-xl shadow-lg">
+      <h1 class="text-2xl font-bold text-center mb-1"><i class="fas fa-user-shield text-primary mr-2"></i>Admin Portal</h1>
+      <p class="text-center muted text-sm mb-6">Sign in to manage your businesses</p>
       <form onsubmit="adminDoLogin(event)">
-        <input id="loginUsername" type="text" placeholder="Username" class="w-full p-3 border rounded-lg mb-3">
-        <input id="loginPassword" type="password" placeholder="Password" class="w-full p-3 border rounded-lg mb-4">
-        <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700">Login</button>
+        <input id="loginUsername" type="text" placeholder="Username" class="w-full p-3 rounded-lg mb-3">
+        <input id="loginPassword" type="password" placeholder="Password" class="w-full p-3 rounded-lg mb-4">
+        <button type="submit" class="w-full bg-primary py-3 rounded-lg">Login</button>
       </form>
-      <p class="text-center mt-4"><a href="?" id="backToStore" target="_top" class="text-blue-500 text-sm hover:underline"><i class="fas fa-arrow-left mr-1"></i>Back to store</a></p>
+      <p class="text-center mt-4"><a href="?" id="backToStore" target="_top" class="text-primary text-sm hover:underline"><i class="fas fa-arrow-left mr-1"></i>Back to store</a></p>
     </div>
   </div>
 
-  <!-- First-Run Setup Screen (only while no admin account exists) -->
-  <div id="setupScreen" class="min-h-screen flex items-center justify-center hidden">
-    <div class="bg-white w-full max-w-sm p-8 rounded-xl shadow-lg">
-      <h1 class="text-2xl font-bold text-center mb-1"><i class="fas fa-wand-magic-sparkles text-blue-600 mr-2"></i>Welcome!</h1>
-      <p class="text-center text-gray-500 text-sm mb-6">Create your admin account to get started. This form only appears once.</p>
+  <!-- First-Run Setup Screen -->
+  <div id="setupScreen" class="min-h-screen flex items-center justify-center p-4 hidden">
+    <div class="surface w-full max-w-sm p-8 rounded-xl shadow-lg">
+      <h1 class="text-2xl font-bold text-center mb-1"><i class="fas fa-wand-magic-sparkles text-primary mr-2"></i>Welcome!</h1>
+      <p class="text-center muted text-sm mb-6">Create your admin account to get started. This form only appears once.</p>
       <form onsubmit="createFirstAccount(event)">
-        <input id="setupName" type="text" placeholder="Your Full Name" class="w-full p-3 border rounded-lg mb-3" required>
-        <input id="setupUsername" type="text" placeholder="Choose a Username" class="w-full p-3 border rounded-lg mb-3" required>
-        <input id="setupPassword" type="password" placeholder="Choose a Password (min 6 characters)" class="w-full p-3 border rounded-lg mb-4" required>
-        <button type="submit" class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700">Create Admin Account</button>
+        <input id="setupName" type="text" placeholder="Your Full Name" class="w-full p-3 rounded-lg mb-3" required>
+        <input id="setupUsername" type="text" placeholder="Choose a Username" class="w-full p-3 rounded-lg mb-3" required>
+        <input id="setupPassword" type="password" placeholder="Choose a Password (min 6 characters)" class="w-full p-3 rounded-lg mb-4" required>
+        <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg">Create Admin Account</button>
       </form>
     </div>
   </div>
 
   <!-- Admin App -->
-  <div id="adminApp" class="hidden flex min-h-screen">
-    <!-- Sidebar -->
-    <aside class="w-64 bg-slate-900 text-slate-200 flex-shrink-0 flex flex-col">
-      <div class="p-4 border-b border-slate-700">
+  <div id="adminApp" class="hidden lg:flex min-h-screen">
+    <div id="sidebarBackdrop" onclick="toggleSidebar()" class="hidden fixed inset-0 bg-black/50 z-40 lg:hidden"></div>
+
+    <aside id="sidebar" class="sidebar w-64 shrink-0 flex flex-col">
+      <div class="p-4 border-b" style="border-color:rgba(255,255,255,.1)">
         <p class="font-bold text-white"><i class="fas fa-store mr-2"></i>Admin Portal</p>
-        <p class="text-xs text-slate-400" id="adminNameLabel"></p>
+        <p class="text-xs opacity-70" id="adminNameLabel"></p>
       </div>
       <nav class="flex-grow overflow-y-auto py-2" id="sideNav">
-        <a class="nav-item active flex items-center gap-3 px-4 py-3 cursor-pointer" data-tab="dashboard"><i class="fas fa-gauge-high w-4"></i>Dashboard</a>
-        <a class="nav-item flex items-center gap-3 px-4 py-3 cursor-pointer" data-tab="orders"><i class="fas fa-receipt w-4"></i>Orders</a>
-        <a class="nav-item flex items-center gap-3 px-4 py-3 cursor-pointer" data-tab="businesses"><i class="fas fa-building w-4"></i>Businesses</a>
-        <a class="nav-item flex items-center gap-3 px-4 py-3 cursor-pointer" data-tab="products"><i class="fas fa-box-open w-4"></i>Products</a>
-        <a class="nav-item flex items-center gap-3 px-4 py-3 cursor-pointer" data-tab="banners"><i class="fas fa-images w-4"></i>Banners</a>
-        <a class="nav-item flex items-center gap-3 px-4 py-3 cursor-pointer" data-tab="payments"><i class="fas fa-money-bill-wave w-4"></i>Payment Methods</a>
-        <a class="nav-item flex items-center gap-3 px-4 py-3 cursor-pointer" data-tab="discounts"><i class="fas fa-percent w-4"></i>Discounts</a>
-        <a class="nav-item flex items-center gap-3 px-4 py-3 cursor-pointer" data-tab="expenses"><i class="fas fa-wallet w-4"></i>Expenses</a>
-        <a class="nav-item flex items-center gap-3 px-4 py-3 cursor-pointer" data-tab="customers"><i class="fas fa-users w-4"></i>Customers</a>
-        <a class="nav-item flex items-center gap-3 px-4 py-3 cursor-pointer" data-tab="settings"><i class="fas fa-gear w-4"></i>Settings</a>
-        <a class="nav-item flex items-center gap-3 px-4 py-3 cursor-pointer" data-tab="admins"><i class="fas fa-user-shield w-4"></i>Admin Users</a>
+        <a class="nav-item active flex items-center gap-3 px-4 py-3" data-tab="dashboard"><i class="fas fa-gauge-high w-4"></i>Dashboard</a>
+        <a class="nav-item flex items-center gap-3 px-4 py-3" data-tab="orders"><i class="fas fa-receipt w-4"></i>Orders</a>
+        <a class="nav-item flex items-center gap-3 px-4 py-3" data-tab="businesses"><i class="fas fa-building w-4"></i>Businesses</a>
+        <a class="nav-item flex items-center gap-3 px-4 py-3" data-tab="products"><i class="fas fa-box-open w-4"></i>Products</a>
+        <a class="nav-item flex items-center gap-3 px-4 py-3" data-tab="banners"><i class="fas fa-images w-4"></i>Banners</a>
+        <a class="nav-item flex items-center gap-3 px-4 py-3" data-tab="payments"><i class="fas fa-money-bill-wave w-4"></i>Payment Methods</a>
+        <a class="nav-item flex items-center gap-3 px-4 py-3" data-tab="discounts"><i class="fas fa-percent w-4"></i>Discounts</a>
+        <a class="nav-item flex items-center gap-3 px-4 py-3" data-tab="expenses"><i class="fas fa-wallet w-4"></i>Expenses</a>
+        <a class="nav-item flex items-center gap-3 px-4 py-3" data-tab="customers"><i class="fas fa-users w-4"></i>Customers</a>
+        <a class="nav-item flex items-center gap-3 px-4 py-3" data-tab="settings"><i class="fas fa-gear w-4"></i>Settings</a>
+        <a class="nav-item flex items-center gap-3 px-4 py-3" data-tab="admins"><i class="fas fa-user-shield w-4"></i>Admin Users</a>
       </nav>
-      <div class="p-4 border-t border-slate-700">
-        <a href="?" id="viewStoreLink" target="_top" class="text-slate-300 text-sm hover:underline block mb-2"><i class="fas fa-store mr-1"></i>View Store</a>
+      <div class="p-4 border-t" style="border-color:rgba(255,255,255,.1)">
+        <a href="?" id="viewStoreLink" target="_top" class="text-sm hover:underline block mb-2"><i class="fas fa-store mr-1"></i>View Store</a>
         <button onclick="adminDoLogout()" class="text-red-400 text-sm hover:underline"><i class="fas fa-sign-out-alt mr-1"></i>Logout</button>
       </div>
     </aside>
 
-    <!-- Content -->
-    <main class="flex-grow p-6 overflow-y-auto">
+    <main class="flex-grow min-w-0 overflow-y-auto">
+      <!-- Mobile top bar -->
+      <div class="lg:hidden sticky top-0 z-30 flex items-center gap-3 px-4 py-3 surface shadow">
+        <button onclick="toggleSidebar()" class="text-xl"><i class="fas fa-bars"></i></button>
+        <span class="font-bold">Admin Portal</span>
+      </div>
+
+      <div class="p-4 md:p-6">
 
       <!-- Dashboard -->
       <section id="tab-dashboard" class="tab-section">
         <h1 class="text-2xl font-bold mb-4">Dashboard</h1>
-        <div id="kpiGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"></div>
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div id="kpiGrid" class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6"></div>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           <div class="lg:col-span-2 kpi-card">
             <h3 class="font-semibold mb-3">Sales — last 14 days (confirmed payments)</h3>
-            <canvas id="salesChart" height="120"></canvas>
+            <canvas id="salesChart" height="160"></canvas>
           </div>
-          <div class="kpi-card">
-            <h3 class="font-semibold mb-3">Low Stock</h3>
-            <div id="lowStockList" class="text-sm space-y-1"></div>
-          </div>
-          <div class="kpi-card">
-            <h3 class="font-semibold mb-3">Sales by Business</h3>
-            <div id="bizBreakdown" class="text-sm space-y-1"></div>
-          </div>
-          <div class="kpi-card">
-            <h3 class="font-semibold mb-3">Top Selling Products</h3>
-            <div id="topProducts" class="text-sm space-y-1"></div>
-          </div>
+          <div class="kpi-card"><h3 class="font-semibold mb-3">Low Stock</h3><div id="lowStockList" class="text-sm space-y-1"></div></div>
+          <div class="kpi-card"><h3 class="font-semibold mb-3">Sales by Business</h3><div id="bizBreakdown" class="text-sm space-y-1"></div></div>
+          <div class="kpi-card"><h3 class="font-semibold mb-3">Top Selling Products</h3><div id="topProducts" class="text-sm space-y-1"></div></div>
         </div>
       </section>
 
@@ -107,22 +142,24 @@
       <section id="tab-orders" class="tab-section hidden">
         <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
           <h1 class="text-2xl font-bold">Orders</h1>
-          <button onclick="exportOrdersCsv()" class="bg-slate-700 text-white px-4 py-2 rounded-lg text-sm"><i class="fas fa-download mr-1"></i>Export CSV</button>
+          <button onclick="exportOrdersCsv()" class="surface bordered px-4 py-2 rounded-lg text-sm"><i class="fas fa-download mr-1"></i>Export CSV</button>
         </div>
-        <div class="flex flex-wrap gap-2 mb-4">
-          <input id="orderSearch" placeholder="Search order id / name / phone" class="p-2 border rounded-lg text-sm flex-grow">
-          <select id="orderPaymentFilter" class="p-2 border rounded-lg text-sm">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
+          <input id="orderSearch" placeholder="Search order id / name / phone" class="p-2 rounded-lg text-sm lg:col-span-2">
+          <select id="orderPaymentFilter" class="p-2 rounded-lg text-sm">
             <option value="">All Payment Status</option>
             <option>Pending Verification</option><option>Confirmed</option><option>Rejected</option>
           </select>
-          <select id="orderStatusFilter" class="p-2 border rounded-lg text-sm">
-            <option value="">All Order Status</option>
-            <option>Pending</option><option>Processing</option><option>Shipped</option><option>Completed</option><option>Cancelled</option>
-          </select>
-          <button onclick="loadOrders()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">Filter</button>
+          <div class="flex gap-2">
+            <select id="orderStatusFilter" class="p-2 rounded-lg text-sm flex-grow">
+              <option value="">All Order Status</option>
+              <option>Pending</option><option>Processing</option><option>Shipped</option><option>Completed</option><option>Cancelled</option>
+            </select>
+            <button onclick="loadOrders()" class="bg-primary px-4 py-2 rounded-lg text-sm">Filter</button>
+          </div>
         </div>
-        <div class="overflow-x-auto bg-white rounded-lg shadow"><table class="admin-table w-full" id="ordersTable">
-          <thead><tr><th>Order ID</th><th>Date</th><th>Customer</th><th>Phone</th><th>Total</th><th>Payment</th><th>Status</th><th>Actions</th></tr></thead>
+        <div class="table-wrap surface rounded-lg shadow"><table class="admin-table" id="ordersTable">
+          <thead><tr><th>Order ID</th><th>Date</th><th>Customer</th><th>Phone</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody></tbody>
         </table></div>
       </section>
@@ -130,24 +167,21 @@
       <!-- Businesses -->
       <section id="tab-businesses" class="tab-section hidden">
         <h1 class="text-2xl font-bold mb-4">Businesses</h1>
-        <form id="businessForm" class="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3" onsubmit="saveBusiness(event)">
+        <form id="businessForm" class="surface p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3" onsubmit="saveBusiness(event)">
           <input type="hidden" id="bizId">
-          <input id="bizName" placeholder="Business Name" class="p-2 border rounded-lg" required>
-          <input id="bizSort" type="number" placeholder="Sort Order" class="p-2 border rounded-lg" value="1">
-          <textarea id="bizDescription" placeholder="Description" class="p-2 border rounded-lg md:col-span-2"></textarea>
-          <div class="md:col-span-2 flex items-center gap-3">
-            <input id="bizLogoUrl" placeholder="Logo Image URL" class="p-2 border rounded-lg flex-grow">
-            <input type="file" id="bizLogoFile" accept="image/*" class="text-sm">
-          </div>
-          <input id="bizWhatsapp" placeholder="Business WhatsApp number (optional, overrides default)" class="p-2 border rounded-lg md:col-span-2">
+          <input id="bizName" placeholder="Business Name" class="p-2 rounded-lg" required>
+          <input id="bizSort" type="number" placeholder="Sort Order" class="p-2 rounded-lg" value="1">
+          <textarea id="bizDescription" placeholder="Description" class="p-2 rounded-lg md:col-span-2"></textarea>
+          <div class="md:col-span-2" id="picker-bizLogo"></div>
+          <input id="bizWhatsapp" placeholder="Business WhatsApp number (optional, overrides default)" class="p-2 rounded-lg md:col-span-2">
           <label class="flex items-center gap-2"><input type="checkbox" id="bizActive" checked> Active</label>
-          <div class="md:col-span-2 flex gap-2">
-            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Save Business</button>
-            <button type="button" onclick="resetBusinessForm()" class="bg-gray-200 px-4 py-2 rounded-lg">Clear</button>
+          <div class="md:col-span-2 flex flex-wrap gap-2">
+            <button type="submit" class="bg-primary px-4 py-2 rounded-lg">Save Business</button>
+            <button type="button" onclick="resetBusinessForm()" class="surface-2 bordered px-4 py-2 rounded-lg">Clear</button>
           </div>
         </form>
-        <div class="overflow-x-auto bg-white rounded-lg shadow"><table class="admin-table w-full">
-          <thead><tr><th>Name</th><th>Description</th><th>Active</th><th>Sort</th><th>Actions</th></tr></thead>
+        <div class="table-wrap surface rounded-lg shadow"><table class="admin-table">
+          <thead><tr><th>Logo</th><th>Name</th><th>Description</th><th>Active</th><th>Sort</th><th>Actions</th></tr></thead>
           <tbody id="businessTableBody"></tbody>
         </table></div>
       </section>
@@ -155,28 +189,32 @@
       <!-- Products -->
       <section id="tab-products" class="tab-section hidden">
         <h1 class="text-2xl font-bold mb-4">Products &amp; Services</h1>
-        <form id="productForm" class="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3" onsubmit="saveProduct(event)">
+        <form id="productForm" class="surface p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3" onsubmit="saveProduct(event)">
           <input type="hidden" id="prdId">
-          <select id="prdBusiness" class="p-2 border rounded-lg" required></select>
-          <input id="prdName" placeholder="Product / Service Name" class="p-2 border rounded-lg" required>
-          <input id="prdCategory" placeholder="Category" class="p-2 border rounded-lg">
-          <input id="prdPrice" type="number" step="0.01" placeholder="Price" class="p-2 border rounded-lg">
-          <input id="prdStock" type="number" placeholder="Stock (blank = unlimited/service)" class="p-2 border rounded-lg">
-          <div class="flex items-center gap-3">
-            <input id="prdImageUrl" placeholder="Image URL" class="p-2 border rounded-lg flex-grow">
-            <input type="file" id="prdImageFile" accept="image/*" class="text-sm">
+          <label class="text-sm">Business<select id="prdBusiness" class="p-2 rounded-lg w-full mt-1" required></select></label>
+          <label class="text-sm">Name<input id="prdName" placeholder="Product / Service Name" class="p-2 rounded-lg w-full mt-1" required></label>
+          <label class="text-sm">Category<input id="prdCategory" placeholder="e.g. Data Bundles" class="p-2 rounded-lg w-full mt-1"></label>
+          <label class="text-sm">Price<input id="prdPrice" type="number" step="0.01" placeholder="0.00" class="p-2 rounded-lg w-full mt-1"></label>
+          <label class="text-sm">Stock <span class="muted">(blank = unlimited / digital)</span><input id="prdStock" type="number" placeholder="blank = unlimited" class="p-2 rounded-lg w-full mt-1"></label>
+          <label class="text-sm">Recipient field label<input id="prdRecipientLabel" placeholder="e.g. Phone number to receive the bundle" class="p-2 rounded-lg w-full mt-1"></label>
+          <div class="md:col-span-2" id="picker-prdImage"></div>
+          <textarea id="prdDescription" placeholder="Description" class="p-2 rounded-lg md:col-span-2"></textarea>
+          <textarea id="prdConfirmationNote" placeholder="Important note shown in the confirmation popup (e.g. bundle SIM restrictions)" class="p-2 rounded-lg md:col-span-2" rows="3"></textarea>
+          <div class="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-2 surface-2 bordered rounded-lg p-3">
+            <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdRequiresRecipient" class="mt-1"> <span>Ask for a phone number before adding to cart <span class="muted">(data bundles — shows the confirmation popup)</span></span></label>
+            <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdEnquireWhatsapp" class="mt-1"> <span>Send customers to WhatsApp instead of Add to Cart <span class="muted">(custom installs like School Siren)</span></span></label>
+            <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdIsService" class="mt-1"> <span>This is a service (not physical stock)</span></label>
+            <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdInStock" class="mt-1" checked> <span>In stock <span class="muted">(untick to show "Out of Stock")</span></span></label>
+            <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdActive" class="mt-1" checked> <span>Active <span class="muted">(untick to hide from the store)</span></span></label>
           </div>
-          <textarea id="prdDescription" placeholder="Description" class="p-2 border rounded-lg md:col-span-2"></textarea>
-          <label class="flex items-center gap-2"><input type="checkbox" id="prdIsService"> This is a service (not physical stock)</label>
-          <label class="flex items-center gap-2"><input type="checkbox" id="prdEnquireWhatsapp"> Direct customers to WhatsApp instead of Add to Cart (e.g. custom installs like School Siren)</label>
-          <label class="flex items-center gap-2"><input type="checkbox" id="prdActive" checked> Active</label>
-          <div class="md:col-span-2 flex gap-2">
-            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Save Product</button>
-            <button type="button" onclick="resetProductForm()" class="bg-gray-200 px-4 py-2 rounded-lg">Clear</button>
+          <div class="md:col-span-2 flex flex-wrap gap-2">
+            <button type="submit" class="bg-primary px-4 py-2 rounded-lg">Save Product</button>
+            <button type="button" onclick="resetProductForm()" class="surface-2 bordered px-4 py-2 rounded-lg">Clear</button>
           </div>
         </form>
-        <div class="overflow-x-auto bg-white rounded-lg shadow"><table class="admin-table w-full">
-          <thead><tr><th>Image</th><th>Name</th><th>Business</th><th>Category</th><th>Price</th><th>Stock</th><th>Flags</th><th>Active</th><th>Actions</th></tr></thead>
+        <input id="productSearch" placeholder="Filter products..." oninput="renderProductTable()" class="p-2 rounded-lg mb-3 w-full sm:w-72">
+        <div class="table-wrap surface rounded-lg shadow"><table class="admin-table">
+          <thead><tr><th>Image</th><th>Name</th><th>Business</th><th>Price</th><th>Stock</th><th>Flags</th><th>Availability</th><th>Actions</th></tr></thead>
           <tbody id="productTableBody"></tbody>
         </table></div>
       </section>
@@ -184,22 +222,19 @@
       <!-- Banners -->
       <section id="tab-banners" class="tab-section hidden">
         <h1 class="text-2xl font-bold mb-4">Carousel Banners</h1>
-        <form id="bannerForm" class="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3" onsubmit="saveBanner(event)">
+        <form id="bannerForm" class="surface p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3" onsubmit="saveBanner(event)">
           <input type="hidden" id="banId">
-          <div class="flex items-center gap-3 md:col-span-2">
-            <input id="banImageUrl" placeholder="Banner Image URL" class="p-2 border rounded-lg flex-grow" required>
-            <input type="file" id="banImageFile" accept="image/*" class="text-sm">
-          </div>
-          <input id="banTitle" placeholder="Title (optional)" class="p-2 border rounded-lg">
-          <input id="banLink" placeholder="Link URL (optional)" class="p-2 border rounded-lg">
-          <input id="banSort" type="number" placeholder="Sort Order" class="p-2 border rounded-lg" value="1">
+          <div class="md:col-span-2" id="picker-banImage"></div>
+          <input id="banTitle" placeholder="Title (optional)" class="p-2 rounded-lg">
+          <input id="banLink" placeholder="Link URL (optional)" class="p-2 rounded-lg">
+          <input id="banSort" type="number" placeholder="Sort Order" class="p-2 rounded-lg" value="1">
           <label class="flex items-center gap-2"><input type="checkbox" id="banActive" checked> Active</label>
-          <div class="md:col-span-2 flex gap-2">
-            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Save Banner</button>
-            <button type="button" onclick="resetBannerForm()" class="bg-gray-200 px-4 py-2 rounded-lg">Clear</button>
+          <div class="md:col-span-2 flex flex-wrap gap-2">
+            <button type="submit" class="bg-primary px-4 py-2 rounded-lg">Save Banner</button>
+            <button type="button" onclick="resetBannerForm()" class="surface-2 bordered px-4 py-2 rounded-lg">Clear</button>
           </div>
         </form>
-        <div class="overflow-x-auto bg-white rounded-lg shadow"><table class="admin-table w-full">
+        <div class="table-wrap surface rounded-lg shadow"><table class="admin-table">
           <thead><tr><th>Preview</th><th>Title</th><th>Active</th><th>Sort</th><th>Actions</th></tr></thead>
           <tbody id="bannerTableBody"></tbody>
         </table></div>
@@ -208,24 +243,24 @@
       <!-- Payment Methods -->
       <section id="tab-payments" class="tab-section hidden">
         <h1 class="text-2xl font-bold mb-4">Payment Methods</h1>
-        <form id="paymentForm" class="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3" onsubmit="savePaymentMethod(event)">
+        <form id="paymentForm" class="surface p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3" onsubmit="savePaymentMethod(event)">
           <input type="hidden" id="pmId">
-          <select id="pmType" class="p-2 border rounded-lg">
+          <label class="text-sm">Type<select id="pmType" class="p-2 rounded-lg w-full mt-1">
             <option>Mobile Money</option><option>Bank Transfer</option><option>Cash on Delivery</option><option>Other</option>
-          </select>
-          <input id="pmLabel" placeholder="Label shown to customers (e.g. Mobile Money)" class="p-2 border rounded-lg" required>
-          <input id="pmAccountName" placeholder="Account Name (e.g. Emmanuel Darkoh)" class="p-2 border rounded-lg">
-          <input id="pmAccountNumber" placeholder="Account / Number (e.g. 0547359015)" class="p-2 border rounded-lg" required>
-          <input id="pmProvider" placeholder="Provider (e.g. MTN Mobile Money)" class="p-2 border rounded-lg">
-          <input id="pmSort" type="number" placeholder="Sort Order" class="p-2 border rounded-lg" value="1">
-          <textarea id="pmInstructions" placeholder="Extra instructions shown at checkout" class="p-2 border rounded-lg md:col-span-2"></textarea>
+          </select></label>
+          <label class="text-sm">Label shown to customers<input id="pmLabel" placeholder="e.g. MTN Mobile Money" class="p-2 rounded-lg w-full mt-1" required></label>
+          <label class="text-sm">Account Name<input id="pmAccountName" placeholder="e.g. Emmanuel Darkoh" class="p-2 rounded-lg w-full mt-1"></label>
+          <label class="text-sm">Account / Number<input id="pmAccountNumber" placeholder="e.g. 0547359015" class="p-2 rounded-lg w-full mt-1" required></label>
+          <label class="text-sm">Provider<input id="pmProvider" placeholder="e.g. MTN Mobile Money" class="p-2 rounded-lg w-full mt-1"></label>
+          <label class="text-sm">Sort Order<input id="pmSort" type="number" class="p-2 rounded-lg w-full mt-1" value="1"></label>
+          <textarea id="pmInstructions" placeholder="Extra instructions shown at checkout" class="p-2 rounded-lg md:col-span-2"></textarea>
           <label class="flex items-center gap-2"><input type="checkbox" id="pmActive" checked> Active</label>
-          <div class="md:col-span-2 flex gap-2">
-            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Save Payment Method</button>
-            <button type="button" onclick="resetPaymentForm()" class="bg-gray-200 px-4 py-2 rounded-lg">Clear</button>
+          <div class="md:col-span-2 flex flex-wrap gap-2">
+            <button type="submit" class="bg-primary px-4 py-2 rounded-lg">Save Payment Method</button>
+            <button type="button" onclick="resetPaymentForm()" class="surface-2 bordered px-4 py-2 rounded-lg">Clear</button>
           </div>
         </form>
-        <div class="overflow-x-auto bg-white rounded-lg shadow"><table class="admin-table w-full">
+        <div class="table-wrap surface rounded-lg shadow"><table class="admin-table">
           <thead><tr><th>Label</th><th>Account</th><th>Provider</th><th>Active</th><th>Actions</th></tr></thead>
           <tbody id="paymentTableBody"></tbody>
         </table></div>
@@ -234,31 +269,31 @@
       <!-- Discounts -->
       <section id="tab-discounts" class="tab-section hidden">
         <h1 class="text-2xl font-bold mb-4">Discounts</h1>
-        <form id="discountForm" class="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3" onsubmit="saveDiscount(event)">
+        <form id="discountForm" class="surface p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3" onsubmit="saveDiscount(event)">
           <input type="hidden" id="dscId">
-          <input id="dscLabel" placeholder="Label (e.g. Back to School Sale)" class="p-2 border rounded-lg">
-          <select id="dscScope" class="p-2 border rounded-lg" onchange="onDiscountScopeChange()">
+          <input id="dscLabel" placeholder="Label (e.g. Back to School Sale)" class="p-2 rounded-lg">
+          <select id="dscScope" class="p-2 rounded-lg" onchange="onDiscountScopeChange()">
             <option value="global">Entire Store</option>
             <option value="business">Specific Business</option>
             <option value="product">Specific Product</option>
           </select>
-          <select id="dscTarget" class="p-2 border rounded-lg hidden"></select>
-          <select id="dscType" class="p-2 border rounded-lg">
+          <select id="dscTarget" class="p-2 rounded-lg hidden"></select>
+          <select id="dscType" class="p-2 rounded-lg">
             <option value="percent">Percent (%)</option>
             <option value="fixed">Fixed Amount</option>
           </select>
-          <input id="dscValue" type="number" step="0.01" placeholder="Value" class="p-2 border rounded-lg" required>
+          <input id="dscValue" type="number" step="0.01" placeholder="Value" class="p-2 rounded-lg" required>
           <div class="flex gap-2">
-            <input id="dscStart" type="date" class="p-2 border rounded-lg flex-grow">
-            <input id="dscEnd" type="date" class="p-2 border rounded-lg flex-grow">
+            <input id="dscStart" type="date" class="p-2 rounded-lg flex-grow">
+            <input id="dscEnd" type="date" class="p-2 rounded-lg flex-grow">
           </div>
           <label class="flex items-center gap-2"><input type="checkbox" id="dscActive" checked> Active</label>
-          <div class="md:col-span-2 flex gap-2">
-            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Save Discount</button>
-            <button type="button" onclick="resetDiscountForm()" class="bg-gray-200 px-4 py-2 rounded-lg">Clear</button>
+          <div class="md:col-span-2 flex flex-wrap gap-2">
+            <button type="submit" class="bg-primary px-4 py-2 rounded-lg">Save Discount</button>
+            <button type="button" onclick="resetDiscountForm()" class="surface-2 bordered px-4 py-2 rounded-lg">Clear</button>
           </div>
         </form>
-        <div class="overflow-x-auto bg-white rounded-lg shadow"><table class="admin-table w-full">
+        <div class="table-wrap surface rounded-lg shadow"><table class="admin-table">
           <thead><tr><th>Label</th><th>Scope</th><th>Type</th><th>Value</th><th>Dates</th><th>Active</th><th>Actions</th></tr></thead>
           <tbody id="discountTableBody"></tbody>
         </table></div>
@@ -267,16 +302,16 @@
       <!-- Expenses -->
       <section id="tab-expenses" class="tab-section hidden">
         <h1 class="text-2xl font-bold mb-4">Expenses</h1>
-        <form id="expenseForm" class="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3" onsubmit="saveExpense(event)">
-          <input id="expDate" type="date" class="p-2 border rounded-lg">
-          <select id="expBusiness" class="p-2 border rounded-lg"><option value="">General / Not business-specific</option></select>
-          <input id="expCategory" placeholder="Category (e.g. Delivery, Airtime, Supplies)" class="p-2 border rounded-lg" required>
-          <input id="expAmount" type="number" step="0.01" placeholder="Amount" class="p-2 border rounded-lg" required>
-          <textarea id="expDescription" placeholder="Description" class="p-2 border rounded-lg md:col-span-2"></textarea>
-          <div class="md:col-span-2"><button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Add Expense</button></div>
+        <form id="expenseForm" class="surface p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3" onsubmit="saveExpense(event)">
+          <input id="expDate" type="date" class="p-2 rounded-lg">
+          <select id="expBusiness" class="p-2 rounded-lg"><option value="">General / Not business-specific</option></select>
+          <input id="expCategory" placeholder="Category (e.g. Delivery, Airtime, Supplies)" class="p-2 rounded-lg" required>
+          <input id="expAmount" type="number" step="0.01" placeholder="Amount" class="p-2 rounded-lg" required>
+          <textarea id="expDescription" placeholder="Description" class="p-2 rounded-lg md:col-span-2"></textarea>
+          <div class="md:col-span-2"><button type="submit" class="bg-primary px-4 py-2 rounded-lg">Add Expense</button></div>
         </form>
         <p class="mb-2 font-semibold">Total Expenses: <span id="expenseTotal">0.00</span></p>
-        <div class="overflow-x-auto bg-white rounded-lg shadow"><table class="admin-table w-full">
+        <div class="table-wrap surface rounded-lg shadow"><table class="admin-table">
           <thead><tr><th>Date</th><th>Business</th><th>Category</th><th>Description</th><th>Amount</th><th>Added By</th><th>Actions</th></tr></thead>
           <tbody id="expenseTableBody"></tbody>
         </table></div>
@@ -285,7 +320,7 @@
       <!-- Customers -->
       <section id="tab-customers" class="tab-section hidden">
         <h1 class="text-2xl font-bold mb-4">Registered Customers</h1>
-        <div class="overflow-x-auto bg-white rounded-lg shadow"><table class="admin-table w-full">
+        <div class="table-wrap surface rounded-lg shadow"><table class="admin-table">
           <thead><tr><th>Name</th><th>Username</th><th>Phone</th><th>Address</th><th>Joined</th></tr></thead>
           <tbody id="customerTableBody"></tbody>
         </table></div>
@@ -294,67 +329,142 @@
       <!-- Settings -->
       <section id="tab-settings" class="tab-section hidden">
         <h1 class="text-2xl font-bold mb-4">Store Settings</h1>
-        <form id="settingsForm" class="bg-white p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-3 max-w-3xl" onsubmit="saveSettings(event)">
-          <label class="text-sm md:col-span-2">Site Name<input id="setSiteName" class="p-2 border rounded-lg w-full mt-1"></label>
-          <label class="text-sm">Currency Code<input id="setCurrency" class="p-2 border rounded-lg w-full mt-1"></label>
-          <label class="text-sm">Currency Symbol/Prefix<input id="setCurrencySymbol" class="p-2 border rounded-lg w-full mt-1"></label>
-          <label class="text-sm md:col-span-2">Default WhatsApp Number (for the floating button / enquiries)<input id="setWhatsapp" class="p-2 border rounded-lg w-full mt-1" placeholder="e.g. 0547359015 or 233547359015"></label>
-          <label class="text-sm md:col-span-2">WhatsApp Greeting Message<input id="setWhatsappGreeting" class="p-2 border rounded-lg w-full mt-1"></label>
-          <label class="text-sm md:col-span-2">Chatbot Greeting<input id="setChatbotGreeting" class="p-2 border rounded-lg w-full mt-1"></label>
-          <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="setChatbotEnabled"> Chatbot Enabled</label>
-          <div class="md:col-span-2"><button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Save Settings</button></div>
+        <form id="settingsForm" class="space-y-6 max-w-4xl" onsubmit="saveSettings(event)">
+
+          <div class="surface p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-3">
+            <h2 class="font-bold md:col-span-2">General</h2>
+            <label class="text-sm md:col-span-2">Site Name<input id="setSiteName" class="p-2 rounded-lg w-full mt-1"></label>
+            <label class="text-sm">Currency Code<input id="setCurrency" class="p-2 rounded-lg w-full mt-1"></label>
+            <label class="text-sm">Currency Symbol / Prefix<input id="setCurrencySymbol" class="p-2 rounded-lg w-full mt-1"></label>
+          </div>
+
+          <div class="surface p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-3">
+            <h2 class="font-bold md:col-span-2">Header News Banner</h2>
+            <p class="text-sm muted md:col-span-2">This message scrolls across the top of the storefront.</p>
+            <label class="text-sm md:col-span-2">News Text<input id="setNewsTicker" class="p-2 rounded-lg w-full mt-1" placeholder="e.g. Free delivery this weekend on all picture frames!"></label>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="setNewsTickerEnabled"> Show news banner</label>
+          </div>
+
+          <div class="surface p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-3">
+            <h2 class="font-bold md:col-span-2">Theme &amp; Colors</h2>
+            <label class="text-sm">Primary Color
+              <span class="flex gap-2 mt-1"><input id="setPrimaryColor" type="color" class="p-1 rounded-lg h-10 w-16"><input id="setPrimaryColorText" class="p-2 rounded-lg flex-grow" placeholder="#2563eb"></span>
+            </label>
+            <label class="text-sm">Accent / Sale Color
+              <span class="flex gap-2 mt-1"><input id="setAccentColor" type="color" class="p-1 rounded-lg h-10 w-16"><input id="setAccentColorText" class="p-2 rounded-lg flex-grow" placeholder="#dc2626"></span>
+            </label>
+            <label class="text-sm">Theme Mode<select id="setThemeMode" class="p-2 rounded-lg w-full mt-1"><option value="light">Light</option><option value="dark">Dark</option></select></label>
+            <div class="md:col-span-2 flex flex-wrap gap-2 items-center">
+              <span class="text-sm muted">Quick presets:</span>
+              <button type="button" onclick="applyPreset('#2563eb','#dc2626')" class="w-8 h-8 rounded-full" style="background:#2563eb" title="Blue"></button>
+              <button type="button" onclick="applyPreset('#059669','#f59e0b')" class="w-8 h-8 rounded-full" style="background:#059669" title="Green"></button>
+              <button type="button" onclick="applyPreset('#7c3aed','#ec4899')" class="w-8 h-8 rounded-full" style="background:#7c3aed" title="Purple"></button>
+              <button type="button" onclick="applyPreset('#ea580c','#0891b2')" class="w-8 h-8 rounded-full" style="background:#ea580c" title="Orange"></button>
+              <button type="button" onclick="applyPreset('#0f172a','#eab308')" class="w-8 h-8 rounded-full" style="background:#0f172a" title="Midnight"></button>
+            </div>
+          </div>
+
+          <div class="surface p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-3">
+            <h2 class="font-bold md:col-span-2">Contact &amp; Location (shown in the store footer)</h2>
+            <label class="text-sm">Contact Phone<input id="setContactPhone" class="p-2 rounded-lg w-full mt-1"></label>
+            <label class="text-sm">Contact Email<input id="setContactEmail" type="email" class="p-2 rounded-lg w-full mt-1"></label>
+            <label class="text-sm md:col-span-2">Address<input id="setContactAddress" class="p-2 rounded-lg w-full mt-1"></label>
+            <label class="text-sm md:col-span-2">Google Maps Embed URL
+              <input id="setMapEmbedURL" class="p-2 rounded-lg w-full mt-1" placeholder="https://www.google.com/maps/embed?pb=...">
+              <span class="muted text-xs">Google Maps → Share → Embed a map → copy just the src="..." link.</span>
+            </label>
+          </div>
+
+          <div class="surface p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-3">
+            <h2 class="font-bold md:col-span-2">Social Media</h2>
+            <label class="text-sm">Facebook URL<input id="setFacebookURL" class="p-2 rounded-lg w-full mt-1"></label>
+            <label class="text-sm">Instagram URL<input id="setInstagramURL" class="p-2 rounded-lg w-full mt-1"></label>
+            <label class="text-sm">X / Twitter URL<input id="setTwitterURL" class="p-2 rounded-lg w-full mt-1"></label>
+            <label class="text-sm">TikTok URL<input id="setTikTokURL" class="p-2 rounded-lg w-full mt-1"></label>
+            <label class="text-sm">YouTube URL<input id="setYouTubeURL" class="p-2 rounded-lg w-full mt-1"></label>
+            <label class="text-sm">LinkedIn URL<input id="setLinkedInURL" class="p-2 rounded-lg w-full mt-1"></label>
+          </div>
+
+          <div class="surface p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-3">
+            <h2 class="font-bold md:col-span-2">WhatsApp &amp; Chatbot</h2>
+            <label class="text-sm md:col-span-2">Default WhatsApp Number<input id="setWhatsapp" class="p-2 rounded-lg w-full mt-1" placeholder="e.g. 0547359015"></label>
+            <label class="text-sm md:col-span-2">WhatsApp Greeting Message<input id="setWhatsappGreeting" class="p-2 rounded-lg w-full mt-1"></label>
+            <label class="text-sm md:col-span-2">Chatbot Greeting<input id="setChatbotGreeting" class="p-2 rounded-lg w-full mt-1"></label>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="setChatbotEnabled"> Chatbot Enabled</label>
+          </div>
+
+          <div class="surface p-4 rounded-lg shadow">
+            <h2 class="font-bold mb-2">Default Bundle Disclaimer</h2>
+            <p class="text-sm muted mb-2">Used in the confirmation popup for any product that asks for a phone number and has no note of its own.</p>
+            <textarea id="setBundleDisclaimer" class="p-2 rounded-lg w-full" rows="3"></textarea>
+          </div>
+
+          <button type="submit" class="bg-primary px-6 py-3 rounded-lg font-semibold">Save All Settings</button>
         </form>
       </section>
 
       <!-- Admin Users -->
       <section id="tab-admins" class="tab-section hidden">
         <h1 class="text-2xl font-bold mb-4">Admin Users</h1>
-        <form id="adminForm" class="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl" onsubmit="addAdminUser(event)">
-          <input id="admName" placeholder="Full Name" class="p-2 border rounded-lg" required>
-          <input id="admUsername" placeholder="Username" class="p-2 border rounded-lg" required>
-          <input id="admPassword" type="password" placeholder="Password" class="p-2 border rounded-lg" required>
-          <select id="admRole" class="p-2 border rounded-lg"><option value="staff">Staff</option><option value="owner">Owner</option></select>
-          <div class="md:col-span-2"><button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Add Admin</button></div>
+        <form id="adminForm" class="surface p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl" onsubmit="addAdminUser(event)">
+          <input id="admName" placeholder="Full Name" class="p-2 rounded-lg" required>
+          <input id="admUsername" placeholder="Username" class="p-2 rounded-lg" required>
+          <input id="admPassword" type="password" placeholder="Password (min 6 characters)" class="p-2 rounded-lg" required>
+          <select id="admRole" class="p-2 rounded-lg"><option value="staff">Staff</option><option value="owner">Owner</option></select>
+          <div class="md:col-span-2"><button type="submit" class="bg-primary px-4 py-2 rounded-lg">Add Admin</button></div>
         </form>
-        <div class="overflow-x-auto bg-white rounded-lg shadow mb-8"><table class="admin-table w-full">
+        <div class="table-wrap surface rounded-lg shadow mb-8"><table class="admin-table">
           <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Created</th></tr></thead>
           <tbody id="adminTableBody"></tbody>
         </table></div>
 
         <h2 class="text-xl font-bold mb-3">Change My Password</h2>
-        <form id="pwForm" class="bg-white p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl" onsubmit="changeMyPassword(event)">
-          <input id="pwCurrent" type="password" placeholder="Current Password" class="p-2 border rounded-lg" required>
-          <input id="pwNew" type="password" placeholder="New Password" class="p-2 border rounded-lg" required>
-          <div class="md:col-span-2"><button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Update Password</button></div>
+        <form id="pwForm" class="surface p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl" onsubmit="changeMyPassword(event)">
+          <input id="pwCurrent" type="password" placeholder="Current Password" class="p-2 rounded-lg" required>
+          <input id="pwNew" type="password" placeholder="New Password" class="p-2 rounded-lg" required>
+          <div class="md:col-span-2"><button type="submit" class="bg-primary px-4 py-2 rounded-lg">Update Password</button></div>
         </form>
       </section>
 
+      </div>
     </main>
   </div>
 
   <!-- Order Details Modal -->
-  <div id="orderModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
-    <div class="bg-white w-full max-w-2xl p-6 rounded-lg shadow-lg relative max-h-[85vh] overflow-y-auto">
-      <button class="absolute top-4 right-4" onclick="document.getElementById('orderModal').classList.add('hidden')"><i class="fas fa-times fa-lg"></i></button>
+  <div id="orderModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 p-4">
+    <div class="surface w-full max-w-2xl p-5 sm:p-6 rounded-lg shadow-lg relative" style="max-height:92vh;overflow-y:auto">
+      <button class="absolute top-4 right-4 muted" onclick="closeOrderModal()"><i class="fas fa-times fa-lg"></i></button>
       <div id="orderModalBody"></div>
     </div>
   </div>
 
   <!-- Loading Spinner -->
-  <div id="loadingSpinner" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden z-[60]">
+  <div id="loadingSpinner" class="fixed inset-0 flex items-center justify-center bg-black/50 hidden z-[60]">
     <div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-16 w-16"></div>
   </div>
 
   <script>
     var adminToken = sessionStorage.getItem('mb_admin_token') || null;
-    var adminInfo = JSON.parse(sessionStorage.getItem('mb_admin_info') || 'null');
-    var cache = { businesses: [], products: [], settings: {} };
+    var adminInfo = null;
+    try { adminInfo = JSON.parse(sessionStorage.getItem('mb_admin_info') || 'null'); } catch (e) { adminInfo = null; }
+    var cache = { businesses: [], products: [], banners: [], paymentMethods: [], discounts: [], settings: {} };
 
     function showLoadingSpinner() { document.getElementById('loadingSpinner').classList.remove('hidden'); }
     function hideLoadingSpinner() { document.getElementById('loadingSpinner').classList.add('hidden'); }
-    function toast(icon, title, text) { Swal.fire({ icon: icon, title: title, text: text, timer: icon === 'success' ? 1600 : undefined, showConfirmButton: icon !== 'success' }); }
+    function toast(icon, title, text) {
+      Swal.fire({ icon: icon, title: title, text: text, timer: icon === 'success' ? 1600 : undefined, showConfirmButton: icon !== 'success' });
+    }
     function currency(n) { return ((cache.settings && cache.settings.CurrencySymbol) || 'GHS ') + Number(n || 0).toFixed(2); }
-    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+    function fmtDate(v) {
+      if (!v) return '';
+      var d = new Date(v);
+      return isNaN(d.getTime()) ? String(v) : d.toLocaleString();
+    }
 
     function runFail(err) {
       hideLoadingSpinner();
@@ -373,20 +483,131 @@
       toast('error', 'Error', msg);
     }
 
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
+      document.getElementById('sidebarBackdrop').classList.toggle('hidden');
+    }
+
     // -------------------------------------------------------------------
-    // Auth
+    // Theme (mirrors the storefront so the admin sees their own palette)
+    // -------------------------------------------------------------------
+    function shadeColor(hex, percent) {
+      var h = String(hex || '').replace('#', '');
+      if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+      if (h.length !== 6) return hex;
+      var num = parseInt(h, 16);
+      var r = (num >> 16) & 255, g = (num >> 8) & 255, b = num & 255;
+      r = Math.round(Math.min(255, Math.max(0, r + r * percent)));
+      g = Math.round(Math.min(255, Math.max(0, g + g * percent)));
+      b = Math.round(Math.min(255, Math.max(0, b + b * percent)));
+      return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+    }
+    function contrastOn(hex) {
+      var h = String(hex || '').replace('#', '');
+      if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+      if (h.length !== 6) return '#ffffff';
+      var num = parseInt(h, 16);
+      var lum = (0.299 * ((num >> 16) & 255) + 0.587 * ((num >> 8) & 255) + 0.114 * (num & 255)) / 255;
+      return lum > 0.6 ? '#111827' : '#ffffff';
+    }
+    function applyTheme(s) {
+      var primary = (s && s.PrimaryColor) || '#2563eb';
+      var root = document.documentElement;
+      root.style.setProperty('--primary', primary);
+      root.style.setProperty('--primary-dark', shadeColor(primary, -0.2));
+      root.style.setProperty('--primary-contrast', contrastOn(primary));
+      document.body.classList.toggle('theme-dark', String(s && s.ThemeMode).toLowerCase() === 'dark');
+    }
+
+    // -------------------------------------------------------------------
+    // Reusable photo picker: URL field + file upload + live preview
+    // -------------------------------------------------------------------
+    function buildPicker(containerId, fieldId, label) {
+      var el = document.getElementById(containerId);
+      if (!el) return;
+      el.innerHTML =
+        '<label class="text-sm block mb-1">' + esc(label) + '</label>' +
+        '<div class="flex flex-col sm:flex-row gap-3 items-start">' +
+          '<img id="' + fieldId + 'Preview" src="" alt="" class="w-24 h-24 object-cover rounded-lg bordered surface-2 hidden">' +
+          '<div class="flex-grow w-full">' +
+            '<input id="' + fieldId + '" placeholder="Paste an image URL, or upload below" class="p-2 rounded-lg w-full mb-2" oninput="refreshPreview(\'' + fieldId + '\')">' +
+            '<div class="flex flex-wrap gap-2 items-center">' +
+              '<button type="button" class="bg-primary px-3 py-2 rounded-lg text-sm" onclick="document.getElementById(\'' + fieldId + 'File\').click()"><i class="fas fa-upload mr-1"></i>Choose Photo</button>' +
+              '<input type="file" id="' + fieldId + 'File" accept="image/*" class="hidden">' +
+              '<button type="button" class="surface-2 bordered px-3 py-2 rounded-lg text-sm" onclick="clearPicker(\'' + fieldId + '\')">Remove</button>' +
+              '<span id="' + fieldId + 'Status" class="text-xs muted"></span>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      wireUpload(fieldId + 'File', fieldId);
+    }
+    function refreshPreview(fieldId) {
+      var url = document.getElementById(fieldId).value.trim();
+      var img = document.getElementById(fieldId + 'Preview');
+      if (!img) return;
+      if (url) { img.src = url; img.classList.remove('hidden'); }
+      else { img.removeAttribute('src'); img.classList.add('hidden'); }
+    }
+    function clearPicker(fieldId) {
+      document.getElementById(fieldId).value = '';
+      var f = document.getElementById(fieldId + 'File');
+      if (f) f.value = '';
+      refreshPreview(fieldId);
+    }
+    function wireUpload(fileId, urlId) {
+      var fileInput = document.getElementById(fileId);
+      if (!fileInput) return;
+      fileInput.onchange = function () {
+        var file = fileInput.files[0];
+        if (!file) return;
+        if (file.size > 4 * 1024 * 1024) {
+          toast('warning', 'Image too large', 'Please choose an image under 4MB.');
+          fileInput.value = '';
+          return;
+        }
+        var status = document.getElementById(urlId + 'Status');
+        if (status) status.textContent = 'Uploading...';
+        var reader = new FileReader();
+        reader.onload = function () {
+          var base64 = String(reader.result).split(',')[1];
+          showLoadingSpinner();
+          google.script.run.withSuccessHandler(function (res) {
+            hideLoadingSpinner();
+            if (status) status.textContent = '';
+            if (res && res.success) {
+              document.getElementById(urlId).value = res.url;
+              refreshPreview(urlId);
+              toast('success', 'Image Uploaded', '');
+            } else if (res && res.needsAuth) {
+              Swal.fire({ icon: 'warning', title: 'Google Drive access needed', text: res.message, width: 620 });
+            } else {
+              toast('error', 'Upload Failed', (res && res.message) || '');
+            }
+          }).withFailureHandler(function (err) {
+            if (status) status.textContent = '';
+            runFail(err);
+          }).adminUploadImage(adminToken, base64, file.name, file.type);
+        };
+        reader.readAsDataURL(file);
+      };
+    }
+
+    // -------------------------------------------------------------------
+    // Auth / bootstrap
     // -------------------------------------------------------------------
     window.onload = function () {
+      buildPicker('picker-bizLogo', 'bizLogoUrl', 'Business Logo');
+      buildPicker('picker-prdImage', 'prdImageUrl', 'Product Photo');
+      buildPicker('picker-banImage', 'banImageUrl', 'Banner Image');
+
       google.script.run.withSuccessHandler(function (url) {
         if (!url) return;
         document.getElementById('backToStore').href = url;
         document.getElementById('viewStoreLink').href = url;
       }).getWebAppUrl();
 
-      if (adminToken) { enterApp(); return; }
+      if (adminToken && adminInfo) { enterApp(); return; }
 
-      // Ask the server whether this deployment has any admin yet, so a brand
-      // new store lands on account creation instead of an unusable login form.
       showLoadingSpinner();
       google.script.run.withSuccessHandler(function (needsSetup) {
         hideLoadingSpinner();
@@ -441,7 +662,6 @@
       sessionStorage.removeItem('mb_admin_token');
       sessionStorage.removeItem('mb_admin_info');
       adminToken = null; adminInfo = null;
-      // Swap panels directly — reloading the sandboxed iframe is unreliable.
       document.getElementById('adminApp').classList.add('hidden');
       document.getElementById('loginScreen').classList.remove('hidden');
       document.getElementById('loginPassword').value = '';
@@ -450,10 +670,15 @@
     function enterApp() {
       document.getElementById('loginScreen').classList.add('hidden');
       document.getElementById('setupScreen').classList.add('hidden');
-      document.getElementById('adminApp').classList.remove('hidden');
+      var app = document.getElementById('adminApp');
+      app.classList.remove('hidden');
+      app.classList.add('flex');
       document.getElementById('adminNameLabel').textContent = adminInfo.name + ' (' + adminInfo.role + ')';
       document.querySelectorAll('.nav-item').forEach(function (el) {
-        el.addEventListener('click', function () { showTab(el.dataset.tab); });
+        el.addEventListener('click', function () {
+          showTab(el.dataset.tab);
+          if (window.innerWidth < 1024) toggleSidebar();
+        });
       });
       loadReferenceData();
       showTab('dashboard');
@@ -473,12 +698,18 @@
 
     function loadReferenceData() {
       google.script.run.withSuccessHandler(function (list) {
-        cache.businesses = list;
-        var options = list.map(function (b) { return '<option value="' + b.BusinessID + '">' + esc(b.Name) + '</option>'; }).join('');
-        document.getElementById('prdBusiness').innerHTML = options;
-        document.getElementById('expBusiness').innerHTML = '<option value="">General / Not business-specific</option>' + options;
+        cache.businesses = list || [];
+        fillBusinessSelects();
       }).withFailureHandler(runFail).adminGetBusinesses(adminToken);
-      google.script.run.withSuccessHandler(function (s) { cache.settings = s; }).withFailureHandler(function () {}).adminGetSettings(adminToken);
+      google.script.run.withSuccessHandler(function (s) {
+        cache.settings = s || {};
+        applyTheme(cache.settings);
+      }).withFailureHandler(function () {}).adminGetSettings(adminToken);
+    }
+    function fillBusinessSelects() {
+      var options = cache.businesses.map(function (b) { return '<option value="' + esc(b.BusinessID) + '">' + esc(b.Name) + '</option>'; }).join('');
+      document.getElementById('prdBusiness').innerHTML = options;
+      document.getElementById('expBusiness').innerHTML = '<option value="">General / Not business-specific</option>' + options;
     }
 
     // -------------------------------------------------------------------
@@ -493,41 +724,53 @@
           kpi('fa-wallet', 'Total Expenses', currency(d.totalExpenses), 'text-red-600'),
           kpi('fa-scale-balanced', 'Net Profit', currency(d.netProfit), d.netProfit >= 0 ? 'text-green-600' : 'text-red-600'),
           kpi('fa-hourglass-half', 'Pending Payments', d.pendingPayments, 'text-orange-500'),
-          kpi('fa-receipt', 'Total Orders', d.totalOrders, 'text-blue-600'),
-          kpi('fa-circle-check', 'Confirmed Orders', d.confirmedOrders, 'text-blue-600'),
+          kpi('fa-receipt', 'Total Orders', d.totalOrders, 'text-primary'),
+          kpi('fa-circle-check', 'Confirmed Orders', d.confirmedOrders, 'text-primary'),
           kpi('fa-building', 'Active Businesses', d.businessCount, 'text-purple-600'),
           kpi('fa-box-open', 'Active Products', d.productCount, 'text-purple-600')
         ].join('');
-        drawSalesChart(d.salesByDay);
-        document.getElementById('lowStockList').innerHTML = d.lowStock.length ? d.lowStock.map(function (p) { return '<p>' + esc(p.name) + ' — <span class="text-red-500 font-semibold">' + p.stock + ' left</span></p>'; }).join('') : '<p class="text-gray-400">All good.</p>';
-        document.getElementById('bizBreakdown').innerHTML = d.businessBreakdown.length ? d.businessBreakdown.map(function (b) { return '<p class="flex justify-between"><span>' + esc(b.business) + '</span><span class="font-semibold">' + currency(b.total) + '</span></p>'; }).join('') : '<p class="text-gray-400">No sales yet.</p>';
-        document.getElementById('topProducts').innerHTML = d.topProducts.length ? d.topProducts.map(function (p) { return '<p class="flex justify-between"><span>' + esc(p.product) + '</span><span class="font-semibold">' + p.qty + ' sold</span></p>'; }).join('') : '<p class="text-gray-400">No sales yet.</p>';
+        drawSalesChart(d.salesByDay || []);
+        document.getElementById('lowStockList').innerHTML = (d.lowStock || []).length
+          ? d.lowStock.map(function (p) { return '<p>' + esc(p.name) + ' — <span class="text-red-500 font-semibold">' + p.stock + ' left</span></p>'; }).join('')
+          : '<p class="muted">All good.</p>';
+        document.getElementById('bizBreakdown').innerHTML = (d.businessBreakdown || []).length
+          ? d.businessBreakdown.map(function (b) { return '<p class="flex justify-between gap-2"><span>' + esc(b.business) + '</span><span class="font-semibold">' + currency(b.total) + '</span></p>'; }).join('')
+          : '<p class="muted">No sales yet.</p>';
+        document.getElementById('topProducts').innerHTML = (d.topProducts || []).length
+          ? d.topProducts.map(function (p) { return '<p class="flex justify-between gap-2"><span>' + esc(p.product) + '</span><span class="font-semibold">' + p.qty + ' sold</span></p>'; }).join('')
+          : '<p class="muted">No sales yet.</p>';
       }).withFailureHandler(runFail).adminGetDashboard(adminToken);
     }
     function kpi(icon, label, value, colorClass) {
-      return '<div class="kpi-card"><i class="fas ' + icon + ' ' + colorClass + ' text-xl mb-2"></i><p class="text-sm text-gray-500">' + label + '</p><p class="text-xl font-bold">' + value + '</p></div>';
+      return '<div class="kpi-card"><i class="fas ' + icon + ' ' + colorClass + ' text-xl mb-2"></i>' +
+        '<p class="text-sm muted">' + label + '</p><p class="text-lg sm:text-xl font-bold">' + value + '</p></div>';
     }
     function drawSalesChart(days) {
       var canvas = document.getElementById('salesChart');
+      if (!canvas || !days.length) return;
       var ctx = canvas.getContext('2d');
       var w = canvas.width = canvas.clientWidth;
       var h = canvas.height = 200;
       ctx.clearRect(0, 0, w, h);
       var max = Math.max.apply(null, days.map(function (d) { return d.total; }).concat([1]));
       var barW = w / days.length;
+      var styles = getComputedStyle(document.documentElement);
+      var primary = styles.getPropertyValue('--primary').trim() || '#2563eb';
+      var muted = styles.getPropertyValue('--muted').trim() || '#64748b';
       ctx.font = '10px sans-serif';
+      // Narrow screens can't fit 14 labels; show every other one.
+      var labelEvery = w < 420 ? 3 : (w < 700 ? 2 : 1);
       days.forEach(function (d, i) {
-        var barH = (d.total / max) * (h - 30);
+        var barH = (d.total / max) * (h - 34);
         var x = i * barW + barW * 0.15;
-        var y = h - 20 - barH;
-        ctx.fillStyle = '#2563eb';
-        ctx.fillRect(x, y, barW * 0.7, barH);
-        ctx.fillStyle = '#64748b';
-        ctx.save();
-        ctx.translate(x + barW * 0.35, h - 5);
-        ctx.textAlign = 'center';
-        ctx.fillText(d.date, 0, 0);
-        ctx.restore();
+        var y = h - 22 - barH;
+        ctx.fillStyle = primary;
+        ctx.fillRect(x, y, barW * 0.7, Math.max(barH, d.total > 0 ? 2 : 0));
+        if (i % labelEvery === 0) {
+          ctx.fillStyle = muted;
+          ctx.textAlign = 'center';
+          ctx.fillText(d.date, x + barW * 0.35, h - 8);
+        }
       });
     }
 
@@ -543,56 +786,102 @@
       };
       google.script.run.withSuccessHandler(function (orders) {
         hideLoadingSpinner();
-        document.getElementById('ordersTable').querySelector('tbody').innerHTML = orders.map(function (o) {
-          return '<tr>' +
-            '<td>' + o.orderId + '</td>' +
-            '<td>' + new Date(o.createdAt).toLocaleString() + '</td>' +
-            '<td>' + esc(o.customerName) + '</td>' +
-            '<td>' + esc(o.phone) + '</td>' +
-            '<td>' + currency(o.total) + '</td>' +
-            '<td>' + statusBadge(o.paymentStatus) + '</td>' +
-            '<td>' + statusBadge(o.orderStatus) + '</td>' +
-            '<td><button class="text-blue-600" onclick="viewOrder(\'' + o.orderId + '\')"><i class="fas fa-eye"></i> View</button></td>' +
-            '</tr>';
-        }).join('') || '<tr><td colspan="8" class="text-center text-gray-400">No orders found.</td></tr>';
-        window._orderCache = orders;
+        var tbody = document.getElementById('ordersTable').querySelector('tbody');
+        try {
+          orders = orders || [];
+          window._orderCache = orders;
+          if (!orders.length) {
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center muted">No orders found.</td></tr>';
+            return;
+          }
+          tbody.innerHTML = orders.map(function (o) {
+            var itemsSummary = (o.items || []).map(function (i) {
+              return esc(i.qty + '× ' + i.productName) + (i.recipient ? ' <span class="muted">(' + esc(i.recipient) + ')</span>' : '');
+            }).join('<br>');
+            return '<tr>' +
+              '<td>' + esc(o.orderId) + '</td>' +
+              '<td>' + esc(fmtDate(o.createdAt)) + '</td>' +
+              '<td>' + esc(o.customerName) + '</td>' +
+              '<td>' + esc(o.phone) + '</td>' +
+              '<td>' + (itemsSummary || '<span class="muted">—</span>') + '</td>' +
+              '<td>' + currency(o.total) + '</td>' +
+              '<td>' + statusBadge(o.paymentStatus) + '</td>' +
+              '<td>' + statusBadge(o.orderStatus) + '</td>' +
+              '<td><button class="text-primary whitespace-nowrap" onclick="viewOrder(\'' + esc(o.orderId) + '\')"><i class="fas fa-eye"></i> View</button></td>' +
+              '</tr>';
+          }).join('');
+        } catch (renderErr) {
+          // Surface render problems instead of leaving a silently blank table.
+          tbody.innerHTML = '<tr><td colspan="9" class="text-red-500">Could not display orders: ' + esc(renderErr.message) + '</td></tr>';
+        }
       }).withFailureHandler(runFail).adminGetOrders(adminToken, filters);
     }
     function statusBadge(s) {
-      var color = { 'Confirmed': 'bg-green-100 text-green-700', 'Rejected': 'bg-red-100 text-red-700', 'Pending Verification': 'bg-orange-100 text-orange-700', 'Pending': 'bg-orange-100 text-orange-700', 'Processing': 'bg-blue-100 text-blue-700', 'Shipped': 'bg-purple-100 text-purple-700', 'Completed': 'bg-green-100 text-green-700', 'Cancelled': 'bg-gray-200 text-gray-600' }[s] || 'bg-gray-100';
-      return '<span class="px-2 py-1 rounded-full text-xs ' + color + '">' + s + '</span>';
+      var color = {
+        'Confirmed': 'background:#dcfce7;color:#15803d', 'Rejected': 'background:#fee2e2;color:#b91c1c',
+        'Pending Verification': 'background:#ffedd5;color:#c2410c', 'Pending': 'background:#ffedd5;color:#c2410c',
+        'Processing': 'background:#dbeafe;color:#1d4ed8', 'Shipped': 'background:#f3e8ff;color:#7e22ce',
+        'Completed': 'background:#dcfce7;color:#15803d', 'Cancelled': 'background:#e5e7eb;color:#4b5563'
+      }[s] || 'background:#e5e7eb;color:#4b5563';
+      return '<span class="px-2 py-1 rounded-full text-xs whitespace-nowrap" style="' + color + '">' + esc(s || '—') + '</span>';
+    }
+    function closeOrderModal() {
+      var m = document.getElementById('orderModal');
+      m.classList.add('hidden'); m.classList.remove('flex');
     }
     function viewOrder(orderId) {
       var o = (window._orderCache || []).filter(function (x) { return x.orderId === orderId; })[0];
       if (!o) return;
-      var itemsHtml = o.items.map(function (it) { return '<li>' + it.qty + 'x ' + esc(it.productName) + ' (' + esc(it.businessName) + ') — ' + currency(it.subtotal) + '</li>'; }).join('');
+      var itemsHtml = (o.items || []).map(function (it) {
+        return '<li>' + it.qty + '× ' + esc(it.productName) + ' <span class="muted">(' + esc(it.businessName) + ')</span>' +
+          (it.recipient ? '<br><span class="text-primary text-sm"><i class="fas fa-sim-card mr-1"></i>Deliver to: <strong>' + esc(it.recipient) + '</strong></span>' : '') +
+          ' — ' + currency(it.subtotal) + '</li>';
+      }).join('');
       document.getElementById('orderModalBody').innerHTML =
-        '<h2 class="text-xl font-bold mb-3">Order ' + o.orderId + '</h2>' +
+        '<h2 class="text-xl font-bold mb-3">Order ' + esc(o.orderId) + '</h2>' +
         '<p><strong>Customer:</strong> ' + esc(o.customerName) + ' · ' + esc(o.phone) + '</p>' +
         '<p><strong>Address:</strong> ' + esc(o.address) + '</p>' +
-        '<p><strong>Payment:</strong> ' + esc(o.paymentMethod) + ' — status: ' + statusBadge(o.paymentStatus) + '</p>' +
-        '<ul class="list-disc list-inside my-3">' + itemsHtml + '</ul>' +
-        '<p>Subtotal: ' + currency(o.subtotal) + ' · Discount: -' + currency(o.discountAmount) + '</p>' +
+        '<p><strong>Placed:</strong> ' + esc(fmtDate(o.createdAt)) + '</p>' +
+        '<div class="surface-2 bordered rounded-lg p-3 my-3">' +
+          '<p><strong>Payment method:</strong> ' + esc(o.paymentMethod) + '</p>' +
+          '<p><strong>Paid from:</strong> ' + esc(o.payerNumber || '—') + '</p>' +
+          '<p><strong>Transaction ID:</strong> ' + esc(o.transactionId || '—') + '</p>' +
+          '<p><strong>Status:</strong> ' + statusBadge(o.paymentStatus) + '</p>' +
+        '</div>' +
+        '<ul class="list-disc list-inside my-3 space-y-2">' + itemsHtml + '</ul>' +
+        (o.notes ? '<p class="text-sm"><strong>Notes:</strong> ' + esc(o.notes) + '</p>' : '') +
+        '<p class="mt-2">Subtotal: ' + currency(o.subtotal) + ' · Discount: -' + currency(o.discountAmount) + '</p>' +
         '<p class="text-lg font-bold mb-4">Total: ' + currency(o.total) + '</p>' +
         '<div class="flex flex-wrap gap-2 mb-4">' +
-        '<button class="bg-green-600 text-white px-3 py-2 rounded-lg text-sm" onclick="confirmPayment(\'' + o.orderId + '\', true)">Confirm Payment</button>' +
-        '<button class="bg-red-600 text-white px-3 py-2 rounded-lg text-sm" onclick="confirmPayment(\'' + o.orderId + '\', false)">Reject Payment</button>' +
+          '<button class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm" onclick="confirmPayment(\'' + esc(o.orderId) + '\', true)">Confirm Payment</button>' +
+          '<button class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm" onclick="confirmPayment(\'' + esc(o.orderId) + '\', false)">Reject Payment</button>' +
         '</div>' +
-        '<label class="text-sm">Order Status<select id="orderStatusSelect" class="p-2 border rounded-lg w-full mt-1">' +
-        ['Pending', 'Processing', 'Shipped', 'Completed', 'Cancelled'].map(function (s) { return '<option ' + (s === o.orderStatus ? 'selected' : '') + '>' + s + '</option>'; }).join('') +
-        '</select></label>' +
-        '<button class="mt-3 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm" onclick="updateOrderStatus(\'' + o.orderId + '\')">Update Status</button>';
-      document.getElementById('orderModal').classList.remove('hidden');
-      document.getElementById('orderModal').classList.add('flex');
+        '<label class="text-sm block">Order Status<select id="orderStatusSelect" class="p-2 rounded-lg w-full mt-1">' +
+        ['Pending', 'Processing', 'Shipped', 'Completed', 'Cancelled'].map(function (s) {
+          return '<option ' + (s === o.orderStatus ? 'selected' : '') + '>' + s + '</option>';
+        }).join('') + '</select></label>' +
+        '<button class="mt-3 bg-primary px-4 py-2 rounded-lg text-sm" onclick="updateOrderStatus(\'' + esc(o.orderId) + '\')">Update Status</button>';
+      var m = document.getElementById('orderModal');
+      m.classList.remove('hidden'); m.classList.add('flex');
     }
     function confirmPayment(orderId, confirmed) {
       showLoadingSpinner();
-      google.script.run.withSuccessHandler(function () { hideLoadingSpinner(); toast('success', confirmed ? 'Payment Confirmed' : 'Payment Rejected', ''); document.getElementById('orderModal').classList.add('hidden'); loadOrders(); }).withFailureHandler(runFail).adminConfirmPayment(adminToken, orderId, confirmed);
+      google.script.run.withSuccessHandler(function () {
+        hideLoadingSpinner();
+        toast('success', confirmed ? 'Payment Confirmed' : 'Payment Rejected', '');
+        closeOrderModal();
+        loadOrders();
+      }).withFailureHandler(runFail).adminConfirmPayment(adminToken, orderId, confirmed);
     }
     function updateOrderStatus(orderId) {
       var status = document.getElementById('orderStatusSelect').value;
       showLoadingSpinner();
-      google.script.run.withSuccessHandler(function () { hideLoadingSpinner(); toast('success', 'Order Updated', ''); document.getElementById('orderModal').classList.add('hidden'); loadOrders(); }).withFailureHandler(runFail).adminUpdateOrderStatus(adminToken, orderId, status);
+      google.script.run.withSuccessHandler(function () {
+        hideLoadingSpinner();
+        toast('success', 'Order Updated', '');
+        closeOrderModal();
+        loadOrders();
+      }).withFailureHandler(runFail).adminUpdateOrderStatus(adminToken, orderId, status);
     }
     function exportOrdersCsv() {
       showLoadingSpinner();
@@ -603,33 +892,9 @@
         var a = document.createElement('a');
         a.href = url; a.download = 'orders.csv';
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
       }).withFailureHandler(runFail).adminExportOrdersCsv(adminToken);
     }
-
-    // -------------------------------------------------------------------
-    // Generic image upload wiring
-    // -------------------------------------------------------------------
-    function wireUpload(fileId, urlId) {
-      var fileInput = document.getElementById(fileId);
-      fileInput.onchange = function () {
-        var file = fileInput.files[0];
-        if (!file) return;
-        var reader = new FileReader();
-        reader.onload = function () {
-          var base64 = reader.result.split(',')[1];
-          showLoadingSpinner();
-          google.script.run.withSuccessHandler(function (res) {
-            hideLoadingSpinner();
-            if (res.success) { document.getElementById(urlId).value = res.url; toast('success', 'Image Uploaded', ''); }
-            else toast('error', 'Upload Failed', res.message || '');
-          }).withFailureHandler(runFail).adminUploadImage(adminToken, base64, file.name, file.type);
-        };
-        reader.readAsDataURL(file);
-      };
-    }
-    wireUpload('bizLogoFile', 'bizLogoUrl');
-    wireUpload('prdImageFile', 'prdImageUrl');
-    wireUpload('banImageFile', 'banImageUrl');
 
     // -------------------------------------------------------------------
     // Businesses
@@ -638,15 +903,15 @@
       showLoadingSpinner();
       google.script.run.withSuccessHandler(function (list) {
         hideLoadingSpinner();
-        cache.businesses = list;
-        document.getElementById('businessTableBody').innerHTML = list.map(function (b) {
-          return '<tr><td>' + esc(b.Name) + '</td><td>' + esc(b.Description) + '</td><td>' + (b.Active ? 'Yes' : 'No') + '</td><td>' + b.SortOrder + '</td>' +
-            '<td><button class="text-blue-600 mr-2" onclick="editBusiness(\'' + b.BusinessID + '\')"><i class="fas fa-edit"></i></button>' +
-            '<button class="text-red-600" onclick="deleteBusiness(\'' + b.BusinessID + '\')"><i class="fas fa-trash"></i></button></td></tr>';
-        }).join('') || '<tr><td colspan="5" class="text-center text-gray-400">No businesses yet.</td></tr>';
-        var options = list.map(function (b) { return '<option value="' + b.BusinessID + '">' + esc(b.Name) + '</option>'; }).join('');
-        document.getElementById('prdBusiness').innerHTML = options;
-        document.getElementById('expBusiness').innerHTML = '<option value="">General / Not business-specific</option>' + options;
+        cache.businesses = list || [];
+        fillBusinessSelects();
+        document.getElementById('businessTableBody').innerHTML = cache.businesses.map(function (b) {
+          return '<tr>' +
+            '<td>' + (b.LogoURL ? '<img src="' + esc(b.LogoURL) + '" class="w-10 h-10 object-cover rounded">' : '<span class="muted">—</span>') + '</td>' +
+            '<td>' + esc(b.Name) + '</td><td>' + esc(b.Description) + '</td><td>' + (b.Active ? 'Yes' : 'No') + '</td><td>' + b.SortOrder + '</td>' +
+            '<td class="whitespace-nowrap"><button class="text-primary mr-3" onclick="editBusiness(\'' + esc(b.BusinessID) + '\')"><i class="fas fa-edit"></i></button>' +
+            '<button class="text-red-600" onclick="deleteBusiness(\'' + esc(b.BusinessID) + '\')"><i class="fas fa-trash"></i></button></td></tr>';
+        }).join('') || '<tr><td colspan="6" class="text-center muted">No businesses yet.</td></tr>';
       }).withFailureHandler(runFail).adminGetBusinesses(adminToken);
     }
     function editBusiness(id) {
@@ -656,12 +921,17 @@
       document.getElementById('bizName').value = b.Name;
       document.getElementById('bizDescription').value = b.Description;
       document.getElementById('bizLogoUrl').value = b.LogoURL;
+      refreshPreview('bizLogoUrl');
       document.getElementById('bizWhatsapp').value = b.WhatsAppNumber;
       document.getElementById('bizSort').value = b.SortOrder;
       document.getElementById('bizActive').checked = !!b.Active;
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-    function resetBusinessForm() { document.getElementById('businessForm').reset(); document.getElementById('bizId').value = ''; }
+    function resetBusinessForm() {
+      document.getElementById('businessForm').reset();
+      document.getElementById('bizId').value = '';
+      clearPicker('bizLogoUrl');
+    }
     function saveBusiness(e) {
       e.preventDefault();
       var biz = {
@@ -695,18 +965,46 @@
       showLoadingSpinner();
       google.script.run.withSuccessHandler(function (list) {
         hideLoadingSpinner();
-        cache.products = list;
-        var bizName = {};
-        cache.businesses.forEach(function (b) { bizName[b.BusinessID] = b.Name; });
-        document.getElementById('productTableBody').innerHTML = list.map(function (p) {
-          var flags = [p.IsService ? 'Service' : '', p.EnquireOnWhatsApp ? 'WhatsApp Enquiry' : ''].filter(Boolean).join(', ');
-          return '<tr><td>' + (p.ImageURL ? '<img src="' + p.ImageURL + '" class="w-10 h-10 object-cover rounded">' : '-') + '</td>' +
-            '<td>' + esc(p.Name) + '</td><td>' + esc(bizName[p.BusinessID] || '-') + '</td><td>' + esc(p.Category) + '</td>' +
-            '<td>' + currency(p.Price) + '</td><td>' + (p.Stock === '' ? 'Unlimited' : p.Stock) + '</td><td>' + flags + '</td><td>' + (p.Active ? 'Yes' : 'No') + '</td>' +
-            '<td><button class="text-blue-600 mr-2" onclick="editProduct(\'' + p.ProductID + '\')"><i class="fas fa-edit"></i></button>' +
-            '<button class="text-red-600" onclick="deleteProduct(\'' + p.ProductID + '\')"><i class="fas fa-trash"></i></button></td></tr>';
-        }).join('') || '<tr><td colspan="9" class="text-center text-gray-400">No products yet.</td></tr>';
+        cache.products = list || [];
+        renderProductTable();
       }).withFailureHandler(runFail).adminGetProducts(adminToken);
+    }
+    function renderProductTable() {
+      var q = (document.getElementById('productSearch').value || '').toLowerCase();
+      var bizName = {};
+      cache.businesses.forEach(function (b) { bizName[b.BusinessID] = b.Name; });
+      var list = cache.products.filter(function (p) { return (p.Name + ' ' + p.Category).toLowerCase().indexOf(q) !== -1; });
+      document.getElementById('productTableBody').innerHTML = list.map(function (p) {
+        var flags = [
+          p.IsService ? 'Service' : '',
+          p.RequiresRecipient ? 'Asks for number' : '',
+          p.EnquireOnWhatsApp ? 'WhatsApp only' : '',
+          p.Active ? '' : 'Hidden'
+        ].filter(Boolean).join(', ');
+        var stockBtn = p.InStock
+          ? '<button class="text-xs px-2 py-1 rounded-full" style="background:#dcfce7;color:#15803d" onclick="toggleStock(\'' + esc(p.ProductID) + '\',false)">In Stock</button>'
+          : '<button class="text-xs px-2 py-1 rounded-full" style="background:#fee2e2;color:#b91c1c" onclick="toggleStock(\'' + esc(p.ProductID) + '\',true)">Out of Stock</button>';
+        return '<tr>' +
+          '<td>' + (p.ImageURL ? '<img src="' + esc(p.ImageURL) + '" class="w-10 h-10 object-cover rounded">' : '<span class="muted">—</span>') + '</td>' +
+          '<td>' + esc(p.Name) + '<br><span class="muted text-xs">' + esc(p.Category) + '</span></td>' +
+          '<td>' + esc(bizName[p.BusinessID] || '—') + '</td>' +
+          '<td>' + currency(p.Price) + '</td>' +
+          '<td>' + (p.Stock === '' ? '<span class="muted">Unlimited</span>' : p.Stock) + '</td>' +
+          '<td class="text-xs">' + esc(flags || '—') + '</td>' +
+          '<td>' + stockBtn + '</td>' +
+          '<td class="whitespace-nowrap"><button class="text-primary mr-3" onclick="editProduct(\'' + esc(p.ProductID) + '\')"><i class="fas fa-edit"></i></button>' +
+          '<button class="text-red-600" onclick="deleteProduct(\'' + esc(p.ProductID) + '\')"><i class="fas fa-trash"></i></button></td></tr>';
+      }).join('') || '<tr><td colspan="8" class="text-center muted">No products yet.</td></tr>';
+    }
+    function toggleStock(productId, inStock) {
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function () {
+        hideLoadingSpinner();
+        var p = cache.products.filter(function (x) { return x.ProductID === productId; })[0];
+        if (p) p.InStock = inStock;
+        renderProductTable();
+        toast('success', inStock ? 'Marked In Stock' : 'Marked Out of Stock', '');
+      }).withFailureHandler(runFail).adminSetProductStock(adminToken, productId, inStock);
     }
     function editProduct(id) {
       var p = cache.products.filter(function (x) { return x.ProductID === id; })[0];
@@ -718,13 +1016,24 @@
       document.getElementById('prdPrice').value = p.Price;
       document.getElementById('prdStock').value = p.Stock;
       document.getElementById('prdImageUrl').value = p.ImageURL;
+      refreshPreview('prdImageUrl');
       document.getElementById('prdDescription').value = p.Description;
+      document.getElementById('prdRecipientLabel').value = p.RecipientLabel;
+      document.getElementById('prdConfirmationNote').value = p.ConfirmationNote;
       document.getElementById('prdIsService').checked = !!p.IsService;
+      document.getElementById('prdRequiresRecipient').checked = !!p.RequiresRecipient;
       document.getElementById('prdEnquireWhatsapp').checked = !!p.EnquireOnWhatsApp;
+      document.getElementById('prdInStock').checked = !!p.InStock;
       document.getElementById('prdActive').checked = !!p.Active;
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-    function resetProductForm() { document.getElementById('productForm').reset(); document.getElementById('prdId').value = ''; }
+    function resetProductForm() {
+      document.getElementById('productForm').reset();
+      document.getElementById('prdId').value = '';
+      document.getElementById('prdInStock').checked = true;
+      document.getElementById('prdActive').checked = true;
+      clearPicker('prdImageUrl');
+    }
     function saveProduct(e) {
       e.preventDefault();
       var p = {
@@ -736,8 +1045,12 @@
         Stock: document.getElementById('prdStock').value,
         ImageURL: document.getElementById('prdImageUrl').value.trim(),
         Description: document.getElementById('prdDescription').value.trim(),
+        RecipientLabel: document.getElementById('prdRecipientLabel').value.trim(),
+        ConfirmationNote: document.getElementById('prdConfirmationNote').value.trim(),
         IsService: document.getElementById('prdIsService').checked,
+        RequiresRecipient: document.getElementById('prdRequiresRecipient').checked,
         EnquireOnWhatsApp: document.getElementById('prdEnquireWhatsapp').checked,
+        InStock: document.getElementById('prdInStock').checked,
         Active: document.getElementById('prdActive').checked
       };
       showLoadingSpinner();
@@ -762,12 +1075,12 @@
       showLoadingSpinner();
       google.script.run.withSuccessHandler(function (list) {
         hideLoadingSpinner();
-        cache.banners = list;
-        document.getElementById('bannerTableBody').innerHTML = list.map(function (b) {
-          return '<tr><td><img src="' + b.ImageURL + '" class="w-16 h-10 object-cover rounded"></td><td>' + esc(b.Title) + '</td><td>' + (b.Active ? 'Yes' : 'No') + '</td><td>' + b.SortOrder + '</td>' +
-            '<td><button class="text-blue-600 mr-2" onclick="editBanner(\'' + b.BannerID + '\')"><i class="fas fa-edit"></i></button>' +
-            '<button class="text-red-600" onclick="deleteBanner(\'' + b.BannerID + '\')"><i class="fas fa-trash"></i></button></td></tr>';
-        }).join('') || '<tr><td colspan="5" class="text-center text-gray-400">No banners yet.</td></tr>';
+        cache.banners = list || [];
+        document.getElementById('bannerTableBody').innerHTML = cache.banners.map(function (b) {
+          return '<tr><td><img src="' + esc(b.ImageURL) + '" class="w-24 h-12 object-cover rounded"></td><td>' + esc(b.Title) + '</td><td>' + (b.Active ? 'Yes' : 'No') + '</td><td>' + b.SortOrder + '</td>' +
+            '<td class="whitespace-nowrap"><button class="text-primary mr-3" onclick="editBanner(\'' + esc(b.BannerID) + '\')"><i class="fas fa-edit"></i></button>' +
+            '<button class="text-red-600" onclick="deleteBanner(\'' + esc(b.BannerID) + '\')"><i class="fas fa-trash"></i></button></td></tr>';
+        }).join('') || '<tr><td colspan="5" class="text-center muted">No banners yet.</td></tr>';
       }).withFailureHandler(runFail).adminGetBanners(adminToken);
     }
     function editBanner(id) {
@@ -775,12 +1088,18 @@
       if (!b) return;
       document.getElementById('banId').value = b.BannerID;
       document.getElementById('banImageUrl').value = b.ImageURL;
+      refreshPreview('banImageUrl');
       document.getElementById('banTitle').value = b.Title;
       document.getElementById('banLink').value = b.LinkURL;
       document.getElementById('banSort').value = b.SortOrder;
       document.getElementById('banActive').checked = !!b.Active;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-    function resetBannerForm() { document.getElementById('bannerForm').reset(); document.getElementById('banId').value = ''; }
+    function resetBannerForm() {
+      document.getElementById('bannerForm').reset();
+      document.getElementById('banId').value = '';
+      clearPicker('banImageUrl');
+    }
     function saveBanner(e) {
       e.preventDefault();
       var b = {
@@ -791,6 +1110,7 @@
         SortOrder: document.getElementById('banSort').value,
         Active: document.getElementById('banActive').checked
       };
+      if (!b.ImageURL) { toast('warning', 'Image required', 'Upload a photo or paste an image URL first.'); return; }
       showLoadingSpinner();
       google.script.run.withSuccessHandler(function (res) {
         hideLoadingSpinner();
@@ -813,12 +1133,12 @@
       showLoadingSpinner();
       google.script.run.withSuccessHandler(function (list) {
         hideLoadingSpinner();
-        cache.paymentMethods = list;
-        document.getElementById('paymentTableBody').innerHTML = list.map(function (p) {
-          return '<tr><td>' + esc(p.Label) + '</td><td>' + esc(p.AccountName) + ' — ' + esc(p.AccountNumber) + '</td><td>' + esc(p.Provider) + '</td><td>' + (p.Active ? 'Yes' : 'No') + '</td>' +
-            '<td><button class="text-blue-600 mr-2" onclick="editPaymentMethod(\'' + p.PaymentMethodID + '\')"><i class="fas fa-edit"></i></button>' +
-            '<button class="text-red-600" onclick="deletePaymentMethod(\'' + p.PaymentMethodID + '\')"><i class="fas fa-trash"></i></button></td></tr>';
-        }).join('') || '<tr><td colspan="5" class="text-center text-gray-400">No payment methods yet.</td></tr>';
+        cache.paymentMethods = list || [];
+        document.getElementById('paymentTableBody').innerHTML = cache.paymentMethods.map(function (p) {
+          return '<tr><td>' + esc(p.Label) + '</td><td><strong>' + esc(p.AccountNumber) + '</strong><br><span class="muted text-xs">' + esc(p.AccountName) + '</span></td><td>' + esc(p.Provider) + '</td><td>' + (p.Active ? 'Yes' : 'No') + '</td>' +
+            '<td class="whitespace-nowrap"><button class="text-primary mr-3" onclick="editPaymentMethod(\'' + esc(p.PaymentMethodID) + '\')"><i class="fas fa-edit"></i></button>' +
+            '<button class="text-red-600" onclick="deletePaymentMethod(\'' + esc(p.PaymentMethodID) + '\')"><i class="fas fa-trash"></i></button></td></tr>';
+        }).join('') || '<tr><td colspan="5" class="text-center muted">No payment methods yet.</td></tr>';
       }).withFailureHandler(runFail).adminGetPaymentMethods(adminToken);
     }
     function editPaymentMethod(id) {
@@ -833,6 +1153,7 @@
       document.getElementById('pmSort').value = p.SortOrder;
       document.getElementById('pmInstructions').value = p.Instructions;
       document.getElementById('pmActive').checked = !!p.Active;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
     function resetPaymentForm() { document.getElementById('paymentForm').reset(); document.getElementById('pmId').value = ''; }
     function savePaymentMethod(e) {
@@ -872,25 +1193,25 @@
       if (scope === 'global') { target.classList.add('hidden'); target.innerHTML = ''; return; }
       target.classList.remove('hidden');
       if (scope === 'business') {
-        target.innerHTML = cache.businesses.map(function (b) { return '<option value="' + b.BusinessID + '">' + esc(b.Name) + '</option>'; }).join('');
+        target.innerHTML = cache.businesses.map(function (b) { return '<option value="' + esc(b.BusinessID) + '">' + esc(b.Name) + '</option>'; }).join('');
       } else {
-        target.innerHTML = cache.products.map(function (p) { return '<option value="' + p.ProductID + '">' + esc(p.Name) + '</option>'; }).join('');
+        target.innerHTML = cache.products.map(function (p) { return '<option value="' + esc(p.ProductID) + '">' + esc(p.Name) + '</option>'; }).join('');
       }
     }
     function loadDiscounts() {
       showLoadingSpinner();
-      // make sure products are available for the "specific product" dropdown
+      // Products power the "specific product" dropdown, so make sure they're loaded.
       google.script.run.withSuccessHandler(function (products) {
-        cache.products = products;
+        cache.products = products || [];
         google.script.run.withSuccessHandler(function (list) {
           hideLoadingSpinner();
-          cache.discounts = list;
-          document.getElementById('discountTableBody').innerHTML = list.map(function (d) {
-            return '<tr><td>' + esc(d.Label) + '</td><td>' + d.Scope + '</td><td>' + d.Type + '</td><td>' + d.Value + '</td>' +
-              '<td>' + (d.StartDate || '') + ' → ' + (d.EndDate || 'ongoing') + '</td><td>' + (d.Active ? 'Yes' : 'No') + '</td>' +
-              '<td><button class="text-blue-600 mr-2" onclick="editDiscount(\'' + d.DiscountID + '\')"><i class="fas fa-edit"></i></button>' +
-              '<button class="text-red-600" onclick="deleteDiscount(\'' + d.DiscountID + '\')"><i class="fas fa-trash"></i></button></td></tr>';
-          }).join('') || '<tr><td colspan="7" class="text-center text-gray-400">No discounts yet.</td></tr>';
+          cache.discounts = list || [];
+          document.getElementById('discountTableBody').innerHTML = cache.discounts.map(function (d) {
+            return '<tr><td>' + esc(d.Label) + '</td><td>' + esc(d.Scope) + '</td><td>' + esc(d.Type) + '</td><td>' + d.Value + '</td>' +
+              '<td>' + esc(d.StartDate || 'any') + ' → ' + esc(d.EndDate || 'ongoing') + '</td><td>' + (d.Active ? 'Yes' : 'No') + '</td>' +
+              '<td class="whitespace-nowrap"><button class="text-primary mr-3" onclick="editDiscount(\'' + esc(d.DiscountID) + '\')"><i class="fas fa-edit"></i></button>' +
+              '<button class="text-red-600" onclick="deleteDiscount(\'' + esc(d.DiscountID) + '\')"><i class="fas fa-trash"></i></button></td></tr>';
+          }).join('') || '<tr><td colspan="7" class="text-center muted">No discounts yet.</td></tr>';
         }).withFailureHandler(runFail).adminGetDiscounts(adminToken);
       }).withFailureHandler(runFail).adminGetProducts(adminToken);
     }
@@ -904,9 +1225,10 @@
       document.getElementById('dscTarget').value = d.TargetID;
       document.getElementById('dscType').value = d.Type;
       document.getElementById('dscValue').value = d.Value;
-      document.getElementById('dscStart').value = d.StartDate ? String(d.StartDate).slice(0, 10) : '';
-      document.getElementById('dscEnd').value = d.EndDate ? String(d.EndDate).slice(0, 10) : '';
+      document.getElementById('dscStart').value = d.StartDate || '';
+      document.getElementById('dscEnd').value = d.EndDate || '';
       document.getElementById('dscActive').checked = !!d.Active;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
     function resetDiscountForm() { document.getElementById('discountForm').reset(); document.getElementById('dscId').value = ''; onDiscountScopeChange(); }
     function saveDiscount(e) {
@@ -944,14 +1266,15 @@
       showLoadingSpinner();
       google.script.run.withSuccessHandler(function (list) {
         hideLoadingSpinner();
+        list = list || [];
         var bizName = {};
         cache.businesses.forEach(function (b) { bizName[b.BusinessID] = b.Name; });
         var total = 0;
         document.getElementById('expenseTableBody').innerHTML = list.map(function (e) {
           total += Number(e.Amount || 0);
-          return '<tr><td>' + (e.Date ? new Date(e.Date).toLocaleDateString() : '') + '</td><td>' + esc(bizName[e.BusinessID] || 'General') + '</td><td>' + esc(e.Category) + '</td><td>' + esc(e.Description) + '</td><td>' + currency(e.Amount) + '</td><td>' + esc(e.AddedBy) + '</td>' +
-            '<td><button class="text-red-600" onclick="deleteExpense(\'' + e.ExpenseID + '\')"><i class="fas fa-trash"></i></button></td></tr>';
-        }).join('') || '<tr><td colspan="7" class="text-center text-gray-400">No expenses recorded.</td></tr>';
+          return '<tr><td>' + esc(e.Date ? new Date(e.Date).toLocaleDateString() : '') + '</td><td>' + esc(bizName[e.BusinessID] || 'General') + '</td><td>' + esc(e.Category) + '</td><td>' + esc(e.Description) + '</td><td>' + currency(e.Amount) + '</td><td>' + esc(e.AddedBy) + '</td>' +
+            '<td><button class="text-red-600" onclick="deleteExpense(\'' + esc(e.ExpenseID) + '\')"><i class="fas fa-trash"></i></button></td></tr>';
+        }).join('') || '<tr><td colspan="7" class="text-center muted">No expenses recorded.</td></tr>';
         document.getElementById('expenseTotal').textContent = currency(total);
       }).withFailureHandler(runFail).adminGetExpenses(adminToken);
     }
@@ -986,42 +1309,75 @@
       showLoadingSpinner();
       google.script.run.withSuccessHandler(function (list) {
         hideLoadingSpinner();
-        document.getElementById('customerTableBody').innerHTML = list.map(function (c) {
-          return '<tr><td>' + esc(c.name) + '</td><td>' + esc(c.username) + '</td><td>' + esc(c.phone) + '</td><td>' + esc(c.address) + '</td><td>' + (c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '') + '</td></tr>';
-        }).join('') || '<tr><td colspan="5" class="text-center text-gray-400">No registered customers yet.</td></tr>';
+        document.getElementById('customerTableBody').innerHTML = (list || []).map(function (c) {
+          return '<tr><td>' + esc(c.name) + '</td><td>' + esc(c.username) + '</td><td>' + esc(c.phone) + '</td><td>' + esc(c.address) + '</td><td>' + esc(c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '') + '</td></tr>';
+        }).join('') || '<tr><td colspan="5" class="text-center muted">No registered customers yet.</td></tr>';
       }).withFailureHandler(runFail).adminGetCustomers(adminToken);
     }
 
     // -------------------------------------------------------------------
     // Settings
     // -------------------------------------------------------------------
+    var SETTING_FIELDS = [
+      ['SiteName', 'setSiteName'], ['Currency', 'setCurrency'], ['CurrencySymbol', 'setCurrencySymbol'],
+      ['NewsTicker', 'setNewsTicker'],
+      ['PrimaryColor', 'setPrimaryColorText'], ['AccentColor', 'setAccentColorText'], ['ThemeMode', 'setThemeMode'],
+      ['ContactPhone', 'setContactPhone'], ['ContactEmail', 'setContactEmail'], ['ContactAddress', 'setContactAddress'],
+      ['MapEmbedURL', 'setMapEmbedURL'],
+      ['FacebookURL', 'setFacebookURL'], ['InstagramURL', 'setInstagramURL'], ['TwitterURL', 'setTwitterURL'],
+      ['TikTokURL', 'setTikTokURL'], ['YouTubeURL', 'setYouTubeURL'], ['LinkedInURL', 'setLinkedInURL'],
+      ['WhatsAppNumber', 'setWhatsapp'], ['WhatsAppGreeting', 'setWhatsappGreeting'],
+      ['ChatbotGreeting', 'setChatbotGreeting'], ['BundleDisclaimer', 'setBundleDisclaimer']
+    ];
+
     function loadSettings() {
       showLoadingSpinner();
       google.script.run.withSuccessHandler(function (s) {
         hideLoadingSpinner();
-        cache.settings = s;
-        document.getElementById('setSiteName').value = s.SiteName || '';
-        document.getElementById('setCurrency').value = s.Currency || '';
-        document.getElementById('setCurrencySymbol').value = s.CurrencySymbol || '';
-        document.getElementById('setWhatsapp').value = s.WhatsAppNumber || '';
-        document.getElementById('setWhatsappGreeting').value = s.WhatsAppGreeting || '';
-        document.getElementById('setChatbotGreeting').value = s.ChatbotGreeting || '';
-        document.getElementById('setChatbotEnabled').checked = String(s.ChatbotEnabled).toUpperCase() !== 'FALSE';
+        cache.settings = s || {};
+        SETTING_FIELDS.forEach(function (pair) {
+          var el = document.getElementById(pair[1]);
+          if (el) el.value = cache.settings[pair[0]] || '';
+        });
+        document.getElementById('setChatbotEnabled').checked = String(cache.settings.ChatbotEnabled).toUpperCase() !== 'FALSE';
+        document.getElementById('setNewsTickerEnabled').checked = String(cache.settings.NewsTickerEnabled).toUpperCase() !== 'FALSE';
+        syncColorInputs();
+        applyTheme(cache.settings);
       }).withFailureHandler(runFail).adminGetSettings(adminToken);
+    }
+    // Keep the swatch and the hex text box mirroring each other.
+    function syncColorInputs() {
+      var pairs = [['setPrimaryColor', 'setPrimaryColorText'], ['setAccentColor', 'setAccentColorText']];
+      pairs.forEach(function (pair) {
+        var swatch = document.getElementById(pair[0]);
+        var text = document.getElementById(pair[1]);
+        if (/^#[0-9a-f]{6}$/i.test(text.value)) swatch.value = text.value;
+        swatch.oninput = function () { text.value = swatch.value; };
+        text.oninput = function () { if (/^#[0-9a-f]{6}$/i.test(text.value)) swatch.value = text.value; };
+      });
+    }
+    function applyPreset(primary, accent) {
+      document.getElementById('setPrimaryColorText').value = primary;
+      document.getElementById('setAccentColorText').value = accent;
+      syncColorInputs();
+      applyTheme({ PrimaryColor: primary, ThemeMode: document.getElementById('setThemeMode').value });
     }
     function saveSettings(e) {
       e.preventDefault();
-      var s = {
-        SiteName: document.getElementById('setSiteName').value.trim(),
-        Currency: document.getElementById('setCurrency').value.trim(),
-        CurrencySymbol: document.getElementById('setCurrencySymbol').value,
-        WhatsAppNumber: document.getElementById('setWhatsapp').value.trim(),
-        WhatsAppGreeting: document.getElementById('setWhatsappGreeting').value.trim(),
-        ChatbotGreeting: document.getElementById('setChatbotGreeting').value.trim(),
-        ChatbotEnabled: document.getElementById('setChatbotEnabled').checked ? 'TRUE' : 'FALSE'
-      };
+      var s = {};
+      SETTING_FIELDS.forEach(function (pair) {
+        var el = document.getElementById(pair[1]);
+        if (el) s[pair[0]] = el.value.trim ? el.value.trim() : el.value;
+      });
+      s.ChatbotEnabled = document.getElementById('setChatbotEnabled').checked ? 'TRUE' : 'FALSE';
+      s.NewsTickerEnabled = document.getElementById('setNewsTickerEnabled').checked ? 'TRUE' : 'FALSE';
       showLoadingSpinner();
-      google.script.run.withSuccessHandler(function () { hideLoadingSpinner(); toast('success', 'Settings Saved', ''); }).withFailureHandler(runFail).adminSaveSettings(adminToken, s);
+      google.script.run.withSuccessHandler(function () {
+        hideLoadingSpinner();
+        cache.settings = s;
+        applyTheme(s);
+        toast('success', 'Settings Saved', 'Refresh the storefront to see the changes.');
+      }).withFailureHandler(runFail).adminSaveSettings(adminToken, s);
     }
 
     // -------------------------------------------------------------------
@@ -1031,8 +1387,8 @@
       showLoadingSpinner();
       google.script.run.withSuccessHandler(function (list) {
         hideLoadingSpinner();
-        document.getElementById('adminTableBody').innerHTML = list.map(function (a) {
-          return '<tr><td>' + esc(a.name) + '</td><td>' + esc(a.username) + '</td><td>' + esc(a.role) + '</td><td>' + (a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '') + '</td></tr>';
+        document.getElementById('adminTableBody').innerHTML = (list || []).map(function (a) {
+          return '<tr><td>' + esc(a.name) + '</td><td>' + esc(a.username) + '</td><td>' + esc(a.role) + '</td><td>' + esc(a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '') + '</td></tr>';
         }).join('');
       }).withFailureHandler(runFail).adminGetAdmins(adminToken);
     }

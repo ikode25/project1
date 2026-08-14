@@ -10,18 +10,23 @@
 // See SETUP.md for how to wire this up to a Google Sheet and deploy it.
 // ============================================================================
 
+// Bump when SHEETS changes so ensureSetup_ re-runs and adds new columns to
+// spreadsheets created by an older version of this script.
+var SCHEMA_VERSION = '3';
+
 // ---------------------------------------------------------------------------
 // Sheet schema — single source of truth for headers used by the generic
-// object <-> row helpers below. Add a new sheet by adding an entry here.
+// object <-> row helpers below. Add a new sheet by adding an entry here;
+// add a column simply by appending its header to an existing list.
 // ---------------------------------------------------------------------------
 var SHEETS = {
   Settings:       ['Key', 'Value'],
   Businesses:     ['BusinessID', 'Name', 'Description', 'LogoURL', 'WhatsAppNumber', 'Active', 'SortOrder', 'CreatedAt'],
-  Products:       ['ProductID', 'BusinessID', 'ImageURL', 'Name', 'Description', 'Category', 'Price', 'Stock', 'IsService', 'EnquireOnWhatsApp', 'Active', 'CreatedAt'],
+  Products:       ['ProductID', 'BusinessID', 'ImageURL', 'Name', 'Description', 'Category', 'Price', 'Stock', 'IsService', 'EnquireOnWhatsApp', 'Active', 'CreatedAt', 'RequiresRecipient', 'RecipientLabel', 'ConfirmationNote', 'InStock'],
   Customers:      ['CustomerID', 'Name', 'Address', 'Phone', 'Username', 'PasswordHash', 'CreatedAt'],
   Admins:         ['AdminID', 'Username', 'PasswordHash', 'Name', 'Role', 'CreatedAt'],
   Orders:         ['OrderID', 'OrderType', 'Username', 'CustomerName', 'Phone', 'Address', 'Subtotal', 'DiscountAmount', 'Total', 'PaymentMethodID', 'PaymentMethodLabel', 'PayerNumber', 'TransactionID', 'PaymentStatus', 'OrderStatus', 'Notes', 'CreatedAt', 'UpdatedAt'],
-  OrderItems:     ['OrderItemID', 'OrderID', 'ProductID', 'BusinessID', 'ProductName', 'BusinessName', 'Category', 'Qty', 'UnitPrice', 'LineDiscount', 'Subtotal'],
+  OrderItems:     ['OrderItemID', 'OrderID', 'ProductID', 'BusinessID', 'ProductName', 'BusinessName', 'Category', 'Qty', 'UnitPrice', 'LineDiscount', 'Subtotal', 'RecipientNumber'],
   PaymentMethods: ['PaymentMethodID', 'Type', 'Label', 'AccountName', 'AccountNumber', 'Provider', 'Instructions', 'Active', 'SortOrder'],
   Banners:        ['BannerID', 'ImageURL', 'Title', 'LinkURL', 'Active', 'SortOrder'],
   Discounts:      ['DiscountID', 'Label', 'Scope', 'TargetID', 'Type', 'Value', 'StartDate', 'EndDate', 'Active'],
@@ -30,6 +35,10 @@ var SHEETS = {
 
 var LOW_STOCK_THRESHOLD = 5;
 var ADMIN_TOKEN_TTL_SECONDS = 21600; // 6 hours (CacheService max)
+
+var DEFAULT_BUNDLE_DISCLAIMER =
+  'This bundle does not apply to Turbo net SIM, WiFi SIM, Merchant Sim, Wrong numbers or MiFi SIM. ' +
+  'No refund will be provided if you attempt to load on these SIMs.';
 
 // ---------------------------------------------------------------------------
 // Web app entry points
@@ -46,7 +55,7 @@ function doGet(e) {
 
   return HtmlService.createTemplateFromFile(page)
     .evaluate()
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=5')
     .setTitle(page === 'admin' ? ('Admin Portal - ' + siteName) : siteName)
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
@@ -131,6 +140,22 @@ function ensureHeaders_(sheet, name) {
   return sheet;
 }
 
+// Adds any header this version of the script expects but the sheet doesn't
+// have yet, so existing stores pick up new features without losing data.
+function ensureColumns_(name) {
+  var sheet = getSheet_(name, false);
+  if (!sheet) return;
+  var headers = SHEETS[name];
+  var width = sheet.getLastColumn();
+  var current = width ? sheet.getRange(1, 1, 1, width).getValues()[0] : [];
+  while (current.length && String(current[current.length - 1]).trim() === '') current.pop();
+
+  var missing = headers.filter(function (h) { return current.indexOf(h) === -1; });
+  if (!missing.length) return;
+  sheet.getRange(1, current.length + 1, 1, missing.length).setValues([missing]);
+  sheet.setFrozenRows(1);
+}
+
 // ---------------------------------------------------------------------------
 // Locking. Apps Script locks are not re-entrant: a second waitLock() inside the
 // same execution blocks until it times out. Track depth so nested writes (a
@@ -159,40 +184,63 @@ function withLock_(fn) {
 // ---------------------------------------------------------------------------
 function ensureSetup_() {
   var props = PropertiesService.getScriptProperties();
-  if (props.getProperty('SETUP_COMPLETE') === 'true') return;
+  if (props.getProperty('SETUP_VERSION') === SCHEMA_VERSION) return;
   withLock_(function () {
-    if (props.getProperty('SETUP_COMPLETE') === 'true') return;
-    Object.keys(SHEETS).forEach(function (name) { getSheet_(name); });
+    if (props.getProperty('SETUP_VERSION') === SCHEMA_VERSION) return;
+    Object.keys(SHEETS).forEach(function (name) {
+      getSheet_(name);
+      ensureColumns_(name);
+    });
     seedDefaultSettings_();
     seedDefaultPaymentMethod_();
     seedSampleCatalog_();
-    props.setProperty('SETUP_COMPLETE', 'true');
+    props.setProperty('SETUP_VERSION', SCHEMA_VERSION);
   });
 }
 
 // Manual entry point, kept for running from the Apps Script editor. Repairs
 // missing sheets/headers even after the auto-setup flag has been set.
 function setupSheets() {
-  PropertiesService.getScriptProperties().deleteProperty('SETUP_COMPLETE');
+  PropertiesService.getScriptProperties().deleteProperty('SETUP_VERSION');
   ensureSetup_();
   return 'Setup complete. Open the web app with ?page=admin to create your admin account.';
 }
 
+// Seeds any setting key that isn't present yet. Runs per-key (rather than
+// bailing out when the sheet is non-empty) so new settings introduced by a
+// later version appear in existing stores without overwriting customized ones.
 function seedDefaultSettings_() {
-  var sheet = getSheet_('Settings');
-  if (sheet.getLastRow() > 1) return; // already seeded
-  var defaults = [
-    ['SiteName', 'My Multi-Business Store'],
-    ['Currency', 'GHS'],
-    ['CurrencySymbol', 'GHS '],
-    ['WhatsAppNumber', '233547359015'],
-    ['WhatsAppGreeting', 'Hello! I would like to ask about your products.'],
-    ['ChatbotEnabled', 'TRUE'],
-    ['ChatbotGreeting', "Hi! I'm your shopping assistant. Ask me about orders, payment, delivery or products."],
-    ['DriveFolderId', '']
-  ];
-  defaults.forEach(function (row) {
-    sheet.appendRow(row);
+  var defaults = {
+    SiteName: 'My Multi-Business Store',
+    Currency: 'GHS',
+    CurrencySymbol: 'GHS ',
+    WhatsAppNumber: '0547359015',
+    WhatsAppGreeting: 'Hello! I would like to ask about your products.',
+    ChatbotEnabled: 'TRUE',
+    ChatbotGreeting: "Hi! I'm your shopping assistant. Ask me about orders, payment, delivery or products.",
+    NewsTicker: 'Welcome to our store! Fast delivery and great prices on all our products.',
+    NewsTickerEnabled: 'TRUE',
+    PrimaryColor: '#2563eb',
+    AccentColor: '#dc2626',
+    ThemeMode: 'light',
+    ContactPhone: '0547359015',
+    ContactEmail: '',
+    ContactAddress: '',
+    FacebookURL: '',
+    InstagramURL: '',
+    TwitterURL: '',
+    TikTokURL: '',
+    YouTubeURL: '',
+    LinkedInURL: '',
+    MapEmbedURL: '',
+    BundleDisclaimer: DEFAULT_BUNDLE_DISCLAIMER
+  };
+
+  var existing = {};
+  sheetToObjects_('Settings').forEach(function (r) { existing[r.Key] = true; });
+  Object.keys(defaults).forEach(function (key) {
+    if (existing[key]) return;
+    appendRowObject_('Settings', { Key: key, Value: defaults[key] });
   });
 }
 
@@ -202,8 +250,7 @@ function seedDefaultSettings_() {
 // adminNeedsFirstAccount() / adminCreateFirstAccount() below.
 
 function seedDefaultPaymentMethod_() {
-  var sheet = getSheet_('PaymentMethods');
-  if (sheet.getLastRow() > 1) return;
+  if (sheetToObjects_('PaymentMethods').length) return;
   appendRowObject_('PaymentMethods', {
     PaymentMethodID: genId_('PM'),
     Type: 'Mobile Money',
@@ -218,36 +265,39 @@ function seedDefaultPaymentMethod_() {
 }
 
 function seedSampleCatalog_() {
-  var bizSheet = getSheet_('Businesses');
-  if (bizSheet.getLastRow() > 1) return; // don't overwrite real data
+  if (sheetToObjects_('Businesses').length) return; // don't overwrite real data
   var businesses = [
-    { key: 'databundles', Name: 'Data Bundles', Description: 'Affordable mobile data bundles for all networks.', LogoURL: '', WhatsAppNumber: '', Active: true, SortOrder: 1 },
-    { key: 'frames', Name: 'Picture Frames & Gifts', Description: 'Custom picture frames and gift items.', LogoURL: '', WhatsAppNumber: '', Active: true, SortOrder: 2 },
-    { key: 'security', Name: 'Security & Alarm Systems', Description: 'School sirens, smart bells and alarm systems — custom installs, enquire on WhatsApp.', LogoURL: '', WhatsAppNumber: '', Active: true, SortOrder: 3 },
-    { key: 'code', Name: 'Scripts & Source Code', Description: 'Ready-made Google Apps Script and PHP project source code.', LogoURL: '', WhatsAppNumber: '', Active: true, SortOrder: 4 }
+    { key: 'databundles', Name: 'Data Bundles', Description: 'Affordable mobile data bundles for all networks.', SortOrder: 1 },
+    { key: 'frames', Name: 'Picture Frames & Gifts', Description: 'Custom picture frames and gift items.', SortOrder: 2 },
+    { key: 'security', Name: 'Security & Alarm Systems', Description: 'School sirens, smart bells and alarm systems — custom installs, enquire on WhatsApp.', SortOrder: 3 },
+    { key: 'code', Name: 'Scripts & Source Code', Description: 'Ready-made Google Apps Script and PHP project source code.', SortOrder: 4 }
   ];
   var ids = {};
   businesses.forEach(function (b) {
     var id = genId_('BIZ');
     ids[b.key] = id;
     appendRowObject_('Businesses', {
-      BusinessID: id, Name: b.Name, Description: b.Description, LogoURL: b.LogoURL,
-      WhatsAppNumber: b.WhatsAppNumber, Active: b.Active, SortOrder: b.SortOrder, CreatedAt: new Date()
+      BusinessID: id, Name: b.Name, Description: b.Description, LogoURL: '',
+      WhatsAppNumber: '', Active: true, SortOrder: b.SortOrder, CreatedAt: new Date()
     });
   });
 
   var products = [
-    { biz: 'databundles', Name: 'MTN 5GB Data Bundle', Description: 'Valid for 30 days.', Category: 'Data Bundles', Price: 30, Stock: '', IsService: true, EnquireOnWhatsApp: false },
-    { biz: 'databundles', Name: 'Telecel 10GB Data Bundle', Description: 'Valid for 30 days.', Category: 'Data Bundles', Price: 55, Stock: '', IsService: true, EnquireOnWhatsApp: false },
-    { biz: 'frames', Name: 'A4 Wooden Picture Frame', Description: 'Elegant wooden frame, holds one A4 photo.', Category: 'Picture Frames', Price: 45, Stock: 20, IsService: false, EnquireOnWhatsApp: false },
-    { biz: 'security', Name: 'School Siren / Smart Bell', Description: 'Loud electronic school bell/siren with programmable schedule. Installation available. Chat with us to discuss your requirements and get a quote.', Category: 'Alarm Systems', Price: 0, Stock: '', IsService: true, EnquireOnWhatsApp: true },
-    { biz: 'code', Name: 'Google Apps Script E-Commerce Source Code', Description: 'Full source code license for a Sheet-powered e-commerce site like this one.', Category: 'Source Code', Price: 250, Stock: '', IsService: true, EnquireOnWhatsApp: false }
+    { biz: 'databundles', Name: 'MTN 5GB Data Bundle', Description: 'Valid for 30 days.', Category: 'Data Bundles', Price: 30, Stock: '', IsService: true, RequiresRecipient: true },
+    { biz: 'databundles', Name: 'Telecel 10GB Data Bundle', Description: 'Valid for 30 days.', Category: 'Data Bundles', Price: 55, Stock: '', IsService: true, RequiresRecipient: true },
+    { biz: 'frames', Name: 'A4 Wooden Picture Frame', Description: 'Elegant wooden frame, holds one A4 photo.', Category: 'Picture Frames', Price: 45, Stock: 20, IsService: false, RequiresRecipient: false },
+    { biz: 'security', Name: 'School Siren / Smart Bell', Description: 'Loud electronic school bell/siren with programmable schedule. Installation available. Chat with us to discuss your requirements and get a quote.', Category: 'Alarm Systems', Price: 0, Stock: '', IsService: true, EnquireOnWhatsApp: true, RequiresRecipient: false },
+    { biz: 'code', Name: 'Google Apps Script E-Commerce Source Code', Description: 'Full source code license for a Sheet-powered e-commerce site like this one.', Category: 'Source Code', Price: 250, Stock: '', IsService: true, RequiresRecipient: false }
   ];
   products.forEach(function (p) {
     appendRowObject_('Products', {
       ProductID: genId_('PRD'), BusinessID: ids[p.biz], ImageURL: '', Name: p.Name, Description: p.Description,
-      Category: p.Category, Price: p.Price, Stock: p.Stock, IsService: p.IsService, EnquireOnWhatsApp: p.EnquireOnWhatsApp,
-      Active: true, CreatedAt: new Date()
+      Category: p.Category, Price: p.Price, Stock: p.Stock, IsService: p.IsService,
+      EnquireOnWhatsApp: !!p.EnquireOnWhatsApp, Active: true, CreatedAt: new Date(),
+      RequiresRecipient: !!p.RequiresRecipient,
+      RecipientLabel: p.RequiresRecipient ? 'Phone number to receive the bundle' : '',
+      ConfirmationNote: p.RequiresRecipient ? DEFAULT_BUNDLE_DISCLAIMER : '',
+      InStock: true
     });
   });
 }
@@ -261,9 +311,10 @@ function sheetToObjects_(name) {
   var sheet = getSheet_(name, false);
   if (!sheet) return [];
   var lastRow = sheet.getLastRow();
-  if (lastRow < 2) return [];
-  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-  var values = sheet.getRange(2, 1, lastRow - 1, headers.length).getValues();
+  var lastCol = sheet.getLastColumn();
+  if (lastRow < 2 || lastCol < 1) return [];
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var values = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
   var out = [];
   for (var r = 0; r < values.length; r++) {
     var obj = { _row: r + 2 };
@@ -278,11 +329,16 @@ function sheetToObjects_(name) {
 function appendRowObject_(name, obj) {
   return withLock_(function () {
     var sheet = getSheet_(name);
-    var headers = SHEETS[name];
-    var row = headers.map(function (h) {
-      var v = obj[h];
-      return (v === undefined || v === null) ? '' : v;
-    });
+    // Write against the sheet's own header row, not the in-code list, so a
+    // sheet whose columns were reordered by hand still lands values correctly.
+    var lastCol = Math.max(sheet.getLastColumn(), SHEETS[name].length);
+    var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    var row = [];
+    for (var i = 0; i < headers.length; i++) {
+      var key = headers[i];
+      var v = (key && obj[key] !== undefined && obj[key] !== null) ? obj[key] : '';
+      row.push(v);
+    }
     sheet.appendRow(row);
     return obj;
   });
@@ -346,9 +402,38 @@ function toBool_(v) {
   return s === 'true' || s === '1' || s === 'yes';
 }
 
+// Treats a blank cell as true — so a column added by a schema upgrade (InStock)
+// doesn't silently switch every existing row off.
+function toBoolDefaultTrue_(v) {
+  if (v === '' || v === null || v === undefined) return true;
+  return toBool_(v);
+}
+
 function toNum_(v, fallback) {
   var n = parseFloat(v);
   return isNaN(n) ? (fallback === undefined ? 0 : fallback) : n;
+}
+
+function round2_(n) { return Math.round((toNum_(n) + Number.EPSILON) * 100) / 100; }
+
+// google.script.run has to serialize everything it returns. Dates inside nested
+// structures are the usual source of silent breakage, so every payload sent to
+// the client goes through here and comes back as plain strings/numbers.
+function isoDate_(v) {
+  if (!v) return '';
+  try {
+    var d = (v instanceof Date) ? v : new Date(v);
+    if (isNaN(d.getTime())) return String(v);
+    return d.toISOString();
+  } catch (err) {
+    return String(v);
+  }
+}
+
+function plain_(v) {
+  if (v === null || v === undefined) return '';
+  if (v instanceof Date) return isoDate_(v);
+  return v;
 }
 
 // ---------------------------------------------------------------------------
@@ -365,7 +450,7 @@ function getSettingValue_(key, fallback) {
 function getPublicSettings_() {
   var rows = sheetToObjects_('Settings');
   var out = {};
-  rows.forEach(function (r) { out[r.Key] = r.Value; });
+  rows.forEach(function (r) { if (r.Key) out[r.Key] = plain_(r.Value); });
   return out;
 }
 
@@ -422,48 +507,64 @@ function getStorefrontData() {
 }
 
 function buildStorefrontData_() {
-  var businesses = sheetToObjects_('Businesses').filter(function (b) { return toBool_(b.Active); })
+  var allBusinesses = sheetToObjects_('Businesses');
+  var bizById = {};
+  allBusinesses.forEach(function (b) { bizById[b.BusinessID] = b; });
+
+  var businesses = allBusinesses.filter(function (b) { return toBool_(b.Active); })
     .sort(function (a, b) { return toNum_(a.SortOrder) - toNum_(b.SortOrder); })
     .map(function (b) {
-      return { id: b.BusinessID, name: b.Name, description: b.Description, logo: b.LogoURL, whatsapp: b.WhatsAppNumber };
+      return {
+        id: String(b.BusinessID), name: String(b.Name || ''), description: String(b.Description || ''),
+        logo: String(b.LogoURL || ''), whatsapp: String(b.WhatsAppNumber || '')
+      };
     });
 
-  var bizById = {};
-  sheetToObjects_('Businesses').forEach(function (b) { bizById[b.BusinessID] = b; });
-
   var discounts = getActiveDiscounts_();
+  var settings = getPublicSettings_();
 
   var products = sheetToObjects_('Products').filter(function (p) { return toBool_(p.Active); }).map(function (p) {
     var biz = bizById[p.BusinessID] || {};
     var price = toNum_(p.Price);
     var discount = bestDiscountFor_(p, discounts);
     var finalPrice = discount ? Math.max(0, price - discount.amount) : price;
+    var stock = (p.Stock === '' || p.Stock === null || p.Stock === undefined) ? null : toNum_(p.Stock);
+    var requiresRecipient = toBool_(p.RequiresRecipient);
     return {
-      id: p.ProductID,
-      businessId: p.BusinessID,
-      businessName: biz.Name || 'General',
-      image: p.ImageURL,
-      name: p.Name,
-      description: p.Description,
-      category: p.Category,
-      price: finalPrice,
-      originalPrice: price,
+      id: String(p.ProductID),
+      businessId: String(p.BusinessID || ''),
+      businessName: String(biz.Name || 'General'),
+      image: String(p.ImageURL || ''),
+      name: String(p.Name || ''),
+      description: String(p.Description || ''),
+      category: String(p.Category || 'General'),
+      price: round2_(finalPrice),
+      originalPrice: round2_(price),
       onSale: !!discount,
-      discountLabel: discount ? discount.label : null,
-      stock: (p.Stock === '' || p.Stock === null || p.Stock === undefined) ? null : toNum_(p.Stock),
+      discountLabel: discount ? String(discount.label) : '',
+      stock: stock,
+      // Admin can force an item out of stock regardless of the counter.
+      inStock: toBoolDefaultTrue_(p.InStock) && !(stock !== null && stock <= 0),
       isService: toBool_(p.IsService),
-      enquireOnWhatsApp: toBool_(p.EnquireOnWhatsApp)
+      enquireOnWhatsApp: toBool_(p.EnquireOnWhatsApp),
+      requiresRecipient: requiresRecipient,
+      recipientLabel: String(p.RecipientLabel || 'Phone number to receive this'),
+      confirmationNote: String(p.ConfirmationNote || (requiresRecipient ? (settings.BundleDisclaimer || DEFAULT_BUNDLE_DISCLAIMER) : ''))
     };
   });
 
   var banners = sheetToObjects_('Banners').filter(function (b) { return toBool_(b.Active); })
     .sort(function (a, b) { return toNum_(a.SortOrder) - toNum_(b.SortOrder); })
-    .map(function (b) { return { id: b.BannerID, image: b.ImageURL, title: b.Title, link: b.LinkURL }; });
+    .map(function (b) { return { id: String(b.BannerID), image: String(b.ImageURL || ''), title: String(b.Title || ''), link: String(b.LinkURL || '') }; });
 
   var paymentMethods = sheetToObjects_('PaymentMethods').filter(function (p) { return toBool_(p.Active); })
     .sort(function (a, b) { return toNum_(a.SortOrder) - toNum_(b.SortOrder); })
     .map(function (p) {
-      return { id: p.PaymentMethodID, type: p.Type, label: p.Label, accountName: p.AccountName, accountNumber: p.AccountNumber, provider: p.Provider, instructions: p.Instructions };
+      return {
+        id: String(p.PaymentMethodID), type: String(p.Type || ''), label: String(p.Label || ''),
+        accountName: String(p.AccountName || ''), accountNumber: String(p.AccountNumber || ''),
+        provider: String(p.Provider || ''), instructions: String(p.Instructions || '')
+      };
     });
 
   return {
@@ -471,7 +572,7 @@ function buildStorefrontData_() {
     products: products,
     banners: banners,
     paymentMethods: paymentMethods,
-    settings: getPublicSettings_(),
+    settings: settings,
     adminUrl: getWebAppUrl()
   };
 }
@@ -506,7 +607,10 @@ function loginCustomer(username, password) {
     return String(c.Username).toLowerCase() === username && c.PasswordHash === hash;
   })[0];
   if (!match) return null;
-  return { username: match.Username, name: match.Name, address: match.Address, phone: match.Phone };
+  return {
+    username: String(match.Username), name: String(match.Name || ''),
+    address: String(match.Address || ''), phone: String(match.Phone || '')
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -543,6 +647,9 @@ function placeOrder(payload) {
 
     var lineItems = [];
     var subtotal = 0, discountTotal = 0;
+    // The same product can appear on several lines (e.g. the same bundle for
+    // different phone numbers), so stock is tracked cumulatively across lines.
+    var qtyByProduct = {};
 
     for (var i = 0; i < payload.items.length; i++) {
       var reqItem = payload.items[i];
@@ -550,21 +657,32 @@ function placeOrder(payload) {
       if (!product || !toBool_(product.Active)) {
         return { success: false, message: 'One of the items in your cart is no longer available. Please refresh and try again.' };
       }
-      var qty = Math.max(1, Math.floor(toNum_(reqItem.qty, 1)));
       var stock = (product.Stock === '' || product.Stock === null || product.Stock === undefined) ? null : toNum_(product.Stock);
-      if (stock !== null && qty > stock) {
+      if (!toBoolDefaultTrue_(product.InStock) || (stock !== null && stock <= 0)) {
+        return { success: false, message: '"' + product.Name + '" is out of stock.' };
+      }
+
+      var recipient = String(reqItem.recipient || '').trim();
+      if (toBool_(product.RequiresRecipient) && !recipient) {
+        return { success: false, message: 'Please provide the phone number for "' + product.Name + '".' };
+      }
+
+      var qty = Math.max(1, Math.floor(toNum_(reqItem.qty, 1)));
+      qtyByProduct[product.ProductID] = (qtyByProduct[product.ProductID] || 0) + qty;
+      if (stock !== null && qtyByProduct[product.ProductID] > stock) {
         return { success: false, message: '"' + product.Name + '" only has ' + stock + ' in stock.' };
       }
+
       var unitPrice = toNum_(product.Price);
       var discount = bestDiscountFor_(product, discounts);
       var finalUnitPrice = discount ? Math.max(0, unitPrice - discount.amount) : unitPrice;
-      var lineSubtotal = finalUnitPrice * qty;
+
       subtotal += unitPrice * qty;
       discountTotal += (unitPrice - finalUnitPrice) * qty;
 
       lineItems.push({
-        product: product, qty: qty, unitPrice: finalUnitPrice,
-        lineDiscount: (unitPrice - finalUnitPrice) * qty, subtotal: lineSubtotal, stock: stock
+        product: product, qty: qty, unitPrice: finalUnitPrice, recipient: recipient,
+        lineDiscount: (unitPrice - finalUnitPrice) * qty, subtotal: finalUnitPrice * qty
       });
     }
 
@@ -590,12 +708,17 @@ function placeOrder(payload) {
         OrderItemID: genId_('OI'), OrderID: orderId, ProductID: li.product.ProductID,
         BusinessID: li.product.BusinessID, ProductName: li.product.Name, BusinessName: biz.Name || '',
         Category: li.product.Category, Qty: li.qty, UnitPrice: round2_(li.unitPrice),
-        LineDiscount: round2_(li.lineDiscount), Subtotal: round2_(li.subtotal)
+        LineDiscount: round2_(li.lineDiscount), Subtotal: round2_(li.subtotal),
+        RecipientNumber: li.recipient
       });
-      // Decrement stock for tracked (non-unlimited) inventory.
-      if (li.stock !== null) {
-        updateRowById_('Products', 'ProductID', li.product.ProductID, { Stock: Math.max(0, li.stock - li.qty) });
-      }
+    });
+
+    // Decrement tracked inventory once per product, after all lines are known.
+    Object.keys(qtyByProduct).forEach(function (productId) {
+      var p = productsById[productId];
+      var stock = (p.Stock === '' || p.Stock === null || p.Stock === undefined) ? null : toNum_(p.Stock);
+      if (stock === null) return;
+      updateRowById_('Products', 'ProductID', productId, { Stock: Math.max(0, stock - qtyByProduct[productId]) });
     });
 
     return { success: true, orderId: orderId, total: round2_(total) };
@@ -603,8 +726,6 @@ function placeOrder(payload) {
     return { success: false, message: 'Something went wrong placing your order: ' + err.message };
   }
 }
-
-function round2_(n) { return Math.round((toNum_(n) + Number.EPSILON) * 100) / 100; }
 
 function getOrderHistory(username) {
   username = String(username || '').trim().toLowerCase();
@@ -617,31 +738,61 @@ function trackOrder(orderId, phone) {
   orderId = String(orderId || '').trim();
   phone = String(phone || '').trim();
   if (!orderId || !phone) return null;
+  var digits = phone.replace(/\D/g, '');
   var order = sheetToObjects_('Orders').filter(function (o) {
-    return String(o.OrderID) === orderId && String(o.Phone).replace(/\D/g, '') === phone.replace(/\D/g, '');
+    return String(o.OrderID).trim().toLowerCase() === orderId.toLowerCase() &&
+      String(o.Phone).replace(/\D/g, '') === digits;
   })[0];
   if (!order) return null;
   return attachItemsToOrders_([order])[0];
 }
 
+// Everything here is flattened to strings/numbers: google.script.run silently
+// drops payloads it cannot serialize, and raw Date values nested inside the
+// items array were doing exactly that — the admin Orders table came back empty
+// while the dashboard (which only counts rows) looked fine.
 function attachItemsToOrders_(orders) {
   var allItems = sheetToObjects_('OrderItems');
-  return orders.map(function (o) {
-    var items = allItems.filter(function (i) { return i.OrderID === o.OrderID; }).map(function (i) {
-      return { productName: i.ProductName, businessName: i.BusinessName, category: i.Category, qty: i.Qty, unitPrice: i.UnitPrice, subtotal: i.Subtotal };
+  var itemsByOrder = {};
+  allItems.forEach(function (i) {
+    var key = String(i.OrderID);
+    if (!itemsByOrder[key]) itemsByOrder[key] = [];
+    itemsByOrder[key].push({
+      productName: String(i.ProductName || ''),
+      businessName: String(i.BusinessName || ''),
+      category: String(i.Category || ''),
+      recipient: String(i.RecipientNumber || ''),
+      qty: toNum_(i.Qty),
+      unitPrice: round2_(i.UnitPrice),
+      subtotal: round2_(i.Subtotal)
     });
+  });
+
+  return orders.map(function (o) {
     return {
-      orderId: o.OrderID, customerName: o.CustomerName, phone: o.Phone, address: o.Address,
-      subtotal: o.Subtotal, discountAmount: o.DiscountAmount, total: o.Total,
-      paymentMethod: o.PaymentMethodLabel, paymentStatus: o.PaymentStatus, orderStatus: o.OrderStatus,
-      createdAt: o.CreatedAt, updatedAt: o.UpdatedAt, items: items
+      orderId: String(o.OrderID || ''),
+      customerName: String(o.CustomerName || ''),
+      phone: String(o.Phone || ''),
+      address: String(o.Address || ''),
+      subtotal: round2_(o.Subtotal),
+      discountAmount: round2_(o.DiscountAmount),
+      total: round2_(o.Total),
+      paymentMethod: String(o.PaymentMethodLabel || ''),
+      payerNumber: String(o.PayerNumber || ''),
+      transactionId: String(o.TransactionID || ''),
+      paymentStatus: String(o.PaymentStatus || ''),
+      orderStatus: String(o.OrderStatus || ''),
+      notes: String(o.Notes || ''),
+      createdAt: isoDate_(o.CreatedAt),
+      updatedAt: isoDate_(o.UpdatedAt),
+      items: itemsByOrder[String(o.OrderID)] || []
     };
   });
 }
 
 // ============================================================================
-// ADMIN PORTAL API — every function below (except adminLogin) requires a
-// valid session token returned by adminLogin().
+// ADMIN PORTAL API — every function below (except adminLogin and the first-run
+// helpers) requires a valid session token returned by adminLogin().
 // ============================================================================
 function requireAdmin_(token) {
   var cache = CacheService.getScriptCache();
@@ -692,7 +843,7 @@ function adminLogin(username, password) {
   var token = Utilities.getUuid();
   var session = { adminId: match.AdminID, username: match.Username, name: match.Name, role: match.Role };
   CacheService.getScriptCache().put('admtok_' + token, JSON.stringify(session), ADMIN_TOKEN_TTL_SECONDS);
-  return { token: token, name: match.Name, role: match.Role, username: match.Username };
+  return { token: token, name: String(match.Name || ''), role: String(match.Role || ''), username: String(match.Username || '') };
 }
 
 function adminLogout(token) {
@@ -715,6 +866,7 @@ function adminAddAdmin(token, data) {
   requireAdmin_(token);
   var username = String(data.username || '').trim().toLowerCase();
   if (!username || !data.password || !data.name) return { success: false, message: 'Name, username and password are required.' };
+  if (String(data.password).length < 6) return { success: false, message: 'Password must be at least 6 characters.' };
   var exists = sheetToObjects_('Admins').some(function (a) { return String(a.Username).toLowerCase() === username; });
   if (exists) return { success: false, message: 'That admin username already exists.' };
   appendRowObject_('Admins', {
@@ -726,7 +878,9 @@ function adminAddAdmin(token, data) {
 
 function adminGetAdmins(token) {
   requireAdmin_(token);
-  return sheetToObjects_('Admins').map(function (a) { return { id: a.AdminID, username: a.Username, name: a.Name, role: a.Role, createdAt: a.CreatedAt }; });
+  return sheetToObjects_('Admins').map(function (a) {
+    return { id: String(a.AdminID), username: String(a.Username || ''), name: String(a.Name || ''), role: String(a.Role || ''), createdAt: isoDate_(a.CreatedAt) };
+  });
 }
 
 // --- Dashboard -------------------------------------------------------------
@@ -743,30 +897,33 @@ function adminGetDashboard(token) {
   var totalExpenses = expenses.reduce(function (s, e) { return s + toNum_(e.Amount); }, 0);
   var pendingPayments = orders.filter(function (o) { return o.PaymentStatus === 'Pending Verification'; }).length;
 
-  // Sales for the last 14 days (confirmed orders only)
+  var tz = Session.getScriptTimeZone() || 'Etc/UTC';
   var days = [];
   for (var i = 13; i >= 0; i--) {
     var d = new Date();
     d.setDate(d.getDate() - i);
-    days.push({ date: Utilities.formatDate(d, Session.getScriptTimeZone() || 'Etc/UTC', 'MMM d'), key: Utilities.formatDate(d, Session.getScriptTimeZone() || 'Etc/UTC', 'yyyy-MM-dd'), total: 0 });
+    days.push({ date: Utilities.formatDate(d, tz, 'd MMM'), key: Utilities.formatDate(d, tz, 'yyyy-MM-dd'), total: 0 });
   }
   var dayIndex = {};
   days.forEach(function (d, idx) { dayIndex[d.key] = idx; });
   confirmedOrders.forEach(function (o) {
     if (!o.CreatedAt) return;
-    var key = Utilities.formatDate(new Date(o.CreatedAt), Session.getScriptTimeZone() || 'Etc/UTC', 'yyyy-MM-dd');
-    if (dayIndex.hasOwnProperty(key)) days[dayIndex[key]].total += toNum_(o.Total);
+    try {
+      var key = Utilities.formatDate(new Date(o.CreatedAt), tz, 'yyyy-MM-dd');
+      if (dayIndex.hasOwnProperty(key)) days[dayIndex[key]].total += toNum_(o.Total);
+    } catch (err) { /* unparseable date, skip */ }
   });
+  days.forEach(function (d) { d.total = round2_(d.total); });
 
-  // Business breakdown (confirmed order items)
   var confirmedOrderIds = {};
   confirmedOrders.forEach(function (o) { confirmedOrderIds[o.OrderID] = true; });
-  var bizTotals = {};
-  var productQty = {};
+  var bizTotals = {}, productQty = {};
   items.forEach(function (it) {
     if (!confirmedOrderIds[it.OrderID]) return;
-    bizTotals[it.BusinessName || 'General'] = (bizTotals[it.BusinessName || 'General'] || 0) + toNum_(it.Subtotal);
-    productQty[it.ProductName] = (productQty[it.ProductName] || 0) + toNum_(it.Qty);
+    var bn = String(it.BusinessName || 'General');
+    bizTotals[bn] = (bizTotals[bn] || 0) + toNum_(it.Subtotal);
+    var pn = String(it.ProductName || '');
+    productQty[pn] = (productQty[pn] || 0) + toNum_(it.Qty);
   });
   var businessBreakdown = Object.keys(bizTotals).map(function (k) { return { business: k, total: round2_(bizTotals[k]) }; })
     .sort(function (a, b) { return b.total - a.total; });
@@ -776,7 +933,7 @@ function adminGetDashboard(token) {
   var lowStock = products.filter(function (p) {
     if (p.Stock === '' || p.Stock === null || p.Stock === undefined) return false;
     return toBool_(p.Active) && toNum_(p.Stock) <= LOW_STOCK_THRESHOLD;
-  }).map(function (p) { return { id: p.ProductID, name: p.Name, stock: toNum_(p.Stock) }; });
+  }).map(function (p) { return { id: String(p.ProductID), name: String(p.Name || ''), stock: toNum_(p.Stock) }; });
 
   return {
     totalOrders: orders.length,
@@ -799,8 +956,8 @@ function adminGetOrders(token, filters) {
   requireAdmin_(token);
   filters = filters || {};
   var orders = sheetToObjects_('Orders');
-  if (filters.paymentStatus) orders = orders.filter(function (o) { return o.PaymentStatus === filters.paymentStatus; });
-  if (filters.orderStatus) orders = orders.filter(function (o) { return o.OrderStatus === filters.orderStatus; });
+  if (filters.paymentStatus) orders = orders.filter(function (o) { return String(o.PaymentStatus) === filters.paymentStatus; });
+  if (filters.orderStatus) orders = orders.filter(function (o) { return String(o.OrderStatus) === filters.orderStatus; });
   if (filters.search) {
     var q = String(filters.search).toLowerCase();
     orders = orders.filter(function (o) {
@@ -828,11 +985,13 @@ function adminUpdateOrderStatus(token, orderId, orderStatus) {
 
 function adminExportOrdersCsv(token) {
   requireAdmin_(token);
-  var orders = sheetToObjects_('Orders');
-  var header = ['OrderID', 'Date', 'Customer', 'Phone', 'Total', 'PaymentMethod', 'PaymentStatus', 'OrderStatus'];
+  var orders = attachItemsToOrders_(sheetToObjects_('Orders'));
+  var header = ['OrderID', 'Date', 'Customer', 'Phone', 'Items', 'Recipients', 'Total', 'PaymentMethod', 'PayerNumber', 'TransactionID', 'PaymentStatus', 'OrderStatus'];
   var lines = [header.join(',')];
   orders.forEach(function (o) {
-    var row = [o.OrderID, o.CreatedAt, o.CustomerName, o.Phone, o.Total, o.PaymentMethodLabel, o.PaymentStatus, o.OrderStatus]
+    var itemsText = o.items.map(function (i) { return i.qty + 'x ' + i.productName; }).join(' | ');
+    var recipients = o.items.map(function (i) { return i.recipient; }).filter(Boolean).join(' | ');
+    var row = [o.orderId, o.createdAt, o.customerName, o.phone, itemsText, recipients, o.total, o.paymentMethod, o.payerNumber, o.transactionId, o.paymentStatus, o.orderStatus]
       .map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; });
     lines.push(row.join(','));
   });
@@ -842,24 +1001,32 @@ function adminExportOrdersCsv(token) {
 // --- Businesses ----------------------------------------------------------
 function adminGetBusinesses(token) {
   requireAdmin_(token);
-  return sheetToObjects_('Businesses').sort(function (a, b) { return toNum_(a.SortOrder) - toNum_(b.SortOrder); });
+  return sheetToObjects_('Businesses')
+    .sort(function (a, b) { return toNum_(a.SortOrder) - toNum_(b.SortOrder); })
+    .map(function (b) {
+      return {
+        BusinessID: String(b.BusinessID), Name: String(b.Name || ''), Description: String(b.Description || ''),
+        LogoURL: String(b.LogoURL || ''), WhatsAppNumber: String(b.WhatsAppNumber || ''),
+        Active: toBool_(b.Active), SortOrder: toNum_(b.SortOrder, 1), CreatedAt: isoDate_(b.CreatedAt)
+      };
+    });
 }
 
 function adminSaveBusiness(token, biz) {
   requireAdmin_(token);
   if (!biz.Name) return { success: false, message: 'Business name is required.' };
+  var data = {
+    Name: biz.Name, Description: biz.Description || '', LogoURL: biz.LogoURL || '',
+    WhatsAppNumber: biz.WhatsAppNumber || '', Active: !!biz.Active, SortOrder: toNum_(biz.SortOrder, 1)
+  };
   if (biz.BusinessID) {
-    updateRowById_('Businesses', 'BusinessID', biz.BusinessID, {
-      Name: biz.Name, Description: biz.Description || '', LogoURL: biz.LogoURL || '',
-      WhatsAppNumber: biz.WhatsAppNumber || '', Active: !!biz.Active, SortOrder: toNum_(biz.SortOrder, 1)
-    });
+    updateRowById_('Businesses', 'BusinessID', biz.BusinessID, data);
     return { success: true, id: biz.BusinessID };
   }
   var id = genId_('BIZ');
-  appendRowObject_('Businesses', {
-    BusinessID: id, Name: biz.Name, Description: biz.Description || '', LogoURL: biz.LogoURL || '',
-    WhatsAppNumber: biz.WhatsAppNumber || '', Active: biz.Active !== false, SortOrder: toNum_(biz.SortOrder, 1), CreatedAt: new Date()
-  });
+  data.BusinessID = id;
+  data.CreatedAt = new Date();
+  appendRowObject_('Businesses', data);
   return { success: true, id: id };
 }
 
@@ -872,7 +1039,17 @@ function adminDeleteBusiness(token, businessId) {
 // --- Products --------------------------------------------------------------
 function adminGetProducts(token) {
   requireAdmin_(token);
-  return sheetToObjects_('Products');
+  return sheetToObjects_('Products').map(function (p) {
+    return {
+      ProductID: String(p.ProductID), BusinessID: String(p.BusinessID || ''), ImageURL: String(p.ImageURL || ''),
+      Name: String(p.Name || ''), Description: String(p.Description || ''), Category: String(p.Category || ''),
+      Price: toNum_(p.Price), Stock: (p.Stock === '' || p.Stock === null || p.Stock === undefined) ? '' : toNum_(p.Stock),
+      IsService: toBool_(p.IsService), EnquireOnWhatsApp: toBool_(p.EnquireOnWhatsApp), Active: toBool_(p.Active),
+      RequiresRecipient: toBool_(p.RequiresRecipient), RecipientLabel: String(p.RecipientLabel || ''),
+      ConfirmationNote: String(p.ConfirmationNote || ''), InStock: toBoolDefaultTrue_(p.InStock),
+      CreatedAt: isoDate_(p.CreatedAt)
+    };
+  });
 }
 
 function adminSaveProduct(token, p) {
@@ -880,8 +1057,11 @@ function adminSaveProduct(token, p) {
   if (!p.Name || !p.BusinessID) return { success: false, message: 'Product name and business are required.' };
   var data = {
     BusinessID: p.BusinessID, ImageURL: p.ImageURL || '', Name: p.Name, Description: p.Description || '',
-    Category: p.Category || 'General', Price: toNum_(p.Price, 0), Stock: p.Stock === '' || p.Stock === null || p.Stock === undefined ? '' : toNum_(p.Stock, 0),
-    IsService: !!p.IsService, EnquireOnWhatsApp: !!p.EnquireOnWhatsApp, Active: p.Active !== false
+    Category: p.Category || 'General', Price: toNum_(p.Price, 0),
+    Stock: (p.Stock === '' || p.Stock === null || p.Stock === undefined) ? '' : toNum_(p.Stock, 0),
+    IsService: !!p.IsService, EnquireOnWhatsApp: !!p.EnquireOnWhatsApp, Active: p.Active !== false,
+    RequiresRecipient: !!p.RequiresRecipient, RecipientLabel: p.RecipientLabel || '',
+    ConfirmationNote: p.ConfirmationNote || '', InStock: p.InStock !== false
   };
   if (p.ProductID) {
     updateRowById_('Products', 'ProductID', p.ProductID, data);
@@ -894,6 +1074,13 @@ function adminSaveProduct(token, p) {
   return { success: true, id: id };
 }
 
+// Quick in-stock / out-of-stock switch used by the toggle in the products table.
+function adminSetProductStock(token, productId, inStock) {
+  requireAdmin_(token);
+  updateRowById_('Products', 'ProductID', productId, { InStock: !!inStock });
+  return { success: true };
+}
+
 function adminDeleteProduct(token, productId) {
   requireAdmin_(token);
   deleteRowById_('Products', 'ProductID', productId);
@@ -903,20 +1090,27 @@ function adminDeleteProduct(token, productId) {
 // --- Banners ---------------------------------------------------------------
 function adminGetBanners(token) {
   requireAdmin_(token);
-  return sheetToObjects_('Banners').sort(function (a, b) { return toNum_(a.SortOrder) - toNum_(b.SortOrder); });
+  return sheetToObjects_('Banners')
+    .sort(function (a, b) { return toNum_(a.SortOrder) - toNum_(b.SortOrder); })
+    .map(function (b) {
+      return {
+        BannerID: String(b.BannerID), ImageURL: String(b.ImageURL || ''), Title: String(b.Title || ''),
+        LinkURL: String(b.LinkURL || ''), Active: toBool_(b.Active), SortOrder: toNum_(b.SortOrder, 1)
+      };
+    });
 }
 
 function adminSaveBanner(token, b) {
   requireAdmin_(token);
   if (!b.ImageURL) return { success: false, message: 'Banner image is required.' };
+  var data = { ImageURL: b.ImageURL, Title: b.Title || '', LinkURL: b.LinkURL || '', Active: !!b.Active, SortOrder: toNum_(b.SortOrder, 1) };
   if (b.BannerID) {
-    updateRowById_('Banners', 'BannerID', b.BannerID, {
-      ImageURL: b.ImageURL, Title: b.Title || '', LinkURL: b.LinkURL || '', Active: !!b.Active, SortOrder: toNum_(b.SortOrder, 1)
-    });
+    updateRowById_('Banners', 'BannerID', b.BannerID, data);
     return { success: true, id: b.BannerID };
   }
   var id = genId_('BAN');
-  appendRowObject_('Banners', { BannerID: id, ImageURL: b.ImageURL, Title: b.Title || '', LinkURL: b.LinkURL || '', Active: b.Active !== false, SortOrder: toNum_(b.SortOrder, 1) });
+  data.BannerID = id;
+  appendRowObject_('Banners', data);
   return { success: true, id: id };
 }
 
@@ -926,10 +1120,19 @@ function adminDeleteBanner(token, bannerId) {
   return { success: true };
 }
 
-// --- Payment Methods ---------------------------------------------------------------
+// --- Payment Methods -------------------------------------------------------
 function adminGetPaymentMethods(token) {
   requireAdmin_(token);
-  return sheetToObjects_('PaymentMethods').sort(function (a, b) { return toNum_(a.SortOrder) - toNum_(b.SortOrder); });
+  return sheetToObjects_('PaymentMethods')
+    .sort(function (a, b) { return toNum_(a.SortOrder) - toNum_(b.SortOrder); })
+    .map(function (p) {
+      return {
+        PaymentMethodID: String(p.PaymentMethodID), Type: String(p.Type || ''), Label: String(p.Label || ''),
+        AccountName: String(p.AccountName || ''), AccountNumber: String(p.AccountNumber || ''),
+        Provider: String(p.Provider || ''), Instructions: String(p.Instructions || ''),
+        Active: toBool_(p.Active), SortOrder: toNum_(p.SortOrder, 1)
+      };
+    });
 }
 
 function adminSavePaymentMethod(token, pm) {
@@ -955,10 +1158,18 @@ function adminDeletePaymentMethod(token, id) {
   return { success: true };
 }
 
-// --- Discounts ---------------------------------------------------------------
+// --- Discounts -------------------------------------------------------------
 function adminGetDiscounts(token) {
   requireAdmin_(token);
-  return sheetToObjects_('Discounts');
+  return sheetToObjects_('Discounts').map(function (d) {
+    return {
+      DiscountID: String(d.DiscountID), Label: String(d.Label || ''), Scope: String(d.Scope || 'global'),
+      TargetID: String(d.TargetID || ''), Type: String(d.Type || 'percent'), Value: toNum_(d.Value),
+      StartDate: d.StartDate ? isoDate_(d.StartDate).slice(0, 10) : '',
+      EndDate: d.EndDate ? isoDate_(d.EndDate).slice(0, 10) : '',
+      Active: toBool_(d.Active)
+    };
+  });
 }
 
 function adminSaveDiscount(token, d) {
@@ -984,10 +1195,18 @@ function adminDeleteDiscount(token, id) {
   return { success: true };
 }
 
-// --- Expenses ---------------------------------------------------------------
+// --- Expenses --------------------------------------------------------------
 function adminGetExpenses(token) {
-  var admin = requireAdmin_(token);
-  return sheetToObjects_('Expenses').sort(function (a, b) { return new Date(b.Date) - new Date(a.Date); });
+  requireAdmin_(token);
+  return sheetToObjects_('Expenses')
+    .sort(function (a, b) { return new Date(b.Date) - new Date(a.Date); })
+    .map(function (e) {
+      return {
+        ExpenseID: String(e.ExpenseID), Date: isoDate_(e.Date), BusinessID: String(e.BusinessID || ''),
+        Category: String(e.Category || ''), Description: String(e.Description || ''),
+        Amount: toNum_(e.Amount), AddedBy: String(e.AddedBy || '')
+      };
+    });
 }
 
 function adminAddExpense(token, e) {
@@ -1007,15 +1226,18 @@ function adminDeleteExpense(token, id) {
   return { success: true };
 }
 
-// --- Customers (read-only view) ---------------------------------------------
+// --- Customers (read-only view) --------------------------------------------
 function adminGetCustomers(token) {
   requireAdmin_(token);
   return sheetToObjects_('Customers').map(function (c) {
-    return { id: c.CustomerID, name: c.Name, address: c.Address, phone: c.Phone, username: c.Username, createdAt: c.CreatedAt };
+    return {
+      id: String(c.CustomerID), name: String(c.Name || ''), address: String(c.Address || ''),
+      phone: String(c.Phone || ''), username: String(c.Username || ''), createdAt: isoDate_(c.CreatedAt)
+    };
   });
 }
 
-// --- Settings ---------------------------------------------------------------
+// --- Settings --------------------------------------------------------------
 function adminGetSettings(token) {
   requireAdmin_(token);
   return getPublicSettings_();
@@ -1023,9 +1245,10 @@ function adminGetSettings(token) {
 
 function adminSaveSettings(token, settingsObj) {
   requireAdmin_(token);
+  var existing = {};
+  sheetToObjects_('Settings').forEach(function (s) { existing[s.Key] = true; });
   Object.keys(settingsObj).forEach(function (key) {
-    var existing = sheetToObjects_('Settings').filter(function (s) { return s.Key === key; })[0];
-    if (existing) {
+    if (existing[key]) {
       updateRowById_('Settings', 'Key', key, { Value: settingsObj[key] });
     } else {
       appendRowObject_('Settings', { Key: key, Value: settingsObj[key] });
@@ -1034,15 +1257,40 @@ function adminSaveSettings(token, settingsObj) {
   return { success: true };
 }
 
-// --- Image upload (Drive-backed) ---------------------------------------------
+// --- Image upload (Drive-backed) -------------------------------------------
 function adminUploadImage(token, base64Data, filename, mimeType) {
   requireAdmin_(token);
+  try {
+    var folder = getOrCreateUploadFolder_();
+    var bytes = Utilities.base64Decode(base64Data);
+    var blob = Utilities.newBlob(bytes, mimeType || 'image/png', filename || ('upload-' + Date.now()));
+    var file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    // lh3 serves the image bytes directly; the older /uc?export=view endpoint
+    // now redirects to an HTML page that won't render inside an <img> tag.
+    return { success: true, url: 'https://lh3.googleusercontent.com/d/' + file.getId() };
+  } catch (err) {
+    var msg = String(err && err.message ? err.message : err);
+    if (msg.indexOf('permission') !== -1 || msg.indexOf('Drive') !== -1 || msg.indexOf('authoriz') !== -1) {
+      return {
+        success: false,
+        needsAuth: true,
+        message: 'This deployment has not been granted Google Drive access yet, which is needed to store uploaded images. ' +
+          'Open the Apps Script editor, run the function "authorizeDrive" once and accept the permission prompt, ' +
+          'then redeploy (Deploy > Manage deployments > Edit > New version). ' +
+          'You can paste an image URL into the field instead in the meantime.'
+      };
+    }
+    return { success: false, message: 'Upload failed: ' + msg };
+  }
+}
+
+// Run this once from the Apps Script editor to trigger the Drive consent
+// prompt. Uploading images needs Drive access, and Apps Script only asks for
+// scopes when a function that uses them actually runs.
+function authorizeDrive() {
   var folder = getOrCreateUploadFolder_();
-  var bytes = Utilities.base64Decode(base64Data);
-  var blob = Utilities.newBlob(bytes, mimeType || 'image/png', filename || ('upload-' + Date.now()));
-  var file = folder.createFile(blob);
-  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-  return { success: true, url: 'https://drive.google.com/uc?export=view&id=' + file.getId() };
+  return 'Drive authorized. Uploads will be stored in: ' + folder.getName();
 }
 
 function getOrCreateUploadFolder_() {
