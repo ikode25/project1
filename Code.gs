@@ -12,7 +12,7 @@
 
 // Bump when SHEETS changes so ensureSetup_ re-runs and adds new columns to
 // spreadsheets created by an older version of this script.
-var SCHEMA_VERSION = '3';
+var SCHEMA_VERSION = '4';
 
 // ---------------------------------------------------------------------------
 // Sheet schema — single source of truth for headers used by the generic
@@ -22,7 +22,7 @@ var SCHEMA_VERSION = '3';
 var SHEETS = {
   Settings:       ['Key', 'Value'],
   Businesses:     ['BusinessID', 'Name', 'Description', 'LogoURL', 'WhatsAppNumber', 'Active', 'SortOrder', 'CreatedAt'],
-  Products:       ['ProductID', 'BusinessID', 'ImageURL', 'Name', 'Description', 'Category', 'Price', 'Stock', 'IsService', 'EnquireOnWhatsApp', 'Active', 'CreatedAt', 'RequiresRecipient', 'RecipientLabel', 'ConfirmationNote', 'InStock'],
+  Products:       ['ProductID', 'BusinessID', 'ImageURL', 'Name', 'Description', 'Category', 'Price', 'Stock', 'IsService', 'EnquireOnWhatsApp', 'Active', 'CreatedAt', 'RequiresRecipient', 'RecipientLabel', 'ConfirmationNote', 'InStock', 'ShowWhatsApp'],
   Customers:      ['CustomerID', 'Name', 'Address', 'Phone', 'Username', 'PasswordHash', 'CreatedAt'],
   Admins:         ['AdminID', 'Username', 'PasswordHash', 'Name', 'Role', 'CreatedAt'],
   Orders:         ['OrderID', 'OrderType', 'Username', 'CustomerName', 'Phone', 'Address', 'Subtotal', 'DiscountAmount', 'Total', 'PaymentMethodID', 'PaymentMethodLabel', 'PayerNumber', 'TransactionID', 'PaymentStatus', 'OrderStatus', 'Notes', 'CreatedAt', 'UpdatedAt'],
@@ -67,8 +67,13 @@ function include(filename) {
 // The pages run inside a sandboxed iframe, so links between the storefront and
 // the admin portal need the real deployment URL plus target="_top".
 function getWebAppUrl() {
+  var props = PropertiesService.getScriptProperties();
+  var cached = props.getProperty('WEB_APP_URL');
+  if (cached) return cached;
   try {
-    return ScriptApp.getService().getUrl() || '';
+    var url = ScriptApp.getService().getUrl() || '';
+    if (url) props.setProperty('WEB_APP_URL', url);
+    return url;
   } catch (err) {
     return '';
   }
@@ -210,11 +215,14 @@ function setupSheets() {
 // bailing out when the sheet is non-empty) so new settings introduced by a
 // later version appear in existing stores without overwriting customized ones.
 function seedDefaultSettings_() {
+  // Generic out of the box — the first-run wizard replaces these with the
+  // store owner's own details, so a fresh copy of this project carries no
+  // previous owner's data.
   var defaults = {
     SiteName: 'My Multi-Business Store',
     Currency: 'GHS',
     CurrencySymbol: 'GHS ',
-    WhatsAppNumber: '0547359015',
+    WhatsAppNumber: '',
     WhatsAppGreeting: 'Hello! I would like to ask about your products.',
     ChatbotEnabled: 'TRUE',
     ChatbotGreeting: "Hi! I'm your shopping assistant. Ask me about orders, payment, delivery or products.",
@@ -223,7 +231,7 @@ function seedDefaultSettings_() {
     PrimaryColor: '#2563eb',
     AccentColor: '#dc2626',
     ThemeMode: 'light',
-    ContactPhone: '0547359015',
+    ContactPhone: '',
     ContactEmail: '',
     ContactAddress: '',
     FacebookURL: '',
@@ -255,8 +263,8 @@ function seedDefaultPaymentMethod_() {
     PaymentMethodID: genId_('PM'),
     Type: 'Mobile Money',
     Label: 'Mobile Money',
-    AccountName: 'Emmanuel Darkoh',
-    AccountNumber: '0547359015',
+    AccountName: '',
+    AccountNumber: '',
     Provider: 'MTN/Vodafone/AirtelTigo Mobile Money',
     Instructions: 'Send the exact amount to this Mobile Money number, then enter the number you paid from and the Transaction ID below to confirm your payment.',
     Active: true,
@@ -264,18 +272,30 @@ function seedDefaultPaymentMethod_() {
   });
 }
 
+// Seeds sample businesses that don't already exist (matched by name), so a
+// store created on an older version picks up newly added samples on upgrade
+// without duplicating what's already there. Runs once per SCHEMA_VERSION.
 function seedSampleCatalog_() {
-  if (sheetToObjects_('Businesses').length) return; // don't overwrite real data
   var businesses = [
     { key: 'databundles', Name: 'Data Bundles', Description: 'Affordable mobile data bundles for all networks.', SortOrder: 1 },
-    { key: 'frames', Name: 'Picture Frames & Gifts', Description: 'Custom picture frames and gift items.', SortOrder: 2 },
-    { key: 'security', Name: 'Security & Alarm Systems', Description: 'School sirens, smart bells and alarm systems — custom installs, enquire on WhatsApp.', SortOrder: 3 },
-    { key: 'code', Name: 'Scripts & Source Code', Description: 'Ready-made Google Apps Script and PHP project source code.', SortOrder: 4 }
+    { key: 'electronics', Name: 'Electronics & Gadgets', Description: 'Quality electronics, accessories and gadgets.', SortOrder: 2 },
+    { key: 'frames', Name: 'Picture Frames & Gifts', Description: 'Custom picture frames and gift items.', SortOrder: 3 },
+    { key: 'security', Name: 'Security & Alarm Systems', Description: 'School sirens, smart bells and alarm systems, supplied and installed.', SortOrder: 4 },
+    { key: 'code', Name: 'Scripts & Source Code', Description: 'Ready-made Google Apps Script and PHP project source code.', SortOrder: 5 }
   ];
-  var ids = {};
+
+  var existingByName = {};
+  sheetToObjects_('Businesses').forEach(function (b) {
+    existingByName[String(b.Name).trim().toLowerCase()] = String(b.BusinessID);
+  });
+
+  var ids = {}, created = {};
   businesses.forEach(function (b) {
+    var key = b.Name.trim().toLowerCase();
+    if (existingByName[key]) { ids[b.key] = existingByName[key]; return; }
     var id = genId_('BIZ');
     ids[b.key] = id;
+    created[b.key] = true;
     appendRowObject_('Businesses', {
       BusinessID: id, Name: b.Name, Description: b.Description, LogoURL: '',
       WhatsAppNumber: '', Active: true, SortOrder: b.SortOrder, CreatedAt: new Date()
@@ -283,21 +303,29 @@ function seedSampleCatalog_() {
   });
 
   var products = [
-    { biz: 'databundles', Name: 'MTN 5GB Data Bundle', Description: 'Valid for 30 days.', Category: 'Data Bundles', Price: 30, Stock: '', IsService: true, RequiresRecipient: true },
-    { biz: 'databundles', Name: 'Telecel 10GB Data Bundle', Description: 'Valid for 30 days.', Category: 'Data Bundles', Price: 55, Stock: '', IsService: true, RequiresRecipient: true },
-    { biz: 'frames', Name: 'A4 Wooden Picture Frame', Description: 'Elegant wooden frame, holds one A4 photo.', Category: 'Picture Frames', Price: 45, Stock: 20, IsService: false, RequiresRecipient: false },
-    { biz: 'security', Name: 'School Siren / Smart Bell', Description: 'Loud electronic school bell/siren with programmable schedule. Installation available. Chat with us to discuss your requirements and get a quote.', Category: 'Alarm Systems', Price: 0, Stock: '', IsService: true, EnquireOnWhatsApp: true, RequiresRecipient: false },
-    { biz: 'code', Name: 'Google Apps Script E-Commerce Source Code', Description: 'Full source code license for a Sheet-powered e-commerce site like this one.', Category: 'Source Code', Price: 250, Stock: '', IsService: true, RequiresRecipient: false }
+    { biz: 'databundles', Name: 'MTN 5GB Data Bundle', Description: 'MTN data bundle valid for 30 days. Delivered to any MTN number you provide at checkout.', Category: 'Data Bundles', Price: 30, Stock: '', IsService: true, RequiresRecipient: true },
+    { biz: 'databundles', Name: 'Telecel 10GB Data Bundle', Description: 'Telecel data bundle valid for 30 days. Delivered to any Telecel number you provide at checkout.', Category: 'Data Bundles', Price: 55, Stock: '', IsService: true, RequiresRecipient: true },
+    { biz: 'electronics', Name: 'Bluetooth Speaker', Description: 'Portable wireless Bluetooth speaker with deep bass, USB/SD playback and up to 8 hours of battery life.', Category: 'Audio', Price: 180, Stock: 12, ShowWhatsApp: true },
+    { biz: 'electronics', Name: 'Wireless Earbuds', Description: 'True wireless earbuds with charging case, touch controls and noise isolation.', Category: 'Audio', Price: 120, Stock: 15, ShowWhatsApp: true },
+    { biz: 'electronics', Name: 'Extension Board with Surge Protection', Description: 'Four-socket extension board with USB ports and built-in surge protection for your electronics.', Category: 'Accessories', Price: 85, Stock: 25 },
+    { biz: 'electronics', Name: 'Rechargeable LED Standing Fan', Description: 'Rechargeable standing fan with built-in LED light — keeps running through power cuts.', Category: 'Home Appliances', Price: 450, Stock: 6, ShowWhatsApp: true },
+    { biz: 'frames', Name: 'A4 Wooden Picture Frame', Description: 'Elegant wooden frame, holds one A4 photo. Custom sizes available on request.', Category: 'Picture Frames', Price: 45, Stock: 20 },
+    { biz: 'security', Name: 'School Siren / Smart Bell', Description: 'Loud programmable electronic school bell and siren system. Rings automatically to your timetable, with manual override and an emergency alarm tone. Price covers the unit; installation and wiring are quoted separately based on your school size — message us on WhatsApp for a site-specific quote.', Category: 'Alarm Systems', Price: 1800, Stock: '', IsService: false, ShowWhatsApp: true },
+    { biz: 'code', Name: 'Google Apps Script E-Commerce Source Code', Description: 'Full source code license for a Google Sheet-powered multi-business e-commerce site like this one. Includes the storefront, admin portal, setup guide and free installation support. Message us on WhatsApp if you have questions before buying.', Category: 'Source Code', Price: 250, Stock: '', IsService: true, ShowWhatsApp: true }
   ];
+
   products.forEach(function (p) {
+    // Only seed products for businesses this run actually created, so sample
+    // items never reappear inside a business the owner has been curating.
+    if (!created[p.biz]) return;
     appendRowObject_('Products', {
       ProductID: genId_('PRD'), BusinessID: ids[p.biz], ImageURL: '', Name: p.Name, Description: p.Description,
-      Category: p.Category, Price: p.Price, Stock: p.Stock, IsService: p.IsService,
+      Category: p.Category, Price: p.Price, Stock: p.Stock, IsService: !!p.IsService,
       EnquireOnWhatsApp: !!p.EnquireOnWhatsApp, Active: true, CreatedAt: new Date(),
       RequiresRecipient: !!p.RequiresRecipient,
       RecipientLabel: p.RequiresRecipient ? 'Phone number to receive the bundle' : '',
       ConfirmationNote: p.RequiresRecipient ? DEFAULT_BUNDLE_DISCLAIMER : '',
-      InStock: true
+      InStock: true, ShowWhatsApp: !!p.ShowWhatsApp
     });
   });
 }
@@ -305,7 +333,24 @@ function seedSampleCatalog_() {
 // ---------------------------------------------------------------------------
 // Generic sheet <-> object helpers (header-driven, order independent)
 // ---------------------------------------------------------------------------
+// Sheet reads dominate request time in Apps Script, and a single request used
+// to read Businesses/Products/Discounts several times over. Memoize per
+// execution; writes drop the affected entry.
+var _readCache = {};
+
+function invalidateRead_(name) {
+  if (name) delete _readCache[name];
+  else _readCache = {};
+}
+
 function sheetToObjects_(name) {
+  if (_readCache[name]) return _readCache[name];
+  var out = readSheetObjects_(name);
+  _readCache[name] = out;
+  return out;
+}
+
+function readSheetObjects_(name) {
   // Reads never create or repair a sheet — a missing tab yields an empty list
   // instead of taking the whole page down.
   var sheet = getSheet_(name, false);
@@ -327,6 +372,8 @@ function sheetToObjects_(name) {
 }
 
 function appendRowObject_(name, obj) {
+  invalidateRead_(name);
+  bustStorefrontCache_();
   return withLock_(function () {
     var sheet = getSheet_(name);
     // Write against the sheet's own header row, not the in-code list, so a
@@ -345,6 +392,8 @@ function appendRowObject_(name, obj) {
 }
 
 function updateRowById_(name, idField, idValue, patch) {
+  invalidateRead_(name);
+  bustStorefrontCache_();
   return withLock_(function () {
     var sheet = getSheet_(name);
     var lastRow = sheet.getLastRow();
@@ -368,6 +417,8 @@ function updateRowById_(name, idField, idValue, patch) {
 }
 
 function deleteRowById_(name, idField, idValue) {
+  invalidateRead_(name);
+  bustStorefrontCache_();
   return withLock_(function () {
     var sheet = getSheet_(name);
     var lastRow = sheet.getLastRow();
@@ -490,11 +541,43 @@ function bestDiscountFor_(product, discounts) {
 // ---------------------------------------------------------------------------
 // Storefront (public) API
 // ---------------------------------------------------------------------------
-function getStorefrontData() {
+var STOREFRONT_CACHE_KEY = 'storefront_v4';
+var STOREFRONT_CACHE_TTL = 300; // seconds
+
+function bustStorefrontCache_() {
+  try { CacheService.getScriptCache().remove(STOREFRONT_CACHE_KEY); } catch (err) { /* non-fatal */ }
+}
+
+// The catalog changes rarely but is read on every visit, and each sheet read
+// costs a second or more. Serve shoppers from a short-lived cache; any admin
+// write busts it, so edits still show up immediately.
+function getStorefrontData(force) {
+  var cache = null;
+  try { cache = CacheService.getScriptCache(); } catch (err) { cache = null; }
+
+  if (cache && !force) {
+    try {
+      var hit = cache.get(STOREFRONT_CACHE_KEY);
+      if (hit) {
+        var parsed = JSON.parse(hit);
+        parsed.cached = true;
+        return parsed;
+      }
+    } catch (err) { /* fall through to a fresh build */ }
+  }
+
   // A broken/empty sheet should degrade to an empty store, never to an error
   // dialog over the whole page.
   try {
-    return buildStorefrontData_();
+    var data = buildStorefrontData_();
+    if (cache) {
+      try {
+        var json = JSON.stringify(data);
+        // CacheService rejects values over 100KB; a large catalog just skips it.
+        if (json.length < 95000) cache.put(STOREFRONT_CACHE_KEY, json, STOREFRONT_CACHE_TTL);
+      } catch (err) { /* caching is best-effort */ }
+    }
+    return data;
   } catch (err) {
     Logger.log('getStorefrontData failed: ' + err);
     return {
@@ -546,7 +629,10 @@ function buildStorefrontData_() {
       // Admin can force an item out of stock regardless of the counter.
       inStock: toBoolDefaultTrue_(p.InStock) && !(stock !== null && stock <= 0),
       isService: toBool_(p.IsService),
+      // enquireOnWhatsApp replaces the buy control; showWhatsApp adds a
+      // secondary enquiry button alongside it.
       enquireOnWhatsApp: toBool_(p.EnquireOnWhatsApp),
+      showWhatsApp: toBool_(p.ShowWhatsApp),
       requiresRecipient: requiresRecipient,
       recipientLabel: String(p.RecipientLabel || 'Phone number to receive this'),
       confirmationNote: String(p.ConfirmationNote || (requiresRecipient ? (settings.BundleDisclaimer || DEFAULT_BUNDLE_DISCLAIMER) : ''))
@@ -809,8 +895,10 @@ function adminNeedsFirstAccount() {
 }
 
 // Deliberately unauthenticated, but only ever succeeds while no admin exists,
-// so it closes permanently the moment the first account is created.
-function adminCreateFirstAccount(name, username, password) {
+// so it closes permanently the moment the first account is created. `store` is
+// optional onboarding data (store name, currency, WhatsApp, payment details)
+// captured by the same wizard, so a new owner is trading immediately.
+function adminCreateFirstAccount(name, username, password, store) {
   try { ensureSetup_(); } catch (err) { Logger.log('ensureSetup_ failed: ' + err); }
 
   name = String(name || '').trim();
@@ -828,8 +916,64 @@ function adminCreateFirstAccount(name, username, password) {
       AdminID: genId_('ADM'), Username: username, PasswordHash: hashPassword_(password),
       Name: name, Role: 'owner', CreatedAt: new Date()
     });
+
+    if (store) {
+      var settings = {};
+      if (store.siteName) settings.SiteName = String(store.siteName).trim();
+      if (store.currencySymbol) settings.CurrencySymbol = String(store.currencySymbol);
+      if (store.currency) settings.Currency = String(store.currency).trim();
+      if (store.whatsapp) { settings.WhatsAppNumber = String(store.whatsapp).trim(); settings.ContactPhone = String(store.whatsapp).trim(); }
+      applySettings_(settings);
+
+      // Fill in the placeholder payment method rather than adding a second one.
+      if (store.momoName || store.momoNumber) {
+        var pm = sheetToObjects_('PaymentMethods')[0];
+        var patch = {
+          AccountName: String(store.momoName || '').trim(),
+          AccountNumber: String(store.momoNumber || '').trim()
+        };
+        if (pm) updateRowById_('PaymentMethods', 'PaymentMethodID', pm.PaymentMethodID, patch);
+      }
+    }
     return { success: true };
   });
+}
+
+// Shared by the onboarding wizard and the Settings screen.
+function applySettings_(settingsObj) {
+  var existing = {};
+  sheetToObjects_('Settings').forEach(function (s) { existing[s.Key] = true; });
+  Object.keys(settingsObj).forEach(function (key) {
+    if (existing[key]) updateRowById_('Settings', 'Key', key, { Value: settingsObj[key] });
+    else appendRowObject_('Settings', { Key: key, Value: settingsObj[key] });
+  });
+}
+
+// Lets a new owner wipe the demo catalog in one click once they've added their
+// own. Only touches businesses/products whose names match what we seeded.
+function adminClearSampleData(token) {
+  requireAdmin_(token);
+  var sampleBusinesses = ['data bundles', 'electronics & gadgets', 'picture frames & gifts', 'security & alarm systems', 'scripts & source code'];
+  var removedBiz = 0, removedProducts = 0;
+
+  var businesses = sheetToObjects_('Businesses').filter(function (b) {
+    return sampleBusinesses.indexOf(String(b.Name).trim().toLowerCase()) !== -1;
+  });
+  var ids = {};
+  businesses.forEach(function (b) { ids[String(b.BusinessID)] = true; });
+
+  sheetToObjects_('Products').forEach(function (p) {
+    if (ids[String(p.BusinessID)]) {
+      deleteRowById_('Products', 'ProductID', p.ProductID);
+      removedProducts++;
+    }
+  });
+  businesses.forEach(function (b) {
+    deleteRowById_('Businesses', 'BusinessID', b.BusinessID);
+    removedBiz++;
+  });
+
+  return { success: true, removedBusinesses: removedBiz, removedProducts: removedProducts };
 }
 
 function adminLogin(username, password) {
@@ -1044,7 +1188,8 @@ function adminGetProducts(token) {
       ProductID: String(p.ProductID), BusinessID: String(p.BusinessID || ''), ImageURL: String(p.ImageURL || ''),
       Name: String(p.Name || ''), Description: String(p.Description || ''), Category: String(p.Category || ''),
       Price: toNum_(p.Price), Stock: (p.Stock === '' || p.Stock === null || p.Stock === undefined) ? '' : toNum_(p.Stock),
-      IsService: toBool_(p.IsService), EnquireOnWhatsApp: toBool_(p.EnquireOnWhatsApp), Active: toBool_(p.Active),
+      IsService: toBool_(p.IsService), EnquireOnWhatsApp: toBool_(p.EnquireOnWhatsApp),
+      ShowWhatsApp: toBool_(p.ShowWhatsApp), Active: toBool_(p.Active),
       RequiresRecipient: toBool_(p.RequiresRecipient), RecipientLabel: String(p.RecipientLabel || ''),
       ConfirmationNote: String(p.ConfirmationNote || ''), InStock: toBoolDefaultTrue_(p.InStock),
       CreatedAt: isoDate_(p.CreatedAt)
@@ -1059,7 +1204,8 @@ function adminSaveProduct(token, p) {
     BusinessID: p.BusinessID, ImageURL: p.ImageURL || '', Name: p.Name, Description: p.Description || '',
     Category: p.Category || 'General', Price: toNum_(p.Price, 0),
     Stock: (p.Stock === '' || p.Stock === null || p.Stock === undefined) ? '' : toNum_(p.Stock, 0),
-    IsService: !!p.IsService, EnquireOnWhatsApp: !!p.EnquireOnWhatsApp, Active: p.Active !== false,
+    IsService: !!p.IsService, EnquireOnWhatsApp: !!p.EnquireOnWhatsApp, ShowWhatsApp: !!p.ShowWhatsApp,
+    Active: p.Active !== false,
     RequiresRecipient: !!p.RequiresRecipient, RecipientLabel: p.RecipientLabel || '',
     ConfirmationNote: p.ConfirmationNote || '', InStock: p.InStock !== false
   };
@@ -1245,15 +1391,7 @@ function adminGetSettings(token) {
 
 function adminSaveSettings(token, settingsObj) {
   requireAdmin_(token);
-  var existing = {};
-  sheetToObjects_('Settings').forEach(function (s) { existing[s.Key] = true; });
-  Object.keys(settingsObj).forEach(function (key) {
-    if (existing[key]) {
-      updateRowById_('Settings', 'Key', key, { Value: settingsObj[key] });
-    } else {
-      appendRowObject_('Settings', { Key: key, Value: settingsObj[key] });
-    }
-  });
+  applySettings_(settingsObj);
   return { success: true };
 }
 

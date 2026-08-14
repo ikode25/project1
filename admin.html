@@ -41,8 +41,12 @@
     table.admin-table th { background: var(--surface-2); white-space: nowrap; }
     .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
-    .loader { border-top-color: var(--primary); animation: spin 1s ease-in-out infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    /* Thin top progress bar replaces the old full-screen blocking spinner. */
+    #progressBar {
+      position: fixed; top: 0; left: 0; height: 3px; width: 0;
+      background: var(--primary); z-index: 70;
+      transition: width .25s ease, opacity .3s ease;
+    }
     .kpi-card { background: var(--surface); border-radius: .75rem; padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 
     /* Off-canvas sidebar on phones */
@@ -58,6 +62,8 @@
 </head>
 <body class="min-h-screen">
 
+  <div id="progressBar"></div>
+
   <!-- Login Screen -->
   <div id="loginScreen" class="min-h-screen flex items-center justify-center p-4 hidden">
     <div class="surface w-full max-w-sm p-8 rounded-xl shadow-lg">
@@ -65,23 +71,51 @@
       <p class="text-center muted text-sm mb-6">Sign in to manage your businesses</p>
       <form onsubmit="adminDoLogin(event)">
         <input id="loginUsername" type="text" placeholder="Username" class="w-full p-3 rounded-lg mb-3">
-        <input id="loginPassword" type="password" placeholder="Password" class="w-full p-3 rounded-lg mb-4">
+        <div class="relative mb-4">
+          <input id="loginPassword" type="password" placeholder="Password" class="w-full p-3 pr-12 rounded-lg">
+          <button type="button" onclick="togglePw('loginPassword', this)" class="absolute right-2 top-1/2 -translate-y-1/2 px-2 muted" aria-label="Show password"><i class="fas fa-eye"></i></button>
+        </div>
         <button type="submit" class="w-full bg-primary py-3 rounded-lg">Login</button>
       </form>
       <p class="text-center mt-4"><a href="?" id="backToStore" target="_top" class="text-primary text-sm hover:underline"><i class="fas fa-arrow-left mr-1"></i>Back to store</a></p>
     </div>
   </div>
 
-  <!-- First-Run Setup Screen -->
+  <!-- First-Run Setup Wizard -->
   <div id="setupScreen" class="min-h-screen flex items-center justify-center p-4 hidden">
-    <div class="surface w-full max-w-sm p-8 rounded-xl shadow-lg">
-      <h1 class="text-2xl font-bold text-center mb-1"><i class="fas fa-wand-magic-sparkles text-primary mr-2"></i>Welcome!</h1>
-      <p class="text-center muted text-sm mb-6">Create your admin account to get started. This form only appears once.</p>
-      <form onsubmit="createFirstAccount(event)">
-        <input id="setupName" type="text" placeholder="Your Full Name" class="w-full p-3 rounded-lg mb-3" required>
-        <input id="setupUsername" type="text" placeholder="Choose a Username" class="w-full p-3 rounded-lg mb-3" required>
-        <input id="setupPassword" type="password" placeholder="Choose a Password (min 6 characters)" class="w-full p-3 rounded-lg mb-4" required>
-        <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg">Create Admin Account</button>
+    <div class="surface w-full max-w-lg p-6 sm:p-8 rounded-xl shadow-lg my-6">
+      <h1 class="text-2xl font-bold text-center mb-1"><i class="fas fa-wand-magic-sparkles text-primary mr-2"></i>Set Up Your Store</h1>
+      <p class="text-center muted text-sm mb-6">A couple of details and you're ready to sell. This only appears once.</p>
+      <form onsubmit="createFirstAccount(event)" class="space-y-5">
+
+        <div>
+          <h2 class="font-semibold mb-2 text-sm uppercase muted">Your admin account</h2>
+          <input id="setupName" type="text" placeholder="Your Full Name" class="w-full p-3 rounded-lg mb-3" required>
+          <input id="setupUsername" type="text" placeholder="Choose a Username" class="w-full p-3 rounded-lg mb-3" required>
+          <div class="relative">
+            <input id="setupPassword" type="password" placeholder="Choose a Password (min 6 characters)" class="w-full p-3 pr-12 rounded-lg" required>
+            <button type="button" onclick="togglePw('setupPassword', this)" class="absolute right-2 top-1/2 -translate-y-1/2 px-2 muted" aria-label="Show password"><i class="fas fa-eye"></i></button>
+          </div>
+        </div>
+
+        <div>
+          <h2 class="font-semibold mb-2 text-sm uppercase muted">Your store</h2>
+          <input id="setupSiteName" type="text" placeholder="Store Name (e.g. Kofi Electronics)" class="w-full p-3 rounded-lg mb-3">
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            <input id="setupCurrency" type="text" placeholder="Currency code (GHS)" class="p-3 rounded-lg" value="GHS">
+            <input id="setupCurrencySymbol" type="text" placeholder="Prefix (GHS )" class="p-3 rounded-lg" value="GHS ">
+          </div>
+          <input id="setupWhatsapp" type="tel" placeholder="Your WhatsApp number (e.g. 0547359015)" class="w-full p-3 rounded-lg">
+        </div>
+
+        <div>
+          <h2 class="font-semibold mb-2 text-sm uppercase muted">Get paid</h2>
+          <p class="text-xs muted mb-2">Customers will see this at checkout. You can change it or add more methods later.</p>
+          <input id="setupMomoName" type="text" placeholder="Mobile Money account name" class="w-full p-3 rounded-lg mb-3">
+          <input id="setupMomoNumber" type="tel" placeholder="Mobile Money number" class="w-full p-3 rounded-lg">
+        </div>
+
+        <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold">Create My Store</button>
       </form>
     </div>
   </div>
@@ -116,9 +150,12 @@
 
     <main class="flex-grow min-w-0 overflow-y-auto">
       <!-- Mobile top bar -->
-      <div class="lg:hidden sticky top-0 z-30 flex items-center gap-3 px-4 py-3 surface shadow">
-        <button onclick="toggleSidebar()" class="text-xl"><i class="fas fa-bars"></i></button>
-        <span class="font-bold">Admin Portal</span>
+      <div class="sticky top-0 z-30 flex items-center gap-3 px-4 py-3 surface shadow">
+        <button onclick="toggleSidebar()" class="text-xl lg:hidden"><i class="fas fa-bars"></i></button>
+        <span class="font-bold lg:hidden">Admin Portal</span>
+        <div class="flex-grow"></div>
+        <button onclick="refreshCurrentTab()" title="Refresh" aria-label="Refresh" class="px-2 text-lg"><i class="fas fa-rotate-right" id="adminRefreshIcon"></i></button>
+        <button onclick="toggleTheme()" title="Switch theme" aria-label="Switch theme" class="px-2 text-lg"><i class="fas fa-moon" id="adminThemeIcon"></i></button>
       </div>
 
       <div class="p-4 md:p-6">
@@ -202,7 +239,8 @@
           <textarea id="prdConfirmationNote" placeholder="Important note shown in the confirmation popup (e.g. bundle SIM restrictions)" class="p-2 rounded-lg md:col-span-2" rows="3"></textarea>
           <div class="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-2 surface-2 bordered rounded-lg p-3">
             <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdRequiresRecipient" class="mt-1"> <span>Ask for a phone number before adding to cart <span class="muted">(data bundles — shows the confirmation popup)</span></span></label>
-            <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdEnquireWhatsapp" class="mt-1"> <span>Send customers to WhatsApp instead of Add to Cart <span class="muted">(custom installs like School Siren)</span></span></label>
+            <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdEnquireWhatsapp" class="mt-1"> <span>Send customers to WhatsApp <em>instead of</em> Add to Cart <span class="muted">(quote-only items)</span></span></label>
+            <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdShowWhatsapp" class="mt-1"> <span>Also show an "Ask a question" WhatsApp button <span class="muted">(keeps Add to Cart — good for source code, sirens, electronics)</span></span></label>
             <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdIsService" class="mt-1"> <span>This is a service (not physical stock)</span></label>
             <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdInStock" class="mt-1" checked> <span>In stock <span class="muted">(untick to show "Out of Stock")</span></span></label>
             <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdActive" class="mt-1" checked> <span>Active <span class="muted">(untick to hide from the store)</span></span></label>
@@ -249,7 +287,7 @@
             <option>Mobile Money</option><option>Bank Transfer</option><option>Cash on Delivery</option><option>Other</option>
           </select></label>
           <label class="text-sm">Label shown to customers<input id="pmLabel" placeholder="e.g. MTN Mobile Money" class="p-2 rounded-lg w-full mt-1" required></label>
-          <label class="text-sm">Account Name<input id="pmAccountName" placeholder="e.g. Emmanuel Darkoh" class="p-2 rounded-lg w-full mt-1"></label>
+          <label class="text-sm">Account Name<input id="pmAccountName" placeholder="Name on the account" class="p-2 rounded-lg w-full mt-1"></label>
           <label class="text-sm">Account / Number<input id="pmAccountNumber" placeholder="e.g. 0547359015" class="p-2 rounded-lg w-full mt-1" required></label>
           <label class="text-sm">Provider<input id="pmProvider" placeholder="e.g. MTN Mobile Money" class="p-2 rounded-lg w-full mt-1"></label>
           <label class="text-sm">Sort Order<input id="pmSort" type="number" class="p-2 rounded-lg w-full mt-1" value="1"></label>
@@ -401,6 +439,12 @@
 
           <button type="submit" class="bg-primary px-6 py-3 rounded-lg font-semibold">Save All Settings</button>
         </form>
+
+        <div class="surface p-4 rounded-lg shadow mt-6 max-w-4xl">
+          <h2 class="font-bold mb-2">Starter Content</h2>
+          <p class="text-sm muted mb-3">This store ships with demo businesses and products so you can see how everything works. Once you've added your own, remove the demo ones in one click. Anything you created yourself is left untouched.</p>
+          <button type="button" onclick="clearSampleData()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm"><i class="fas fa-broom mr-1"></i>Delete demo businesses &amp; products</button>
+        </div>
       </section>
 
       <!-- Admin Users -->
@@ -409,7 +453,10 @@
         <form id="adminForm" class="surface p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl" onsubmit="addAdminUser(event)">
           <input id="admName" placeholder="Full Name" class="p-2 rounded-lg" required>
           <input id="admUsername" placeholder="Username" class="p-2 rounded-lg" required>
-          <input id="admPassword" type="password" placeholder="Password (min 6 characters)" class="p-2 rounded-lg" required>
+          <div class="relative">
+          <input id="admPassword" type="password" placeholder="Password (min 6 characters)" class="p-2 pr-10 rounded-lg w-full" required>
+          <button type="button" onclick="togglePw('admPassword', this)" class="absolute right-1 top-1/2 -translate-y-1/2 px-2 muted"><i class="fas fa-eye"></i></button>
+        </div>
           <select id="admRole" class="p-2 rounded-lg"><option value="staff">Staff</option><option value="owner">Owner</option></select>
           <div class="md:col-span-2"><button type="submit" class="bg-primary px-4 py-2 rounded-lg">Add Admin</button></div>
         </form>
@@ -420,8 +467,14 @@
 
         <h2 class="text-xl font-bold mb-3">Change My Password</h2>
         <form id="pwForm" class="surface p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl" onsubmit="changeMyPassword(event)">
-          <input id="pwCurrent" type="password" placeholder="Current Password" class="p-2 rounded-lg" required>
-          <input id="pwNew" type="password" placeholder="New Password" class="p-2 rounded-lg" required>
+          <div class="relative">
+            <input id="pwCurrent" type="password" placeholder="Current Password" class="p-2 pr-10 rounded-lg w-full" required>
+            <button type="button" onclick="togglePw('pwCurrent', this)" class="absolute right-1 top-1/2 -translate-y-1/2 px-2 muted"><i class="fas fa-eye"></i></button>
+          </div>
+          <div class="relative">
+            <input id="pwNew" type="password" placeholder="New Password" class="p-2 pr-10 rounded-lg w-full" required>
+            <button type="button" onclick="togglePw('pwNew', this)" class="absolute right-1 top-1/2 -translate-y-1/2 px-2 muted"><i class="fas fa-eye"></i></button>
+          </div>
           <div class="md:col-span-2"><button type="submit" class="bg-primary px-4 py-2 rounded-lg">Update Password</button></div>
         </form>
       </section>
@@ -438,10 +491,6 @@
     </div>
   </div>
 
-  <!-- Loading Spinner -->
-  <div id="loadingSpinner" class="fixed inset-0 flex items-center justify-center bg-black/50 hidden z-[60]">
-    <div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-16 w-16"></div>
-  </div>
 
   <script>
     var adminToken = sessionStorage.getItem('mb_admin_token') || null;
@@ -449,8 +498,32 @@
     try { adminInfo = JSON.parse(sessionStorage.getItem('mb_admin_info') || 'null'); } catch (e) { adminInfo = null; }
     var cache = { businesses: [], products: [], banners: [], paymentMethods: [], discounts: [], settings: {} };
 
-    function showLoadingSpinner() { document.getElementById('loadingSpinner').classList.remove('hidden'); }
-    function hideLoadingSpinner() { document.getElementById('loadingSpinner').classList.add('hidden'); }
+    // Non-blocking progress indicator. Kept under the original names so every
+    // existing call site keeps working.
+    var pending = 0;
+    function showLoadingSpinner() {
+      pending++;
+      var bar = document.getElementById('progressBar');
+      bar.style.opacity = '1';
+      bar.style.width = '35%';
+    }
+    function hideLoadingSpinner() {
+      pending = Math.max(0, pending - 1);
+      if (pending > 0) return;
+      var bar = document.getElementById('progressBar');
+      bar.style.width = '100%';
+      setTimeout(function () {
+        bar.style.opacity = '0';
+        setTimeout(function () { if (pending === 0) bar.style.width = '0'; }, 300);
+      }, 200);
+    }
+
+    function togglePw(id, btn) {
+      var input = document.getElementById(id);
+      var showing = input.type === 'text';
+      input.type = showing ? 'password' : 'text';
+      btn.innerHTML = showing ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
+    }
     function toast(icon, title, text) {
       Swal.fire({ icon: icon, title: title, text: text, timer: icon === 'success' ? 1600 : undefined, showConfirmButton: icon !== 'success' });
     }
@@ -516,7 +589,33 @@
       root.style.setProperty('--primary', primary);
       root.style.setProperty('--primary-dark', shadeColor(primary, -0.2));
       root.style.setProperty('--primary-contrast', contrastOn(primary));
-      document.body.classList.toggle('theme-dark', String(s && s.ThemeMode).toLowerCase() === 'dark');
+      applyStoredTheme();
+    }
+    // The saved store setting is the default; the header toggle overrides it
+    // for this browser only, so an admin can work dark on a light-themed store.
+    function currentThemeMode() {
+      var override = localStorage.getItem('mb_admin_theme');
+      if (override) return override;
+      return String((cache.settings && cache.settings.ThemeMode) || 'light').toLowerCase();
+    }
+    function applyStoredTheme() {
+      var dark = currentThemeMode() === 'dark';
+      document.body.classList.toggle('theme-dark', dark);
+      var icon = document.getElementById('adminThemeIcon');
+      if (icon) icon.className = dark ? 'fas fa-sun' : 'fas fa-moon';
+    }
+    function toggleTheme() {
+      localStorage.setItem('mb_admin_theme', currentThemeMode() === 'dark' ? 'light' : 'dark');
+      applyStoredTheme();
+    }
+
+    var activeTab = 'dashboard';
+    function refreshCurrentTab() {
+      var icon = document.getElementById('adminRefreshIcon');
+      icon.classList.add('fa-spin');
+      setTimeout(function () { icon.classList.remove('fa-spin'); }, 800);
+      loadReferenceData();
+      showTab(activeTab);
     }
 
     // -------------------------------------------------------------------
@@ -596,6 +695,7 @@
     // Auth / bootstrap
     // -------------------------------------------------------------------
     window.onload = function () {
+      applyStoredTheme();
       buildPicker('picker-bizLogo', 'bizLogoUrl', 'Business Logo');
       buildPicker('picker-prdImage', 'prdImageUrl', 'Product Photo');
       buildPicker('picker-banImage', 'banImageUrl', 'Banner Image');
@@ -624,17 +724,25 @@
       var name = document.getElementById('setupName').value.trim();
       var username = document.getElementById('setupUsername').value.trim();
       var password = document.getElementById('setupPassword').value;
+      var storeCfg = {
+        siteName: document.getElementById('setupSiteName').value.trim(),
+        currency: document.getElementById('setupCurrency').value.trim(),
+        currencySymbol: document.getElementById('setupCurrencySymbol').value,
+        whatsapp: document.getElementById('setupWhatsapp').value.trim(),
+        momoName: document.getElementById('setupMomoName').value.trim(),
+        momoNumber: document.getElementById('setupMomoNumber').value.trim()
+      };
       showLoadingSpinner();
       google.script.run.withSuccessHandler(function (res) {
         hideLoadingSpinner();
         if (!res.success) { toast('error', 'Could not create account', res.message || ''); return; }
-        Swal.fire({ icon: 'success', title: 'Admin account created', text: 'You can now sign in.' }).then(function () {
+        Swal.fire({ icon: 'success', title: 'Your store is ready', text: 'Sign in to start adding businesses and products.' }).then(function () {
           document.getElementById('setupScreen').classList.add('hidden');
           document.getElementById('loginScreen').classList.remove('hidden');
           document.getElementById('loginUsername').value = username;
           document.getElementById('loginPassword').focus();
         });
-      }).withFailureHandler(runFail).adminCreateFirstAccount(name, username, password);
+      }).withFailureHandler(runFail).adminCreateFirstAccount(name, username, password, storeCfg);
     }
 
     function adminDoLogin(e) {
@@ -685,6 +793,7 @@
     }
 
     function showTab(name) {
+      activeTab = name;
       document.querySelectorAll('.tab-section').forEach(function (s) { s.classList.add('hidden'); });
       document.getElementById('tab-' + name).classList.remove('hidden');
       document.querySelectorAll('.nav-item').forEach(function (el) { el.classList.toggle('active', el.dataset.tab === name); });
@@ -979,6 +1088,7 @@
           p.IsService ? 'Service' : '',
           p.RequiresRecipient ? 'Asks for number' : '',
           p.EnquireOnWhatsApp ? 'WhatsApp only' : '',
+          p.ShowWhatsApp ? 'WhatsApp button' : '',
           p.Active ? '' : 'Hidden'
         ].filter(Boolean).join(', ');
         var stockBtn = p.InStock
@@ -1023,6 +1133,7 @@
       document.getElementById('prdIsService').checked = !!p.IsService;
       document.getElementById('prdRequiresRecipient').checked = !!p.RequiresRecipient;
       document.getElementById('prdEnquireWhatsapp').checked = !!p.EnquireOnWhatsApp;
+      document.getElementById('prdShowWhatsapp').checked = !!p.ShowWhatsApp;
       document.getElementById('prdInStock').checked = !!p.InStock;
       document.getElementById('prdActive').checked = !!p.Active;
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1050,6 +1161,7 @@
         IsService: document.getElementById('prdIsService').checked,
         RequiresRecipient: document.getElementById('prdRequiresRecipient').checked,
         EnquireOnWhatsApp: document.getElementById('prdEnquireWhatsapp').checked,
+        ShowWhatsApp: document.getElementById('prdShowWhatsapp').checked,
         InStock: document.getElementById('prdInStock').checked,
         Active: document.getElementById('prdActive').checked
       };
@@ -1378,6 +1490,23 @@
         applyTheme(s);
         toast('success', 'Settings Saved', 'Refresh the storefront to see the changes.');
       }).withFailureHandler(runFail).adminSaveSettings(adminToken, s);
+    }
+
+    function clearSampleData() {
+      Swal.fire({
+        title: 'Delete the demo catalog?',
+        text: 'This removes only the sample businesses that shipped with the system, and their products. Your own businesses and products are kept.',
+        icon: 'warning', showCancelButton: true, confirmButtonText: 'Yes, delete demo data', confirmButtonColor: '#dc2626'
+      }).then(function (r) {
+        if (!r.isConfirmed) return;
+        showLoadingSpinner();
+        google.script.run.withSuccessHandler(function (res) {
+          hideLoadingSpinner();
+          Swal.fire({ icon: 'success', title: 'Demo data removed',
+            text: 'Deleted ' + res.removedBusinesses + ' business(es) and ' + res.removedProducts + ' product(s).' });
+          loadReferenceData();
+        }).withFailureHandler(runFail).adminClearSampleData(adminToken);
+      });
     }
 
     // -------------------------------------------------------------------
