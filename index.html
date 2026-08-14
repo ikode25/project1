@@ -1,26 +1,815 @@
+<!-- index.html — Multi-Business Storefront -->
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>MySchool</title>
+  <meta charset="UTF-8">
+  <title>Multi-Business Store</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/daisyui@2.50.0/dist/full.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    body { padding-top: 112px; padding-bottom: 56px; }
+    .carousel-track { display: flex; transition: transform .5s ease; }
+    .carousel-slide { min-width: 100%; }
+    .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .biz-chip.active { background-color: #2563eb; color: white; }
+    .loader { border-top-color: #3498db; animation: spin 1s ease-in-out infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #chatPanel { height: 60vh; max-height: 480px; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+  </style>
 </head>
-<body>
-  <iframe 
-    src="https://script.google.com/macros/s/AKfycbweB2UbaMxFiRbdJ9s71xnKL1C_Ak15HqS9bdLskkxrZzf4YWR5fcX-uOt4mUD8Va8/exec"
-    width="100%"
-    height="100%"
-    allowfullscreen="true"
-    style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; border: none;">
-  </iframe>
+<body class="flex flex-col min-h-screen bg-gray-100">
+
+  <!-- Header -->
+  <header class="bg-blue-600 text-white fixed top-0 left-0 right-0 z-40 shadow">
+    <div class="flex justify-between items-center px-4 md:px-6 py-3">
+      <div class="flex items-center space-x-2">
+        <img id="siteLogo" src="" class="h-8 w-8 rounded hidden" alt="logo">
+        <a href="#" onclick="goHome();return false;" id="siteName" class="text-lg font-bold whitespace-nowrap">Multi-Business Store</a>
+      </div>
+      <div class="hidden md:flex items-center space-x-4">
+        <a href="#" onclick="goHome();return false;" class="hover:underline"><i class="fas fa-home mr-1"></i>Home</a>
+        <a href="#" onclick="openTrackOrder();return false;" class="hover:underline"><i class="fas fa-truck mr-1"></i>Track Order</a>
+        <a href="#" onclick="showPurchaseHistory();return false;" id="historyMenu" class="hover:underline hidden"><i class="fas fa-history mr-1"></i>My Orders</a>
+      </div>
+      <div class="flex items-center space-x-3">
+        <a href="#" onclick="showLoginForm();return false;" id="loginMenu" class="hover:underline text-sm"><i class="fas fa-sign-in-alt mr-1"></i>Sign In</a>
+        <span id="loggedInName" class="hidden text-sm"></span>
+        <a href="#" onclick="logout();return false;" id="logoutMenu" class="hover:underline hidden text-sm"><i class="fas fa-sign-out-alt mr-1"></i>Logout</a>
+        <button id="cartButton" class="relative bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-full" onclick="openCheckout()">
+          <i class="fas fa-shopping-cart"></i>
+          <span id="cartCount" class="absolute -top-2 -right-2 bg-yellow-400 text-black rounded-full px-2 text-xs">0</span>
+        </button>
+      </div>
+    </div>
+    <div class="md:hidden flex justify-around bg-blue-700 text-xs py-2">
+      <a href="#" onclick="goHome();return false;"><i class="fas fa-home"></i> Home</a>
+      <a href="#" onclick="openTrackOrder();return false;"><i class="fas fa-truck"></i> Track</a>
+      <a href="#" onclick="showPurchaseHistory();return false;" id="historyMenuMobile" class="hidden"><i class="fas fa-history"></i> Orders</a>
+    </div>
+  </header>
+
+  <!-- Banner Carousel -->
+  <div id="bannerWrap" class="relative overflow-hidden hidden max-w-6xl mx-auto mt-2 rounded-lg shadow">
+    <div id="carouselTrack" class="carousel-track"></div>
+    <div id="carouselDots" class="absolute bottom-2 left-1/2 -translate-x-1/2 flex space-x-2"></div>
+  </div>
+
+  <!-- Business Selector -->
+  <div class="max-w-6xl mx-auto w-full px-4 mt-4">
+    <h2 class="text-sm font-semibold text-gray-500 uppercase mb-2">Shop by Business</h2>
+    <div id="businessNav" class="flex flex-wrap gap-2 mb-2"></div>
+  </div>
+
+  <!-- Main Content -->
+  <main class="flex-grow flex max-w-6xl mx-auto w-full px-4 gap-6 mt-2">
+    <aside class="hidden md:block w-1/5 bg-white p-4 rounded-lg shadow-md self-start sticky top-32">
+      <h2 class="text-lg font-semibold mb-3">Categories</h2>
+      <div id="categoryList" class="space-y-2 max-h-[60vh] overflow-y-auto"></div>
+    </aside>
+
+    <section class="w-full md:w-4/5 py-2">
+      <div id="activeBusinessBanner" class="hidden bg-white p-4 rounded-lg shadow mb-4"></div>
+      <div class="mb-4 flex gap-2">
+        <input type="text" id="searchInput" placeholder="Search products or services..." oninput="renderProducts()" class="flex-grow p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div id="productContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+      <p id="emptyState" class="text-center text-gray-500 py-10 hidden">No products found.</p>
+    </section>
+  </main>
+
+  <footer class="bg-gray-800 text-white text-center py-3 fixed bottom-0 left-0 right-0 text-sm z-30">
+    <p id="footerText">&copy; <span id="footerYear"></span> Multi-Business Store. All rights reserved.</p>
+  </footer>
+
+  <!-- Floating WhatsApp Button -->
+  <a id="whatsappFloat" href="#" target="_blank" class="hidden fixed bottom-20 right-5 z-40 bg-green-500 hover:bg-green-600 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg text-2xl">
+    <i class="fab fa-whatsapp"></i>
+  </a>
+
+  <!-- Floating Chatbot Button + Panel -->
+  <button id="chatToggle" onclick="toggleChat()" class="fixed bottom-20 right-24 z-40 bg-blue-600 hover:bg-blue-700 text-white w-14 h-14 rounded-full flex items-center justify-center shadow-lg text-2xl">
+    <i class="fas fa-comment-dots"></i>
+  </button>
+  <div id="chatPanel" class="hidden fixed bottom-36 right-5 z-40 w-80 bg-white rounded-lg shadow-2xl flex flex-col overflow-hidden border">
+    <div class="bg-blue-600 text-white px-4 py-3 flex justify-between items-center">
+      <span class="font-semibold"><i class="fas fa-robot mr-2"></i>Shopping Assistant</span>
+      <button onclick="toggleChat()" class="text-white"><i class="fas fa-times"></i></button>
+    </div>
+    <div id="chatMessages" class="flex-grow overflow-y-auto p-3 space-y-2 text-sm bg-gray-50"></div>
+    <div id="chatQuickReplies" class="flex flex-wrap gap-1 p-2 border-t bg-white"></div>
+    <form id="chatForm" class="flex border-t" onsubmit="handleChatSubmit(event)">
+      <input id="chatInput" type="text" placeholder="Type a message..." class="flex-grow px-3 py-2 text-sm focus:outline-none">
+      <button type="submit" class="bg-blue-600 text-white px-4"><i class="fas fa-paper-plane"></i></button>
+    </form>
+  </div>
+
+  <!-- Login Modal -->
+  <div id="loginModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden z-50">
+    <div class="bg-white w-full max-w-md p-8 rounded-lg shadow-lg relative mx-4">
+      <button class="absolute top-4 right-4 text-gray-600 hover:text-gray-800" onclick="closeLoginModal()"><i class="fas fa-times fa-lg"></i></button>
+      <h2 class="text-2xl font-semibold mb-2 text-center">Sign In</h2>
+      <p class="text-center text-sm text-gray-500 mb-6">An account is optional — you can also <a href="#" onclick="closeLoginModal();openCheckout();" class="text-blue-600 underline">checkout as a guest</a>.</p>
+      <div class="mb-4"><input type="text" id="username" placeholder="Username" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+      <div class="mb-6"><input type="password" id="password" placeholder="Password" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+      <button type="button" onclick="login()" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700">Login</button>
+      <div class="mt-4 text-center"><p>Don't have an account? <a href="#" onclick="toggleToRegister()" class="text-blue-500 hover:underline">Register</a></p></div>
+    </div>
+  </div>
+
+  <!-- Register Modal -->
+  <div id="registerModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden z-50">
+    <div class="bg-white w-full max-w-md p-8 rounded-lg shadow-lg relative mx-4">
+      <button class="absolute top-4 right-4 text-gray-600 hover:text-gray-800" onclick="closeRegisterModal()"><i class="fas fa-times fa-lg"></i></button>
+      <h2 class="text-2xl font-semibold mb-6 text-center">Create Account</h2>
+      <div class="mb-4"><input type="text" id="name" placeholder="Full Name" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"></div>
+      <div class="mb-4"><input type="text" id="address" placeholder="Address" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"></div>
+      <div class="mb-4"><input type="text" id="phone" placeholder="Phone" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"></div>
+      <div class="mb-4"><input type="text" id="regUsername" placeholder="Username" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"></div>
+      <div class="mb-6"><input type="password" id="regPassword" placeholder="Password (min 6 characters)" class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"></div>
+      <button type="button" onclick="register()" class="w-full bg-green-600 text-white py-3 rounded-lg hover:bg-green-700">Register</button>
+      <div class="mt-4 text-center"><p>Already have an account? <a href="#" onclick="toggleToLogin()" class="text-blue-500 hover:underline">Login</a></p></div>
+    </div>
+  </div>
+
+  <!-- Checkout Modal -->
+  <div id="checkoutModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden z-50 p-4">
+    <div class="bg-white w-full max-w-3xl p-6 md:p-8 rounded-lg shadow-lg relative max-h-[90vh] overflow-y-auto">
+      <button class="absolute top-4 right-4 text-gray-600 hover:text-gray-800" onclick="closeCheckout()"><i class="fas fa-times fa-lg"></i></button>
+      <h2 class="text-2xl font-semibold mb-6 text-center">Your Cart &amp; Checkout</h2>
+
+      <div class="overflow-x-auto mb-4">
+        <table class="min-w-full border text-sm">
+          <thead class="bg-gray-200">
+            <tr><th class="py-2 px-3 border">Item</th><th class="py-2 px-3 border">Business</th><th class="py-2 px-3 border">Qty</th><th class="py-2 px-3 border">Price</th><th class="py-2 px-3 border">Subtotal</th><th class="py-2 px-3 border"></th></tr>
+          </thead>
+          <tbody id="cartBody"></tbody>
+        </table>
+      </div>
+      <div class="text-right mb-6 space-y-1">
+        <p>Subtotal: <span id="cartSubtotal">0.00</span></p>
+        <p class="text-green-600">Discount: -<span id="cartDiscount">0.00</span></p>
+        <p class="text-lg font-bold">Total: <span id="cartTotal">0.00</span></p>
+      </div>
+
+      <div id="checkoutForm" class="border-t pt-6">
+        <h3 class="font-semibold mb-3">Delivery / Contact Details</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+          <input type="text" id="coName" placeholder="Full Name" class="p-3 border border-gray-300 rounded-lg">
+          <input type="text" id="coPhone" placeholder="Phone Number" class="p-3 border border-gray-300 rounded-lg">
+          <input type="text" id="coAddress" placeholder="Delivery Address" class="p-3 border border-gray-300 rounded-lg md:col-span-2">
+        </div>
+
+        <h3 class="font-semibold mb-3">Payment Method</h3>
+        <div id="paymentMethodList" class="space-y-2 mb-4"></div>
+        <div id="paymentInstructions" class="bg-blue-50 border border-blue-200 text-blue-800 rounded-lg p-4 mb-4 hidden text-sm"></div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+          <input type="text" id="coPayerNumber" placeholder="Mobile Money number used to pay" class="p-3 border border-gray-300 rounded-lg">
+          <input type="text" id="coTransactionId" placeholder="Transaction ID" class="p-3 border border-gray-300 rounded-lg">
+        </div>
+        <textarea id="coNotes" placeholder="Order notes (optional)" class="w-full p-3 border border-gray-300 rounded-lg mb-4"></textarea>
+      </div>
+
+      <div class="flex justify-end space-x-4 mt-2">
+        <button onclick="closeCheckout()" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700">Close</button>
+        <button onclick="submitOrder()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">Place Order</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Order Confirmation Modal -->
+  <div id="confirmModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden z-50 p-4">
+    <div class="bg-white w-full max-w-md p-8 rounded-lg shadow-lg text-center">
+      <i class="fas fa-circle-check text-green-500 text-5xl mb-4"></i>
+      <h2 class="text-2xl font-semibold mb-2">Order Received!</h2>
+      <p class="mb-1">Your order ID is:</p>
+      <p class="text-xl font-bold text-blue-600 mb-4" id="confirmOrderId"></p>
+      <p class="text-sm text-gray-600 mb-6">We will verify your payment and update your order status. Save your Order ID and phone number to track your order anytime.</p>
+      <button onclick="closeConfirmModal()" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700">Done</button>
+    </div>
+  </div>
+
+  <!-- Track Order Modal -->
+  <div id="trackModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden z-50 p-4">
+    <div class="bg-white w-full max-w-lg p-8 rounded-lg shadow-lg relative">
+      <button class="absolute top-4 right-4 text-gray-600 hover:text-gray-800" onclick="closeTrackOrder()"><i class="fas fa-times fa-lg"></i></button>
+      <h2 class="text-2xl font-semibold mb-4 text-center">Track Your Order</h2>
+      <div class="flex flex-col md:flex-row gap-2 mb-4">
+        <input type="text" id="trackOrderId" placeholder="Order ID" class="flex-grow p-3 border border-gray-300 rounded-lg">
+        <input type="text" id="trackPhone" placeholder="Phone Number" class="flex-grow p-3 border border-gray-300 rounded-lg">
+        <button onclick="doTrackOrder()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Track</button>
+      </div>
+      <div id="trackResult" class="text-sm"></div>
+    </div>
+  </div>
+
+  <!-- Purchase History Modal -->
+  <div id="purchaseHistoryModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden z-50 p-4">
+    <div class="bg-white w-full max-w-3xl p-8 rounded-lg shadow-lg relative max-h-[85vh] overflow-y-auto">
+      <button class="absolute top-4 right-4 text-gray-600 hover:text-gray-800" onclick="closePurchaseHistory()"><i class="fas fa-times fa-lg"></i></button>
+      <h2 class="text-2xl font-semibold mb-6 text-center">My Orders</h2>
+      <div id="historyContainer" class="space-y-4"></div>
+    </div>
+  </div>
+
+  <!-- Loading Spinner -->
+  <div id="loadingSpinner" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden z-[60]">
+    <div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-16 w-16"></div>
+  </div>
 
   <script>
-    window.onload = function() {
-      document.querySelector('iframe')
-        .requestFullscreen()
-        .catch((err) => {
-          console.error('Error attempting to enable full-screen mode:', err.message);
+    // ---------------------------------------------------------------------
+    // Global state
+    // ---------------------------------------------------------------------
+    var store = { businesses: [], products: [], banners: [], paymentMethods: [], settings: {} };
+    var cart = JSON.parse(localStorage.getItem('mb_cart') || '[]');
+    var isLoggedIn = false, currentUser = null;
+    var selectedBusinessId = null, selectedCategory = null;
+    var carouselIndex = 0, carouselTimer = null;
+    var selectedPaymentMethodId = null;
+
+    function currency(n) {
+      var sym = (store.settings && store.settings.CurrencySymbol) || 'GHS ';
+      return sym + Number(n || 0).toFixed(2);
+    }
+    function showLoadingSpinner() { document.getElementById('loadingSpinner').classList.remove('hidden'); }
+    function hideLoadingSpinner() { document.getElementById('loadingSpinner').classList.add('hidden'); }
+    function toast(icon, title, text) { Swal.fire({ icon: icon, title: title, text: text, timer: icon === 'success' ? 1800 : undefined, showConfirmButton: icon !== 'success' }); }
+
+    // ---------------------------------------------------------------------
+    // Bootstrapping
+    // ---------------------------------------------------------------------
+    window.onload = function () {
+      document.getElementById('footerYear').textContent = new Date().getFullYear();
+      restoreSession();
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(onStoreLoaded).withFailureHandler(onStoreLoadFailed).getStorefrontData();
+    };
+
+    function onStoreLoadFailed(err) {
+      hideLoadingSpinner();
+      toast('error', 'Could not load store', String(err));
+    }
+
+    function onStoreLoaded(data) {
+      hideLoadingSpinner();
+      store = data;
+      applyBranding();
+      renderBanners();
+      renderBusinessNav();
+      renderCategories();
+      renderProducts();
+      updateCartCount();
+      setupWhatsapp();
+      setupChatbot();
+      reconcileCartWithCatalog();
+    }
+
+    function applyBranding() {
+      var name = store.settings.SiteName || 'Multi-Business Store';
+      document.title = name;
+      document.getElementById('siteName').textContent = name;
+      document.getElementById('footerText').innerHTML = '&copy; <span id="footerYear">' + new Date().getFullYear() + '</span> ' + name + '. All rights reserved.';
+    }
+
+    function goHome() {
+      selectedBusinessId = null; selectedCategory = null;
+      document.getElementById('searchInput').value = '';
+      renderCategories(); renderProducts(); renderBusinessNav();
+      document.getElementById('activeBusinessBanner').classList.add('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // ---------------------------------------------------------------------
+    // Banners / Carousel
+    // ---------------------------------------------------------------------
+    function renderBanners() {
+      var wrap = document.getElementById('bannerWrap');
+      var track = document.getElementById('carouselTrack');
+      var dots = document.getElementById('carouselDots');
+      track.innerHTML = ''; dots.innerHTML = '';
+      if (!store.banners.length) { wrap.classList.add('hidden'); return; }
+      wrap.classList.remove('hidden');
+      store.banners.forEach(function (b, i) {
+        var slide = document.createElement('div');
+        slide.className = 'carousel-slide';
+        slide.innerHTML = '<a href="' + (b.link || '#') + '" target="' + (b.link ? '_blank' : '_self') + '"><img src="' + b.image + '" alt="' + (b.title || '') + '" class="w-full h-48 md:h-72 object-cover"></a>';
+        track.appendChild(slide);
+        var dot = document.createElement('button');
+        dot.className = 'w-2 h-2 rounded-full bg-white/70';
+        dot.onclick = function () { carouselIndex = i; renderCarouselPosition(); };
+        dots.appendChild(dot);
+      });
+      carouselIndex = 0;
+      renderCarouselPosition();
+      if (carouselTimer) clearInterval(carouselTimer);
+      if (store.banners.length > 1) {
+        carouselTimer = setInterval(function () {
+          carouselIndex = (carouselIndex + 1) % store.banners.length;
+          renderCarouselPosition();
+        }, 5000);
+      }
+    }
+    function renderCarouselPosition() {
+      document.getElementById('carouselTrack').style.transform = 'translateX(-' + (carouselIndex * 100) + '%)';
+      Array.from(document.getElementById('carouselDots').children).forEach(function (d, i) {
+        d.className = 'w-2 h-2 rounded-full ' + (i === carouselIndex ? 'bg-white' : 'bg-white/50');
+      });
+    }
+
+    // ---------------------------------------------------------------------
+    // Business + Category navigation
+    // ---------------------------------------------------------------------
+    function renderBusinessNav() {
+      var nav = document.getElementById('businessNav');
+      nav.innerHTML = '';
+      var allChip = document.createElement('button');
+      allChip.className = 'biz-chip px-4 py-2 rounded-full border text-sm ' + (selectedBusinessId === null ? 'active' : 'bg-white');
+      allChip.textContent = 'All Businesses';
+      allChip.onclick = function () { selectedBusinessId = null; afterBusinessChange(); };
+      nav.appendChild(allChip);
+
+      store.businesses.forEach(function (b) {
+        var chip = document.createElement('button');
+        chip.className = 'biz-chip px-4 py-2 rounded-full border text-sm flex items-center gap-2 ' + (selectedBusinessId === b.id ? 'active' : 'bg-white');
+        chip.innerHTML = (b.logo ? '<img src="' + b.logo + '" class="w-5 h-5 rounded-full object-cover">' : '') + '<span>' + b.name + '</span>';
+        chip.onclick = function () { selectedBusinessId = b.id; afterBusinessChange(); };
+        nav.appendChild(chip);
+      });
+    }
+
+    function afterBusinessChange() {
+      selectedCategory = null;
+      renderBusinessNav(); renderCategories(); renderProducts();
+      var banner = document.getElementById('activeBusinessBanner');
+      var biz = store.businesses.filter(function (b) { return b.id === selectedBusinessId; })[0];
+      if (biz) {
+        banner.classList.remove('hidden');
+        banner.innerHTML = '<div class="flex items-center gap-4">' +
+          (biz.logo ? '<img src="' + biz.logo + '" class="w-14 h-14 rounded-lg object-cover">' : '') +
+          '<div><h3 class="text-xl font-bold">' + biz.name + '</h3><p class="text-gray-600 text-sm">' + (biz.description || '') + '</p></div></div>';
+      } else {
+        banner.classList.add('hidden');
+      }
+    }
+
+    function currentProductPool() {
+      return store.products.filter(function (p) { return selectedBusinessId === null || p.businessId === selectedBusinessId; });
+    }
+
+    function renderCategories() {
+      var list = document.getElementById('categoryList');
+      list.innerHTML = '';
+      var cats = [];
+      currentProductPool().forEach(function (p) { if (p.category && cats.indexOf(p.category) === -1) cats.push(p.category); });
+      var allBtn = document.createElement('button');
+      allBtn.className = 'block w-full text-left px-2 py-1 rounded ' + (selectedCategory === null ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100');
+      allBtn.textContent = 'All Categories';
+      allBtn.onclick = function () { selectedCategory = null; renderCategories(); renderProducts(); };
+      list.appendChild(allBtn);
+      cats.forEach(function (c) {
+        var btn = document.createElement('button');
+        btn.className = 'block w-full text-left px-2 py-1 rounded ' + (selectedCategory === c ? 'bg-blue-100 text-blue-700 font-semibold' : 'hover:bg-gray-100');
+        btn.textContent = c;
+        btn.onclick = function () { selectedCategory = c; renderCategories(); renderProducts(); };
+        list.appendChild(btn);
+      });
+    }
+
+    // ---------------------------------------------------------------------
+    // Products
+    // ---------------------------------------------------------------------
+    function renderProducts() {
+      var search = document.getElementById('searchInput').value.toLowerCase();
+      var list = currentProductPool().filter(function (p) {
+        var matchesCategory = selectedCategory === null || p.category === selectedCategory;
+        var matchesSearch = (p.name + ' ' + (p.description || '')).toLowerCase().indexOf(search) !== -1;
+        return matchesCategory && matchesSearch;
+      });
+      var container = document.getElementById('productContainer');
+      container.innerHTML = '';
+      document.getElementById('emptyState').classList.toggle('hidden', list.length > 0);
+
+      list.forEach(function (p) {
+        var outOfStock = p.stock !== null && p.stock <= 0;
+        var cartQty = cartQtyFor(p.id);
+        var priceHtml = p.onSale
+          ? '<span class="text-lg font-bold text-red-500">' + currency(p.price) + '</span> <span class="text-sm text-gray-400 line-through">' + currency(p.originalPrice) + '</span>'
+          : (p.isService && !p.price ? '<span class="text-sm font-semibold text-blue-600">Contact for price</span>' : '<span class="text-lg font-bold text-red-500">' + currency(p.price) + '</span>');
+
+        var actionHtml;
+        if (p.enquireOnWhatsApp) {
+          actionHtml = '<button class="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg w-full flex items-center justify-center gap-2" onclick="enquireOnWhatsapp(\'' + p.id + '\')"><i class="fab fa-whatsapp"></i> Enquire on WhatsApp</button>';
+        } else if (outOfStock) {
+          actionHtml = '<button class="bg-gray-300 text-gray-600 px-3 py-2 rounded-lg w-full cursor-not-allowed" disabled>Out of Stock</button>';
+        } else {
+          actionHtml = '<div class="flex items-center gap-2 w-full">' +
+            '<button class="bg-gray-200 px-3 py-2 rounded-lg" onclick="changeCartQty(\'' + p.id + '\', -1)">-</button>' +
+            '<span class="flex-grow text-center font-semibold" id="qty_' + p.id + '">' + cartQty + '</span>' +
+            '<button class="bg-gray-200 px-3 py-2 rounded-lg" onclick="changeCartQty(\'' + p.id + '\', 1)">+</button>' +
+            '<button class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg" onclick="quickAdd(\'' + p.id + '\')"><i class="fas fa-cart-plus"></i></button>' +
+            '</div>';
+        }
+
+        var card = document.createElement('div');
+        card.className = 'bg-white p-4 rounded-lg shadow-md flex flex-col';
+        card.innerHTML =
+          '<img src="' + (p.image || 'https://placehold.co/400x300?text=' + encodeURIComponent(p.name)) + '" alt="' + p.name + '" class="w-full h-44 object-cover mb-3 rounded">' +
+          '<span class="text-xs text-blue-600 font-semibold mb-1">' + p.businessName + '</span>' +
+          '<h3 class="text-lg font-semibold mb-1">' + p.name + '</h3>' +
+          '<div class="flex items-center mb-2 text-sm text-gray-500"><i class="fas fa-tag text-blue-400 mr-2"></i>' + (p.category || 'General') + (p.isService ? ' <span class="ml-2 text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Service</span>' : '') + '</div>' +
+          '<p class="text-gray-600 mb-3 flex-grow text-sm line-clamp-2">' + (p.description || '') + '</p>' +
+          (p.stock !== null && p.stock > 0 && p.stock <= 5 ? '<p class="text-xs text-orange-500 mb-1">Only ' + p.stock + ' left</p>' : '') +
+          '<div class="flex items-center justify-between mb-3">' + priceHtml + '</div>' +
+          actionHtml;
+        container.appendChild(card);
+      });
+    }
+
+    function enquireOnWhatsapp(productId) {
+      var p = store.products.filter(function (x) { return x.id === productId; })[0];
+      if (!p) return;
+      var biz = store.businesses.filter(function (b) { return b.id === p.businessId; })[0];
+      var number = (biz && biz.whatsapp) || store.settings.WhatsAppNumber;
+      var text = "Hi, I'm interested in \"" + p.name + "\" (" + p.businessName + "). Please tell me more.";
+      window.open('https://wa.me/' + formatWaNumber(number) + '?text=' + encodeURIComponent(text), '_blank');
+    }
+
+    // ---------------------------------------------------------------------
+    // Cart
+    // ---------------------------------------------------------------------
+    function cartQtyFor(productId) {
+      var item = cart.filter(function (c) { return c.productId === productId; })[0];
+      return item ? item.qty : 0;
+    }
+    function saveCart() { localStorage.setItem('mb_cart', JSON.stringify(cart)); updateCartCount(); }
+    function updateCartCount() {
+      var total = cart.reduce(function (s, c) { return s + c.qty; }, 0);
+      document.getElementById('cartCount').textContent = total;
+    }
+    function changeCartQty(productId, delta) {
+      var p = store.products.filter(function (x) { return x.id === productId; })[0];
+      if (!p) return;
+      var item = cart.filter(function (c) { return c.productId === productId; })[0];
+      var newQty = (item ? item.qty : 0) + delta;
+      if (newQty <= 0) {
+        cart = cart.filter(function (c) { return c.productId !== productId; });
+      } else {
+        if (p.stock !== null && newQty > p.stock) { toast('warning', 'Limited stock', 'Only ' + p.stock + ' available.'); return; }
+        if (item) { item.qty = newQty; } else { cart.push({ productId: productId, qty: newQty }); }
+      }
+      saveCart();
+      var qtyEl = document.getElementById('qty_' + productId);
+      if (qtyEl) qtyEl.textContent = newQty > 0 ? newQty : 0;
+    }
+    function quickAdd(productId) {
+      if (cartQtyFor(productId) === 0) changeCartQty(productId, 1);
+      var cartBtn = document.getElementById('cartButton');
+      cartBtn.classList.add('animate-bounce');
+      setTimeout(function () { cartBtn.classList.remove('animate-bounce'); }, 800);
+    }
+    function reconcileCartWithCatalog() {
+      var ids = store.products.map(function (p) { return p.id; });
+      cart = cart.filter(function (c) { return ids.indexOf(c.productId) !== -1; });
+      saveCart();
+    }
+
+    // ---------------------------------------------------------------------
+    // Checkout
+    // ---------------------------------------------------------------------
+    function openCheckout() {
+      if (cart.length === 0) { toast('info', 'Cart Empty', 'Add a product to your cart first.'); return; }
+      renderCartTable();
+      renderPaymentMethods();
+      if (isLoggedIn && currentUser) {
+        document.getElementById('coName').value = currentUser.name || '';
+        document.getElementById('coPhone').value = currentUser.phone || '';
+        document.getElementById('coAddress').value = currentUser.address || '';
+      }
+      document.getElementById('checkoutModal').classList.remove('hidden');
+    }
+    function closeCheckout() { document.getElementById('checkoutModal').classList.add('hidden'); }
+
+    function renderCartTable() {
+      var body = document.getElementById('cartBody');
+      body.innerHTML = '';
+      var subtotal = 0, discount = 0;
+      cart.forEach(function (item) {
+        var p = store.products.filter(function (x) { return x.id === item.productId; })[0];
+        if (!p) return;
+        var lineSub = p.price * item.qty;
+        subtotal += p.originalPrice * item.qty;
+        discount += (p.originalPrice - p.price) * item.qty;
+        var row = document.createElement('tr');
+        row.innerHTML = '<td class="border px-3 py-2">' + p.name + '</td>' +
+          '<td class="border px-3 py-2">' + p.businessName + '</td>' +
+          '<td class="border px-3 py-2 text-center">' + item.qty + '</td>' +
+          '<td class="border px-3 py-2">' + currency(p.price) + '</td>' +
+          '<td class="border px-3 py-2">' + currency(lineSub) + '</td>' +
+          '<td class="border px-3 py-2 text-center"><button class="text-red-500" onclick="removeFromCart(\'' + p.id + '\')"><i class="fas fa-trash"></i></button></td>';
+        body.appendChild(row);
+      });
+      document.getElementById('cartSubtotal').textContent = subtotal.toFixed(2);
+      document.getElementById('cartDiscount').textContent = discount.toFixed(2);
+      document.getElementById('cartTotal').textContent = (subtotal - discount).toFixed(2);
+    }
+    function removeFromCart(productId) {
+      cart = cart.filter(function (c) { return c.productId !== productId; });
+      saveCart();
+      renderCartTable();
+      if (cart.length === 0) closeCheckout();
+    }
+
+    function renderPaymentMethods() {
+      var wrap = document.getElementById('paymentMethodList');
+      wrap.innerHTML = '';
+      if (!store.paymentMethods.length) {
+        wrap.innerHTML = '<p class="text-red-500 text-sm">No payment methods configured yet. Please contact us.</p>';
+        return;
+      }
+      store.paymentMethods.forEach(function (pm, i) {
+        if (i === 0 && !selectedPaymentMethodId) selectedPaymentMethodId = pm.id;
+        var div = document.createElement('label');
+        div.className = 'flex items-center gap-3 border rounded-lg p-3 cursor-pointer ' + (selectedPaymentMethodId === pm.id ? 'border-blue-500 bg-blue-50' : 'border-gray-300');
+        div.innerHTML = '<input type="radio" name="paymentMethod" ' + (selectedPaymentMethodId === pm.id ? 'checked' : '') + '>' +
+          '<div><p class="font-semibold">' + pm.label + ' <span class="text-xs text-gray-500">(' + (pm.provider || pm.type) + ')</span></p>' +
+          '<p class="text-sm text-gray-600">' + pm.accountName + ' — ' + pm.accountNumber + '</p></div>';
+        div.querySelector('input').onclick = function () { selectedPaymentMethodId = pm.id; renderPaymentMethods(); };
+        wrap.appendChild(div);
+      });
+      var pm = store.paymentMethods.filter(function (p) { return p.id === selectedPaymentMethodId; })[0];
+      var box = document.getElementById('paymentInstructions');
+      if (pm) {
+        box.classList.remove('hidden');
+        box.innerHTML = '<strong>How to pay:</strong> Send <strong>' + currency(document.getElementById('cartTotal').textContent) + '</strong> to <strong>' + pm.accountNumber + '</strong> (' + pm.accountName + ') via ' + (pm.provider || pm.type) + '.<br>' + (pm.instructions || '');
+      } else {
+        box.classList.add('hidden');
+      }
+    }
+
+    function submitOrder() {
+      if (cart.length === 0) { toast('info', 'Cart Empty', 'Your cart is empty.'); return; }
+      var payload = {
+        isGuest: !isLoggedIn,
+        username: isLoggedIn ? currentUser.username : '',
+        customerName: document.getElementById('coName').value.trim(),
+        phone: document.getElementById('coPhone').value.trim(),
+        address: document.getElementById('coAddress').value.trim(),
+        items: cart.map(function (c) { return { productId: c.productId, qty: c.qty }; }),
+        paymentMethodId: selectedPaymentMethodId,
+        payerNumber: document.getElementById('coPayerNumber').value.trim(),
+        transactionId: document.getElementById('coTransactionId').value.trim(),
+        notes: document.getElementById('coNotes').value.trim()
+      };
+      if (!payload.customerName || !payload.phone || !payload.address) { toast('warning', 'Missing Details', 'Please fill in your name, phone and address.'); return; }
+      if (!payload.paymentMethodId) { toast('warning', 'Payment Method', 'Please select a payment method.'); return; }
+      if (!payload.payerNumber || !payload.transactionId) { toast('warning', 'Payment Confirmation', 'Enter the Mobile Money number used and the Transaction ID.'); return; }
+
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (res) {
+        hideLoadingSpinner();
+        if (res.success) {
+          cart = []; saveCart();
+          closeCheckout();
+          document.getElementById('confirmOrderId').textContent = res.orderId;
+          document.getElementById('confirmModal').classList.remove('hidden');
+          document.getElementById('coPayerNumber').value = '';
+          document.getElementById('coTransactionId').value = '';
+          document.getElementById('coNotes').value = '';
+          renderProducts();
+        } else {
+          toast('error', 'Order Failed', res.message || 'Please try again.');
+        }
+      }).withFailureHandler(function (err) { hideLoadingSpinner(); toast('error', 'Order Failed', String(err)); }).placeOrder(payload);
+    }
+    function closeConfirmModal() { document.getElementById('confirmModal').classList.add('hidden'); }
+
+    // ---------------------------------------------------------------------
+    // Track order (no login required)
+    // ---------------------------------------------------------------------
+    function openTrackOrder() { document.getElementById('trackModal').classList.remove('hidden'); }
+    function closeTrackOrder() { document.getElementById('trackModal').classList.add('hidden'); }
+    function doTrackOrder() {
+      var orderId = document.getElementById('trackOrderId').value.trim();
+      var phone = document.getElementById('trackPhone').value.trim();
+      if (!orderId || !phone) { toast('warning', 'Missing Info', 'Enter both Order ID and phone number.'); return; }
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (order) {
+        hideLoadingSpinner();
+        var box = document.getElementById('trackResult');
+        if (!order) { box.innerHTML = '<p class="text-red-500">No order found with that ID and phone number.</p>'; return; }
+        var steps = ['Pending', 'Processing', 'Shipped', 'Completed'];
+        var currentIdx = steps.indexOf(order.orderStatus);
+        var timeline = steps.map(function (s, i) {
+          return '<span class="' + (i <= currentIdx ? 'text-green-600 font-semibold' : 'text-gray-400') + '">' + s + (i < steps.length - 1 ? ' → ' : '') + '</span>';
+        }).join('');
+        var itemsHtml = order.items.map(function (it) { return '<li>' + it.qty + 'x ' + it.productName + ' (' + it.businessName + ') — ' + currency(it.subtotal) + '</li>'; }).join('');
+        box.innerHTML = '<div class="bg-gray-50 border rounded-lg p-4">' +
+          '<p class="mb-2">' + timeline + '</p>' +
+          '<p><strong>Payment status:</strong> ' + order.paymentStatus + '</p>' +
+          '<p><strong>Total:</strong> ' + currency(order.total) + '</p>' +
+          '<ul class="list-disc list-inside mt-2 text-sm">' + itemsHtml + '</ul></div>';
+      }).withFailureHandler(function (err) { hideLoadingSpinner(); toast('error', 'Error', String(err)); }).trackOrder(orderId, phone);
+    }
+
+    // ---------------------------------------------------------------------
+    // Accounts (optional)
+    // ---------------------------------------------------------------------
+    function showLoginForm() { document.getElementById('loginModal').classList.remove('hidden'); }
+    function closeLoginModal() { document.getElementById('loginModal').classList.add('hidden'); document.getElementById('registerModal').classList.add('hidden'); }
+    function toggleToRegister() { document.getElementById('loginModal').classList.add('hidden'); document.getElementById('registerModal').classList.remove('hidden'); }
+    function toggleToLogin() { document.getElementById('registerModal').classList.add('hidden'); document.getElementById('loginModal').classList.remove('hidden'); }
+    function closeRegisterModal() { document.getElementById('registerModal').classList.add('hidden'); }
+
+    function register() {
+      var name = document.getElementById('name').value.trim();
+      var address = document.getElementById('address').value.trim();
+      var phone = document.getElementById('phone').value.trim();
+      var username = document.getElementById('regUsername').value.trim();
+      var password = document.getElementById('regPassword').value.trim();
+      if (!name || !address || !phone || !username || !password) { toast('warning', 'Incomplete Fields', 'Please fill in all fields.'); return; }
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (res) {
+        hideLoadingSpinner();
+        if (res.success) { toast('success', 'Registered', 'You can now sign in.'); toggleToLogin(); }
+        else toast('error', 'Registration Failed', res.message);
+      }).withFailureHandler(function (err) { hideLoadingSpinner(); toast('error', 'Error', String(err)); }).registerCustomer(name, address, phone, username, password);
+    }
+
+    function login() {
+      var username = document.getElementById('username').value.trim();
+      var password = document.getElementById('password').value.trim();
+      if (!username || !password) { toast('warning', 'Incomplete Fields', 'Enter username and password.'); return; }
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (user) {
+        hideLoadingSpinner();
+        if (user) {
+          isLoggedIn = true; currentUser = user;
+          sessionStorage.setItem('mb_user', JSON.stringify(user));
+          applyLoggedInUI();
+          closeLoginModal();
+          toast('success', 'Welcome back!', '');
+        } else {
+          toast('error', 'Login Failed', 'Incorrect username or password.');
+        }
+      }).withFailureHandler(function (err) { hideLoadingSpinner(); toast('error', 'Error', String(err)); }).loginCustomer(username, password);
+    }
+
+    function logout() {
+      isLoggedIn = false; currentUser = null;
+      sessionStorage.removeItem('mb_user');
+      applyLoggedInUI();
+      toast('success', 'Logged Out', '');
+    }
+
+    function applyLoggedInUI() {
+      document.getElementById('loginMenu').classList.toggle('hidden', isLoggedIn);
+      document.getElementById('logoutMenu').classList.toggle('hidden', !isLoggedIn);
+      document.getElementById('historyMenu').classList.toggle('hidden', !isLoggedIn);
+      document.getElementById('historyMenuMobile').classList.toggle('hidden', !isLoggedIn);
+      var nameSpan = document.getElementById('loggedInName');
+      nameSpan.classList.toggle('hidden', !isLoggedIn);
+      nameSpan.textContent = isLoggedIn ? ('Hi, ' + currentUser.name.split(' ')[0]) : '';
+    }
+    function restoreSession() {
+      var raw = sessionStorage.getItem('mb_user');
+      if (raw) { isLoggedIn = true; currentUser = JSON.parse(raw); applyLoggedInUI(); }
+    }
+
+    function showPurchaseHistory() {
+      if (!isLoggedIn) { toast('warning', 'Not Logged In', 'Please sign in to view your orders.'); return; }
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (orders) {
+        hideLoadingSpinner();
+        var container = document.getElementById('historyContainer');
+        container.innerHTML = '';
+        if (!orders.length) { container.innerHTML = '<p class="text-center text-gray-500">No orders yet.</p>'; }
+        orders.forEach(function (o) {
+          var itemsHtml = o.items.map(function (it) { return '<li>' + it.qty + 'x ' + it.productName + ' — ' + currency(it.subtotal) + '</li>'; }).join('');
+          var div = document.createElement('div');
+          div.className = 'border rounded-lg p-4';
+          div.innerHTML = '<div class="flex justify-between mb-2"><strong>' + o.orderId + '</strong><span class="text-sm text-gray-500">' + new Date(o.createdAt).toLocaleString() + '</span></div>' +
+            '<p class="text-sm mb-1">Status: <strong>' + o.orderStatus + '</strong> · Payment: <strong>' + o.paymentStatus + '</strong></p>' +
+            '<ul class="list-disc list-inside text-sm mb-1">' + itemsHtml + '</ul>' +
+            '<p class="text-right font-semibold">Total: ' + currency(o.total) + '</p>';
+          container.appendChild(div);
         });
+        document.getElementById('purchaseHistoryModal').classList.remove('hidden');
+      }).withFailureHandler(function (err) { hideLoadingSpinner(); toast('error', 'Error', String(err)); }).getOrderHistory(currentUser.username);
+    }
+    function closePurchaseHistory() { document.getElementById('purchaseHistoryModal').classList.add('hidden'); }
+
+    // ---------------------------------------------------------------------
+    // WhatsApp button
+    // ---------------------------------------------------------------------
+    function formatWaNumber(number) {
+      var digits = String(number || '').replace(/\D/g, '');
+      if (digits.charAt(0) === '0' && digits.length === 10) digits = '233' + digits.slice(1);
+      return digits;
+    }
+    function setupWhatsapp() {
+      var btn = document.getElementById('whatsappFloat');
+      var number = store.settings.WhatsAppNumber;
+      if (!number) return;
+      btn.href = 'https://wa.me/' + formatWaNumber(number) + '?text=' + encodeURIComponent(store.settings.WhatsAppGreeting || 'Hello!');
+      btn.classList.remove('hidden');
+    }
+
+    // ---------------------------------------------------------------------
+    // AI-style chatbot (rule-based shopping assistant, no external API)
+    // ---------------------------------------------------------------------
+    var chatHistory = [];
+    function setupChatbot() {
+      if (store.settings.ChatbotEnabled === false || store.settings.ChatbotEnabled === 'FALSE') {
+        document.getElementById('chatToggle').classList.add('hidden');
+        return;
+      }
+      addChatMessage('bot', store.settings.ChatbotGreeting || "Hi! I'm your shopping assistant. Ask me about orders, payment, delivery or products.");
+      renderQuickReplies(['Track my order', 'How do I pay?', 'What businesses do you have?', 'Talk to a human']);
+    }
+    function toggleChat() { document.getElementById('chatPanel').classList.toggle('hidden'); }
+    function addChatMessage(who, text) {
+      chatHistory.push({ who: who, text: text });
+      var box = document.getElementById('chatMessages');
+      var bubble = document.createElement('div');
+      bubble.className = who === 'bot' ? 'bg-blue-100 text-gray-800 rounded-lg px-3 py-2 max-w-[85%]' : 'bg-blue-600 text-white rounded-lg px-3 py-2 max-w-[85%] ml-auto';
+      bubble.textContent = text;
+      box.appendChild(bubble);
+      box.scrollTop = box.scrollHeight;
+    }
+    function renderQuickReplies(options) {
+      var wrap = document.getElementById('chatQuickReplies');
+      wrap.innerHTML = '';
+      options.forEach(function (opt) {
+        var btn = document.createElement('button');
+        btn.className = 'text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded-full';
+        btn.textContent = opt;
+        btn.onclick = function () { respondToChat(opt); };
+        wrap.appendChild(btn);
+      });
+    }
+    function handleChatSubmit(e) {
+      e.preventDefault();
+      var input = document.getElementById('chatInput');
+      var text = input.value.trim();
+      if (!text) return;
+      input.value = '';
+      respondToChat(text);
+    }
+    function respondToChat(text) {
+      addChatMessage('user', text);
+      var reply = getBotReply(text);
+      setTimeout(function () { addChatMessage('bot', reply.text); renderQuickReplies(reply.options || ['Track my order', 'How do I pay?', 'Talk to a human']); }, 350);
+    }
+    function getBotReply(raw) {
+      var t = raw.toLowerCase();
+      if (t.indexOf('track') !== -1) { openTrackOrder(); return { text: "I've opened the order tracking form for you. You'll need your Order ID and phone number." }; }
+      if (t.indexOf('pay') !== -1 || t.indexOf('momo') !== -1 || t.indexOf('mobile money') !== -1) {
+        var pm = store.paymentMethods[0];
+        if (pm) return { text: 'You can pay via ' + pm.label + ' to ' + pm.accountNumber + ' (' + pm.accountName + '). After paying, enter your Mobile Money number and Transaction ID at checkout to confirm.' };
+        return { text: 'Payment methods will be shown at checkout.' };
+      }
+      if (t.indexOf('business') !== -1 || t.indexOf('what do you sell') !== -1 || t.indexOf('shop') !== -1 || t.indexOf('categor') !== -1) {
+        var names = store.businesses.map(function (b) { return b.name; }).join(', ');
+        return { text: 'We currently offer: ' + names + '. Tap a business chip at the top of the page to browse.' };
+      }
+      if (t.indexOf('siren') !== -1 || t.indexOf('bell') !== -1 || t.indexOf('alarm') !== -1) {
+        return { text: 'For school sirens / smart bells, please chat with us directly on WhatsApp so we can discuss your requirements.', options: ['Chat on WhatsApp'] };
+      }
+      if (t.indexOf('human') !== -1 || t.indexOf('whatsapp') !== -1 || t.indexOf('agent') !== -1 || t.indexOf('chat on whatsapp') !== -1) {
+        document.getElementById('whatsappFloat').click();
+        return { text: 'Opening WhatsApp for you now!' };
+      }
+      if (t.indexOf('deliver') !== -1 || t.indexOf('shipping') !== -1) {
+        return { text: 'Delivery details are arranged after your order and payment are confirmed. You can track order status any time.' };
+      }
+      if (t.indexOf('discount') !== -1 || t.indexOf('offer') !== -1 || t.indexOf('promo') !== -1) {
+        return { text: 'Check the banner at the top of the page and look for the red "sale price" tag on products for current discounts.' };
+      }
+      if (t.indexOf('account') !== -1 || t.indexOf('sign in') !== -1 || t.indexOf('login') !== -1 || t.indexOf('register') !== -1) {
+        return { text: 'Creating an account is optional — you can checkout as a guest any time. An account just lets you see your order history.' };
+      }
+      return { text: "I can help with orders, payment, delivery, discounts and our businesses. You can also tap 'Talk to a human' to reach us on WhatsApp." };
+    }
+    // Special-case quick reply for WhatsApp
+    document.addEventListener('click', function (e) {
+      if (e.target && e.target.textContent === 'Chat on WhatsApp') document.getElementById('whatsappFloat').click();
+    });
+
+    // ---------------------------------------------------------------------
+    // Modal backdrop close
+    // ---------------------------------------------------------------------
+    window.onclick = function (event) {
+      ['loginModal', 'registerModal', 'checkoutModal', 'trackModal', 'purchaseHistoryModal', 'confirmModal'].forEach(function (id) {
+        var modal = document.getElementById(id);
+        if (event.target === modal) modal.classList.add('hidden');
+      });
     };
   </script>
 </body>
 </html>
-        

@@ -1,0 +1,995 @@
+<!-- admin.html — Multi-Business Admin Portal -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Portal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <style>
+    body { background:#f1f5f9; }
+    .nav-item.active { background:#2563eb; color:#fff; }
+    .nav-item.active i { color:#fff; }
+    table.admin-table th, table.admin-table td { padding:.5rem .75rem; border:1px solid #e2e8f0; font-size:.85rem; }
+    table.admin-table th { background:#f8fafc; text-align:left; }
+    .loader { border-top-color:#3498db; animation: spin 1s ease-in-out infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .kpi-card { background:#fff; border-radius:.75rem; padding:1rem 1.25rem; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <!-- Login Screen -->
+  <div id="loginScreen" class="min-h-screen flex items-center justify-center">
+    <div class="bg-white w-full max-w-sm p-8 rounded-xl shadow-lg">
+      <h1 class="text-2xl font-bold text-center mb-1"><i class="fas fa-user-shield text-blue-600 mr-2"></i>Admin Portal</h1>
+      <p class="text-center text-gray-500 text-sm mb-6">Sign in to manage your businesses</p>
+      <input id="loginUsername" type="text" placeholder="Username" class="w-full p-3 border rounded-lg mb-3">
+      <input id="loginPassword" type="password" placeholder="Password" class="w-full p-3 border rounded-lg mb-4">
+      <button onclick="adminDoLogin()" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700">Login</button>
+      <p class="text-xs text-gray-400 mt-4 text-center">First time? Run <code>setupSheets()</code> from the Apps Script editor and check the execution log for your initial credentials.</p>
+      <p class="text-center mt-4"><a href="?" class="text-blue-500 text-sm hover:underline"><i class="fas fa-arrow-left mr-1"></i>Back to store</a></p>
+    </div>
+  </div>
+
+  <!-- Admin App -->
+  <div id="adminApp" class="hidden flex min-h-screen">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-slate-900 text-slate-200 flex-shrink-0 flex flex-col">
+      <div class="p-4 border-b border-slate-700">
+        <p class="font-bold text-white"><i class="fas fa-store mr-2"></i>Admin Portal</p>
+        <p class="text-xs text-slate-400" id="adminNameLabel"></p>
+      </div>
+      <nav class="flex-grow overflow-y-auto py-2" id="sideNav">
+        <a class="nav-item active flex items-center gap-3 px-4 py-3 cursor-pointer" data-tab="dashboard"><i class="fas fa-gauge-high w-4"></i>Dashboard</a>
+        <a class="nav-item flex items-center gap-3 px-4 py-3 cursor-pointer" data-tab="orders"><i class="fas fa-receipt w-4"></i>Orders</a>
+        <a class="nav-item flex items-center gap-3 px-4 py-3 cursor-pointer" data-tab="businesses"><i class="fas fa-building w-4"></i>Businesses</a>
+        <a class="nav-item flex items-center gap-3 px-4 py-3 cursor-pointer" data-tab="products"><i class="fas fa-box-open w-4"></i>Products</a>
+        <a class="nav-item flex items-center gap-3 px-4 py-3 cursor-pointer" data-tab="banners"><i class="fas fa-images w-4"></i>Banners</a>
+        <a class="nav-item flex items-center gap-3 px-4 py-3 cursor-pointer" data-tab="payments"><i class="fas fa-money-bill-wave w-4"></i>Payment Methods</a>
+        <a class="nav-item flex items-center gap-3 px-4 py-3 cursor-pointer" data-tab="discounts"><i class="fas fa-percent w-4"></i>Discounts</a>
+        <a class="nav-item flex items-center gap-3 px-4 py-3 cursor-pointer" data-tab="expenses"><i class="fas fa-wallet w-4"></i>Expenses</a>
+        <a class="nav-item flex items-center gap-3 px-4 py-3 cursor-pointer" data-tab="customers"><i class="fas fa-users w-4"></i>Customers</a>
+        <a class="nav-item flex items-center gap-3 px-4 py-3 cursor-pointer" data-tab="settings"><i class="fas fa-gear w-4"></i>Settings</a>
+        <a class="nav-item flex items-center gap-3 px-4 py-3 cursor-pointer" data-tab="admins"><i class="fas fa-user-shield w-4"></i>Admin Users</a>
+      </nav>
+      <div class="p-4 border-t border-slate-700">
+        <a href="?" target="_top" class="text-slate-300 text-sm hover:underline block mb-2"><i class="fas fa-store mr-1"></i>View Store</a>
+        <button onclick="adminDoLogout()" class="text-red-400 text-sm hover:underline"><i class="fas fa-sign-out-alt mr-1"></i>Logout</button>
+      </div>
+    </aside>
+
+    <!-- Content -->
+    <main class="flex-grow p-6 overflow-y-auto">
+
+      <!-- Dashboard -->
+      <section id="tab-dashboard" class="tab-section">
+        <h1 class="text-2xl font-bold mb-4">Dashboard</h1>
+        <div id="kpiGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6"></div>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div class="lg:col-span-2 kpi-card">
+            <h3 class="font-semibold mb-3">Sales — last 14 days (confirmed payments)</h3>
+            <canvas id="salesChart" height="120"></canvas>
+          </div>
+          <div class="kpi-card">
+            <h3 class="font-semibold mb-3">Low Stock</h3>
+            <div id="lowStockList" class="text-sm space-y-1"></div>
+          </div>
+          <div class="kpi-card">
+            <h3 class="font-semibold mb-3">Sales by Business</h3>
+            <div id="bizBreakdown" class="text-sm space-y-1"></div>
+          </div>
+          <div class="kpi-card">
+            <h3 class="font-semibold mb-3">Top Selling Products</h3>
+            <div id="topProducts" class="text-sm space-y-1"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Orders -->
+      <section id="tab-orders" class="tab-section hidden">
+        <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+          <h1 class="text-2xl font-bold">Orders</h1>
+          <button onclick="exportOrdersCsv()" class="bg-slate-700 text-white px-4 py-2 rounded-lg text-sm"><i class="fas fa-download mr-1"></i>Export CSV</button>
+        </div>
+        <div class="flex flex-wrap gap-2 mb-4">
+          <input id="orderSearch" placeholder="Search order id / name / phone" class="p-2 border rounded-lg text-sm flex-grow">
+          <select id="orderPaymentFilter" class="p-2 border rounded-lg text-sm">
+            <option value="">All Payment Status</option>
+            <option>Pending Verification</option><option>Confirmed</option><option>Rejected</option>
+          </select>
+          <select id="orderStatusFilter" class="p-2 border rounded-lg text-sm">
+            <option value="">All Order Status</option>
+            <option>Pending</option><option>Processing</option><option>Shipped</option><option>Completed</option><option>Cancelled</option>
+          </select>
+          <button onclick="loadOrders()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm">Filter</button>
+        </div>
+        <div class="overflow-x-auto bg-white rounded-lg shadow"><table class="admin-table w-full" id="ordersTable">
+          <thead><tr><th>Order ID</th><th>Date</th><th>Customer</th><th>Phone</th><th>Total</th><th>Payment</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </section>
+
+      <!-- Businesses -->
+      <section id="tab-businesses" class="tab-section hidden">
+        <h1 class="text-2xl font-bold mb-4">Businesses</h1>
+        <form id="businessForm" class="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3" onsubmit="saveBusiness(event)">
+          <input type="hidden" id="bizId">
+          <input id="bizName" placeholder="Business Name" class="p-2 border rounded-lg" required>
+          <input id="bizSort" type="number" placeholder="Sort Order" class="p-2 border rounded-lg" value="1">
+          <textarea id="bizDescription" placeholder="Description" class="p-2 border rounded-lg md:col-span-2"></textarea>
+          <div class="md:col-span-2 flex items-center gap-3">
+            <input id="bizLogoUrl" placeholder="Logo Image URL" class="p-2 border rounded-lg flex-grow">
+            <input type="file" id="bizLogoFile" accept="image/*" class="text-sm">
+          </div>
+          <input id="bizWhatsapp" placeholder="Business WhatsApp number (optional, overrides default)" class="p-2 border rounded-lg md:col-span-2">
+          <label class="flex items-center gap-2"><input type="checkbox" id="bizActive" checked> Active</label>
+          <div class="md:col-span-2 flex gap-2">
+            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Save Business</button>
+            <button type="button" onclick="resetBusinessForm()" class="bg-gray-200 px-4 py-2 rounded-lg">Clear</button>
+          </div>
+        </form>
+        <div class="overflow-x-auto bg-white rounded-lg shadow"><table class="admin-table w-full">
+          <thead><tr><th>Name</th><th>Description</th><th>Active</th><th>Sort</th><th>Actions</th></tr></thead>
+          <tbody id="businessTableBody"></tbody>
+        </table></div>
+      </section>
+
+      <!-- Products -->
+      <section id="tab-products" class="tab-section hidden">
+        <h1 class="text-2xl font-bold mb-4">Products &amp; Services</h1>
+        <form id="productForm" class="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3" onsubmit="saveProduct(event)">
+          <input type="hidden" id="prdId">
+          <select id="prdBusiness" class="p-2 border rounded-lg" required></select>
+          <input id="prdName" placeholder="Product / Service Name" class="p-2 border rounded-lg" required>
+          <input id="prdCategory" placeholder="Category" class="p-2 border rounded-lg">
+          <input id="prdPrice" type="number" step="0.01" placeholder="Price" class="p-2 border rounded-lg">
+          <input id="prdStock" type="number" placeholder="Stock (blank = unlimited/service)" class="p-2 border rounded-lg">
+          <div class="flex items-center gap-3">
+            <input id="prdImageUrl" placeholder="Image URL" class="p-2 border rounded-lg flex-grow">
+            <input type="file" id="prdImageFile" accept="image/*" class="text-sm">
+          </div>
+          <textarea id="prdDescription" placeholder="Description" class="p-2 border rounded-lg md:col-span-2"></textarea>
+          <label class="flex items-center gap-2"><input type="checkbox" id="prdIsService"> This is a service (not physical stock)</label>
+          <label class="flex items-center gap-2"><input type="checkbox" id="prdEnquireWhatsapp"> Direct customers to WhatsApp instead of Add to Cart (e.g. custom installs like School Siren)</label>
+          <label class="flex items-center gap-2"><input type="checkbox" id="prdActive" checked> Active</label>
+          <div class="md:col-span-2 flex gap-2">
+            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Save Product</button>
+            <button type="button" onclick="resetProductForm()" class="bg-gray-200 px-4 py-2 rounded-lg">Clear</button>
+          </div>
+        </form>
+        <div class="overflow-x-auto bg-white rounded-lg shadow"><table class="admin-table w-full">
+          <thead><tr><th>Image</th><th>Name</th><th>Business</th><th>Category</th><th>Price</th><th>Stock</th><th>Flags</th><th>Active</th><th>Actions</th></tr></thead>
+          <tbody id="productTableBody"></tbody>
+        </table></div>
+      </section>
+
+      <!-- Banners -->
+      <section id="tab-banners" class="tab-section hidden">
+        <h1 class="text-2xl font-bold mb-4">Carousel Banners</h1>
+        <form id="bannerForm" class="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3" onsubmit="saveBanner(event)">
+          <input type="hidden" id="banId">
+          <div class="flex items-center gap-3 md:col-span-2">
+            <input id="banImageUrl" placeholder="Banner Image URL" class="p-2 border rounded-lg flex-grow" required>
+            <input type="file" id="banImageFile" accept="image/*" class="text-sm">
+          </div>
+          <input id="banTitle" placeholder="Title (optional)" class="p-2 border rounded-lg">
+          <input id="banLink" placeholder="Link URL (optional)" class="p-2 border rounded-lg">
+          <input id="banSort" type="number" placeholder="Sort Order" class="p-2 border rounded-lg" value="1">
+          <label class="flex items-center gap-2"><input type="checkbox" id="banActive" checked> Active</label>
+          <div class="md:col-span-2 flex gap-2">
+            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Save Banner</button>
+            <button type="button" onclick="resetBannerForm()" class="bg-gray-200 px-4 py-2 rounded-lg">Clear</button>
+          </div>
+        </form>
+        <div class="overflow-x-auto bg-white rounded-lg shadow"><table class="admin-table w-full">
+          <thead><tr><th>Preview</th><th>Title</th><th>Active</th><th>Sort</th><th>Actions</th></tr></thead>
+          <tbody id="bannerTableBody"></tbody>
+        </table></div>
+      </section>
+
+      <!-- Payment Methods -->
+      <section id="tab-payments" class="tab-section hidden">
+        <h1 class="text-2xl font-bold mb-4">Payment Methods</h1>
+        <form id="paymentForm" class="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3" onsubmit="savePaymentMethod(event)">
+          <input type="hidden" id="pmId">
+          <select id="pmType" class="p-2 border rounded-lg">
+            <option>Mobile Money</option><option>Bank Transfer</option><option>Cash on Delivery</option><option>Other</option>
+          </select>
+          <input id="pmLabel" placeholder="Label shown to customers (e.g. Mobile Money)" class="p-2 border rounded-lg" required>
+          <input id="pmAccountName" placeholder="Account Name (e.g. Emmanuel Darkoh)" class="p-2 border rounded-lg">
+          <input id="pmAccountNumber" placeholder="Account / Number (e.g. 0547359015)" class="p-2 border rounded-lg" required>
+          <input id="pmProvider" placeholder="Provider (e.g. MTN Mobile Money)" class="p-2 border rounded-lg">
+          <input id="pmSort" type="number" placeholder="Sort Order" class="p-2 border rounded-lg" value="1">
+          <textarea id="pmInstructions" placeholder="Extra instructions shown at checkout" class="p-2 border rounded-lg md:col-span-2"></textarea>
+          <label class="flex items-center gap-2"><input type="checkbox" id="pmActive" checked> Active</label>
+          <div class="md:col-span-2 flex gap-2">
+            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Save Payment Method</button>
+            <button type="button" onclick="resetPaymentForm()" class="bg-gray-200 px-4 py-2 rounded-lg">Clear</button>
+          </div>
+        </form>
+        <div class="overflow-x-auto bg-white rounded-lg shadow"><table class="admin-table w-full">
+          <thead><tr><th>Label</th><th>Account</th><th>Provider</th><th>Active</th><th>Actions</th></tr></thead>
+          <tbody id="paymentTableBody"></tbody>
+        </table></div>
+      </section>
+
+      <!-- Discounts -->
+      <section id="tab-discounts" class="tab-section hidden">
+        <h1 class="text-2xl font-bold mb-4">Discounts</h1>
+        <form id="discountForm" class="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3" onsubmit="saveDiscount(event)">
+          <input type="hidden" id="dscId">
+          <input id="dscLabel" placeholder="Label (e.g. Back to School Sale)" class="p-2 border rounded-lg">
+          <select id="dscScope" class="p-2 border rounded-lg" onchange="onDiscountScopeChange()">
+            <option value="global">Entire Store</option>
+            <option value="business">Specific Business</option>
+            <option value="product">Specific Product</option>
+          </select>
+          <select id="dscTarget" class="p-2 border rounded-lg hidden"></select>
+          <select id="dscType" class="p-2 border rounded-lg">
+            <option value="percent">Percent (%)</option>
+            <option value="fixed">Fixed Amount</option>
+          </select>
+          <input id="dscValue" type="number" step="0.01" placeholder="Value" class="p-2 border rounded-lg" required>
+          <div class="flex gap-2">
+            <input id="dscStart" type="date" class="p-2 border rounded-lg flex-grow">
+            <input id="dscEnd" type="date" class="p-2 border rounded-lg flex-grow">
+          </div>
+          <label class="flex items-center gap-2"><input type="checkbox" id="dscActive" checked> Active</label>
+          <div class="md:col-span-2 flex gap-2">
+            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Save Discount</button>
+            <button type="button" onclick="resetDiscountForm()" class="bg-gray-200 px-4 py-2 rounded-lg">Clear</button>
+          </div>
+        </form>
+        <div class="overflow-x-auto bg-white rounded-lg shadow"><table class="admin-table w-full">
+          <thead><tr><th>Label</th><th>Scope</th><th>Type</th><th>Value</th><th>Dates</th><th>Active</th><th>Actions</th></tr></thead>
+          <tbody id="discountTableBody"></tbody>
+        </table></div>
+      </section>
+
+      <!-- Expenses -->
+      <section id="tab-expenses" class="tab-section hidden">
+        <h1 class="text-2xl font-bold mb-4">Expenses</h1>
+        <form id="expenseForm" class="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3" onsubmit="saveExpense(event)">
+          <input id="expDate" type="date" class="p-2 border rounded-lg">
+          <select id="expBusiness" class="p-2 border rounded-lg"><option value="">General / Not business-specific</option></select>
+          <input id="expCategory" placeholder="Category (e.g. Delivery, Airtime, Supplies)" class="p-2 border rounded-lg" required>
+          <input id="expAmount" type="number" step="0.01" placeholder="Amount" class="p-2 border rounded-lg" required>
+          <textarea id="expDescription" placeholder="Description" class="p-2 border rounded-lg md:col-span-2"></textarea>
+          <div class="md:col-span-2"><button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Add Expense</button></div>
+        </form>
+        <p class="mb-2 font-semibold">Total Expenses: <span id="expenseTotal">0.00</span></p>
+        <div class="overflow-x-auto bg-white rounded-lg shadow"><table class="admin-table w-full">
+          <thead><tr><th>Date</th><th>Business</th><th>Category</th><th>Description</th><th>Amount</th><th>Added By</th><th>Actions</th></tr></thead>
+          <tbody id="expenseTableBody"></tbody>
+        </table></div>
+      </section>
+
+      <!-- Customers -->
+      <section id="tab-customers" class="tab-section hidden">
+        <h1 class="text-2xl font-bold mb-4">Registered Customers</h1>
+        <div class="overflow-x-auto bg-white rounded-lg shadow"><table class="admin-table w-full">
+          <thead><tr><th>Name</th><th>Username</th><th>Phone</th><th>Address</th><th>Joined</th></tr></thead>
+          <tbody id="customerTableBody"></tbody>
+        </table></div>
+      </section>
+
+      <!-- Settings -->
+      <section id="tab-settings" class="tab-section hidden">
+        <h1 class="text-2xl font-bold mb-4">Store Settings</h1>
+        <form id="settingsForm" class="bg-white p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-3 max-w-3xl" onsubmit="saveSettings(event)">
+          <label class="text-sm md:col-span-2">Site Name<input id="setSiteName" class="p-2 border rounded-lg w-full mt-1"></label>
+          <label class="text-sm">Currency Code<input id="setCurrency" class="p-2 border rounded-lg w-full mt-1"></label>
+          <label class="text-sm">Currency Symbol/Prefix<input id="setCurrencySymbol" class="p-2 border rounded-lg w-full mt-1"></label>
+          <label class="text-sm md:col-span-2">Default WhatsApp Number (for the floating button / enquiries)<input id="setWhatsapp" class="p-2 border rounded-lg w-full mt-1" placeholder="e.g. 0547359015 or 233547359015"></label>
+          <label class="text-sm md:col-span-2">WhatsApp Greeting Message<input id="setWhatsappGreeting" class="p-2 border rounded-lg w-full mt-1"></label>
+          <label class="text-sm md:col-span-2">Chatbot Greeting<input id="setChatbotGreeting" class="p-2 border rounded-lg w-full mt-1"></label>
+          <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="setChatbotEnabled"> Chatbot Enabled</label>
+          <div class="md:col-span-2"><button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Save Settings</button></div>
+        </form>
+      </section>
+
+      <!-- Admin Users -->
+      <section id="tab-admins" class="tab-section hidden">
+        <h1 class="text-2xl font-bold mb-4">Admin Users</h1>
+        <form id="adminForm" class="bg-white p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl" onsubmit="addAdminUser(event)">
+          <input id="admName" placeholder="Full Name" class="p-2 border rounded-lg" required>
+          <input id="admUsername" placeholder="Username" class="p-2 border rounded-lg" required>
+          <input id="admPassword" type="password" placeholder="Password" class="p-2 border rounded-lg" required>
+          <select id="admRole" class="p-2 border rounded-lg"><option value="staff">Staff</option><option value="owner">Owner</option></select>
+          <div class="md:col-span-2"><button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Add Admin</button></div>
+        </form>
+        <div class="overflow-x-auto bg-white rounded-lg shadow mb-8"><table class="admin-table w-full">
+          <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Created</th></tr></thead>
+          <tbody id="adminTableBody"></tbody>
+        </table></div>
+
+        <h2 class="text-xl font-bold mb-3">Change My Password</h2>
+        <form id="pwForm" class="bg-white p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl" onsubmit="changeMyPassword(event)">
+          <input id="pwCurrent" type="password" placeholder="Current Password" class="p-2 border rounded-lg" required>
+          <input id="pwNew" type="password" placeholder="New Password" class="p-2 border rounded-lg" required>
+          <div class="md:col-span-2"><button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg">Update Password</button></div>
+        </form>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Order Details Modal -->
+  <div id="orderModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 p-4">
+    <div class="bg-white w-full max-w-2xl p-6 rounded-lg shadow-lg relative max-h-[85vh] overflow-y-auto">
+      <button class="absolute top-4 right-4" onclick="document.getElementById('orderModal').classList.add('hidden')"><i class="fas fa-times fa-lg"></i></button>
+      <div id="orderModalBody"></div>
+    </div>
+  </div>
+
+  <!-- Loading Spinner -->
+  <div id="loadingSpinner" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 hidden z-[60]">
+    <div class="loader ease-linear rounded-full border-8 border-t-8 border-gray-200 h-16 w-16"></div>
+  </div>
+
+  <script>
+    var adminToken = sessionStorage.getItem('mb_admin_token') || null;
+    var adminInfo = JSON.parse(sessionStorage.getItem('mb_admin_info') || 'null');
+    var cache = { businesses: [], products: [], settings: {} };
+
+    function showLoadingSpinner() { document.getElementById('loadingSpinner').classList.remove('hidden'); }
+    function hideLoadingSpinner() { document.getElementById('loadingSpinner').classList.add('hidden'); }
+    function toast(icon, title, text) { Swal.fire({ icon: icon, title: title, text: text, timer: icon === 'success' ? 1600 : undefined, showConfirmButton: icon !== 'success' }); }
+    function currency(n) { return ((cache.settings && cache.settings.CurrencySymbol) || 'GHS ') + Number(n || 0).toFixed(2); }
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+    function runFail(err) { hideLoadingSpinner(); toast('error', 'Error', String(err)); }
+
+    // -------------------------------------------------------------------
+    // Auth
+    // -------------------------------------------------------------------
+    window.onload = function () {
+      if (adminToken) { enterApp(); } else { document.getElementById('loginScreen').classList.remove('hidden'); }
+    };
+
+    function adminDoLogin() {
+      var username = document.getElementById('loginUsername').value.trim();
+      var password = document.getElementById('loginPassword').value;
+      if (!username || !password) { toast('warning', 'Missing Fields', 'Enter username and password.'); return; }
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (res) {
+        hideLoadingSpinner();
+        if (res) {
+          adminToken = res.token;
+          adminInfo = res;
+          sessionStorage.setItem('mb_admin_token', adminToken);
+          sessionStorage.setItem('mb_admin_info', JSON.stringify(res));
+          enterApp();
+        } else {
+          toast('error', 'Login Failed', 'Incorrect username or password.');
+        }
+      }).withFailureHandler(runFail).adminLogin(username, password);
+    }
+
+    function adminDoLogout() {
+      google.script.run.adminLogout(adminToken);
+      sessionStorage.removeItem('mb_admin_token');
+      sessionStorage.removeItem('mb_admin_info');
+      location.reload();
+    }
+
+    function enterApp() {
+      document.getElementById('loginScreen').classList.add('hidden');
+      document.getElementById('adminApp').classList.remove('hidden');
+      document.getElementById('adminNameLabel').textContent = adminInfo.name + ' (' + adminInfo.role + ')';
+      document.querySelectorAll('.nav-item').forEach(function (el) {
+        el.addEventListener('click', function () { showTab(el.dataset.tab); });
+      });
+      loadReferenceData();
+      showTab('dashboard');
+    }
+
+    function showTab(name) {
+      document.querySelectorAll('.tab-section').forEach(function (s) { s.classList.add('hidden'); });
+      document.getElementById('tab-' + name).classList.remove('hidden');
+      document.querySelectorAll('.nav-item').forEach(function (el) { el.classList.toggle('active', el.dataset.tab === name); });
+      var loaders = {
+        dashboard: loadDashboard, orders: loadOrders, businesses: loadBusinesses, products: loadProducts,
+        banners: loadBanners, payments: loadPaymentMethods, discounts: loadDiscounts, expenses: loadExpenses,
+        customers: loadCustomers, settings: loadSettings, admins: loadAdmins
+      };
+      if (loaders[name]) loaders[name]();
+    }
+
+    function loadReferenceData() {
+      google.script.run.withSuccessHandler(function (list) {
+        cache.businesses = list;
+        var options = list.map(function (b) { return '<option value="' + b.BusinessID + '">' + esc(b.Name) + '</option>'; }).join('');
+        document.getElementById('prdBusiness').innerHTML = options;
+        document.getElementById('expBusiness').innerHTML = '<option value="">General / Not business-specific</option>' + options;
+      }).withFailureHandler(runFail).adminGetBusinesses(adminToken);
+      google.script.run.withSuccessHandler(function (s) { cache.settings = s; }).withFailureHandler(function () {}).adminGetSettings(adminToken);
+    }
+
+    // -------------------------------------------------------------------
+    // Dashboard
+    // -------------------------------------------------------------------
+    function loadDashboard() {
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (d) {
+        hideLoadingSpinner();
+        document.getElementById('kpiGrid').innerHTML = [
+          kpi('fa-sack-dollar', 'Confirmed Income', currency(d.totalIncome), 'text-green-600'),
+          kpi('fa-wallet', 'Total Expenses', currency(d.totalExpenses), 'text-red-600'),
+          kpi('fa-scale-balanced', 'Net Profit', currency(d.netProfit), d.netProfit >= 0 ? 'text-green-600' : 'text-red-600'),
+          kpi('fa-hourglass-half', 'Pending Payments', d.pendingPayments, 'text-orange-500'),
+          kpi('fa-receipt', 'Total Orders', d.totalOrders, 'text-blue-600'),
+          kpi('fa-circle-check', 'Confirmed Orders', d.confirmedOrders, 'text-blue-600'),
+          kpi('fa-building', 'Active Businesses', d.businessCount, 'text-purple-600'),
+          kpi('fa-box-open', 'Active Products', d.productCount, 'text-purple-600')
+        ].join('');
+        drawSalesChart(d.salesByDay);
+        document.getElementById('lowStockList').innerHTML = d.lowStock.length ? d.lowStock.map(function (p) { return '<p>' + esc(p.name) + ' — <span class="text-red-500 font-semibold">' + p.stock + ' left</span></p>'; }).join('') : '<p class="text-gray-400">All good.</p>';
+        document.getElementById('bizBreakdown').innerHTML = d.businessBreakdown.length ? d.businessBreakdown.map(function (b) { return '<p class="flex justify-between"><span>' + esc(b.business) + '</span><span class="font-semibold">' + currency(b.total) + '</span></p>'; }).join('') : '<p class="text-gray-400">No sales yet.</p>';
+        document.getElementById('topProducts').innerHTML = d.topProducts.length ? d.topProducts.map(function (p) { return '<p class="flex justify-between"><span>' + esc(p.product) + '</span><span class="font-semibold">' + p.qty + ' sold</span></p>'; }).join('') : '<p class="text-gray-400">No sales yet.</p>';
+      }).withFailureHandler(runFail).adminGetDashboard(adminToken);
+    }
+    function kpi(icon, label, value, colorClass) {
+      return '<div class="kpi-card"><i class="fas ' + icon + ' ' + colorClass + ' text-xl mb-2"></i><p class="text-sm text-gray-500">' + label + '</p><p class="text-xl font-bold">' + value + '</p></div>';
+    }
+    function drawSalesChart(days) {
+      var canvas = document.getElementById('salesChart');
+      var ctx = canvas.getContext('2d');
+      var w = canvas.width = canvas.clientWidth;
+      var h = canvas.height = 200;
+      ctx.clearRect(0, 0, w, h);
+      var max = Math.max.apply(null, days.map(function (d) { return d.total; }).concat([1]));
+      var barW = w / days.length;
+      ctx.font = '10px sans-serif';
+      days.forEach(function (d, i) {
+        var barH = (d.total / max) * (h - 30);
+        var x = i * barW + barW * 0.15;
+        var y = h - 20 - barH;
+        ctx.fillStyle = '#2563eb';
+        ctx.fillRect(x, y, barW * 0.7, barH);
+        ctx.fillStyle = '#64748b';
+        ctx.save();
+        ctx.translate(x + barW * 0.35, h - 5);
+        ctx.textAlign = 'center';
+        ctx.fillText(d.date, 0, 0);
+        ctx.restore();
+      });
+    }
+
+    // -------------------------------------------------------------------
+    // Orders
+    // -------------------------------------------------------------------
+    function loadOrders() {
+      showLoadingSpinner();
+      var filters = {
+        search: document.getElementById('orderSearch').value.trim(),
+        paymentStatus: document.getElementById('orderPaymentFilter').value,
+        orderStatus: document.getElementById('orderStatusFilter').value
+      };
+      google.script.run.withSuccessHandler(function (orders) {
+        hideLoadingSpinner();
+        document.getElementById('ordersTable').querySelector('tbody').innerHTML = orders.map(function (o) {
+          return '<tr>' +
+            '<td>' + o.orderId + '</td>' +
+            '<td>' + new Date(o.createdAt).toLocaleString() + '</td>' +
+            '<td>' + esc(o.customerName) + '</td>' +
+            '<td>' + esc(o.phone) + '</td>' +
+            '<td>' + currency(o.total) + '</td>' +
+            '<td>' + statusBadge(o.paymentStatus) + '</td>' +
+            '<td>' + statusBadge(o.orderStatus) + '</td>' +
+            '<td><button class="text-blue-600" onclick="viewOrder(\'' + o.orderId + '\')"><i class="fas fa-eye"></i> View</button></td>' +
+            '</tr>';
+        }).join('') || '<tr><td colspan="8" class="text-center text-gray-400">No orders found.</td></tr>';
+        window._orderCache = orders;
+      }).withFailureHandler(runFail).adminGetOrders(adminToken, filters);
+    }
+    function statusBadge(s) {
+      var color = { 'Confirmed': 'bg-green-100 text-green-700', 'Rejected': 'bg-red-100 text-red-700', 'Pending Verification': 'bg-orange-100 text-orange-700', 'Pending': 'bg-orange-100 text-orange-700', 'Processing': 'bg-blue-100 text-blue-700', 'Shipped': 'bg-purple-100 text-purple-700', 'Completed': 'bg-green-100 text-green-700', 'Cancelled': 'bg-gray-200 text-gray-600' }[s] || 'bg-gray-100';
+      return '<span class="px-2 py-1 rounded-full text-xs ' + color + '">' + s + '</span>';
+    }
+    function viewOrder(orderId) {
+      var o = (window._orderCache || []).filter(function (x) { return x.orderId === orderId; })[0];
+      if (!o) return;
+      var itemsHtml = o.items.map(function (it) { return '<li>' + it.qty + 'x ' + esc(it.productName) + ' (' + esc(it.businessName) + ') — ' + currency(it.subtotal) + '</li>'; }).join('');
+      document.getElementById('orderModalBody').innerHTML =
+        '<h2 class="text-xl font-bold mb-3">Order ' + o.orderId + '</h2>' +
+        '<p><strong>Customer:</strong> ' + esc(o.customerName) + ' · ' + esc(o.phone) + '</p>' +
+        '<p><strong>Address:</strong> ' + esc(o.address) + '</p>' +
+        '<p><strong>Payment:</strong> ' + esc(o.paymentMethod) + ' — status: ' + statusBadge(o.paymentStatus) + '</p>' +
+        '<ul class="list-disc list-inside my-3">' + itemsHtml + '</ul>' +
+        '<p>Subtotal: ' + currency(o.subtotal) + ' · Discount: -' + currency(o.discountAmount) + '</p>' +
+        '<p class="text-lg font-bold mb-4">Total: ' + currency(o.total) + '</p>' +
+        '<div class="flex flex-wrap gap-2 mb-4">' +
+        '<button class="bg-green-600 text-white px-3 py-2 rounded-lg text-sm" onclick="confirmPayment(\'' + o.orderId + '\', true)">Confirm Payment</button>' +
+        '<button class="bg-red-600 text-white px-3 py-2 rounded-lg text-sm" onclick="confirmPayment(\'' + o.orderId + '\', false)">Reject Payment</button>' +
+        '</div>' +
+        '<label class="text-sm">Order Status<select id="orderStatusSelect" class="p-2 border rounded-lg w-full mt-1">' +
+        ['Pending', 'Processing', 'Shipped', 'Completed', 'Cancelled'].map(function (s) { return '<option ' + (s === o.orderStatus ? 'selected' : '') + '>' + s + '</option>'; }).join('') +
+        '</select></label>' +
+        '<button class="mt-3 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm" onclick="updateOrderStatus(\'' + o.orderId + '\')">Update Status</button>';
+      document.getElementById('orderModal').classList.remove('hidden');
+      document.getElementById('orderModal').classList.add('flex');
+    }
+    function confirmPayment(orderId, confirmed) {
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function () { hideLoadingSpinner(); toast('success', confirmed ? 'Payment Confirmed' : 'Payment Rejected', ''); document.getElementById('orderModal').classList.add('hidden'); loadOrders(); }).withFailureHandler(runFail).adminConfirmPayment(adminToken, orderId, confirmed);
+    }
+    function updateOrderStatus(orderId) {
+      var status = document.getElementById('orderStatusSelect').value;
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function () { hideLoadingSpinner(); toast('success', 'Order Updated', ''); document.getElementById('orderModal').classList.add('hidden'); loadOrders(); }).withFailureHandler(runFail).adminUpdateOrderStatus(adminToken, orderId, status);
+    }
+    function exportOrdersCsv() {
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (csv) {
+        hideLoadingSpinner();
+        var blob = new Blob([csv], { type: 'text/csv' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = 'orders.csv';
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      }).withFailureHandler(runFail).adminExportOrdersCsv(adminToken);
+    }
+
+    // -------------------------------------------------------------------
+    // Generic image upload wiring
+    // -------------------------------------------------------------------
+    function wireUpload(fileId, urlId) {
+      var fileInput = document.getElementById(fileId);
+      fileInput.onchange = function () {
+        var file = fileInput.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function () {
+          var base64 = reader.result.split(',')[1];
+          showLoadingSpinner();
+          google.script.run.withSuccessHandler(function (res) {
+            hideLoadingSpinner();
+            if (res.success) { document.getElementById(urlId).value = res.url; toast('success', 'Image Uploaded', ''); }
+            else toast('error', 'Upload Failed', res.message || '');
+          }).withFailureHandler(runFail).adminUploadImage(adminToken, base64, file.name, file.type);
+        };
+        reader.readAsDataURL(file);
+      };
+    }
+    wireUpload('bizLogoFile', 'bizLogoUrl');
+    wireUpload('prdImageFile', 'prdImageUrl');
+    wireUpload('banImageFile', 'banImageUrl');
+
+    // -------------------------------------------------------------------
+    // Businesses
+    // -------------------------------------------------------------------
+    function loadBusinesses() {
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (list) {
+        hideLoadingSpinner();
+        cache.businesses = list;
+        document.getElementById('businessTableBody').innerHTML = list.map(function (b) {
+          return '<tr><td>' + esc(b.Name) + '</td><td>' + esc(b.Description) + '</td><td>' + (b.Active ? 'Yes' : 'No') + '</td><td>' + b.SortOrder + '</td>' +
+            '<td><button class="text-blue-600 mr-2" onclick="editBusiness(\'' + b.BusinessID + '\')"><i class="fas fa-edit"></i></button>' +
+            '<button class="text-red-600" onclick="deleteBusiness(\'' + b.BusinessID + '\')"><i class="fas fa-trash"></i></button></td></tr>';
+        }).join('') || '<tr><td colspan="5" class="text-center text-gray-400">No businesses yet.</td></tr>';
+        var options = list.map(function (b) { return '<option value="' + b.BusinessID + '">' + esc(b.Name) + '</option>'; }).join('');
+        document.getElementById('prdBusiness').innerHTML = options;
+        document.getElementById('expBusiness').innerHTML = '<option value="">General / Not business-specific</option>' + options;
+      }).withFailureHandler(runFail).adminGetBusinesses(adminToken);
+    }
+    function editBusiness(id) {
+      var b = cache.businesses.filter(function (x) { return x.BusinessID === id; })[0];
+      if (!b) return;
+      document.getElementById('bizId').value = b.BusinessID;
+      document.getElementById('bizName').value = b.Name;
+      document.getElementById('bizDescription').value = b.Description;
+      document.getElementById('bizLogoUrl').value = b.LogoURL;
+      document.getElementById('bizWhatsapp').value = b.WhatsAppNumber;
+      document.getElementById('bizSort').value = b.SortOrder;
+      document.getElementById('bizActive').checked = !!b.Active;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    function resetBusinessForm() { document.getElementById('businessForm').reset(); document.getElementById('bizId').value = ''; }
+    function saveBusiness(e) {
+      e.preventDefault();
+      var biz = {
+        BusinessID: document.getElementById('bizId').value,
+        Name: document.getElementById('bizName').value.trim(),
+        Description: document.getElementById('bizDescription').value.trim(),
+        LogoURL: document.getElementById('bizLogoUrl').value.trim(),
+        WhatsAppNumber: document.getElementById('bizWhatsapp').value.trim(),
+        SortOrder: document.getElementById('bizSort').value,
+        Active: document.getElementById('bizActive').checked
+      };
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (res) {
+        hideLoadingSpinner();
+        if (res.success) { toast('success', 'Saved', ''); resetBusinessForm(); loadBusinesses(); }
+        else toast('error', 'Failed', res.message || '');
+      }).withFailureHandler(runFail).adminSaveBusiness(adminToken, biz);
+    }
+    function deleteBusiness(id) {
+      Swal.fire({ title: 'Delete this business?', text: 'Its products will remain but be unassigned.', icon: 'warning', showCancelButton: true }).then(function (r) {
+        if (!r.isConfirmed) return;
+        showLoadingSpinner();
+        google.script.run.withSuccessHandler(function () { hideLoadingSpinner(); loadBusinesses(); }).withFailureHandler(runFail).adminDeleteBusiness(adminToken, id);
+      });
+    }
+
+    // -------------------------------------------------------------------
+    // Products
+    // -------------------------------------------------------------------
+    function loadProducts() {
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (list) {
+        hideLoadingSpinner();
+        cache.products = list;
+        var bizName = {};
+        cache.businesses.forEach(function (b) { bizName[b.BusinessID] = b.Name; });
+        document.getElementById('productTableBody').innerHTML = list.map(function (p) {
+          var flags = [p.IsService ? 'Service' : '', p.EnquireOnWhatsApp ? 'WhatsApp Enquiry' : ''].filter(Boolean).join(', ');
+          return '<tr><td>' + (p.ImageURL ? '<img src="' + p.ImageURL + '" class="w-10 h-10 object-cover rounded">' : '-') + '</td>' +
+            '<td>' + esc(p.Name) + '</td><td>' + esc(bizName[p.BusinessID] || '-') + '</td><td>' + esc(p.Category) + '</td>' +
+            '<td>' + currency(p.Price) + '</td><td>' + (p.Stock === '' ? 'Unlimited' : p.Stock) + '</td><td>' + flags + '</td><td>' + (p.Active ? 'Yes' : 'No') + '</td>' +
+            '<td><button class="text-blue-600 mr-2" onclick="editProduct(\'' + p.ProductID + '\')"><i class="fas fa-edit"></i></button>' +
+            '<button class="text-red-600" onclick="deleteProduct(\'' + p.ProductID + '\')"><i class="fas fa-trash"></i></button></td></tr>';
+        }).join('') || '<tr><td colspan="9" class="text-center text-gray-400">No products yet.</td></tr>';
+      }).withFailureHandler(runFail).adminGetProducts(adminToken);
+    }
+    function editProduct(id) {
+      var p = cache.products.filter(function (x) { return x.ProductID === id; })[0];
+      if (!p) return;
+      document.getElementById('prdId').value = p.ProductID;
+      document.getElementById('prdBusiness').value = p.BusinessID;
+      document.getElementById('prdName').value = p.Name;
+      document.getElementById('prdCategory').value = p.Category;
+      document.getElementById('prdPrice').value = p.Price;
+      document.getElementById('prdStock').value = p.Stock;
+      document.getElementById('prdImageUrl').value = p.ImageURL;
+      document.getElementById('prdDescription').value = p.Description;
+      document.getElementById('prdIsService').checked = !!p.IsService;
+      document.getElementById('prdEnquireWhatsapp').checked = !!p.EnquireOnWhatsApp;
+      document.getElementById('prdActive').checked = !!p.Active;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    function resetProductForm() { document.getElementById('productForm').reset(); document.getElementById('prdId').value = ''; }
+    function saveProduct(e) {
+      e.preventDefault();
+      var p = {
+        ProductID: document.getElementById('prdId').value,
+        BusinessID: document.getElementById('prdBusiness').value,
+        Name: document.getElementById('prdName').value.trim(),
+        Category: document.getElementById('prdCategory').value.trim(),
+        Price: document.getElementById('prdPrice').value,
+        Stock: document.getElementById('prdStock').value,
+        ImageURL: document.getElementById('prdImageUrl').value.trim(),
+        Description: document.getElementById('prdDescription').value.trim(),
+        IsService: document.getElementById('prdIsService').checked,
+        EnquireOnWhatsApp: document.getElementById('prdEnquireWhatsapp').checked,
+        Active: document.getElementById('prdActive').checked
+      };
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (res) {
+        hideLoadingSpinner();
+        if (res.success) { toast('success', 'Saved', ''); resetProductForm(); loadProducts(); }
+        else toast('error', 'Failed', res.message || '');
+      }).withFailureHandler(runFail).adminSaveProduct(adminToken, p);
+    }
+    function deleteProduct(id) {
+      Swal.fire({ title: 'Delete this product?', icon: 'warning', showCancelButton: true }).then(function (r) {
+        if (!r.isConfirmed) return;
+        showLoadingSpinner();
+        google.script.run.withSuccessHandler(function () { hideLoadingSpinner(); loadProducts(); }).withFailureHandler(runFail).adminDeleteProduct(adminToken, id);
+      });
+    }
+
+    // -------------------------------------------------------------------
+    // Banners
+    // -------------------------------------------------------------------
+    function loadBanners() {
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (list) {
+        hideLoadingSpinner();
+        cache.banners = list;
+        document.getElementById('bannerTableBody').innerHTML = list.map(function (b) {
+          return '<tr><td><img src="' + b.ImageURL + '" class="w-16 h-10 object-cover rounded"></td><td>' + esc(b.Title) + '</td><td>' + (b.Active ? 'Yes' : 'No') + '</td><td>' + b.SortOrder + '</td>' +
+            '<td><button class="text-blue-600 mr-2" onclick="editBanner(\'' + b.BannerID + '\')"><i class="fas fa-edit"></i></button>' +
+            '<button class="text-red-600" onclick="deleteBanner(\'' + b.BannerID + '\')"><i class="fas fa-trash"></i></button></td></tr>';
+        }).join('') || '<tr><td colspan="5" class="text-center text-gray-400">No banners yet.</td></tr>';
+      }).withFailureHandler(runFail).adminGetBanners(adminToken);
+    }
+    function editBanner(id) {
+      var b = cache.banners.filter(function (x) { return x.BannerID === id; })[0];
+      if (!b) return;
+      document.getElementById('banId').value = b.BannerID;
+      document.getElementById('banImageUrl').value = b.ImageURL;
+      document.getElementById('banTitle').value = b.Title;
+      document.getElementById('banLink').value = b.LinkURL;
+      document.getElementById('banSort').value = b.SortOrder;
+      document.getElementById('banActive').checked = !!b.Active;
+    }
+    function resetBannerForm() { document.getElementById('bannerForm').reset(); document.getElementById('banId').value = ''; }
+    function saveBanner(e) {
+      e.preventDefault();
+      var b = {
+        BannerID: document.getElementById('banId').value,
+        ImageURL: document.getElementById('banImageUrl').value.trim(),
+        Title: document.getElementById('banTitle').value.trim(),
+        LinkURL: document.getElementById('banLink').value.trim(),
+        SortOrder: document.getElementById('banSort').value,
+        Active: document.getElementById('banActive').checked
+      };
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (res) {
+        hideLoadingSpinner();
+        if (res.success) { toast('success', 'Saved', ''); resetBannerForm(); loadBanners(); }
+        else toast('error', 'Failed', res.message || '');
+      }).withFailureHandler(runFail).adminSaveBanner(adminToken, b);
+    }
+    function deleteBanner(id) {
+      Swal.fire({ title: 'Delete this banner?', icon: 'warning', showCancelButton: true }).then(function (r) {
+        if (!r.isConfirmed) return;
+        showLoadingSpinner();
+        google.script.run.withSuccessHandler(function () { hideLoadingSpinner(); loadBanners(); }).withFailureHandler(runFail).adminDeleteBanner(adminToken, id);
+      });
+    }
+
+    // -------------------------------------------------------------------
+    // Payment Methods
+    // -------------------------------------------------------------------
+    function loadPaymentMethods() {
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (list) {
+        hideLoadingSpinner();
+        cache.paymentMethods = list;
+        document.getElementById('paymentTableBody').innerHTML = list.map(function (p) {
+          return '<tr><td>' + esc(p.Label) + '</td><td>' + esc(p.AccountName) + ' — ' + esc(p.AccountNumber) + '</td><td>' + esc(p.Provider) + '</td><td>' + (p.Active ? 'Yes' : 'No') + '</td>' +
+            '<td><button class="text-blue-600 mr-2" onclick="editPaymentMethod(\'' + p.PaymentMethodID + '\')"><i class="fas fa-edit"></i></button>' +
+            '<button class="text-red-600" onclick="deletePaymentMethod(\'' + p.PaymentMethodID + '\')"><i class="fas fa-trash"></i></button></td></tr>';
+        }).join('') || '<tr><td colspan="5" class="text-center text-gray-400">No payment methods yet.</td></tr>';
+      }).withFailureHandler(runFail).adminGetPaymentMethods(adminToken);
+    }
+    function editPaymentMethod(id) {
+      var p = cache.paymentMethods.filter(function (x) { return x.PaymentMethodID === id; })[0];
+      if (!p) return;
+      document.getElementById('pmId').value = p.PaymentMethodID;
+      document.getElementById('pmType').value = p.Type;
+      document.getElementById('pmLabel').value = p.Label;
+      document.getElementById('pmAccountName').value = p.AccountName;
+      document.getElementById('pmAccountNumber').value = p.AccountNumber;
+      document.getElementById('pmProvider').value = p.Provider;
+      document.getElementById('pmSort').value = p.SortOrder;
+      document.getElementById('pmInstructions').value = p.Instructions;
+      document.getElementById('pmActive').checked = !!p.Active;
+    }
+    function resetPaymentForm() { document.getElementById('paymentForm').reset(); document.getElementById('pmId').value = ''; }
+    function savePaymentMethod(e) {
+      e.preventDefault();
+      var pm = {
+        PaymentMethodID: document.getElementById('pmId').value,
+        Type: document.getElementById('pmType').value,
+        Label: document.getElementById('pmLabel').value.trim(),
+        AccountName: document.getElementById('pmAccountName').value.trim(),
+        AccountNumber: document.getElementById('pmAccountNumber').value.trim(),
+        Provider: document.getElementById('pmProvider').value.trim(),
+        Instructions: document.getElementById('pmInstructions').value.trim(),
+        SortOrder: document.getElementById('pmSort').value,
+        Active: document.getElementById('pmActive').checked
+      };
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (res) {
+        hideLoadingSpinner();
+        if (res.success) { toast('success', 'Saved', ''); resetPaymentForm(); loadPaymentMethods(); }
+        else toast('error', 'Failed', res.message || '');
+      }).withFailureHandler(runFail).adminSavePaymentMethod(adminToken, pm);
+    }
+    function deletePaymentMethod(id) {
+      Swal.fire({ title: 'Delete this payment method?', icon: 'warning', showCancelButton: true }).then(function (r) {
+        if (!r.isConfirmed) return;
+        showLoadingSpinner();
+        google.script.run.withSuccessHandler(function () { hideLoadingSpinner(); loadPaymentMethods(); }).withFailureHandler(runFail).adminDeletePaymentMethod(adminToken, id);
+      });
+    }
+
+    // -------------------------------------------------------------------
+    // Discounts
+    // -------------------------------------------------------------------
+    function onDiscountScopeChange() {
+      var scope = document.getElementById('dscScope').value;
+      var target = document.getElementById('dscTarget');
+      if (scope === 'global') { target.classList.add('hidden'); target.innerHTML = ''; return; }
+      target.classList.remove('hidden');
+      if (scope === 'business') {
+        target.innerHTML = cache.businesses.map(function (b) { return '<option value="' + b.BusinessID + '">' + esc(b.Name) + '</option>'; }).join('');
+      } else {
+        target.innerHTML = cache.products.map(function (p) { return '<option value="' + p.ProductID + '">' + esc(p.Name) + '</option>'; }).join('');
+      }
+    }
+    function loadDiscounts() {
+      showLoadingSpinner();
+      // make sure products are available for the "specific product" dropdown
+      google.script.run.withSuccessHandler(function (products) {
+        cache.products = products;
+        google.script.run.withSuccessHandler(function (list) {
+          hideLoadingSpinner();
+          cache.discounts = list;
+          document.getElementById('discountTableBody').innerHTML = list.map(function (d) {
+            return '<tr><td>' + esc(d.Label) + '</td><td>' + d.Scope + '</td><td>' + d.Type + '</td><td>' + d.Value + '</td>' +
+              '<td>' + (d.StartDate || '') + ' → ' + (d.EndDate || 'ongoing') + '</td><td>' + (d.Active ? 'Yes' : 'No') + '</td>' +
+              '<td><button class="text-blue-600 mr-2" onclick="editDiscount(\'' + d.DiscountID + '\')"><i class="fas fa-edit"></i></button>' +
+              '<button class="text-red-600" onclick="deleteDiscount(\'' + d.DiscountID + '\')"><i class="fas fa-trash"></i></button></td></tr>';
+          }).join('') || '<tr><td colspan="7" class="text-center text-gray-400">No discounts yet.</td></tr>';
+        }).withFailureHandler(runFail).adminGetDiscounts(adminToken);
+      }).withFailureHandler(runFail).adminGetProducts(adminToken);
+    }
+    function editDiscount(id) {
+      var d = cache.discounts.filter(function (x) { return x.DiscountID === id; })[0];
+      if (!d) return;
+      document.getElementById('dscId').value = d.DiscountID;
+      document.getElementById('dscLabel').value = d.Label;
+      document.getElementById('dscScope').value = d.Scope;
+      onDiscountScopeChange();
+      document.getElementById('dscTarget').value = d.TargetID;
+      document.getElementById('dscType').value = d.Type;
+      document.getElementById('dscValue').value = d.Value;
+      document.getElementById('dscStart').value = d.StartDate ? String(d.StartDate).slice(0, 10) : '';
+      document.getElementById('dscEnd').value = d.EndDate ? String(d.EndDate).slice(0, 10) : '';
+      document.getElementById('dscActive').checked = !!d.Active;
+    }
+    function resetDiscountForm() { document.getElementById('discountForm').reset(); document.getElementById('dscId').value = ''; onDiscountScopeChange(); }
+    function saveDiscount(e) {
+      e.preventDefault();
+      var d = {
+        DiscountID: document.getElementById('dscId').value,
+        Label: document.getElementById('dscLabel').value.trim(),
+        Scope: document.getElementById('dscScope').value,
+        TargetID: document.getElementById('dscTarget').value || '',
+        Type: document.getElementById('dscType').value,
+        Value: document.getElementById('dscValue').value,
+        StartDate: document.getElementById('dscStart').value,
+        EndDate: document.getElementById('dscEnd').value,
+        Active: document.getElementById('dscActive').checked
+      };
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (res) {
+        hideLoadingSpinner();
+        if (res.success) { toast('success', 'Saved', ''); resetDiscountForm(); loadDiscounts(); }
+        else toast('error', 'Failed', res.message || '');
+      }).withFailureHandler(runFail).adminSaveDiscount(adminToken, d);
+    }
+    function deleteDiscount(id) {
+      Swal.fire({ title: 'Delete this discount?', icon: 'warning', showCancelButton: true }).then(function (r) {
+        if (!r.isConfirmed) return;
+        showLoadingSpinner();
+        google.script.run.withSuccessHandler(function () { hideLoadingSpinner(); loadDiscounts(); }).withFailureHandler(runFail).adminDeleteDiscount(adminToken, id);
+      });
+    }
+
+    // -------------------------------------------------------------------
+    // Expenses
+    // -------------------------------------------------------------------
+    function loadExpenses() {
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (list) {
+        hideLoadingSpinner();
+        var bizName = {};
+        cache.businesses.forEach(function (b) { bizName[b.BusinessID] = b.Name; });
+        var total = 0;
+        document.getElementById('expenseTableBody').innerHTML = list.map(function (e) {
+          total += Number(e.Amount || 0);
+          return '<tr><td>' + (e.Date ? new Date(e.Date).toLocaleDateString() : '') + '</td><td>' + esc(bizName[e.BusinessID] || 'General') + '</td><td>' + esc(e.Category) + '</td><td>' + esc(e.Description) + '</td><td>' + currency(e.Amount) + '</td><td>' + esc(e.AddedBy) + '</td>' +
+            '<td><button class="text-red-600" onclick="deleteExpense(\'' + e.ExpenseID + '\')"><i class="fas fa-trash"></i></button></td></tr>';
+        }).join('') || '<tr><td colspan="7" class="text-center text-gray-400">No expenses recorded.</td></tr>';
+        document.getElementById('expenseTotal').textContent = currency(total);
+      }).withFailureHandler(runFail).adminGetExpenses(adminToken);
+    }
+    function saveExpense(e) {
+      e.preventDefault();
+      var exp = {
+        Date: document.getElementById('expDate').value || new Date().toISOString().slice(0, 10),
+        BusinessID: document.getElementById('expBusiness').value,
+        Category: document.getElementById('expCategory').value.trim(),
+        Amount: document.getElementById('expAmount').value,
+        Description: document.getElementById('expDescription').value.trim()
+      };
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (res) {
+        hideLoadingSpinner();
+        if (res.success) { toast('success', 'Expense Added', ''); document.getElementById('expenseForm').reset(); loadExpenses(); }
+        else toast('error', 'Failed', res.message || '');
+      }).withFailureHandler(runFail).adminAddExpense(adminToken, exp);
+    }
+    function deleteExpense(id) {
+      Swal.fire({ title: 'Delete this expense?', icon: 'warning', showCancelButton: true }).then(function (r) {
+        if (!r.isConfirmed) return;
+        showLoadingSpinner();
+        google.script.run.withSuccessHandler(function () { hideLoadingSpinner(); loadExpenses(); }).withFailureHandler(runFail).adminDeleteExpense(adminToken, id);
+      });
+    }
+
+    // -------------------------------------------------------------------
+    // Customers
+    // -------------------------------------------------------------------
+    function loadCustomers() {
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (list) {
+        hideLoadingSpinner();
+        document.getElementById('customerTableBody').innerHTML = list.map(function (c) {
+          return '<tr><td>' + esc(c.name) + '</td><td>' + esc(c.username) + '</td><td>' + esc(c.phone) + '</td><td>' + esc(c.address) + '</td><td>' + (c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '') + '</td></tr>';
+        }).join('') || '<tr><td colspan="5" class="text-center text-gray-400">No registered customers yet.</td></tr>';
+      }).withFailureHandler(runFail).adminGetCustomers(adminToken);
+    }
+
+    // -------------------------------------------------------------------
+    // Settings
+    // -------------------------------------------------------------------
+    function loadSettings() {
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (s) {
+        hideLoadingSpinner();
+        cache.settings = s;
+        document.getElementById('setSiteName').value = s.SiteName || '';
+        document.getElementById('setCurrency').value = s.Currency || '';
+        document.getElementById('setCurrencySymbol').value = s.CurrencySymbol || '';
+        document.getElementById('setWhatsapp').value = s.WhatsAppNumber || '';
+        document.getElementById('setWhatsappGreeting').value = s.WhatsAppGreeting || '';
+        document.getElementById('setChatbotGreeting').value = s.ChatbotGreeting || '';
+        document.getElementById('setChatbotEnabled').checked = String(s.ChatbotEnabled).toUpperCase() !== 'FALSE';
+      }).withFailureHandler(runFail).adminGetSettings(adminToken);
+    }
+    function saveSettings(e) {
+      e.preventDefault();
+      var s = {
+        SiteName: document.getElementById('setSiteName').value.trim(),
+        Currency: document.getElementById('setCurrency').value.trim(),
+        CurrencySymbol: document.getElementById('setCurrencySymbol').value,
+        WhatsAppNumber: document.getElementById('setWhatsapp').value.trim(),
+        WhatsAppGreeting: document.getElementById('setWhatsappGreeting').value.trim(),
+        ChatbotGreeting: document.getElementById('setChatbotGreeting').value.trim(),
+        ChatbotEnabled: document.getElementById('setChatbotEnabled').checked ? 'TRUE' : 'FALSE'
+      };
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function () { hideLoadingSpinner(); toast('success', 'Settings Saved', ''); }).withFailureHandler(runFail).adminSaveSettings(adminToken, s);
+    }
+
+    // -------------------------------------------------------------------
+    // Admin Users
+    // -------------------------------------------------------------------
+    function loadAdmins() {
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (list) {
+        hideLoadingSpinner();
+        document.getElementById('adminTableBody').innerHTML = list.map(function (a) {
+          return '<tr><td>' + esc(a.name) + '</td><td>' + esc(a.username) + '</td><td>' + esc(a.role) + '</td><td>' + (a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '') + '</td></tr>';
+        }).join('');
+      }).withFailureHandler(runFail).adminGetAdmins(adminToken);
+    }
+    function addAdminUser(e) {
+      e.preventDefault();
+      var data = {
+        name: document.getElementById('admName').value.trim(),
+        username: document.getElementById('admUsername').value.trim(),
+        password: document.getElementById('admPassword').value,
+        role: document.getElementById('admRole').value
+      };
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (res) {
+        hideLoadingSpinner();
+        if (res.success) { toast('success', 'Admin Added', ''); document.getElementById('adminForm').reset(); loadAdmins(); }
+        else toast('error', 'Failed', res.message || '');
+      }).withFailureHandler(runFail).adminAddAdmin(adminToken, data);
+    }
+    function changeMyPassword(e) {
+      e.preventDefault();
+      var cur = document.getElementById('pwCurrent').value;
+      var next = document.getElementById('pwNew').value;
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (res) {
+        hideLoadingSpinner();
+        if (res.success) { toast('success', 'Password Updated', ''); document.getElementById('pwForm').reset(); }
+        else toast('error', 'Failed', res.message || '');
+      }).withFailureHandler(runFail).adminChangePassword(adminToken, cur, next);
+    }
+  </script>
+</body>
+</html>
