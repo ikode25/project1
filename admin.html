@@ -1,4 +1,5 @@
 <!-- admin.html — Multi-Business Admin Portal -->
+<!-- MB_BUILD:2026.08.15-6 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -35,6 +36,8 @@
     aside.sidebar { background: var(--side-bg); color: var(--side-text); }
     .nav-item { cursor: pointer; }
     .nav-item.active { background: var(--primary); color: var(--primary-contrast); }
+    .set-tab { background: var(--surface); border: 1px solid var(--border); }
+    .set-tab.active { background: var(--primary); color: var(--primary-contrast); border-color: var(--primary); }
 
     table.admin-table { width: 100%; border-collapse: collapse; }
     table.admin-table th, table.admin-table td { padding: .5rem .75rem; border: 1px solid var(--border); font-size: .85rem; text-align: left; vertical-align: top; }
@@ -73,7 +76,7 @@
     <div class="surface w-full max-w-sm p-8 rounded-xl shadow-lg">
       <h1 class="text-2xl font-bold text-center mb-1"><i class="fas fa-user-shield text-primary mr-2"></i>Admin Portal</h1>
       <p class="text-center muted text-sm mb-1">Sign in to manage your businesses</p>
-      <p class="text-center text-xs muted mb-6">Build <strong id="loginBuildTag">2026.08.15-5</strong> · <a href="#" onclick="showDiagnostics();return false;" class="text-primary underline">Check install</a></p>
+      <p class="text-center text-xs muted mb-6">Build <strong id="loginBuildTag">2026.08.15-6</strong> · <a href="#" onclick="showDiagnostics();return false;" class="text-primary underline">Check install</a></p>
       <div id="adminGoogleWrap" class="hidden mb-4">
         <div id="gsiButtonAdmin" class="flex justify-center"></div>
         <div class="flex items-center gap-3 my-4"><span class="flex-grow h-px" style="background:var(--border)"></span><span class="text-xs muted">or</span><span class="flex-grow h-px" style="background:var(--border)"></span></div>
@@ -529,8 +532,18 @@
       <!-- Settings -->
       <section id="tab-settings" class="tab-section hidden">
         <h1 class="text-2xl font-bold mb-4">Store Settings</h1>
-        <form id="settingsForm" class="space-y-6 max-w-4xl" onsubmit="saveSettings(event)">
+        <div class="flex gap-1 mb-5 scroll-x pb-1" id="settingsTabs">
+          <button type="button" class="set-tab px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-pane="general"><i class="fas fa-sliders mr-1"></i>General</button>
+          <button type="button" class="set-tab px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-pane="appearance"><i class="fas fa-palette mr-1"></i>Appearance</button>
+          <button type="button" class="set-tab px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-pane="contact"><i class="fas fa-address-book mr-1"></i>Contact &amp; Social</button>
+          <button type="button" class="set-tab px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-pane="media"><i class="fas fa-photo-film mr-1"></i>Branding &amp; Video</button>
+          <button type="button" class="set-tab px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-pane="comms"><i class="fas fa-bell mr-1"></i>Notifications &amp; Sign-in</button>
+          <button type="button" class="set-tab px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-pane="advanced"><i class="fas fa-screwdriver-wrench mr-1"></i>Advanced</button>
+        </div>
 
+        <form id="settingsForm" class="max-w-4xl" onsubmit="saveSettings(event)">
+
+          <div class="set-pane space-y-6" data-pane="general">
           <div class="surface p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-3">
             <h2 class="font-bold md:col-span-2">General</h2>
             <label class="text-sm md:col-span-2">Site Name<input id="setSiteName" class="p-2 rounded-lg w-full mt-1"></label>
@@ -545,6 +558,9 @@
             <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="setNewsTickerEnabled"> Show news banner</label>
           </div>
 
+          </div>
+
+          <div class="set-pane space-y-6 hidden" data-pane="appearance">
           <div class="surface p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-3">
             <h2 class="font-bold md:col-span-2">Theme &amp; Colors</h2>
             <label class="text-sm">Primary Color
@@ -564,6 +580,9 @@
             </div>
           </div>
 
+          </div>
+
+          <div class="set-pane space-y-6 hidden" data-pane="contact">
           <div class="surface p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-3">
             <h2 class="font-bold md:col-span-2">Contact &amp; Location (shown in the store footer)</h2>
             <label class="text-sm">Contact Phone<input id="setContactPhone" class="p-2 rounded-lg w-full mt-1"></label>
@@ -593,6 +612,9 @@
             <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="setChatbotEnabled"> Chatbot Enabled</label>
           </div>
 
+          </div>
+
+          <div class="set-pane space-y-6 hidden" data-pane="media">
           <div class="surface p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-3">
             <h2 class="font-bold md:col-span-2">Branding &amp; Video Advert</h2>
             <div class="md:col-span-2" id="picker-setLogo"></div>
@@ -606,6 +628,9 @@
             <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="setVideoAdvertEnabled"> Show video advert</label>
           </div>
 
+          </div>
+
+          <div class="set-pane space-y-6 hidden" data-pane="comms">
           <div class="surface p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-3">
             <h2 class="font-bold md:col-span-2">Notifications &amp; Sign-in</h2>
             <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="setOrderEmailEnabled"> Email customers a receipt after checkout</label>
@@ -619,13 +644,21 @@
             </label>
           </div>
 
+          </div>
+
+          <div class="set-pane space-y-6 hidden" data-pane="advanced">
           <div class="surface p-4 rounded-lg shadow">
             <h2 class="font-bold mb-2">Default Bundle Disclaimer</h2>
             <p class="text-sm muted mb-2">Used in the confirmation popup for any product that asks for a phone number and has no note of its own.</p>
             <textarea id="setBundleDisclaimer" class="p-2 rounded-lg w-full" rows="3"></textarea>
           </div>
 
-          <button type="submit" class="bg-primary px-6 py-3 rounded-lg font-semibold">Save All Settings</button>
+          </div>
+
+          <div class="sticky bottom-0 py-3" style="background:linear-gradient(transparent,var(--bg) 40%)">
+            <button type="submit" class="bg-primary px-6 py-3 rounded-lg font-semibold w-full sm:w-auto">Save All Settings</button>
+            <span class="text-xs muted ml-2">Saves every tab at once.</span>
+          </div>
         </form>
 
         <div class="surface p-4 rounded-lg shadow mt-6 max-w-4xl">
@@ -967,7 +1000,7 @@
           html: '<table style="margin:0 auto;font-size:13px">' + rows + '</table>' +
             '<hr style="margin:12px 0">' +
             '<div style="font-size:12px;text-align:left">' +
-              '<b>admin page build:</b> 2026.08.15-5<br>' +
+              '<b>admin page build:</b> 2026.08.15-6<br>' +
               '<b>Code.gs build:</b> ' + ((info && info.build) || 'could not read') + '<br>' +
               '<b>schema:</b> ' + ((info && info.setupVersion) || '?') +
             '</div>' +
@@ -1806,7 +1839,22 @@
       ['ContactFormEnabled', 'setContactFormEnabled', true], ['VideoAdvertEnabled', 'setVideoAdvertEnabled', false]
     ];
 
+    function showSettingsPane(name) {
+      document.querySelectorAll('.set-pane').forEach(function (p) {
+        p.classList.toggle('hidden', p.dataset.pane !== name);
+      });
+      document.querySelectorAll('.set-tab').forEach(function (b) {
+        b.classList.toggle('active', b.dataset.pane === name);
+      });
+    }
+
     function loadSettings() {
+      if (!document.querySelector('.set-tab.active')) {
+        document.querySelectorAll('.set-tab').forEach(function (b) {
+          b.addEventListener('click', function () { showSettingsPane(b.dataset.pane); });
+        });
+        showSettingsPane('general');
+      }
       showLoadingSpinner();
       google.script.run.withSuccessHandler(function (s) {
         hideLoadingSpinner();

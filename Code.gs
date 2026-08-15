@@ -16,7 +16,7 @@ var SCHEMA_VERSION = '5';
 
 // Shown in the storefront footer and admin sidebar. If this doesn't match the
 // file you pasted, the deployment is still serving an older version.
-var BUILD_VERSION = '2026.08.15-5';
+var BUILD_VERSION = '2026.08.15-6';
 
 // ---------------------------------------------------------------------------
 // Sheet schema — single source of truth for headers used by the generic
@@ -62,11 +62,61 @@ function doGet(e) {
   var siteName = 'My Multi-Business Store';
   try { siteName = getSettingValue_('SiteName', siteName); } catch (err) { /* not set up yet */ }
 
-  return HtmlService.createTemplateFromFile(page)
+  var out = HtmlService.createTemplateFromFile(page)
     .evaluate()
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=5')
     .setTitle(page === 'admin' ? ('Admin Portal - ' + siteName) : siteName)
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+
+  // Warn loudly, on the page itself, when a file is out of date.
+  try {
+    var stale = staleFiles_();
+    if (stale.length) {
+      var banner = staleBannerHtml_(stale);
+      var html = out.getContent();
+      out.setContent(html.indexOf('</body>') !== -1 ? html.replace('</body>', banner + '</body>') : html + banner);
+    }
+  } catch (err) {
+    Logger.log('stale check failed: ' + err);
+  }
+
+  return out;
+}
+
+// Each HTML file embeds MB_BUILD:<version>. Comparing that against
+// BUILD_VERSION tells us if a file was missed when the code was pasted in,
+// which is otherwise very easy to miss and looks like "the feature didn't ship".
+function fileBuild_(filename) {
+  try {
+    var content = HtmlService.createHtmlOutputFromFile(filename).getContent();
+    var m = content.match(/MB_BUILD:([0-9.\-]+)/);
+    return m ? m[1] : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+function staleFiles_() {
+  var stale = [];
+  ['index', 'admin'].forEach(function (f) {
+    var v = fileBuild_(f);
+    if (v !== BUILD_VERSION) stale.push({ file: f, found: v || 'no version marker', expected: BUILD_VERSION });
+  });
+  return stale;
+}
+
+function staleBannerHtml_(stale) {
+  var rows = stale.map(function (s) {
+    return '<li><b>' + s.file + '</b> file is on <code>' + s.found + '</code>, expected <code>' + s.expected + '</code></li>';
+  }).join('');
+  return '<div id="mbStaleBanner" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#b91c1c;color:#fff;' +
+    'padding:12px 44px 12px 16px;font:14px/1.5 Segoe UI,Roboto,Arial,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.3)">' +
+    '<b>Some files were not updated.</b> Code.gs is on <code>' + BUILD_VERSION + '</code> but:' +
+    '<ul style="margin:6px 0 0 18px;padding:0">' + rows + '</ul>' +
+    '<div style="margin-top:8px;font-size:13px;opacity:.95">Open the Apps Script editor, click into that file, press <b>Ctrl+A</b> then <b>Delete</b>, paste the new file, <b>Ctrl+S</b>, then Deploy &rarr; Manage deployments &rarr; pencil &rarr; New version.</div>' +
+    '<button onclick="document.getElementById(\'mbStaleBanner\').remove()" ' +
+    'style="position:absolute;top:8px;right:10px;background:transparent;border:0;color:#fff;font-size:20px;cursor:pointer">&times;</button>' +
+    '</div>';
 }
 
 function include(filename) {
@@ -2176,6 +2226,8 @@ function updateCustomerProfile(username, profile) {
 function getBuildInfo() {
   return {
     build: BUILD_VERSION,
+    indexFile: fileBuild_('index') || 'no marker',
+    adminFile: fileBuild_('admin') || 'no marker',
     schema: SCHEMA_VERSION,
     setupVersion: PropertiesService.getScriptProperties().getProperty('SETUP_VERSION') || '(not run yet)',
     serverTime: new Date().toISOString()
