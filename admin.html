@@ -72,7 +72,8 @@
   <div id="loginScreen" class="min-h-screen flex items-center justify-center p-4 hidden">
     <div class="surface w-full max-w-sm p-8 rounded-xl shadow-lg">
       <h1 class="text-2xl font-bold text-center mb-1"><i class="fas fa-user-shield text-primary mr-2"></i>Admin Portal</h1>
-      <p class="text-center muted text-sm mb-6">Sign in to manage your businesses</p>
+      <p class="text-center muted text-sm mb-1">Sign in to manage your businesses</p>
+      <p class="text-center text-xs muted mb-6">Build <strong id="loginBuildTag">2026.08.15-5</strong> · <a href="#" onclick="showDiagnostics();return false;" class="text-primary underline">Check install</a></p>
       <div id="adminGoogleWrap" class="hidden mb-4">
         <div id="gsiButtonAdmin" class="flex justify-center"></div>
         <div class="flex items-center gap-3 my-4"><span class="flex-grow h-px" style="background:var(--border)"></span><span class="text-xs muted">or</span><span class="flex-grow h-px" style="background:var(--border)"></span></div>
@@ -596,6 +597,7 @@
             <h2 class="font-bold md:col-span-2">Branding &amp; Video Advert</h2>
             <div class="md:col-span-2" id="picker-setLogo"></div>
             <p class="text-xs muted md:col-span-2">Your logo appears at the top of every email you send.</p>
+            <p class="md:col-span-2 text-sm" id="videoAdvertStatus"></p>
             <label class="text-sm md:col-span-2">Video Advert URL
               <input id="setVideoAdvertURL" class="p-2 rounded-lg w-full mt-1" placeholder="YouTube, Vimeo or Google Drive video link">
               <span class="text-xs muted">Shown as a large advert on the storefront. For a video file, upload it as a Banner with media type "Video advert" instead.</span>
@@ -610,6 +612,7 @@
             <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="setOrderSmsEnabled"> SMS customers after checkout <span class="muted">(uses SMS credits)</span></label>
             <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="setContactFormEnabled"> Let customers send messages from the store</label>
             <label class="text-sm">SMS Country Code<input id="setSmsCountryCode" class="p-2 rounded-lg w-full mt-1" placeholder="233"></label>
+            <p class="md:col-span-2 text-sm" id="googleStatus"></p>
             <label class="text-sm md:col-span-2">Google Sign-In Client ID
               <input id="setGoogleClientId" class="p-2 rounded-lg w-full mt-1" placeholder="xxxxx.apps.googleusercontent.com">
               <span class="text-xs muted">Leave blank to hide Google sign-in. See SETUP.md for how to create one.</span>
@@ -938,6 +941,44 @@
       adminToken = null; adminInfo = null;
       showEntryScreen();
     };
+
+    // Confirms the file the server is serving really is this version, by
+    // testing for markers that only exist in the current build.
+    function showDiagnostics() {
+      var checks = [
+        ['SMS tab', !!document.querySelector('[data-tab="sms"]')],
+        ['Email tab', !!document.querySelector('[data-tab="email"]')],
+        ['Messages tab', !!document.querySelector('[data-tab="messages"]')],
+        ['Keep me signed in', !!document.getElementById('loginRemember')],
+        ['Video banner option', !!document.getElementById('banMediaType')],
+        ['Google sign-in slot', !!document.getElementById('gsiButtonAdmin')]
+      ];
+      var rows = checks.map(function (c) {
+        return '<tr><td style="text-align:left;padding:4px 8px">' + c[0] + '</td>' +
+          '<td style="padding:4px 8px">' + (c[1] ? '<span style="color:#15803d">&#10004; present</span>'
+                                                 : '<span style="color:#b91c1c">&#10008; MISSING</span>') + '</td></tr>';
+      }).join('');
+      var allOk = checks.every(function (c) { return c[1]; });
+
+      google.script.run.withSuccessHandler(function (info) {
+        Swal.fire({
+          icon: allOk ? 'success' : 'error',
+          title: allOk ? 'Admin page is up to date' : 'Admin page is OUT OF DATE',
+          html: '<table style="margin:0 auto;font-size:13px">' + rows + '</table>' +
+            '<hr style="margin:12px 0">' +
+            '<div style="font-size:12px;text-align:left">' +
+              '<b>admin page build:</b> 2026.08.15-5<br>' +
+              '<b>Code.gs build:</b> ' + ((info && info.build) || 'could not read') + '<br>' +
+              '<b>schema:</b> ' + ((info && info.setupVersion) || '?') +
+            '</div>' +
+            (allOk ? '' : '<p style="margin-top:12px;font-size:13px;color:#b91c1c">Re-paste <b>admin.html</b> into the <b>admin</b> file, save, then Deploy &rarr; Manage deployments &rarr; edit &rarr; New version.</p>'),
+          width: 520
+        });
+      }).withFailureHandler(function () {
+        Swal.fire({ icon: 'error', title: 'Cannot reach Code.gs',
+          html: '<table style="margin:0 auto;font-size:13px">' + rows + '</table>' });
+      }).getBuildInfo();
+    }
 
     function showEntryScreen() {
       showLoadingSpinner();
@@ -1780,9 +1821,27 @@
         });
         refreshPreview('setLogoUrl');
         syncColorInputs();
+        renderFeatureStatus();
         applyTheme(cache.settings);
       }).withFailureHandler(runFail).adminGetSettings(adminToken);
     }
+    // These two features stay invisible on the storefront until they are
+    // configured, so spell out their current state rather than leaving the
+    // admin wondering why nothing appeared.
+    function renderFeatureStatus() {
+      var vOn = String(cache.settings.VideoAdvertEnabled).toUpperCase() === 'TRUE';
+      var vUrl = !!cache.settings.VideoAdvertURL;
+      var vEl = document.getElementById('videoAdvertStatus');
+      if (vOn && vUrl) vEl.innerHTML = '<span style="color:#15803d">&#10004; Live on the storefront.</span>';
+      else if (vOn && !vUrl) vEl.innerHTML = '<span style="color:#c2410c">&#9888; Enabled, but no video URL yet — nothing will show.</span>';
+      else vEl.innerHTML = '<span style="color:#64748b">Not showing yet. Paste a video link and tick "Show video advert".</span>';
+
+      var gEl = document.getElementById('googleStatus');
+      gEl.innerHTML = cache.settings.GoogleClientId
+        ? '<span style="color:#15803d">&#10004; Google sign-in buttons are active.</span>'
+        : '<span style="color:#64748b">No Client ID set, so Google sign-in buttons are hidden on both pages. See SETUP.md.</span>';
+    }
+
     // Keep the swatch and the hex text box mirroring each other.
     function syncColorInputs() {
       var pairs = [['setPrimaryColor', 'setPrimaryColorText'], ['setAccentColor', 'setAccentColorText']];
