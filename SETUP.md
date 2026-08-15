@@ -116,6 +116,105 @@ own, so it survives the cleanup.
 Both keep showing the product's price and full description, so nothing is
 hidden behind "Contact for price" unless you actually leave the price at 0.
 
+## Admin login security
+
+Opening the admin page **always shows the login form**. A customer who taps the
+shield icon by mistake sees a login screen and nothing else — there is no
+automatic sign-in, even if an admin used the same browser earlier.
+
+The only exception is opt-in: tick **"Keep me signed in on this device"** at
+login and a 30-day token is issued. It is stored hashed in the sheet (so a
+copied spreadsheet can't be replayed as a login) and is destroyed the moment
+you log out. Leave the box unticked on shared or public devices.
+
+## Sign in with Google
+
+Optional, and off until you configure it.
+
+1. Go to [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials).
+2. **Create Credentials → OAuth client ID → Web application**.
+3. Under **Authorised JavaScript origins** add `https://script.google.com` and `https://<your-id>.googleusercontent.com` (the host your web app iframe runs on — copy it from your browser's address bar when the app is open).
+4. Copy the **Client ID** into **Admin → Settings → Google Sign-In Client ID**.
+
+Customers can then sign in with Google, and an account is created for them
+automatically on first use.
+
+For **admins**, Google sign-in is allow-listed: the Google account's email must
+already be attached to an admin user (**Admin → Admin Users → Google email**).
+Nobody can grant themselves portal access just by having a Google account.
+
+### About Sign in with Apple
+
+Not implemented, and I'd rather say so than ship something that looks like it
+works. Apple requires a paid Apple Developer account ($99/year), a registered
+Services ID, and **verification of a domain you control** — `script.google.com`
+belongs to Google, so it can't be verified. Apple's token exchange also needs a
+client secret signed with ES256, which Apps Script can't produce natively.
+
+If Apple sign-in matters to you, it needs the storefront hosted on your own
+domain with a small backend (or a service like Firebase Auth / Auth0 handling
+both Google and Apple). Happy to help with that migration if you decide to go
+that route.
+
+## SMS
+
+**Admin → SMS.** Add a provider (Arkesel, Hubtel, or any custom HTTP API), save
+your API key, and send.
+
+- **Arkesel** — paste your API key. Sender ID max 11 characters, and must be registered with Arkesel.
+- **Hubtel** — API Key field takes your *Client ID*, and the Client Secret field takes your *Client Secret*.
+- **Custom** — put your endpoint in the URL field using placeholders `{to}` `{message}` `{sender}` `{apikey}` `{apisecret}`. For POST APIs, use the Advanced JSON box, e.g.
+  ```json
+  {"method":"post","contentType":"application/json",
+   "headers":{"Authorization":"Bearer YOUR_TOKEN"},
+   "payload":"{\"to\":\"{to}\",\"text\":\"{message}\"}"}
+  ```
+
+**API keys are never stored in your spreadsheet** — they live in Script
+Properties, and the admin portal only ever shows whether a key is saved, never
+the key itself.
+
+You can send to specific numbers, all registered customers, everyone who has
+ordered, or only customers with confirmed payments. Duplicate numbers are
+removed, so somebody who ordered three times gets one message.
+
+The SMS tab shows **sent, failed, balance and full history**. Balance also
+appears on the Dashboard and **blinks** when it is low (20 or fewer) or when it
+can't be read — so you find out before a campaign dies halfway through. Balance
+lookup works for Arkesel and Hubtel; custom providers report "not supported".
+
+Local numbers are converted to international format automatically using the
+**SMS Country Code** setting (default `233` for Ghana).
+
+## Email
+
+**Admin → Email.** Emails are built automatically with your **logo, primary
+colour, business name, contact details and social links** — set your logo under
+Settings → Branding.
+
+- Customers get an **automatic branded receipt** after checkout (toggle in Settings → Notifications). Add your logo first so it looks the part.
+- You can also send promos to the same audience options as SMS.
+- Sending uses your Gmail quota (100/day on a free account, 1,500 on Workspace). The tab shows how many you have left today and blocks a send that would exceed it.
+
+Optionally also SMS customers after checkout — off by default, since it costs credits.
+
+## Video adverts
+
+Two ways, both under the admin portal:
+
+- **Banners → Media Type: Video advert** — puts a video in the homepage carousel. Paste a YouTube, Vimeo or Google Drive link, or upload a video file (max 25MB). The carousel pauses on video slides so it never cuts an advert off.
+- **Settings → Branding & Video Advert** — a single large featured video below the carousel.
+
+For anything longer than a short clip, upload to YouTube or Drive and paste the
+link: it streams properly and doesn't consume your Drive quota or slow the page.
+
+## Customer messages
+
+Customers can message you from the store (envelope button, or the footer link).
+Messages arrive in **Admin → Messages** with an unread badge, and you can reply
+by **email or SMS** right from there, or jump to WhatsApp. Turn the form off in
+Settings if you'd rather not receive messages.
+
 ## How it works (data model)
 
 Every sheet lives in the same spreadsheet:
@@ -126,6 +225,9 @@ Every sheet lives in the same spreadsheet:
 - `PaymentMethods` — Mobile Money / bank / other options shown at checkout.
 - `Banners`, `Discounts`, `Settings` — merchandising & site config.
 - `Expenses` — manual entries for cost tracking; combined with confirmed order income on the Dashboard for a profit figure.
+- `SmsProviders` / `SmsLog` — gateway config (no secrets) and every message attempted, with status and gateway response.
+- `EmailLog` — every email sent, with status.
+- `Messages` — customer enquiries from the storefront contact form, plus your replies.
 - `Admins` — admin portal logins (also SHA-256 hashed). Admin sessions use a random token cached server-side for 6 hours.
 
 ## Checkout & payment flow

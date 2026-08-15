@@ -125,6 +125,8 @@ box-shadow: 0 0 8px var(--accent);
     </div>
   </div>
 
+  <div id="videoAdvert" class="hidden max-w-6xl mx-auto w-full px-3 md:px-4 mt-4"></div>
+
   <div class="max-w-6xl mx-auto w-full px-3 md:px-4 mt-4">
     <h2 class="text-xs font-semibold muted uppercase mb-2">Shop by Business</h2>
     <div id="businessNav" class="flex gap-2 mb-2 scroll-x pb-1"></div>
@@ -163,6 +165,7 @@ box-shadow: 0 0 8px var(--accent);
           <li><a href="#" onclick="goHome();return false;" class="hover:underline">Home</a></li>
           <li><a href="#" onclick="openTrackOrder();return false;" class="hover:underline">Track Your Order</a></li>
           <li><a href="#" onclick="openChat();return false;" class="hover:underline">Chat with us</a></li>
+          <li><a href="#" onclick="openContact();return false;" class="hover:underline" id="contactFooterLink">Send us a message</a></li>
           <li><a href="?page=admin" id="adminLinkFooter" target="_top" class="hover:underline">Admin Portal</a></li>
         </ul>
       </div>
@@ -181,6 +184,7 @@ box-shadow: 0 0 8px var(--accent);
     <div id="fabMenu" class="closed flex flex-col items-end gap-2 mb-2">
       <a id="whatsappFloat" href="#" target="_blank" class="fab bg-green-500 hover:bg-green-600 text-white text-xl hidden" aria-label="WhatsApp"><i class="fab fa-whatsapp"></i></a>
       <button onclick="openChat()" class="fab bg-primary text-xl" aria-label="Chat with assistant"><i class="fas fa-comment-dots"></i></button>
+      <button onclick="openContact()" id="contactFab" class="fab text-xl surface bordered" aria-label="Send us a message"><i class="fas fa-envelope text-primary"></i></button>
     </div>
     <button id="fabToggle" onclick="toggleFab()" class="fab bg-primary text-xl ml-auto" aria-label="Help and contact">
       <i class="fas fa-headset" id="fabIcon"></i>
@@ -208,12 +212,40 @@ box-shadow: 0 0 8px var(--accent);
     </div>
   </div>
 
+  <!-- Full-size image lightbox -->
+  <div id="lightbox" class="fixed inset-0 bg-black/90 hidden z-[55] items-center justify-center p-3" onclick="closeLightbox()">
+    <button class="absolute top-4 right-4 text-white text-2xl" onclick="closeLightbox()" aria-label="Close"><i class="fas fa-times"></i></button>
+    <img id="lightboxImg" src="" alt="" class="max-h-[92vh] max-w-full object-contain">
+  </div>
+
+  <!-- Contact / message admin -->
+  <div id="contactModal" class="modal-shell fixed inset-0 flex items-center justify-center bg-black/50 hidden z-50 p-4">
+    <div class="surface w-full max-w-md p-6 sm:p-8 rounded-lg shadow-lg relative modal-panel">
+      <button class="absolute top-4 right-4 muted" onclick="closeContact()"><i class="fas fa-times fa-lg"></i></button>
+      <h2 class="text-2xl font-semibold mb-1 text-center">Send us a message</h2>
+      <p class="text-center text-sm muted mb-5">We'll reply by email or SMS.</p>
+      <form onsubmit="submitContact(event)">
+        <input type="text" id="msgName" placeholder="Your Name" class="w-full p-3 rounded-lg mb-3" required>
+        <input type="tel" id="msgPhone" placeholder="Phone Number" class="w-full p-3 rounded-lg mb-3">
+        <input type="email" id="msgEmail" placeholder="Email Address" class="w-full p-3 rounded-lg mb-3">
+        <input type="text" id="msgSubject" placeholder="Subject" class="w-full p-3 rounded-lg mb-3">
+        <textarea id="msgBody" placeholder="How can we help?" rows="4" class="w-full p-3 rounded-lg mb-4" required></textarea>
+        <p class="text-xs muted mb-3">Leave a phone number or an email so we can get back to you.</p>
+        <button type="submit" class="w-full bg-primary py-3 rounded-lg font-semibold">Send Message</button>
+      </form>
+    </div>
+  </div>
+
   <!-- Login Modal -->
   <div id="loginModal" class="modal-shell fixed inset-0 flex items-center justify-center bg-black/50 hidden z-50 p-4">
     <div class="surface w-full max-w-md p-6 sm:p-8 rounded-lg shadow-lg relative modal-panel">
       <button class="absolute top-4 right-4 muted" onclick="closeLoginModal()"><i class="fas fa-times fa-lg"></i></button>
       <h2 class="text-2xl font-semibold mb-2 text-center">Sign In</h2>
       <p class="text-center text-sm muted mb-6">An account is optional — you can also <a href="#" onclick="closeLoginModal();openCheckout();return false;" class="text-primary underline">checkout as a guest</a>.</p>
+      <div id="googleSignInLogin" class="hidden mb-4">
+        <div id="gsiButtonLogin" class="flex justify-center"></div>
+        <div class="flex items-center gap-3 my-4"><span class="flex-grow h-px" style="background:var(--border)"></span><span class="text-xs muted">or</span><span class="flex-grow h-px" style="background:var(--border)"></span></div>
+      </div>
       <form onsubmit="login(event)">
         <input type="text" id="username" placeholder="Username" class="w-full p-3 rounded-lg mb-4">
         <div class="relative mb-6">
@@ -282,6 +314,7 @@ box-shadow: 0 0 8px var(--accent);
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
           <input type="text" id="coName" placeholder="Full Name" class="p-3 rounded-lg">
           <input type="tel" id="coPhone" placeholder="Your Phone Number" class="p-3 rounded-lg">
+          <input type="email" id="coEmail" placeholder="Email (for your receipt — optional)" class="p-3 rounded-lg">
           <input type="text" id="coAddress" placeholder="Delivery Address" class="p-3 rounded-lg md:col-span-2">
         </div>
 
@@ -475,6 +508,7 @@ box-shadow: 0 0 8px var(--accent);
       applyBranding();
       renderNewsTicker();
       renderBanners();
+      renderVideoAdvert();
       renderBusinessNav();
       renderCategories();
       renderProducts();
@@ -482,6 +516,10 @@ box-shadow: 0 0 8px var(--accent);
       updateCartCount();
       setupWhatsapp();
       setupChatbot();
+      setupGoogleSignIn();
+      var contactOn = String(store.settings.ContactFormEnabled).toUpperCase() !== 'FALSE';
+      document.getElementById('contactFab').classList.toggle('hidden', !contactOn);
+      document.getElementById('contactFooterLink').parentNode.style.display = contactOn ? '' : 'none';
       reconcileCartWithCatalog();
       syncHeaderSpacer();
     }
@@ -616,8 +654,14 @@ box-shadow: 0 0 8px var(--accent);
       store.banners.forEach(function (b, i) {
         var slide = document.createElement('div');
         slide.className = 'carousel-slide';
-        var img = '<img src="' + esc(b.image) + '" alt="' + esc(b.title) + '" loading="lazy" class="w-full h-40 sm:h-56 md:h-72 object-cover">';
-        slide.innerHTML = b.link ? '<a href="' + esc(b.link) + '" target="_blank" rel="noopener">' + img + '</a>' : img;
+        var media;
+        if (b.mediaType === 'video') {
+          media = videoEmbedHtml_(b.image, 'w-full h-40 sm:h-56 md:h-72');
+          slide.innerHTML = media; // never wrap video in a link — it eats the controls
+        } else {
+          media = '<img src="' + esc(b.image) + '" alt="' + esc(b.title) + '" loading="lazy" class="w-full h-40 sm:h-56 md:h-72 object-cover">';
+          slide.innerHTML = b.link ? '<a href="' + esc(b.link) + '" target="_blank" rel="noopener">' + media + '</a>' : media;
+        }
         track.appendChild(slide);
         var dot = document.createElement('button');
         dot.className = 'w-2 h-2 rounded-full bg-white/70';
@@ -629,6 +673,8 @@ box-shadow: 0 0 8px var(--accent);
       if (carouselTimer) clearInterval(carouselTimer);
       if (store.banners.length > 1) {
         carouselTimer = setInterval(function () {
+          // Don't slide away from a video the customer may be watching.
+          if (store.banners[carouselIndex] && store.banners[carouselIndex].mediaType === 'video') return;
           carouselIndex = (carouselIndex + 1) % store.banners.length;
           renderCarouselPosition();
         }, 5000);
@@ -639,6 +685,42 @@ box-shadow: 0 0 8px var(--accent);
       Array.prototype.forEach.call(document.getElementById('carouselDots').children, function (d, i) {
         d.className = 'w-2 h-2 rounded-full ' + (i === carouselIndex ? 'bg-white' : 'bg-white/50');
       });
+    }
+
+    // Accepts a YouTube/Vimeo link, a Google Drive file link, or a direct video
+    // file URL and returns something that will actually play inline.
+    function videoEmbedHtml_(url, sizeClasses) {
+      url = String(url || '');
+      var yt = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/);
+      if (yt) {
+        return '<iframe class="' + sizeClasses + '" src="https://www.youtube.com/embed/' + esc(yt[1]) +
+          '?rel=0" frameborder="0" allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>';
+      }
+      var vimeo = url.match(/vimeo\.com\/(\d+)/);
+      if (vimeo) {
+        return '<iframe class="' + sizeClasses + '" src="https://player.vimeo.com/video/' + esc(vimeo[1]) +
+          '" frameborder="0" allow="autoplay; fullscreen" allowfullscreen></iframe>';
+      }
+      var drive = url.match(/drive\.google\.com\/(?:file\/d\/|uc\?(?:export=\w+&)?id=)([A-Za-z0-9_-]+)/) ||
+                  url.match(/lh3\.googleusercontent\.com\/d\/([A-Za-z0-9_-]+)/);
+      if (drive) {
+        return '<iframe class="' + sizeClasses + '" src="https://drive.google.com/file/d/' + esc(drive[1]) +
+          '/preview" frameborder="0" allow="autoplay" allowfullscreen></iframe>';
+      }
+      return '<video class="' + sizeClasses + ' object-cover bg-black" controls playsinline preload="metadata" src="' + esc(url) + '"></video>';
+    }
+
+    function renderVideoAdvert() {
+      var s = store.settings;
+      var wrap = document.getElementById('videoAdvert');
+      var on = String(s.VideoAdvertEnabled).toUpperCase() === 'TRUE' && s.VideoAdvertURL;
+      if (!on) { wrap.classList.add('hidden'); wrap.innerHTML = ''; return; }
+      wrap.classList.remove('hidden');
+      wrap.innerHTML =
+        (s.VideoAdvertTitle ? '<h2 class="text-lg font-bold mb-2">' + esc(s.VideoAdvertTitle) + '</h2>' : '') +
+        '<div class="rounded-lg overflow-hidden shadow surface">' +
+          videoEmbedHtml_(s.VideoAdvertURL, 'w-full aspect-video') +
+        '</div>';
     }
 
     // ---------------------------------------------------------------------
@@ -770,7 +852,12 @@ box-shadow: 0 0 8px var(--accent);
       var p = productById(productId);
       if (!p) return;
       document.getElementById('productModalBody').innerHTML =
-        '<img src="' + esc(p.image || 'https://placehold.co/600x400?text=' + encodeURIComponent(p.name)) + '" alt="' + esc(p.name) + '" class="w-full h-52 sm:h-64 object-cover rounded-t-lg">' +
+        // object-contain on a neutral backdrop: physical goods like picture
+        // frames must be seen whole, never cropped to fill a box.
+        '<div class="w-full rounded-t-lg flex items-center justify-center cursor-zoom-in" style="background:var(--surface-2);min-height:220px" onclick="openLightbox(\'' + p.id + '\')">' +
+          '<img src="' + esc(p.image || 'https://placehold.co/600x400?text=' + encodeURIComponent(p.name)) + '" alt="' + esc(p.name) + '" class="max-h-[55vh] w-auto max-w-full object-contain">' +
+        '</div>' +
+        '<p class="text-center text-xs muted pt-2"><i class="fas fa-magnifying-glass-plus mr-1"></i>Tap the photo to view it full size</p>' +
         '<div class="p-5 sm:p-6">' +
           '<span class="text-xs text-primary font-semibold">' + esc(p.businessName) + '</span>' +
           '<h2 class="text-xl sm:text-2xl font-bold mb-2">' + esc(p.name) + '</h2>' +
@@ -912,6 +999,7 @@ box-shadow: 0 0 8px var(--accent);
         document.getElementById('coName').value = currentUser.name || '';
         document.getElementById('coPhone').value = currentUser.phone || '';
         document.getElementById('coAddress').value = currentUser.address || '';
+        if (currentUser.email) document.getElementById('coEmail').value = currentUser.email;
       }
       document.getElementById('checkoutModal').classList.remove('hidden');
     }
@@ -991,6 +1079,7 @@ box-shadow: 0 0 8px var(--accent);
         customerName: document.getElementById('coName').value.trim(),
         phone: document.getElementById('coPhone').value.trim(),
         address: document.getElementById('coAddress').value.trim(),
+        email: document.getElementById('coEmail').value.trim(),
         items: cart.map(function (c) { return { productId: c.productId, qty: c.qty, recipient: c.recipient || '' }; }),
         paymentMethodId: selectedPaymentMethodId,
         payerNumber: document.getElementById('coPayerNumber').value.trim(),
@@ -1239,10 +1328,116 @@ box-shadow: 0 0 8px var(--accent);
     }
 
     // ---------------------------------------------------------------------
+    // Full-size image lightbox
+    // ---------------------------------------------------------------------
+    function openLightbox(productId) {
+      var p = productById(productId);
+      if (!p || !p.image) return;
+      document.getElementById('lightboxImg').src = p.image;
+      var lb = document.getElementById('lightbox');
+      lb.classList.remove('hidden');
+      lb.classList.add('flex');
+    }
+    function closeLightbox() {
+      var lb = document.getElementById('lightbox');
+      lb.classList.add('hidden');
+      lb.classList.remove('flex');
+    }
+
+    // ---------------------------------------------------------------------
+    // Contact form — customer messages land in the admin Messages tab
+    // ---------------------------------------------------------------------
+    function openContact() {
+      if (isLoggedIn && currentUser) {
+        document.getElementById('msgName').value = currentUser.name || '';
+        document.getElementById('msgPhone').value = currentUser.phone || '';
+        document.getElementById('msgEmail').value = currentUser.email || '';
+      }
+      document.getElementById('contactModal').classList.remove('hidden');
+      document.getElementById('fabMenu').classList.add('closed');
+      document.getElementById('fabIcon').className = 'fas fa-headset';
+    }
+    function closeContact() { document.getElementById('contactModal').classList.add('hidden'); }
+    function submitContact(e) {
+      e.preventDefault();
+      var payload = {
+        name: document.getElementById('msgName').value.trim(),
+        phone: document.getElementById('msgPhone').value.trim(),
+        email: document.getElementById('msgEmail').value.trim(),
+        subject: document.getElementById('msgSubject').value.trim(),
+        body: document.getElementById('msgBody').value.trim()
+      };
+      if (!payload.phone && !payload.email) {
+        toast('warning', 'How should we reply?', 'Please leave a phone number or an email address.');
+        return;
+      }
+      startProgress();
+      google.script.run.withSuccessHandler(function (res) {
+        stopProgress();
+        if (res && res.success) {
+          closeContact();
+          document.getElementById('msgSubject').value = '';
+          document.getElementById('msgBody').value = '';
+          Swal.fire({ icon: 'success', title: 'Message sent', text: 'Thank you — we will get back to you shortly.' });
+        } else {
+          toast('error', 'Could not send', (res && res.message) || 'Please try again.');
+        }
+      }).withFailureHandler(function (err) { stopProgress(); toast('error', 'Error', String(err)); })
+        .submitCustomerMessage(payload);
+    }
+
+    // ---------------------------------------------------------------------
+    // Google Sign-In (only appears once a Client ID is set in admin Settings)
+    // ---------------------------------------------------------------------
+    function setupGoogleSignIn() {
+      var clientId = store.settings.GoogleClientId;
+      if (!clientId) return;
+      if (window._gsiLoaded) { renderGsiButton(clientId); return; }
+      var sc = document.createElement('script');
+      sc.src = 'https://accounts.google.com/gsi/client';
+      sc.async = true; sc.defer = true;
+      sc.onload = function () { window._gsiLoaded = true; renderGsiButton(clientId); };
+      sc.onerror = function () { console.warn('Google Sign-In script could not load.'); };
+      document.head.appendChild(sc);
+    }
+    function renderGsiButton(clientId) {
+      if (!window.google || !google.accounts || !google.accounts.id) return;
+      try {
+        google.accounts.id.initialize({
+          client_id: clientId,
+          callback: onGoogleCredential,
+          ux_mode: 'popup'   // redirect mode cannot work inside the Apps Script iframe
+        });
+        google.accounts.id.renderButton(document.getElementById('gsiButtonLogin'),
+          { theme: 'outline', size: 'large', text: 'continue_with', width: 280 });
+        document.getElementById('googleSignInLogin').classList.remove('hidden');
+      } catch (err) {
+        console.warn('Google Sign-In unavailable:', err);
+      }
+    }
+    function onGoogleCredential(response) {
+      if (!response || !response.credential) return;
+      startProgress();
+      google.script.run.withSuccessHandler(function (res) {
+        stopProgress();
+        if (res && res.success) {
+          isLoggedIn = true; currentUser = res.user;
+          sessionStorage.setItem('mb_user', JSON.stringify(res.user));
+          applyLoggedInUI();
+          closeLoginModal();
+          toast('success', 'Signed in', 'Welcome, ' + (res.user.name || '') + '!');
+        } else {
+          toast('error', 'Sign-in failed', (res && res.message) || 'Please try again.');
+        }
+      }).withFailureHandler(function (err) { stopProgress(); toast('error', 'Error', String(err)); })
+        .customerGoogleLogin(response.credential);
+    }
+
+    // ---------------------------------------------------------------------
     // Modal backdrop close
     // ---------------------------------------------------------------------
     window.onclick = function (event) {
-      ['loginModal', 'registerModal', 'checkoutModal', 'trackModal', 'purchaseHistoryModal', 'confirmModal', 'recipientModal', 'productModal'].forEach(function (id) {
+      ['loginModal', 'registerModal', 'checkoutModal', 'trackModal', 'purchaseHistoryModal', 'confirmModal', 'recipientModal', 'productModal', 'contactModal'].forEach(function (id) {
         var modal = document.getElementById(id);
         if (event.target === modal) modal.classList.add('hidden');
       });

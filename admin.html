@@ -48,6 +48,10 @@
       transition: width .25s ease, opacity .3s ease;
     }
     .kpi-card { background: var(--surface); border-radius: .75rem; padding: 1rem 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    /* SMS balance pulses on the dashboard so a low/again-unknown balance is
+       noticed before a campaign fails halfway through. */
+    @keyframes blinkPulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+    .blink { animation: blinkPulse 1.2s ease-in-out infinite; }
 
     /* Off-canvas sidebar on phones */
     @media (max-width: 1023px) {
@@ -69,14 +73,23 @@
     <div class="surface w-full max-w-sm p-8 rounded-xl shadow-lg">
       <h1 class="text-2xl font-bold text-center mb-1"><i class="fas fa-user-shield text-primary mr-2"></i>Admin Portal</h1>
       <p class="text-center muted text-sm mb-6">Sign in to manage your businesses</p>
+      <div id="adminGoogleWrap" class="hidden mb-4">
+        <div id="gsiButtonAdmin" class="flex justify-center"></div>
+        <div class="flex items-center gap-3 my-4"><span class="flex-grow h-px" style="background:var(--border)"></span><span class="text-xs muted">or</span><span class="flex-grow h-px" style="background:var(--border)"></span></div>
+      </div>
       <form onsubmit="adminDoLogin(event)">
         <input id="loginUsername" type="text" placeholder="Username" class="w-full p-3 rounded-lg mb-3">
         <div class="relative mb-4">
           <input id="loginPassword" type="password" placeholder="Password" class="w-full p-3 pr-12 rounded-lg">
           <button type="button" onclick="togglePw('loginPassword', this)" class="absolute right-2 top-1/2 -translate-y-1/2 px-2 muted" aria-label="Show password"><i class="fas fa-eye"></i></button>
         </div>
+        <label class="flex items-center gap-2 text-sm mb-4 cursor-pointer">
+          <input type="checkbox" id="loginRemember">
+          <span>Keep me signed in on this device</span>
+        </label>
         <button type="submit" class="w-full bg-primary py-3 rounded-lg">Login</button>
       </form>
+      <p class="text-xs muted mt-3 text-center">Leave the box unticked on a shared or public device.</p>
       <p class="text-center mt-4"><a href="?" id="backToStore" target="_top" class="text-primary text-sm hover:underline"><i class="fas fa-arrow-left mr-1"></i>Back to store</a></p>
     </div>
   </div>
@@ -139,6 +152,9 @@
         <a class="nav-item flex items-center gap-3 px-4 py-3" data-tab="discounts"><i class="fas fa-percent w-4"></i>Discounts</a>
         <a class="nav-item flex items-center gap-3 px-4 py-3" data-tab="expenses"><i class="fas fa-wallet w-4"></i>Expenses</a>
         <a class="nav-item flex items-center gap-3 px-4 py-3" data-tab="customers"><i class="fas fa-users w-4"></i>Customers</a>
+        <a class="nav-item flex items-center gap-3 px-4 py-3" data-tab="messages"><i class="fas fa-inbox w-4"></i>Messages <span id="msgBadge" class="ml-auto text-xs px-2 py-0.5 rounded-full hidden" style="background:#dc2626;color:#fff"></span></a>
+        <a class="nav-item flex items-center gap-3 px-4 py-3" data-tab="sms"><i class="fas fa-comment-sms w-4"></i>SMS</a>
+        <a class="nav-item flex items-center gap-3 px-4 py-3" data-tab="email"><i class="fas fa-envelope w-4"></i>Email</a>
         <a class="nav-item flex items-center gap-3 px-4 py-3" data-tab="settings"><i class="fas fa-gear w-4"></i>Settings</a>
         <a class="nav-item flex items-center gap-3 px-4 py-3" data-tab="admins"><i class="fas fa-user-shield w-4"></i>Admin Users</a>
       </nav>
@@ -168,6 +184,10 @@
           <div class="lg:col-span-2 kpi-card">
             <h3 class="font-semibold mb-3">Sales — last 14 days (confirmed payments)</h3>
             <canvas id="salesChart" height="160"></canvas>
+          </div>
+          <div class="kpi-card">
+            <h3 class="font-semibold mb-3">SMS Balance</h3>
+            <div id="dashSmsBalance" class="text-sm"><span class="muted">Checking…</span></div>
           </div>
           <div class="kpi-card"><h3 class="font-semibold mb-3">Low Stock</h3><div id="lowStockList" class="text-sm space-y-1"></div></div>
           <div class="kpi-card"><h3 class="font-semibold mb-3">Sales by Business</h3><div id="bizBreakdown" class="text-sm space-y-1"></div></div>
@@ -262,7 +282,17 @@
         <h1 class="text-2xl font-bold mb-4">Carousel Banners</h1>
         <form id="bannerForm" class="surface p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3" onsubmit="saveBanner(event)">
           <input type="hidden" id="banId">
+          <label class="text-sm md:col-span-2">Media Type
+            <select id="banMediaType" class="p-2 rounded-lg w-full mt-1" onchange="onBannerMediaTypeChange()">
+              <option value="image">Image</option>
+              <option value="video">Video advert</option>
+            </select>
+          </label>
           <div class="md:col-span-2" id="picker-banImage"></div>
+          <p id="banVideoHelp" class="md:col-span-2 text-xs muted hidden">
+            Paste a YouTube, Vimeo or Google Drive video link, or upload a video file below (max 25MB —
+            for anything larger, upload it to YouTube or Drive and paste the link instead).
+          </p>
           <input id="banTitle" placeholder="Title (optional)" class="p-2 rounded-lg">
           <input id="banLink" placeholder="Link URL (optional)" class="p-2 rounded-lg">
           <input id="banSort" type="number" placeholder="Sort Order" class="p-2 rounded-lg" value="1">
@@ -364,6 +394,136 @@
         </table></div>
       </section>
 
+      <!-- Messages -->
+      <section id="tab-messages" class="tab-section hidden">
+        <h1 class="text-2xl font-bold mb-4">Customer Messages</h1>
+        <div id="messageList" class="space-y-3"></div>
+      </section>
+
+      <!-- SMS -->
+      <section id="tab-sms" class="tab-section hidden">
+        <h1 class="text-2xl font-bold mb-4">SMS</h1>
+
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6" id="smsStatsGrid"></div>
+
+        <div class="surface p-4 rounded-lg shadow mb-6">
+          <h2 class="font-bold mb-3">Send a message</h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <label class="text-sm">Send to
+              <select id="smsAudience" class="p-2 rounded-lg w-full mt-1" onchange="onSmsAudienceChange()">
+                <option value="manual">Specific numbers</option>
+                <option value="customers">All registered customers</option>
+                <option value="buyers">Everyone who has ordered</option>
+                <option value="confirmed">Customers with confirmed payments</option>
+              </select>
+            </label>
+            <label class="text-sm">Campaign label <span class="muted">(for your history)</span>
+              <input id="smsCampaign" class="p-2 rounded-lg w-full mt-1" placeholder="e.g. December promo">
+            </label>
+            <label class="text-sm md:col-span-2" id="smsNumbersWrap">Phone numbers <span class="muted">(comma or line separated)</span>
+              <textarea id="smsNumbers" rows="2" class="p-2 rounded-lg w-full mt-1" placeholder="0243569785, 0201112222"></textarea>
+            </label>
+            <label class="text-sm md:col-span-2">Message
+              <textarea id="smsMessage" rows="4" class="p-2 rounded-lg w-full mt-1" oninput="updateSmsCount()" placeholder="Hi! We have 20% off all picture frames this week."></textarea>
+              <span class="text-xs muted" id="smsCount">0 characters · 1 SMS</span>
+            </label>
+          </div>
+          <button onclick="sendSms()" class="bg-primary px-5 py-3 rounded-lg font-semibold mt-3"><i class="fas fa-paper-plane mr-2"></i>Send SMS</button>
+        </div>
+
+        <div class="surface p-4 rounded-lg shadow mb-6">
+          <h2 class="font-bold mb-3">SMS Providers</h2>
+          <p class="text-sm muted mb-3">The first active provider is used for sending. API keys are stored in Script Properties, never in your spreadsheet.</p>
+          <form id="smsProviderForm" class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4" onsubmit="saveSmsProvider(event)">
+            <input type="hidden" id="spId">
+            <label class="text-sm">Provider
+              <select id="spType" class="p-2 rounded-lg w-full mt-1" onchange="onSmsProviderTypeChange()">
+                <option value="arkesel">Arkesel</option>
+                <option value="hubtel">Hubtel</option>
+                <option value="custom">Custom (any HTTP API)</option>
+              </select>
+            </label>
+            <label class="text-sm">Display Name<input id="spName" class="p-2 rounded-lg w-full mt-1" placeholder="e.g. Arkesel" required></label>
+            <label class="text-sm">Sender ID<input id="spSender" class="p-2 rounded-lg w-full mt-1" placeholder="e.g. MyStore (max 11 chars)"></label>
+            <label class="text-sm">Sort Order<input id="spSort" type="number" class="p-2 rounded-lg w-full mt-1" value="1"></label>
+            <label class="text-sm">API Key <span class="muted" id="spKeyHint"></span>
+              <div class="relative mt-1">
+                <input id="spApiKey" type="password" class="p-2 pr-10 rounded-lg w-full" placeholder="Leave blank to keep the saved key">
+                <button type="button" onclick="togglePw('spApiKey', this)" class="absolute right-1 top-1/2 -translate-y-1/2 px-2 muted"><i class="fas fa-eye"></i></button>
+              </div>
+            </label>
+            <label class="text-sm" id="spSecretWrap">Client Secret <span class="muted" id="spSecretHint"></span>
+              <div class="relative mt-1">
+                <input id="spApiSecret" type="password" class="p-2 pr-10 rounded-lg w-full" placeholder="Leave blank to keep the saved secret">
+                <button type="button" onclick="togglePw('spApiSecret', this)" class="absolute right-1 top-1/2 -translate-y-1/2 px-2 muted"><i class="fas fa-eye"></i></button>
+              </div>
+            </label>
+            <label class="text-sm md:col-span-2" id="spUrlWrap">Endpoint URL
+              <input id="spBaseUrl" class="p-2 rounded-lg w-full mt-1" placeholder="Leave blank to use the provider default">
+              <span class="text-xs muted" id="spUrlHint"></span>
+            </label>
+            <label class="text-sm md:col-span-2 hidden" id="spExtraWrap">Advanced JSON <span class="muted">(custom providers)</span>
+              <textarea id="spExtra" rows="3" class="p-2 rounded-lg w-full mt-1" placeholder='{"method":"post","contentType":"application/json","payload":"{\"to\":\"{to}\",\"msg\":\"{message}\"}"}'></textarea>
+            </label>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="spActive" checked> Active</label>
+            <div class="md:col-span-2 flex flex-wrap gap-2">
+              <button type="submit" class="bg-primary px-4 py-2 rounded-lg">Save Provider</button>
+              <button type="button" onclick="resetSmsProviderForm()" class="surface-2 bordered px-4 py-2 rounded-lg">Clear</button>
+              <button type="button" onclick="loadSmsBalance(true)" class="surface-2 bordered px-4 py-2 rounded-lg"><i class="fas fa-rotate mr-1"></i>Check Balance</button>
+            </div>
+          </form>
+          <div class="table-wrap"><table class="admin-table">
+            <thead><tr><th>Name</th><th>Type</th><th>Sender</th><th>Key Saved</th><th>Active</th><th>Actions</th></tr></thead>
+            <tbody id="smsProviderTableBody"></tbody>
+          </table></div>
+        </div>
+
+        <div class="surface p-4 rounded-lg shadow">
+          <h2 class="font-bold mb-3">SMS History</h2>
+          <div class="table-wrap"><table class="admin-table">
+            <thead><tr><th>Date</th><th>To</th><th>Message</th><th>Provider</th><th>Status</th><th>Campaign</th></tr></thead>
+            <tbody id="smsLogTableBody"></tbody>
+          </table></div>
+        </div>
+      </section>
+
+      <!-- Email -->
+      <section id="tab-email" class="tab-section hidden">
+        <h1 class="text-2xl font-bold mb-4">Email</h1>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6" id="emailStatsGrid"></div>
+
+        <div class="surface p-4 rounded-lg shadow mb-6">
+          <h2 class="font-bold mb-3">Send an email</h2>
+          <p class="text-sm muted mb-3">Emails go out with your store's logo, colours and contact details automatically.</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <label class="text-sm">Send to
+              <select id="emailAudience" class="p-2 rounded-lg w-full mt-1" onchange="onEmailAudienceChange()">
+                <option value="manual">Specific addresses</option>
+                <option value="customers">All registered customers</option>
+                <option value="buyers">Everyone who has ordered</option>
+                <option value="confirmed">Customers with confirmed payments</option>
+              </select>
+            </label>
+            <label class="text-sm">Campaign label<input id="emailCampaign" class="p-2 rounded-lg w-full mt-1" placeholder="e.g. December promo"></label>
+            <label class="text-sm md:col-span-2" id="emailAddressWrap">Email addresses <span class="muted">(comma or line separated)</span>
+              <textarea id="emailAddresses" rows="2" class="p-2 rounded-lg w-full mt-1"></textarea>
+            </label>
+            <label class="text-sm md:col-span-2">Subject<input id="emailSubject" class="p-2 rounded-lg w-full mt-1"></label>
+            <label class="text-sm md:col-span-2">Banner line <span class="muted">(shown under your logo)</span><input id="emailTitle" class="p-2 rounded-lg w-full mt-1" placeholder="e.g. December Promo"></label>
+            <label class="text-sm md:col-span-2">Message<textarea id="emailBody" rows="6" class="p-2 rounded-lg w-full mt-1"></textarea></label>
+          </div>
+          <button onclick="sendEmailBlast()" class="bg-primary px-5 py-3 rounded-lg font-semibold mt-3"><i class="fas fa-paper-plane mr-2"></i>Send Email</button>
+        </div>
+
+        <div class="surface p-4 rounded-lg shadow">
+          <h2 class="font-bold mb-3">Email History</h2>
+          <div class="table-wrap"><table class="admin-table">
+            <thead><tr><th>Date</th><th>To</th><th>Subject</th><th>Status</th><th>Campaign</th></tr></thead>
+            <tbody id="emailLogTableBody"></tbody>
+          </table></div>
+        </div>
+      </section>
+
       <!-- Settings -->
       <section id="tab-settings" class="tab-section hidden">
         <h1 class="text-2xl font-bold mb-4">Store Settings</h1>
@@ -431,6 +591,30 @@
             <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="setChatbotEnabled"> Chatbot Enabled</label>
           </div>
 
+          <div class="surface p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-3">
+            <h2 class="font-bold md:col-span-2">Branding &amp; Video Advert</h2>
+            <div class="md:col-span-2" id="picker-setLogo"></div>
+            <p class="text-xs muted md:col-span-2">Your logo appears at the top of every email you send.</p>
+            <label class="text-sm md:col-span-2">Video Advert URL
+              <input id="setVideoAdvertURL" class="p-2 rounded-lg w-full mt-1" placeholder="YouTube, Vimeo or Google Drive video link">
+              <span class="text-xs muted">Shown as a large advert on the storefront. For a video file, upload it as a Banner with media type "Video advert" instead.</span>
+            </label>
+            <label class="text-sm">Video Advert Heading<input id="setVideoAdvertTitle" class="p-2 rounded-lg w-full mt-1" placeholder="e.g. See our products in action"></label>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="setVideoAdvertEnabled"> Show video advert</label>
+          </div>
+
+          <div class="surface p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-3">
+            <h2 class="font-bold md:col-span-2">Notifications &amp; Sign-in</h2>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="setOrderEmailEnabled"> Email customers a receipt after checkout</label>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="setOrderSmsEnabled"> SMS customers after checkout <span class="muted">(uses SMS credits)</span></label>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="setContactFormEnabled"> Let customers send messages from the store</label>
+            <label class="text-sm">SMS Country Code<input id="setSmsCountryCode" class="p-2 rounded-lg w-full mt-1" placeholder="233"></label>
+            <label class="text-sm md:col-span-2">Google Sign-In Client ID
+              <input id="setGoogleClientId" class="p-2 rounded-lg w-full mt-1" placeholder="xxxxx.apps.googleusercontent.com">
+              <span class="text-xs muted">Leave blank to hide Google sign-in. See SETUP.md for how to create one.</span>
+            </label>
+          </div>
+
           <div class="surface p-4 rounded-lg shadow">
             <h2 class="font-bold mb-2">Default Bundle Disclaimer</h2>
             <p class="text-sm muted mb-2">Used in the confirmation popup for any product that asks for a phone number and has no note of its own.</p>
@@ -453,6 +637,7 @@
         <form id="adminForm" class="surface p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3 max-w-2xl" onsubmit="addAdminUser(event)">
           <input id="admName" placeholder="Full Name" class="p-2 rounded-lg" required>
           <input id="admUsername" placeholder="Username" class="p-2 rounded-lg" required>
+          <input id="admEmail" type="email" placeholder="Google email (optional, enables Google sign-in)" class="p-2 rounded-lg md:col-span-2">
           <div class="relative">
           <input id="admPassword" type="password" placeholder="Password (min 6 characters)" class="p-2 pr-10 rounded-lg w-full" required>
           <button type="button" onclick="togglePw('admPassword', this)" class="absolute right-1 top-1/2 -translate-y-1/2 px-2 muted"><i class="fas fa-eye"></i></button>
@@ -461,7 +646,7 @@
           <div class="md:col-span-2"><button type="submit" class="bg-primary px-4 py-2 rounded-lg">Add Admin</button></div>
         </form>
         <div class="table-wrap surface rounded-lg shadow mb-8"><table class="admin-table">
-          <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Created</th></tr></thead>
+          <thead><tr><th>Name</th><th>Username</th><th>Google Email</th><th>Role</th><th>Created</th></tr></thead>
           <tbody id="adminTableBody"></tbody>
         </table></div>
 
@@ -644,7 +829,9 @@
       var url = document.getElementById(fieldId).value.trim();
       var img = document.getElementById(fieldId + 'Preview');
       if (!img) return;
-      if (url) { img.src = url; img.classList.remove('hidden'); }
+      var mediaSelect = document.getElementById('banMediaType');
+      var isVideoField = fieldId === 'banImageUrl' && mediaSelect && mediaSelect.value === 'video';
+      if (url && !isVideoField) { img.src = url; img.classList.remove('hidden'); }
       else { img.removeAttribute('src'); img.classList.add('hidden'); }
     }
     function clearPicker(fieldId) {
@@ -659,8 +846,14 @@
       fileInput.onchange = function () {
         var file = fileInput.files[0];
         if (!file) return;
-        if (file.size > 4 * 1024 * 1024) {
-          toast('warning', 'Image too large', 'Please choose an image under 4MB.');
+        var isVideo = (file.type || '').indexOf('video') === 0;
+        // Video is base64-encoded over google.script.run, so keep it modest;
+        // anything bigger belongs on YouTube/Drive with the link pasted in.
+        var limit = isVideo ? 25 * 1024 * 1024 : 4 * 1024 * 1024;
+        if (file.size > limit) {
+          toast('warning', 'File too large',
+            isVideo ? 'Please choose a video under 25MB, or upload it to YouTube/Drive and paste the link.'
+                    : 'Please choose an image under 4MB.');
           fileInput.value = '';
           return;
         }
@@ -699,6 +892,7 @@
       buildPicker('picker-bizLogo', 'bizLogoUrl', 'Business Logo');
       buildPicker('picker-prdImage', 'prdImageUrl', 'Product Photo');
       buildPicker('picker-banImage', 'banImageUrl', 'Banner Image');
+      buildPicker('picker-setLogo', 'setLogoUrl', 'Store Logo (used in emails)');
 
       google.script.run.withSuccessHandler(function (url) {
         if (!url) return;
@@ -706,12 +900,45 @@
         document.getElementById('viewStoreLink').href = url;
       }).getWebAppUrl();
 
-      if (adminToken && adminInfo) { enterApp(); return; }
+      // A live token alone is NOT enough to walk into the portal — a customer
+      // tapping the admin icon must always land on the login form. Only an
+      // explicit "Keep me signed in" restores a session automatically.
+      var rememberToken = localStorage.getItem('mb_admin_remember');
+      if (rememberToken) {
+        showLoadingSpinner();
+        google.script.run.withSuccessHandler(function (session) {
+          hideLoadingSpinner();
+          if (session && session.token) {
+            adminToken = session.token;
+            adminInfo = session;
+            sessionStorage.setItem('mb_admin_token', adminToken);
+            sessionStorage.setItem('mb_admin_info', JSON.stringify(session));
+            enterApp();
+          } else {
+            localStorage.removeItem('mb_admin_remember');
+            showEntryScreen();
+          }
+        }).withFailureHandler(function () {
+          hideLoadingSpinner();
+          localStorage.removeItem('mb_admin_remember');
+          showEntryScreen();
+        }).adminResumeSession(rememberToken);
+        return;
+      }
 
+      // Any stale token from a previous visit is discarded rather than reused.
+      sessionStorage.removeItem('mb_admin_token');
+      sessionStorage.removeItem('mb_admin_info');
+      adminToken = null; adminInfo = null;
+      showEntryScreen();
+    };
+
+    function showEntryScreen() {
       showLoadingSpinner();
       google.script.run.withSuccessHandler(function (needsSetup) {
         hideLoadingSpinner();
         document.getElementById(needsSetup ? 'setupScreen' : 'loginScreen').classList.remove('hidden');
+        if (!needsSetup) setupAdminGoogleSignIn();
       }).withFailureHandler(function (err) {
         hideLoadingSpinner();
         document.getElementById('loginScreen').classList.remove('hidden');
@@ -750,25 +977,68 @@
       var username = document.getElementById('loginUsername').value.trim();
       var password = document.getElementById('loginPassword').value;
       if (!username || !password) { toast('warning', 'Missing Fields', 'Enter username and password.'); return; }
+      var remember = document.getElementById('loginRemember').checked;
       showLoadingSpinner();
       google.script.run.withSuccessHandler(function (res) {
         hideLoadingSpinner();
         if (res) {
-          adminToken = res.token;
-          adminInfo = res;
-          sessionStorage.setItem('mb_admin_token', adminToken);
-          sessionStorage.setItem('mb_admin_info', JSON.stringify(res));
-          enterApp();
+          applyAdminSession(res, remember);
         } else {
           toast('error', 'Login Failed', 'Incorrect username or password.');
         }
-      }).withFailureHandler(runFail).adminLogin(username, password);
+      }).withFailureHandler(runFail).adminLogin(username, password, remember);
+    }
+
+    // Admin Google sign-in is allow-listed server-side: the Google account's
+    // email must already be attached to an admin user.
+    function setupAdminGoogleSignIn() {
+      google.script.run.withSuccessHandler(function (clientId) {
+        if (!clientId) return;
+        var sc = document.createElement('script');
+        sc.src = 'https://accounts.google.com/gsi/client';
+        sc.async = true; sc.defer = true;
+        sc.onload = function () {
+          if (!window.google || !google.accounts || !google.accounts.id) return;
+          try {
+            google.accounts.id.initialize({
+              client_id: clientId,
+              callback: onAdminGoogleCredential,
+              ux_mode: 'popup'
+            });
+            google.accounts.id.renderButton(document.getElementById('gsiButtonAdmin'),
+              { theme: 'outline', size: 'large', text: 'signin_with', width: 280 });
+            document.getElementById('adminGoogleWrap').classList.remove('hidden');
+          } catch (err) { console.warn('Google Sign-In unavailable:', err); }
+        };
+        document.head.appendChild(sc);
+      }).withFailureHandler(function () {}).getGoogleClientId();
+    }
+    function onAdminGoogleCredential(response) {
+      if (!response || !response.credential) return;
+      var remember = document.getElementById('loginRemember').checked;
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (res) {
+        hideLoadingSpinner();
+        if (res && res.success) applyAdminSession(res.session, remember);
+        else toast('error', 'Sign-in refused', (res && res.message) || 'Please try again.');
+      }).withFailureHandler(runFail).adminGoogleLogin(response.credential, remember);
+    }
+
+    function applyAdminSession(res, remember) {
+      adminToken = res.token;
+      adminInfo = res;
+      sessionStorage.setItem('mb_admin_token', adminToken);
+      sessionStorage.setItem('mb_admin_info', JSON.stringify(res));
+      if (remember && res.rememberToken) localStorage.setItem('mb_admin_remember', res.rememberToken);
+      else localStorage.removeItem('mb_admin_remember');
+      enterApp();
     }
 
     function adminDoLogout() {
-      google.script.run.adminLogout(adminToken);
+      google.script.run.adminLogout(adminToken, localStorage.getItem('mb_admin_remember'));
       sessionStorage.removeItem('mb_admin_token');
       sessionStorage.removeItem('mb_admin_info');
+      localStorage.removeItem('mb_admin_remember');
       adminToken = null; adminInfo = null;
       document.getElementById('adminApp').classList.add('hidden');
       document.getElementById('loginScreen').classList.remove('hidden');
@@ -789,6 +1059,10 @@
         });
       });
       loadReferenceData();
+      google.script.run.withSuccessHandler(function (list) {
+        cache.messages = list || [];
+        updateMessageBadge();
+      }).withFailureHandler(function () {}).adminGetMessages(adminToken);
       showTab('dashboard');
     }
 
@@ -800,7 +1074,8 @@
       var loaders = {
         dashboard: loadDashboard, orders: loadOrders, businesses: loadBusinesses, products: loadProducts,
         banners: loadBanners, payments: loadPaymentMethods, discounts: loadDiscounts, expenses: loadExpenses,
-        customers: loadCustomers, settings: loadSettings, admins: loadAdmins
+        customers: loadCustomers, settings: loadSettings, admins: loadAdmins,
+        messages: loadMessages, sms: loadSmsTab, email: loadEmailTab
       };
       if (loaders[name]) loaders[name]();
     }
@@ -839,6 +1114,7 @@
           kpi('fa-box-open', 'Active Products', d.productCount, 'text-purple-600')
         ].join('');
         drawSalesChart(d.salesByDay || []);
+        loadSmsBalance(false);
         document.getElementById('lowStockList').innerHTML = (d.lowStock || []).length
           ? d.lowStock.map(function (p) { return '<p>' + esc(p.name) + ' — <span class="text-red-500 font-semibold">' + p.stock + ' left</span></p>'; }).join('')
           : '<p class="muted">All good.</p>';
@@ -850,6 +1126,25 @@
           : '<p class="muted">No sales yet.</p>';
       }).withFailureHandler(runFail).adminGetDashboard(adminToken);
     }
+    // Blinks while the balance is low or unknown; calm once healthy.
+    function renderDashboardSmsBalance() {
+      var el = document.getElementById('dashSmsBalance');
+      if (!el) return;
+      var b = cache.smsBalance;
+      if (!b) { el.innerHTML = '<span class="muted">Checking…</span>'; return; }
+      if (!b.available) {
+        el.innerHTML = '<p class="blink text-orange-500 font-semibold"><i class="fas fa-triangle-exclamation mr-1"></i>Unavailable</p>' +
+          '<p class="muted text-xs mt-1">' + esc(b.message || '') + '</p>' +
+          '<button class="text-primary text-xs underline mt-2" onclick="showTab(\'sms\')">Open SMS settings</button>';
+        return;
+      }
+      var numeric = parseFloat(String(b.balance).replace(/[^0-9.]/g, ''));
+      var low = !isNaN(numeric) && numeric <= 20;
+      el.innerHTML = '<p class="text-2xl font-bold ' + (low ? 'text-red-600 blink' : 'text-green-600') + '">' + esc(b.balance) + '</p>' +
+        '<p class="muted text-xs">' + esc(b.provider || '') + (low ? ' · running low' : '') + '</p>' +
+        '<button class="text-primary text-xs underline mt-2" onclick="loadSmsBalance(true)">Refresh balance</button>';
+    }
+
     function kpi(icon, label, value, colorClass) {
       return '<div class="kpi-card"><i class="fas ' + icon + ' ' + colorClass + ' text-xl mb-2"></i>' +
         '<p class="text-sm muted">' + label + '</p><p class="text-lg sm:text-xl font-bold">' + value + '</p></div>';
@@ -1189,7 +1484,10 @@
         hideLoadingSpinner();
         cache.banners = list || [];
         document.getElementById('bannerTableBody').innerHTML = cache.banners.map(function (b) {
-          return '<tr><td><img src="' + esc(b.ImageURL) + '" class="w-24 h-12 object-cover rounded"></td><td>' + esc(b.Title) + '</td><td>' + (b.Active ? 'Yes' : 'No') + '</td><td>' + b.SortOrder + '</td>' +
+          var preview = b.MediaType === 'video'
+            ? '<span class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded" style="background:var(--surface-2)"><i class="fas fa-video text-primary"></i> Video</span>'
+            : '<img src="' + esc(b.ImageURL) + '" class="w-24 h-12 object-cover rounded">';
+          return '<tr><td>' + preview + '</td><td>' + esc(b.Title) + '</td><td>' + (b.Active ? 'Yes' : 'No') + '</td><td>' + b.SortOrder + '</td>' +
             '<td class="whitespace-nowrap"><button class="text-primary mr-3" onclick="editBanner(\'' + esc(b.BannerID) + '\')"><i class="fas fa-edit"></i></button>' +
             '<button class="text-red-600" onclick="deleteBanner(\'' + esc(b.BannerID) + '\')"><i class="fas fa-trash"></i></button></td></tr>';
         }).join('') || '<tr><td colspan="5" class="text-center muted">No banners yet.</td></tr>';
@@ -1200,6 +1498,8 @@
       if (!b) return;
       document.getElementById('banId').value = b.BannerID;
       document.getElementById('banImageUrl').value = b.ImageURL;
+      document.getElementById('banMediaType').value = b.MediaType || 'image';
+      onBannerMediaTypeChange();
       refreshPreview('banImageUrl');
       document.getElementById('banTitle').value = b.Title;
       document.getElementById('banLink').value = b.LinkURL;
@@ -1207,10 +1507,17 @@
       document.getElementById('banActive').checked = !!b.Active;
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+    function onBannerMediaTypeChange() {
+      var isVideo = document.getElementById('banMediaType').value === 'video';
+      document.getElementById('banVideoHelp').classList.toggle('hidden', !isVideo);
+      var fileInput = document.getElementById('banImageUrlFile');
+      if (fileInput) fileInput.setAttribute('accept', isVideo ? 'video/*' : 'image/*');
+    }
     function resetBannerForm() {
       document.getElementById('bannerForm').reset();
       document.getElementById('banId').value = '';
       clearPicker('banImageUrl');
+      onBannerMediaTypeChange();
     }
     function saveBanner(e) {
       e.preventDefault();
@@ -1220,7 +1527,8 @@
         Title: document.getElementById('banTitle').value.trim(),
         LinkURL: document.getElementById('banLink').value.trim(),
         SortOrder: document.getElementById('banSort').value,
-        Active: document.getElementById('banActive').checked
+        Active: document.getElementById('banActive').checked,
+        MediaType: document.getElementById('banMediaType').value
       };
       if (!b.ImageURL) { toast('warning', 'Image required', 'Upload a photo or paste an image URL first.'); return; }
       showLoadingSpinner();
@@ -1439,7 +1747,16 @@
       ['FacebookURL', 'setFacebookURL'], ['InstagramURL', 'setInstagramURL'], ['TwitterURL', 'setTwitterURL'],
       ['TikTokURL', 'setTikTokURL'], ['YouTubeURL', 'setYouTubeURL'], ['LinkedInURL', 'setLinkedInURL'],
       ['WhatsAppNumber', 'setWhatsapp'], ['WhatsAppGreeting', 'setWhatsappGreeting'],
-      ['ChatbotGreeting', 'setChatbotGreeting'], ['BundleDisclaimer', 'setBundleDisclaimer']
+      ['ChatbotGreeting', 'setChatbotGreeting'], ['BundleDisclaimer', 'setBundleDisclaimer'],
+      ['SiteLogoURL', 'setLogoUrl'], ['GoogleClientId', 'setGoogleClientId'],
+      ['SmsCountryCode', 'setSmsCountryCode'],
+      ['VideoAdvertURL', 'setVideoAdvertURL'], ['VideoAdvertTitle', 'setVideoAdvertTitle']
+    ];
+    // Checkbox settings stored as TRUE/FALSE strings.
+    var SETTING_TOGGLES = [
+      ['ChatbotEnabled', 'setChatbotEnabled', true], ['NewsTickerEnabled', 'setNewsTickerEnabled', true],
+      ['OrderEmailEnabled', 'setOrderEmailEnabled', true], ['OrderSmsEnabled', 'setOrderSmsEnabled', false],
+      ['ContactFormEnabled', 'setContactFormEnabled', true], ['VideoAdvertEnabled', 'setVideoAdvertEnabled', false]
     ];
 
     function loadSettings() {
@@ -1451,8 +1768,11 @@
           var el = document.getElementById(pair[1]);
           if (el) el.value = cache.settings[pair[0]] || '';
         });
-        document.getElementById('setChatbotEnabled').checked = String(cache.settings.ChatbotEnabled).toUpperCase() !== 'FALSE';
-        document.getElementById('setNewsTickerEnabled').checked = String(cache.settings.NewsTickerEnabled).toUpperCase() !== 'FALSE';
+        SETTING_TOGGLES.forEach(function (t) {
+          var v = String(cache.settings[t[0]]).toUpperCase();
+          document.getElementById(t[1]).checked = t[2] ? v !== 'FALSE' : v === 'TRUE';
+        });
+        refreshPreview('setLogoUrl');
         syncColorInputs();
         applyTheme(cache.settings);
       }).withFailureHandler(runFail).adminGetSettings(adminToken);
@@ -1481,8 +1801,9 @@
         var el = document.getElementById(pair[1]);
         if (el) s[pair[0]] = el.value.trim ? el.value.trim() : el.value;
       });
-      s.ChatbotEnabled = document.getElementById('setChatbotEnabled').checked ? 'TRUE' : 'FALSE';
-      s.NewsTickerEnabled = document.getElementById('setNewsTickerEnabled').checked ? 'TRUE' : 'FALSE';
+      SETTING_TOGGLES.forEach(function (t) {
+        s[t[0]] = document.getElementById(t[1]).checked ? 'TRUE' : 'FALSE';
+      });
       showLoadingSpinner();
       google.script.run.withSuccessHandler(function () {
         hideLoadingSpinner();
@@ -1510,6 +1831,289 @@
     }
 
     // -------------------------------------------------------------------
+    // Messages from customers
+    // -------------------------------------------------------------------
+    function loadMessages() {
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (list) {
+        hideLoadingSpinner();
+        cache.messages = list || [];
+        updateMessageBadge();
+        var wrap = document.getElementById('messageList');
+        if (!cache.messages.length) { wrap.innerHTML = '<p class="muted">No messages yet.</p>'; return; }
+        wrap.innerHTML = cache.messages.map(function (m) {
+          var badge = { 'New': 'background:#fee2e2;color:#b91c1c', 'Replied': 'background:#dcfce7;color:#15803d' }[m.status] || 'background:#e5e7eb;color:#4b5563';
+          return '<div class="surface p-4 rounded-lg shadow">' +
+            '<div class="flex justify-between flex-wrap gap-2 mb-2">' +
+              '<div><strong>' + esc(m.name) + '</strong> <span class="text-xs px-2 py-0.5 rounded-full" style="' + badge + '">' + esc(m.status) + '</span>' +
+              '<div class="text-xs muted">' + esc(m.phone) + (m.phone && m.email ? ' · ' : '') + esc(m.email) + '</div></div>' +
+              '<span class="text-xs muted">' + esc(fmtDate(m.createdAt)) + '</span>' +
+            '</div>' +
+            '<p class="font-semibold text-sm">' + esc(m.subject) + '</p>' +
+            '<p class="text-sm mb-3 whitespace-pre-line">' + esc(m.body) + '</p>' +
+            (m.reply ? '<div class="surface-2 bordered rounded p-2 text-sm mb-3"><strong>Your reply:</strong><br>' + esc(m.reply) + '</div>' : '') +
+            '<textarea id="reply_' + esc(m.id) + '" rows="2" class="p-2 rounded-lg w-full mb-2" placeholder="Write a reply..."></textarea>' +
+            '<div class="flex flex-wrap gap-2">' +
+              (m.email ? '<button class="bg-primary px-3 py-2 rounded-lg text-sm" onclick="replyMessage(\'' + esc(m.id) + '\',\'email\')"><i class="fas fa-envelope mr-1"></i>Reply by Email</button>' : '') +
+              (m.phone ? '<button class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg text-sm" onclick="replyMessage(\'' + esc(m.id) + '\',\'sms\')"><i class="fas fa-comment-sms mr-1"></i>Reply by SMS</button>' : '') +
+              (m.phone ? '<a class="surface-2 bordered px-3 py-2 rounded-lg text-sm" target="_blank" href="https://wa.me/' + esc(String(m.phone).replace(/\D/g, '').replace(/^0/, '233')) + '"><i class="fab fa-whatsapp mr-1"></i>WhatsApp</a>' : '') +
+              '<button class="surface-2 bordered px-3 py-2 rounded-lg text-sm" onclick="setMessageStatus(\'' + esc(m.id) + '\',\'Closed\')">Mark Closed</button>' +
+              '<button class="text-red-600 px-3 py-2 text-sm" onclick="deleteMessage(\'' + esc(m.id) + '\')"><i class="fas fa-trash"></i></button>' +
+            '</div></div>';
+        }).join('');
+      }).withFailureHandler(runFail).adminGetMessages(adminToken);
+    }
+    function updateMessageBadge() {
+      var newCount = (cache.messages || []).filter(function (m) { return m.status === 'New'; }).length;
+      var badge = document.getElementById('msgBadge');
+      badge.textContent = newCount;
+      badge.classList.toggle('hidden', newCount === 0);
+    }
+    function replyMessage(id, channel) {
+      var reply = document.getElementById('reply_' + id).value.trim();
+      if (!reply) { toast('warning', 'Empty reply', 'Write something first.'); return; }
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (res) {
+        hideLoadingSpinner();
+        if (res.success) toast('success', 'Reply sent by ' + res.channel, '');
+        else toast('error', 'Not delivered', res.message || '');
+        loadMessages();
+      }).withFailureHandler(runFail).adminReplyToMessage(adminToken, id, reply, channel);
+    }
+    function setMessageStatus(id, status) {
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function () { hideLoadingSpinner(); loadMessages(); })
+        .withFailureHandler(runFail).adminUpdateMessageStatus(adminToken, id, status);
+    }
+    function deleteMessage(id) {
+      Swal.fire({ title: 'Delete this message?', icon: 'warning', showCancelButton: true }).then(function (r) {
+        if (!r.isConfirmed) return;
+        showLoadingSpinner();
+        google.script.run.withSuccessHandler(function () { hideLoadingSpinner(); loadMessages(); })
+          .withFailureHandler(runFail).adminDeleteMessage(adminToken, id);
+      });
+    }
+
+    // -------------------------------------------------------------------
+    // SMS
+    // -------------------------------------------------------------------
+    function loadSmsTab() {
+      loadSmsProviders();
+      loadSmsStats();
+      loadSmsLog();
+      loadSmsBalance(false);
+      onSmsAudienceChange();
+      onSmsProviderTypeChange();
+    }
+    function onSmsAudienceChange() {
+      var manual = document.getElementById('smsAudience').value === 'manual';
+      document.getElementById('smsNumbersWrap').classList.toggle('hidden', !manual);
+    }
+    function onEmailAudienceChange() {
+      var manual = document.getElementById('emailAudience').value === 'manual';
+      document.getElementById('emailAddressWrap').classList.toggle('hidden', !manual);
+    }
+    // GSM-7 segments are 160 chars, 153 when concatenated.
+    function updateSmsCount() {
+      var len = document.getElementById('smsMessage').value.length;
+      var parts = len <= 160 ? 1 : Math.ceil(len / 153);
+      document.getElementById('smsCount').textContent = len + ' characters · ' + parts + ' SMS per recipient';
+    }
+    function loadSmsStats() {
+      google.script.run.withSuccessHandler(function (st) {
+        cache.smsStats = st;
+        renderSmsStats();
+      }).withFailureHandler(function () {}).adminGetSmsStats(adminToken);
+    }
+    function loadSmsBalance(notify) {
+      google.script.run.withSuccessHandler(function (b) {
+        cache.smsBalance = b;
+        renderSmsStats();
+        renderDashboardSmsBalance();
+        if (notify) {
+          if (b.available) toast('success', 'Balance: ' + b.balance, '');
+          else toast('info', 'Balance unavailable', b.message || '');
+        }
+      }).withFailureHandler(function () {}).adminGetSmsBalance(adminToken);
+    }
+    function renderSmsStats() {
+      var st = cache.smsStats || { sent: 0, failed: 0, total: 0 };
+      var bal = cache.smsBalance || {};
+      document.getElementById('smsStatsGrid').innerHTML = [
+        kpi('fa-paper-plane', 'SMS Sent', st.sent, 'text-green-600'),
+        kpi('fa-triangle-exclamation', 'Failed', st.failed, 'text-red-600'),
+        kpi('fa-list', 'Total Attempts', st.total, 'text-primary'),
+        kpi('fa-wallet', 'Balance', bal.available ? bal.balance : '—', 'text-orange-500')
+      ].join('');
+    }
+    function loadSmsLog() {
+      google.script.run.withSuccessHandler(function (log) {
+        document.getElementById('smsLogTableBody').innerHTML = (log || []).map(function (r) {
+          var color = r.status === 'Sent' ? 'background:#dcfce7;color:#15803d' : 'background:#fee2e2;color:#b91c1c';
+          return '<tr><td>' + esc(fmtDate(r.createdAt)) + '</td><td>' + esc(r.phone) + '</td>' +
+            '<td>' + esc(r.message.slice(0, 70)) + (r.message.length > 70 ? '…' : '') + '</td>' +
+            '<td>' + esc(r.provider) + '</td>' +
+            '<td><span class="px-2 py-1 rounded-full text-xs" style="' + color + '" title="' + esc(r.response) + '">' + esc(r.status) + '</span></td>' +
+            '<td>' + esc(r.campaign) + '</td></tr>';
+        }).join('') || '<tr><td colspan="6" class="text-center muted">No SMS sent yet.</td></tr>';
+      }).withFailureHandler(runFail).adminGetSmsLog(adminToken, 200);
+    }
+    function sendSms() {
+      var payload = {
+        audience: document.getElementById('smsAudience').value,
+        numbers: document.getElementById('smsNumbers').value,
+        message: document.getElementById('smsMessage').value.trim(),
+        campaign: document.getElementById('smsCampaign').value.trim()
+      };
+      if (!payload.message) { toast('warning', 'Empty message', 'Write your SMS first.'); return; }
+      Swal.fire({
+        title: 'Send this SMS?',
+        text: payload.audience === 'manual' ? 'To the numbers you listed.' : 'To your selected audience. This uses SMS credits.',
+        icon: 'question', showCancelButton: true, confirmButtonText: 'Send'
+      }).then(function (r) {
+        if (!r.isConfirmed) return;
+        showLoadingSpinner();
+        google.script.run.withSuccessHandler(function (res) {
+          hideLoadingSpinner();
+          if (!res.success) { toast('error', 'Not sent', res.message); return; }
+          Swal.fire({
+            icon: res.failed ? 'warning' : 'success',
+            title: 'Sent ' + res.sent + ' of ' + res.total,
+            text: res.failed ? (res.failed + ' failed. ' + (res.errors || []).join(' | ')) : 'All messages delivered to the gateway.'
+          });
+          document.getElementById('smsMessage').value = '';
+          updateSmsCount();
+          loadSmsStats(); loadSmsLog(); loadSmsBalance(false);
+        }).withFailureHandler(runFail).adminSendSms(adminToken, payload);
+      });
+    }
+    function onSmsProviderTypeChange() {
+      var type = document.getElementById('spType').value;
+      document.getElementById('spSecretWrap').classList.toggle('hidden', type !== 'hubtel' && type !== 'custom');
+      document.getElementById('spExtraWrap').classList.toggle('hidden', type !== 'custom');
+      var hints = {
+        arkesel: 'Default: https://sms.arkesel.com/api/v2/sms/send',
+        hubtel: 'Default: https://smsc.hubtel.com/v1/messages/send',
+        custom: 'Use placeholders {to} {message} {sender} {apikey} {apisecret}'
+      };
+      document.getElementById('spUrlHint').textContent = hints[type] || '';
+      document.getElementById('spKeyHint').textContent = type === 'hubtel' ? '(Client ID)' : '(API key)';
+    }
+    function loadSmsProviders() {
+      google.script.run.withSuccessHandler(function (list) {
+        cache.smsProviders = list || [];
+        document.getElementById('smsProviderTableBody').innerHTML = cache.smsProviders.map(function (p) {
+          return '<tr><td>' + esc(p.Name) + '</td><td>' + esc(p.Type) + '</td><td>' + esc(p.SenderID) + '</td>' +
+            '<td>' + (p.hasApiKey ? '<span class="text-green-600"><i class="fas fa-check"></i> Yes</span>' : '<span class="text-red-600">No</span>') + '</td>' +
+            '<td>' + (p.Active ? 'Yes' : 'No') + '</td>' +
+            '<td class="whitespace-nowrap"><button class="text-primary mr-3" onclick="editSmsProvider(\'' + esc(p.ProviderID) + '\')"><i class="fas fa-edit"></i></button>' +
+            '<button class="text-red-600" onclick="deleteSmsProvider(\'' + esc(p.ProviderID) + '\')"><i class="fas fa-trash"></i></button></td></tr>';
+        }).join('') || '<tr><td colspan="6" class="text-center muted">No providers yet — add Arkesel, Hubtel or a custom one.</td></tr>';
+      }).withFailureHandler(runFail).adminGetSmsProviders(adminToken);
+    }
+    function editSmsProvider(id) {
+      var p = (cache.smsProviders || []).filter(function (x) { return x.ProviderID === id; })[0];
+      if (!p) return;
+      document.getElementById('spId').value = p.ProviderID;
+      document.getElementById('spType').value = p.Type;
+      document.getElementById('spName').value = p.Name;
+      document.getElementById('spSender').value = p.SenderID;
+      document.getElementById('spBaseUrl').value = p.BaseURL;
+      document.getElementById('spExtra').value = p.ExtraConfig;
+      document.getElementById('spSort').value = p.SortOrder;
+      document.getElementById('spActive').checked = !!p.Active;
+      document.getElementById('spApiKey').value = '';
+      document.getElementById('spApiSecret').value = '';
+      document.getElementById('spApiKey').placeholder = p.hasApiKey ? 'Saved — leave blank to keep it' : 'Enter your API key';
+      document.getElementById('spApiSecret').placeholder = p.hasApiSecret ? 'Saved — leave blank to keep it' : 'Enter your secret';
+      onSmsProviderTypeChange();
+    }
+    function resetSmsProviderForm() {
+      document.getElementById('smsProviderForm').reset();
+      document.getElementById('spId').value = '';
+      onSmsProviderTypeChange();
+    }
+    function saveSmsProvider(e) {
+      e.preventDefault();
+      var p = {
+        ProviderID: document.getElementById('spId').value,
+        Type: document.getElementById('spType').value,
+        Name: document.getElementById('spName').value.trim(),
+        SenderID: document.getElementById('spSender').value.trim(),
+        BaseURL: document.getElementById('spBaseUrl').value.trim(),
+        ExtraConfig: document.getElementById('spExtra').value.trim(),
+        SortOrder: document.getElementById('spSort').value,
+        Active: document.getElementById('spActive').checked,
+        ApiKey: document.getElementById('spApiKey').value,
+        ApiSecret: document.getElementById('spApiSecret').value
+      };
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (res) {
+        hideLoadingSpinner();
+        if (res.success) { toast('success', 'Provider saved', ''); resetSmsProviderForm(); loadSmsProviders(); loadSmsBalance(false); }
+        else toast('error', 'Failed', res.message || '');
+      }).withFailureHandler(runFail).adminSaveSmsProvider(adminToken, p);
+    }
+    function deleteSmsProvider(id) {
+      Swal.fire({ title: 'Delete this provider?', text: 'Its saved API key will be removed too.', icon: 'warning', showCancelButton: true }).then(function (r) {
+        if (!r.isConfirmed) return;
+        showLoadingSpinner();
+        google.script.run.withSuccessHandler(function () { hideLoadingSpinner(); loadSmsProviders(); })
+          .withFailureHandler(runFail).adminDeleteSmsProvider(adminToken, id);
+      });
+    }
+
+    // -------------------------------------------------------------------
+    // Email
+    // -------------------------------------------------------------------
+    function loadEmailTab() {
+      onEmailAudienceChange();
+      google.script.run.withSuccessHandler(function (st) {
+        document.getElementById('emailStatsGrid').innerHTML = [
+          kpi('fa-paper-plane', 'Emails Sent', st.sent, 'text-green-600'),
+          kpi('fa-triangle-exclamation', 'Failed', st.failed, 'text-red-600'),
+          kpi('fa-list', 'Total', st.total, 'text-primary'),
+          kpi('fa-gauge', 'Remaining Today', st.remainingQuota < 0 ? '—' : st.remainingQuota, 'text-orange-500')
+        ].join('');
+      }).withFailureHandler(function () {}).adminGetEmailStats(adminToken);
+
+      google.script.run.withSuccessHandler(function (log) {
+        document.getElementById('emailLogTableBody').innerHTML = (log || []).map(function (r) {
+          var color = r.status === 'Sent' ? 'background:#dcfce7;color:#15803d' : 'background:#fee2e2;color:#b91c1c';
+          return '<tr><td>' + esc(fmtDate(r.createdAt)) + '</td><td>' + esc(r.to) + '</td><td>' + esc(r.subject) + '</td>' +
+            '<td><span class="px-2 py-1 rounded-full text-xs" style="' + color + '" title="' + esc(r.response) + '">' + esc(r.status) + '</span></td>' +
+            '<td>' + esc(r.campaign) + '</td></tr>';
+        }).join('') || '<tr><td colspan="5" class="text-center muted">No emails sent yet.</td></tr>';
+      }).withFailureHandler(runFail).adminGetEmailLog(adminToken, 200);
+    }
+    function sendEmailBlast() {
+      var payload = {
+        audience: document.getElementById('emailAudience').value,
+        emails: document.getElementById('emailAddresses').value,
+        subject: document.getElementById('emailSubject').value.trim(),
+        title: document.getElementById('emailTitle').value.trim(),
+        body: document.getElementById('emailBody').value.trim(),
+        campaign: document.getElementById('emailCampaign').value.trim()
+      };
+      if (!payload.subject || !payload.body) { toast('warning', 'Missing fields', 'Subject and message are required.'); return; }
+      Swal.fire({ title: 'Send this email?', icon: 'question', showCancelButton: true, confirmButtonText: 'Send' }).then(function (r) {
+        if (!r.isConfirmed) return;
+        showLoadingSpinner();
+        google.script.run.withSuccessHandler(function (res) {
+          hideLoadingSpinner();
+          if (!res.success) { toast('error', 'Not sent', res.message); return; }
+          Swal.fire({
+            icon: res.failed ? 'warning' : 'success',
+            title: 'Sent ' + res.sent + ' of ' + res.total,
+            text: res.failed ? res.failed + ' failed.' : 'All emails sent.'
+          });
+          document.getElementById('emailBody').value = '';
+          loadEmailTab();
+        }).withFailureHandler(runFail).adminSendEmail(adminToken, payload);
+      });
+    }
+
+    // -------------------------------------------------------------------
     // Admin Users
     // -------------------------------------------------------------------
     function loadAdmins() {
@@ -1517,7 +2121,7 @@
       google.script.run.withSuccessHandler(function (list) {
         hideLoadingSpinner();
         document.getElementById('adminTableBody').innerHTML = (list || []).map(function (a) {
-          return '<tr><td>' + esc(a.name) + '</td><td>' + esc(a.username) + '</td><td>' + esc(a.role) + '</td><td>' + esc(a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '') + '</td></tr>';
+          return '<tr><td>' + esc(a.name) + '</td><td>' + esc(a.username) + '</td><td>' + (a.email ? esc(a.email) : '<span class="muted">—</span>') + '</td><td>' + esc(a.role) + '</td><td>' + esc(a.createdAt ? new Date(a.createdAt).toLocaleDateString() : '') + '</td></tr>';
         }).join('');
       }).withFailureHandler(runFail).adminGetAdmins(adminToken);
     }
@@ -1526,6 +2130,7 @@
       var data = {
         name: document.getElementById('admName').value.trim(),
         username: document.getElementById('admUsername').value.trim(),
+        email: document.getElementById('admEmail').value.trim(),
         password: document.getElementById('admPassword').value,
         role: document.getElementById('admRole').value
       };

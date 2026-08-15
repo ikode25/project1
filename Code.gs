@@ -12,7 +12,7 @@
 
 // Bump when SHEETS changes so ensureSetup_ re-runs and adds new columns to
 // spreadsheets created by an older version of this script.
-var SCHEMA_VERSION = '4';
+var SCHEMA_VERSION = '5';
 
 // ---------------------------------------------------------------------------
 // Sheet schema — single source of truth for headers used by the generic
@@ -23,18 +23,23 @@ var SHEETS = {
   Settings:       ['Key', 'Value'],
   Businesses:     ['BusinessID', 'Name', 'Description', 'LogoURL', 'WhatsAppNumber', 'Active', 'SortOrder', 'CreatedAt'],
   Products:       ['ProductID', 'BusinessID', 'ImageURL', 'Name', 'Description', 'Category', 'Price', 'Stock', 'IsService', 'EnquireOnWhatsApp', 'Active', 'CreatedAt', 'RequiresRecipient', 'RecipientLabel', 'ConfirmationNote', 'InStock', 'ShowWhatsApp'],
-  Customers:      ['CustomerID', 'Name', 'Address', 'Phone', 'Username', 'PasswordHash', 'CreatedAt'],
-  Admins:         ['AdminID', 'Username', 'PasswordHash', 'Name', 'Role', 'CreatedAt'],
-  Orders:         ['OrderID', 'OrderType', 'Username', 'CustomerName', 'Phone', 'Address', 'Subtotal', 'DiscountAmount', 'Total', 'PaymentMethodID', 'PaymentMethodLabel', 'PayerNumber', 'TransactionID', 'PaymentStatus', 'OrderStatus', 'Notes', 'CreatedAt', 'UpdatedAt'],
+  Customers:      ['CustomerID', 'Name', 'Address', 'Phone', 'Username', 'PasswordHash', 'CreatedAt', 'Email', 'AuthProvider'],
+  Admins:         ['AdminID', 'Username', 'PasswordHash', 'Name', 'Role', 'CreatedAt', 'Email', 'RememberHash', 'RememberExpires'],
+  Orders:         ['OrderID', 'OrderType', 'Username', 'CustomerName', 'Phone', 'Address', 'Subtotal', 'DiscountAmount', 'Total', 'PaymentMethodID', 'PaymentMethodLabel', 'PayerNumber', 'TransactionID', 'PaymentStatus', 'OrderStatus', 'Notes', 'CreatedAt', 'UpdatedAt', 'CustomerEmail'],
   OrderItems:     ['OrderItemID', 'OrderID', 'ProductID', 'BusinessID', 'ProductName', 'BusinessName', 'Category', 'Qty', 'UnitPrice', 'LineDiscount', 'Subtotal', 'RecipientNumber'],
   PaymentMethods: ['PaymentMethodID', 'Type', 'Label', 'AccountName', 'AccountNumber', 'Provider', 'Instructions', 'Active', 'SortOrder'],
-  Banners:        ['BannerID', 'ImageURL', 'Title', 'LinkURL', 'Active', 'SortOrder'],
+  Banners:        ['BannerID', 'ImageURL', 'Title', 'LinkURL', 'Active', 'SortOrder', 'MediaType'],
   Discounts:      ['DiscountID', 'Label', 'Scope', 'TargetID', 'Type', 'Value', 'StartDate', 'EndDate', 'Active'],
-  Expenses:       ['ExpenseID', 'Date', 'BusinessID', 'Category', 'Description', 'Amount', 'AddedBy', 'CreatedAt']
+  Expenses:       ['ExpenseID', 'Date', 'BusinessID', 'Category', 'Description', 'Amount', 'AddedBy', 'CreatedAt'],
+  SmsProviders:   ['ProviderID', 'Name', 'Type', 'SenderID', 'BaseURL', 'ExtraConfig', 'Active', 'SortOrder', 'CreatedAt'],
+  SmsLog:         ['SmsID', 'CreatedAt', 'Phone', 'Message', 'ProviderID', 'ProviderName', 'Status', 'Response', 'Campaign', 'SentBy'],
+  EmailLog:       ['EmailID', 'CreatedAt', 'ToEmail', 'Subject', 'Status', 'Response', 'Campaign', 'SentBy'],
+  Messages:       ['MessageID', 'CreatedAt', 'Name', 'Phone', 'Email', 'Subject', 'Body', 'Status', 'Reply', 'RepliedAt', 'RepliedBy']
 };
 
 var LOW_STOCK_THRESHOLD = 5;
 var ADMIN_TOKEN_TTL_SECONDS = 21600; // 6 hours (CacheService max)
+var ADMIN_REMEMBER_DAYS = 30;        // lifetime of an opt-in "keep me signed in" token
 
 var DEFAULT_BUNDLE_DISCLAIMER =
   'This bundle does not apply to Turbo net SIM, WiFi SIM, Merchant Sim, Wrong numbers or MiFi SIM. ' +
@@ -241,7 +246,16 @@ function seedDefaultSettings_() {
     YouTubeURL: '',
     LinkedInURL: '',
     MapEmbedURL: '',
-    BundleDisclaimer: DEFAULT_BUNDLE_DISCLAIMER
+    BundleDisclaimer: DEFAULT_BUNDLE_DISCLAIMER,
+    SiteLogoURL: '',
+    GoogleClientId: '',
+    SmsCountryCode: '233',
+    OrderEmailEnabled: 'TRUE',
+    OrderSmsEnabled: 'FALSE',
+    ContactFormEnabled: 'TRUE',
+    VideoAdvertURL: '',
+    VideoAdvertTitle: '',
+    VideoAdvertEnabled: 'FALSE'
   };
 
   var existing = {};
@@ -641,7 +655,12 @@ function buildStorefrontData_() {
 
   var banners = sheetToObjects_('Banners').filter(function (b) { return toBool_(b.Active); })
     .sort(function (a, b) { return toNum_(a.SortOrder) - toNum_(b.SortOrder); })
-    .map(function (b) { return { id: String(b.BannerID), image: String(b.ImageURL || ''), title: String(b.Title || ''), link: String(b.LinkURL || '') }; });
+    .map(function (b) {
+      return {
+        id: String(b.BannerID), image: String(b.ImageURL || ''), title: String(b.Title || ''),
+        link: String(b.LinkURL || ''), mediaType: String(b.MediaType || 'image').toLowerCase()
+      };
+    });
 
   var paymentMethods = sheetToObjects_('PaymentMethods').filter(function (p) { return toBool_(p.Active); })
     .sort(function (a, b) { return toNum_(a.SortOrder) - toNum_(b.SortOrder); })
@@ -785,7 +804,8 @@ function placeOrder(payload) {
       PaymentMethodID: paymentMethod.PaymentMethodID, PaymentMethodLabel: paymentMethod.Label,
       PayerNumber: payerNumber, TransactionID: transactionId,
       PaymentStatus: 'Pending Verification', OrderStatus: 'Pending',
-      Notes: payload.notes || '', CreatedAt: now, UpdatedAt: now
+      Notes: payload.notes || '', CreatedAt: now, UpdatedAt: now,
+      CustomerEmail: String(payload.email || '').trim().toLowerCase()
     });
 
     lineItems.forEach(function (li) {
@@ -806,6 +826,10 @@ function placeOrder(payload) {
       if (stock === null) return;
       updateRowById_('Products', 'ProductID', productId, { Stock: Math.max(0, stock - qtyByProduct[productId]) });
     });
+
+    // Best-effort: the order is already saved, so a mail/SMS failure must not
+    // turn a successful checkout into an error for the customer.
+    notifyOrderPlaced_(orderId);
 
     return { success: true, orderId: orderId, total: round2_(total) };
   } catch (err) {
@@ -976,22 +1000,69 @@ function adminClearSampleData(token) {
   return { success: true, removedBusinesses: removedBiz, removedProducts: removedProducts };
 }
 
-function adminLogin(username, password) {
+function startAdminSession_(admin, remember) {
+  var token = Utilities.getUuid();
+  var session = { adminId: admin.AdminID, username: admin.Username, name: admin.Name, role: admin.Role };
+  CacheService.getScriptCache().put('admtok_' + token, JSON.stringify(session), ADMIN_TOKEN_TTL_SECONDS);
+
+  var out = {
+    token: token, name: String(admin.Name || ''), role: String(admin.Role || ''),
+    username: String(admin.Username || '')
+  };
+
+  // "Keep me signed in" is opt-in. Only then do we mint a long-lived token,
+  // stored hashed so a leaked spreadsheet can't be replayed as a login.
+  if (remember) {
+    var rememberToken = Utilities.getUuid() + Utilities.getUuid();
+    var expires = new Date();
+    expires.setDate(expires.getDate() + ADMIN_REMEMBER_DAYS);
+    updateRowById_('Admins', 'AdminID', admin.AdminID, {
+      RememberHash: hashPassword_(rememberToken), RememberExpires: expires
+    });
+    out.rememberToken = rememberToken;
+  }
+  return out;
+}
+
+function adminLogin(username, password, remember) {
   username = String(username || '').trim().toLowerCase();
   var hash = hashPassword_(String(password || ''));
   var match = sheetToObjects_('Admins').filter(function (a) {
     return String(a.Username).toLowerCase() === username && a.PasswordHash === hash;
   })[0];
   if (!match) return null;
-
-  var token = Utilities.getUuid();
-  var session = { adminId: match.AdminID, username: match.Username, name: match.Name, role: match.Role };
-  CacheService.getScriptCache().put('admtok_' + token, JSON.stringify(session), ADMIN_TOKEN_TTL_SECONDS);
-  return { token: token, name: String(match.Name || ''), role: String(match.Role || ''), username: String(match.Username || '') };
+  return startAdminSession_(match, !!remember);
 }
 
-function adminLogout(token) {
-  if (token) CacheService.getScriptCache().remove('admtok_' + token);
+// Only called when the admin ticked "Keep me signed in"; a plain revisit always
+// lands on the login form, so a customer tapping the admin icon sees nothing.
+function adminResumeSession(rememberToken) {
+  rememberToken = String(rememberToken || '');
+  if (!rememberToken) return null;
+  var hash = hashPassword_(rememberToken);
+  var match = sheetToObjects_('Admins').filter(function (a) { return a.RememberHash && a.RememberHash === hash; })[0];
+  if (!match) return null;
+  if (!match.RememberExpires || new Date(match.RememberExpires) < new Date()) {
+    updateRowById_('Admins', 'AdminID', match.AdminID, { RememberHash: '', RememberExpires: '' });
+    return null;
+  }
+  return startAdminSession_(match, false);
+}
+
+function adminLogout(token, rememberToken) {
+  if (token) {
+    try {
+      var session = requireAdmin_(token);
+      // Clear the long-lived token too, so "log out" really logs out.
+      updateRowById_('Admins', 'AdminID', session.adminId, { RememberHash: '', RememberExpires: '' });
+    } catch (err) { /* session already gone */ }
+    CacheService.getScriptCache().remove('admtok_' + token);
+  }
+  if (rememberToken) {
+    var hash = hashPassword_(String(rememberToken));
+    var match = sheetToObjects_('Admins').filter(function (a) { return a.RememberHash === hash; })[0];
+    if (match) updateRowById_('Admins', 'AdminID', match.AdminID, { RememberHash: '', RememberExpires: '' });
+  }
   return true;
 }
 
@@ -1015,7 +1086,8 @@ function adminAddAdmin(token, data) {
   if (exists) return { success: false, message: 'That admin username already exists.' };
   appendRowObject_('Admins', {
     AdminID: genId_('ADM'), Username: username, PasswordHash: hashPassword_(data.password),
-    Name: data.name, Role: data.role || 'staff', CreatedAt: new Date()
+    Name: data.name, Role: data.role || 'staff', CreatedAt: new Date(),
+    Email: String(data.email || '').trim().toLowerCase()
   });
   return { success: true };
 }
@@ -1023,7 +1095,10 @@ function adminAddAdmin(token, data) {
 function adminGetAdmins(token) {
   requireAdmin_(token);
   return sheetToObjects_('Admins').map(function (a) {
-    return { id: String(a.AdminID), username: String(a.Username || ''), name: String(a.Name || ''), role: String(a.Role || ''), createdAt: isoDate_(a.CreatedAt) };
+    return {
+      id: String(a.AdminID), username: String(a.Username || ''), name: String(a.Name || ''),
+      role: String(a.Role || ''), email: String(a.Email || ''), createdAt: isoDate_(a.CreatedAt)
+    };
   });
 }
 
@@ -1241,7 +1316,8 @@ function adminGetBanners(token) {
     .map(function (b) {
       return {
         BannerID: String(b.BannerID), ImageURL: String(b.ImageURL || ''), Title: String(b.Title || ''),
-        LinkURL: String(b.LinkURL || ''), Active: toBool_(b.Active), SortOrder: toNum_(b.SortOrder, 1)
+        LinkURL: String(b.LinkURL || ''), Active: toBool_(b.Active), SortOrder: toNum_(b.SortOrder, 1),
+        MediaType: String(b.MediaType || 'image').toLowerCase()
       };
     });
 }
@@ -1249,7 +1325,11 @@ function adminGetBanners(token) {
 function adminSaveBanner(token, b) {
   requireAdmin_(token);
   if (!b.ImageURL) return { success: false, message: 'Banner image is required.' };
-  var data = { ImageURL: b.ImageURL, Title: b.Title || '', LinkURL: b.LinkURL || '', Active: !!b.Active, SortOrder: toNum_(b.SortOrder, 1) };
+  var data = {
+    ImageURL: b.ImageURL, Title: b.Title || '', LinkURL: b.LinkURL || '',
+    Active: !!b.Active, SortOrder: toNum_(b.SortOrder, 1),
+    MediaType: String(b.MediaType || 'image').toLowerCase()
+  };
   if (b.BannerID) {
     updateRowById_('Banners', 'BannerID', b.BannerID, data);
     return { success: true, id: b.BannerID };
@@ -1441,4 +1521,649 @@ function getOrCreateUploadFolder_() {
   var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder('MultiBiz Store Uploads');
   props.setProperty('UPLOAD_FOLDER_ID', folder.getId());
   return folder;
+}
+
+// ============================================================================
+// SMS — pluggable providers (Arkesel, Hubtel, or any custom HTTP endpoint)
+//
+// Credentials never go in the spreadsheet: the SmsProviders sheet holds only
+// non-secret config, while API keys/secrets live in Script Properties under
+// SMS_KEY_<ProviderID> / SMS_SECRET_<ProviderID>.
+// ============================================================================
+function smsSecretKey_(providerId) { return 'SMS_KEY_' + providerId; }
+function smsSecretSecret_(providerId) { return 'SMS_SECRET_' + providerId; }
+
+function getSmsCreds_(providerId) {
+  var props = PropertiesService.getScriptProperties();
+  return {
+    apiKey: props.getProperty(smsSecretKey_(providerId)) || '',
+    apiSecret: props.getProperty(smsSecretSecret_(providerId)) || ''
+  };
+}
+
+function activeSmsProvider_() {
+  var list = sheetToObjects_('SmsProviders').filter(function (p) { return toBool_(p.Active); })
+    .sort(function (a, b) { return toNum_(a.SortOrder) - toNum_(b.SortOrder); });
+  return list[0] || null;
+}
+
+// Ghana numbers are stored locally (0XXXXXXXXX) but every gateway wants
+// international format.
+function toInternational_(phone, countryCode) {
+  var digits = String(phone || '').replace(/\D/g, '');
+  var cc = String(countryCode || '233').replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.indexOf(cc) === 0 && digits.length > 9) return digits;
+  if (digits.charAt(0) === '0') return cc + digits.slice(1);
+  return digits;
+}
+
+function sendOneSms_(provider, creds, phone, message) {
+  var to = toInternational_(phone, getSettingValue_('SmsCountryCode', '233'));
+  if (!to) return { ok: false, response: 'Invalid phone number' };
+
+  var type = String(provider.Type || '').toLowerCase();
+  var options, url, res, body;
+
+  try {
+    if (type === 'arkesel') {
+      url = (provider.BaseURL || 'https://sms.arkesel.com/api/v2/sms/send');
+      options = {
+        method: 'post', contentType: 'application/json',
+        headers: { 'api-key': creds.apiKey },
+        payload: JSON.stringify({ sender: provider.SenderID || 'Store', message: message, recipients: [to] }),
+        muteHttpExceptions: true
+      };
+    } else if (type === 'hubtel') {
+      url = (provider.BaseURL || 'https://smsc.hubtel.com/v1/messages/send') +
+        '?clientid=' + encodeURIComponent(creds.apiKey) +
+        '&clientsecret=' + encodeURIComponent(creds.apiSecret) +
+        '&from=' + encodeURIComponent(provider.SenderID || 'Store') +
+        '&to=' + encodeURIComponent(to) +
+        '&content=' + encodeURIComponent(message);
+      options = { method: 'get', muteHttpExceptions: true };
+    } else {
+      // Custom: BaseURL is a template. Supported placeholders:
+      // {to} {message} {sender} {apikey} {apisecret}
+      var template = String(provider.BaseURL || '');
+      if (!template) return { ok: false, response: 'No endpoint configured for this provider' };
+      var filled = template
+        .replace(/\{to\}/g, encodeURIComponent(to))
+        .replace(/\{message\}/g, encodeURIComponent(message))
+        .replace(/\{sender\}/g, encodeURIComponent(provider.SenderID || ''))
+        .replace(/\{apikey\}/g, encodeURIComponent(creds.apiKey))
+        .replace(/\{apisecret\}/g, encodeURIComponent(creds.apiSecret));
+
+      var extra = {};
+      try { extra = provider.ExtraConfig ? JSON.parse(provider.ExtraConfig) : {}; } catch (e) { extra = {}; }
+      var method = String(extra.method || 'get').toLowerCase();
+      options = { method: method, muteHttpExceptions: true };
+      if (extra.headers) options.headers = extra.headers;
+      if (method === 'post') {
+        options.contentType = extra.contentType || 'application/json';
+        var payload = String(extra.payload || '{"to":"{to}","message":"{message}"}')
+          .replace(/\{to\}/g, to)
+          .replace(/\{message\}/g, String(message).replace(/"/g, '\\"'))
+          .replace(/\{sender\}/g, provider.SenderID || '')
+          .replace(/\{apikey\}/g, creds.apiKey)
+          .replace(/\{apisecret\}/g, creds.apiSecret);
+        options.payload = payload;
+      }
+      url = filled;
+    }
+
+    res = UrlFetchApp.fetch(url, options);
+    var code = res.getResponseCode();
+    body = res.getContentText();
+    // Gateways signal failure in the body as often as in the status code.
+    var looksFailed = /"?(status)"?\s*[:=]\s*"?(failed|error)/i.test(body);
+    return { ok: code >= 200 && code < 300 && !looksFailed, response: (body || '').slice(0, 400) };
+  } catch (err) {
+    return { ok: false, response: String(err && err.message ? err.message : err) };
+  }
+}
+
+function logSms_(phone, message, provider, result, campaign, sentBy) {
+  appendRowObject_('SmsLog', {
+    SmsID: genId_('SMS'), CreatedAt: new Date(), Phone: phone, Message: message,
+    ProviderID: provider ? provider.ProviderID : '', ProviderName: provider ? provider.Name : '',
+    Status: result.ok ? 'Sent' : 'Failed', Response: result.response, Campaign: campaign || '', SentBy: sentBy || 'system'
+  });
+}
+
+// Used both by the admin SMS console and by automatic order notifications.
+function sendSmsBatch_(recipients, message, campaign, sentBy) {
+  var provider = activeSmsProvider_();
+  if (!provider) return { success: false, message: 'No active SMS provider configured. Add one under Admin -> SMS.' };
+  var creds = getSmsCreds_(provider.ProviderID);
+  if (!creds.apiKey) return { success: false, message: 'No API key saved for "' + provider.Name + '". Open Admin -> SMS and save your key.' };
+
+  var sent = 0, failed = 0, errors = [];
+  recipients.forEach(function (phone) {
+    if (!phone) return;
+    var result = sendOneSms_(provider, creds, phone, message);
+    logSms_(phone, message, provider, result, campaign, sentBy);
+    if (result.ok) sent++;
+    else { failed++; if (errors.length < 3) errors.push(phone + ': ' + result.response); }
+  });
+  return { success: true, sent: sent, failed: failed, errors: errors };
+}
+
+function adminSendSms(token, payload) {
+  var admin = requireAdmin_(token);
+  payload = payload || {};
+  var message = String(payload.message || '').trim();
+  if (!message) return { success: false, message: 'Please write a message.' };
+
+  var recipients = resolveSmsRecipients_(payload);
+  if (!recipients.length) return { success: false, message: 'No recipients matched your selection.' };
+
+  var res = sendSmsBatch_(recipients, message, payload.campaign || 'manual', admin.name);
+  if (!res.success) return res;
+  return { success: true, sent: res.sent, failed: res.failed, total: recipients.length, errors: res.errors };
+}
+
+function resolveSmsRecipients_(payload) {
+  var audience = String(payload.audience || 'manual');
+  var numbers = [];
+
+  if (audience === 'manual') {
+    numbers = String(payload.numbers || '').split(/[\s,;\n]+/).filter(Boolean);
+  } else if (audience === 'customers') {
+    numbers = sheetToObjects_('Customers').map(function (c) { return String(c.Phone || ''); });
+  } else if (audience === 'buyers') {
+    numbers = sheetToObjects_('Orders').map(function (o) { return String(o.Phone || ''); });
+  } else if (audience === 'confirmed') {
+    numbers = sheetToObjects_('Orders').filter(function (o) { return o.PaymentStatus === 'Confirmed'; })
+      .map(function (o) { return String(o.Phone || ''); });
+  } else if (audience === 'order') {
+    var order = sheetToObjects_('Orders').filter(function (o) { return String(o.OrderID) === String(payload.orderId); })[0];
+    numbers = order ? [String(order.Phone || '')] : [];
+  }
+
+  // One person shouldn't get the same promo twice because they ordered twice.
+  var seen = {}, unique = [];
+  numbers.forEach(function (n) {
+    var key = String(n).replace(/\D/g, '');
+    if (!key || seen[key]) return;
+    seen[key] = true;
+    unique.push(n);
+  });
+  return unique;
+}
+
+function adminGetSmsProviders(token) {
+  requireAdmin_(token);
+  return sheetToObjects_('SmsProviders').map(function (p) {
+    var creds = getSmsCreds_(p.ProviderID);
+    return {
+      ProviderID: String(p.ProviderID), Name: String(p.Name || ''), Type: String(p.Type || ''),
+      SenderID: String(p.SenderID || ''), BaseURL: String(p.BaseURL || ''),
+      ExtraConfig: String(p.ExtraConfig || ''), Active: toBool_(p.Active), SortOrder: toNum_(p.SortOrder, 1),
+      // Never send the key back to the browser — just say whether one is set.
+      hasApiKey: !!creds.apiKey, hasApiSecret: !!creds.apiSecret
+    };
+  }).sort(function (a, b) { return a.SortOrder - b.SortOrder; });
+}
+
+function adminSaveSmsProvider(token, p) {
+  requireAdmin_(token);
+  if (!p.Name || !p.Type) return { success: false, message: 'Provider name and type are required.' };
+  var data = {
+    Name: p.Name, Type: String(p.Type).toLowerCase(), SenderID: p.SenderID || '',
+    BaseURL: p.BaseURL || '', ExtraConfig: p.ExtraConfig || '',
+    Active: !!p.Active, SortOrder: toNum_(p.SortOrder, 1)
+  };
+  var id = p.ProviderID;
+  if (id) {
+    updateRowById_('SmsProviders', 'ProviderID', id, data);
+  } else {
+    id = genId_('SMSP');
+    data.ProviderID = id;
+    data.CreatedAt = new Date();
+    appendRowObject_('SmsProviders', data);
+  }
+
+  // Blank means "leave the stored key alone", so editing a provider doesn't
+  // wipe credentials the admin didn't retype.
+  var props = PropertiesService.getScriptProperties();
+  if (p.ApiKey) props.setProperty(smsSecretKey_(id), String(p.ApiKey));
+  if (p.ApiSecret) props.setProperty(smsSecretSecret_(id), String(p.ApiSecret));
+  return { success: true, id: id };
+}
+
+function adminDeleteSmsProvider(token, providerId) {
+  requireAdmin_(token);
+  deleteRowById_('SmsProviders', 'ProviderID', providerId);
+  var props = PropertiesService.getScriptProperties();
+  props.deleteProperty(smsSecretKey_(providerId));
+  props.deleteProperty(smsSecretSecret_(providerId));
+  return { success: true };
+}
+
+// Balance lookup differs per gateway and is best-effort: a provider that
+// doesn't expose one shouldn't look like an error.
+function adminGetSmsBalance(token) {
+  requireAdmin_(token);
+  var provider = activeSmsProvider_();
+  if (!provider) return { available: false, message: 'No active SMS provider.' };
+  var creds = getSmsCreds_(provider.ProviderID);
+  if (!creds.apiKey) return { available: false, message: 'No API key saved for ' + provider.Name + '.' };
+
+  var type = String(provider.Type || '').toLowerCase();
+  try {
+    if (type === 'arkesel') {
+      var res = UrlFetchApp.fetch('https://sms.arkesel.com/api/v2/clients/balance-details',
+        { method: 'get', headers: { 'api-key': creds.apiKey }, muteHttpExceptions: true });
+      var json = JSON.parse(res.getContentText());
+      var d = json.data || {};
+      return { available: true, provider: provider.Name, balance: d.sms_balance || d.balance || d.main_balance || '—', raw: String(res.getContentText()).slice(0, 200) };
+    }
+    if (type === 'hubtel') {
+      var hres = UrlFetchApp.fetch('https://smsc.hubtel.com/v1/account/balance',
+        { method: 'get', headers: { Authorization: 'Basic ' + Utilities.base64Encode(creds.apiKey + ':' + creds.apiSecret) }, muteHttpExceptions: true });
+      var hjson = JSON.parse(hres.getContentText());
+      return { available: true, provider: provider.Name, balance: (hjson.data && (hjson.data.balance || hjson.data.Balance)) || '—', raw: String(hres.getContentText()).slice(0, 200) };
+    }
+    return { available: false, provider: provider.Name, message: 'Balance lookup is not supported for custom providers.' };
+  } catch (err) {
+    return { available: false, provider: provider.Name, message: 'Could not read balance: ' + err.message };
+  }
+}
+
+function adminGetSmsStats(token) {
+  requireAdmin_(token);
+  var log = sheetToObjects_('SmsLog');
+  var sent = 0, failed = 0;
+  log.forEach(function (r) { if (String(r.Status) === 'Sent') sent++; else failed++; });
+  return { sent: sent, failed: failed, total: log.length };
+}
+
+function adminGetSmsLog(token, limit) {
+  requireAdmin_(token);
+  var log = sheetToObjects_('SmsLog').sort(function (a, b) { return new Date(b.CreatedAt) - new Date(a.CreatedAt); });
+  return log.slice(0, limit || 200).map(function (r) {
+    return {
+      id: String(r.SmsID), createdAt: isoDate_(r.CreatedAt), phone: String(r.Phone || ''),
+      message: String(r.Message || ''), provider: String(r.ProviderName || ''),
+      status: String(r.Status || ''), response: String(r.Response || ''),
+      campaign: String(r.Campaign || ''), sentBy: String(r.SentBy || '')
+    };
+  });
+}
+
+// ============================================================================
+// EMAIL — branded HTML built from the store's own colors, logo and details
+// ============================================================================
+function buildEmailHtml_(title, bodyHtml, opts) {
+  opts = opts || {};
+  var s = getPublicSettings_();
+  var primary = s.PrimaryColor || '#2563eb';
+  var siteName = s.SiteName || 'Our Store';
+  var logo = s.SiteLogoURL || '';
+
+  var contactBits = [];
+  if (s.ContactPhone) contactBits.push(escapeHtml_(s.ContactPhone));
+  if (s.ContactEmail) contactBits.push(escapeHtml_(s.ContactEmail));
+  if (s.ContactAddress) contactBits.push(escapeHtml_(s.ContactAddress));
+
+  var socials = [];
+  [['FacebookURL', 'Facebook'], ['InstagramURL', 'Instagram'], ['TwitterURL', 'X'], ['TikTokURL', 'TikTok'], ['YouTubeURL', 'YouTube']]
+    .forEach(function (pair) {
+      if (s[pair[0]]) socials.push('<a href="' + escapeHtml_(s[pair[0]]) + '" style="color:' + primary + ';text-decoration:none;margin:0 6px">' + pair[1] + '</a>');
+    });
+
+  return '' +
+  '<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f1f5f9;font-family:Segoe UI,Roboto,Helvetica,Arial,sans-serif;">' +
+    '<table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 12px;">' +
+      '<tr><td align="center">' +
+        '<table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08);">' +
+          '<tr><td style="background:' + primary + ';padding:24px;text-align:center;">' +
+            (logo ? '<img src="' + escapeHtml_(logo) + '" alt="' + escapeHtml_(siteName) + '" style="max-height:56px;margin-bottom:10px;display:block;margin-left:auto;margin-right:auto;">' : '') +
+            '<h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">' + escapeHtml_(siteName) + '</h1>' +
+            (title ? '<p style="margin:6px 0 0;color:rgba(255,255,255,.9);font-size:15px;">' + escapeHtml_(title) + '</p>' : '') +
+          '</td></tr>' +
+          '<tr><td style="padding:28px 24px;color:#0f172a;font-size:15px;line-height:1.6;">' + bodyHtml + '</td></tr>' +
+          '<tr><td style="background:#f8fafc;padding:20px 24px;text-align:center;color:#64748b;font-size:12px;line-height:1.6;border-top:1px solid #e2e8f0;">' +
+            (contactBits.length ? '<p style="margin:0 0 6px;">' + contactBits.join(' &nbsp;•&nbsp; ') + '</p>' : '') +
+            (socials.length ? '<p style="margin:0 0 6px;">' + socials.join('') + '</p>' : '') +
+            '<p style="margin:0;">&copy; ' + new Date().getFullYear() + ' ' + escapeHtml_(siteName) + '. All rights reserved.</p>' +
+          '</td></tr>' +
+        '</table>' +
+      '</td></tr>' +
+    '</table>' +
+  '</body></html>';
+}
+
+function escapeHtml_(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function sendEmail_(to, subject, bodyHtml, title, campaign, sentBy) {
+  to = String(to || '').trim();
+  if (!to || to.indexOf('@') === -1) return { ok: false, response: 'Invalid email address' };
+  try {
+    var siteName = getSettingValue_('SiteName', 'Our Store');
+    MailApp.sendEmail({
+      to: to, subject: subject, name: siteName,
+      htmlBody: buildEmailHtml_(title, bodyHtml),
+      body: String(bodyHtml).replace(/<[^>]+>/g, ' ') // plain-text fallback
+    });
+    appendRowObject_('EmailLog', {
+      EmailID: genId_('EML'), CreatedAt: new Date(), ToEmail: to, Subject: subject,
+      Status: 'Sent', Response: '', Campaign: campaign || '', SentBy: sentBy || 'system'
+    });
+    return { ok: true, response: '' };
+  } catch (err) {
+    var msg = String(err && err.message ? err.message : err);
+    appendRowObject_('EmailLog', {
+      EmailID: genId_('EML'), CreatedAt: new Date(), ToEmail: to, Subject: subject,
+      Status: 'Failed', Response: msg, Campaign: campaign || '', SentBy: sentBy || 'system'
+    });
+    return { ok: false, response: msg };
+  }
+}
+
+function orderConfirmationHtml_(order, items) {
+  var s = getPublicSettings_();
+  var sym = s.CurrencySymbol || 'GHS ';
+  var rows = items.map(function (i) {
+    return '<tr>' +
+      '<td style="padding:8px;border-bottom:1px solid #e2e8f0;">' + escapeHtml_(i.ProductName) +
+        (i.RecipientNumber ? '<br><span style="color:#64748b;font-size:12px;">For: ' + escapeHtml_(i.RecipientNumber) + '</span>' : '') +
+      '</td>' +
+      '<td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:center;">' + i.Qty + '</td>' +
+      '<td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">' + sym + Number(i.Subtotal).toFixed(2) + '</td>' +
+    '</tr>';
+  }).join('');
+
+  return '<p>Hi ' + escapeHtml_(order.CustomerName) + ',</p>' +
+    '<p>Thank you for your order! We have received it and are verifying your payment.</p>' +
+    '<p style="background:#f1f5f9;padding:12px;border-radius:8px;"><strong>Order ID:</strong> ' + escapeHtml_(order.OrderID) + '<br>' +
+    '<strong>Payment status:</strong> ' + escapeHtml_(order.PaymentStatus) + '</p>' +
+    '<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:16px 0;">' +
+      '<tr style="background:#f8fafc;"><th align="left" style="padding:8px;">Item</th><th style="padding:8px;">Qty</th><th align="right" style="padding:8px;">Amount</th></tr>' +
+      rows +
+      '<tr><td colspan="2" style="padding:10px;text-align:right;font-weight:700;">Total</td>' +
+      '<td style="padding:10px;text-align:right;font-weight:700;">' + sym + Number(order.Total).toFixed(2) + '</td></tr>' +
+    '</table>' +
+    '<p>You can track your order any time using your Order ID and phone number.</p>' +
+    '<p>We appreciate your business!</p>';
+}
+
+// Fired after checkout. Wrapped so a mail/SMS problem can never fail an order
+// that has already been recorded.
+function notifyOrderPlaced_(orderId) {
+  try {
+    var order = sheetToObjects_('Orders').filter(function (o) { return String(o.OrderID) === String(orderId); })[0];
+    if (!order) return;
+    var items = sheetToObjects_('OrderItems').filter(function (i) { return String(i.OrderID) === String(orderId); });
+    var s = getPublicSettings_();
+
+    if (String(s.OrderEmailEnabled).toUpperCase() !== 'FALSE' && order.CustomerEmail) {
+      sendEmail_(order.CustomerEmail, 'Order ' + order.OrderID + ' received',
+        orderConfirmationHtml_(order, items), 'Order Confirmation', 'order-confirmation', 'system');
+    }
+    if (String(s.OrderSmsEnabled).toUpperCase() === 'TRUE' && order.Phone) {
+      var sym = s.CurrencySymbol || 'GHS ';
+      var msg = (s.SiteName || 'Store') + ': Thank you ' + order.CustomerName + '! Order ' + order.OrderID +
+        ' for ' + sym + Number(order.Total).toFixed(2) + ' received. We are verifying your payment.';
+      sendSmsBatch_([order.Phone], msg, 'order-confirmation', 'system');
+    }
+  } catch (err) {
+    Logger.log('notifyOrderPlaced_ failed: ' + err);
+  }
+}
+
+function adminSendEmail(token, payload) {
+  var admin = requireAdmin_(token);
+  payload = payload || {};
+  var subject = String(payload.subject || '').trim();
+  var body = String(payload.body || '').trim();
+  if (!subject || !body) return { success: false, message: 'Subject and message are required.' };
+
+  var recipients = resolveEmailRecipients_(payload);
+  if (!recipients.length) return { success: false, message: 'No email addresses matched your selection.' };
+
+  var quota = MailApp.getRemainingDailyQuota();
+  if (recipients.length > quota) {
+    return { success: false, message: 'You can only send ' + quota + ' more emails today (Gmail daily limit). Reduce your audience and try again.' };
+  }
+
+  var bodyHtml = '<p>' + escapeHtml_(body).replace(/\n/g, '<br>') + '</p>';
+  var sent = 0, failed = 0;
+  recipients.forEach(function (email) {
+    var res = sendEmail_(email, subject, bodyHtml, payload.title || '', payload.campaign || 'manual', admin.name);
+    if (res.ok) sent++; else failed++;
+  });
+  return { success: true, sent: sent, failed: failed, total: recipients.length };
+}
+
+function resolveEmailRecipients_(payload) {
+  var audience = String(payload.audience || 'manual');
+  var emails = [];
+  if (audience === 'manual') {
+    emails = String(payload.emails || '').split(/[\s,;\n]+/).filter(Boolean);
+  } else if (audience === 'customers') {
+    emails = sheetToObjects_('Customers').map(function (c) { return String(c.Email || ''); });
+  } else if (audience === 'buyers') {
+    emails = sheetToObjects_('Orders').map(function (o) { return String(o.CustomerEmail || ''); });
+  } else if (audience === 'confirmed') {
+    emails = sheetToObjects_('Orders').filter(function (o) { return o.PaymentStatus === 'Confirmed'; })
+      .map(function (o) { return String(o.CustomerEmail || ''); });
+  }
+  var seen = {}, unique = [];
+  emails.forEach(function (e) {
+    var key = String(e).trim().toLowerCase();
+    if (!key || key.indexOf('@') === -1 || seen[key]) return;
+    seen[key] = true;
+    unique.push(key);
+  });
+  return unique;
+}
+
+function adminGetEmailStats(token) {
+  requireAdmin_(token);
+  var log = sheetToObjects_('EmailLog');
+  var sent = 0, failed = 0;
+  log.forEach(function (r) { if (String(r.Status) === 'Sent') sent++; else failed++; });
+  var quota = 0;
+  try { quota = MailApp.getRemainingDailyQuota(); } catch (err) { quota = -1; }
+  return { sent: sent, failed: failed, total: log.length, remainingQuota: quota };
+}
+
+function adminGetEmailLog(token, limit) {
+  requireAdmin_(token);
+  return sheetToObjects_('EmailLog')
+    .sort(function (a, b) { return new Date(b.CreatedAt) - new Date(a.CreatedAt); })
+    .slice(0, limit || 200)
+    .map(function (r) {
+      return {
+        id: String(r.EmailID), createdAt: isoDate_(r.CreatedAt), to: String(r.ToEmail || ''),
+        subject: String(r.Subject || ''), status: String(r.Status || ''),
+        response: String(r.Response || ''), campaign: String(r.Campaign || ''), sentBy: String(r.SentBy || '')
+      };
+    });
+}
+
+// ============================================================================
+// CUSTOMER MESSAGES — storefront contact form + admin replies
+// ============================================================================
+function submitCustomerMessage(payload) {
+  payload = payload || {};
+  var name = String(payload.name || '').trim();
+  var body = String(payload.body || '').trim();
+  if (!name || !body) return { success: false, message: 'Please enter your name and a message.' };
+  if (!payload.phone && !payload.email) return { success: false, message: 'Please leave a phone number or email so we can reply.' };
+
+  appendRowObject_('Messages', {
+    MessageID: genId_('MSG'), CreatedAt: new Date(), Name: name,
+    Phone: String(payload.phone || '').trim(), Email: String(payload.email || '').trim().toLowerCase(),
+    Subject: String(payload.subject || 'General enquiry').trim(), Body: body,
+    Status: 'New', Reply: '', RepliedAt: '', RepliedBy: ''
+  });
+  return { success: true };
+}
+
+function adminGetMessages(token) {
+  requireAdmin_(token);
+  return sheetToObjects_('Messages')
+    .sort(function (a, b) { return new Date(b.CreatedAt) - new Date(a.CreatedAt); })
+    .map(function (m) {
+      return {
+        id: String(m.MessageID), createdAt: isoDate_(m.CreatedAt), name: String(m.Name || ''),
+        phone: String(m.Phone || ''), email: String(m.Email || ''), subject: String(m.Subject || ''),
+        body: String(m.Body || ''), status: String(m.Status || 'New'), reply: String(m.Reply || ''),
+        repliedAt: isoDate_(m.RepliedAt), repliedBy: String(m.RepliedBy || '')
+      };
+    });
+}
+
+// Replies go out by email when we have one, otherwise by SMS.
+function adminReplyToMessage(token, messageId, reply, channel) {
+  var admin = requireAdmin_(token);
+  reply = String(reply || '').trim();
+  if (!reply) return { success: false, message: 'Please write a reply.' };
+
+  var msg = sheetToObjects_('Messages').filter(function (m) { return String(m.MessageID) === String(messageId); })[0];
+  if (!msg) return { success: false, message: 'Message not found.' };
+
+  var delivered = false, how = '', problem = '';
+  channel = channel || (msg.Email ? 'email' : 'sms');
+
+  if (channel === 'email' && msg.Email) {
+    var html = '<p>Hi ' + escapeHtml_(msg.Name) + ',</p>' +
+      '<p>' + escapeHtml_(reply).replace(/\n/g, '<br>') + '</p>' +
+      '<hr style="border:none;border-top:1px solid #e2e8f0;margin:18px 0;">' +
+      '<p style="color:#64748b;font-size:13px;"><strong>Your message:</strong><br>' + escapeHtml_(msg.Body).replace(/\n/g, '<br>') + '</p>';
+    var r = sendEmail_(msg.Email, 'Re: ' + (msg.Subject || 'Your enquiry'), html, 'Reply from our team', 'message-reply', admin.name);
+    delivered = r.ok; how = 'email'; problem = r.response;
+  } else if (msg.Phone) {
+    var sres = sendSmsBatch_([msg.Phone], reply, 'message-reply', admin.name);
+    delivered = sres.success && sres.sent > 0;
+    how = 'SMS';
+    problem = sres.message || (sres.errors || []).join('; ');
+  } else {
+    return { success: false, message: 'This message has no email or phone number to reply to.' };
+  }
+
+  updateRowById_('Messages', 'MessageID', messageId, {
+    Reply: reply, Status: delivered ? 'Replied' : 'Reply failed',
+    RepliedAt: new Date(), RepliedBy: admin.name
+  });
+  return delivered
+    ? { success: true, channel: how }
+    : { success: false, message: 'Saved your reply, but sending by ' + how + ' failed: ' + problem };
+}
+
+function adminUpdateMessageStatus(token, messageId, status) {
+  requireAdmin_(token);
+  updateRowById_('Messages', 'MessageID', messageId, { Status: status });
+  return { success: true };
+}
+
+function adminDeleteMessage(token, messageId) {
+  requireAdmin_(token);
+  deleteRowById_('Messages', 'MessageID', messageId);
+  return { success: true };
+}
+
+// ============================================================================
+// GOOGLE SIGN-IN — verifies the ID token Google Identity Services returns
+// ============================================================================
+function verifyGoogleIdToken_(idToken) {
+  var clientId = getSettingValue_('GoogleClientId', '');
+  if (!clientId) return { ok: false, message: 'Google sign-in is not configured for this store.' };
+  try {
+    var res = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken), { muteHttpExceptions: true });
+    if (res.getResponseCode() !== 200) return { ok: false, message: 'Google could not verify that sign-in.' };
+    var info = JSON.parse(res.getContentText());
+    // Confirm the token was minted for THIS store, not some other app.
+    if (String(info.aud) !== String(clientId)) return { ok: false, message: 'This sign-in was issued for a different application.' };
+    if (String(info.email_verified) !== 'true' && info.email_verified !== true) return { ok: false, message: 'Your Google email is not verified.' };
+    if (info.exp && (Number(info.exp) * 1000) < Date.now()) return { ok: false, message: 'That sign-in has expired, please try again.' };
+    return { ok: true, email: String(info.email).toLowerCase(), name: String(info.name || info.email) };
+  } catch (err) {
+    return { ok: false, message: 'Could not verify Google sign-in: ' + err.message };
+  }
+}
+
+// Signs a shopper in, creating a lightweight account on first use.
+function customerGoogleLogin(idToken) {
+  var v = verifyGoogleIdToken_(idToken);
+  if (!v.ok) return { success: false, message: v.message };
+
+  var existing = sheetToObjects_('Customers').filter(function (c) {
+    return String(c.Email || '').toLowerCase() === v.email;
+  })[0];
+
+  if (!existing) {
+    var username = v.email.split('@')[0].replace(/[^a-z0-9]/g, '') + Math.floor(Math.random() * 900 + 100);
+    appendRowObject_('Customers', {
+      CustomerID: genId_('CUS'), Name: v.name, Address: '', Phone: '',
+      Username: username, PasswordHash: '', CreatedAt: new Date(),
+      Email: v.email, AuthProvider: 'google'
+    });
+    existing = sheetToObjects_('Customers').filter(function (c) { return String(c.Username) === username; })[0];
+  }
+
+  return {
+    success: true,
+    user: {
+      username: String(existing.Username), name: String(existing.Name || ''),
+      address: String(existing.Address || ''), phone: String(existing.Phone || ''),
+      email: String(existing.Email || '')
+    }
+  };
+}
+
+// Admin Google sign-in is allow-list only: the email must already belong to an
+// admin account, so nobody can self-provision access to the portal.
+function adminGoogleLogin(idToken, remember) {
+  var v = verifyGoogleIdToken_(idToken);
+  if (!v.ok) return { success: false, message: v.message };
+
+  var admin = sheetToObjects_('Admins').filter(function (a) {
+    return String(a.Email || '').toLowerCase() === v.email;
+  })[0];
+  if (!admin) {
+    return { success: false, message: 'No admin account is linked to ' + v.email + '. An existing admin must add that address under Admin Users first.' };
+  }
+  return { success: true, session: startAdminSession_(admin, !!remember) };
+}
+
+function adminSetAdminEmail(token, adminId, email) {
+  requireAdmin_(token);
+  email = String(email || '').trim().toLowerCase();
+  if (email && email.indexOf('@') === -1) return { success: false, message: 'That does not look like an email address.' };
+  var clash = sheetToObjects_('Admins').filter(function (a) {
+    return String(a.Email || '').toLowerCase() === email && String(a.AdminID) !== String(adminId);
+  })[0];
+  if (email && clash) return { success: false, message: 'Another admin already uses that email.' };
+  updateRowById_('Admins', 'AdminID', adminId, { Email: email });
+  return { success: true };
+}
+
+// Lets the customer save a delivery address/phone captured at checkout back
+// onto a Google-created account, which starts with neither.
+function updateCustomerProfile(username, profile) {
+  username = String(username || '').trim().toLowerCase();
+  if (!username) return { success: false };
+  var c = sheetToObjects_('Customers').filter(function (x) { return String(x.Username).toLowerCase() === username; })[0];
+  if (!c) return { success: false };
+  var patch = {};
+  if (profile.name) patch.Name = String(profile.name).trim();
+  if (profile.phone) patch.Phone = String(profile.phone).trim();
+  if (profile.address) patch.Address = String(profile.address).trim();
+  if (profile.email) patch.Email = String(profile.email).trim().toLowerCase();
+  if (Object.keys(patch).length) updateRowById_('Customers', 'CustomerID', c.CustomerID, patch);
+  return { success: true };
+}
+
+// Public: the admin login page needs the Client ID before any session exists.
+// A Google OAuth client ID is not a secret.
+function getGoogleClientId() {
+  try { return getSettingValue_('GoogleClientId', '') || ''; } catch (err) { return ''; }
 }
