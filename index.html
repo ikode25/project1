@@ -176,6 +176,7 @@ box-shadow: 0 0 8px var(--accent);
     </div>
     <div class="border-t border-white/10 text-center py-3 text-xs opacity-75">
       <p id="footerText">&copy; <span id="footerYear"></span> Multi-Business Store. All rights reserved.</p>
+      <p class="mt-1 opacity-60">Build <span id="buildTag">—</span></p>
     </div>
   </footer>
 
@@ -386,6 +387,9 @@ box-shadow: 0 0 8px var(--accent);
     var selectedPaymentMethodId = null;
     var pendingRecipientProduct = null;
     var storeLoaded = false;
+    // Bump alongside the server build so a cached payload from an older
+    // version is never rendered after an upgrade.
+    var STORE_CACHE_KEY = 'mb_store_v5';
 
     // ---------------------------------------------------------------------
     // Progress bar (non-blocking, replaces the old spinner overlay)
@@ -478,7 +482,10 @@ box-shadow: 0 0 8px var(--accent);
       applyStoredTheme();
 
       var cached = null;
-      try { cached = JSON.parse(sessionStorage.getItem('mb_store') || 'null'); } catch (e) { cached = null; }
+      try {
+        sessionStorage.removeItem('mb_store'); // key used by older builds
+        cached = JSON.parse(sessionStorage.getItem(STORE_CACHE_KEY) || 'null');
+      } catch (e) { cached = null; }
       if (cached && cached.products) {
         onStoreLoaded(cached, true);
       }
@@ -490,7 +497,18 @@ box-shadow: 0 0 8px var(--accent);
 
     function onStoreLoadFailed(err) {
       stopProgress();
-      if (!storeLoaded) toast('error', 'Could not load store', String(err));
+      console.error('getStorefrontData failed:', err);
+      // Always surface it. Previously this was suppressed whenever cached
+      // content was already on screen, which made a failed load look like
+      // "the update just didn't appear".
+      var msg = String(err && err.message ? err.message : err);
+      Swal.fire({
+        icon: 'error',
+        title: storeLoaded ? 'Showing older data' : 'Could not load store',
+        html: (storeLoaded ? 'The store could not be refreshed, so you are seeing a saved copy.<br><br>' : '') +
+              '<code style="font-size:12px">' + esc(msg) + '</code>',
+        confirmButtonText: 'OK'
+      });
     }
 
     function onStoreLoaded(data, fromCache) {
@@ -500,9 +518,10 @@ box-shadow: 0 0 8px var(--accent);
       store.settings = store.settings || {};
       storeLoaded = true;
       if (!fromCache) {
-        try { sessionStorage.setItem('mb_store', JSON.stringify(data)); } catch (e) { /* quota */ }
+        try { sessionStorage.setItem(STORE_CACHE_KEY, JSON.stringify(data)); } catch (e) { /* quota */ }
       }
       setupAdminLinks(store.adminUrl);
+      if (store.build) document.getElementById('buildTag').textContent = store.build;
       if (store.loadError) console.warn('Store loaded with errors:', store.loadError);
       applyTheme();
       applyBranding();

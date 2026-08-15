@@ -161,6 +161,7 @@
       <div class="p-4 border-t" style="border-color:rgba(255,255,255,.1)">
         <a href="?" id="viewStoreLink" target="_top" class="text-sm hover:underline block mb-2"><i class="fas fa-store mr-1"></i>View Store</a>
         <button onclick="adminDoLogout()" class="text-red-400 text-sm hover:underline"><i class="fas fa-sign-out-alt mr-1"></i>Logout</button>
+        <p class="text-xs opacity-50 mt-2">Build <span id="adminBuildTag">—</span></p>
       </div>
     </aside>
 
@@ -899,6 +900,11 @@
         document.getElementById('backToStore').href = url;
         document.getElementById('viewStoreLink').href = url;
       }).getWebAppUrl();
+
+      // Confirms which deployment this page is actually talking to.
+      google.script.run.withSuccessHandler(function (info) {
+        if (info && info.build) document.getElementById('adminBuildTag').textContent = info.build;
+      }).withFailureHandler(function () {}).getBuildInfo();
 
       // A live token alone is NOT enough to walk into the portal — a customer
       // tapping the admin icon must always land on the login form. Only an

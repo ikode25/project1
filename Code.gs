@@ -14,6 +14,10 @@
 // spreadsheets created by an older version of this script.
 var SCHEMA_VERSION = '5';
 
+// Shown in the storefront footer and admin sidebar. If this doesn't match the
+// file you pasted, the deployment is still serving an older version.
+var BUILD_VERSION = '2026.08.15-5';
+
 // ---------------------------------------------------------------------------
 // Sheet schema — single source of truth for headers used by the generic
 // object <-> row helpers below. Add a new sheet by adding an entry here;
@@ -205,6 +209,9 @@ function ensureSetup_() {
     seedDefaultPaymentMethod_();
     seedSampleCatalog_();
     props.setProperty('SETUP_VERSION', SCHEMA_VERSION);
+    // A version change means cached payloads are stale by definition.
+    invalidateRead_();
+    bustStorefrontCache_();
   });
 }
 
@@ -555,7 +562,9 @@ function bestDiscountFor_(product, discounts) {
 // ---------------------------------------------------------------------------
 // Storefront (public) API
 // ---------------------------------------------------------------------------
-var STOREFRONT_CACHE_KEY = 'storefront_v4';
+// Keyed by schema version: upgrading the code can never serve a payload cached
+// by the previous build (which is missing the new fields).
+var STOREFRONT_CACHE_KEY = 'storefront_v' + SCHEMA_VERSION;
 var STOREFRONT_CACHE_TTL = 300; // seconds
 
 function bustStorefrontCache_() {
@@ -678,7 +687,8 @@ function buildStorefrontData_() {
     banners: banners,
     paymentMethods: paymentMethods,
     settings: settings,
-    adminUrl: getWebAppUrl()
+    adminUrl: getWebAppUrl(),
+    build: BUILD_VERSION
   };
 }
 
@@ -2160,6 +2170,16 @@ function updateCustomerProfile(username, profile) {
   if (profile.email) patch.Email = String(profile.email).trim().toLowerCase();
   if (Object.keys(patch).length) updateRowById_('Customers', 'CustomerID', c.CustomerID, patch);
   return { success: true };
+}
+
+// Lets either page prove which deployment it is talking to.
+function getBuildInfo() {
+  return {
+    build: BUILD_VERSION,
+    schema: SCHEMA_VERSION,
+    setupVersion: PropertiesService.getScriptProperties().getProperty('SETUP_VERSION') || '(not run yet)',
+    serverTime: new Date().toISOString()
+  };
 }
 
 // Public: the admin login page needs the Client ID before any session exists.
