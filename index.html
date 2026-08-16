@@ -2598,6 +2598,47 @@
       document.title = settings.hotelName || 'Hotel Management System';
     }
 
+    // Calls a server-side (Code.gs) function via google.script.run, guaranteeing
+    // onSuccess/onError fires within timeoutMs even if the round trip never
+    // returns (e.g. this deployment's Code.gs is stale and the function doesn't
+    // exist server-side, a network hiccup drops the response, or Apps Script's
+    // authorization prompt is silently blocked) - so a button can never get
+    // stuck showing "Saving..." forever with no feedback.
+    function callAppsScript(fnName, args, onSuccess, onError, timeoutMs = 20000) {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        console.error(`callAppsScript timeout: ${fnName} did not respond within ${timeoutMs}ms`);
+        onError({ message: `The server did not respond after ${Math.round(timeoutMs / 1000)}s. Open your browser console (F12) for details, and double-check that the latest Code.gs was pasted in and redeployed (Deploy > Manage deployments > Edit > New version).` });
+      }, timeoutMs);
+
+      try {
+        google.script.run
+          .withSuccessHandler((res) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            onSuccess(res);
+          })
+          .withFailureHandler((err) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            console.error(`callAppsScript error in ${fnName}:`, err);
+            onError(err);
+          })
+          [fnName](...args);
+      } catch (err) {
+        if (!settled) {
+          settled = true;
+          clearTimeout(timer);
+          console.error(`callAppsScript threw calling ${fnName}:`, err);
+          onError(err);
+        }
+      }
+    }
+
     // Renders the uploaded hotel logo, or a monogram badge when none is set yet.
     function LogoOrInitial({ settings, size = 60, style = {} }) {
       if (settings.logoUrl) {
@@ -11741,18 +11782,18 @@
 
       const handleSave = () => {
         setSaving(true);
-        google.script.run
-          .withSuccessHandler((res) => {
-            setSaving(false);
-            if (res.success) {
-              Swal.fire({ icon: 'success', text: 'Settings saved', timer: 1500, showConfirmButton: false });
-              refreshSettings();
-            } else {
-              Swal.fire({ icon: 'error', text: res.message });
-            }
-          })
-          .withFailureHandler((err) => { setSaving(false); Swal.fire({ icon: 'error', text: err.message }); })
-          .saveSettings(form);
+        callAppsScript('saveSettings', [form], (res) => {
+          setSaving(false);
+          if (res && res.success) {
+            Swal.fire({ icon: 'success', text: 'Settings saved', timer: 1500, showConfirmButton: false });
+            refreshSettings();
+          } else {
+            Swal.fire({ icon: 'error', title: 'Save failed', text: (res && res.message) || 'Unknown error' });
+          }
+        }, (err) => {
+          setSaving(false);
+          Swal.fire({ icon: 'error', title: 'Save failed', text: err.message });
+        });
       };
 
       const handleLogoChange = async (e) => {
@@ -11762,14 +11803,14 @@
         setUploadingLogo(true);
         try {
           const b64 = await fileToBase64(file);
-          google.script.run
-            .withSuccessHandler((res) => {
-              setUploadingLogo(false);
-              if (res.success) { Swal.fire({ icon: 'success', text: 'Logo updated', timer: 1500, showConfirmButton: false }); refreshSettings(); }
-              else Swal.fire({ icon: 'error', text: res.message });
-            })
-            .withFailureHandler((err) => { setUploadingLogo(false); Swal.fire({ icon: 'error', text: err.message }); })
-            .saveLogo(b64.data, b64.name, b64.mime);
+          callAppsScript('saveLogo', [b64.data, b64.name, b64.mime], (res) => {
+            setUploadingLogo(false);
+            if (res && res.success) { Swal.fire({ icon: 'success', text: 'Logo updated', timer: 1500, showConfirmButton: false }); refreshSettings(); }
+            else Swal.fire({ icon: 'error', title: 'Upload failed', text: (res && res.message) || 'Unknown error' });
+          }, (err) => {
+            setUploadingLogo(false);
+            Swal.fire({ icon: 'error', title: 'Upload failed', text: err.message });
+          });
         } catch (err) {
           setUploadingLogo(false);
           Swal.fire({ icon: 'error', text: 'Error reading logo file: ' + err.message });
@@ -11783,14 +11824,14 @@
         setUploadingAbout(true);
         try {
           const b64 = await fileToBase64(file);
-          google.script.run
-            .withSuccessHandler((res) => {
-              setUploadingAbout(false);
-              if (res.success) { Swal.fire({ icon: 'success', text: 'About photo updated', timer: 1500, showConfirmButton: false }); refreshSettings(); }
-              else Swal.fire({ icon: 'error', text: res.message });
-            })
-            .withFailureHandler((err) => { setUploadingAbout(false); Swal.fire({ icon: 'error', text: err.message }); })
-            .saveAboutImage(b64.data, b64.name, b64.mime);
+          callAppsScript('saveAboutImage', [b64.data, b64.name, b64.mime], (res) => {
+            setUploadingAbout(false);
+            if (res && res.success) { Swal.fire({ icon: 'success', text: 'About photo updated', timer: 1500, showConfirmButton: false }); refreshSettings(); }
+            else Swal.fire({ icon: 'error', title: 'Upload failed', text: (res && res.message) || 'Unknown error' });
+          }, (err) => {
+            setUploadingAbout(false);
+            Swal.fire({ icon: 'error', title: 'Upload failed', text: err.message });
+          });
         } catch (err) {
           setUploadingAbout(false);
           Swal.fire({ icon: 'error', text: 'Error reading photo file: ' + err.message });
@@ -11801,18 +11842,17 @@
         const files = Array.from(e.target.files || []);
         if (files.length === 0) return;
         setUploadingHero(true);
+        let failures = 0;
         try {
           for (const file of files) {
             if (file.size > 5 * 1024 * 1024) continue; // skip oversized silently, keep uploading the rest
             const b64 = await fileToBase64(file);
             await new Promise((resolve) => {
-              google.script.run
-                .withSuccessHandler(resolve)
-                .withFailureHandler(resolve)
-                .addHeroImage(b64.data, b64.name, b64.mime);
+              callAppsScript('addHeroImage', [b64.data, b64.name, b64.mime], resolve, (err) => { failures++; console.error('addHeroImage failed:', err); resolve(null); });
             });
           }
           refreshSettings();
+          if (failures > 0) Swal.fire({ icon: 'warning', text: `${failures} image(s) failed to upload. Check your browser console for details.` });
         } finally {
           setUploadingHero(false);
           e.target.value = '';
@@ -11822,23 +11862,23 @@
       const handleDeleteHero = (fileId) => {
         Swal.fire({ icon: 'warning', title: 'Remove this image?', showCancelButton: true, confirmButtonColor: '#ea4335', confirmButtonText: 'Remove' }).then((result) => {
           if (!result.isConfirmed) return;
-          google.script.run
-            .withSuccessHandler((res) => { if (res.success) refreshSettings(); else Swal.fire({ icon: 'error', text: res.message }); })
-            .withFailureHandler((err) => Swal.fire({ icon: 'error', text: err.message }))
-            .deleteHeroImage(fileId);
+          callAppsScript('deleteHeroImage', [fileId], (res) => {
+            if (res && res.success) refreshSettings();
+            else Swal.fire({ icon: 'error', title: 'Remove failed', text: (res && res.message) || 'Unknown error' });
+          }, (err) => Swal.fire({ icon: 'error', title: 'Remove failed', text: err.message }));
         });
       };
 
       const handleTestSms = () => {
         if (!testPhone) { Swal.fire({ icon: 'warning', text: 'Enter a phone number to send the test to' }); return; }
         setTestingSms(true);
-        google.script.run
-          .withSuccessHandler((res) => {
-            setTestingSms(false);
-            Swal.fire({ icon: res.success ? 'success' : 'error', title: res.success ? 'Test SMS Sent' : 'Test SMS Failed', text: res.message });
-          })
-          .withFailureHandler((err) => { setTestingSms(false); Swal.fire({ icon: 'error', text: err.message }); })
-          .sendTestSms(form, testPhone);
+        callAppsScript('sendTestSms', [form, testPhone], (res) => {
+          setTestingSms(false);
+          Swal.fire({ icon: res && res.success ? 'success' : 'error', title: res && res.success ? 'Test SMS Sent' : 'Test SMS Failed', text: res && res.message });
+        }, (err) => {
+          setTestingSms(false);
+          Swal.fire({ icon: 'error', title: 'Test SMS Failed', text: err.message });
+        });
       };
 
       const tabs = [
@@ -12899,10 +12939,11 @@
       const [settings, setSettings] = useState(DEFAULT_CLIENT_SETTINGS);
 
       const refreshSettings = () => {
-        google.script.run
-          .withSuccessHandler((res) => { if (res) { setSettings(res); applyThemeToDocument(res); } })
-          .withFailureHandler(() => {})
-          .getSettings();
+        callAppsScript('getSettings', [], (res) => {
+          if (res) { setSettings(res); applyThemeToDocument(res); }
+        }, (err) => {
+          console.error('Failed to load settings:', err);
+        }, 15000);
       };
 
       // Load hotel branding/theme/SMS/hero settings once on app start
