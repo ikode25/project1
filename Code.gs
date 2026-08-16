@@ -12,11 +12,11 @@
 
 // Bump when SHEETS changes so ensureSetup_ re-runs and adds new columns to
 // spreadsheets created by an older version of this script.
-var SCHEMA_VERSION = '5';
+var SCHEMA_VERSION = '6';
 
 // Shown in the storefront footer and admin sidebar. If this doesn't match the
 // file you pasted, the deployment is still serving an older version.
-var BUILD_VERSION = '2026.08.16-9';
+var BUILD_VERSION = '2026.08.17-10';
 
 // ---------------------------------------------------------------------------
 // Sheet schema — single source of truth for headers used by the generic
@@ -26,7 +26,7 @@ var BUILD_VERSION = '2026.08.16-9';
 var SHEETS = {
   Settings:       ['Key', 'Value'],
   Businesses:     ['BusinessID', 'Name', 'Description', 'LogoURL', 'WhatsAppNumber', 'Active', 'SortOrder', 'CreatedAt'],
-  Products:       ['ProductID', 'BusinessID', 'ImageURL', 'Name', 'Description', 'Category', 'Price', 'Stock', 'IsService', 'EnquireOnWhatsApp', 'Active', 'CreatedAt', 'RequiresRecipient', 'RecipientLabel', 'ConfirmationNote', 'InStock', 'ShowWhatsApp'],
+  Products:       ['ProductID', 'BusinessID', 'ImageURL', 'Name', 'Description', 'Category', 'Price', 'Stock', 'IsService', 'EnquireOnWhatsApp', 'Active', 'CreatedAt', 'RequiresRecipient', 'RecipientLabel', 'ConfirmationNote', 'InStock', 'ShowWhatsApp', 'IsDigital'],
   Customers:      ['CustomerID', 'Name', 'Address', 'Phone', 'Username', 'PasswordHash', 'CreatedAt', 'Email', 'AuthProvider'],
   Admins:         ['AdminID', 'Username', 'PasswordHash', 'Name', 'Role', 'CreatedAt', 'Email', 'RememberHash', 'RememberExpires'],
   Orders:         ['OrderID', 'OrderType', 'Username', 'CustomerName', 'Phone', 'Address', 'Subtotal', 'DiscountAmount', 'Total', 'PaymentMethodID', 'PaymentMethodLabel', 'PayerNumber', 'TransactionID', 'PaymentStatus', 'OrderStatus', 'Notes', 'CreatedAt', 'UpdatedAt', 'CustomerEmail'],
@@ -385,15 +385,15 @@ function seedSampleCatalog_() {
   });
 
   var products = [
-    { biz: 'databundles', Name: 'MTN 5GB Data Bundle', Description: 'MTN data bundle valid for 30 days. Delivered to any MTN number you provide at checkout.', Category: 'Data Bundles', Price: 30, Stock: '', IsService: true, RequiresRecipient: true },
-    { biz: 'databundles', Name: 'Telecel 10GB Data Bundle', Description: 'Telecel data bundle valid for 30 days. Delivered to any Telecel number you provide at checkout.', Category: 'Data Bundles', Price: 55, Stock: '', IsService: true, RequiresRecipient: true },
+    { biz: 'databundles', Name: 'MTN 5GB Data Bundle', Description: 'MTN data bundle valid for 30 days. Delivered to any MTN number you provide at checkout.', Category: 'Data Bundles', Price: 30, Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
+    { biz: 'databundles', Name: 'Telecel 10GB Data Bundle', Description: 'Telecel data bundle valid for 30 days. Delivered to any Telecel number you provide at checkout.', Category: 'Data Bundles', Price: 55, Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
     { biz: 'electronics', Name: 'Bluetooth Speaker', Description: 'Portable wireless Bluetooth speaker with deep bass, USB/SD playback and up to 8 hours of battery life.', Category: 'Audio', Price: 180, Stock: 12, ShowWhatsApp: true },
     { biz: 'electronics', Name: 'Wireless Earbuds', Description: 'True wireless earbuds with charging case, touch controls and noise isolation.', Category: 'Audio', Price: 120, Stock: 15, ShowWhatsApp: true },
     { biz: 'electronics', Name: 'Extension Board with Surge Protection', Description: 'Four-socket extension board with USB ports and built-in surge protection for your electronics.', Category: 'Accessories', Price: 85, Stock: 25 },
     { biz: 'electronics', Name: 'Rechargeable LED Standing Fan', Description: 'Rechargeable standing fan with built-in LED light — keeps running through power cuts.', Category: 'Home Appliances', Price: 450, Stock: 6, ShowWhatsApp: true },
     { biz: 'frames', Name: 'A4 Wooden Picture Frame', Description: 'Elegant wooden frame, holds one A4 photo. Custom sizes available on request.', Category: 'Picture Frames', Price: 45, Stock: 20 },
     { biz: 'security', Name: 'School Siren / Smart Bell', Description: 'Loud programmable electronic school bell and siren system. Rings automatically to your timetable, with manual override and an emergency alarm tone. Price covers the unit; installation and wiring are quoted separately based on your school size — message us on WhatsApp for a site-specific quote.', Category: 'Alarm Systems', Price: 1800, Stock: '', IsService: false, ShowWhatsApp: true },
-    { biz: 'code', Name: 'Google Apps Script E-Commerce Source Code', Description: 'Full source code license for a Google Sheet-powered multi-business e-commerce site like this one. Includes the storefront, admin portal, setup guide and free installation support. Message us on WhatsApp if you have questions before buying.', Category: 'Source Code', Price: 250, Stock: '', IsService: true, ShowWhatsApp: true }
+    { biz: 'code', Name: 'Google Apps Script E-Commerce Source Code', Description: 'Full source code license for a Google Sheet-powered multi-business e-commerce site like this one. Includes the storefront, admin portal, setup guide and free installation support. Message us on WhatsApp if you have questions before buying.', Category: 'Source Code', Price: 250, Stock: '', IsService: true, ShowWhatsApp: true, IsDigital: true }
   ];
 
   products.forEach(function (p) {
@@ -407,7 +407,7 @@ function seedSampleCatalog_() {
       RequiresRecipient: !!p.RequiresRecipient,
       RecipientLabel: p.RequiresRecipient ? 'Phone number to receive the bundle' : '',
       ConfirmationNote: p.RequiresRecipient ? DEFAULT_BUNDLE_DISCLAIMER : '',
-      InStock: true, ShowWhatsApp: !!p.ShowWhatsApp
+      InStock: true, ShowWhatsApp: !!p.ShowWhatsApp, IsDigital: !!p.IsDigital
     });
   });
 }
@@ -719,7 +719,10 @@ function buildStorefrontData_() {
       showWhatsApp: toBool_(p.ShowWhatsApp),
       requiresRecipient: requiresRecipient,
       recipientLabel: String(p.RecipientLabel || 'Phone number to receive this'),
-      confirmationNote: String(p.ConfirmationNote || (requiresRecipient ? (settings.BundleDisclaimer || DEFAULT_BUNDLE_DISCLAIMER) : ''))
+      confirmationNote: String(p.ConfirmationNote || (requiresRecipient ? (settings.BundleDisclaimer || DEFAULT_BUNDLE_DISCLAIMER) : '')),
+      // Digital items (data bundles, source code, ...) never need a delivery
+      // address; the storefront only asks for one when the cart needs it.
+      isDigital: toBool_(p.IsDigital)
     };
   });
 
@@ -802,8 +805,8 @@ function placeOrder(payload) {
     var customerName = String(payload.customerName || '').trim();
     var phone = String(payload.phone || '').trim();
     var address = String(payload.address || '').trim();
-    if (!customerName || !phone || !address) {
-      return { success: false, message: 'Please provide your name, phone number and address.' };
+    if (!customerName || !phone) {
+      return { success: false, message: 'Please provide your name and phone number.' };
     }
     if (!payload.paymentMethodId) return { success: false, message: 'Please select a payment method.' };
     var payerNumber = String(payload.payerNumber || '').trim();
@@ -862,6 +865,14 @@ function placeOrder(payload) {
       });
     }
 
+    // Determined from the product data itself, not a client-sent flag — a
+    // tampered request can't skip collecting an address for a real physical
+    // item just by claiming everything in the cart is digital.
+    var needsDelivery = lineItems.some(function (li) { return !toBool_(li.product.IsDigital); });
+    if (needsDelivery && !address) {
+      return { success: false, message: 'Please provide a delivery address for the physical item(s) in your order.' };
+    }
+
     var total = subtotal - discountTotal;
     var orderId = genId_('ORD');
     var now = new Date();
@@ -870,7 +881,7 @@ function placeOrder(payload) {
       OrderID: orderId,
       OrderType: payload.isGuest === false ? 'customer' : 'guest',
       Username: payload.username ? String(payload.username).toLowerCase() : '',
-      CustomerName: customerName, Phone: phone, Address: address,
+      CustomerName: customerName, Phone: phone, Address: needsDelivery ? address : '',
       Subtotal: round2_(subtotal), DiscountAmount: round2_(discountTotal), Total: round2_(total),
       PaymentMethodID: paymentMethod.PaymentMethodID, PaymentMethodLabel: paymentMethod.Label,
       PayerNumber: payerNumber, TransactionID: transactionId,
@@ -902,7 +913,25 @@ function placeOrder(payload) {
     // turn a successful checkout into an error for the customer.
     notifyOrderPlaced_(orderId);
 
-    return { success: true, orderId: orderId, total: round2_(total) };
+    // Full order detail returned inline (not just the id/total) so the
+    // storefront can offer an immediate "Download Receipt" without a second
+    // round trip.
+    var order = {
+      orderId: orderId, customerName: customerName, phone: phone, address: needsDelivery ? address : '',
+      subtotal: round2_(subtotal), discountAmount: round2_(discountTotal), total: round2_(total),
+      paymentMethod: paymentMethod.Label, payerNumber: payerNumber, transactionId: transactionId,
+      paymentStatus: 'Pending Verification', orderStatus: 'Pending', notes: payload.notes || '',
+      createdAt: isoDate_(now), updatedAt: isoDate_(now),
+      items: lineItems.map(function (li) {
+        var biz = businessById[li.product.BusinessID] || {};
+        return {
+          productName: li.product.Name, businessName: biz.Name || '', category: li.product.Category,
+          recipient: li.recipient, qty: li.qty, unitPrice: round2_(li.unitPrice), subtotal: round2_(li.subtotal)
+        };
+      })
+    };
+
+    return { success: true, orderId: orderId, total: round2_(total), order: order };
   } catch (err) {
     return { success: false, message: 'Something went wrong placing your order: ' + err.message };
   }
@@ -980,6 +1009,16 @@ function requireAdmin_(token) {
   var raw = token ? cache.get('admtok_' + token) : null;
   if (!raw) throw new Error('Your admin session has expired. Please log in again.');
   return JSON.parse(raw);
+}
+
+// Backup/restore can overwrite every sheet in the store, so it's restricted
+// to owner-role admins rather than any staff account.
+function requireOwner_(token) {
+  var admin = requireAdmin_(token);
+  if (String(admin.role) !== 'owner') {
+    throw new Error('Only an owner-level admin can manage backups. Ask an owner to do this, or promote your account under Admin Users.');
+  }
+  return admin;
 }
 
 // True while the Admins sheet is empty — the admin page then shows a "create
@@ -1338,7 +1377,7 @@ function adminGetProducts(token) {
       ShowWhatsApp: toBool_(p.ShowWhatsApp), Active: toBool_(p.Active),
       RequiresRecipient: toBool_(p.RequiresRecipient), RecipientLabel: String(p.RecipientLabel || ''),
       ConfirmationNote: String(p.ConfirmationNote || ''), InStock: toBoolDefaultTrue_(p.InStock),
-      CreatedAt: isoDate_(p.CreatedAt)
+      IsDigital: toBool_(p.IsDigital), CreatedAt: isoDate_(p.CreatedAt)
     };
   });
 }
@@ -1351,7 +1390,7 @@ function adminSaveProduct(token, p) {
     Category: p.Category || 'General', Price: toNum_(p.Price, 0),
     Stock: (p.Stock === '' || p.Stock === null || p.Stock === undefined) ? '' : toNum_(p.Stock, 0),
     IsService: !!p.IsService, EnquireOnWhatsApp: !!p.EnquireOnWhatsApp, ShowWhatsApp: !!p.ShowWhatsApp,
-    Active: p.Active !== false,
+    Active: p.Active !== false, IsDigital: !!p.IsDigital,
     RequiresRecipient: !!p.RequiresRecipient, RecipientLabel: p.RecipientLabel || '',
     ConfirmationNote: p.ConfirmationNote || '', InStock: p.InStock !== false
   };
@@ -2249,4 +2288,153 @@ function getBuildInfo() {
 // A Google OAuth client ID is not a secret.
 function getGoogleClientId() {
   try { return getSettingValue_('GoogleClientId', '') || ''; } catch (err) { return ''; }
+}
+
+// ============================================================================
+// BACKUP & RECOVERY — owner-only. Two backup formats, one restore path:
+//  - "Create Backup Now" makes a full copy of the live spreadsheet in a
+//    dedicated Drive folder (the most complete, native snapshot).
+//  - "Download Data (JSON)" exports every tracked sheet's rows to a JSON file
+//    the admin keeps themselves (offline copy, or for moving to a new sheet).
+// Both restore the same way: read a {headers, rows} bundle per sheet and
+// overwrite the live sheet, mapping columns by header NAME (not position), so
+// a restore is robust even if the schema gained columns since the backup was
+// taken.
+// ============================================================================
+function getOrCreateBackupFolder_() {
+  var props = PropertiesService.getScriptProperties();
+  var folderId = props.getProperty('BACKUP_FOLDER_ID');
+  if (folderId) {
+    try { return DriveApp.getFolderById(folderId); } catch (err) { /* fall through and recreate */ }
+  }
+  var folders = DriveApp.getFoldersByName('MultiBiz Store Backups');
+  var folder = folders.hasNext() ? folders.next() : DriveApp.createFolder('MultiBiz Store Backups');
+  props.setProperty('BACKUP_FOLDER_ID', folder.getId());
+  return folder;
+}
+
+function adminCreateBackup(token) {
+  var admin = requireOwner_(token);
+  try {
+    var ss = getSS_();
+    var folder = getOrCreateBackupFolder_();
+    var siteName = getSettingValue_('SiteName', 'Store');
+    var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'Etc/UTC', 'yyyy-MM-dd HH:mm');
+    var name = siteName + ' backup - ' + stamp;
+    var file = DriveApp.getFileById(ss.getId()).makeCopy(name, folder);
+    return { success: true, id: file.getId(), name: file.getName(), url: file.getUrl(), createdAt: new Date().toISOString(), createdBy: admin.name };
+  } catch (err) {
+    var msg = String(err && err.message ? err.message : err);
+    if (msg.indexOf('permission') !== -1 || msg.indexOf('authoriz') !== -1 || msg.indexOf('Drive') !== -1) {
+      return {
+        success: false, needsAuth: true,
+        message: 'This deployment needs Google Drive access to create backups. Open the Apps Script editor, run "authorizeDrive" once (the same step used for photo uploads), accept the prompt, then try again.'
+      };
+    }
+    return { success: false, message: 'Could not create backup: ' + msg };
+  }
+}
+
+function adminListBackups(token) {
+  requireOwner_(token);
+  var folder = getOrCreateBackupFolder_();
+  var files = folder.getFilesByType(MimeType.GOOGLE_SHEETS);
+  var out = [];
+  while (files.hasNext()) {
+    var f = files.next();
+    out.push({ id: f.getId(), name: f.getName(), url: f.getUrl(), createdAt: f.getDateCreated().toISOString(), size: f.getSize() });
+  }
+  out.sort(function (a, b) { return new Date(b.createdAt) - new Date(a.createdAt); });
+  return out;
+}
+
+function adminDeleteBackup(token, fileId) {
+  requireOwner_(token);
+  try {
+    DriveApp.getFileById(fileId).setTrashed(true);
+    return { success: true };
+  } catch (err) {
+    return { success: false, message: String(err && err.message ? err.message : err) };
+  }
+}
+
+// Raw {headers, rows} for one sheet, every cell passed through plain_() so it
+// survives JSON.stringify / google.script.run serialization (Date cells are
+// the usual thing that silently breaks this).
+function rawSheetRows_(sheet, fallbackHeaders) {
+  if (!sheet) return { headers: fallbackHeaders || [], rows: [] };
+  var lastRow = sheet.getLastRow(), lastCol = sheet.getLastColumn();
+  if (lastRow < 1 || lastCol < 1) return { headers: fallbackHeaders || [], rows: [] };
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(String);
+  var rows = lastRow < 2 ? [] : sheet.getRange(2, 1, lastRow - 1, lastCol).getValues().map(function (r) { return r.map(plain_); });
+  return { headers: headers, rows: rows };
+}
+
+function adminExportDataJson(token) {
+  requireOwner_(token);
+  var bundle = {
+    exportedAt: new Date().toISOString(), build: BUILD_VERSION, schema: SCHEMA_VERSION,
+    siteName: getSettingValue_('SiteName', ''), sheets: {}
+  };
+  Object.keys(SHEETS).forEach(function (name) {
+    bundle.sheets[name] = rawSheetRows_(getSheet_(name, false), SHEETS[name]);
+  });
+  return JSON.stringify(bundle);
+}
+
+// Overwrites one live sheet with a {headers, rows} bundle, matching columns
+// by header name so a restore survives schema upgrades in either direction.
+function restoreSheetFromBundle_(name, bundleSheet) {
+  if (!bundleSheet || !bundleSheet.headers || !bundleSheet.headers.length) return 0;
+  var sheet = getSheet_(name); // creates + headers it if this sheet doesn't exist yet
+  var width = Math.max(sheet.getLastColumn(), SHEETS[name].length);
+  var liveHeaders = sheet.getRange(1, 1, 1, width).getValues()[0];
+  var colMap = bundleSheet.headers.map(function (h) { return liveHeaders.indexOf(h); });
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow > 1) sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).clearContent();
+  if (!bundleSheet.rows.length) return 0;
+
+  var outRows = bundleSheet.rows.map(function (row) {
+    var out = new Array(width).fill('');
+    row.forEach(function (val, i) {
+      var col = colMap[i];
+      if (col !== -1 && col !== undefined) out[col] = val;
+    });
+    return out;
+  });
+  sheet.getRange(2, 1, outRows.length, width).setValues(outRows);
+  return outRows.length;
+}
+
+function restoreBundle_(bundle) {
+  var results = {};
+  Object.keys(SHEETS).forEach(function (name) {
+    results[name] = restoreSheetFromBundle_(name, bundle.sheets && bundle.sheets[name]);
+  });
+  // Every cached read and the storefront payload cache are now stale.
+  invalidateRead_();
+  bustStorefrontCache_();
+  return results;
+}
+
+function adminRestoreFromJson(token, jsonString) {
+  requireOwner_(token);
+  var bundle;
+  try { bundle = JSON.parse(jsonString); } catch (err) { return { success: false, message: 'That file is not valid JSON.' }; }
+  if (!bundle || !bundle.sheets) return { success: false, message: 'That file does not look like a backup exported from this system.' };
+  return withLock_(function () { return { success: true, results: restoreBundle_(bundle) }; });
+}
+
+function adminRestoreFromBackupId(token, backupFileId) {
+  requireOwner_(token);
+  var backupSS;
+  try { backupSS = SpreadsheetApp.openById(backupFileId); } catch (err) {
+    return { success: false, message: 'Could not open that backup file: ' + err.message };
+  }
+  var bundle = { sheets: {} };
+  Object.keys(SHEETS).forEach(function (name) {
+    bundle.sheets[name] = rawSheetRows_(backupSS.getSheetByName(name), SHEETS[name]);
+  });
+  return withLock_(function () { return { success: true, results: restoreBundle_(bundle) }; });
 }

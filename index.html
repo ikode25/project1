@@ -1,5 +1,5 @@
 <!-- index.html — Multi-Business Storefront -->
-<!-- MB_BUILD:2026.08.16-9 -->
+<!-- MB_BUILD:2026.08.17-10 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -73,7 +73,7 @@ box-shadow: 0 0 8px var(--accent);
     #fabMenu.closed { opacity: 0; transform: translateY(8px); pointer-events: none; }
   </style>
 </head>
-<body class="flex flex-col min-h-screen" data-mb-build="2026.08.16-9">
+<body class="flex flex-col min-h-screen" data-mb-build="2026.08.17-10">
 
   <div id="progressBar"></div>
 
@@ -119,36 +119,40 @@ box-shadow: 0 0 8px var(--accent);
 
   <div id="headerSpacer" style="height:96px"></div>
 
-  <div id="bannerWrap" class="relative overflow-hidden hidden max-w-6xl mx-auto w-full px-3 md:px-4 mt-2">
+  <!-- Full-bleed: carousel and product area now span the whole viewport
+       width (no max-w-6xl cap), with just enough side padding to keep edges
+       readable. Only the footer keeps a centered column, since its 3-column
+       layout gets awkwardly sparse at full width. -->
+  <div id="bannerWrap" class="relative overflow-hidden hidden w-full px-3 md:px-4 mt-2">
     <div class="rounded-lg overflow-hidden shadow relative">
       <div id="carouselTrack" class="carousel-track"></div>
       <div id="carouselDots" class="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2"></div>
     </div>
   </div>
 
-  <div id="videoAdvert" class="hidden max-w-6xl mx-auto w-full px-3 md:px-4 mt-4"></div>
+  <div id="videoAdvert" class="hidden w-full px-3 md:px-4 mt-4"></div>
 
-  <div class="max-w-6xl mx-auto w-full px-3 md:px-4 mt-4">
+  <div class="w-full px-3 md:px-4 mt-4">
     <h2 class="text-xs font-semibold muted uppercase mb-2">Shop by Business</h2>
     <div id="businessNav" class="flex gap-2 mb-2 scroll-x pb-1"></div>
   </div>
 
-  <div class="md:hidden max-w-6xl mx-auto w-full px-3 mt-2">
+  <div class="md:hidden w-full px-3 mt-2">
     <select id="mobileCategory" onchange="selectedCategory = this.value || null; renderProducts();" class="w-full p-3 rounded-lg bordered"></select>
   </div>
 
-  <main class="flex-grow flex max-w-6xl mx-auto w-full px-3 md:px-4 gap-6 mt-3">
-    <aside class="hidden md:block w-1/5 surface p-4 rounded-lg shadow-md self-start sticky top-32">
+  <main class="flex-grow flex w-full px-3 md:px-4 gap-6 mt-3">
+    <aside class="hidden md:block w-1/5 xl:w-1/6 surface p-4 rounded-lg shadow-md self-start sticky top-32">
       <h2 class="text-lg font-semibold mb-3">Categories</h2>
       <div id="categoryList" class="space-y-1 max-h-[60vh] overflow-y-auto"></div>
     </aside>
 
-    <section class="w-full md:w-4/5 pb-28">
+    <section class="w-full md:w-4/5 xl:w-5/6 pb-28">
       <div id="activeBusinessBanner" class="hidden surface p-4 rounded-lg shadow mb-4"></div>
       <div class="mb-4">
         <input type="text" id="searchInput" placeholder="Search products or services..." oninput="renderProducts()" class="w-full p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
       </div>
-      <div id="productContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6"></div>
+      <div id="productContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 md:gap-6"></div>
       <p id="emptyState" class="text-center muted py-10 hidden">No products found.</p>
     </section>
   </main>
@@ -317,7 +321,11 @@ box-shadow: 0 0 8px var(--accent);
           <input type="text" id="coName" placeholder="Full Name" class="p-3 rounded-lg">
           <input type="tel" id="coPhone" placeholder="Your Phone Number" class="p-3 rounded-lg">
           <input type="email" id="coEmail" placeholder="Email (for your receipt — optional)" class="p-3 rounded-lg">
-          <input type="text" id="coAddress" placeholder="Delivery Address" class="p-3 rounded-lg md:col-span-2">
+        </div>
+        <!-- Only shown when the cart contains a physical item; digital-only
+             carts (data bundles, source code, ...) skip this entirely. -->
+        <div id="coAddressWrap" class="mb-5 hidden">
+          <input type="text" id="coAddress" placeholder="Delivery Address" class="p-3 rounded-lg w-full">
         </div>
 
         <h3 class="font-semibold mb-3">Payment Method</h3>
@@ -348,6 +356,7 @@ box-shadow: 0 0 8px var(--accent);
       <p class="text-xl font-bold text-primary mb-2" id="confirmOrderId"></p>
       <button onclick="copyText(document.getElementById('confirmOrderId').textContent,'Order ID copied')" class="text-sm text-primary underline mb-4"><i class="fas fa-copy mr-1"></i>Copy Order ID</button>
       <p class="text-sm muted mb-6">We will verify your payment and update your order status. Save your Order ID and phone number to track your order anytime.</p>
+      <button onclick="downloadReceipt(lastPlacedOrder)" class="w-full surface-2 bordered py-3 rounded-lg font-semibold mb-3"><i class="fas fa-receipt mr-2"></i>Download Receipt</button>
       <button onclick="closeConfirmModal()" class="w-full bg-primary py-3 rounded-lg">Done</button>
     </div>
   </div>
@@ -676,10 +685,10 @@ box-shadow: 0 0 8px var(--accent);
         slide.className = 'carousel-slide';
         var media;
         if (b.mediaType === 'video') {
-          media = videoEmbedHtml_(b.image, 'w-full h-40 sm:h-56 md:h-72');
+          media = videoEmbedHtml_(b.image, 'w-full h-40 sm:h-56 md:h-72 xl:h-[420px]');
           slide.innerHTML = media; // never wrap video in a link — it eats the controls
         } else {
-          media = '<img src="' + esc(b.image) + '" alt="' + esc(b.title) + '" loading="lazy" class="w-full h-40 sm:h-56 md:h-72 object-cover">';
+          media = '<img src="' + esc(b.image) + '" alt="' + esc(b.title) + '" loading="lazy" class="w-full h-40 sm:h-56 md:h-72 xl:h-[420px] object-cover">';
           slide.innerHTML = b.link ? '<a href="' + esc(b.link) + '" target="_blank" rel="noopener">' + media + '</a>' : media;
         }
         track.appendChild(slide);
@@ -994,6 +1003,7 @@ box-shadow: 0 0 8px var(--accent);
       saveCart();
       renderCartLines();
       renderProducts();
+      updateAddressVisibility();
       if (cart.length === 0) closeCheckout();
     }
     function reconcileCartWithCatalog() {
@@ -1015,6 +1025,7 @@ box-shadow: 0 0 8px var(--accent);
       closeProductModal();
       renderCartLines();
       renderPaymentMethods();
+      updateAddressVisibility();
       if (isLoggedIn && currentUser) {
         document.getElementById('coName').value = currentUser.name || '';
         document.getElementById('coPhone').value = currentUser.phone || '';
@@ -1024,6 +1035,23 @@ box-shadow: 0 0 8px var(--accent);
       document.getElementById('checkoutModal').classList.remove('hidden');
     }
     function closeCheckout() { document.getElementById('checkoutModal').classList.add('hidden'); }
+
+    // Digital items (data bundles, source code, ...) never need a delivery
+    // address; only ask for one when the cart actually contains something
+    // physical. The server independently re-checks this from product data,
+    // so this is purely about not asking the customer for information the
+    // order doesn't need.
+    function cartNeedsDelivery() {
+      return cart.some(function (line) {
+        var p = productById(line.productId);
+        return p && !p.isDigital;
+      });
+    }
+    function updateAddressVisibility() {
+      var needed = cartNeedsDelivery();
+      document.getElementById('coAddressWrap').classList.toggle('hidden', !needed);
+      if (!needed) document.getElementById('coAddress').value = '';
+    }
 
     function renderCartLines() {
       var wrap = document.getElementById('cartLines');
@@ -1093,12 +1121,13 @@ box-shadow: 0 0 8px var(--accent);
 
     function submitOrder() {
       if (cart.length === 0) { toast('info', 'Cart Empty', 'Your cart is empty.'); return; }
+      var needsDelivery = cartNeedsDelivery();
       var payload = {
         isGuest: !isLoggedIn,
         username: isLoggedIn ? currentUser.username : '',
         customerName: document.getElementById('coName').value.trim(),
         phone: document.getElementById('coPhone').value.trim(),
-        address: document.getElementById('coAddress').value.trim(),
+        address: needsDelivery ? document.getElementById('coAddress').value.trim() : '',
         email: document.getElementById('coEmail').value.trim(),
         items: cart.map(function (c) { return { productId: c.productId, qty: c.qty, recipient: c.recipient || '' }; }),
         paymentMethodId: selectedPaymentMethodId,
@@ -1106,7 +1135,8 @@ box-shadow: 0 0 8px var(--accent);
         transactionId: document.getElementById('coTransactionId').value.trim(),
         notes: document.getElementById('coNotes').value.trim()
       };
-      if (!payload.customerName || !payload.phone || !payload.address) { toast('warning', 'Missing Details', 'Please fill in your name, phone and address.'); return; }
+      if (!payload.customerName || !payload.phone) { toast('warning', 'Missing Details', 'Please fill in your name and phone number.'); return; }
+      if (needsDelivery && !payload.address) { toast('warning', 'Delivery Address', 'Please enter a delivery address for the physical item(s) in your cart.'); return; }
       if (!payload.paymentMethodId) { toast('warning', 'Payment Method', 'Please select a payment method.'); return; }
       if (!payload.payerNumber || !payload.transactionId) { toast('warning', 'Payment Confirmation', 'Enter the Mobile Money number used and the Transaction ID.'); return; }
 
@@ -1116,6 +1146,7 @@ box-shadow: 0 0 8px var(--accent);
         if (res && res.success) {
           cart = []; saveCart();
           closeCheckout();
+          lastPlacedOrder = res.order || null;
           document.getElementById('confirmOrderId').textContent = res.orderId;
           document.getElementById('confirmModal').classList.remove('hidden');
           document.getElementById('coPayerNumber').value = '';
@@ -1128,6 +1159,53 @@ box-shadow: 0 0 8px var(--accent);
       }).withFailureHandler(function (err) { stopProgress(); toast('error', 'Order Failed', String(err)); }).placeOrder(payload);
     }
     function closeConfirmModal() { document.getElementById('confirmModal').classList.add('hidden'); }
+
+    // ---------------------------------------------------------------------
+    // Downloadable / printable receipt — used from the order confirmation,
+    // track-order result, and order history. Opens a new tab with a styled,
+    // branded receipt and triggers the browser's print dialog, where "Save
+    // as PDF" gives a real downloadable file without needing any library.
+    // ---------------------------------------------------------------------
+    var lastPlacedOrder = null;
+    function buildReceiptHtml(order) {
+      var s = store.settings || {};
+      var sym = s.CurrencySymbol || 'GHS ';
+      var primary = s.PrimaryColor || '#2563eb';
+      var siteName = s.SiteName || 'Receipt';
+      var rows = (order.items || []).map(function (it) {
+        return '<tr><td style="padding:8px;border-bottom:1px solid #e2e8f0">' + esc(it.productName) +
+          (it.recipient ? '<br><span style="color:#64748b;font-size:12px">For: ' + esc(it.recipient) + '</span>' : '') +
+          '</td><td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:center">' + it.qty + '</td>' +
+          '<td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right">' + sym + Number(it.subtotal).toFixed(2) + '</td></tr>';
+      }).join('');
+      return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Receipt ' + esc(order.orderId) + '</title>' +
+        '<style>body{font-family:Segoe UI,Roboto,Arial,sans-serif;color:#0f172a;max-width:480px;margin:24px auto;padding:0 16px}' +
+        '.hdr{background:' + primary + ';color:#fff;padding:20px;border-radius:10px 10px 0 0;text-align:center}' +
+        '.box{border:1px solid #e2e8f0;border-top:0;border-radius:0 0 10px 10px;padding:20px}' +
+        'table{width:100%;border-collapse:collapse;margin:14px 0}th{text-align:left;padding:8px;background:#f8fafc;font-size:13px}' +
+        '.total{text-align:right;font-size:18px;font-weight:800;margin-top:8px}' +
+        '.pill{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;background:#f1f5f9}' +
+        '@media print{.no-print{display:none}}</style></head><body>' +
+        '<div class="hdr"><h1 style="margin:0;font-size:20px">' + esc(siteName) + '</h1><p style="margin:4px 0 0;opacity:.9">Receipt</p></div>' +
+        '<div class="box">' +
+        '<p><strong>Order ID:</strong> ' + esc(order.orderId) + '<br><strong>Date:</strong> ' + esc(new Date(order.createdAt || Date.now()).toLocaleString()) + '</p>' +
+        '<p><strong>Customer:</strong> ' + esc(order.customerName) + ' · ' + esc(order.phone) + (order.address ? '<br><strong>Delivery:</strong> ' + esc(order.address) : '') + '</p>' +
+        '<p><span class="pill">Payment: ' + esc(order.paymentStatus || 'Pending Verification') + '</span> <span class="pill">Order: ' + esc(order.orderStatus || 'Pending') + '</span></p>' +
+        '<table><tr><th>Item</th><th style="text-align:center">Qty</th><th style="text-align:right">Amount</th></tr>' + rows + '</table>' +
+        '<p>Subtotal: ' + sym + Number(order.subtotal || 0).toFixed(2) + ' &nbsp;·&nbsp; Discount: -' + sym + Number(order.discountAmount || 0).toFixed(2) + '</p>' +
+        '<p class="total">Total: ' + sym + Number(order.total || 0).toFixed(2) + '</p>' +
+        '<p style="font-size:12px;color:#64748b">Paid via ' + esc(order.paymentMethod || '') + '. Thank you for your order!</p>' +
+        '<button class="no-print" onclick="window.print()" style="margin-top:10px;padding:10px 16px;border-radius:8px;border:0;background:' + primary + ';color:#fff;font-weight:600;cursor:pointer">Print / Save as PDF</button>' +
+        '</div></body></html>';
+    }
+    function downloadReceipt(order) {
+      if (!order) { toast('info', 'Receipt unavailable', 'Order details for this receipt could not be found.'); return; }
+      var w = window.open('', '_blank');
+      if (!w) { toast('warning', 'Popup blocked', 'Please allow popups to view or print your receipt.'); return; }
+      w.document.write(buildReceiptHtml(order));
+      w.document.close();
+      setTimeout(function () { try { w.focus(); w.print(); } catch (e) { /* user can still click the button */ } }, 400);
+    }
 
     // ---------------------------------------------------------------------
     // Track order (no login required)
@@ -1143,6 +1221,7 @@ box-shadow: 0 0 8px var(--accent);
         stopProgress();
         var box = document.getElementById('trackResult');
         if (!order) { box.innerHTML = '<p class="text-red-500">No order found with that ID and phone number.</p>'; return; }
+        lastTrackedOrder = order;
         var steps = ['Pending', 'Processing', 'Shipped', 'Completed'];
         var currentIdx = steps.indexOf(order.orderStatus);
         var timeline = steps.map(function (s, i) {
@@ -1155,9 +1234,12 @@ box-shadow: 0 0 8px var(--accent);
           '<p class="mb-2 flex flex-wrap gap-1">' + timeline + '</p>' +
           '<p><strong>Payment status:</strong> ' + esc(order.paymentStatus) + '</p>' +
           '<p><strong>Total:</strong> ' + currency(order.total) + '</p>' +
-          '<ul class="list-disc list-inside mt-2">' + itemsHtml + '</ul></div>';
+          '<ul class="list-disc list-inside mt-2">' + itemsHtml + '</ul>' +
+          '<button onclick="downloadReceipt(lastTrackedOrder)" class="mt-3 text-sm text-primary underline"><i class="fas fa-receipt mr-1"></i>Download Receipt</button>' +
+          '</div>';
       }).withFailureHandler(function (err) { stopProgress(); toast('error', 'Error', String(err)); }).trackOrder(orderId, phone);
     }
+    var lastTrackedOrder = null;
 
     // ---------------------------------------------------------------------
     // Accounts (optional)
@@ -1226,6 +1308,7 @@ box-shadow: 0 0 8px var(--accent);
       if (raw) { try { isLoggedIn = true; currentUser = JSON.parse(raw); applyLoggedInUI(); } catch (e) { isLoggedIn = false; } }
     }
 
+    var historyOrders = {};
     function showPurchaseHistory() {
       if (!isLoggedIn) { toast('warning', 'Not Logged In', 'Please sign in to view your orders.'); return; }
       startProgress();
@@ -1233,7 +1316,9 @@ box-shadow: 0 0 8px var(--accent);
         stopProgress();
         var container = document.getElementById('historyContainer');
         orders = orders || [];
+        historyOrders = {};
         container.innerHTML = orders.length ? orders.map(function (o) {
+          historyOrders[o.orderId] = o;
           var itemsHtml = o.items.map(function (it) {
             return '<li>' + it.qty + '× ' + esc(it.productName) + (it.recipient ? ' <span class="muted">(for ' + esc(it.recipient) + ')</span>' : '') + ' — ' + currency(it.subtotal) + '</li>';
           }).join('');
@@ -1241,7 +1326,10 @@ box-shadow: 0 0 8px var(--accent);
             '<div class="flex justify-between flex-wrap gap-2 mb-2"><strong>' + esc(o.orderId) + '</strong><span class="text-sm muted">' + new Date(o.createdAt).toLocaleString() + '</span></div>' +
             '<p class="text-sm mb-1">Status: <strong>' + esc(o.orderStatus) + '</strong> · Payment: <strong>' + esc(o.paymentStatus) + '</strong></p>' +
             '<ul class="list-disc list-inside text-sm mb-1">' + itemsHtml + '</ul>' +
-            '<p class="text-right font-semibold">Total: ' + currency(o.total) + '</p></div>';
+            '<div class="flex justify-between items-center">' +
+              '<button onclick="downloadReceipt(historyOrders[\'' + esc(o.orderId) + '\'])" class="text-sm text-primary underline"><i class="fas fa-receipt mr-1"></i>Download Receipt</button>' +
+              '<p class="font-semibold">Total: ' + currency(o.total) + '</p>' +
+            '</div></div>';
         }).join('') : '<p class="text-center muted">No orders yet.</p>';
         document.getElementById('purchaseHistoryModal').classList.remove('hidden');
       }).withFailureHandler(function (err) { stopProgress(); toast('error', 'Error', String(err)); }).getOrderHistory(currentUser.username);
