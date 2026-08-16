@@ -12,11 +12,11 @@
 
 // Bump when SHEETS changes so ensureSetup_ re-runs and adds new columns to
 // spreadsheets created by an older version of this script.
-var SCHEMA_VERSION = '6';
+var SCHEMA_VERSION = '7';
 
 // Shown in the storefront footer and admin sidebar. If this doesn't match the
 // file you pasted, the deployment is still serving an older version.
-var BUILD_VERSION = '2026.08.17-11';
+var BUILD_VERSION = '2026.08.17-12';
 
 // ---------------------------------------------------------------------------
 // Sheet schema — single source of truth for headers used by the generic
@@ -217,18 +217,45 @@ function ensureHeaders_(sheet, name) {
 
 // Adds any header this version of the script expects but the sheet doesn't
 // have yet, so existing stores pick up new features without losing data.
+// Returns the headers actually added, so callers can react to a specific
+// column showing up for the first time (see the IsDigital migration below).
 function ensureColumns_(name) {
   var sheet = getSheet_(name, false);
-  if (!sheet) return;
+  if (!sheet) return [];
   var headers = SHEETS[name];
   var width = sheet.getLastColumn();
   var current = width ? sheet.getRange(1, 1, 1, width).getValues()[0] : [];
   while (current.length && String(current[current.length - 1]).trim() === '') current.pop();
 
   var missing = headers.filter(function (h) { return current.indexOf(h) === -1; });
-  if (!missing.length) return;
+  if (!missing.length) return [];
   sheet.getRange(1, current.length + 1, 1, missing.length).setValues([missing]);
   sheet.setFrozenRows(1);
+  return missing;
+}
+
+// A product flagged RequiresRecipient (data bundles, delivered to a phone
+// number) is, in every case this system supports, a digital delivery — so
+// when the IsDigital column is first added to an existing store, backfill it
+// from that signal. Without this, every bundle created before this column
+// existed would silently default to "needs a delivery address" at checkout,
+// which is wrong and not something an admin would think to go fix manually.
+function migrateIsDigitalForBundles_() {
+  var sheet = getSheet_('Products', false);
+  if (!sheet) return;
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var recipientCol = headers.indexOf('RequiresRecipient');
+  var digitalCol = headers.indexOf('IsDigital');
+  if (recipientCol === -1 || digitalCol === -1) return;
+  var data = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
+  data.forEach(function (row, i) {
+    var digitalBlank = row[digitalCol] === '' || row[digitalCol] === null || row[digitalCol] === undefined;
+    if (toBool_(row[recipientCol]) && digitalBlank) {
+      sheet.getRange(i + 2, digitalCol + 1).setValue(true);
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -266,6 +293,10 @@ function ensureSetup_() {
       getSheet_(name);
       ensureColumns_(name);
     });
+    // Gated by SCHEMA_VERSION like everything else in this block, so it runs
+    // once per version bump rather than every page load. Safe to call even
+    // when there's nothing to migrate — it only touches blank IsDigital cells.
+    migrateIsDigitalForBundles_();
     seedDefaultSettings_();
     seedDefaultPaymentMethod_();
     seedSampleCatalog_();
@@ -385,8 +416,15 @@ function seedSampleCatalog_() {
   });
 
   var products = [
-    { biz: 'databundles', Name: 'MTN 5GB Data Bundle', Description: 'MTN data bundle valid for 30 days. Delivered to any MTN number you provide at checkout.', Category: 'Data Bundles', Price: 30, Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
-    { biz: 'databundles', Name: 'Telecel 10GB Data Bundle', Description: 'Telecel data bundle valid for 30 days. Delivered to any Telecel number you provide at checkout.', Category: 'Data Bundles', Price: 55, Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
+    // Category is set to the network name (not "Data Bundles") on purpose —
+    // the storefront turns a business's distinct categories into a big
+    // toggle row automatically, which is exactly the MTN / Telecel /
+    // AirtelTigo switch a data-bundle shop needs.
+    { biz: 'databundles', Name: 'MTN 5GB Data Bundle', Description: 'MTN data bundle valid for 30 days. Delivered to any MTN number you provide at checkout.', Category: 'MTN', Price: 30, Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
+    { biz: 'databundles', Name: 'MTN 10GB Data Bundle', Description: 'MTN data bundle valid for 30 days. Delivered to any MTN number you provide at checkout.', Category: 'MTN', Price: 52, Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
+    { biz: 'databundles', Name: 'Telecel 5GB Data Bundle', Description: 'Telecel data bundle valid for 30 days. Delivered to any Telecel number you provide at checkout.', Category: 'Telecel', Price: 27, Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
+    { biz: 'databundles', Name: 'Telecel 10GB Data Bundle', Description: 'Telecel data bundle valid for 30 days. Delivered to any Telecel number you provide at checkout.', Category: 'Telecel', Price: 55, Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
+    { biz: 'databundles', Name: 'AirtelTigo 5GB Data Bundle', Description: 'AirtelTigo data bundle valid for 30 days. Delivered to any AirtelTigo number you provide at checkout.', Category: 'AirtelTigo', Price: 26, Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
     { biz: 'electronics', Name: 'Bluetooth Speaker', Description: 'Portable wireless Bluetooth speaker with deep bass, USB/SD playback and up to 8 hours of battery life.', Category: 'Audio', Price: 180, Stock: 12, ShowWhatsApp: true },
     { biz: 'electronics', Name: 'Wireless Earbuds', Description: 'True wireless earbuds with charging case, touch controls and noise isolation.', Category: 'Audio', Price: 120, Stock: 15, ShowWhatsApp: true },
     { biz: 'electronics', Name: 'Extension Board with Surge Protection', Description: 'Four-socket extension board with USB ports and built-in surge protection for your electronics.', Category: 'Accessories', Price: 85, Stock: 25 },

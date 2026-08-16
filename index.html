@@ -1,5 +1,5 @@
 <!-- index.html — Multi-Business Storefront -->
-<!-- MB_BUILD:2026.08.17-11 -->
+<!-- MB_BUILD:2026.08.17-12 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -73,7 +73,7 @@ box-shadow: 0 0 8px var(--accent);
     #fabMenu.closed { opacity: 0; transform: translateY(8px); pointer-events: none; }
   </style>
 </head>
-<body class="flex flex-col min-h-screen" data-mb-build="2026.08.17-11">
+<body class="flex flex-col min-h-screen" data-mb-build="2026.08.17-12">
 
   <div id="progressBar"></div>
 
@@ -149,6 +149,10 @@ box-shadow: 0 0 8px var(--accent);
 
     <section class="w-full md:w-4/5 xl:w-5/6 pb-28">
       <div id="activeBusinessBanner" class="hidden surface p-4 rounded-lg shadow mb-4"></div>
+      <!-- Big toggle buttons for a business's categories (e.g. MTN / Telecel /
+           AirtelTigo for Data Bundles). Hidden whenever the current business
+           doesn't have more than one category to toggle between. -->
+      <div id="categoryToggleRow" class="hidden flex flex-wrap gap-2 mb-4"></div>
       <div class="mb-4">
         <input type="text" id="searchInput" placeholder="Search products or services..." oninput="renderProducts()" class="w-full p-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
       </div>
@@ -303,9 +307,8 @@ box-shadow: 0 0 8px var(--accent);
       <h2 class="text-xl font-semibold mb-1">Enter Phone Number</h2>
       <p class="text-sm muted mb-4" id="recipientProductName"></p>
       <label class="block text-sm mb-1" id="recipientLabel">Phone number</label>
-      <input type="tel" id="recipientNumber" inputmode="numeric" placeholder="e.g. 0243569785" class="w-full p-3 rounded-lg mb-3">
-      <label class="block text-sm mb-1">Quantity</label>
-      <input type="number" id="recipientQty" min="1" value="1" class="w-full p-3 rounded-lg mb-4">
+      <input type="tel" id="recipientNumber" inputmode="numeric" placeholder="e.g. 0243569785" class="w-full p-3 rounded-lg mb-4">
+      <p class="text-xs muted mb-4">Want to load this on another number too? Confirm this one, then tap Buy Now again for the next number.</p>
       <div class="flex gap-2">
         <button onclick="closeRecipientModal()" class="flex-1 surface-2 bordered py-3 rounded-lg">Cancel</button>
         <button onclick="confirmRecipientPurchase()" class="flex-1 bg-primary py-3 rounded-lg">Continue</button>
@@ -670,8 +673,21 @@ box-shadow: 0 0 8px var(--accent);
 
       var mapBox = document.getElementById('footerMap');
       mapBox.innerHTML = s.MapEmbedURL
-        ? '<iframe src="' + esc(s.MapEmbedURL) + '" width="100%" height="180" style="border:0" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>'
+        ? '<iframe src="' + esc(toEmbeddableMapUrl(s.MapEmbedURL)) + '" width="100%" height="180" style="border:0" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>'
         : '<p class="text-sm opacity-75">Location coming soon.</p>';
+    }
+
+    // A plain Google Maps link (what you get from "Share" or the address bar)
+    // refuses to load inside an iframe — only the official /maps/embed format
+    // is allowed to. Appending output=embed to an ordinary maps.google.com
+    // link is a well-known, no-API-key way to make it embeddable, so accept
+    // whatever the admin pasted rather than requiring the separate "Embed a
+    // map" flow.
+    function toEmbeddableMapUrl(url) {
+      url = String(url || '').trim();
+      if (!url) return '';
+      if (url.indexOf('/maps/embed') !== -1 || url.indexOf('output=embed') !== -1) return url;
+      return url + (url.indexOf('?') === -1 ? '?' : '&') + 'output=embed';
     }
 
     function goHome() {
@@ -804,6 +820,7 @@ box-shadow: 0 0 8px var(--accent);
     function renderCategories() {
       var list = document.getElementById('categoryList');
       var mobile = document.getElementById('mobileCategory');
+      var toggleRow = document.getElementById('categoryToggleRow');
       list.innerHTML = '';
       var cats = [];
       currentProductPool().forEach(function (p) { if (p.category && cats.indexOf(p.category) === -1) cats.push(p.category); });
@@ -820,6 +837,27 @@ box-shadow: 0 0 8px var(--accent);
 
       mobile.innerHTML = '<option value="">All Categories</option>' +
         cats.map(function (c) { return '<option value="' + esc(c) + '"' + (selectedCategory === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('');
+
+      // Big pill toggle above the grid — e.g. MTN / Telecel / AirtelTigo for a
+      // Data Bundles business. Categories are just the product's Category
+      // field, so this works for any business the admin sets up the same way;
+      // it only appears once there's actually more than one to switch between.
+      // Built as DOM nodes with closures (not an inline onclick string) so a
+      // category name never has to be escaped into a JS string literal.
+      toggleRow.innerHTML = '';
+      if (cats.length > 1) {
+        toggleRow.classList.remove('hidden');
+        cats.forEach(function (c) {
+          var active = selectedCategory === c;
+          var btn = document.createElement('button');
+          btn.className = 'px-5 py-2.5 rounded-full font-semibold text-sm ' + (active ? 'bg-primary' : 'surface-2 bordered');
+          btn.textContent = c;
+          btn.onclick = function () { selectedCategory = active ? null : c; renderCategories(); renderProducts(); };
+          toggleRow.appendChild(btn);
+        });
+      } else {
+        toggleRow.classList.add('hidden');
+      }
     }
 
     // ---------------------------------------------------------------------
@@ -939,7 +977,6 @@ box-shadow: 0 0 8px var(--accent);
       document.getElementById('recipientProductName').textContent = p.name + ' — ' + currency(p.price);
       document.getElementById('recipientLabel').textContent = p.recipientLabel || 'Phone number';
       document.getElementById('recipientNumber').value = '';
-      document.getElementById('recipientQty').value = '1';
       document.getElementById('recipientModal').classList.remove('hidden');
       setTimeout(function () { document.getElementById('recipientNumber').focus(); }, 100);
     }
@@ -952,12 +989,14 @@ box-shadow: 0 0 8px var(--accent);
       var p = pendingRecipientProduct;
       if (!p) return;
       var number = document.getElementById('recipientNumber').value.trim();
-      var qty = Math.max(1, parseInt(document.getElementById('recipientQty').value, 10) || 1);
+      // One bundle per confirmation, always — buying the same bundle for a
+      // second number is a second "Buy Now" tap, not a quantity field next to
+      // a single number (which reads ambiguously: one number, several loads?).
+      var qty = 1;
       if (number.replace(/\D/g, '').length < 9) { toast('warning', 'Invalid Number', 'Please enter a valid phone number.'); return; }
 
       var note = p.confirmationNote || '';
       var html = 'Are you sure you want to purchase <strong>"' + esc(p.name) + ' - ' + esc(currency(p.price)) + '"</strong>' +
-        (qty > 1 ? ' <strong>x' + qty + '</strong>' : '') +
         ' for phone number: <strong>' + esc(number) + '</strong>?' +
         (note ? '<div style="margin-top:14px;text-align:left;font-size:.85rem;color:#b45309;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px"><strong>Important:</strong> ' + esc(note) + '</div>' : '');
 
