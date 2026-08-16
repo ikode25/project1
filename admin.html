@@ -1,5 +1,5 @@
 <!-- admin.html — Multi-Business Admin Portal -->
-<!-- MB_BUILD:2026.08.17-12 -->
+<!-- MB_BUILD:2026.08.17-13 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -67,7 +67,7 @@
     }
   </style>
 </head>
-<body class="min-h-screen" data-mb-build="2026.08.17-12">
+<body class="min-h-screen" data-mb-build="2026.08.17-13">
 
   <div id="progressBar"></div>
 
@@ -253,9 +253,13 @@
         <h1 class="text-2xl font-bold mb-4">Products &amp; Services</h1>
         <form id="productForm" class="surface p-4 rounded-lg shadow mb-6 grid grid-cols-1 md:grid-cols-2 gap-3" onsubmit="saveProduct(event)">
           <input type="hidden" id="prdId">
-          <label class="text-sm">Business<select id="prdBusiness" class="p-2 rounded-lg w-full mt-1" required></select></label>
+          <label class="text-sm">Business<select id="prdBusiness" class="p-2 rounded-lg w-full mt-1" required onchange="renderCategoryQuickPicks()"></select></label>
           <label class="text-sm">Name<input id="prdName" placeholder="Product / Service Name" class="p-2 rounded-lg w-full mt-1" required></label>
-          <label class="text-sm">Category<input id="prdCategory" placeholder="e.g. Data Bundles" class="p-2 rounded-lg w-full mt-1"></label>
+          <label class="text-sm md:col-span-2">Category <span class="muted font-normal">— products sharing a category become toggle buttons on the store page. For data bundles, set this to the network: MTN, Telecel or AirtelTigo, spelled exactly the same on every bundle for that network.</span>
+            <input id="prdCategory" list="categorySuggestions" placeholder="e.g. MTN" class="p-2 rounded-lg w-full mt-1" oninput="renderCategoryQuickPicks()">
+            <datalist id="categorySuggestions"></datalist>
+            <div id="categoryQuickPicks" class="flex flex-wrap gap-1 mt-2"></div>
+          </label>
           <label class="text-sm">Price<input id="prdPrice" type="number" step="0.01" placeholder="0.00" class="p-2 rounded-lg w-full mt-1"></label>
           <label class="text-sm">Stock <span class="muted">(blank = unlimited / digital)</span><input id="prdStock" type="number" placeholder="blank = unlimited" class="p-2 rounded-lg w-full mt-1"></label>
           <label class="text-sm">Recipient field label<input id="prdRecipientLabel" placeholder="e.g. Phone number to receive the bundle" class="p-2 rounded-lg w-full mt-1"></label>
@@ -1079,7 +1083,7 @@
           html: '<table style="margin:0 auto;font-size:13px">' + rows + '</table>' +
             '<hr style="margin:12px 0">' +
             '<div style="font-size:12px;text-align:left">' +
-              '<b>admin page build:</b> 2026.08.17-12<br>' +
+              '<b>admin page build:</b> 2026.08.17-13<br>' +
               '<b>Code.gs build:</b> ' + ((info && info.build) || 'could not read') + '<br>' +
               '<b>schema:</b> ' + ((info && info.setupVersion) || '?') +
             '</div>' +
@@ -1550,7 +1554,34 @@
         hideLoadingSpinner();
         cache.products = list || [];
         renderProductTable();
+        renderCategoryQuickPicks();
       }).withFailureHandler(runFail).adminGetProducts(adminToken);
+    }
+
+    // Existing categories for whichever business is selected, offered both as
+    // a native autocomplete (keyboard-friendly) and as one-tap pills (so an
+    // admin never retypes "MTN" by hand and risks a stray space or a
+    // different capitalization quietly splitting it into a second toggle
+    // group on the storefront).
+    function renderCategoryQuickPicks() {
+      var bizId = document.getElementById('prdBusiness').value;
+      var current = document.getElementById('prdCategory').value.trim();
+      var cats = [];
+      (cache.products || []).forEach(function (p) {
+        if (p.BusinessID === bizId && p.Category && cats.indexOf(p.Category) === -1) cats.push(p.Category);
+      });
+
+      document.getElementById('categorySuggestions').innerHTML =
+        cats.map(function (c) { return '<option value="' + esc(c) + '">'; }).join('');
+
+      var picks = document.getElementById('categoryQuickPicks');
+      if (!cats.length) { picks.innerHTML = ''; return; }
+      picks.innerHTML = '<span class="text-xs muted w-full">Already used for this business — tap to reuse exactly:</span>' +
+        cats.map(function (c) {
+          var active = c === current;
+          return '<button type="button" class="text-xs px-2 py-1 rounded-full ' + (active ? 'bg-primary' : 'surface-2 bordered') + '" ' +
+            'onclick="document.getElementById(\'prdCategory\').value=this.dataset.c;renderCategoryQuickPicks();" data-c="' + esc(c) + '">' + esc(c) + '</button>';
+        }).join('');
     }
     function renderProductTable() {
       var q = (document.getElementById('productSearch').value || '').toLowerCase();
@@ -1598,6 +1629,7 @@
       document.getElementById('prdBusiness').value = p.BusinessID;
       document.getElementById('prdName').value = p.Name;
       document.getElementById('prdCategory').value = p.Category;
+      renderCategoryQuickPicks();
       document.getElementById('prdPrice').value = p.Price;
       document.getElementById('prdStock').value = p.Stock;
       document.getElementById('prdImageUrl').value = p.ImageURL;
@@ -1620,6 +1652,7 @@
       document.getElementById('prdInStock').checked = true;
       document.getElementById('prdActive').checked = true;
       clearPicker('prdImageUrl');
+      renderCategoryQuickPicks();
     }
     function saveProduct(e) {
       e.preventDefault();
