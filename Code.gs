@@ -123,7 +123,9 @@ const DEFAULT_SETTINGS = {
   // Public page / hero carousel
   heroImages: [],           // [{ fileId, url }]
   heroAutoplay: true,
-  heroIntervalSeconds: 6
+  heroIntervalSeconds: 6,
+  aboutImageUrl: "",
+  aboutImageFileId: ""
 };
 
 // Keys whose value is JSON (object/array) rather than a plain string/boolean/number
@@ -1256,7 +1258,7 @@ function uploadIdCardImage(base64Data, fileName, mimeType) {
 
     // Get the direct view URL using proper Drive format
     const fileId = file.getId();
-    const viewUrl = 'https://drive.google.com/uc?export=view&id=' + fileId;
+    const viewUrl = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w2000';
 
     Logger.log('Uploaded image: ' + fileName + ', URL: ' + viewUrl);
 
@@ -1316,7 +1318,7 @@ function uploadBrandAsset(base64Data, fileName, mimeType, subfolder) {
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
     const fileId = file.getId();
-    const viewUrl = 'https://drive.google.com/uc?export=view&id=' + fileId;
+    const viewUrl = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w2000';
 
     return { success: true, fileId: fileId, fileName: fileName, viewUrl: viewUrl, driveUrl: file.getUrl() };
   } catch (e) {
@@ -1376,11 +1378,32 @@ function getSettings() {
       if (!key) continue;
       stored[key] = decodeSettingValue(key, data[i][SETTINGS_VALUE_COL]);
     }
-    return Object.assign({}, DEFAULT_SETTINGS, stored);
+    const merged = Object.assign({}, DEFAULT_SETTINGS, stored);
+    return migrateLegacyDriveUrls(merged);
   } catch (e) {
     Logger.log('Error in getSettings: ' + e.toString());
     return DEFAULT_SETTINGS;
   }
+}
+
+/**
+ * Self-heals settings images that were saved before the switch from the
+ * unreliable 'uc?export=view' Drive link format to 'thumbnail' links (which
+ * embed far more reliably in <img> tags). Rewrites in place from the stored
+ * fileId - no re-upload needed - so older saves pick up the fix automatically.
+ */
+function migrateLegacyDriveUrls(settings) {
+  const isLegacy = (url) => url && url.indexOf('uc?export=view') !== -1;
+  const thumb = (fileId) => 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w2000';
+
+  if (isLegacy(settings.logoUrl) && settings.logoFileId) settings.logoUrl = thumb(settings.logoFileId);
+  if (isLegacy(settings.aboutImageUrl) && settings.aboutImageFileId) settings.aboutImageUrl = thumb(settings.aboutImageFileId);
+  if (Array.isArray(settings.heroImages)) {
+    settings.heroImages = settings.heroImages.map(img =>
+      (img && isLegacy(img.url) && img.fileId) ? Object.assign({}, img, { url: thumb(img.fileId) }) : img
+    );
+  }
+  return settings;
 }
 
 /**
@@ -1389,23 +1412,34 @@ function getSettings() {
  */
 function saveSettings(partialSettings) {
   try {
-    const sheet = getOrCreateSettingsSheet();
-    const data = sheet.getDataRange().getValues();
-    const rowByKey = {};
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][SETTINGS_KEY_COL]) rowByKey[data[i][SETTINGS_KEY_COL]] = i + 1; // 1-based sheet row
-    }
+    const keys = Object.keys(partialSettings || {});
+    if (keys.length === 0) return { success: true, message: 'Nothing to save', settings: getSettings() };
 
-    Object.keys(partialSettings || {}).forEach(key => {
+    const sheet = getOrCreateSettingsSheet();
+    const lastRow = sheet.getLastRow();
+    const data = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
+    const rowByKey = {};
+    data.forEach((row, i) => { if (row[SETTINGS_KEY_COL]) rowByKey[row[SETTINGS_KEY_COL]] = i + 2; }); // 1-based sheet row
+
+    // Batch every brand-new key into a single appended range instead of one
+    // appendRow() call per key - keeps a first-time save (30+ keys) to ~1-2
+    // Sheets API calls instead of dozens, which is both faster and avoids
+    // hitting per-second write quotas.
+    const newRows = [];
+    keys.forEach(key => {
       const encoded = encodeSettingValue(key, partialSettings[key]);
       if (rowByKey[key]) {
         sheet.getRange(rowByKey[key], SETTINGS_VALUE_COL + 1).setValue(encoded);
       } else {
-        sheet.appendRow([key, encoded]);
+        newRows.push([key, encoded]);
       }
     });
+    if (newRows.length > 0) {
+      sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, 2).setValues(newRows);
+    }
 
-    logActivity('admin', 'SETTINGS_UPDATED', 'Keys: ' + Object.keys(partialSettings || {}).join(', '));
+    try { logActivity('admin', 'SETTINGS_UPDATED', 'Keys: ' + keys.join(', ')); }
+    catch (logErr) { Logger.log('saveSettings: activity log failed (non-fatal): ' + logErr.toString()); }
 
     return { success: true, message: 'Settings saved successfully', settings: getSettings() };
   } catch (e) {
@@ -1460,6 +1494,27 @@ function deleteHeroImage(fileId) {
   } catch (e) {
     return { success: false, message: 'Error removing hero image: ' + e.toString() };
   }
+}
+
+/**
+ * Uploads a new "About" section photo for the public website.
+ */
+function saveAboutImage(base64Data, fileName, mimeType) {
+  try {
+    const result = uploadBrandAsset(base64Data, 'ABOUT_' + Date.now() + '_' + fileName, mimeType, 'AboutPhoto');
+    if (!result.success) return result;
+    return saveSettings({ aboutImageUrl: result.viewUrl, aboutImageFileId: result.fileId });
+  } catch (e) {
+    return { success: false, message: 'Error saving about photo: ' + e.toString() };
+  }
+}
+
+/**
+ * Uploads a food menu item photo to Drive. Used by the admin Food Menu
+ * form's image picker instead of a raw pasted URL.
+ */
+function uploadFoodImage(base64Data, fileName, mimeType) {
+  return uploadBrandAsset(base64Data, 'FOOD_' + Date.now() + '_' + fileName, mimeType, 'FoodMenu');
 }
 
 /**
@@ -2545,7 +2600,7 @@ function getPublicRoomTypes() {
       const type = (row[ROOM_TYPE_COL] || "").toString();
       const rate = parseFloat(row[ROOM_RATE_COL]) || 0;
       const imageFileId = (row[ROOM_IMAGE_COL] || "").toString();
-      const imageUrl = imageFileId ? 'https://drive.google.com/uc?export=view&id=' + imageFileId : '';
+      const imageUrl = imageFileId ? 'https://drive.google.com/thumbnail?id=' + imageFileId + '&sz=w2000' : '';
       const status = (row[ROOM_STATUS_COL] || "Available").toString().toLowerCase();
 
       if (!roomTypeMap[type]) {
@@ -2605,7 +2660,7 @@ function uploadRoomImage(roomNo, base64Data, fileName, mimeType) {
 
     // Get the file ID (not the full URL - we store just the ID)
     const fileId = file.getId();
-    const viewUrl = 'https://drive.google.com/uc?export=view&id=' + fileId;
+    const viewUrl = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w2000';
 
     // Update the room's image in the sheet
     const roomsSheet = SpreadsheetApp.openById(SS_ID).getSheetByName(ROOMS_SHEET_NAME);
@@ -2657,7 +2712,7 @@ function updateRoomTypeImage(roomType, base64Data, fileName, mimeType) {
 
     // Get the file ID
     const fileId = file.getId();
-    const viewUrl = 'https://drive.google.com/uc?export=view&id=' + fileId;
+    const viewUrl = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w2000';
 
     // Update all rooms of this type with the new image
     const roomsSheet = SpreadsheetApp.openById(SS_ID).getSheetByName(ROOMS_SHEET_NAME);
@@ -3150,7 +3205,7 @@ function getAllRooms() {
     for (let i = 1; i < data.length; i++) {
       let row = data[i];
       let imageFileId = (row[ROOM_IMAGE_COL] || "").toString();
-      let imageUrl = imageFileId ? 'https://drive.google.com/uc?export=view&id=' + imageFileId : '';
+      let imageUrl = imageFileId ? 'https://drive.google.com/thumbnail?id=' + imageFileId + '&sz=w2000' : '';
       rooms.push({
         rowIndex: i + 1,
         roomNo: row[ROOM_NO_COL],
@@ -3352,7 +3407,7 @@ function getPaymentMethods() {
 
     return data.map((row, index) => {
       const qrFileId = (row[PM_QR_CODE_COL] || '').toString();
-      const qrCodeUrl = qrFileId ? 'https://drive.google.com/uc?export=view&id=' + qrFileId : '';
+      const qrCodeUrl = qrFileId ? 'https://drive.google.com/thumbnail?id=' + qrFileId + '&sz=w2000' : '';
       return {
         rowIndex: index + 2,
         id: row[PM_ID_COL],

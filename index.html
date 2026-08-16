@@ -2574,7 +2574,8 @@
       arkeselApiKey: '', arkeselSenderId: '',
       hubtelClientId: '', hubtelClientSecret: '', hubtelSenderId: '',
       customSmsUrl: '', customSmsMethod: 'POST', customSmsHeaders: '', customSmsBodyTemplate: '',
-      heroImages: [], heroAutoplay: true, heroIntervalSeconds: 6
+      heroImages: [], heroAutoplay: true, heroIntervalSeconds: 6,
+      aboutImageUrl: '', aboutImageFileId: ''
     };
 
     const SettingsContext = React.createContext({ settings: DEFAULT_CLIENT_SETTINGS, refreshSettings: () => {} });
@@ -2606,6 +2607,41 @@
       return (
         <div style={{ width: size, height: size, borderRadius: '50%', background: 'var(--navy-primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: size * 0.42, flexShrink: 0, ...style }}>
           {initial}
+        </div>
+      );
+    }
+
+    // Reusable color picker (swatch + hex text field). Defined at module scope -
+    // NOT inline inside a parent component - so it keeps a stable identity across
+    // renders. Defining a component like this inline inside another component's
+    // body recreates its function reference on every render, which makes React
+    // unmount+remount the underlying <input> on every keystroke; for a native
+    // <input type="color">, that tears down the element the OS color picker is
+    // anchored to, so the picker visibly closes itself mid-selection.
+    function ColorField({ label, field, form, update }) {
+      return (
+        <div className="form-group">
+          <label>{label}</label>
+          <div className="color-field">
+            <input type="color" value={form[field] || '#000000'} onChange={(e) => update({ [field]: e.target.value })} />
+            <input type="text" value={form[field] || ''} onChange={(e) => update({ [field]: e.target.value })} />
+          </div>
+        </div>
+      );
+    }
+
+    // Reusable toggle switch - kept at module scope for the same reason as ColorField above.
+    function ToggleSwitch({ checked, onChange, label, desc }) {
+      return (
+        <div className="toggle-row">
+          <label className="toggle-switch">
+            <input type="checkbox" checked={!!checked} onChange={(e) => onChange(e.target.checked)} />
+            <span className="toggle-slider"></span>
+          </label>
+          <div>
+            <div className="toggle-label">{label}</div>
+            {desc && <div className="toggle-desc">{desc}</div>}
+          </div>
         </div>
       );
     }
@@ -9725,24 +9761,54 @@
         status: item?.status || 'Available'
       });
       const [saving, setSaving] = useState(false);
+      const [imageFile, setImageFile] = useState(null);
+      const [imagePreview, setImagePreview] = useState(item?.image || '');
+
+      const handleImageChange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 5 * 1024 * 1024) { Swal.fire({ icon: 'warning', text: 'Photo must be less than 5MB' }); return; }
+        setImageFile(file);
+        const reader = new FileReader();
+        reader.onload = (ev) => setImagePreview(ev.target.result);
+        reader.readAsDataURL(file);
+      };
 
       const handleSubmit = (e) => {
         e.preventDefault();
         if (!formData.name || !formData.price) { Swal.fire({ icon: 'warning', text: 'Name and price are required' }); return; }
         setSaving(true);
 
-        if (item) {
-          google.script.run.withSuccessHandler((res) => {
+        const submitWithImage = (imageUrl) => {
+          const payload = { ...formData, image: imageUrl };
+          const done = (res) => {
             setSaving(false);
             if (res.success) { Swal.fire({ icon: 'success', text: res.message, timer: 1500 }); onSave(); }
             else Swal.fire({ icon: 'error', text: res.message });
-          }).updateFoodItem(item.rowIndex, formData);
+          };
+          const fail = (err) => { setSaving(false); Swal.fire({ icon: 'error', text: err.message }); };
+          if (item) {
+            google.script.run.withSuccessHandler(done).withFailureHandler(fail).updateFoodItem(item.rowIndex, payload);
+          } else {
+            google.script.run.withSuccessHandler(done).withFailureHandler(fail).addFoodItem(payload);
+          }
+        };
+
+        if (imageFile) {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const base64 = ev.target.result.split(',')[1];
+            google.script.run
+              .withSuccessHandler((res) => {
+                if (res.success) submitWithImage(res.viewUrl);
+                else { setSaving(false); Swal.fire({ icon: 'error', text: res.message }); }
+              })
+              .withFailureHandler((err) => { setSaving(false); Swal.fire({ icon: 'error', text: err.message }); })
+              .uploadFoodImage(base64, imageFile.name, imageFile.type);
+          };
+          reader.readAsDataURL(imageFile);
         } else {
-          google.script.run.withSuccessHandler((res) => {
-            setSaving(false);
-            if (res.success) { Swal.fire({ icon: 'success', text: res.message, timer: 1500 }); onSave(); }
-            else Swal.fire({ icon: 'error', text: res.message });
-          }).addFoodItem(formData);
+          submitWithImage(formData.image);
         }
       };
 
@@ -9784,10 +9850,18 @@
                       <option value="Out of Stock">Out of Stock</option>
                     </select>
                   </div>
-                  <div className="form-group">
-                    <label>Image URL (optional)</label>
-                    <input type="text" value={formData.image} onChange={(e) => setFormData({...formData, image: e.target.value})} placeholder="https://..." />
-                  </div>
+                </div>
+                <div className="form-group">
+                  <label><i className="fas fa-image"></i> Photo (optional)</label>
+                  <input type="file" accept="image/*" onChange={handleImageChange} />
+                  {imagePreview && (
+                    <div style={{marginTop: 10, position: 'relative', display: 'inline-block'}}>
+                      <img src={imagePreview} alt="Preview" style={{maxWidth: 150, maxHeight: 120, borderRadius: 6, border: '1px solid #ddd', objectFit: 'cover'}} />
+                      <button type="button" onClick={() => { setImageFile(null); setImagePreview(''); setFormData({...formData, image: ''}); }} style={{position: 'absolute', top: -8, right: -8, background: '#ea4335', color: 'white', border: 'none', borderRadius: '50%', width: 24, height: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+                        <i className="fas fa-times"></i>
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div className="form-group">
                   <label>Description</label>
@@ -11649,6 +11723,7 @@
       const [saving, setSaving] = useState(false);
       const [uploadingLogo, setUploadingLogo] = useState(false);
       const [uploadingHero, setUploadingHero] = useState(false);
+      const [uploadingAbout, setUploadingAbout] = useState(false);
       const [testPhone, setTestPhone] = useState('');
       const [testingSms, setTestingSms] = useState(false);
 
@@ -11701,6 +11776,27 @@
         }
       };
 
+      const handleAboutImageChange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 5 * 1024 * 1024) { Swal.fire({ icon: 'warning', text: 'Photo must be less than 5MB' }); return; }
+        setUploadingAbout(true);
+        try {
+          const b64 = await fileToBase64(file);
+          google.script.run
+            .withSuccessHandler((res) => {
+              setUploadingAbout(false);
+              if (res.success) { Swal.fire({ icon: 'success', text: 'About photo updated', timer: 1500, showConfirmButton: false }); refreshSettings(); }
+              else Swal.fire({ icon: 'error', text: res.message });
+            })
+            .withFailureHandler((err) => { setUploadingAbout(false); Swal.fire({ icon: 'error', text: err.message }); })
+            .saveAboutImage(b64.data, b64.name, b64.mime);
+        } catch (err) {
+          setUploadingAbout(false);
+          Swal.fire({ icon: 'error', text: 'Error reading photo file: ' + err.message });
+        }
+      };
+
       const handleHeroUpload = async (e) => {
         const files = Array.from(e.target.files || []);
         if (files.length === 0) return;
@@ -11744,29 +11840,6 @@
           .withFailureHandler((err) => { setTestingSms(false); Swal.fire({ icon: 'error', text: err.message }); })
           .sendTestSms(form, testPhone);
       };
-
-      const ColorField = ({ label, field }) => (
-        <div className="form-group">
-          <label>{label}</label>
-          <div className="color-field">
-            <input type="color" value={form[field] || '#000000'} onChange={(e) => update({ [field]: e.target.value })} />
-            <input type="text" value={form[field] || ''} onChange={(e) => update({ [field]: e.target.value })} />
-          </div>
-        </div>
-      );
-
-      const Toggle = ({ checked, onChange, label, desc }) => (
-        <div className="toggle-row">
-          <label className="toggle-switch">
-            <input type="checkbox" checked={!!checked} onChange={(e) => onChange(e.target.checked)} />
-            <span className="toggle-slider"></span>
-          </label>
-          <div>
-            <div className="toggle-label">{label}</div>
-            {desc && <div className="toggle-desc">{desc}</div>}
-          </div>
-        </div>
-      );
 
       const tabs = [
         { id: 'general', label: 'General', icon: 'fa-hotel' },
@@ -11864,14 +11937,14 @@
                 <h4 style={{marginTop: 10}}><i className="fas fa-palette"></i> Colors & Theme</h4>
                 <p className="settings-hint">These colors are applied across the entire system instantly on save.</p>
                 <div className="form-grid">
-                  <ColorField label="Primary" field="primaryColor" />
-                  <ColorField label="Dark / Sidebar" field="darkColor" />
-                  <ColorField label="Light Accent" field="lightColor" />
-                  <ColorField label="Accent (links & highlights)" field="accentColor" />
-                  <ColorField label="Hover" field="hoverColor" />
-                  <ColorField label="Success" field="successColor" />
-                  <ColorField label="Warning" field="warningColor" />
-                  <ColorField label="Danger" field="dangerColor" />
+                  <ColorField label="Primary" field="primaryColor" form={form} update={update} />
+                  <ColorField label="Dark / Sidebar" field="darkColor" form={form} update={update} />
+                  <ColorField label="Light Accent" field="lightColor" form={form} update={update} />
+                  <ColorField label="Accent (links & highlights)" field="accentColor" form={form} update={update} />
+                  <ColorField label="Hover" field="hoverColor" form={form} update={update} />
+                  <ColorField label="Success" field="successColor" form={form} update={update} />
+                  <ColorField label="Warning" field="warningColor" form={form} update={update} />
+                  <ColorField label="Danger" field="dangerColor" form={form} update={update} />
                 </div>
                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => update({
                   primaryColor: '#001f3f', darkColor: '#001529', lightColor: '#003366', accentColor: '#0074D9',
@@ -11885,8 +11958,8 @@
             {activeTab === 'sms' && (
               <div className="settings-card">
                 <h4><i className="fas fa-sms"></i> SMS Notifications</h4>
-                <Toggle checked={form.smsEnabled} onChange={(v) => update({ smsEnabled: v })} label="Enable SMS" desc="Turn on SMS sending for this system" />
-                <Toggle checked={form.smsSendOnBooking} onChange={(v) => update({ smsSendOnBooking: v })} label="Send confirmation SMS on booking" desc="Guests get a text when an admin booking is created" />
+                <ToggleSwitch checked={form.smsEnabled} onChange={(v) => update({ smsEnabled: v })} label="Enable SMS" desc="Turn on SMS sending for this system" />
+                <ToggleSwitch checked={form.smsSendOnBooking} onChange={(v) => update({ smsSendOnBooking: v })} label="Send confirmation SMS on booking" desc="Guests get a text when an admin booking is created" />
 
                 <p className="settings-hint" style={{marginTop: 10}}>Choose a provider</p>
                 <div className="provider-select-grid">
@@ -11997,10 +12070,27 @@
                   </label>
                 </div>
 
-                <Toggle checked={form.heroAutoplay} onChange={(v) => update({ heroAutoplay: v })} label="Auto-rotate slides" desc="Automatically cycle through hero images" />
+                <ToggleSwitch checked={form.heroAutoplay} onChange={(v) => update({ heroAutoplay: v })} label="Auto-rotate slides" desc="Automatically cycle through hero images" />
                 <div className="form-group" style={{maxWidth: 220}}>
                   <label>Slide Interval (seconds)</label>
                   <input type="number" min="2" max="30" value={form.heroIntervalSeconds || 6} onChange={(e) => update({ heroIntervalSeconds: parseInt(e.target.value) || 6 })} />
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'public' && (
+              <div className="settings-card">
+                <h4><i className="fas fa-image"></i> About Section Photo</h4>
+                <p className="settings-hint">The photo shown next to "About {settings.hotelName}" on your public website.</p>
+                <div className="logo-preview-box">
+                  {settings.aboutImageUrl
+                    ? <img src={settings.aboutImageUrl} alt="About" style={{width: 90, height: 70, borderRadius: 8, objectFit: 'cover', flexShrink: 0}} />
+                    : <div className="logo-placeholder" style={{width: 90, height: 70, borderRadius: 8}}><i className="fas fa-image"></i></div>}
+                  <div>
+                    <input type="file" accept="image/*" onChange={handleAboutImageChange} disabled={uploadingAbout} />
+                    <p className="settings-hint" style={{margin: '8px 0 0'}}>Uploaded to Google Drive (ASSETS/AboutPhoto). Max 5MB. Applies immediately.</p>
+                    {uploadingAbout && <p style={{fontSize: 13, color: 'var(--navy-accent)'}}><i className="fas fa-spinner fa-spin"></i> Uploading...</p>}
+                  </div>
                 </div>
               </div>
             )}
@@ -12415,7 +12505,7 @@
               </div>
               <div className="about-grid">
                 <div className="about-image">
-                  <img src="https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80" alt="Hotel Lobby" />
+                  <img src={settings.aboutImageUrl || 'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'} alt="Hotel Lobby" />
                 </div>
                 <div className="about-content">
                   <h3>Your Home Away From Home</h3>
