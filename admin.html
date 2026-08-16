@@ -1,5 +1,5 @@
 <!-- admin.html — Multi-Business Admin Portal -->
-<!-- MB_BUILD:2026.08.16-7 -->
+<!-- MB_BUILD:2026.08.16-8 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -67,7 +67,7 @@
     }
   </style>
 </head>
-<body class="min-h-screen" data-mb-build="2026.08.16-7">
+<body class="min-h-screen" data-mb-build="2026.08.16-8">
 
   <div id="progressBar"></div>
 
@@ -75,8 +75,7 @@
   <div id="loginScreen" class="min-h-screen flex items-center justify-center p-4 hidden">
     <div class="surface w-full max-w-sm p-8 rounded-xl shadow-lg">
       <h1 class="text-2xl font-bold text-center mb-1"><i class="fas fa-user-shield text-primary mr-2"></i>Admin Portal</h1>
-      <p class="text-center muted text-sm mb-1">Sign in to manage your businesses</p>
-      <p class="text-center text-xs muted mb-6">Build <strong id="loginBuildTag">2026.08.16-7</strong> · <a href="#" onclick="showDiagnostics();return false;" class="text-primary underline">Check install</a></p>
+      <p class="text-center muted text-sm mb-6">Sign in to manage your businesses</p>
       <div id="adminGoogleWrap" class="hidden mb-4">
         <div id="gsiButtonAdmin" class="flex justify-center"></div>
         <div class="flex items-center gap-3 my-4"><span class="flex-grow h-px" style="background:var(--border)"></span><span class="text-xs muted">or</span><span class="flex-grow h-px" style="background:var(--border)"></span></div>
@@ -770,12 +769,50 @@
         sessionStorage.removeItem('mb_admin_token');
         sessionStorage.removeItem('mb_admin_info');
         adminToken = null; adminInfo = null;
-        document.getElementById('adminApp').classList.add('hidden');
-        document.getElementById('loginScreen').classList.remove('hidden');
+        showOnlyScreen('loginScreen');
         toast('warning', 'Session expired', 'Please sign in again.');
         return;
       }
       toast('error', 'Error', msg);
+    }
+
+    // Exactly one of these three should ever be visible. Using
+    // querySelectorAll (not getElementById) means this still works even if a
+    // botched paste left a duplicate copy of an element somewhere in the DOM.
+    var SCREEN_IDS = ['loginScreen', 'setupScreen', 'adminApp'];
+    function showOnlyScreen(id) {
+      SCREEN_IDS.forEach(function (sid) {
+        document.querySelectorAll('#' + sid).forEach(function (el) {
+          el.classList.add('hidden');
+          el.classList.remove('flex');
+        });
+      });
+      document.querySelectorAll('#' + id).forEach(function (el) {
+        el.classList.remove('hidden');
+        if (id === 'adminApp') el.classList.add('flex');
+      });
+    }
+
+    // Runs once on load. If the deployed file contains duplicate copies of
+    // core elements (a paste that appended instead of replaced), this makes
+    // that obvious immediately instead of showing two screens stacked.
+    function checkForDuplicateMarkup() {
+      var dupes = [];
+      ['loginScreen', 'setupScreen', 'adminApp', 'sideNav'].forEach(function (id) {
+        var n = document.querySelectorAll('#' + id).length;
+        if (n > 1) dupes.push(id + ' appears ' + n + ' times');
+      });
+      if (!dupes.length) return;
+      var banner = document.createElement('div');
+      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#b91c1c;color:#fff;' +
+        'padding:12px 44px 12px 16px;font:14px/1.5 Segoe UI,Roboto,Arial,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.3)';
+      banner.innerHTML = '<b>This page has duplicate content</b> (' + dupes.join(', ') + ') — that happens when a paste ' +
+        'is added on top of the old file instead of replacing it.<div style="margin-top:6px;font-size:13px">' +
+        'In the Apps Script editor, open <b>admin</b>, press <b>Ctrl+A</b> then <b>Delete</b> until the file is completely ' +
+        'empty, paste the file fresh, <b>Ctrl+S</b>, then Deploy &rarr; Manage deployments &rarr; pencil &rarr; New version.</div>' +
+        '<button style="position:absolute;top:8px;right:10px;background:transparent;border:0;color:#fff;font-size:20px;cursor:pointer" ' +
+        'onclick="this.parentNode.remove()">&times;</button>';
+      document.body.prepend(banner);
     }
 
     function toggleSidebar() {
@@ -837,7 +874,7 @@
       icon.classList.add('fa-spin');
       setTimeout(function () { icon.classList.remove('fa-spin'); }, 800);
       loadReferenceData();
-      showTab(activeTab);
+      showTab(activeTab, true); // force: ignore the freshness cache
     }
 
     // -------------------------------------------------------------------
@@ -925,6 +962,7 @@
     // Auth / bootstrap
     // -------------------------------------------------------------------
     window.onload = function () {
+      checkForDuplicateMarkup();
       applyStoredTheme();
       buildPicker('picker-bizLogo', 'bizLogoUrl', 'Business Logo');
       buildPicker('picker-prdImage', 'prdImageUrl', 'Product Photo');
@@ -1000,7 +1038,7 @@
           html: '<table style="margin:0 auto;font-size:13px">' + rows + '</table>' +
             '<hr style="margin:12px 0">' +
             '<div style="font-size:12px;text-align:left">' +
-              '<b>admin page build:</b> 2026.08.16-7<br>' +
+              '<b>admin page build:</b> 2026.08.16-8<br>' +
               '<b>Code.gs build:</b> ' + ((info && info.build) || 'could not read') + '<br>' +
               '<b>schema:</b> ' + ((info && info.setupVersion) || '?') +
             '</div>' +
@@ -1017,14 +1055,14 @@
       showLoadingSpinner();
       google.script.run.withSuccessHandler(function (needsSetup) {
         hideLoadingSpinner();
-        document.getElementById(needsSetup ? 'setupScreen' : 'loginScreen').classList.remove('hidden');
+        showOnlyScreen(needsSetup ? 'setupScreen' : 'loginScreen');
         if (!needsSetup) setupAdminGoogleSignIn();
       }).withFailureHandler(function (err) {
         hideLoadingSpinner();
-        document.getElementById('loginScreen').classList.remove('hidden');
+        showOnlyScreen('loginScreen');
         toast('error', 'Error', String(err));
       }).adminNeedsFirstAccount();
-    };
+    }
 
     function createFirstAccount(e) {
       e.preventDefault();
@@ -1044,8 +1082,7 @@
         hideLoadingSpinner();
         if (!res.success) { toast('error', 'Could not create account', res.message || ''); return; }
         Swal.fire({ icon: 'success', title: 'Your store is ready', text: 'Sign in to start adding businesses and products.' }).then(function () {
-          document.getElementById('setupScreen').classList.add('hidden');
-          document.getElementById('loginScreen').classList.remove('hidden');
+          showOnlyScreen('loginScreen');
           document.getElementById('loginUsername').value = username;
           document.getElementById('loginPassword').focus();
         });
@@ -1120,24 +1157,29 @@
       sessionStorage.removeItem('mb_admin_info');
       localStorage.removeItem('mb_admin_remember');
       adminToken = null; adminInfo = null;
-      document.getElementById('adminApp').classList.add('hidden');
-      document.getElementById('loginScreen').classList.remove('hidden');
+      showOnlyScreen('loginScreen');
       document.getElementById('loginPassword').value = '';
     }
 
-    function enterApp() {
-      document.getElementById('loginScreen').classList.add('hidden');
-      document.getElementById('setupScreen').classList.add('hidden');
-      var app = document.getElementById('adminApp');
-      app.classList.remove('hidden');
-      app.classList.add('flex');
-      document.getElementById('adminNameLabel').textContent = adminInfo.name + ' (' + adminInfo.role + ')';
-      document.querySelectorAll('.nav-item').forEach(function (el) {
-        el.addEventListener('click', function () {
-          showTab(el.dataset.tab);
-          if (window.innerWidth < 1024) toggleSidebar();
-        });
+    // A logout/login cycle calls enterApp() again; attaching listeners here
+    // would double- or triple-bind them onto the same buttons. Delegate from
+    // the nav container once instead, so re-entering the app is always safe.
+    var _navDelegated = false;
+    function wireSideNavOnce() {
+      if (_navDelegated) return;
+      _navDelegated = true;
+      document.getElementById('sideNav').addEventListener('click', function (e) {
+        var item = e.target.closest('.nav-item');
+        if (!item) return;
+        showTab(item.dataset.tab);
+        if (window.innerWidth < 1024) toggleSidebar();
       });
+    }
+
+    function enterApp() {
+      showOnlyScreen('adminApp');
+      document.getElementById('adminNameLabel').textContent = adminInfo.name + ' (' + adminInfo.role + ')';
+      wireSideNavOnce();
       loadReferenceData();
       google.script.run.withSuccessHandler(function (list) {
         cache.messages = list || [];
@@ -1146,18 +1188,34 @@
       showTab('dashboard');
     }
 
-    function showTab(name) {
+    // Switching tabs is pure DOM show/hide and is always instant. Fetching
+    // that tab's data from Apps Script is what's slow (each round trip costs
+    // 1-3s of Google's own function-start overhead, independent of anything
+    // in this code). Re-fetching on every single click made every click feel
+    // slow even when nothing had changed, so a tab already loaded recently
+    // just stays on screen as-is instead of re-fetching. The section is never
+    // cleared on hide, so the previous render is still sitting there ready.
+    var TAB_FRESH_MS = 45000;
+    var tabLoadedAt = {};
+    function showTab(name, force) {
       activeTab = name;
       document.querySelectorAll('.tab-section').forEach(function (s) { s.classList.add('hidden'); });
       document.getElementById('tab-' + name).classList.remove('hidden');
       document.querySelectorAll('.nav-item').forEach(function (el) { el.classList.toggle('active', el.dataset.tab === name); });
+
       var loaders = {
         dashboard: loadDashboard, orders: loadOrders, businesses: loadBusinesses, products: loadProducts,
         banners: loadBanners, payments: loadPaymentMethods, discounts: loadDiscounts, expenses: loadExpenses,
         customers: loadCustomers, settings: loadSettings, admins: loadAdmins,
         messages: loadMessages, sms: loadSmsTab, email: loadEmailTab
       };
-      if (loaders[name]) loaders[name]();
+      if (!loaders[name]) return;
+
+      var fresh = !force && tabLoadedAt[name] !== undefined && (Date.now() - tabLoadedAt[name] < TAB_FRESH_MS);
+      if (fresh) return; // already showing an up-to-date render, nothing to fetch
+
+      tabLoadedAt[name] = Date.now();
+      loaders[name]();
     }
 
     function loadReferenceData() {
