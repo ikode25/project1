@@ -1,5 +1,5 @@
 <!-- admin.html — Multi-Business Admin Portal -->
-<!-- MB_BUILD:2026.08.16-8 -->
+<!-- MB_BUILD:2026.08.16-9 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -67,12 +67,12 @@
     }
   </style>
 </head>
-<body class="min-h-screen" data-mb-build="2026.08.16-8">
+<body class="min-h-screen" data-mb-build="2026.08.16-9">
 
   <div id="progressBar"></div>
 
   <!-- Login Screen -->
-  <div id="loginScreen" class="min-h-screen flex items-center justify-center p-4 hidden">
+  <div id="loginScreen" class="min-h-screen flex items-center justify-center p-4" style="display:none">
     <div class="surface w-full max-w-sm p-8 rounded-xl shadow-lg">
       <h1 class="text-2xl font-bold text-center mb-1"><i class="fas fa-user-shield text-primary mr-2"></i>Admin Portal</h1>
       <p class="text-center muted text-sm mb-6">Sign in to manage your businesses</p>
@@ -98,7 +98,7 @@
   </div>
 
   <!-- First-Run Setup Wizard -->
-  <div id="setupScreen" class="min-h-screen flex items-center justify-center p-4 hidden">
+  <div id="setupScreen" class="min-h-screen flex items-center justify-center p-4" style="display:none">
     <div class="surface w-full max-w-lg p-6 sm:p-8 rounded-xl shadow-lg my-6">
       <h1 class="text-2xl font-bold text-center mb-1"><i class="fas fa-wand-magic-sparkles text-primary mr-2"></i>Set Up Your Store</h1>
       <p class="text-center muted text-sm mb-6">A couple of details and you're ready to sell. This only appears once.</p>
@@ -137,7 +137,7 @@
   </div>
 
   <!-- Admin App -->
-  <div id="adminApp" class="hidden lg:flex min-h-screen">
+  <div id="adminApp" class="min-h-screen" style="display:none">
     <div id="sidebarBackdrop" onclick="toggleSidebar()" class="hidden fixed inset-0 bg-black/50 z-40 lg:hidden"></div>
 
     <aside id="sidebar" class="sidebar w-64 shrink-0 flex flex-col">
@@ -776,21 +776,25 @@
       toast('error', 'Error', msg);
     }
 
-    // Exactly one of these three should ever be visible. Using
-    // querySelectorAll (not getElementById) means this still works even if a
-    // botched paste left a duplicate copy of an element somewhere in the DOM.
+    // Exactly one of these three should ever be visible. Driven by inline
+    // style.display rather than Tailwind's "hidden"/"flex" classes: adminApp
+    // used to carry class="hidden lg:flex", and lg:flex is a responsive
+    // variant designed to force display:flex at >=1024px UNCONDITIONALLY —
+    // that's the entire point of the "hidden md:block" idiom in Tailwind. It
+    // completely ignores whatever the "hidden" class is doing, so on any
+    // desktop-width screen the admin app was rendering underneath the login
+    // form no matter what classList.add/remove('hidden') did in JS — a pure
+    // CSS cascade conflict that no amount of class-toggling logic could ever
+    // fix. Inline styles win over any class-based rule regardless of
+    // specificity or source order, closing this off for good. querySelectorAll
+    // (not getElementById) also means this still works if a botched paste
+    // ever leaves a duplicate copy of an element in the DOM.
     var SCREEN_IDS = ['loginScreen', 'setupScreen', 'adminApp'];
     function showOnlyScreen(id) {
       SCREEN_IDS.forEach(function (sid) {
-        document.querySelectorAll('#' + sid).forEach(function (el) {
-          el.classList.add('hidden');
-          el.classList.remove('flex');
-        });
+        document.querySelectorAll('#' + sid).forEach(function (el) { el.style.display = 'none'; });
       });
-      document.querySelectorAll('#' + id).forEach(function (el) {
-        el.classList.remove('hidden');
-        if (id === 'adminApp') el.classList.add('flex');
-      });
+      document.querySelectorAll('#' + id).forEach(function (el) { el.style.display = 'flex'; });
     }
 
     // Runs once on load. If the deployed file contains duplicate copies of
@@ -1038,7 +1042,7 @@
           html: '<table style="margin:0 auto;font-size:13px">' + rows + '</table>' +
             '<hr style="margin:12px 0">' +
             '<div style="font-size:12px;text-align:left">' +
-              '<b>admin page build:</b> 2026.08.16-8<br>' +
+              '<b>admin page build:</b> 2026.08.16-9<br>' +
               '<b>Code.gs build:</b> ' + ((info && info.build) || 'could not read') + '<br>' +
               '<b>schema:</b> ' + ((info && info.setupVersion) || '?') +
             '</div>' +
