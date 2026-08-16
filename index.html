@@ -1,5 +1,5 @@
 <!-- index.html — Multi-Business Storefront -->
-<!-- MB_BUILD:2026.08.17-10 -->
+<!-- MB_BUILD:2026.08.17-11 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -73,7 +73,7 @@ box-shadow: 0 0 8px var(--accent);
     #fabMenu.closed { opacity: 0; transform: translateY(8px); pointer-events: none; }
   </style>
 </head>
-<body class="flex flex-col min-h-screen" data-mb-build="2026.08.17-10">
+<body class="flex flex-col min-h-screen" data-mb-build="2026.08.17-11">
 
   <div id="progressBar"></div>
 
@@ -250,10 +250,12 @@ box-shadow: 0 0 8px var(--accent);
       <p class="text-center text-sm muted mb-6">An account is optional — you can also <a href="#" onclick="closeLoginModal();openCheckout();return false;" class="text-primary underline">checkout as a guest</a>.</p>
       <div id="googleSignInLogin" class="hidden mb-4">
         <div id="gsiButtonLogin" class="flex justify-center"></div>
-        <div class="flex items-center gap-3 my-4"><span class="flex-grow h-px" style="background:var(--border)"></span><span class="text-xs muted">or</span><span class="flex-grow h-px" style="background:var(--border)"></span></div>
+        <div class="flex items-center gap-3 my-4"><span class="flex-grow h-px" style="background:var(--border)"></span><span class="text-xs muted">or sign in with a username</span><span class="flex-grow h-px" style="background:var(--border)"></span></div>
       </div>
       <form onsubmit="login(event)">
-        <input type="text" id="username" placeholder="Username" class="w-full p-3 rounded-lg mb-4">
+        <label class="block text-sm font-medium mb-1" for="username">Username</label>
+        <input type="text" id="username" placeholder="The username you chose when registering" class="w-full p-3 rounded-lg mb-4">
+        <label class="block text-sm font-medium mb-1" for="password">Password</label>
         <div class="relative mb-6">
           <input type="password" id="password" placeholder="Password" class="w-full p-3 pr-12 rounded-lg">
           <button type="button" onclick="togglePw('password', this)" class="absolute right-2 top-1/2 -translate-y-1/2 px-2 muted" aria-label="Show password"><i class="fas fa-eye"></i></button>
@@ -268,12 +270,22 @@ box-shadow: 0 0 8px var(--accent);
   <div id="registerModal" class="modal-shell fixed inset-0 flex items-center justify-center bg-black/50 hidden z-50 p-4">
     <div class="surface w-full max-w-md p-6 sm:p-8 rounded-lg shadow-lg relative modal-panel">
       <button class="absolute top-4 right-4 muted" onclick="closeRegisterModal()"><i class="fas fa-times fa-lg"></i></button>
-      <h2 class="text-2xl font-semibold mb-6 text-center">Create Account</h2>
+      <h2 class="text-2xl font-semibold mb-1 text-center">Create Account</h2>
+      <p class="text-center text-sm muted mb-6">Google sign-up needs no username at all — it's ready to use every time you come back.</p>
+      <div id="googleSignInRegister" class="hidden mb-4">
+        <div id="gsiButtonRegister" class="flex justify-center"></div>
+        <div class="flex items-center gap-3 my-4"><span class="flex-grow h-px" style="background:var(--border)"></span><span class="text-xs muted">or create a username &amp; password</span><span class="flex-grow h-px" style="background:var(--border)"></span></div>
+      </div>
       <form onsubmit="register(event)">
+        <label class="block text-sm font-medium mb-1" for="name">Full Name</label>
         <input type="text" id="name" placeholder="Full Name" class="w-full p-3 rounded-lg mb-3">
+        <label class="block text-sm font-medium mb-1" for="address">Address</label>
         <input type="text" id="address" placeholder="Address" class="w-full p-3 rounded-lg mb-3">
+        <label class="block text-sm font-medium mb-1" for="phone">Phone</label>
         <input type="tel" id="phone" placeholder="Phone" class="w-full p-3 rounded-lg mb-3">
-        <input type="text" id="regUsername" placeholder="Username" class="w-full p-3 rounded-lg mb-3">
+        <label class="block text-sm font-medium mb-1" for="regUsername">Choose a Username <span class="muted font-normal">(you'll need this to log in — write it down)</span></label>
+        <input type="text" id="regUsername" placeholder="e.g. yourname123" class="w-full p-3 rounded-lg mb-3">
+        <label class="block text-sm font-medium mb-1" for="regPassword">Choose a Password</label>
         <div class="relative mb-6">
           <input type="password" id="regPassword" placeholder="Password (min 6 characters)" class="w-full p-3 pr-12 rounded-lg">
           <button type="button" onclick="togglePw('regPassword', this)" class="absolute right-2 top-1/2 -translate-y-1/2 px-2 muted" aria-label="Show password"><i class="fas fa-eye"></i></button>
@@ -1261,8 +1273,23 @@ box-shadow: 0 0 8px var(--accent);
       startProgress();
       google.script.run.withSuccessHandler(function (res) {
         stopProgress();
-        if (res.success) { toast('success', 'Registered', 'You can now sign in.'); toggleToLogin(); }
-        else toast('error', 'Registration Failed', res.message);
+        if (res.success) {
+          // The single most common support question for a username/password
+          // account is "what did I register with?" — so state it back
+          // plainly, require an explicit dismiss, and carry it straight into
+          // the login form so there's nothing left to remember or retype.
+          Swal.fire({
+            icon: 'success', title: 'Account Created',
+            html: 'Your username is:<br><strong style="font-size:1.4em">' + esc(username) + '</strong><br><span style="font-size:.85em;color:#64748b">Save this — you\'ll need it to sign in.</span>',
+            confirmButtonText: "OK, I've noted it"
+          }).then(function () {
+            toggleToLogin();
+            document.getElementById('username').value = username;
+            document.getElementById('password').focus();
+          });
+        } else {
+          toast('error', 'Registration Failed', res.message);
+        }
       }).withFailureHandler(function (err) { stopProgress(); toast('error', 'Error', String(err)); }).registerCustomer(name, address, phone, username, password);
     }
 
@@ -1516,9 +1543,16 @@ box-shadow: 0 0 8px var(--accent);
           callback: onGoogleCredential,
           ux_mode: 'popup'   // redirect mode cannot work inside the Apps Script iframe
         });
+        // Same account flow serves both modals: customerGoogleLogin() creates
+        // an account on first use, so "sign in" and "sign up" with Google are
+        // the same button — no separate registration step, and never a
+        // username to invent or remember.
         google.accounts.id.renderButton(document.getElementById('gsiButtonLogin'),
           { theme: 'outline', size: 'large', text: 'continue_with', width: 280 });
         document.getElementById('googleSignInLogin').classList.remove('hidden');
+        google.accounts.id.renderButton(document.getElementById('gsiButtonRegister'),
+          { theme: 'outline', size: 'large', text: 'signup_with', width: 280 });
+        document.getElementById('googleSignInRegister').classList.remove('hidden');
       } catch (err) {
         console.warn('Google Sign-In unavailable:', err);
       }
