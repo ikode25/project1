@@ -16,7 +16,7 @@ var SCHEMA_VERSION = '5';
 
 // Shown in the storefront footer and admin sidebar. If this doesn't match the
 // file you pasted, the deployment is still serving an older version.
-var BUILD_VERSION = '2026.08.15-6';
+var BUILD_VERSION = '2026.08.16-7';
 
 // ---------------------------------------------------------------------------
 // Sheet schema — single source of truth for headers used by the generic
@@ -58,6 +58,12 @@ function doGet(e) {
   // Builds/repairs the spreadsheet on first visit so there is no manual setup
   // step. Never let a setup hiccup block the page from rendering.
   try { ensureSetup_(); } catch (err) { Logger.log('ensureSetup_ failed: ' + err); }
+  // One-time purge of a URL an older build cached permanently in Script
+  // Properties (shared across every deployment) — see getWebAppUrl().
+  try {
+    var _props = PropertiesService.getScriptProperties();
+    if (_props.getProperty('WEB_APP_URL')) _props.deleteProperty('WEB_APP_URL');
+  } catch (err) { /* non-fatal */ }
 
   var siteName = 'My Multi-Business Store';
   try { siteName = getSettingValue_('SiteName', siteName); } catch (err) { /* not set up yet */ }
@@ -130,13 +136,14 @@ function include(filename) {
 // The pages run inside a sandboxed iframe, so links between the storefront and
 // the admin portal need the real deployment URL plus target="_top".
 function getWebAppUrl() {
-  var props = PropertiesService.getScriptProperties();
-  var cached = props.getProperty('WEB_APP_URL');
-  if (cached) return cached;
+  // Deliberately NOT cached. Script Properties are shared by every deployment
+  // of this project, so caching this once meant every deployment — including
+  // ones created later — kept reading back whichever URL happened to be saved
+  // first, even after that deployment was archived. ScriptApp.getService()
+  // already returns the URL of whichever deployment served THIS request, and
+  // costs nothing (no sheet access), so there is nothing to cache.
   try {
-    var url = ScriptApp.getService().getUrl() || '';
-    if (url) props.setProperty('WEB_APP_URL', url);
-    return url;
+    return ScriptApp.getService().getUrl() || '';
   } catch (err) {
     return '';
   }
