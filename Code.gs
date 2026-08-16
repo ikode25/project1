@@ -89,7 +89,9 @@ function doGet(e) {
 function fileBuild_(filename) {
   try {
     var content = HtmlService.createHtmlOutputFromFile(filename).getContent();
-    var m = content.match(/MB_BUILD:([0-9.\-]+)/);
+    // Matched from either the leading comment or the body attribute, so the
+    // check can't produce a false "out of date" if comments are ever stripped.
+    var m = content.match(/MB_BUILD:([0-9.\-]+)/) || content.match(/data-mb-build="([0-9.\-]+)"/);
     return m ? m[1] : null;
   } catch (err) {
     return null;
@@ -113,6 +115,8 @@ function staleBannerHtml_(stale) {
     'padding:12px 44px 12px 16px;font:14px/1.5 Segoe UI,Roboto,Arial,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.3)">' +
     '<b>Some files were not updated.</b> Code.gs is on <code>' + BUILD_VERSION + '</code> but:' +
     '<ul style="margin:6px 0 0 18px;padding:0">' + rows + '</ul>' +
+    '<div style="margin-top:8px;font-size:13px;opacity:.95">This is why features are missing: the SMS/Email/Messages tabs, ' +
+    'the tabbed Settings screen, "Keep me signed in" and the video upload option all live in these files.</div>' +
     '<div style="margin-top:8px;font-size:13px;opacity:.95">Open the Apps Script editor, click into that file, press <b>Ctrl+A</b> then <b>Delete</b>, paste the new file, <b>Ctrl+S</b>, then Deploy &rarr; Manage deployments &rarr; pencil &rarr; New version.</div>' +
     '<button onclick="document.getElementById(\'mbStaleBanner\').remove()" ' +
     'style="position:absolute;top:8px;right:10px;background:transparent;border:0;color:#fff;font-size:20px;cursor:pointer">&times;</button>' +
