@@ -10,26 +10,30 @@ A complete, production-ready **Barber & Salon management system for Ghana**, bui
 ### Public website
 - Mobile-first hero carousel, fully admin-editable (images, titles, buttons)
 - Live services & price list (GH₵) grouped by category, pulled from the sheet
-- Staff/team showcase
+- Staff/team showcase, each stylist showing their working days
+- **Photo gallery** of work samples with a lightbox viewer, fully admin-managed
 - Multi-branch selector
-- Online booking form with Ghana phone number validation (`0XXXXXXXXX` or `+233XXXXXXXXX`)
-- Instant booking reference number + SMS/Email confirmation
-- Customer reviews display
+- **Step-by-step booking wizard**: Branch → Service (with category filter) → Stylist (with live "Available/Not Available" status and working-day tags, or "Anyone") → a real calendar with a live availability grid per time slot → your details → a review-and-confirm summary — ending in a polished confirmation screen with your booking reference. Ghana phone number validation throughout (`0XXXXXXXXX` or `+233XXXXXXXXX`)
+- SMS/Email confirmation the moment a booking is submitted
+- Customer reviews display **plus a public "Leave a Review" star-rating form**
 - Contact section: click-to-call, WhatsApp deep link, embedded Google Map, opening hours
+- A small hand-built inline-SVG icon set throughout (no emoji, no icon-font download)
 
 ### Admin / staff dashboard (role-based: Owner, Manager, Staff, Receptionist)
 - Secure login (SHA-256 salted password hashing, session tokens via `CacheService`)
-- Overview dashboard: today's revenue, today's appointments, upcoming bookings, low-stock alerts
-- Appointment management: confirm / reschedule / cancel / mark completed / no-show, filter by branch, staff, date, status
+- Overview dashboard: today's revenue, today's appointments, upcoming bookings, low-stock alerts, plus a **7-day revenue trend chart**
+- Appointment management: confirm / reschedule / cancel / mark completed / no-show, filter by branch, staff, date, status; live per-slot availability prevents double-booking
 - Point of Sale (POS): add services/products to a cart, discounts, **Cash / MTN MoMo / Vodafone Cash / Telecel Cash / AirtelTigo Money / Card**, printable receipt
-- Staff management with commission rates, photo upload
+- Staff management with commission rates, **working-day scheduling** (drives booking-wizard availability), and a photo picker (upload or paste a URL, with live preview)
 - Inventory management with low-stock alerts and restock logging
 - Customer CRM: profiles, visit & purchase history, loyalty points
 - Multi-branch support with an "All Branches" consolidated view for the Owner
-- Reports: revenue by day, best-selling services, staff performance/commissions, expenses vs income, **CSV and PDF export**
+- Reports: revenue by day, best-selling services, staff performance/commissions, expenses vs income, **CSV and PDF export**, all shown as **built-in inline-SVG charts** (revenue trend line, best-seller bars, payment-method donut, staff performance bars) — no external charting library
 - Expense tracking per branch
-- **Theme customization** — Owner can change primary/secondary/accent/background/text colors live from Settings, plus business name, tagline, and logo
+- **Theme customization** — Owner can change primary/secondary/accent/background/text colors live from Settings, plus business name, tagline, and logo (photo picker with preview)
+- **Photo gallery manager** — Owner/Manager can add/edit/reorder photos that showcase the salon's work on the public site
 - **Hero carousel & image manager** — Owner/Manager can add/edit/reorder hero slides and upload images directly to Google Drive (no external image host needed)
+- Every "image URL" field across Staff, Hero Slides, Gallery, and the Logo uses the same **upload-or-paste photo picker with a live thumbnail preview**
 - Dark/light mode toggle for the dashboard UI
 - SMS + Email notifications: booking confirmation, status updates, appointment reminders, **post-service "thank you" SMS/Email with loyalty points earned**, sales receipts — via `MailApp` and a pluggable SMS gateway (Arkesel or Hubtel, both popular in Ghana), with a "simulate" mode for testing before you have SMS credentials
 - User management (create staff logins, assign roles/branches, reset passwords)
@@ -48,7 +52,7 @@ A complete, production-ready **Barber & Salon management system for Ghana**, bui
 |---|---|
 | Branches | BranchID, Name, Location, Phone, OpeningHours |
 | Services | ServiceID, Name, Category, Description, DurationMinutes, Price, BranchID, Active |
-| Staff | StaffID, Name, Role, BranchID, Phone, Specialties, PhotoURL, Active, CommissionRate |
+| Staff | StaffID, Name, Role, BranchID, Phone, Specialties, PhotoURL, Active, CommissionRate, WorkDays |
 | Customers | CustomerID, Name, Phone, Email, DateJoined, LoyaltyPoints, Notes |
 | Appointments | AppointmentID, Reference, CustomerID, StaffID, ServiceID, BranchID, Date, TimeSlot, Status, CreatedAt, Notes |
 | Sales | SaleID, Date, BranchID, CustomerID, StaffID, Items (JSON), Subtotal, Discount, Tax, Total, PaymentMethod, PaymentStatus |
@@ -58,9 +62,12 @@ A complete, production-ready **Barber & Salon management system for Ghana**, bui
 | Reviews | ReviewID, CustomerID, StaffID, Rating, Comment, Date |
 | Settings | Key, Value (branding, theme colors, tax rate, loyalty rules, SMS gateway config…) |
 | HeroSlides | SlideID, ImageURL, Title, Subtitle, ButtonText, ButtonLink, SortOrder, Active |
+| Gallery | GalleryID, ImageURL, Caption, Category, BranchID, SortOrder, Active |
 | Notifications | NotificationID, Type, Recipient, Message, Status, Date |
 
-Sample data (2 branches, 10 services, 5 staff, 4 products, 2 hero slides) is seeded automatically on first run so the app is immediately demoable.
+`Staff.WorkDays` is a comma-separated list of weekday abbreviations (e.g. `Mon,Tue,Wed,Thu,Fri,Sat`) that drives each stylist's "Available/Not Available" status and the calendar in the public booking wizard. `Settings` also stores `BookingStartHour`, `BookingEndHour`, and `SlotIntervalMinutes`, which control the time slots offered in the wizard (defaults: 9am–6pm, 30-minute slots).
+
+Sample data (2 branches, 10 services, 5 staff with working days, 4 products, 5 customers, 8 reviews, 2 hero slides, 6 gallery photos) is seeded automatically on first run so the app is immediately demoable.
 
 ## Deployment
 

@@ -34,8 +34,10 @@
   .container { max-width: 1180px; margin: 0 auto; padding: 0 20px; }
   .hidden { display: none !important; }
   .muted { color: #777; font-size: .9em; }
+  .icon { flex-shrink: 0; }
   .btn {
-    display: inline-block; padding: 12px 24px; border-radius: 999px; border: none;
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    padding: 12px 24px; border-radius: 999px; border: none;
     background: var(--clr-primary); color: #fff; cursor: pointer; font-weight: 600;
     transition: opacity .15s ease, transform .1s ease;
   }
@@ -52,6 +54,7 @@
   .badge-confirmed { background: #dbeeff; color: #0b5da3; }
   .badge-completed { background: #dcf5e3; color: #1c7c3c; }
   .badge-cancelled, .badge-no-show { background: #fbe0e0; color: #b32424; }
+  .warn-line { display: flex; align-items: center; gap: 8px; color: #8a6d00; }
 
   /* ---------- PUBLIC NAV ---------- */
   #publicNav {
@@ -64,10 +67,10 @@
   #publicNav nav { display: flex; gap: 18px; align-items: center; }
   #publicNav nav a { font-size: .92rem; opacity: .9; }
   #publicNav nav a:hover { opacity: 1; color: var(--clr-accent); }
-  #navToggle { display: none; background: none; border: none; color: #fff; font-size: 1.5rem; cursor: pointer; }
-  @media (max-width: 800px) {
+  #navToggle { display: none; background: none; border: none; color: #fff; cursor: pointer; }
+  @media (max-width: 860px) {
     #navToggle { display: block; }
-    #publicNav nav { position: absolute; top: 100%; left: 0; right: 0; background: var(--clr-primary); flex-direction: column; padding: 10px 20px 20px; display: none; }
+    #publicNav nav { position: absolute; top: 100%; left: 0; right: 0; background: var(--clr-primary); flex-direction: column; align-items: flex-start; padding: 10px 20px 20px; display: none; }
     #publicNav nav.open { display: flex; }
   }
 
@@ -101,15 +104,77 @@
   .svc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
   .svc-card { background: #fff; border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px; }
   .svc-card .price { font-size: 1.3rem; font-weight: 800; color: var(--clr-primary); }
-  .svc-card .dur { color: #888; font-size: .85rem; }
+  .svc-card .dur { color: #888; font-size: .85rem; display: flex; align-items: center; gap: 5px; }
 
   .staff-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
   .staff-card { background: #fff; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); text-align: center; }
-  .staff-card .photo { height: 180px; background-size: cover; background-position: center; background-color: #ddd; }
+  .staff-card .photo { height: 180px; background-size: cover; background-position: center; background-color: #ddd; display: flex; align-items: center; justify-content: center; color: #aaa; }
   .staff-card .info { padding: 14px; }
   .staff-card .role { color: var(--clr-secondary); font-weight: 700; font-size: .82rem; text-transform: uppercase; }
 
-  .book-wrap { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 30px; max-width: 640px; margin: 0 auto; }
+  /* ---------- GALLERY ---------- */
+  .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+  .gallery-item { position: relative; border-radius: var(--radius); overflow: hidden; cursor: pointer; box-shadow: var(--shadow); aspect-ratio: 4/3; }
+  .gallery-item img { width: 100%; height: 100%; object-fit: cover; transition: transform .3s ease; }
+  .gallery-item:hover img { transform: scale(1.06); }
+  .gallery-caption { position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(0deg,rgba(0,0,0,.75),transparent); color: #fff; padding: 24px 10px 8px; font-size: .82rem; font-weight: 600; }
+  .lightbox-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.92); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; padding: 30px; }
+  .lightbox-overlay img { max-width: 90vw; max-height: 78vh; border-radius: 8px; }
+  .lightbox-caption { color: #fff; margin-top: 14px; }
+  .lightbox-close { position: absolute; top: 20px; right: 20px; background: rgba(255,255,255,.15); border: none; color: #fff; border-radius: 50%; width: 42px; height: 42px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+  /* ---------- BOOKING WIZARD ---------- */
+  .wizard-box { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 26px; max-width: 920px; margin: 0 auto; }
+  .wizard-head { text-align: center; margin-bottom: 16px; }
+  .wizard-progress { display: flex; justify-content: center; gap: 6px; margin-bottom: 22px; }
+  .wizard-progress .dot { width: 34px; height: 4px; border-radius: 4px; background: #e5e2dc; }
+  .wizard-progress .dot.done, .wizard-progress .dot.active { background: var(--clr-accent); }
+  .wizard-nav { display: flex; gap: 14px; margin-bottom: 22px; }
+  .wizard-nav .btn { flex: 1; }
+  .wizard-cat-filter { margin-bottom: 18px; }
+  .wizard-cat-filter select { width: 100%; padding: 12px 14px; border-radius: 8px; border: 1px solid #ddd; }
+  .wizard-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+  .wizard-card { background: #fafafa; border: 2px solid transparent; border-radius: 10px; padding: 16px; cursor: pointer; transition: .15s; }
+  .wizard-card:hover { border-color: #ddd; }
+  .wizard-card.selected { border-color: var(--clr-accent); background: var(--clr-accent); color: #1a1a1a; }
+  .wizard-card.selected .muted { color: rgba(26,26,26,.65); }
+  .wizard-card.selected .tag { background: rgba(0,0,0,.14); }
+  .wizard-card.disabled { opacity: .45; cursor: not-allowed; }
+  .wizard-card h4 { margin: 0 0 4px; }
+  .wizard-card .price { font-weight: 800; margin-top: 8px; }
+  .wizard-card .tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0; }
+  .wizard-card .tag { background: #eee; border-radius: 999px; padding: 2px 9px; font-size: .72rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+  .wizard-card .status { display: flex; align-items: center; gap: 6px; font-size: .8rem; font-weight: 700; margin-top: 6px; }
+  .wizard-card .status.avail { color: #1c7c3c; }
+  .wizard-card.selected .status.avail { color: #145c2c; }
+  .wizard-card .status.unavail { color: #c0392b; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .status-dot.avail { background: #1c7c3c; }
+  .status-dot.unavail { background: #c0392b; }
+
+  .cal-nav { display: flex; align-items: center; justify-content: center; gap: 18px; margin-bottom: 14px; font-weight: 700; }
+  .cal-nav button { background: #f2f2f2; border: none; cursor: pointer; color: var(--clr-primary); width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7,1fr); gap: 6px; margin-bottom: 24px; }
+  .cal-dow { text-align: center; font-size: .7rem; color: #999; font-weight: 700; text-transform: uppercase; padding-bottom: 4px; }
+  .cal-cell { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; border-radius: 8px; cursor: pointer; font-size: .85rem; background: #fafafa; }
+  .cal-cell.empty { visibility: hidden; cursor: default; }
+  .cal-cell.past { opacity: .3; cursor: not-allowed; }
+  .cal-cell.selected { background: var(--clr-accent); color: #1a1a1a; font-weight: 800; }
+  .cal-cell:hover:not(.past):not(.selected):not(.empty) { background: #eee; }
+  .time-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 10px; }
+  .time-slot { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; border-radius: 8px; background: #fafafa; cursor: pointer; font-size: .85rem; font-weight: 600; border: 2px solid transparent; }
+  .time-slot.unavailable { opacity: .4; cursor: not-allowed; text-decoration: line-through; }
+  .time-slot.selected { border-color: var(--clr-accent); background: var(--clr-accent); color: #1a1a1a; }
+
+  .confirm-card { background: #fafafa; border-radius: 10px; padding: 20px; margin-bottom: 18px; }
+  .confirm-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; font-size: .92rem; gap: 12px; }
+  .confirm-row:last-child { border-bottom: none; }
+  .confirm-row .lbl { color: #888; }
+  .booking-success { text-align: center; padding: 30px 10px; }
+  .booking-success .check-icon { color: #1c7c3c; margin-bottom: 14px; }
+  .booking-success .ref-badge { display: inline-block; background: #1a1a1a; color: #fff; padding: 10px 22px; border-radius: 999px; font-weight: 800; letter-spacing: .5px; margin: 14px 0; }
+
+  .book-wrap { max-width: 640px; margin: 0 auto; }
   .form-row { margin-bottom: 16px; }
   .form-row label { display: block; margin-bottom: 6px; font-weight: 600; font-size: .9rem; }
   .form-row input, .form-row select, .form-row textarea {
@@ -121,14 +186,22 @@
   .form-error { color: #c0392b; font-size: .85rem; margin-top: 6px; }
   .form-success { background: #dcf5e3; color: #1c7c3c; padding: 14px 16px; border-radius: 8px; margin-top: 14px; }
 
-  .reviews-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: 16px; }
+  /* ---------- REVIEWS ---------- */
+  .reviews-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: 16px; margin-bottom: 40px; }
   .review-card { background: #fff; border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
-  .stars { color: var(--clr-secondary); letter-spacing: 2px; }
+  .stars { color: var(--clr-secondary); display: flex; gap: 2px; margin-bottom: 8px; }
+  .review-author { color: #888; font-size: .82rem; font-weight: 600; }
+  .review-form-wrap { max-width: 560px; margin: 0 auto; background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px; }
+  .star-picker { display: flex; gap: 6px; }
+  .star-pick { cursor: pointer; color: #ccc; }
+  .star-pick svg { fill: none; stroke: currentColor; }
+  .star-pick.active { color: var(--clr-accent); }
+  .star-pick.active svg { fill: currentColor; }
 
   .contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
   @media (max-width: 800px) { .contact-grid { grid-template-columns: 1fr; } }
   .contact-item { display: flex; gap: 12px; margin-bottom: 14px; align-items: flex-start; }
-  .contact-item .ic { font-size: 1.3rem; }
+  .contact-item .ic { color: var(--clr-secondary); margin-top: 2px; }
   .contact-grid iframe { width: 100%; height: 280px; border: 0; border-radius: var(--radius); }
 
   footer.pub-footer { background: var(--clr-primary); color: #eee; padding: 30px 0; text-align: center; font-size: .85rem; }
@@ -143,6 +216,16 @@
   .toast.error { background: #c0392b; }
   .toast.success { background: #1c7c3c; }
   @keyframes slidein { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  /* ---------- PHOTO PICKER ---------- */
+  .photo-picker { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .photo-preview { width: 74px; height: 74px; border-radius: 10px; background-size: cover; background-position: center; background-color: #eee; display: flex; align-items: center; justify-content: center; color: #aaa; flex-shrink: 0; }
+  .photo-picker-controls { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 180px; }
+  .photo-upload-btn { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; width: fit-content; }
+  .day-picker { display: flex; gap: 6px; flex-wrap: wrap; }
+  .day-chip { padding: 6px 12px; border-radius: 999px; background: #eee; font-size: .78rem; cursor: pointer; font-weight: 600; }
+  #adminApp.dark .day-chip { background: #2a2e37; }
+  .day-chip.active { background: var(--clr-accent); color: #1a1a1a; }
 
   /* ---------- ADMIN ---------- */
   #adminApp { display: none; min-height: 100vh; background: #f1f2f5; color: #1a1a1a; }
@@ -175,7 +258,7 @@
 
   .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px,1fr)); gap: 14px; margin-bottom: 24px; }
   .stat-card { background: #fff; border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
-  #adminApp.dark .stat-card, #adminApp.dark .panel, #adminApp.dark table { background: #1e2127; color: #e8e8e8; }
+  #adminApp.dark .stat-card, #adminApp.dark .panel, #adminApp.dark table, #adminApp.dark .wizard-box { background: #1e2127; color: #e8e8e8; }
   .stat-card .val { font-size: 1.7rem; font-weight: 800; }
   .stat-card .lbl { color: #888; font-size: .85rem; }
 
@@ -183,6 +266,8 @@
   .panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
   .filters-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
   .filters-bar input, .filters-bar select { padding: 8px 10px; border-radius: 6px; border: 1px solid #ccc; }
+  .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 860px) { .chart-row { grid-template-columns: 1fr; } }
 
   table { width: 100%; border-collapse: collapse; font-size: .88rem; background: #fff; }
   table th, table td { text-align: left; padding: 9px 10px; border-bottom: 1px solid #eee; }
@@ -194,7 +279,7 @@
   .modal-box { background: #fff; border-radius: var(--radius); padding: 26px; width: 100%; max-width: 560px; box-shadow: var(--shadow); }
   #adminApp.dark .modal-box { background: #1e2127; color: #e8e8e8; }
   .modal-box h3 { margin-top: 0; }
-  .modal-close { float: right; background: none; border: none; font-size: 1.3rem; cursor: pointer; color: inherit; }
+  .modal-close { float: right; background: none; border: none; cursor: pointer; color: inherit; }
   .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   @media (max-width: 500px) { .field-grid { grid-template-columns: 1fr; } }
   .field-grid label { font-size: .82rem; font-weight: 600; display: block; margin-bottom: 4px; }
@@ -207,20 +292,29 @@
   .pos-item-card { background: #f7f7f7; border-radius: 8px; padding: 10px; cursor: pointer; border: 1px solid #eee; }
   #adminApp.dark .pos-item-card { background: #262a31; border-color: #333; }
   .pos-item-card:hover { border-color: var(--clr-accent); }
+  .pos-item-card .item-name { display: flex; align-items: center; gap: 6px; font-weight: 700; }
   .cart-line { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; font-size: .88rem; }
   .cart-tot-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: .92rem; }
   .cart-tot-row.grand { font-weight: 800; font-size: 1.15rem; border-top: 2px solid #ddd; padding-top: 10px; margin-top: 8px; }
 
-  .theme-swatch { width: 36px; height: 36px; border-radius: 8px; border: 2px solid #ccc; cursor: pointer; display: inline-block; }
   .color-field { display: flex; align-items: center; gap: 8px; }
   .color-field input[type=color] { width: 46px; height: 36px; border: none; padding: 0; background: none; }
 
   .receipt-box { font-family: monospace; font-size: .85rem; background: #fafafa; border: 1px dashed #999; padding: 16px; }
   .receipt-box hr { border: none; border-top: 1px dashed #999; }
 
-  .bar-chart { display: flex; align-items: flex-end; gap: 6px; height: 160px; }
-  .bar-chart .bar { flex: 1; background: var(--clr-accent); border-radius: 4px 4px 0 0; position: relative; min-width: 6px; }
-  .bar-chart .bar span { position: absolute; top: -18px; left: 0; right: 0; text-align: center; font-size: .65rem; color: #888; }
+  /* Charts */
+  .hbar-chart { display: flex; flex-direction: column; gap: 10px; }
+  .hbar-row { display: grid; grid-template-columns: 120px 1fr 90px; align-items: center; gap: 10px; font-size: .85rem; }
+  .hbar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hbar-track { background: #eee; border-radius: 6px; height: 12px; overflow: hidden; }
+  #adminApp.dark .hbar-track { background: #2a2e37; }
+  .hbar-fill { height: 100%; border-radius: 6px; transition: width .4s ease; }
+  .hbar-value { text-align: right; font-weight: 700; }
+  .donut-wrap { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+  .legend-list { display: flex; flex-direction: column; gap: 6px; font-size: .85rem; }
+  .legend-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+  .chart-svg { display: block; }
 
   @media print {
     #adminApp .admin-sidebar, #adminApp .admin-topbar, .modal-backdrop .btn, #navToggle { display: none !important; }
@@ -235,10 +329,11 @@
   <nav id="publicNav">
     <div class="bar container">
       <div class="brand"><img id="pubLogo" src="" alt="" class="hidden"><span id="pubBrandName">Salon</span></div>
-      <button id="navToggle">☰</button>
+      <button id="navToggle" aria-label="Menu"></button>
       <nav id="pubNav">
         <a href="#services">Services</a>
         <a href="#team">Our Team</a>
+        <a href="#gallery">Gallery</a>
         <a href="#booking">Book Now</a>
         <a href="#reviews">Reviews</a>
         <a href="#contact">Contact</a>
@@ -271,75 +366,49 @@
     </div>
   </section>
 
-  <section class="pub alt" id="booking">
+  <section class="pub alt" id="gallery">
+    <div class="container">
+      <h2 class="section-title">Our Work</h2>
+      <p class="section-sub">A glimpse into the salon experience</p>
+      <div class="gallery-grid" id="galleryGrid">Loading gallery…</div>
+    </div>
+  </section>
+
+  <section class="pub" id="booking">
     <div class="container">
       <h2 class="section-title">Book an Appointment</h2>
-      <p class="section-sub">Fill the form below — we'll confirm by SMS/Email</p>
-      <div class="book-wrap">
-        <form id="bookingForm">
-          <div class="form-row">
-            <label>Branch *</label>
-            <select id="bkBranch" required></select>
-          </div>
-          <div class="form-row">
-            <label>Service *</label>
-            <select id="bkService" required></select>
-          </div>
-          <div class="form-row">
-            <label>Preferred Staff</label>
-            <select id="bkStaff"><option value="">Any available</option></select>
-          </div>
+      <p class="section-sub">Follow the steps below — we'll confirm by SMS/Email</p>
+      <div id="bookingWizardHost" class="book-wrap"><p class="muted" style="text-align:center;">Loading booking form…</p></div>
+    </div>
+  </section>
+
+  <section class="pub alt" id="reviews">
+    <div class="container">
+      <h2 class="section-title">What Our Customers Say</h2>
+      <div class="reviews-grid" id="reviewsList">Loading reviews…</div>
+      <div class="review-form-wrap">
+        <h3>Leave a Review</h3>
+        <form id="reviewForm">
+          <div class="form-row"><label>Your Rating</label><div class="star-picker" id="starPicker"></div></div>
           <div class="form-row2">
-            <div class="form-row">
-              <label>Date *</label>
-              <input type="date" id="bkDate" required>
-            </div>
-            <div class="form-row">
-              <label>Time *</label>
-              <input type="time" id="bkTime" required>
-            </div>
+            <div class="form-row"><label>Your Name</label><input type="text" id="rvName" required></div>
+            <div class="form-row"><label>Phone (optional)</label><input type="text" id="rvPhone" placeholder="024XXXXXXX"></div>
           </div>
-          <div class="form-row2">
-            <div class="form-row">
-              <label>Full Name *</label>
-              <input type="text" id="bkName" required>
-            </div>
-            <div class="form-row">
-              <label>Phone Number *</label>
-              <input type="tel" id="bkPhone" placeholder="024XXXXXXX or +233XXXXXXXXX" required>
-            </div>
-          </div>
-          <div class="form-row">
-            <label>Email (optional)</label>
-            <input type="email" id="bkEmail">
-          </div>
-          <div class="form-row">
-            <label>Notes (optional)</label>
-            <textarea id="bkNotes" rows="2"></textarea>
-          </div>
-          <button type="submit" class="btn btn-accent btn-block" id="bkSubmitBtn">Request Appointment</button>
-          <div id="bkError" class="form-error hidden"></div>
-          <div id="bkSuccess" class="form-success hidden"></div>
+          <div class="form-row"><label>Comment</label><textarea id="rvComment" rows="3" required></textarea></div>
+          <button type="submit" class="btn btn-accent">Submit Review</button>
         </form>
       </div>
     </div>
   </section>
 
-  <section class="pub" id="reviews">
-    <div class="container">
-      <h2 class="section-title">What Our Customers Say</h2>
-      <div class="reviews-grid" id="reviewsList">Loading reviews…</div>
-    </div>
-  </section>
-
-  <section class="pub alt" id="contact">
+  <section class="pub" id="contact">
     <div class="container contact-grid">
       <div>
         <h2>Visit / Contact Us</h2>
-        <div class="contact-item"><span class="ic">📞</span><div><b>Call Us</b><br><a id="contactPhoneLink" href="#"></a></div></div>
-        <div class="contact-item"><span class="ic">💬</span><div><b>WhatsApp</b><br><a id="contactWaLink" href="#" target="_blank">Chat with us</a></div></div>
-        <div class="contact-item"><span class="ic">✉️</span><div><b>Email</b><br><a id="contactEmailLink" href="#"></a></div></div>
-        <div class="contact-item"><span class="ic">🕒</span><div><b>Opening Hours</b><br><span id="contactHours"></span></div></div>
+        <div class="contact-item"><span class="ic" id="icPhone"></span><div><b>Call Us</b><br><a id="contactPhoneLink" href="#"></a></div></div>
+        <div class="contact-item"><span class="ic" id="icChat"></span><div><b>WhatsApp</b><br><a id="contactWaLink" href="#" target="_blank">Chat with us</a></div></div>
+        <div class="contact-item"><span class="ic" id="icMail"></span><div><b>Email</b><br><a id="contactEmailLink" href="#"></a></div></div>
+        <div class="contact-item"><span class="ic" id="icClock"></span><div><b>Opening Hours</b><br><span id="contactHours"></span></div></div>
       </div>
       <iframe id="contactMap" loading="lazy" src=""></iframe>
     </div>
@@ -379,9 +448,9 @@
         <h2 id="pageTitle">Overview</h2>
         <div class="admin-topbar-actions">
           <select class="branch-switch hidden" id="ownerBranchSwitch"></select>
-          <button class="btn btn-sm btn-outline" id="darkModeToggle">🌙 Dark Mode</button>
+          <button class="btn btn-sm btn-outline" id="darkModeToggle"></button>
           <span class="muted" id="currentUserLabel"></span>
-          <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+          <button class="btn btn-sm btn-danger" id="logoutBtn"></button>
         </div>
       </div>
       <div id="adminContent"></div>
@@ -393,6 +462,61 @@
 
 <script>
 /* =====================================================================
+ * ICONS — small inline-SVG line-icon set (no external assets/fonts)
+ * ===================================================================*/
+var STAR_PATH_D = 'M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 21 12 17.77 5.82 21 7 14.14l-5-4.87 6.91-1.01L12 2z';
+var ICONS = {
+  menu: '<line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/>',
+  close: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  phone: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>',
+  mail: '<rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/>',
+  chat: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  grid: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',
+  cart: '<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>',
+  users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  scissors: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/>',
+  box: '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.73V8z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/>',
+  mapPin: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
+  card: '<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>',
+  barChart: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
+  star: '<path d="' + STAR_PATH_D + '"/>',
+  image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
+  copy: '<rect x="3" y="7" width="14" height="14" rx="2"/><path d="M7 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-2"/>',
+  droplet: '<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>',
+  lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  sliders: '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+  moon: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+  sun: '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>',
+  chevronLeft: '<polyline points="15 18 9 12 15 6"/>',
+  chevronRight: '<polyline points="9 18 15 12 9 6"/>',
+  plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+  trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>',
+  edit: '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>',
+  upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>',
+  search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+  check: '<polyline points="20 6 9 17 4 12"/>',
+  checkCircle: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+  alertTriangle: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>'
+};
+function icon(name, size, cls) {
+  size = size || 20;
+  var body = ICONS[name] || '';
+  return '<svg class="icon' + (cls ? ' ' + cls : '') + '" width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + body + '</svg>';
+}
+function starRow(rating, size) {
+  size = size || 16;
+  var html = '';
+  for (var i = 1; i <= 5; i++) {
+    html += '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="' + (i <= rating ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.5"><path d="' + STAR_PATH_D + '"/></svg>';
+  }
+  return html;
+}
+
+/* =====================================================================
  * GLOBAL STATE
  * ===================================================================*/
 var STATE = {
@@ -401,7 +525,7 @@ var STATE = {
   settings: null,
   branches: [],
   publicData: null,
-  currentBranchFilter: '', // '' = all (owner)
+  currentBranchFilter: '',
   adminPage: 'overview',
   loadingCount: 0
 };
@@ -457,6 +581,24 @@ function money(n) {
   return symbol + Number(n || 0).toFixed(2);
 }
 
+function isoToday() { return new Date().toISOString().slice(0, 10); }
+function isoDaysAgo(n) { return new Date(Date.now() - n * 86400000).toISOString().slice(0, 10); }
+
+function formatTime12(t) {
+  if (!t) return '';
+  var parts = t.split(':');
+  var h = parseInt(parts[0], 10);
+  var m = parts[1];
+  var ampm = h >= 12 ? 'PM' : 'AM';
+  var h12 = h % 12; if (h12 === 0) h12 = 12;
+  return h12 + ':' + m + ' ' + ampm;
+}
+function formatNiceDate(dateStr) {
+  if (!dateStr) return '';
+  var d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+}
+
 /* =====================================================================
  * THEME APPLICATION
  * ===================================================================*/
@@ -474,11 +616,20 @@ function applyTheme(settings) {
  * BOOT
  * ===================================================================*/
 window.addEventListener('DOMContentLoaded', function () {
+  document.getElementById('navToggle').innerHTML = icon('menu', 22);
+  document.getElementById('darkModeToggle').innerHTML = icon('moon', 15) + ' Dark Mode';
+  document.getElementById('logoutBtn').innerHTML = icon('logout', 14) + ' Logout';
+  ['icPhone', 'icChat', 'icMail', 'icClock'].forEach(function (id, i) {
+    document.getElementById(id).innerHTML = icon(['phone', 'chat', 'mail', 'clock'][i], 20);
+  });
+
   document.getElementById('navToggle').addEventListener('click', function () {
-    document.getElementById('pubNav').classList.toggle('open');
+    var nav = document.getElementById('pubNav');
+    nav.classList.toggle('open');
+    document.getElementById('navToggle').innerHTML = icon(nav.classList.contains('open') ? 'close' : 'menu', 22);
   });
   loadPublicSite();
-  bindPublicForms();
+  bindReviewForm();
   bindLoginForm();
   window.addEventListener('hashchange', routeHash);
   routeHash();
@@ -487,7 +638,10 @@ window.addEventListener('DOMContentLoaded', function () {
   if (savedDark) document.getElementById('adminApp').classList.add('dark');
   document.getElementById('darkModeToggle').addEventListener('click', function () {
     document.getElementById('adminApp').classList.toggle('dark');
-    localStorage.setItem('salon_dark_mode', document.getElementById('adminApp').classList.contains('dark') ? '1' : '0');
+    var dark = document.getElementById('adminApp').classList.contains('dark');
+    localStorage.setItem('salon_dark_mode', dark ? '1' : '0');
+    document.getElementById('darkModeToggle').innerHTML = icon(dark ? 'sun' : 'moon', 15) + (dark ? ' Light Mode' : ' Dark Mode');
+    if (STATE.token && ['overview', 'reports'].indexOf(STATE.adminPage) > -1) renderAdminPage();
   });
   document.getElementById('logoutBtn').addEventListener('click', doLogout);
 });
@@ -522,9 +676,10 @@ function loadPublicSite() {
     renderBranchSelector(data.branches);
     renderServices(data.services, data.branches, '');
     renderStaff(data.staff, '');
+    renderGallery(data.gallery || []);
     renderReviews(data.reviews);
     renderContact(data.settings);
-    populateBookingSelectors(data);
+    initBookingWizard();
   }).catch(function (err) {
     document.getElementById('servicesList').innerHTML = '<p class="form-error">Could not load site data. Please refresh. (' + esc(err.message) + ')</p>';
   });
@@ -576,8 +731,6 @@ function renderBranchSelector(branches) {
   sel.addEventListener('change', function () {
     renderServices(STATE.publicData.services, STATE.publicData.branches, sel.value);
     renderStaff(STATE.publicData.staff, sel.value);
-    document.getElementById('bkBranch').value = sel.value;
-    updateBookingServiceOptions();
   });
 }
 
@@ -594,7 +747,7 @@ function renderServices(services, branches, branchFilter) {
       byCategory[cat].map(function (s) {
         return '<div class="svc-card"><div><b>' + esc(s.Name) + '</b>' + (branches.length > 1 ? ' <span class="muted">— ' + esc(branchMap[s.BranchID] || '') + '</span>' : '') + '</div>' +
           '<div class="muted">' + esc(s.Description || '') + '</div>' +
-          '<div class="dur">⏱ ' + s.DurationMinutes + ' mins</div>' +
+          '<div class="dur">' + icon('clock', 14) + ' ' + s.DurationMinutes + ' mins</div>' +
           '<div class="price">' + money(s.Price) + '</div>' +
           '<button class="btn btn-sm btn-outline" onclick="quickBook(\'' + s.ServiceID + '\',\'' + s.BranchID + '\')">Book Now</button></div>';
       }).join('') + '</div></div>';
@@ -602,29 +755,64 @@ function renderServices(services, branches, branchFilter) {
   document.getElementById('servicesList').innerHTML = html || '<p class="muted">No services available yet.</p>';
 }
 
-function quickBook(serviceId, branchId) {
-  document.getElementById('bkBranch').value = branchId;
-  updateBookingServiceOptions();
-  document.getElementById('bkService').value = serviceId;
-  location.hash = '#booking';
-  document.getElementById('bkName').focus();
-}
-
 function renderStaff(staff, branchFilter) {
   var list = branchFilter ? staff.filter(function (s) { return s.BranchID === branchFilter; }) : staff;
   document.getElementById('staffList').innerHTML = list.map(function (s) {
     var photo = s.PhotoURL ? 'style="background-image:url(\'' + esc(s.PhotoURL) + '\')"' : '';
-    return '<div class="staff-card"><div class="photo" ' + photo + '>' + (s.PhotoURL ? '' : '<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:2rem;">👤</div>') + '</div>' +
+    return '<div class="staff-card"><div class="photo" ' + photo + '>' + (s.PhotoURL ? '' : icon('user', 46)) + '</div>' +
       '<div class="info"><b>' + esc(s.Name) + '</b><div class="role">' + esc(s.Role) + '</div><div class="muted">' + esc(s.Specialties || '') + '</div></div></div>';
   }).join('') || '<p class="muted">No team members listed yet.</p>';
+}
+
+function renderGallery(items) {
+  var host = document.getElementById('galleryGrid');
+  if (!items.length) { host.innerHTML = '<p class="muted">Gallery coming soon.</p>'; return; }
+  host.innerHTML = items.map(function (g, i) {
+    return '<div class="gallery-item" onclick="openLightbox(' + i + ')"><img src="' + esc(g.ImageURL) + '" alt="' + esc(g.Caption || '') + '" loading="lazy"><div class="gallery-caption">' + esc(g.Caption || '') + '</div></div>';
+  }).join('');
+}
+function openLightbox(i) {
+  var items = STATE.publicData.gallery || [];
+  var g = items[i];
+  if (!g) return;
+  var overlay = document.createElement('div');
+  overlay.className = 'lightbox-overlay';
+  overlay.innerHTML = '<button class="lightbox-close">' + icon('close', 20) + '</button><img src="' + esc(g.ImageURL) + '"><div class="lightbox-caption">' + esc(g.Caption || '') + '</div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function (e) { if (e.target === overlay || e.target.closest('.lightbox-close')) overlay.remove(); });
 }
 
 function renderReviews(reviews) {
   var el = document.getElementById('reviewsList');
   if (!reviews.length) { el.innerHTML = '<p class="muted">No reviews yet — be the first!</p>'; return; }
   el.innerHTML = reviews.map(function (r) {
-    return '<div class="review-card"><div class="stars">' + '★'.repeat(r.Rating) + '☆'.repeat(5 - r.Rating) + '</div><p>' + esc(r.Comment || '') + '</p></div>';
+    return '<div class="review-card"><div class="stars">' + starRow(r.Rating) + '</div><p>&ldquo;' + esc(r.Comment || '') + '&rdquo;</p><div class="review-author">— ' + esc(r.CustomerName || 'Customer') + (r.StaffName ? ' · ' + esc(r.StaffName) : '') + '</div></div>';
   }).join('');
+}
+
+var reviewRating = 0;
+function bindReviewForm() {
+  var picker = document.getElementById('starPicker');
+  picker.innerHTML = [1, 2, 3, 4, 5].map(function (i) { return '<span class="star-pick" data-val="' + i + '">' + icon('star', 26) + '</span>'; }).join('');
+  picker.querySelectorAll('.star-pick').forEach(function (el) {
+    el.addEventListener('click', function () {
+      reviewRating = Number(el.dataset.val);
+      picker.querySelectorAll('.star-pick').forEach(function (s) { s.classList.toggle('active', Number(s.dataset.val) <= reviewRating); });
+    });
+  });
+  document.getElementById('reviewForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!reviewRating) { toast('Please select a star rating', 'error'); return; }
+    api('submitReview', {
+      rating: reviewRating, name: document.getElementById('rvName').value,
+      phone: document.getElementById('rvPhone').value, comment: document.getElementById('rvComment').value
+    }).then(function () {
+      toast('Thank you for your feedback!', 'success');
+      document.getElementById('reviewForm').reset();
+      reviewRating = 0;
+      picker.querySelectorAll('.star-pick').forEach(function (s) { s.classList.remove('active'); });
+    }).catch(showError);
+  });
 }
 
 function renderContact(s) {
@@ -638,57 +826,290 @@ function renderContact(s) {
   document.getElementById('contactHours').innerHTML = hoursHtml || 'Mon-Sat 8am-7pm';
 }
 
-function populateBookingSelectors(data) {
-  var branchSel = document.getElementById('bkBranch');
-  branchSel.innerHTML = '<option value="">Select branch</option>' + data.branches.map(function (b) { return '<option value="' + b.BranchID + '">' + esc(b.Name) + '</option>'; }).join('');
-  branchSel.addEventListener('change', updateBookingServiceOptions);
-  updateBookingServiceOptions();
-  var minDate = new Date().toISOString().slice(0, 10);
-  document.getElementById('bkDate').min = minDate;
+/* =====================================================================
+ * BOOKING WIZARD (multi-step: Branch → Service → Stylist → Date/Time →
+ * Details → Confirm), mirroring a familiar salon-booking UX.
+ * ===================================================================*/
+var BOOKING = {};
+var WIZ_STEPS = [];
+var WIZ_INDEX = 0;
+
+function resetBooking() {
+  BOOKING = { branchId: '', serviceId: '', staffId: '', category: '', date: '', time: '', name: '', phone: '', email: '', notes: '' };
 }
 
-function updateBookingServiceOptions() {
-  var branchId = document.getElementById('bkBranch').value;
+function initBookingWizard(prefill, startStepKey) {
+  resetBooking();
   var data = STATE.publicData;
-  var services = branchId ? data.services.filter(function (s) { return s.BranchID === branchId; }) : data.services;
-  var staff = branchId ? data.staff.filter(function (s) { return s.BranchID === branchId; }) : data.staff;
-  document.getElementById('bkService').innerHTML = '<option value="">Select service</option>' + services.map(function (s) {
-    return '<option value="' + s.ServiceID + '">' + esc(s.Name) + ' — ' + money(s.Price) + '</option>';
-  }).join('');
-  document.getElementById('bkStaff').innerHTML = '<option value="">Any available</option>' + staff.map(function (s) {
-    return '<option value="' + s.StaffID + '">' + esc(s.Name) + '</option>';
-  }).join('');
+  if (!data) return;
+  if (prefill) Object.keys(prefill).forEach(function (k) { BOOKING[k] = prefill[k]; });
+  WIZ_STEPS = [];
+  if (data.branches.length > 1) {
+    WIZ_STEPS.push('branch');
+  } else {
+    BOOKING.branchId = (data.branches[0] && data.branches[0].BranchID) || '';
+  }
+  WIZ_STEPS.push('service', 'stylist', 'datetime', 'details', 'confirm');
+  WIZ_INDEX = startStepKey ? Math.max(0, WIZ_STEPS.indexOf(startStepKey)) : 0;
+  renderWizard();
 }
 
-function bindPublicForms() {
-  document.getElementById('bookingForm').addEventListener('submit', function (e) {
-    e.preventDefault();
-    var errEl = document.getElementById('bkError'), okEl = document.getElementById('bkSuccess');
-    errEl.classList.add('hidden'); okEl.classList.add('hidden');
-    var payload = {
-      branchId: document.getElementById('bkBranch').value,
-      serviceId: document.getElementById('bkService').value,
-      staffId: document.getElementById('bkStaff').value,
-      date: document.getElementById('bkDate').value,
-      timeSlot: document.getElementById('bkTime').value,
-      name: document.getElementById('bkName').value,
-      phone: document.getElementById('bkPhone').value,
-      email: document.getElementById('bkEmail').value,
-      notes: document.getElementById('bkNotes').value
-    };
-    var btn = document.getElementById('bkSubmitBtn');
-    btn.disabled = true; btn.textContent = 'Submitting…';
-    api('createAppointment', payload).then(function (res) {
-      okEl.textContent = res.message + ' Your reference: ' + res.reference;
-      okEl.classList.remove('hidden');
-      document.getElementById('bookingForm').reset();
-    }).catch(function (err) {
-      errEl.textContent = err.message;
-      errEl.classList.remove('hidden');
-    }).finally(function () {
-      btn.disabled = false; btn.textContent = 'Request Appointment';
+function quickBook(serviceId, branchId) {
+  initBookingWizard({ branchId: branchId, serviceId: serviceId }, 'stylist');
+  location.hash = '#booking';
+  setTimeout(function () {
+    var el = document.getElementById('bookingWizardHost');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 60);
+}
+
+function renderWizard() {
+  var section = document.getElementById('bookingWizardHost');
+  var stepKey = WIZ_STEPS[WIZ_INDEX];
+  var titleMap = { branch: 'Choose Branch', service: 'Choose Service', stylist: 'Pick Stylist', datetime: 'Select Date & Time', details: 'Add Details', confirm: 'Confirm & Book' };
+  var progressDots = WIZ_STEPS.map(function (s, i) { return '<span class="dot ' + (i < WIZ_INDEX ? 'done' : (i === WIZ_INDEX ? 'active' : '')) + '"></span>'; }).join('');
+  var canBack = WIZ_INDEX > 0;
+  var isLast = WIZ_INDEX === WIZ_STEPS.length - 1;
+
+  section.innerHTML =
+    '<div class="wizard-box">' +
+    '<div class="wizard-head"><h3>Step ' + (WIZ_INDEX + 1) + ': ' + titleMap[stepKey] + '</h3></div>' +
+    '<div class="wizard-progress">' + progressDots + '</div>' +
+    '<div class="wizard-nav">' +
+    '<button class="btn btn-outline" id="wizBackBtn" ' + (canBack ? '' : 'disabled') + '>' + icon('chevronLeft', 16) + ' Back</button>' +
+    '<button class="btn btn-accent" id="wizNextBtn">' + (isLast ? icon('check', 16) + ' Confirm Booking' : 'Next ' + icon('chevronRight', 16)) + '</button>' +
+    '</div>' +
+    '<div id="wizardBody">' + renderWizardStep(stepKey) + '</div>' +
+    '<div id="wizError" class="form-error hidden"></div>' +
+    '</div>';
+
+  document.getElementById('wizBackBtn').addEventListener('click', wizBack);
+  document.getElementById('wizNextBtn').addEventListener('click', wizNext);
+  bindWizardStepEvents(stepKey);
+}
+
+function refreshWizardBody() {
+  var stepKey = WIZ_STEPS[WIZ_INDEX];
+  document.getElementById('wizardBody').innerHTML = renderWizardStep(stepKey);
+  bindWizardStepEvents(stepKey);
+}
+
+function renderWizardStep(stepKey) {
+  var data = STATE.publicData;
+  if (stepKey === 'branch') {
+    return '<div class="wizard-grid">' + data.branches.map(function (b) {
+      var sel = BOOKING.branchId === b.BranchID;
+      return '<div class="wizard-card' + (sel ? ' selected' : '') + '" data-branch="' + b.BranchID + '"><h4>' + esc(b.Name) + '</h4><p class="muted">' + esc(b.Location) + '</p><p class="muted">' + esc(b.OpeningHours) + '</p></div>';
+    }).join('') + '</div>';
+  }
+  if (stepKey === 'service') {
+    var services = data.services.filter(function (s) { return s.BranchID === BOOKING.branchId; });
+    var cats = services.map(function (s) { return s.Category; }).filter(function (c, i, a) { return a.indexOf(c) === i; });
+    var filtered = BOOKING.category ? services.filter(function (s) { return s.Category === BOOKING.category; }) : services;
+    return '<div class="wizard-cat-filter"><select id="wizCategorySelect"><option value="">All Categories</option>' +
+      cats.map(function (c) { return '<option value="' + esc(c) + '"' + (BOOKING.category === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select></div>' +
+      '<div class="wizard-grid">' + filtered.map(function (s) {
+        var sel = BOOKING.serviceId === s.ServiceID;
+        return '<div class="wizard-card' + (sel ? ' selected' : '') + '" data-service="' + s.ServiceID + '"><h4>' + esc(s.Name) + '</h4><p class="muted">' + esc(s.Description || '') + '</p>' +
+          '<div class="tags"><span class="tag">' + icon('clock', 12) + ' ' + s.DurationMinutes + ' min</span></div><div class="price">' + money(s.Price) + '</div></div>';
+      }).join('') + '</div>' + (filtered.length ? '' : '<p class="muted">No services in this category yet.</p>');
+  }
+  if (stepKey === 'stylist') {
+    var staffList = data.staff.filter(function (s) { return s.BranchID === BOOKING.branchId; });
+    var anyoneSel = !BOOKING.staffId;
+    var cards = '<div class="wizard-card' + (anyoneSel ? ' selected' : '') + '" data-staff=""><h4>Anyone</h4><p class="muted">First available stylist</p>' +
+      '<div class="status avail"><span class="status-dot avail"></span>Available</div></div>';
+    cards += staffList.map(function (s) {
+      var sel = BOOKING.staffId === s.StaffID;
+      var active = String(s.Active).toUpperCase() === 'Y';
+      var days = String(s.WorkDays || '').split(',').map(function (d) { return d.trim(); }).filter(Boolean);
+      return '<div class="wizard-card' + (sel ? ' selected' : '') + (active ? '' : ' disabled') + '" data-staff="' + (active ? s.StaffID : '') + '">' +
+        '<h4>' + esc(s.Name) + '</h4><p class="muted">' + esc(s.Specialties || s.Role) + '</p>' +
+        '<div class="tags">' + days.map(function (d) { return '<span class="tag">' + d + '</span>'; }).join('') + '</div>' +
+        '<div class="status ' + (active ? 'avail' : 'unavail') + '"><span class="status-dot ' + (active ? 'avail' : 'unavail') + '"></span>' + (active ? 'Available' : 'Not Available') + '</div></div>';
+    }).join('');
+    return '<div class="wizard-grid">' + cards + '</div>';
+  }
+  if (stepKey === 'datetime') {
+    if (!BOOKING.calYear) { var now = new Date(); BOOKING.calYear = now.getFullYear(); BOOKING.calMonth = now.getMonth(); }
+    var cal = buildCalendarMonth(BOOKING.calYear, BOOKING.calMonth);
+    var dowHtml = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(function (d) { return '<div class="cal-dow">' + d + '</div>'; }).join('');
+    var cellsHtml = cal.cells.map(function (c) {
+      if (!c) return '<div class="cal-cell empty"></div>';
+      var classes = 'cal-cell' + (c.isPast ? ' past' : '') + (BOOKING.date === c.dateStr ? ' selected' : '');
+      return '<div class="' + classes + '" data-date="' + (c.isPast ? '' : c.dateStr) + '">' + c.day + '</div>';
+    }).join('');
+    var timeHtml = '<div id="wizTimeGridHost">' + (BOOKING.date ? '<p class="muted">Loading time slots…</p>' : '<p class="muted">Select a date to see available times.</p>') + '</div>';
+    return '<div class="cal-nav"><button id="calPrevBtn">' + icon('chevronLeft', 18) + '</button><span>' + cal.monthLabel + '</span><button id="calNextBtn">' + icon('chevronRight', 18) + '</button></div>' +
+      '<div class="cal-grid">' + dowHtml + cellsHtml + '</div>' +
+      '<h4>Select Time</h4>' + timeHtml;
+  }
+  if (stepKey === 'details') {
+    return '<div class="form-row"><label>Full Name *</label><input type="text" id="wizName" value="' + esc(BOOKING.name) + '"></div>' +
+      '<div class="form-row"><label>Phone Number *</label><input type="tel" id="wizPhone" placeholder="024XXXXXXX or +233XXXXXXXXX" value="' + esc(BOOKING.phone) + '"></div>' +
+      '<div class="form-row"><label>Email (optional)</label><input type="email" id="wizEmail" value="' + esc(BOOKING.email) + '"></div>' +
+      '<div class="form-row"><label>Notes (optional)</label><textarea id="wizNotes" rows="2">' + esc(BOOKING.notes) + '</textarea></div>';
+  }
+  if (stepKey === 'confirm') {
+    var branch = data.branches.find(function (b) { return b.BranchID === BOOKING.branchId; });
+    var service = data.services.find(function (s) { return s.ServiceID === BOOKING.serviceId; });
+    var staffMember = data.staff.find(function (s) { return s.StaffID === BOOKING.staffId; });
+    function row(label, val) { return '<div class="confirm-row"><span class="lbl">' + label + '</span><span>' + val + '</span></div>'; }
+    return '<div class="confirm-card">' +
+      row('Branch', esc(branch ? branch.Name : '')) + row('Service', esc(service ? service.Name : '')) +
+      row('Stylist', esc(staffMember ? staffMember.Name : 'Any available')) +
+      row('Date & Time', esc(formatNiceDate(BOOKING.date)) + ' at ' + esc(formatTime12(BOOKING.time))) +
+      row('Duration', service ? service.DurationMinutes + ' min' : '') +
+      row('Name', esc(BOOKING.name)) + row('Phone', esc(BOOKING.phone)) + (BOOKING.email ? row('Email', esc(BOOKING.email)) : '') +
+      row('Total', '<b>' + money(service ? service.Price : 0) + '</b>') +
+      '</div><p class="muted">By confirming, you agree to receive an SMS/Email booking confirmation.</p>';
+  }
+  return '';
+}
+
+function bindWizardStepEvents(stepKey) {
+  var body = document.getElementById('wizardBody');
+  if (stepKey === 'branch') {
+    body.querySelectorAll('[data-branch]').forEach(function (el) {
+      el.addEventListener('click', function () { BOOKING.branchId = el.dataset.branch; BOOKING.serviceId = ''; BOOKING.staffId = ''; refreshWizardBody(); });
     });
+  } else if (stepKey === 'service') {
+    var catSel = document.getElementById('wizCategorySelect');
+    if (catSel) catSel.addEventListener('change', function () { BOOKING.category = catSel.value; refreshWizardBody(); });
+    body.querySelectorAll('[data-service]').forEach(function (el) {
+      el.addEventListener('click', function () { BOOKING.serviceId = el.dataset.service; refreshWizardBody(); });
+    });
+  } else if (stepKey === 'stylist') {
+    body.querySelectorAll('.wizard-card:not(.disabled)').forEach(function (el) {
+      el.addEventListener('click', function () { BOOKING.staffId = el.dataset.staff || ''; refreshWizardBody(); });
+    });
+  } else if (stepKey === 'datetime') {
+    var prevBtn = document.getElementById('calPrevBtn'), nextBtn = document.getElementById('calNextBtn');
+    if (prevBtn) prevBtn.addEventListener('click', function () { shiftCalMonth(-1); });
+    if (nextBtn) nextBtn.addEventListener('click', function () { shiftCalMonth(1); });
+    body.querySelectorAll('.cal-cell:not(.empty)').forEach(function (el) {
+      el.addEventListener('click', function () {
+        if (!el.dataset.date) return;
+        BOOKING.date = el.dataset.date; BOOKING.time = '';
+        refreshWizardBody();
+      });
+    });
+    if (BOOKING.date) loadTimeSlots();
+  }
+}
+
+function shiftCalMonth(delta) {
+  var m = BOOKING.calMonth + delta, y = BOOKING.calYear;
+  if (m < 0) { m = 11; y--; }
+  if (m > 11) { m = 0; y++; }
+  BOOKING.calMonth = m; BOOKING.calYear = y;
+  refreshWizardBody();
+}
+
+function buildCalendarMonth(year, month) {
+  var first = new Date(year, month, 1);
+  var startDow = first.getDay();
+  var daysInMonth = new Date(year, month + 1, 0).getDate();
+  var todayStr = isoToday();
+  var cells = [];
+  for (var i = 0; i < startDow; i++) cells.push(null);
+  for (var d = 1; d <= daysInMonth; d++) {
+    var dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    cells.push({ day: d, dateStr: dateStr, isPast: dateStr < todayStr });
+  }
+  return { monthLabel: first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }), cells: cells };
+}
+
+function loadTimeSlots() {
+  var host = document.getElementById('wizTimeGridHost');
+  if (!host) return;
+  host.innerHTML = '<p class="muted">Loading time slots…</p>';
+  api('getAvailableSlots', BOOKING.branchId, BOOKING.staffId, BOOKING.date).then(function (res) {
+    if (!res.dayAvailable || !res.slots.length) {
+      host.innerHTML = '<p class="form-error">No availability on this date. Please pick another date.</p>';
+      BOOKING.time = '';
+      return;
+    }
+    host.innerHTML = '<div class="time-grid">' + res.slots.map(function (s) {
+      var sel = BOOKING.time === s.time;
+      return '<div class="time-slot' + (s.available ? '' : ' unavailable') + (sel ? ' selected' : '') + '" data-time="' + (s.available ? s.time : '') + '">' +
+        '<span class="status-dot ' + (s.available ? 'avail' : 'unavail') + '"></span>' + formatTime12(s.time) + '</div>';
+    }).join('') + '</div>';
+    document.querySelectorAll('.time-slot[data-time]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        if (!el.dataset.time) return;
+        BOOKING.time = el.dataset.time;
+        document.querySelectorAll('.time-slot').forEach(function (t) { t.classList.remove('selected'); });
+        el.classList.add('selected');
+      });
+    });
+  }).catch(function (err) { host.innerHTML = '<p class="form-error">' + esc(err.message) + '</p>'; });
+}
+
+function isValidGhanaPhoneClient(phone) {
+  var d = String(phone || '').replace(/[\s\-()]/g, '');
+  return /^0\d{9}$/.test(d) || /^\+233\d{9}$/.test(d) || /^233\d{9}$/.test(d);
+}
+
+function wizErr(msg) {
+  var e = document.getElementById('wizError');
+  e.textContent = msg;
+  e.classList.remove('hidden');
+}
+
+function wizBack() {
+  WIZ_INDEX = Math.max(0, WIZ_INDEX - 1);
+  renderWizard();
+}
+
+function wizNext() {
+  var stepKey = WIZ_STEPS[WIZ_INDEX];
+  document.getElementById('wizError').classList.add('hidden');
+  if (stepKey === 'branch' && !BOOKING.branchId) return wizErr('Please select a branch.');
+  if (stepKey === 'service' && !BOOKING.serviceId) return wizErr('Please select a service.');
+  if (stepKey === 'datetime') {
+    if (!BOOKING.date) return wizErr('Please select a date.');
+    if (!BOOKING.time) return wizErr('Please select a time.');
+  }
+  if (stepKey === 'details') {
+    BOOKING.name = document.getElementById('wizName').value.trim();
+    BOOKING.phone = document.getElementById('wizPhone').value.trim();
+    BOOKING.email = document.getElementById('wizEmail').value.trim();
+    BOOKING.notes = document.getElementById('wizNotes').value.trim();
+    if (!BOOKING.name) return wizErr('Please enter your name.');
+    if (!isValidGhanaPhoneClient(BOOKING.phone)) return wizErr('Please enter a valid Ghana phone number, e.g. 024XXXXXXX or +233XXXXXXXXX.');
+  }
+  if (stepKey === 'confirm') { submitBooking(); return; }
+  WIZ_INDEX++;
+  renderWizard();
+  var host = document.getElementById('bookingWizardHost');
+  if (host) host.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function submitBooking() {
+  var btn = document.getElementById('wizNextBtn');
+  btn.disabled = true; btn.textContent = 'Submitting…';
+  api('createAppointment', {
+    branchId: BOOKING.branchId, serviceId: BOOKING.serviceId, staffId: BOOKING.staffId,
+    date: BOOKING.date, timeSlot: BOOKING.time, name: BOOKING.name, phone: BOOKING.phone,
+    email: BOOKING.email, notes: BOOKING.notes
+  }).then(function (res) {
+    renderBookingSuccess(res);
+  }).catch(function (err) {
+    wizErr(err.message);
+    btn.disabled = false; btn.innerHTML = icon('check', 16) + ' Confirm Booking';
   });
+}
+
+function renderBookingSuccess(res) {
+  var section = document.getElementById('bookingWizardHost');
+  section.innerHTML = '<div class="wizard-box booking-success">' +
+    '<div class="check-icon">' + icon('checkCircle', 64) + '</div>' +
+    '<h2>Booking Requested!</h2><p class="muted">' + esc(res.message) + '</p>' +
+    '<div class="ref-badge">' + esc(res.reference) + '</div>' +
+    '<p class="muted">Save this reference. We\'ve sent a confirmation to your phone' + (BOOKING.email ? ' and email' : '') + '.</p>' +
+    '<button class="btn btn-accent" onclick="initBookingWizard()">Book Another Appointment</button>' +
+    '</div>';
 }
 
 /* =====================================================================
@@ -716,7 +1137,6 @@ function bindLoginForm() {
       });
   });
 
-  // resume session if we already have a token in this tab
   var t = sessionStorage.getItem('salon_token');
   var u = sessionStorage.getItem('salon_user');
   if (t && u) { STATE.token = t; STATE.user = JSON.parse(u); }
@@ -732,23 +1152,73 @@ function doLogout() {
 }
 
 /* =====================================================================
+ * PHOTO PICKER — reusable component for every "image URL" admin field.
+ * Lets the admin either upload a file (stored in Google Drive) or paste
+ * a URL, with a live thumbnail preview either way.
+ * ===================================================================*/
+function photoPickerHtml(idPrefix, currentUrl) {
+  return '<div class="photo-picker" id="' + idPrefix + 'Picker">' +
+    '<div class="photo-preview" id="' + idPrefix + 'Preview" style="' + (currentUrl ? "background-image:url('" + esc(currentUrl) + "')" : '') + '">' + (currentUrl ? '' : icon('image', 26)) + '</div>' +
+    '<div class="photo-picker-controls">' +
+    '<label class="btn btn-sm btn-outline photo-upload-btn">' + icon('upload', 14) + ' Upload Photo<input type="file" accept="image/*" id="' + idPrefix + 'File" style="display:none"></label>' +
+    '<input type="text" id="' + idPrefix + 'Url" placeholder="or paste an image URL" value="' + esc(currentUrl || '') + '">' +
+    '</div></div>';
+}
+function bindPhotoPicker(idPrefix) {
+  var fileInput = document.getElementById(idPrefix + 'File');
+  var urlInput = document.getElementById(idPrefix + 'Url');
+  var preview = document.getElementById(idPrefix + 'Preview');
+  fileInput.addEventListener('change', function () {
+    var file = fileInput.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      preview.style.backgroundImage = "url('" + reader.result + "')";
+      preview.innerHTML = '';
+    };
+    reader.readAsDataURL(file);
+  });
+  urlInput.addEventListener('input', function () {
+    if (urlInput.value) { preview.style.backgroundImage = "url('" + urlInput.value + "')"; preview.innerHTML = ''; }
+  });
+}
+/** Resolves the picker's final image URL — uploads the chosen file first if one was picked. */
+function resolvePhotoPicker(idPrefix, callback) {
+  var fileInput = document.getElementById(idPrefix + 'File');
+  var urlInput = document.getElementById(idPrefix + 'Url');
+  var file = fileInput.files[0];
+  if (file) { uploadFileThen(file, function (url) { callback(url); }); }
+  else callback(urlInput.value);
+}
+function uploadFileThen(file, callback) {
+  var reader = new FileReader();
+  reader.onload = function () {
+    api('uploadImage', STATE.token, reader.result, file.name, file.type).then(function (res) {
+      callback(res.url);
+    }).catch(showError);
+  };
+  reader.readAsDataURL(file);
+}
+
+/* =====================================================================
  * ADMIN APP SHELL
  * ===================================================================*/
 var NAV_CONFIG = [
-  { key: 'overview', label: '📊 Overview', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] },
-  { key: 'appointments', label: '📅 Appointments', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] },
-  { key: 'pos', label: '🧾 Point of Sale', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] },
-  { key: 'customers', label: '👥 Customers', roles: ['Owner', 'Manager', 'Receptionist'] },
-  { key: 'staff', label: '💈 Staff', roles: ['Owner', 'Manager'] },
-  { key: 'inventory', label: '📦 Inventory', roles: ['Owner', 'Manager'] },
-  { key: 'branches', label: '🏢 Branches', roles: ['Owner'] },
-  { key: 'expenses', label: '💸 Expenses', roles: ['Owner', 'Manager'] },
-  { key: 'reports', label: '📈 Reports', roles: ['Owner', 'Manager'] },
-  { key: 'reviews', label: '⭐ Reviews', roles: ['Owner', 'Manager'] },
-  { key: 'heroSlides', label: '🖼️ Hero Carousel', roles: ['Owner', 'Manager'] },
-  { key: 'settings', label: '🎨 Branding & Theme', roles: ['Owner'] },
-  { key: 'users', label: '🔑 Users', roles: ['Owner'] },
-  { key: 'account', label: '⚙️ My Account', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] }
+  { key: 'overview', icon: 'grid', label: 'Overview', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] },
+  { key: 'appointments', icon: 'calendar', label: 'Appointments', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] },
+  { key: 'pos', icon: 'cart', label: 'Point of Sale', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] },
+  { key: 'customers', icon: 'users', label: 'Customers', roles: ['Owner', 'Manager', 'Receptionist'] },
+  { key: 'staff', icon: 'scissors', label: 'Staff', roles: ['Owner', 'Manager'] },
+  { key: 'inventory', icon: 'box', label: 'Inventory', roles: ['Owner', 'Manager'] },
+  { key: 'branches', icon: 'mapPin', label: 'Branches', roles: ['Owner'] },
+  { key: 'expenses', icon: 'card', label: 'Expenses', roles: ['Owner', 'Manager'] },
+  { key: 'reports', icon: 'barChart', label: 'Reports', roles: ['Owner', 'Manager'] },
+  { key: 'reviews', icon: 'star', label: 'Reviews', roles: ['Owner', 'Manager'] },
+  { key: 'gallery', icon: 'copy', label: 'Gallery', roles: ['Owner', 'Manager'] },
+  { key: 'heroSlides', icon: 'image', label: 'Hero Carousel', roles: ['Owner', 'Manager'] },
+  { key: 'settings', icon: 'droplet', label: 'Branding & Theme', roles: ['Owner'] },
+  { key: 'users', icon: 'lock', label: 'Users', roles: ['Owner'] },
+  { key: 'account', icon: 'sliders', label: 'My Account', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] }
 ];
 
 function showAdminApp() {
@@ -775,49 +1245,27 @@ function renderSidebar() {
   NAV_CONFIG.filter(function (n) { return n.roles.indexOf(STATE.user.role) > -1; }).forEach(function (n) {
     var div = document.createElement('div');
     div.className = 'nav-item' + (STATE.adminPage === n.key ? ' active' : '');
-    div.textContent = n.label;
+    div.innerHTML = icon(n.icon, 18) + '<span>' + n.label + '</span>';
     div.addEventListener('click', function () { STATE.adminPage = n.key; renderSidebar(); renderAdminPage(); });
     host.appendChild(div);
   });
 }
 
 function renderAdminPage() {
-  var titleMap = {}; NAV_CONFIG.forEach(function (n) { titleMap[n.key] = n.label.replace(/^[^\s]+\s/, ''); });
+  var titleMap = {}; NAV_CONFIG.forEach(function (n) { titleMap[n.key] = n.label; });
   document.getElementById('pageTitle').textContent = titleMap[STATE.adminPage] || '';
   var content = document.getElementById('adminContent');
   content.innerHTML = '<p class="muted">Loading…</p>';
   var renderers = {
     overview: renderOverview, appointments: renderAppointments, pos: renderPOS, customers: renderCustomers,
     staff: renderStaffAdmin, inventory: renderInventory, branches: renderBranchesAdmin, expenses: renderExpenses,
-    reports: renderReports, reviews: renderReviewsAdmin, heroSlides: renderHeroAdmin, settings: renderSettingsAdmin,
-    users: renderUsersAdmin, account: renderAccount
+    reports: renderReports, reviews: renderReviewsAdmin, gallery: renderGalleryAdmin, heroSlides: renderHeroAdmin,
+    settings: renderSettingsAdmin, users: renderUsersAdmin, account: renderAccount
   };
   (renderers[STATE.adminPage] || function () {})(content);
 }
 
 function branchArg() { return STATE.user.role === 'Owner' ? STATE.currentBranchFilter : STATE.user.branchId; }
-
-/* ---------- OVERVIEW ---------- */
-function renderOverview(content) {
-  api('getDashboardOverview', STATE.token, branchArg()).then(function (d) {
-    content.innerHTML =
-      '<div class="stat-grid">' +
-        statCard('Today\'s Revenue', money(d.todayRevenue)) +
-        statCard('Today\'s Sales', d.todaySalesCount) +
-        statCard('Today\'s Appointments', d.todayAppointments.length) +
-        statCard('Pending Bookings', d.pendingCount) +
-        statCard('Upcoming (7 days)', d.upcomingCount) +
-        statCard('Low Stock Items', d.lowStock.length) +
-      '</div>' +
-      '<div class="panel"><div class="panel-head"><h3>Today\'s Appointments</h3></div>' +
-        renderTable(['Time', 'Customer', 'Service', 'Staff', 'Status'], d.todayAppointments.map(function (a) {
-          return [a.TimeSlot, a.CustomerName, a.ServiceName, a.StaffName, statusBadge(a.Status)];
-        })) + '</div>' +
-      (d.lowStock.length ? '<div class="panel"><div class="panel-head"><h3>⚠️ Low Stock Alerts</h3></div>' +
-        renderTable(['Product', 'In Stock', 'Reorder Level'], d.lowStock.map(function (p) { return [p.Name, p.QuantityInStock, p.ReorderLevel]; })) + '</div>' : '');
-  }).catch(function (err) { content.innerHTML = errorPanel(err); });
-}
-
 function statCard(label, val) {
   return '<div class="stat-card"><div class="val">' + val + '</div><div class="lbl">' + esc(label) + '</div></div>';
 }
@@ -825,7 +1273,7 @@ function statusBadge(status) {
   return '<span class="badge badge-' + status.toLowerCase().replace(' ', '-') + '">' + status + '</span>';
 }
 function errorPanel(err) {
-  return '<div class="panel"><p class="form-error">⚠️ ' + esc(err.message || err) + '</p></div>';
+  return '<div class="panel"><p class="form-error">' + icon('alertTriangle', 15) + ' ' + esc(err.message || err) + '</p></div>';
 }
 function renderTable(headers, rows) {
   if (!rows.length) return '<p class="muted">No records found.</p>';
@@ -833,15 +1281,41 @@ function renderTable(headers, rows) {
     '</tr></thead><tbody>' + rows.map(function (r) { return '<tr>' + r.map(function (c) { return '<td>' + c + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>';
 }
 
+/* ---------- OVERVIEW ---------- */
+function renderOverview(content) {
+  Promise.all([
+    api('getDashboardOverview', STATE.token, branchArg()),
+    api('getReports', STATE.token, { branchId: branchArg(), startDate: isoDaysAgo(6), endDate: isoToday() })
+  ]).then(function (res) {
+    var d = res[0], rpt = res[1];
+    content.innerHTML =
+      '<div class="stat-grid">' +
+      statCard('Today\'s Revenue', money(d.todayRevenue)) +
+      statCard('Today\'s Sales', d.todaySalesCount) +
+      statCard('Today\'s Appointments', d.todayAppointments.length) +
+      statCard('Pending Bookings', d.pendingCount) +
+      statCard('Upcoming (7 days)', d.upcomingCount) +
+      statCard('Low Stock Items', d.lowStock.length) +
+      '</div>' +
+      '<div class="panel"><h3>7-Day Revenue Trend</h3>' + renderLineChart(rpt.revenueByDay.map(function (r) { return { label: r.date, value: r.revenue }; }), { height: 180 }) + '</div>' +
+      '<div class="panel"><div class="panel-head"><h3>Today\'s Appointments</h3></div>' +
+      renderTable(['Time', 'Customer', 'Service', 'Staff', 'Status'], d.todayAppointments.map(function (a) {
+        return [a.TimeSlot, a.CustomerName, a.ServiceName, a.StaffName, statusBadge(a.Status)];
+      })) + '</div>' +
+      (d.lowStock.length ? '<div class="panel"><div class="panel-head"><h3 class="warn-line">' + icon('alertTriangle', 17) + ' Low Stock Alerts</h3></div>' +
+        renderTable(['Product', 'In Stock', 'Reorder Level'], d.lowStock.map(function (p) { return [p.Name, p.QuantityInStock, p.ReorderLevel]; })) + '</div>' : '');
+  }).catch(function (err) { content.innerHTML = errorPanel(err); });
+}
+
 /* ---------- APPOINTMENTS ---------- */
 function renderAppointments(content) {
   content.innerHTML =
     '<div class="panel">' +
-    '<div class="panel-head"><h3>Appointments</h3><button class="btn btn-sm" onclick="openAppointmentModal()">+ New Appointment</button></div>' +
+    '<div class="panel-head"><h3>Appointments</h3><button class="btn btn-sm" onclick="openAppointmentModal()">' + icon('plus', 14) + ' New Appointment</button></div>' +
     '<div class="filters-bar">' +
-      '<input type="date" id="apFilterDate">' +
-      '<select id="apFilterStatus"><option value="">All Statuses</option>' + ['Pending', 'Confirmed', 'Completed', 'No-show', 'Cancelled'].map(function (s) { return '<option value="' + s + '">' + s + '</option>'; }).join('') + '</select>' +
-      '<button class="btn btn-sm btn-outline" onclick="loadAppointmentsTable()">Filter</button>' +
+    '<input type="date" id="apFilterDate">' +
+    '<select id="apFilterStatus"><option value="">All Statuses</option>' + ['Pending', 'Confirmed', 'Completed', 'No-show', 'Cancelled'].map(function (s) { return '<option value="' + s + '">' + s + '</option>'; }).join('') + '</select>' +
+    '<button class="btn btn-sm btn-outline" onclick="loadAppointmentsTable()">Filter</button>' +
     '</div>' +
     '<div id="apTableHost"><p class="muted">Loading…</p></div></div>';
   loadAppointmentsTable();
@@ -920,7 +1394,7 @@ var POS_CART = [];
 function renderPOS(content) {
   POS_CART = [];
   var branchHint = (STATE.user.role === 'Owner' && !branchArg())
-    ? '<div class="panel" style="background:#fff4d6;"><b>⚠️ Select a branch</b> in the top-right switcher before checking out a sale.</div>' : '';
+    ? '<div class="panel" style="background:#fff4d6;"><b class="warn-line">' + icon('alertTriangle', 16) + ' Select a branch</b> in the top-right switcher before checking out a sale.</div>' : '';
   content.innerHTML = branchHint + '<div class="pos-layout">' +
     '<div class="panel"><div class="panel-head"><h3>Services & Products</h3></div>' +
     '<div class="filters-bar"><input type="text" id="posSearch" placeholder="Search…" oninput="renderPosItems()"></div>' +
@@ -951,9 +1425,9 @@ function renderPosItems() {
   var services = (STATE.posServices || []).filter(function (s) { return s.Name.toLowerCase().indexOf(q) > -1; });
   var products = (STATE.posProducts || []).filter(function (p) { return p.Name.toLowerCase().indexOf(q) > -1; });
   var html = services.map(function (s) {
-    return '<div class="pos-item-card" onclick="addToCart(\'service\',\'' + s.ServiceID + '\',\'' + esc(s.Name).replace(/'/g, "\\'") + '\',' + s.Price + ')"><b>' + esc(s.Name) + '</b><br><span class="muted">' + money(s.Price) + '</span></div>';
+    return '<div class="pos-item-card" onclick="addToCart(\'service\',\'' + s.ServiceID + '\',\'' + esc(s.Name).replace(/'/g, "\\'") + '\',' + s.Price + ')"><div class="item-name">' + icon('scissors', 14) + esc(s.Name) + '</div><span class="muted">' + money(s.Price) + '</span></div>';
   }).join('') + products.map(function (p) {
-    return '<div class="pos-item-card" onclick="addToCart(\'product\',\'' + p.ProductID + '\',\'' + esc(p.Name).replace(/'/g, "\\'") + '\',' + p.SellingPrice + ')"><b>📦 ' + esc(p.Name) + '</b><br><span class="muted">' + money(p.SellingPrice) + ' · Stock: ' + p.QuantityInStock + '</span></div>';
+    return '<div class="pos-item-card" onclick="addToCart(\'product\',\'' + p.ProductID + '\',\'' + esc(p.Name).replace(/'/g, "\\'") + '\',' + p.SellingPrice + ')"><div class="item-name">' + icon('box', 14) + esc(p.Name) + '</div><span class="muted">' + money(p.SellingPrice) + ' · Stock: ' + p.QuantityInStock + '</span></div>';
   }).join('');
   document.getElementById('posItemGrid').innerHTML = html || '<p class="muted">No items found.</p>';
 }
@@ -1045,7 +1519,7 @@ function viewCustomerProfile(id) {
 
 /* ---------- STAFF ---------- */
 function renderStaffAdmin(content) {
-  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Staff</h3><button class="btn btn-sm" onclick="openStaffModal()">+ Add Staff</button></div><div id="staffTableHost"></div></div>';
+  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Staff</h3><button class="btn btn-sm" onclick="openStaffModal()">' + icon('plus', 14) + ' Add Staff</button></div><div id="staffTableHost"></div></div>';
   loadStaffTable();
 }
 function loadStaffTable() {
@@ -1053,13 +1527,16 @@ function loadStaffTable() {
     document.getElementById('staffTableHost').innerHTML = '<div class="table-wrap"><table><thead><tr><th>Name</th><th>Role</th><th>Phone</th><th>Specialties</th><th>Commission %</th><th>Active</th><th>Actions</th></tr></thead><tbody>' +
       rows.map(function (s) {
         return '<tr><td>' + esc(s.Name) + '</td><td>' + esc(s.Role) + '</td><td>' + esc(s.Phone) + '</td><td>' + esc(s.Specialties) + '</td><td>' + s.CommissionRate + '</td><td>' + s.Active + '</td>' +
-          '<td class="row-actions"><button class="btn btn-sm btn-outline" onclick=\'openStaffModal(' + JSON.stringify(s).replace(/'/g, '&#39;') + ')\'>Edit</button><button class="btn btn-sm btn-danger" onclick="deleteStaffRow(\'' + s.StaffID + '\')">Delete</button></td></tr>';
+          '<td class="row-actions"><button class="btn btn-sm btn-outline" onclick=\'openStaffModal(' + JSON.stringify(s).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button><button class="btn btn-sm btn-danger" onclick="deleteStaffRow(\'' + s.StaffID + '\')">' + icon('trash', 13) + '</button></td></tr>';
       }).join('') + '</tbody></table></div>';
   }).catch(function (err) { document.getElementById('staffTableHost').innerHTML = errorPanel(err); });
 }
 function openStaffModal(s) {
   s = s || {};
   var branchOpts = STATE.branches.map(function (b) { return '<option value="' + b.BranchID + '"' + (s.BranchID === b.BranchID ? ' selected' : '') + '>' + esc(b.Name) + '</option>'; }).join('');
+  var days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  var selectedDays = String(s.WorkDays || 'Mon,Tue,Wed,Thu,Fri,Sat').split(',').map(function (d) { return d.trim(); });
+  var dayChips = days.map(function (d) { return '<span class="day-chip' + (selectedDays.indexOf(d) > -1 ? ' active' : '') + '" data-day="' + d + '">' + d + '</span>'; }).join('');
   var html = '<div class="field-grid">' +
     '<div><label>Name</label><input id="sfName" value="' + esc(s.Name || '') + '"></div>' +
     '<div><label>Role</label><select id="sfRole">' + ['Barber', 'Stylist', 'Receptionist', 'Manager'].map(function (r) { return '<option' + (s.Role === r ? ' selected' : '') + '>' + r + '</option>'; }).join('') + '</select></div>' +
@@ -1067,22 +1544,26 @@ function openStaffModal(s) {
     '<div><label>Phone</label><input id="sfPhone" value="' + esc(s.Phone || '') + '"></div>' +
     '<div><label>Specialties</label><input id="sfSpecialties" value="' + esc(s.Specialties || '') + '"></div>' +
     '<div><label>Commission %</label><input type="number" id="sfCommission" value="' + (s.CommissionRate || 10) + '"></div>' +
-    '<div><label>Photo URL</label><input id="sfPhoto" value="' + esc(s.PhotoURL || '') + '"></div>' +
-    '<div><label>Upload Photo</label><input type="file" id="sfPhotoFile" accept="image/*"></div>' +
+    '<div style="grid-column:1/-1"><label>Photo</label>' + photoPickerHtml('sf', s.PhotoURL) + '</div>' +
+    '<div style="grid-column:1/-1"><label>Working Days</label><div class="day-picker" id="sfDayPicker">' + dayChips + '</div></div>' +
     '<div><label>Active</label><select id="sfActive">' + ['Y', 'N'].map(function (a) { return '<option' + (s.Active === a ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select></div>' +
     '</div>';
   openModal(s.StaffID ? 'Edit Staff' : 'Add Staff', html, function () {
-    var save = function (photoUrl) {
+    resolvePhotoPicker('sf', function (photoUrl) {
+      var workDays = Array.prototype.slice.call(document.querySelectorAll('#sfDayPicker .day-chip.active')).map(function (el) { return el.dataset.day; }).join(',');
       api('saveStaff', STATE.token, {
         StaffID: s.StaffID || '', Name: document.getElementById('sfName').value, Role: document.getElementById('sfRole').value,
         BranchID: document.getElementById('sfBranch').value, Phone: document.getElementById('sfPhone').value,
-        Specialties: document.getElementById('sfSpecialties').value, PhotoURL: photoUrl || document.getElementById('sfPhoto').value,
-        CommissionRate: document.getElementById('sfCommission').value, Active: document.getElementById('sfActive').value
+        Specialties: document.getElementById('sfSpecialties').value, PhotoURL: photoUrl,
+        CommissionRate: document.getElementById('sfCommission').value, Active: document.getElementById('sfActive').value,
+        WorkDays: workDays
       }).then(function () { toast('Staff saved', 'success'); closeModal(); loadStaffTable(); }).catch(showError);
-    };
-    var file = document.getElementById('sfPhotoFile').files[0];
-    if (file) uploadFileThen(file, save); else save();
+    });
   }, 'Save');
+  bindPhotoPicker('sf');
+  document.querySelectorAll('#sfDayPicker .day-chip').forEach(function (el) {
+    el.addEventListener('click', function () { el.classList.toggle('active'); });
+  });
 }
 function deleteStaffRow(id) {
   if (!confirm('Delete this staff member?')) return;
@@ -1091,7 +1572,7 @@ function deleteStaffRow(id) {
 
 /* ---------- INVENTORY ---------- */
 function renderInventory(content) {
-  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Products / Inventory</h3><button class="btn btn-sm" onclick="openProductModal()">+ Add Product</button></div><div id="prodTableHost"></div></div>';
+  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Products / Inventory</h3><button class="btn btn-sm" onclick="openProductModal()">' + icon('plus', 14) + ' Add Product</button></div><div id="prodTableHost"></div></div>';
   loadProductsTable();
 }
 function loadProductsTable() {
@@ -1100,9 +1581,9 @@ function loadProductsTable() {
       rows.map(function (p) {
         var low = Number(p.QuantityInStock) <= Number(p.ReorderLevel);
         return '<tr' + (low ? ' style="background:#fff4d6"' : '') + '><td>' + esc(p.Name) + '</td><td>' + esc(p.Category) + '</td><td>' + money(p.CostPrice) + '</td><td>' + money(p.SellingPrice) + '</td><td>' + p.QuantityInStock + '</td><td>' + p.ReorderLevel + '</td>' +
-          '<td class="row-actions"><button class="btn btn-sm btn-outline" onclick=\'openProductModal(' + JSON.stringify(p).replace(/'/g, '&#39;') + ')\'>Edit</button>' +
-          '<button class="btn btn-sm" onclick="restockPrompt(\'' + p.ProductID + '\')">Restock</button>' +
-          '<button class="btn btn-sm btn-danger" onclick="deleteProductRow(\'' + p.ProductID + '\')">Delete</button></td></tr>';
+          '<td class="row-actions"><button class="btn btn-sm btn-outline" onclick=\'openProductModal(' + JSON.stringify(p).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button>' +
+          '<button class="btn btn-sm" onclick="restockPrompt(\'' + p.ProductID + '\')">' + icon('plus', 13) + ' Restock</button>' +
+          '<button class="btn btn-sm btn-danger" onclick="deleteProductRow(\'' + p.ProductID + '\')">' + icon('trash', 13) + '</button></td></tr>';
       }).join('') + '</tbody></table></div>';
   }).catch(function (err) { document.getElementById('prodTableHost').innerHTML = errorPanel(err); });
 }
@@ -1138,7 +1619,7 @@ function restockPrompt(id) {
 
 /* ---------- BRANCHES ---------- */
 function renderBranchesAdmin(content) {
-  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Branches</h3><button class="btn btn-sm" onclick="openBranchModal()">+ Add Branch</button></div><div id="branchTableHost"></div></div>';
+  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Branches</h3><button class="btn btn-sm" onclick="openBranchModal()">' + icon('plus', 14) + ' Add Branch</button></div><div id="branchTableHost"></div></div>';
   loadBranchesTable();
 }
 function loadBranchesTable() {
@@ -1146,7 +1627,7 @@ function loadBranchesTable() {
     STATE.branches = rows;
     document.getElementById('branchTableHost').innerHTML = renderTable(['Name', 'Location', 'Phone', 'Hours', 'Actions'], rows.map(function (b) {
       return [esc(b.Name), esc(b.Location), esc(b.Phone), esc(b.OpeningHours),
-        '<button class="btn btn-sm btn-outline" onclick=\'openBranchModal(' + JSON.stringify(b).replace(/'/g, '&#39;') + ')\'>Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteBranchRow(\'' + b.BranchID + '\')">Delete</button>'];
+        '<button class="btn btn-sm btn-outline" onclick=\'openBranchModal(' + JSON.stringify(b).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button> <button class="btn btn-sm btn-danger" onclick="deleteBranchRow(\'' + b.BranchID + '\')">' + icon('trash', 13) + '</button>'];
     }));
   }).catch(function (err) { document.getElementById('branchTableHost').innerHTML = errorPanel(err); });
 }
@@ -1172,13 +1653,13 @@ function deleteBranchRow(id) {
 
 /* ---------- EXPENSES ---------- */
 function renderExpenses(content) {
-  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Expenses</h3><button class="btn btn-sm" onclick="openExpenseModal()">+ Add Expense</button></div><div id="expTableHost"></div></div>';
+  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Expenses</h3><button class="btn btn-sm" onclick="openExpenseModal()">' + icon('plus', 14) + ' Add Expense</button></div><div id="expTableHost"></div></div>';
   loadExpensesTable();
 }
 function loadExpensesTable() {
   api('getExpenses', STATE.token, { branchId: branchArg() }).then(function (rows) {
     document.getElementById('expTableHost').innerHTML = renderTable(['Date', 'Category', 'Amount', 'Description', 'Actions'], rows.map(function (e) {
-      return [e.Date, esc(e.Category), money(e.Amount), esc(e.Description), '<button class="btn btn-sm btn-danger" onclick="deleteExpenseRow(\'' + e.ExpenseID + '\')">Delete</button>'];
+      return [e.Date, esc(e.Category), money(e.Amount), esc(e.Description), '<button class="btn btn-sm btn-danger" onclick="deleteExpenseRow(\'' + e.ExpenseID + '\')">' + icon('trash', 13) + '</button>'];
     }));
   }).catch(function (err) { document.getElementById('expTableHost').innerHTML = errorPanel(err); });
 }
@@ -1203,16 +1684,98 @@ function deleteExpenseRow(id) {
   api('deleteExpense', STATE.token, id).then(function () { toast('Deleted', 'success'); loadExpensesTable(); }).catch(showError);
 }
 
+/* =====================================================================
+ * CHARTS — small dependency-free inline-SVG charting module.
+ * ===================================================================*/
+function chartTheme() {
+  var dark = document.getElementById('adminApp').classList.contains('dark');
+  var accent = getComputedStyle(document.documentElement).getPropertyValue('--clr-accent').trim() || '#c9a227';
+  return {
+    text: dark ? '#aab0bd' : '#888888',
+    grid: dark ? '#2a2e37' : '#eeeeee',
+    accent: accent,
+    palette: [accent, '#3b7dd8', '#1c7c3c', '#c0392b', '#8e44ad', '#16a2a2']
+  };
+}
+
+function renderLineChart(data, opts) {
+  opts = opts || {};
+  if (!data.length) return '<p class="muted">No data for this period.</p>';
+  var w = opts.width || 640, h = opts.height || 200, pad = 34;
+  var theme = chartTheme();
+  var max = Math.max.apply(null, data.map(function (d) { return d.value; }).concat([1]));
+  var stepX = data.length > 1 ? (w - pad * 2) / (data.length - 1) : 0;
+  var pts = data.map(function (d, i) {
+    var x = pad + i * stepX;
+    var y = h - pad - (d.value / max) * (h - pad * 2 - 20);
+    return { x: x, y: y, label: d.label, value: d.value };
+  });
+  var d0 = 'M ' + pts[0].x + ',' + pts[0].y;
+  for (var i = 1; i < pts.length; i++) {
+    var midX = (pts[i - 1].x + pts[i].x) / 2, midY = (pts[i - 1].y + pts[i].y) / 2;
+    d0 += ' Q ' + pts[i - 1].x + ',' + pts[i - 1].y + ' ' + midX + ',' + midY;
+  }
+  d0 += ' L ' + pts[pts.length - 1].x + ',' + pts[pts.length - 1].y;
+  var areaD = d0 + ' L ' + pts[pts.length - 1].x + ',' + (h - pad) + ' L ' + pts[0].x + ',' + (h - pad) + ' Z';
+  var gridLines = [0, 0.5, 1].map(function (f) {
+    var y = pad + f * (h - pad * 2 - 20);
+    return '<line x1="' + pad + '" y1="' + y + '" x2="' + (w - pad) + '" y2="' + y + '" stroke="' + theme.grid + '" stroke-width="1"/>';
+  }).join('');
+  var dots = pts.map(function (p) { return '<circle cx="' + p.x + '" cy="' + p.y + '" r="3.5" fill="' + theme.accent + '"><title>' + esc(p.label) + ': ' + money(p.value) + '</title></circle>'; }).join('');
+  var skip = Math.ceil(pts.length / 6) || 1;
+  var labels = pts.filter(function (_, i) { return i % skip === 0; }).map(function (p) {
+    return '<text x="' + p.x + '" y="' + (h - 8) + '" font-size="10" fill="' + theme.text + '" text-anchor="middle">' + esc(String(p.label).slice(5)) + '</text>';
+  }).join('');
+  return '<svg viewBox="0 0 ' + w + ' ' + h + '" class="chart-svg" preserveAspectRatio="none" style="width:100%;height:' + h + 'px;">' +
+    '<defs><linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="' + theme.accent + '" stop-opacity="0.35"/><stop offset="100%" stop-color="' + theme.accent + '" stop-opacity="0"/></linearGradient></defs>' +
+    gridLines + '<path d="' + areaD + '" fill="url(#areaGrad)" stroke="none"/>' +
+    '<path d="' + d0 + '" fill="none" stroke="' + theme.accent + '" stroke-width="2.5" stroke-linecap="round"/>' +
+    dots + labels + '</svg>';
+}
+
+function renderBarChart(data) {
+  if (!data.length) return '<p class="muted">No data yet.</p>';
+  var theme = chartTheme();
+  var max = Math.max.apply(null, data.map(function (d) { return d.value; }).concat([1]));
+  var rows = data.map(function (d, i) {
+    var pct = Math.max(3, (d.value / max) * 100);
+    var color = theme.palette[i % theme.palette.length];
+    return '<div class="hbar-row"><div class="hbar-label" title="' + esc(d.label) + '">' + esc(d.label) + '</div>' +
+      '<div class="hbar-track"><div class="hbar-fill" style="width:' + pct + '%;background:' + color + '"></div></div>' +
+      '<div class="hbar-value">' + esc(d.display || d.value) + '</div></div>';
+  }).join('');
+  return '<div class="hbar-chart">' + rows + '</div>';
+}
+
+function renderDonutChart(data) {
+  if (!data.length) return '<p class="muted">No sales yet.</p>';
+  var theme = chartTheme();
+  var total = data.reduce(function (s, d) { return s + d.value; }, 0) || 1;
+  var r = 52, cx = 62, cy = 62, circumference = 2 * Math.PI * r;
+  var offset = 0;
+  var segs = data.map(function (d, i) {
+    var frac = d.value / total;
+    var len = frac * circumference;
+    var seg = '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + theme.palette[i % theme.palette.length] + '" stroke-width="18" stroke-dasharray="' + len + ' ' + (circumference - len) + '" stroke-dashoffset="' + (-offset) + '" transform="rotate(-90 ' + cx + ' ' + cy + ')"><title>' + esc(d.label) + ': ' + money(d.value) + '</title></circle>';
+    offset += len;
+    return seg;
+  }).join('');
+  var legend = data.map(function (d, i) {
+    return '<div class="legend-row"><span class="legend-dot" style="background:' + theme.palette[i % theme.palette.length] + '"></span>' + esc(d.label) + ' — <b>' + money(d.value) + '</b></div>';
+  }).join('');
+  return '<div class="donut-wrap"><svg viewBox="0 0 124 124" width="124" height="124">' + segs + '</svg><div class="legend-list">' + legend + '</div></div>';
+}
+
 /* ---------- REPORTS ---------- */
 function renderReports(content) {
-  var today = new Date().toISOString().slice(0, 10);
-  var monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+  var today = isoToday();
+  var monthAgo = isoDaysAgo(30);
   content.innerHTML = '<div class="panel"><div class="filters-bar">' +
     '<input type="date" id="rpStart" value="' + monthAgo + '"><input type="date" id="rpEnd" value="' + today + '">' +
     '<button class="btn btn-sm" onclick="loadReports()">Run Report</button>' +
-    '<button class="btn btn-sm btn-outline" onclick="exportCsv(\'sales\')">Export Sales CSV</button>' +
-    '<button class="btn btn-sm btn-outline" onclick="exportCsv(\'expenses\')">Export Expenses CSV</button>' +
-    '<button class="btn btn-sm btn-outline" onclick="exportPdf()">Export PDF</button>' +
+    '<button class="btn btn-sm btn-outline" onclick="exportCsv(\'sales\')">' + icon('upload', 13) + ' Sales CSV</button>' +
+    '<button class="btn btn-sm btn-outline" onclick="exportCsv(\'expenses\')">' + icon('upload', 13) + ' Expenses CSV</button>' +
+    '<button class="btn btn-sm btn-outline" onclick="exportPdf()">' + icon('upload', 13) + ' PDF</button>' +
     '</div></div><div id="reportHost"></div>';
   loadReports();
 }
@@ -1221,16 +1784,16 @@ function loadReports() {
   STATE.lastReportParams = params;
   api('getReports', STATE.token, params).then(function (r) {
     STATE.lastReport = r;
-    var maxRev = Math.max.apply(null, r.revenueByDay.map(function (d) { return d.revenue; }).concat([1]));
-    var chart = '<div class="bar-chart">' + r.revenueByDay.map(function (d) {
-      return '<div class="bar" style="height:' + Math.max(4, (d.revenue / maxRev) * 140) + 'px"><span>' + money(d.revenue) + '</span></div>';
-    }).join('') + '</div>';
     document.getElementById('reportHost').innerHTML =
       '<div class="stat-grid">' + statCard('Total Revenue', money(r.totalRevenue)) + statCard('Total Expenses', money(r.totalExpenses)) + statCard('Net Profit', money(r.netProfit)) + statCard('Sales Count', r.salesCount) + '</div>' +
-      '<div class="panel"><h3>Revenue by Day</h3>' + (r.revenueByDay.length ? chart : '<p class="muted">No sales in this period.</p>') + '</div>' +
-      '<div class="panel"><h3>Best-Selling Services</h3>' + renderTable(['Service', 'Qty Sold', 'Revenue'], r.bestSellers.map(function (b) { return [esc(b.name), b.qty, money(b.revenue)]; })) + '</div>' +
-      '<div class="panel"><h3>Staff Performance</h3>' + renderTable(['Staff', 'Sales', 'Revenue', 'Commission'], r.staffPerformance.map(function (s) { return [esc(s.name), s.salesCount, money(s.revenue), money(s.commission)]; })) + '</div>' +
-      '<div class="panel"><h3>Payment Method Breakdown</h3>' + renderTable(['Method', 'Total'], r.paymentBreakdown.map(function (p) { return [p.method, money(p.total)]; })) + '</div>';
+      '<div class="panel"><h3>Revenue Trend</h3>' + renderLineChart(r.revenueByDay.map(function (d) { return { label: d.date, value: d.revenue }; })) + '</div>' +
+      '<div class="chart-row">' +
+      '<div class="panel"><h3>Best-Selling Services</h3>' + renderBarChart(r.bestSellers.map(function (b) { return { label: b.name, value: b.revenue, display: money(b.revenue) }; })) + '</div>' +
+      '<div class="panel"><h3>Payment Methods</h3>' + renderDonutChart(r.paymentBreakdown.map(function (p) { return { label: p.method, value: p.total }; })) + '</div>' +
+      '</div>' +
+      '<div class="panel"><h3>Staff Performance</h3>' + renderBarChart(r.staffPerformance.map(function (s) { return { label: s.name, value: s.revenue, display: money(s.revenue) }; })) +
+      (r.staffPerformance.length ? '<div style="margin-top:16px">' + renderTable(['Staff', 'Sales', 'Revenue', 'Commission'], r.staffPerformance.map(function (s) { return [esc(s.name), s.salesCount, money(s.revenue), money(s.commission)]; })) + '</div>' : '') +
+      '</div>';
   }).catch(function (err) { document.getElementById('reportHost').innerHTML = errorPanel(err); });
 }
 function exportCsv(type) {
@@ -1260,29 +1823,69 @@ function renderReviewsAdmin(content) {
   content.innerHTML = '<div class="panel"><h3>Customer Reviews</h3><div id="revTableHost"></div></div>';
   api('getReviews', STATE.token).then(function (rows) {
     document.getElementById('revTableHost').innerHTML = renderTable(['Date', 'Customer', 'Staff', 'Rating', 'Comment'], rows.map(function (r) {
-      return [String(r.Date).slice(0, 10), esc(r.CustomerName), esc(r.StaffName), '★'.repeat(r.Rating), esc(r.Comment)];
+      return [String(r.Date).slice(0, 10), esc(r.CustomerName), esc(r.StaffName), starRow(r.Rating, 13), esc(r.Comment)];
     }));
   }).catch(function (err) { document.getElementById('revTableHost').innerHTML = errorPanel(err); });
 }
 
+/* ---------- GALLERY ADMIN ---------- */
+function renderGalleryAdmin(content) {
+  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Gallery</h3><button class="btn btn-sm" onclick="openGalleryModal()">' + icon('plus', 14) + ' Add Photo</button></div><div id="galleryTableHost"></div></div>';
+  loadGalleryTable();
+}
+function loadGalleryTable() {
+  api('getGallery', STATE.token).then(function (rows) {
+    document.getElementById('galleryTableHost').innerHTML = renderTable(['Preview', 'Caption', 'Category', 'Order', 'Active', 'Actions'], rows.map(function (g) {
+      return ['<img src="' + esc(g.ImageURL) + '" style="width:80px;height:50px;object-fit:cover;border-radius:6px">', esc(g.Caption), esc(g.Category), g.SortOrder, g.Active,
+        '<div class="row-actions"><button class="btn btn-sm btn-outline" onclick=\'openGalleryModal(' + JSON.stringify(g).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button> <button class="btn btn-sm btn-danger" onclick="deleteGalleryRow(\'' + g.GalleryID + '\')">' + icon('trash', 13) + '</button></div>'];
+    }));
+  }).catch(function (err) { document.getElementById('galleryTableHost').innerHTML = errorPanel(err); });
+}
+function openGalleryModal(g) {
+  g = g || {};
+  var branchOpts = '<option value="">All Branches</option>' + STATE.branches.map(function (b) { return '<option value="' + b.BranchID + '"' + (g.BranchID === b.BranchID ? ' selected' : '') + '>' + esc(b.Name) + '</option>'; }).join('');
+  var html = '<div class="field-grid">' +
+    '<div style="grid-column:1/-1">' + photoPickerHtml('gal', g.ImageURL) + '</div>' +
+    '<div><label>Caption</label><input id="galCaption" value="' + esc(g.Caption || '') + '"></div>' +
+    '<div><label>Category</label><input id="galCategory" value="' + esc(g.Category || '') + '" placeholder="Haircuts, Braids…"></div>' +
+    '<div><label>Branch</label><select id="galBranch">' + branchOpts + '</select></div>' +
+    '<div><label>Sort Order</label><input type="number" id="galOrder" value="' + (g.SortOrder || 1) + '"></div>' +
+    '<div><label>Active</label><select id="galActive">' + ['Y', 'N'].map(function (a) { return '<option' + (g.Active === a ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select></div>' +
+    '</div>';
+  openModal(g.GalleryID ? 'Edit Photo' : 'Add Photo', html, function () {
+    resolvePhotoPicker('gal', function (url) {
+      if (!url) { toast('Please choose an image', 'error'); return; }
+      api('saveGalleryItem', STATE.token, {
+        GalleryID: g.GalleryID || '', ImageURL: url, Caption: document.getElementById('galCaption').value,
+        Category: document.getElementById('galCategory').value, BranchID: document.getElementById('galBranch').value,
+        SortOrder: document.getElementById('galOrder').value, Active: document.getElementById('galActive').value
+      }).then(function () { toast('Photo saved', 'success'); closeModal(); loadGalleryTable(); }).catch(showError);
+    });
+  }, 'Save');
+  bindPhotoPicker('gal');
+}
+function deleteGalleryRow(id) {
+  if (!confirm('Delete this photo?')) return;
+  api('deleteGalleryItem', STATE.token, id).then(function () { toast('Deleted', 'success'); loadGalleryTable(); }).catch(showError);
+}
+
 /* ---------- HERO CAROUSEL ADMIN ---------- */
 function renderHeroAdmin(content) {
-  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Hero Carousel Slides</h3><button class="btn btn-sm" onclick="openSlideModal()">+ Add Slide</button></div><div id="slideTableHost"></div></div>';
+  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Hero Carousel Slides</h3><button class="btn btn-sm" onclick="openSlideModal()">' + icon('plus', 14) + ' Add Slide</button></div><div id="slideTableHost"></div></div>';
   loadSlidesTable();
 }
 function loadSlidesTable() {
   api('getHeroSlides', STATE.token).then(function (rows) {
     document.getElementById('slideTableHost').innerHTML = renderTable(['Preview', 'Title', 'Order', 'Active', 'Actions'], rows.map(function (s) {
       return ['<img src="' + esc(s.ImageURL) + '" style="width:90px;height:50px;object-fit:cover;border-radius:4px">', esc(s.Title), s.SortOrder, s.Active,
-        '<button class="btn btn-sm btn-outline" onclick=\'openSlideModal(' + JSON.stringify(s).replace(/'/g, '&#39;') + ')\'>Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteSlideRow(\'' + s.SlideID + '\')">Delete</button>'];
+        '<button class="btn btn-sm btn-outline" onclick=\'openSlideModal(' + JSON.stringify(s).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button> <button class="btn btn-sm btn-danger" onclick="deleteSlideRow(\'' + s.SlideID + '\')">' + icon('trash', 13) + '</button>'];
     }));
   }).catch(function (err) { document.getElementById('slideTableHost').innerHTML = errorPanel(err); });
 }
 function openSlideModal(s) {
   s = s || {};
   var html = '<div class="field-grid">' +
-    '<div style="grid-column:1/-1"><label>Image URL</label><input id="slImage" value="' + esc(s.ImageURL || '') + '"></div>' +
-    '<div style="grid-column:1/-1"><label>Or Upload Image</label><input type="file" id="slImageFile" accept="image/*"></div>' +
+    '<div style="grid-column:1/-1">' + photoPickerHtml('sl', s.ImageURL) + '</div>' +
     '<div><label>Title</label><input id="slTitle" value="' + esc(s.Title || '') + '"></div>' +
     '<div><label>Subtitle</label><input id="slSubtitle" value="' + esc(s.Subtitle || '') + '"></div>' +
     '<div><label>Button Text</label><input id="slBtnText" value="' + esc(s.ButtonText || 'Book Now') + '"></div>' +
@@ -1291,30 +1894,20 @@ function openSlideModal(s) {
     '<div><label>Active</label><select id="slActive">' + ['Y', 'N'].map(function (a) { return '<option' + (s.Active === a ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select></div>' +
     '</div>';
   openModal(s.SlideID ? 'Edit Slide' : 'Add Slide', html, function () {
-    var save = function (imgUrl) {
+    resolvePhotoPicker('sl', function (url) {
+      if (!url) { toast('Please choose an image', 'error'); return; }
       api('saveHeroSlide', STATE.token, {
-        SlideID: s.SlideID || '', ImageURL: imgUrl || document.getElementById('slImage').value, Title: document.getElementById('slTitle').value,
+        SlideID: s.SlideID || '', ImageURL: url, Title: document.getElementById('slTitle').value,
         Subtitle: document.getElementById('slSubtitle').value, ButtonText: document.getElementById('slBtnText').value,
         ButtonLink: document.getElementById('slBtnLink').value, SortOrder: document.getElementById('slOrder').value, Active: document.getElementById('slActive').value
       }).then(function () { toast('Slide saved', 'success'); closeModal(); loadSlidesTable(); }).catch(showError);
-    };
-    var file = document.getElementById('slImageFile').files[0];
-    if (file) uploadFileThen(file, save); else save();
+    });
   }, 'Save');
+  bindPhotoPicker('sl');
 }
 function deleteSlideRow(id) {
   if (!confirm('Delete this slide?')) return;
   api('deleteHeroSlide', STATE.token, id).then(function () { toast('Deleted', 'success'); loadSlidesTable(); }).catch(showError);
-}
-
-function uploadFileThen(file, callback) {
-  var reader = new FileReader();
-  reader.onload = function () {
-    api('uploadImage', STATE.token, reader.result, file.name, file.type).then(function (res) {
-      callback(res.url);
-    }).catch(showError);
-  };
-  reader.readAsDataURL(file);
 }
 
 /* ---------- SETTINGS / BRANDING / THEME ---------- */
@@ -1325,8 +1918,7 @@ function renderSettingsAdmin(content) {
       '<div class="panel"><h3>Business Branding</h3><div class="field-grid">' +
       field('Business Name', 'stBusinessName', s.BusinessName) +
       field('Tagline', 'stTagline', s.Tagline) +
-      field('Logo URL', 'stLogoURL', s.LogoURL) +
-      '<div><label>Or Upload Logo</label><input type="file" id="stLogoFile" accept="image/*"></div>' +
+      '<div style="grid-column:1/-1"><label>Logo</label>' + photoPickerHtml('stLogo', s.LogoURL) + '</div>' +
       field('WhatsApp Number (233...)', 'stWhatsAppNumber', s.WhatsAppNumber) +
       field('Contact Phone', 'stContactPhone', s.ContactPhone) +
       field('Contact Email', 'stContactEmail', s.ContactEmail) +
@@ -1340,6 +1932,12 @@ function renderSettingsAdmin(content) {
       colorField('Background Color', 'stBackgroundColor', s.BackgroundColor) +
       colorField('Text Color', 'stTextColor', s.TextColor) +
       '</div><button class="btn btn-sm btn-outline" style="margin-top:10px" onclick="previewTheme()">Preview Theme</button></div>' +
+
+      '<div class="panel"><h3>Booking Availability</h3><div class="field-grid">' +
+      field('Booking Start Hour (24h)', 'stBookingStartHour', s.BookingStartHour) +
+      field('Booking End Hour (24h)', 'stBookingEndHour', s.BookingEndHour) +
+      field('Slot Interval (minutes)', 'stSlotIntervalMinutes', s.SlotIntervalMinutes) +
+      '</div></div>' +
 
       '<div class="panel"><h3>Payments & Loyalty</h3><div class="field-grid">' +
       field('Tax Rate (%)', 'stTaxRatePercent', s.TaxRatePercent) +
@@ -1356,6 +1954,7 @@ function renderSettingsAdmin(content) {
       '</div><p class="muted">"Simulate" logs messages to the Notifications sheet without sending — useful for testing before you have SMS gateway credentials.</p></div>' +
 
       '<button class="btn btn-accent" onclick="saveAllSettings()">Save All Settings</button>';
+    bindPhotoPicker('stLogo');
   }).catch(function (err) { content.innerHTML = errorPanel(err); });
 }
 function field(label, id, val) {
@@ -1376,15 +1975,17 @@ function previewTheme() {
   toast('Preview applied — click "Save All Settings" to make it permanent', 'success');
 }
 function saveAllSettings() {
-  var save = function (logoUrl) {
+  resolvePhotoPicker('stLogo', function (logoUrl) {
     var payload = {
       BusinessName: document.getElementById('stBusinessName').value, Tagline: document.getElementById('stTagline').value,
-      LogoURL: logoUrl || document.getElementById('stLogoURL').value, WhatsAppNumber: document.getElementById('stWhatsAppNumber').value,
+      LogoURL: logoUrl, WhatsAppNumber: document.getElementById('stWhatsAppNumber').value,
       ContactPhone: document.getElementById('stContactPhone').value, ContactEmail: document.getElementById('stContactEmail').value,
       MapEmbedURL: document.getElementById('stMapEmbedURL').value,
       PrimaryColor: document.getElementById('stPrimaryColor').value, SecondaryColor: document.getElementById('stSecondaryColor').value,
       AccentColor: document.getElementById('stAccentColor').value, BackgroundColor: document.getElementById('stBackgroundColor').value,
       TextColor: document.getElementById('stTextColor').value,
+      BookingStartHour: document.getElementById('stBookingStartHour').value, BookingEndHour: document.getElementById('stBookingEndHour').value,
+      SlotIntervalMinutes: document.getElementById('stSlotIntervalMinutes').value,
       TaxRatePercent: document.getElementById('stTaxRatePercent').value, LoyaltyPointsPerCedi: document.getElementById('stLoyaltyPointsPerCedi').value,
       LoyaltyRedeemRate: document.getElementById('stLoyaltyRedeemRate').value,
       SmsProvider: document.getElementById('stSmsProvider').value, SmsSenderId: document.getElementById('stSmsSenderId').value,
@@ -1394,21 +1995,19 @@ function saveAllSettings() {
     api('updateSettings', STATE.token, payload).then(function (s) {
       STATE.settings = s; applyTheme(s); toast('Settings saved', 'success');
     }).catch(showError);
-  };
-  var file = document.getElementById('stLogoFile').files[0];
-  if (file) uploadFileThen(file, save); else save();
+  });
 }
 
 /* ---------- USERS ---------- */
 function renderUsersAdmin(content) {
-  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>System Users</h3><button class="btn btn-sm" onclick="openUserModal()">+ Add User</button></div><div id="userTableHost"></div></div>';
+  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>System Users</h3><button class="btn btn-sm" onclick="openUserModal()">' + icon('plus', 14) + ' Add User</button></div><div id="userTableHost"></div></div>';
   loadUsersTable();
 }
 function loadUsersTable() {
   api('getUsers', STATE.token).then(function (rows) {
     document.getElementById('userTableHost').innerHTML = renderTable(['Username', 'Role', 'Branch', 'Active', 'Actions'], rows.map(function (u) {
       return [esc(u.Username), esc(u.Role), esc(u.BranchID), u.Active,
-        '<button class="btn btn-sm btn-outline" onclick=\'openUserModal(' + JSON.stringify(u).replace(/'/g, '&#39;') + ')\'>Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteUserRow(\'' + u.Username + '\')">Delete</button>'];
+        '<button class="btn btn-sm btn-outline" onclick=\'openUserModal(' + JSON.stringify(u).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button> <button class="btn btn-sm btn-danger" onclick="deleteUserRow(\'' + u.Username + '\')">' + icon('trash', 13) + '</button>'];
     }));
   }).catch(function (err) { document.getElementById('userTableHost').innerHTML = errorPanel(err); });
 }
@@ -1455,7 +2054,7 @@ function changePw() {
  * ===================================================================*/
 function openModal(title, bodyHtml, onSave, saveLabel) {
   var host = document.getElementById('modalHost');
-  host.innerHTML = '<div class="modal-backdrop" id="modalBackdrop"><div class="modal-box"><button class="modal-close" onclick="closeModal()">✕</button><h3>' + esc(title) + '</h3><div id="modalBody">' + bodyHtml + '</div>' +
+  host.innerHTML = '<div class="modal-backdrop" id="modalBackdrop"><div class="modal-box"><button class="modal-close" onclick="closeModal()">' + icon('close', 18) + '</button><h3>' + esc(title) + '</h3><div id="modalBody">' + bodyHtml + '</div>' +
     (onSave ? '<div style="margin-top:16px;display:flex;gap:8px;"><button class="btn btn-accent" id="modalSaveBtn">' + (saveLabel || 'Save') + '</button><button class="btn btn-outline" onclick="closeModal()">Cancel</button></div>' : '') +
     '</div></div>';
   if (onSave) document.getElementById('modalSaveBtn').addEventListener('click', onSave);

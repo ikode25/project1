@@ -47,7 +47,7 @@ var UPLOAD_FOLDER_NAME = 'SalonSystem_Uploads';
 var SCHEMA = {
   Branches:      ['BranchID', 'Name', 'Location', 'Phone', 'OpeningHours'],
   Services:      ['ServiceID', 'Name', 'Category', 'Description', 'DurationMinutes', 'Price', 'BranchID', 'Active'],
-  Staff:         ['StaffID', 'Name', 'Role', 'BranchID', 'Phone', 'Specialties', 'PhotoURL', 'Active', 'CommissionRate'],
+  Staff:         ['StaffID', 'Name', 'Role', 'BranchID', 'Phone', 'Specialties', 'PhotoURL', 'Active', 'CommissionRate', 'WorkDays'],
   Customers:     ['CustomerID', 'Name', 'Phone', 'Email', 'DateJoined', 'LoyaltyPoints', 'Notes'],
   Appointments:  ['AppointmentID', 'Reference', 'CustomerID', 'StaffID', 'ServiceID', 'BranchID', 'Date', 'TimeSlot', 'Status', 'CreatedAt', 'Notes'],
   Sales:         ['SaleID', 'Date', 'BranchID', 'CustomerID', 'StaffID', 'Items', 'Subtotal', 'Discount', 'Tax', 'Total', 'PaymentMethod', 'PaymentStatus'],
@@ -57,12 +57,13 @@ var SCHEMA = {
   Reviews:       ['ReviewID', 'CustomerID', 'StaffID', 'Rating', 'Comment', 'Date'],
   Settings:      ['Key', 'Value'],
   HeroSlides:    ['SlideID', 'ImageURL', 'Title', 'Subtitle', 'ButtonText', 'ButtonLink', 'SortOrder', 'Active'],
+  Gallery:       ['GalleryID', 'ImageURL', 'Caption', 'Category', 'BranchID', 'SortOrder', 'Active'],
   Notifications: ['NotificationID', 'Type', 'Recipient', 'Message', 'Status', 'Date']
 };
 
 var ID_PREFIX = {
   Branches: 'BR', Services: 'SV', Staff: 'ST', Customers: 'CU', Appointments: 'AP',
-  Sales: 'SL', Products: 'PR', Expenses: 'EX', Reviews: 'RV', HeroSlides: 'HS', Notifications: 'NT'
+  Sales: 'SL', Products: 'PR', Expenses: 'EX', Reviews: 'RV', HeroSlides: 'HS', Gallery: 'GL', Notifications: 'NT'
 };
 
 var ROLES = ['Owner', 'Manager', 'Staff', 'Receptionist'];
@@ -89,7 +90,10 @@ var DEFAULT_SETTINGS = {
   SmsSenderId: 'SALON',
   HubtelClientId: '',
   HubtelClientSecret: '',
-  Currency: 'GH₵'
+  Currency: 'GH₵',
+  BookingStartHour: '9',
+  BookingEndHour: '18',
+  SlotIntervalMinutes: '30'
 };
 
 /* ============================================================================
@@ -191,19 +195,20 @@ function seedIfEmpty_() {
     });
   }
 
-  // Staff
+  // Staff — WorkDays is a comma-separated list of weekday abbreviations (Mon..Sun)
+  // used to drive stylist availability in the public booking wizard.
   if (readAll_('Staff').length === 0) {
     var staff = [
-      ['Kwame Mensah', 'Barber', 'BR-0001', '0244001122', 'Fades, Lineups', 'Y', 10],
-      ['Kofi Asante', 'Barber', 'BR-0001', '0244002233', 'Braids, Shaves', 'Y', 10],
-      ['Ama Owusu', 'Stylist', 'BR-0002', '0244003344', 'Manicure, Pedicure', 'Y', 12],
-      ['Efua Boateng', 'Stylist', 'BR-0002', '0244004455', 'Facials, Skincare', 'Y', 12],
-      ['Yaw Darko', 'Manager', 'BR-0001', '0244005566', 'Operations', 'Y', 5]
+      ['Kwame Mensah', 'Barber', 'BR-0001', '0244001122', 'Fades, Lineups', 'Y', 10, 'Mon,Tue,Wed,Thu,Fri,Sat'],
+      ['Kofi Asante', 'Barber', 'BR-0001', '0244002233', 'Braids, Shaves', 'Y', 10, 'Mon,Wed,Thu,Fri,Sat'],
+      ['Ama Owusu', 'Stylist', 'BR-0002', '0244003344', 'Manicure, Pedicure', 'Y', 12, 'Mon,Tue,Thu,Fri,Sat'],
+      ['Efua Boateng', 'Stylist', 'BR-0002', '0244004455', 'Facials, Skincare', 'Y', 12, 'Tue,Wed,Fri,Sat,Sun'],
+      ['Yaw Darko', 'Manager', 'BR-0001', '0244005566', 'Operations', 'Y', 5, 'Mon,Tue,Wed,Thu,Fri']
     ];
     staff.forEach(function (s, i) {
       appendRow_('Staff', {
         StaffID: 'ST-' + String(i + 1).padStart(4, '0'), Name: s[0], Role: s[1], BranchID: s[2], Phone: s[3],
-        Specialties: s[4], PhotoURL: '', Active: s[5], CommissionRate: s[6]
+        Specialties: s[4], PhotoURL: '', Active: s[5], CommissionRate: s[6], WorkDays: s[7]
       });
     });
   }
@@ -228,6 +233,59 @@ function seedIfEmpty_() {
   if (readAll_('HeroSlides').length === 0) {
     appendRow_('HeroSlides', { SlideID: 'HS-0001', ImageURL: 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?q=80&w=1600&auto=format&fit=crop', Title: 'Sharp Fades. Fresh Styles.', Subtitle: 'Book your next cut at Ghana\'s top-rated barbershop.', ButtonText: 'Book Now', ButtonLink: '#booking', SortOrder: 1, Active: 'Y' });
     appendRow_('HeroSlides', { SlideID: 'HS-0002', ImageURL: 'https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?q=80&w=1600&auto=format&fit=crop', Title: 'Braids, Facials & More', Subtitle: 'Full-service salon care across two branches.', ButtonText: 'View Services', ButtonLink: '#services', SortOrder: 2, Active: 'Y' });
+  }
+
+  // Gallery — showcase work samples on the public site (admin-manageable)
+  if (readAll_('Gallery').length === 0) {
+    var gallery = [
+      ['https://images.unsplash.com/photo-1599351431202-1e0f0137899a?q=80&w=1000&auto=format&fit=crop', 'Precision skin fade', 'Haircuts', 'BR-0001'],
+      ['https://images.unsplash.com/photo-1622286346003-c5c7e63ff123?q=80&w=1000&auto=format&fit=crop', 'Clean beard sculpting', 'Shaves', 'BR-0001'],
+      ['https://images.unsplash.com/photo-1519345182560-3f2917c472ef?q=80&w=1000&auto=format&fit=crop', 'Box braids finished look', 'Braids', 'BR-0001'],
+      ['https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=1000&auto=format&fit=crop', 'Fresh manicure set', 'Manicure', 'BR-0002'],
+      ['https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?q=80&w=1000&auto=format&fit=crop', 'Glow facial treatment', 'Facials', 'BR-0002'],
+      ['https://images.unsplash.com/photo-1580618672591-eb180b1a973f?q=80&w=1000&auto=format&fit=crop', 'Our Osu branch interior', 'Our Shop', 'BR-0001']
+    ];
+    gallery.forEach(function (g, i) {
+      appendRow_('Gallery', {
+        GalleryID: 'GL-' + String(i + 1).padStart(4, '0'), ImageURL: g[0], Caption: g[1], Category: g[2],
+        BranchID: g[3], SortOrder: i + 1, Active: 'Y'
+      });
+    });
+  }
+
+  // Sample customers + reviews, so the site looks credible on first launch.
+  if (readAll_('Customers').length === 0) {
+    var sampleCustomers = [
+      ['Nana Adjei', '0244112233', 'nana.adjei@gmail.com'],
+      ['Abena Serwaa', '0201223344', 'abena.serwaa@gmail.com'],
+      ['Kojo Antwi', '0554334455', ''],
+      ['Linda Owusu', '0271445566', 'linda.owusu@gmail.com'],
+      ['Emmanuel Tetteh', '0501556677', '']
+    ];
+    sampleCustomers.forEach(function (c, i) {
+      appendRow_('Customers', {
+        CustomerID: 'CU-' + String(i + 1).padStart(4, '0'), Name: c[0], Phone: c[1], Email: c[2],
+        DateJoined: nowIso_(), LoyaltyPoints: [120, 45, 300, 80, 15][i], Notes: ''
+      });
+    });
+  }
+  if (readAll_('Reviews').length === 0) {
+    var sampleReviews = [
+      ['CU-0001', 'ST-0001', 5, 'Kwame gave me the cleanest skin fade I\'ve had in Accra. Sharp lineup, no wait time. My go-to spot now!'],
+      ['CU-0002', 'ST-0003', 5, 'Ama\'s manicure lasted almost three weeks. The salon is spotless and the staff are so friendly.'],
+      ['CU-0003', 'ST-0002', 4, 'Great braids work from Kofi, took a bit longer than expected but the result was worth it.'],
+      ['CU-0004', 'ST-0004', 5, 'Efua\'s facial treatment left my skin glowing for my sister\'s wedding. Highly recommend booking ahead.'],
+      ['CU-0005', 'ST-0001', 5, 'Booked online in two minutes and got an SMS confirmation right away. Very professional service.'],
+      ['CU-0001', 'ST-0005', 5, 'Yaw runs a tight ship — the East Legon branch is always on time and the loyalty points are a nice touch.'],
+      ['CU-0002', 'ST-0001', 5, 'Been coming here for a year. Consistent quality every single time, never disappointed.'],
+      ['CU-0003', 'ST-0003', 4, 'Lovely pedicure experience, will definitely be back before my next event.']
+    ];
+    sampleReviews.forEach(function (r, i) {
+      appendRow_('Reviews', {
+        ReviewID: 'RV-' + String(i + 1).padStart(4, '0'), CustomerID: r[0], StaffID: r[1], Rating: r[2], Comment: r[3],
+        Date: nowIso_()
+      });
+    });
   }
 
   // Default admin user
@@ -406,7 +464,18 @@ function getPublicData() {
   var heroSlides = readAll_('HeroSlides')
     .filter(function (h) { return String(h.Active).toUpperCase() === 'Y'; })
     .sort(function (a, b) { return Number(a.SortOrder) - Number(b.SortOrder); });
-  var reviews = readAll_('Reviews').slice(-12).reverse();
+  var gallery = readAll_('Gallery')
+    .filter(function (g) { return String(g.Active).toUpperCase() === 'Y'; })
+    .sort(function (a, b) { return Number(a.SortOrder) - Number(b.SortOrder); });
+  var reviewRows = readAll_('Reviews');
+  var customersMap = keyBy_(readAll_('Customers'), 'CustomerID');
+  var staffMapForReviews = keyBy_(readAll_('Staff'), 'StaffID');
+  var reviews = reviewRows.slice(-16).reverse().map(function (r) {
+    var o = stripRow_(r);
+    o.CustomerName = customersMap[r.CustomerID] ? firstNameOnly_(customersMap[r.CustomerID].Name) : 'Customer';
+    o.StaffName = staffMapForReviews[r.StaffID] ? staffMapForReviews[r.StaffID].Name : '';
+    return o;
+  });
 
   return {
     settings: settings,
@@ -414,12 +483,18 @@ function getPublicData() {
     services: services.map(stripRow_),
     staff: staff.map(function (s) { return stripRow_(sanitizeStaff_(s)); }),
     heroSlides: heroSlides.map(stripRow_),
-    reviews: reviews.map(stripRow_)
+    gallery: gallery.map(stripRow_),
+    reviews: reviews
   };
 }
 
 function sanitizeStaff_(s) {
-  return { StaffID: s.StaffID, Name: s.Name, Role: s.Role, BranchID: s.BranchID, Specialties: s.Specialties, PhotoURL: s.PhotoURL };
+  return { StaffID: s.StaffID, Name: s.Name, Role: s.Role, BranchID: s.BranchID, Specialties: s.Specialties, PhotoURL: s.PhotoURL, WorkDays: s.WorkDays, Active: s.Active };
+}
+
+function firstNameOnly_(fullName) {
+  var parts = String(fullName || '').trim().split(/\s+/);
+  return parts[0] + (parts[1] ? ' ' + parts[1].charAt(0) + '.' : '');
 }
 
 function stripRow_(obj) {
@@ -461,6 +536,10 @@ function createAppointment(data) {
     if (!staffMember || String(staffMember.Active).toUpperCase() !== 'Y') throw new Error('The selected staff member is not available.');
   }
 
+  if (!isSlotAvailable_(branchId, staffId, date, timeSlot)) {
+    throw new Error('Sorry, that time slot was just taken. Please go back and choose another time.');
+  }
+
   // Find or create the customer by phone number
   var customer = findOrCreateCustomerByPhone_(name, phone, email);
 
@@ -494,15 +573,100 @@ function submitReview(data) {
   data = data || {};
   var rating = Number(data.rating);
   if (!rating || rating < 1 || rating > 5) throw new Error('Please provide a rating between 1 and 5.');
+  var customerId = data.customerId || '';
+  if (!customerId && data.name && data.phone) {
+    var phone = normalizeGhanaPhone_(data.phone);
+    if (phone) customerId = findOrCreateCustomerByPhone_(data.name, phone, '').CustomerID;
+  }
   var review = appendRow_('Reviews', {
     ReviewID: nextId_('Reviews', 'ReviewID'),
-    CustomerID: data.customerId || '',
+    CustomerID: customerId,
     StaffID: data.staffId || '',
     Rating: rating,
     Comment: String(data.comment || '').trim(),
     Date: nowIso_()
   });
   return stripRow_(review);
+}
+
+/**
+ * Returns bookable time slots for a branch/date, optionally scoped to one
+ * stylist ("Anyone" when staffId is ''). Used by the public booking wizard
+ * to render a live availability grid, and defensively by createAppointment()
+ * to prevent double-booking.
+ */
+function getAvailableSlots(branchId, staffId, date) {
+  if (!branchId || !date) return { slots: [], dayAvailable: true };
+  var settings = getSettingsMap_();
+  var startHour = Number(settings.BookingStartHour) || 9;
+  var endHour = Number(settings.BookingEndHour) || 18;
+  var interval = Number(settings.SlotIntervalMinutes) || 30;
+
+  var branchStaff = readAll_('Staff').filter(function (s) {
+    return s.BranchID === branchId && String(s.Active).toUpperCase() === 'Y';
+  });
+  var weekday = Utilities.formatDate(new Date(date + 'T00:00:00'), TIMEZONE, 'EEE');
+
+  var dayAvailable = true;
+  var candidateStaff = branchStaff;
+  if (staffId) {
+    var chosen = branchStaff.find(function (s) { return s.StaffID === staffId; });
+    if (!chosen) return { slots: [], dayAvailable: false };
+    dayAvailable = worksOnDay_(chosen, weekday);
+    candidateStaff = [chosen];
+  } else {
+    dayAvailable = branchStaff.some(function (s) { return worksOnDay_(s, weekday); });
+  }
+
+  var existing = readAll_('Appointments').filter(function (a) {
+    return a.BranchID === branchId && a.Date === date && a.Status !== 'Cancelled' && a.Status !== 'No-show';
+  });
+
+  var slots = [];
+  for (var mins = startHour * 60; mins < endHour * 60; mins += interval) {
+    var h = Math.floor(mins / 60), m = mins % 60;
+    var label = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+    var available = dayAvailable && candidateStaff.some(function (s) {
+      if (!worksOnDay_(s, weekday)) return false;
+      return !existing.some(function (a) { return a.StaffID === s.StaffID && a.TimeSlot === label; });
+    });
+    slots.push({ time: label, available: available });
+  }
+  return { slots: slots, dayAvailable: dayAvailable };
+}
+
+function worksOnDay_(staffMember, weekday) {
+  var days = String(staffMember.WorkDays || '').split(',').map(function (d) { return d.trim(); }).filter(Boolean);
+  return days.length === 0 || days.indexOf(weekday) > -1;
+}
+
+function isSlotAvailable_(branchId, staffId, date, timeSlot) {
+  var result = getAvailableSlots(branchId, staffId, date);
+  var slot = result.slots.find(function (s) { return s.time === timeSlot; });
+  return !slot || slot.available; // an off-grid custom time is not blocked
+}
+
+/* ---------- Gallery (public showcase + admin management) ---------- */
+
+function getGallery(token) {
+  requireAuth_(token);
+  return readAll_('Gallery').sort(function (a, b) { return Number(a.SortOrder) - Number(b.SortOrder); }).map(stripRow_);
+}
+
+function saveGalleryItem(token, item) {
+  var user = requireAuth_(token);
+  requireRole_(user, ['Owner', 'Manager']);
+  item.SortOrder = Number(item.SortOrder) || 1;
+  item.Active = item.Active === 'N' ? 'N' : 'Y';
+  if (item.GalleryID) return stripRow_(updateById_('Gallery', 'GalleryID', item.GalleryID, item));
+  item.GalleryID = nextId_('Gallery', 'GalleryID');
+  return stripRow_(appendRow_('Gallery', item));
+}
+
+function deleteGalleryItem(token, galleryId) {
+  var user = requireAuth_(token);
+  requireRole_(user, ['Owner', 'Manager']);
+  return deleteById_('Gallery', 'GalleryID', galleryId);
 }
 
 /* ============================================================================
