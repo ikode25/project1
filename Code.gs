@@ -1305,16 +1305,23 @@ function getOrCreateSubFolder(parentFolder, name) {
 }
 
 function uploadBrandAsset(base64Data, fileName, mimeType, subfolder) {
+  let stage = 'starting';
   try {
     if (!base64Data || !fileName) {
       return { success: false, message: 'No image data provided' };
     }
 
+    stage = 'accessing the Drive ASSETS folder';
     const assetsFolder = getOrCreateAssetsFolder();
     const folder = subfolder ? getOrCreateSubFolder(assetsFolder, subfolder) : assetsFolder;
 
+    stage = 'decoding the image data';
     const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), mimeType, fileName);
+
+    stage = 'creating the file in Drive';
     const file = folder.createFile(blob);
+
+    stage = 'setting file sharing permissions';
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
     const fileId = file.getId();
@@ -1322,8 +1329,9 @@ function uploadBrandAsset(base64Data, fileName, mimeType, subfolder) {
 
     return { success: true, fileId: fileId, fileName: fileName, viewUrl: viewUrl, driveUrl: file.getUrl() };
   } catch (e) {
-    Logger.log('Error in uploadBrandAsset: ' + e.toString());
-    return { success: false, message: 'Error uploading image: ' + e.toString() };
+    const detail = 'Failed while ' + stage + ': ' + (e && e.message ? e.message : e);
+    Logger.log('Error in uploadBrandAsset: ' + detail);
+    return { success: false, message: detail };
   }
 }
 
@@ -1331,14 +1339,30 @@ function uploadBrandAsset(base64Data, fileName, mimeType, subfolder) {
  * SETTINGS - HOTEL BRANDING, SMS & PUBLIC PAGE CONFIG
  ***************************************************/
 function getOrCreateSettingsSheet() {
-  const ss = SpreadsheetApp.openById(SS_ID);
-  let sheet = ss.getSheetByName(SETTINGS_SHEET_NAME);
+  let ss;
+  try {
+    ss = SpreadsheetApp.openById(SS_ID);
+  } catch (e) {
+    throw new Error('Could not open the spreadsheet (SS_ID=' + SS_ID + '): ' + e.toString());
+  }
+
+  let sheet;
+  try {
+    sheet = ss.getSheetByName(SETTINGS_SHEET_NAME);
+  } catch (e) {
+    throw new Error('Could not look up the Settings sheet: ' + e.toString());
+  }
+
   if (!sheet) {
-    sheet = ss.insertSheet(SETTINGS_SHEET_NAME);
-    sheet.appendRow(['Key', 'Value']);
-    sheet.getRange(1, 1, 1, 2).setFontWeight('bold').setBackground('#001f3f').setFontColor('white');
-    sheet.setColumnWidth(1, 220);
-    sheet.setColumnWidth(2, 500);
+    try {
+      sheet = ss.insertSheet(SETTINGS_SHEET_NAME);
+      sheet.appendRow(['Key', 'Value']);
+      sheet.getRange(1, 1, 1, 2).setFontWeight('bold').setBackground('#001f3f').setFontColor('white');
+      sheet.setColumnWidth(1, 220);
+      sheet.setColumnWidth(2, 500);
+    } catch (e) {
+      throw new Error('Could not create the Settings sheet (check the deploying account has edit access to the spreadsheet): ' + e.toString());
+    }
   }
   return sheet;
 }
@@ -1411,11 +1435,17 @@ function migrateLegacyDriveUrls(settings) {
  * Returns the freshly merged settings object.
  */
 function saveSettings(partialSettings) {
+  // Each stage is caught separately so a failure always reports exactly
+  // which step broke, instead of a generic/empty message.
+  let stage = 'starting';
   try {
     const keys = Object.keys(partialSettings || {});
     if (keys.length === 0) return { success: true, message: 'Nothing to save', settings: getSettings() };
 
+    stage = 'opening the Settings sheet';
     const sheet = getOrCreateSettingsSheet();
+
+    stage = 'reading existing settings rows';
     const lastRow = sheet.getLastRow();
     const data = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
     const rowByKey = {};
@@ -1425,26 +1455,39 @@ function saveSettings(partialSettings) {
     // appendRow() call per key - keeps a first-time save (30+ keys) to ~1-2
     // Sheets API calls instead of dozens, which is both faster and avoids
     // hitting per-second write quotas.
+    stage = 'encoding values';
     const newRows = [];
+    const updates = [];
     keys.forEach(key => {
       const encoded = encodeSettingValue(key, partialSettings[key]);
       if (rowByKey[key]) {
-        sheet.getRange(rowByKey[key], SETTINGS_VALUE_COL + 1).setValue(encoded);
+        updates.push([rowByKey[key], encoded]);
       } else {
         newRows.push([key, encoded]);
       }
     });
+
+    stage = 'updating existing rows';
+    updates.forEach(([rowNum, encoded]) => {
+      sheet.getRange(rowNum, SETTINGS_VALUE_COL + 1).setValue(encoded);
+    });
+
     if (newRows.length > 0) {
+      stage = 'appending new setting rows';
       sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, 2).setValues(newRows);
     }
 
     try { logActivity('admin', 'SETTINGS_UPDATED', 'Keys: ' + keys.join(', ')); }
     catch (logErr) { Logger.log('saveSettings: activity log failed (non-fatal): ' + logErr.toString()); }
 
-    return { success: true, message: 'Settings saved successfully', settings: getSettings() };
+    stage = 'reloading merged settings';
+    const merged = getSettings();
+
+    return { success: true, message: 'Settings saved successfully', settings: merged };
   } catch (e) {
-    Logger.log('Error in saveSettings: ' + e.toString());
-    return { success: false, message: 'Error saving settings: ' + e.toString() };
+    const detail = 'Failed while ' + stage + ': ' + (e && e.message ? e.message : e);
+    Logger.log('Error in saveSettings: ' + detail);
+    return { success: false, message: detail };
   }
 }
 

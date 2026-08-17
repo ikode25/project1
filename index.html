@@ -11788,7 +11788,7 @@
             Swal.fire({ icon: 'success', text: 'Settings saved', timer: 1500, showConfirmButton: false });
             refreshSettings();
           } else {
-            Swal.fire({ icon: 'error', title: 'Save failed', text: (res && res.message) || 'Unknown error' });
+            console.error('saveSettings returned:', res); Swal.fire({ icon: 'error', title: 'Save failed', text: (res && res.message) || 'Unknown error (see browser console for the raw response)' });
           }
         }, (err) => {
           setSaving(false);
@@ -11806,7 +11806,7 @@
           callAppsScript('saveLogo', [b64.data, b64.name, b64.mime], (res) => {
             setUploadingLogo(false);
             if (res && res.success) { Swal.fire({ icon: 'success', text: 'Logo updated', timer: 1500, showConfirmButton: false }); refreshSettings(); }
-            else Swal.fire({ icon: 'error', title: 'Upload failed', text: (res && res.message) || 'Unknown error' });
+            else { console.error('saveLogo returned:', res); Swal.fire({ icon: 'error', title: 'Upload failed', text: (res && res.message) || 'Unknown error (see browser console for the raw response)' }); }
           }, (err) => {
             setUploadingLogo(false);
             Swal.fire({ icon: 'error', title: 'Upload failed', text: err.message });
@@ -11827,7 +11827,7 @@
           callAppsScript('saveAboutImage', [b64.data, b64.name, b64.mime], (res) => {
             setUploadingAbout(false);
             if (res && res.success) { Swal.fire({ icon: 'success', text: 'About photo updated', timer: 1500, showConfirmButton: false }); refreshSettings(); }
-            else Swal.fire({ icon: 'error', title: 'Upload failed', text: (res && res.message) || 'Unknown error' });
+            else { console.error('saveAboutImage returned:', res); Swal.fire({ icon: 'error', title: 'Upload failed', text: (res && res.message) || 'Unknown error (see browser console for the raw response)' }); }
           }, (err) => {
             setUploadingAbout(false);
             Swal.fire({ icon: 'error', title: 'Upload failed', text: err.message });
@@ -11843,16 +11843,29 @@
         if (files.length === 0) return;
         setUploadingHero(true);
         let failures = 0;
+        let lastErrorMessage = '';
         try {
           for (const file of files) {
             if (file.size > 5 * 1024 * 1024) continue; // skip oversized silently, keep uploading the rest
             const b64 = await fileToBase64(file);
             await new Promise((resolve) => {
-              callAppsScript('addHeroImage', [b64.data, b64.name, b64.mime], resolve, (err) => { failures++; console.error('addHeroImage failed:', err); resolve(null); });
+              callAppsScript('addHeroImage', [b64.data, b64.name, b64.mime], (res) => {
+                if (!res || !res.success) {
+                  failures++;
+                  lastErrorMessage = (res && res.message) || 'Unknown error';
+                  console.error('addHeroImage returned:', res);
+                }
+                resolve(res);
+              }, (err) => {
+                failures++;
+                lastErrorMessage = err.message;
+                console.error('addHeroImage failed:', err);
+                resolve(null);
+              });
             });
           }
           refreshSettings();
-          if (failures > 0) Swal.fire({ icon: 'warning', text: `${failures} image(s) failed to upload. Check your browser console for details.` });
+          if (failures > 0) Swal.fire({ icon: 'error', title: `${failures} image(s) failed to upload`, text: lastErrorMessage + ' (see browser console for full details)' });
         } finally {
           setUploadingHero(false);
           e.target.value = '';
@@ -11864,7 +11877,7 @@
           if (!result.isConfirmed) return;
           callAppsScript('deleteHeroImage', [fileId], (res) => {
             if (res && res.success) refreshSettings();
-            else Swal.fire({ icon: 'error', title: 'Remove failed', text: (res && res.message) || 'Unknown error' });
+            else { console.error('deleteHeroImage returned:', res); Swal.fire({ icon: 'error', title: 'Remove failed', text: (res && res.message) || 'Unknown error (see browser console)' }); }
           }, (err) => Swal.fire({ icon: 'error', title: 'Remove failed', text: err.message }));
         });
       };
