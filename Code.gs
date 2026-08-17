@@ -43,6 +43,7 @@ const ROOM_RATE_COL        = 2;
 const ROOM_STATUS_COL      = 3;
 const ROOM_DND_COL         = 4;  // Do Not Disturb
 const ROOM_IMAGE_COL       = 5;  // Room Image URL
+const ROOM_AMENITIES_COL   = 6;  // JSON array of amenity keys, e.g. ["ac","wifi"]
 
 // BOOKINGS sheet columns (0-based) - Updated with new fields
 const TICKET_ID_COL        = 0;
@@ -125,11 +126,42 @@ const DEFAULT_SETTINGS = {
   heroAutoplay: true,
   heroIntervalSeconds: 6,
   aboutImageUrl: "",
-  aboutImageFileId: ""
+  aboutImageFileId: "",
+  // Hotel-wide amenities shown on the public "About" section. Admin toggles
+  // these off for anything the property doesn't actually offer.
+  amenities: {
+    wifi: true,
+    restaurant: true,
+    pool: true,
+    gym: true,
+    parking: true,
+    concierge: true
+  }
 };
 
+// Canonical list of per-room amenities admins can toggle for each room
+// (distinct from the hotel-wide `amenities` setting above).
+const ROOM_AMENITY_DEFINITIONS = [
+  { key: 'ac', label: 'Air Conditioning', icon: 'fa-snowflake' },
+  { key: 'fan', label: 'Fan', icon: 'fa-fan' },
+  { key: 'wifi', label: 'WiFi', icon: 'fa-wifi' },
+  { key: 'smarttv', label: 'Smart TV', icon: 'fa-tv' },
+  { key: 'minibar', label: 'Mini Bar', icon: 'fa-glass-martini-alt' },
+  { key: 'jacuzzi', label: 'Jacuzzi', icon: 'fa-hot-tub' }
+];
+
+function parseRoomAmenities(raw) {
+  if (!raw) return [];
+  try {
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch (e) {
+    return [];
+  }
+}
+
 // Keys whose value is JSON (object/array) rather than a plain string/boolean/number
-const SETTINGS_JSON_KEYS = ["heroImages"];
+const SETTINGS_JSON_KEYS = ["heroImages", "amenities"];
 const SETTINGS_BOOLEAN_KEYS = ["smsEnabled", "smsSendOnBooking", "heroAutoplay"];
 const SETTINGS_NUMBER_KEYS = ["heroIntervalSeconds"];
 
@@ -253,7 +285,16 @@ function setupDemoData() {
   // STEP 4: ROOMS SHEET (20 Rooms - Various Status)
   // ============================================
   let roomsSheet = ss.insertSheet(ROOMS_SHEET_NAME);
-  roomsSheet.appendRow(['Room No', 'Type', 'Rate', 'Status', 'DND', 'Image']);
+  roomsSheet.appendRow(['Room No', 'Type', 'Rate', 'Status', 'DND', 'Image', 'Amenities']);
+
+  // Default per-type amenities, used only to seed the demo data - each room's
+  // amenities are independently editable afterwards from Rooms > Edit.
+  const amenitiesByType = {
+    Standard: ['fan', 'wifi'],
+    Deluxe: ['ac', 'wifi', 'smarttv'],
+    Suite: ['ac', 'wifi', 'smarttv', 'minibar'],
+    Executive: ['ac', 'wifi', 'smarttv', 'minibar', 'jacuzzi']
+  };
 
   const roomConfigs = [
     // Floor 1: Standard Rooms (101-105)
@@ -283,11 +324,11 @@ function setupDemoData() {
   ];
 
   roomConfigs.forEach(room => {
-    roomsSheet.appendRow([room.no, room.type, room.rate, room.status, room.dnd, '']);
+    roomsSheet.appendRow([room.no, room.type, room.rate, room.status, room.dnd, '', JSON.stringify(amenitiesByType[room.type] || [])]);
   });
 
-  roomsSheet.getRange(1, 1, 1, 6).setFontWeight('bold').setBackground('#001f3f').setFontColor('white');
-  roomsSheet.setColumnWidths(1, 6, 120);
+  roomsSheet.getRange(1, 1, 1, 7).setFontWeight('bold').setBackground('#001f3f').setFontColor('white');
+  roomsSheet.setColumnWidths(1, 7, 120);
 
   // ============================================
   // STEP 5: BOOKINGS SHEET (15 Bookings - Various Status & Payments)
@@ -1383,7 +1424,7 @@ function decodeSettingValue(key, rawValue) {
 }
 
 function encodeSettingValue(key, value) {
-  if (SETTINGS_JSON_KEYS.indexOf(key) !== -1) return JSON.stringify(value || []);
+  if (SETTINGS_JSON_KEYS.indexOf(key) !== -1) return JSON.stringify(value !== undefined && value !== null ? value : DEFAULT_SETTINGS[key]);
   if (SETTINGS_BOOLEAN_KEYS.indexOf(key) !== -1) return value === true || value === 'true' ? 'true' : 'false';
   return (value === undefined || value === null) ? '' : value.toString();
 }
@@ -2669,7 +2710,7 @@ function getAllRoomsWithStatus() {
     data.forEach(row => {
       let status = (row[ROOM_STATUS_COL] || "Available").toString();
       let imageFileId = (row[ROOM_IMAGE_COL] || "").toString();
-      let imageUrl = imageFileId ? 'https://lh3.google.com/u/0/d/' + imageFileId : '';
+      let imageUrl = imageFileId ? 'https://drive.google.com/thumbnail?id=' + imageFileId + '&sz=w2000' : '';
       allRooms.push({
         roomNo: (row[ROOM_NO_COL] || "").toString(),
         type: (row[ROOM_TYPE_COL] || "").toString(),
@@ -2677,7 +2718,8 @@ function getAllRoomsWithStatus() {
         status: status,
         isAvailable: status.toLowerCase() === "available",
         dnd: (row[ROOM_DND_COL] || "No").toString(),
-        image: imageUrl
+        image: imageUrl,
+        amenities: parseRoomAmenities(row[ROOM_AMENITIES_COL])
       });
     });
     return allRooms;
@@ -2707,6 +2749,7 @@ function getPublicRoomTypes() {
       const imageFileId = (row[ROOM_IMAGE_COL] || "").toString();
       const imageUrl = imageFileId ? 'https://drive.google.com/thumbnail?id=' + imageFileId + '&sz=w2000' : '';
       const status = (row[ROOM_STATUS_COL] || "Available").toString().toLowerCase();
+      const amenities = parseRoomAmenities(row[ROOM_AMENITIES_COL]);
 
       if (!roomTypeMap[type]) {
         roomTypeMap[type] = {
@@ -2716,7 +2759,8 @@ function getPublicRoomTypes() {
           pricePerMonth: Math.round(rate * 30 * 0.8), // 20% discount for monthly
           image: imageUrl,
           totalRooms: 0,
-          availableRooms: 0
+          availableRooms: 0,
+          amenities: null // set below - intersection of every room of this type
         };
       }
 
@@ -2729,10 +2773,16 @@ function getPublicRoomTypes() {
       if (imageUrl && !roomTypeMap[type].image) {
         roomTypeMap[type].image = imageUrl;
       }
+
+      // Only advertise an amenity on the type card if EVERY room of that type
+      // has it - avoids promising guests something a specific room lacks.
+      roomTypeMap[type].amenities = roomTypeMap[type].amenities === null
+        ? amenities
+        : roomTypeMap[type].amenities.filter(a => amenities.indexOf(a) !== -1);
     });
 
     // Convert to array
-    const roomTypes = Object.values(roomTypeMap);
+    const roomTypes = Object.values(roomTypeMap).map(rt => ({ ...rt, amenities: rt.amenities || [] }));
 
     return { success: true, data: roomTypes };
   } catch (e) {
@@ -3318,7 +3368,8 @@ function getAllRooms() {
         roomRate: row[ROOM_RATE_COL],
         roomStatus: row[ROOM_STATUS_COL],
         dnd: row[ROOM_DND_COL] || 'No',
-        image: imageUrl
+        image: imageUrl,
+        amenities: parseRoomAmenities(row[ROOM_AMENITIES_COL])
       });
     }
     return rooms;
@@ -3327,7 +3378,7 @@ function getAllRooms() {
   }
 }
 
-function addRoom(roomNo, roomType, roomRate, roomStatus) {
+function addRoom(roomNo, roomType, roomRate, roomStatus, amenities) {
   try {
     if (!roomNo) {
       return { success: false, message: "Room No is required." };
@@ -3349,7 +3400,8 @@ function addRoom(roomNo, roomType, roomRate, roomStatus) {
       parseFloat(roomRate) || 0,
       (roomStatus || "Available").trim(),
       "No",
-      ""  // Image column - empty by default
+      "", // Image column - empty by default
+      JSON.stringify(Array.isArray(amenities) ? amenities : [])
     ]);
 
     logActivity('Admin', 'ROOM_ADDED', `Room: ${roomNo}, Type: ${roomType}`);
@@ -3359,7 +3411,7 @@ function addRoom(roomNo, roomType, roomRate, roomStatus) {
   }
 }
 
-function updateRoom(rowIndex, roomNo, roomType, roomRate, roomStatus) {
+function updateRoom(rowIndex, roomNo, roomType, roomRate, roomStatus, amenities) {
   try {
     const sheet = SpreadsheetApp.openById(SS_ID).getSheetByName(ROOMS_SHEET_NAME);
     if (rowIndex <= 1) {
@@ -3382,6 +3434,7 @@ function updateRoom(rowIndex, roomNo, roomType, roomRate, roomStatus) {
     if (roomType !== undefined) sheet.getRange(rowIndex, ROOM_TYPE_COL + 1).setValue(roomType);
     if (roomRate !== undefined) sheet.getRange(rowIndex, ROOM_RATE_COL + 1).setValue(parseFloat(roomRate) || 0);
     if (roomStatus !== undefined) sheet.getRange(rowIndex, ROOM_STATUS_COL + 1).setValue(roomStatus);
+    if (amenities !== undefined) sheet.getRange(rowIndex, ROOM_AMENITIES_COL + 1).setValue(JSON.stringify(Array.isArray(amenities) ? amenities : []));
 
     return { success: true, message: "Room updated successfully." };
   } catch (err) {

@@ -2552,6 +2552,38 @@
       .settings-tab-btn { padding: 10px 12px; font-size: 13px; }
       .provider-select-grid { grid-template-columns: repeat(2, 1fr); }
     }
+
+    /* Floating WhatsApp chat button */
+    .whatsapp-float {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: #25D366;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+      z-index: 1000;
+      text-decoration: none;
+      animation: whatsapp-bounce 2.2s ease-in-out infinite;
+      transition: transform 0.2s;
+    }
+    .whatsapp-float:hover { transform: scale(1.08); animation-play-state: paused; }
+    @keyframes whatsapp-bounce {
+      0%, 100% { transform: translateY(0); }
+      10% { transform: translateY(-10px); }
+      20% { transform: translateY(0); }
+      30% { transform: translateY(-5px); }
+      40% { transform: translateY(0); }
+    }
+    @media (max-width: 768px) {
+      .whatsapp-float { width: 50px; height: 50px; font-size: 24px; bottom: 16px; right: 16px; }
+    }
   </style>
 </head>
 <body>
@@ -2575,8 +2607,29 @@
       hubtelClientId: '', hubtelClientSecret: '', hubtelSenderId: '',
       customSmsUrl: '', customSmsMethod: 'POST', customSmsHeaders: '', customSmsBodyTemplate: '',
       heroImages: [], heroAutoplay: true, heroIntervalSeconds: 6,
-      aboutImageUrl: '', aboutImageFileId: ''
+      aboutImageUrl: '', aboutImageFileId: '',
+      amenities: { wifi: true, restaurant: true, pool: true, gym: true, parking: true, concierge: true }
     };
+
+    // Hotel-wide amenities (Settings > General) - shown/hidden on the public About section.
+    const HOTEL_AMENITY_DEFS = [
+      { key: 'wifi', label: 'Free High-Speed WiFi', icon: 'fa-wifi' },
+      { key: 'restaurant', label: 'Fine Dining Restaurant', icon: 'fa-utensils' },
+      { key: 'pool', label: 'Swimming Pool & Spa', icon: 'fa-swimming-pool' },
+      { key: 'gym', label: 'Fitness Center', icon: 'fa-dumbbell' },
+      { key: 'parking', label: 'Free Parking', icon: 'fa-car' },
+      { key: 'concierge', label: '24/7 Concierge', icon: 'fa-concierge-bell' }
+    ];
+
+    // Per-room amenities (Rooms > Add/Edit) - mirrors ROOM_AMENITY_DEFINITIONS in Code.gs.
+    const ROOM_AMENITY_DEFS = [
+      { key: 'ac', label: 'Air Conditioning', icon: 'fa-snowflake' },
+      { key: 'fan', label: 'Fan', icon: 'fa-fan' },
+      { key: 'wifi', label: 'WiFi', icon: 'fa-wifi' },
+      { key: 'smarttv', label: 'Smart TV', icon: 'fa-tv' },
+      { key: 'minibar', label: 'Mini Bar', icon: 'fa-glass-martini-alt' },
+      { key: 'jacuzzi', label: 'Jacuzzi', icon: 'fa-hot-tub' }
+    ];
 
     const SettingsContext = React.createContext({ settings: DEFAULT_CLIENT_SETTINGS, refreshSettings: () => {} });
     const useSettings = () => React.useContext(SettingsContext);
@@ -2684,6 +2737,27 @@
             {desc && <div className="toggle-desc">{desc}</div>}
           </div>
         </div>
+      );
+    }
+
+    // Bouncing floating WhatsApp button for guests to chat the hotel directly.
+    // Renders nothing if no phone number has been configured in Settings yet.
+    function WhatsAppFloatingButton({ settings }) {
+      if (!settings || !settings.phone) return null;
+      const digits = settings.phone.replace(/[^\d]/g, '');
+      if (!digits) return null;
+      const message = encodeURIComponent(`Hello ${settings.hotelName || 'there'}, I'd like to ask about...`);
+      return (
+        <a
+          href={`https://wa.me/${digits}?text=${message}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="whatsapp-float"
+          title="Chat with us on WhatsApp"
+          aria-label="Chat with us on WhatsApp"
+        >
+          <i className="fab fa-whatsapp"></i>
+        </a>
       );
     }
 
@@ -5892,7 +5966,12 @@
 
     function RoomModal({ room, onClose, onSave }) {
       const [formData, setFormData] = useState({ roomNo: room?.roomNo || '', roomType: room?.roomType || '', roomRate: room?.roomRate || '', roomStatus: room?.roomStatus || 'Available' });
+      const [amenities, setAmenities] = useState(room?.amenities || []);
       const [saving, setSaving] = useState(false);
+
+      const toggleAmenity = (key) => {
+        setAmenities(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+      };
 
       const handleSubmit = (e) => {
         e.preventDefault();
@@ -5900,7 +5979,9 @@
         setSaving(true);
 
         const action = room ? 'updateRoom' : 'addRoom';
-        const args = room ? [room.rowIndex, formData.roomNo, formData.roomType, formData.roomRate, formData.roomStatus] : [formData.roomNo, formData.roomType, formData.roomRate, formData.roomStatus];
+        const args = room
+          ? [room.rowIndex, formData.roomNo, formData.roomType, formData.roomRate, formData.roomStatus, amenities]
+          : [formData.roomNo, formData.roomType, formData.roomRate, formData.roomStatus, amenities];
 
         google.script.run
           .withSuccessHandler((res) => { setSaving(false); if (res.success) { Swal.fire({ icon: 'success', text: res.message, timer: 2000 }); onSave(); } else Swal.fire({ icon: 'error', text: res.message }); })
@@ -5918,6 +5999,21 @@
                 <div className="form-group"><label>Room Type</label><input type="text" value={formData.roomType} onChange={(e) => setFormData({...formData, roomType: e.target.value})} placeholder="Standard, Deluxe, Suite" /></div>
                 <div className="form-group"><label>Rate/Night</label><input type="number" step="0.01" value={formData.roomRate} onChange={(e) => setFormData({...formData, roomRate: e.target.value})} /></div>
                 <div className="form-group"><label>Status</label><select value={formData.roomStatus} onChange={(e) => setFormData({...formData, roomStatus: e.target.value})}><option value="Available">Available</option><option value="Booked">Booked</option><option value="Maintenance">Maintenance</option></select></div>
+                <div className="form-group">
+                  <label><i className="fas fa-concierge-bell"></i> Amenities in this room</label>
+                  <p className="settings-hint" style={{margin: '0 0 10px'}}>Only what's checked here is shown to guests for this specific room.</p>
+                  <div className="provider-select-grid">
+                    {ROOM_AMENITY_DEFS.map(a => {
+                      const enabled = amenities.includes(a.key);
+                      return (
+                        <div key={a.key} className={`provider-option ${enabled ? 'active' : ''}`} onClick={() => toggleAmenity(a.key)} style={{padding: '10px 8px'}}>
+                          <i className={`fas ${a.icon}`} style={{fontSize: 18, marginBottom: 4}}></i>
+                          <span style={{fontSize: 12}}>{a.label}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
                 <div className="form-actions">
                   <button type="submit" className="btn btn-primary" disabled={saving}>{saving ? <><i className="fas fa-spinner fa-spin"></i> Saving...</> : <><i className="fas fa-save"></i> Save</>}</button>
                   <button type="button" className="btn btn-secondary" onClick={onClose}><i className="fas fa-times"></i> Cancel</button>
@@ -11996,6 +12092,24 @@
               </div>
             )}
 
+            {activeTab === 'general' && (
+              <div className="settings-card">
+                <h4><i className="fas fa-concierge-bell"></i> Hotel Amenities</h4>
+                <p className="settings-hint">Turn off anything your property doesn't actually offer - only enabled amenities are shown on your public website's About section.</p>
+                <div className="provider-select-grid">
+                  {HOTEL_AMENITY_DEFS.map(a => {
+                    const enabled = !!(form.amenities && form.amenities[a.key]);
+                    return (
+                      <div key={a.key} className={`provider-option ${enabled ? 'active' : ''}`} onClick={() => update({ amenities: { ...(form.amenities || {}), [a.key]: !enabled } })}>
+                        <i className={`fas ${a.icon}`}></i>
+                        <span>{a.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {activeTab === 'branding' && (
               <div className="settings-card">
                 <h4><i className="fas fa-image"></i> Logo</h4>
@@ -12296,6 +12410,7 @@
             </div>
             <MainContent activeMenu={activeMenu} user={user} role={role} />
           </div>
+          {role !== 'admin' && role !== 'FoodStaff' && role !== 'Cleaner' && <WhatsAppFloatingButton settings={settings} />}
         </div>
       );
     }
@@ -12371,11 +12486,18 @@
       const roomTypes = publicRoomTypes.length > 0
         ? publicRoomTypes.map(room => {
             const info = defaultRoomInfo[room.type] || defaultRoomInfo['Standard'];
+            // Prefer the real amenities admin set for these rooms (every room of this
+            // type has to have it - see getPublicRoomTypes' intersection logic) over
+            // the generic placeholder list, so guests see accurate information.
+            const realAmenities = (room.amenities || []).map(key => {
+              const def = ROOM_AMENITY_DEFS.find(d => d.key === key);
+              return def ? def.label : key;
+            });
             return {
               ...room,
               name: info.name,
               description: info.description,
-              amenities: info.amenities,
+              amenities: realAmenities.length > 0 ? realAmenities : info.amenities,
               image: room.image || info.fallbackImage
             };
           })
@@ -12594,30 +12716,12 @@
                     combined with the luxury they deserve.
                   </p>
                   <div className="about-features">
-                    <div className="about-feature">
-                      <i className="fas fa-wifi"></i>
-                      <span>Free High-Speed WiFi</span>
-                    </div>
-                    <div className="about-feature">
-                      <i className="fas fa-utensils"></i>
-                      <span>Fine Dining Restaurant</span>
-                    </div>
-                    <div className="about-feature">
-                      <i className="fas fa-swimming-pool"></i>
-                      <span>Swimming Pool & Spa</span>
-                    </div>
-                    <div className="about-feature">
-                      <i className="fas fa-dumbbell"></i>
-                      <span>Fitness Center</span>
-                    </div>
-                    <div className="about-feature">
-                      <i className="fas fa-car"></i>
-                      <span>Free Parking</span>
-                    </div>
-                    <div className="about-feature">
-                      <i className="fas fa-concierge-bell"></i>
-                      <span>24/7 Concierge</span>
-                    </div>
+                    {HOTEL_AMENITY_DEFS.filter(a => !settings.amenities || settings.amenities[a.key] !== false).map(a => (
+                      <div className="about-feature" key={a.key}>
+                        <i className={`fas ${a.icon}`}></i>
+                        <span>{a.label}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -12677,15 +12781,15 @@
                           <div className="room-pricing">
                             <div className="room-price-row">
                               <span className="room-price-label">Per Night</span>
-                              <span className="room-price-value highlight">${room.pricePerNight}</span>
+                              <span className="room-price-value highlight">{settings.currencySymbol || '$'}{room.pricePerNight}</span>
                             </div>
                             <div className="room-price-row">
                               <span className="room-price-label">Weekly (10% off)</span>
-                              <span className="room-price-value">${room.pricePerWeek || Math.round(room.pricePerNight * 7 * 0.9)}</span>
+                              <span className="room-price-value">{settings.currencySymbol || '$'}{room.pricePerWeek || Math.round(room.pricePerNight * 7 * 0.9)}</span>
                             </div>
                             <div className="room-price-row">
                               <span className="room-price-label">Monthly (20% off)</span>
-                              <span className="room-price-value">${room.pricePerMonth || Math.round(room.pricePerNight * 30 * 0.8)}</span>
+                              <span className="room-price-value">{settings.currencySymbol || '$'}{room.pricePerMonth || Math.round(room.pricePerNight * 30 * 0.8)}</span>
                             </div>
                           </div>
                         </div>
@@ -12739,7 +12843,7 @@
                   <div className="calc-result-grid">
                     <div className="calc-result-item">
                       <div className="calc-result-label">Rate/Night</div>
-                      <div className="calc-result-value">${prices.pricePerNight}</div>
+                      <div className="calc-result-value">{settings.currencySymbol || '$'}{prices.pricePerNight}</div>
                     </div>
                     <div className="calc-result-item">
                       <div className="calc-result-label">Total Nights</div>
@@ -12747,18 +12851,18 @@
                     </div>
                     <div className="calc-result-item">
                       <div className="calc-result-label">Subtotal</div>
-                      <div className="calc-result-value">${prices.subtotal.toFixed(2)}</div>
+                      <div className="calc-result-value">{settings.currencySymbol || '$'}{prices.subtotal.toFixed(2)}</div>
                     </div>
                     <div className="calc-result-item">
                       <div className="calc-result-label">Discount</div>
                       <div className="calc-result-value" style={{color: 'var(--success)'}}>
-                        {prices.discount > 0 ? `-$${prices.discountAmount.toFixed(2)} (${prices.discount}%)` : '-'}
+                        {prices.discount > 0 ? `-${settings.currencySymbol || '$'}${prices.discountAmount.toFixed(2)} (${prices.discount}%)` : '-'}
                       </div>
                     </div>
                   </div>
                   <div className="calc-total">
                     <div className="calc-total-label">Total Amount</div>
-                    <div className="calc-total-value">${prices.total.toFixed(2)}</div>
+                    <div className="calc-total-value">{settings.currencySymbol || '$'}{prices.total.toFixed(2)}</div>
                   </div>
                 </div>
 
@@ -12957,6 +13061,7 @@
               <p>&copy; {new Date().getFullYear()} {settings.hotelName}. All Rights Reserved. | Developed by <a href="https://wa.me/233547359015" target="_blank" style={{color: '#ffd700'}}>Manuel Scripts</a> | <a href="https://www.youtube.com/@manuelspctips" target="_blank" style={{color: '#ff0000'}}>Subscribe on YouTube</a></p>
             </div>
           </footer>
+          <WhatsAppFloatingButton settings={settings} />
         </div>
       );
     }
