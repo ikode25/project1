@@ -207,7 +207,8 @@
   footer.pub-footer { background: var(--clr-primary); color: #eee; padding: 30px 0; text-align: center; font-size: .85rem; }
   footer.pub-footer a { color: var(--clr-secondary); }
 
-  #adminLoginLink { background: var(--clr-accent); color: #1a1a1a; padding: 7px 16px; border-radius: 999px; font-weight: 700; font-size: .85rem; }
+  #adminLoginLink { background: var(--clr-accent); color: #1a1a1a; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  #adminLoginLink:hover { opacity: .85; }
 
   /* ---------- LOADING / TOAST ---------- */
   #loadingBar { position: fixed; top: 0; left: 0; height: 3px; background: var(--clr-accent); width: 0; z-index: 9999; transition: width .3s ease, opacity .3s ease; }
@@ -337,7 +338,7 @@
         <a href="#booking">Book Now</a>
         <a href="#reviews">Reviews</a>
         <a href="#contact">Contact</a>
-        <a href="#admin" id="adminLoginLink">Staff Login</a>
+        <a href="#admin" id="adminLoginLink" title="Staff Login" aria-label="Staff Login"></a>
       </nav>
     </div>
   </nav>
@@ -617,6 +618,7 @@ function applyTheme(settings) {
  * ===================================================================*/
 window.addEventListener('DOMContentLoaded', function () {
   document.getElementById('navToggle').innerHTML = icon('menu', 22);
+  document.getElementById('adminLoginLink').innerHTML = icon('lock', 18);
   document.getElementById('darkModeToggle').innerHTML = icon('moon', 15) + ' Dark Mode';
   document.getElementById('logoutBtn').innerHTML = icon('logout', 14) + ' Logout';
   ['icPhone', 'icChat', 'icMail', 'icClock'].forEach(function (id, i) {
@@ -681,7 +683,11 @@ function loadPublicSite() {
     renderContact(data.settings);
     initBookingWizard();
   }).catch(function (err) {
-    document.getElementById('servicesList').innerHTML = '<p class="form-error">Could not load site data. Please refresh. (' + esc(err.message) + ')</p>';
+    var msg = '<p class="form-error">' + icon('alertTriangle', 15) + ' Could not load site data. Please refresh. (' + esc(err.message) + ')</p>';
+    ['servicesList', 'staffList', 'galleryGrid', 'bookingWizardHost', 'reviewsList'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.innerHTML = msg;
+    });
   });
 }
 

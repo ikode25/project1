@@ -151,11 +151,27 @@ function setupSheets() {
   return 'Setup complete';
 }
 
+/**
+ * Self-healing check run on every request: if any tab the current schema
+ * expects is missing entirely (e.g. this deployment predates a newer sheet
+ * like "Gallery" being added to SCHEMA) or has an outdated header row (e.g.
+ * a new column like Staff.WorkDays was added later), re-run setupSheets()
+ * to create/fix it. setupSheets() is idempotent — it only touches headers
+ * that don't already match and only seeds a tab that is completely empty —
+ * so this check-and-heal is cheap and safe to run on every request.
+ */
 function ensureSetup_() {
-  var props = PropertiesService.getScriptProperties();
-  if (props.getProperty('SETUP_DONE') === 'true') return;
-  setupSheets();
-  props.setProperty('SETUP_DONE', 'true');
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheetsByName = {};
+  ss.getSheets().forEach(function (sheet) { sheetsByName[sheet.getName()] = sheet; });
+  var needsSetup = Object.keys(SCHEMA).some(function (name) {
+    var sheet = sheetsByName[name];
+    if (!sheet) return true;
+    var headers = SCHEMA[name];
+    var existing = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
+    return headers.some(function (h, i) { return existing[i] !== h; });
+  });
+  if (needsSetup) setupSheets();
 }
 
 function seedIfEmpty_() {
