@@ -1389,6 +1389,23 @@ function encodeSettingValue(key, value) {
 }
 
 /**
+ * Zero-dependency diagnostic: no Sheets/Drive access at all, just proves the
+ * client<->server google.script.run bridge is alive and this exact Code.gs
+ * is the one actually deployed. If this ever comes back null/empty too, the
+ * problem isn't in the settings logic - it's the deployment itself (stale
+ * version, missing authorization, etc.) rather than anything saveSettings
+ * or addHeroImage do.
+ */
+function pingSettings() {
+  return {
+    success: true,
+    message: 'pong',
+    serverTime: new Date().toString(),
+    ssId: (typeof SS_ID !== 'undefined' && SS_ID) ? SS_ID : '(SS_ID not set)'
+  };
+}
+
+/**
  * Returns the merged settings object (defaults overridden by whatever is stored).
  * Safe to call from the client on every app load.
  */

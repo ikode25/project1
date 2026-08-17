@@ -11872,6 +11872,24 @@
         }
       };
 
+      const [testingConnection, setTestingConnection] = useState(false);
+      const handleTestConnection = () => {
+        setTestingConnection(true);
+        callAppsScript('pingSettings', [], (res) => {
+          setTestingConnection(false);
+          console.log('pingSettings returned:', res);
+          if (res && res.success) {
+            Swal.fire({ icon: 'success', title: 'Connection OK', html: `Server responded.<br/>Server time: ${res.serverTime}<br/>Spreadsheet ID in use: <code>${res.ssId}</code>` });
+          } else {
+            Swal.fire({ icon: 'error', title: 'Connection test failed', text: 'The server returned an unexpected result. Check the browser console and the Apps Script Executions log.' });
+          }
+        }, (err) => {
+          setTestingConnection(false);
+          console.error('pingSettings failed:', err);
+          Swal.fire({ icon: 'error', title: 'Connection test failed', text: err.message + ' - this means the basic google.script.run bridge itself is broken (stale deployment, or the "pingSettings" function is missing from the deployed Code.gs).' });
+        });
+      };
+
       const handleDeleteHero = (fileId) => {
         Swal.fire({ icon: 'warning', title: 'Remove this image?', showCancelButton: true, confirmButtonColor: '#ea4335', confirmButtonText: 'Remove' }).then((result) => {
           if (!result.isConfirmed) return;
@@ -11905,6 +11923,9 @@
         <div className="data-section">
           <div className="section-header">
             <h2><i className="fas fa-cog"></i> Settings</h2>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={handleTestConnection} disabled={testingConnection} title="Checks that this page can reach your Code.gs at all, independent of any settings logic">
+              {testingConnection ? <><i className="fas fa-spinner fa-spin"></i> Testing...</> : <><i className="fas fa-plug"></i> Test Connection</>}
+            </button>
           </div>
 
           <div className="settings-tabs">
