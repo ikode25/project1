@@ -88,11 +88,16 @@ Log in to the admin portal, then:
 - **Settings** — Site Name, currency, the **scrolling news headline** for the top of the store, **theme colors** (pick a primary/accent color or a preset, and light/dark mode), **contact details, social media links and a Google Maps embed** for the footer, WhatsApp number, and the default bundle disclaimer.
 - **Payment Methods** — edit the seeded Mobile Money entry or add Bank Transfer / Cash on Delivery / other numbers. Customers pick one at checkout, where the number is shown large with a one-tap **Copy** button.
 - **Businesses** — add/edit your businesses (name, description, logo).
-- **Products** — add products/services per business:
-  - Leave **Stock** blank for unlimited/digital items (data bundles, source code).
-  - Tick **"Ask for a phone number before adding to cart"** for data bundles. The customer then enters the receiving number and gets a *Confirm Purchase* popup quoting the product, the number, and your disclaimer. Each confirmed number becomes its own cart line, so one customer can buy the same bundle for several different numbers in a single order.
+- **Products** — add regular products/services per business:
+  - Leave **Stock** blank for unlimited/digital items (source code, etc.).
   - Choose a WhatsApp option (see the table below) for items customers usually ask about before buying.
   - Use the **In Stock / Out of Stock** button in the products table to flip availability instantly without editing the product.
+  - Data bundles are **not** created here — see **Data Bundles** below.
+- **Data Bundles** — a dedicated pricing module for MTN / Telecel / AirtelTigo (and any other network you add) styled like a reseller dashboard:
+  - Pick a **Business**, then a **Network** (or add a new one by name — spelling must match exactly across bundles for the same network, since it also drives the customer-facing network toggle).
+  - Add a bundle **Size** (e.g. "1GB"), your **Base Price** (what it costs you) and **Your Selling Price** — the **Profit** is calculated for you live, and again per row in the table below.
+  - Edit **Your Selling Price** directly in the table any time to reprice instantly; **Available/Unavailable** flips storefront visibility without deleting the bundle.
+  - Every bundle created here automatically asks the customer for the receiving phone number before checkout, skips the delivery-address step (it's digital), and groups by network into the storefront's toggle row — you don't need to configure any of that separately.
 - **Banners** — upload images for the homepage carousel.
 - **Discounts** — run a sale storewide, for one business, or for a single product, percent or fixed amount, with an optional date range.
 

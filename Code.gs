@@ -12,11 +12,11 @@
 
 // Bump when SHEETS changes so ensureSetup_ re-runs and adds new columns to
 // spreadsheets created by an older version of this script.
-var SCHEMA_VERSION = '7';
+var SCHEMA_VERSION = '8';
 
 // Shown in the storefront footer and admin sidebar. If this doesn't match the
 // file you pasted, the deployment is still serving an older version.
-var BUILD_VERSION = '2026.08.17-13';
+var BUILD_VERSION = '2026.08.17-14';
 
 // ---------------------------------------------------------------------------
 // Sheet schema — single source of truth for headers used by the generic
@@ -26,7 +26,7 @@ var BUILD_VERSION = '2026.08.17-13';
 var SHEETS = {
   Settings:       ['Key', 'Value'],
   Businesses:     ['BusinessID', 'Name', 'Description', 'LogoURL', 'WhatsAppNumber', 'Active', 'SortOrder', 'CreatedAt'],
-  Products:       ['ProductID', 'BusinessID', 'ImageURL', 'Name', 'Description', 'Category', 'Price', 'Stock', 'IsService', 'EnquireOnWhatsApp', 'Active', 'CreatedAt', 'RequiresRecipient', 'RecipientLabel', 'ConfirmationNote', 'InStock', 'ShowWhatsApp', 'IsDigital'],
+  Products:       ['ProductID', 'BusinessID', 'ImageURL', 'Name', 'Description', 'Category', 'Price', 'Stock', 'IsService', 'EnquireOnWhatsApp', 'Active', 'CreatedAt', 'RequiresRecipient', 'RecipientLabel', 'ConfirmationNote', 'InStock', 'ShowWhatsApp', 'IsDigital', 'BasePrice', 'BundleSize'],
   Customers:      ['CustomerID', 'Name', 'Address', 'Phone', 'Username', 'PasswordHash', 'CreatedAt', 'Email', 'AuthProvider'],
   Admins:         ['AdminID', 'Username', 'PasswordHash', 'Name', 'Role', 'CreatedAt', 'Email', 'RememberHash', 'RememberExpires'],
   Orders:         ['OrderID', 'OrderType', 'Username', 'CustomerName', 'Phone', 'Address', 'Subtotal', 'DiscountAmount', 'Total', 'PaymentMethodID', 'PaymentMethodLabel', 'PayerNumber', 'TransactionID', 'PaymentStatus', 'OrderStatus', 'Notes', 'CreatedAt', 'UpdatedAt', 'CustomerEmail'],
@@ -420,11 +420,11 @@ function seedSampleCatalog_() {
     // the storefront turns a business's distinct categories into a big
     // toggle row automatically, which is exactly the MTN / Telecel /
     // AirtelTigo switch a data-bundle shop needs.
-    { biz: 'databundles', Name: 'MTN 5GB Data Bundle', Description: 'MTN data bundle valid for 30 days. Delivered to any MTN number you provide at checkout.', Category: 'MTN', Price: 30, Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
-    { biz: 'databundles', Name: 'MTN 10GB Data Bundle', Description: 'MTN data bundle valid for 30 days. Delivered to any MTN number you provide at checkout.', Category: 'MTN', Price: 52, Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
-    { biz: 'databundles', Name: 'Telecel 5GB Data Bundle', Description: 'Telecel data bundle valid for 30 days. Delivered to any Telecel number you provide at checkout.', Category: 'Telecel', Price: 27, Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
-    { biz: 'databundles', Name: 'Telecel 10GB Data Bundle', Description: 'Telecel data bundle valid for 30 days. Delivered to any Telecel number you provide at checkout.', Category: 'Telecel', Price: 55, Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
-    { biz: 'databundles', Name: 'AirtelTigo 5GB Data Bundle', Description: 'AirtelTigo data bundle valid for 30 days. Delivered to any AirtelTigo number you provide at checkout.', Category: 'AirtelTigo', Price: 26, Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
+    { biz: 'databundles', Name: 'MTN 5GB Data Bundle', Description: 'MTN data bundle valid for 30 days. Delivered to any MTN number you provide at checkout.', Category: 'MTN', Price: 30, BasePrice: 24, BundleSize: '5GB', Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
+    { biz: 'databundles', Name: 'MTN 10GB Data Bundle', Description: 'MTN data bundle valid for 30 days. Delivered to any MTN number you provide at checkout.', Category: 'MTN', Price: 52, BasePrice: 43, BundleSize: '10GB', Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
+    { biz: 'databundles', Name: 'Telecel 5GB Data Bundle', Description: 'Telecel data bundle valid for 30 days. Delivered to any Telecel number you provide at checkout.', Category: 'Telecel', Price: 27, BasePrice: 21, BundleSize: '5GB', Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
+    { biz: 'databundles', Name: 'Telecel 10GB Data Bundle', Description: 'Telecel data bundle valid for 30 days. Delivered to any Telecel number you provide at checkout.', Category: 'Telecel', Price: 55, BasePrice: 45, BundleSize: '10GB', Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
+    { biz: 'databundles', Name: 'AirtelTigo 5GB Data Bundle', Description: 'AirtelTigo data bundle valid for 30 days. Delivered to any AirtelTigo number you provide at checkout.', Category: 'AirtelTigo', Price: 26, BasePrice: 20, BundleSize: '5GB', Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
     { biz: 'electronics', Name: 'Bluetooth Speaker', Description: 'Portable wireless Bluetooth speaker with deep bass, USB/SD playback and up to 8 hours of battery life.', Category: 'Audio', Price: 180, Stock: 12, ShowWhatsApp: true },
     { biz: 'electronics', Name: 'Wireless Earbuds', Description: 'True wireless earbuds with charging case, touch controls and noise isolation.', Category: 'Audio', Price: 120, Stock: 15, ShowWhatsApp: true },
     { biz: 'electronics', Name: 'Extension Board with Surge Protection', Description: 'Four-socket extension board with USB ports and built-in surge protection for your electronics.', Category: 'Accessories', Price: 85, Stock: 25 },
@@ -445,7 +445,8 @@ function seedSampleCatalog_() {
       RequiresRecipient: !!p.RequiresRecipient,
       RecipientLabel: p.RequiresRecipient ? 'Phone number to receive the bundle' : '',
       ConfirmationNote: p.RequiresRecipient ? DEFAULT_BUNDLE_DISCLAIMER : '',
-      InStock: true, ShowWhatsApp: !!p.ShowWhatsApp, IsDigital: !!p.IsDigital
+      InStock: true, ShowWhatsApp: !!p.ShowWhatsApp, IsDigital: !!p.IsDigital,
+      BasePrice: p.BasePrice || 0, BundleSize: p.BundleSize || ''
     });
   });
 }
@@ -1415,9 +1416,16 @@ function adminGetProducts(token) {
       ShowWhatsApp: toBool_(p.ShowWhatsApp), Active: toBool_(p.Active),
       RequiresRecipient: toBool_(p.RequiresRecipient), RecipientLabel: String(p.RecipientLabel || ''),
       ConfirmationNote: String(p.ConfirmationNote || ''), InStock: toBoolDefaultTrue_(p.InStock),
-      IsDigital: toBool_(p.IsDigital), CreatedAt: isoDate_(p.CreatedAt)
+      IsDigital: toBool_(p.IsDigital), CreatedAt: isoDate_(p.CreatedAt),
+      BasePrice: toNum_(p.BasePrice, 0), BundleSize: String(p.BundleSize || '')
     };
   });
+}
+
+// Data Bundles are just Products with RequiresRecipient=true; this is the dedicated,
+// filtered view used by the Data Bundles admin module (Category doubles as Network).
+function adminGetDataBundles(token) {
+  return adminGetProducts(token).filter(function (p) { return p.RequiresRecipient; });
 }
 
 function adminSaveProduct(token, p) {
@@ -1430,11 +1438,63 @@ function adminSaveProduct(token, p) {
     IsService: !!p.IsService, EnquireOnWhatsApp: !!p.EnquireOnWhatsApp, ShowWhatsApp: !!p.ShowWhatsApp,
     Active: p.Active !== false, IsDigital: !!p.IsDigital,
     RequiresRecipient: !!p.RequiresRecipient, RecipientLabel: p.RecipientLabel || '',
-    ConfirmationNote: p.ConfirmationNote || '', InStock: p.InStock !== false
+    ConfirmationNote: p.ConfirmationNote || '', InStock: p.InStock !== false,
+    BasePrice: toNum_(p.BasePrice, 0), BundleSize: p.BundleSize || ''
   };
   if (p.ProductID) {
     updateRowById_('Products', 'ProductID', p.ProductID, data);
     return { success: true, id: p.ProductID };
+  }
+  var id = genId_('PRD');
+  data.ProductID = id;
+  data.CreatedAt = new Date();
+  appendRowObject_('Products', data);
+  return { success: true, id: id };
+}
+
+// Dedicated save path for the Data Bundles module (Network/Size/Base/Selling price table).
+// Builds a well-formed bundle product so all existing storefront logic (recipient modal,
+// category/network toggle, digital-delivery skip, WhatsApp flags) keeps working unmodified.
+function adminSaveDataBundle(token, b) {
+  requireAdmin_(token);
+  if (!b.BusinessID || !b.Network || !b.Size) {
+    return { success: false, message: 'Business, network and size are required.' };
+  }
+  // On an edit, callers (the main bundle form, and the inline selling-price
+  // cell) only ever send the fields they actually changed. Load the existing
+  // row so anything omitted — image, confirmation note, active/in-stock flags
+  // — is preserved instead of silently reset to a default on every save.
+  var existing = null;
+  if (b.ProductID) {
+    existing = sheetToObjects_('Products').filter(function (p) { return String(p.ProductID) === String(b.ProductID); })[0] || null;
+  }
+  var network = String(b.Network).trim();
+  var size = String(b.Size).trim();
+  var sellingPrice = toNum_(b.SellingPrice, existing ? toNum_(existing.Price, 0) : 0);
+  var basePrice = toNum_(b.BasePrice, existing ? toNum_(existing.BasePrice, 0) : 0);
+  var data = {
+    BusinessID: b.BusinessID,
+    ImageURL: b.ImageURL !== undefined ? (b.ImageURL || '') : (existing ? String(existing.ImageURL || '') : ''),
+    Name: network + ' ' + size + ' Data Bundle',
+    Description: b.Description || (existing ? String(existing.Description || '') : '') || (network + ' ' + size + ' data bundle'),
+    Category: network,
+    Price: sellingPrice,
+    Stock: '',
+    IsService: true,
+    EnquireOnWhatsApp: false,
+    ShowWhatsApp: b.ShowWhatsApp !== undefined ? !!b.ShowWhatsApp : !!(existing && toBool_(existing.ShowWhatsApp)),
+    Active: b.Active !== undefined ? !!b.Active : (existing ? toBool_(existing.Active) : true),
+    IsDigital: true,
+    RequiresRecipient: true,
+    RecipientLabel: b.RecipientLabel || (existing ? String(existing.RecipientLabel || '') : '') || 'Phone number to load the bundle on',
+    ConfirmationNote: b.ConfirmationNote !== undefined ? (b.ConfirmationNote || '') : (existing ? String(existing.ConfirmationNote || '') : ''),
+    InStock: b.InStock !== undefined ? !!b.InStock : (existing ? toBoolDefaultTrue_(existing.InStock) : true),
+    BasePrice: basePrice,
+    BundleSize: size
+  };
+  if (b.ProductID) {
+    updateRowById_('Products', 'ProductID', b.ProductID, data);
+    return { success: true, id: b.ProductID };
   }
   var id = genId_('PRD');
   data.ProductID = id;
