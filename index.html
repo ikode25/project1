@@ -1,5 +1,5 @@
 <!-- index.html — Multi-Business Storefront -->
-<!-- MB_BUILD:2026.08.17-15 -->
+<!-- MB_BUILD:2026.08.17-16 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -73,7 +73,7 @@ box-shadow: 0 0 8px var(--accent);
     #fabMenu.closed { opacity: 0; transform: translateY(8px); pointer-events: none; }
   </style>
 </head>
-<body class="flex flex-col min-h-screen" data-mb-build="2026.08.17-15">
+<body class="flex flex-col min-h-screen" data-mb-build="2026.08.17-16">
 
   <div id="progressBar"></div>
 
@@ -332,11 +332,17 @@ box-shadow: 0 0 8px var(--accent);
 
       <div class="border-t pt-5" style="border-color:var(--border)">
         <h3 class="font-semibold mb-3">Delivery / Contact Details</h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
-          <input type="text" id="coName" placeholder="Full Name" class="p-3 rounded-lg">
-          <input type="tel" id="coPhone" placeholder="Your Phone Number" class="p-3 rounded-lg">
-          <input type="email" id="coEmail" placeholder="Email (for your receipt — optional)" class="p-3 rounded-lg">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
+          <!-- display:contents keeps Name/Phone in the same grid as Email
+               when shown; hidden entirely for a guest buying data bundles
+               only, since the Mobile Money number below stands in for both. -->
+          <div id="coNamePhoneWrap" class="contents">
+            <input type="text" id="coName" placeholder="Full Name" class="p-3 rounded-lg">
+            <input type="tel" id="coPhone" placeholder="Your Phone Number" class="p-3 rounded-lg">
+          </div>
+          <input type="email" id="coEmail" placeholder="Email (for your receipt — optional)" class="p-3 rounded-lg md:col-span-2">
         </div>
+        <p id="coGuestBundleNote" class="text-sm mb-4 hidden" style="color:var(--primary)"><i class="fas fa-circle-info mr-1"></i>Buying data bundles only — enter the Mobile Money number you're paying from below and we'll use that as your contact number.</p>
         <!-- Only shown when the cart contains a physical item; digital-only
              carts (data bundles, source code, ...) skip this entirely. -->
         <div id="coAddressWrap" class="mb-5 hidden">
@@ -863,6 +869,54 @@ box-shadow: 0 0 8px var(--accent);
     // ---------------------------------------------------------------------
     // Products
     // ---------------------------------------------------------------------
+    // Real network brand colors for data bundle cards — a bundle never needs
+    // its own photo, the network name alone (plus these colors) is the
+    // recognizable visual. Falls back to the store's own theme color for any
+    // network name that isn't one of these (custom/local networks etc).
+    var NETWORK_COLORS = {
+      mtn: { bg: '#ffcc08', fg: '#1a1a1a' },
+      telecel: { bg: '#e4032f', fg: '#ffffff' },
+      vodafone: { bg: '#e4032f', fg: '#ffffff' },
+      airteltigo: { bg: '#0057b8', fg: '#ffffff' },
+      airtel: { bg: '#e4032f', fg: '#ffffff' },
+      tigo: { bg: '#0057b8', fg: '#ffffff' },
+      glo: { bg: '#00a651', fg: '#ffffff' }
+    };
+    function networkColorFor(name) {
+      var key = String(name || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      return NETWORK_COLORS[key] || { bg: 'var(--primary)', fg: 'var(--primary-contrast)' };
+    }
+    // The "Purchase" action for a bundle card — separate from actionHtmlFor
+    // because a bundle never shows the qty stepper or falls back to a plain
+    // "Buy Now" bg-primary button; it's always network-colored to match the
+    // card it sits in (or under).
+    function bundleActionHtml(p, c) {
+      if (p.enquireOnWhatsApp) {
+        return '<button class="w-full py-3 font-semibold flex items-center justify-center gap-2 bg-green-500 hover:bg-green-600 text-white" onclick="event.stopPropagation();enquireOnWhatsapp(\'' + p.id + '\')"><i class="fab fa-whatsapp"></i> Enquire on WhatsApp</button>';
+      }
+      if (!p.inStock) {
+        return '<button class="w-full py-3 font-semibold surface-2 muted cursor-not-allowed" disabled>Out of Stock</button>';
+      }
+      return '<button class="w-full py-3 font-semibold" style="background:' + c.bg + ';color:' + c.fg + '" onclick="event.stopPropagation();openRecipientModal(\'' + p.id + '\')">Purchase</button>';
+    }
+    // Compact, photo-free card for data bundles (RequiresRecipient products):
+    // a network-colored badge, the size in large type, and the price — no
+    // image slot at all, matching how resellers present bundle pricing and
+    // meaning an admin never has to source or upload bundle artwork.
+    function bundleCardHtml(p) {
+      var c = networkColorFor(p.category);
+      return '<div class="rounded-lg shadow-md flex flex-col overflow-hidden cursor-pointer relative transition-shadow hover:shadow-lg" style="border:2px solid ' + c.bg + '" onclick="openProductModal(\'' + p.id + '\')">' +
+        (p.onSale ? '<span class="absolute top-2 right-2 z-10 text-white text-xs px-2 py-1 rounded" style="background:var(--accent)">' + esc(p.discountLabel || 'Sale') + '</span>' : '') +
+        '<div class="p-4 flex-grow" style="background:var(--surface)">' +
+          '<span class="inline-block text-xs font-bold uppercase tracking-wide px-3 py-1 rounded-full mb-3" style="background:' + c.bg + ';color:' + c.fg + '">' + esc(p.category) + '</span>' +
+          '<p class="text-2xl sm:text-3xl font-extrabold mb-2">' + esc(p.bundleSize || p.name) + '</p>' +
+          (p.onSale
+            ? '<p><span class="text-lg font-bold" style="color:' + c.bg + '">' + currency(p.price) + '</span> <span class="text-sm muted line-through ml-1">' + currency(p.originalPrice) + '</span></p>'
+            : '<p class="text-lg font-bold" style="color:' + c.bg + '">' + currency(p.price) + '</p>') +
+        '</div>' +
+        bundleActionHtml(p, c) +
+      '</div>';
+    }
     function priceHtmlFor(p) {
       if (p.onSale) {
         return '<span class="text-lg font-bold text-accent">' + currency(p.price) + '</span> <span class="text-sm muted line-through">' + currency(p.originalPrice) + '</span>';
@@ -908,6 +962,7 @@ box-shadow: 0 0 8px var(--accent);
 
       // Build once and swap in, rather than reflowing on every appendChild.
       var html = list.map(function (p) {
+        if (p.requiresRecipient) return bundleCardHtml(p);
         return '<div class="surface p-4 rounded-lg shadow-md flex flex-col relative cursor-pointer" onclick="openProductModal(\'' + p.id + '\')">' +
           (!p.inStock && !p.enquireOnWhatsApp ? '<span class="absolute top-2 left-2 z-10 bg-gray-800 text-white text-xs px-2 py-1 rounded">Out of Stock</span>' : '') +
           (p.onSale ? '<span class="absolute top-2 right-2 z-10 text-white text-xs px-2 py-1 rounded" style="background:var(--accent)">' + esc(p.discountLabel || 'Sale') + '</span>' : '') +
@@ -930,13 +985,25 @@ box-shadow: 0 0 8px var(--accent);
     function openProductModal(productId) {
       var p = productById(productId);
       if (!p) return;
+      var isBundle = p.requiresRecipient;
+      var c = isBundle ? networkColorFor(p.category) : null;
+      // A bundle never needs its own photo — no image was uploaded for it in
+      // the vast majority of cases, so show the same network-colored header
+      // as the card instead of a generic placeholder box. If an admin did
+      // upload one anyway, honor it same as any other product.
+      var mediaHtml = (isBundle && !p.image)
+        ? '<div class="w-full rounded-t-lg flex flex-col items-center justify-center text-center py-10 px-6" style="background:' + c.bg + ';color:' + c.fg + ';min-height:160px">' +
+            '<span class="text-sm font-bold uppercase tracking-widest mb-2 opacity-90">' + esc(p.category) + '</span>' +
+            '<span class="text-4xl sm:text-5xl font-extrabold">' + esc(p.bundleSize || p.name) + '</span>' +
+          '</div>'
+        : '<div class="w-full rounded-t-lg flex items-center justify-center cursor-zoom-in" style="background:var(--surface-2);min-height:220px" onclick="openLightbox(\'' + p.id + '\')">' +
+            '<img src="' + esc(p.image || 'https://placehold.co/600x400?text=' + encodeURIComponent(p.name)) + '" alt="' + esc(p.name) + '" class="max-h-[55vh] w-auto max-w-full object-contain">' +
+          '</div>' +
+          '<p class="text-center text-xs muted pt-2"><i class="fas fa-magnifying-glass-plus mr-1"></i>Tap the photo to view it full size</p>';
       document.getElementById('productModalBody').innerHTML =
         // object-contain on a neutral backdrop: physical goods like picture
         // frames must be seen whole, never cropped to fill a box.
-        '<div class="w-full rounded-t-lg flex items-center justify-center cursor-zoom-in" style="background:var(--surface-2);min-height:220px" onclick="openLightbox(\'' + p.id + '\')">' +
-          '<img src="' + esc(p.image || 'https://placehold.co/600x400?text=' + encodeURIComponent(p.name)) + '" alt="' + esc(p.name) + '" class="max-h-[55vh] w-auto max-w-full object-contain">' +
-        '</div>' +
-        '<p class="text-center text-xs muted pt-2"><i class="fas fa-magnifying-glass-plus mr-1"></i>Tap the photo to view it full size</p>' +
+        mediaHtml +
         '<div class="p-5 sm:p-6">' +
           '<span class="text-xs text-primary font-semibold">' + esc(p.businessName) + '</span>' +
           '<h2 class="text-xl sm:text-2xl font-bold mb-2">' + esc(p.name) + '</h2>' +
@@ -948,7 +1015,7 @@ box-shadow: 0 0 8px var(--accent);
           '<div class="mb-4">' + priceHtmlFor(p) + '</div>' +
           '<p class="mb-5 whitespace-pre-line leading-relaxed">' + esc(p.description || 'No description provided.') + '</p>' +
           (p.stock !== null && p.stock > 0 ? '<p class="text-sm muted mb-3">' + p.stock + ' available</p>' : '') +
-          actionHtmlFor(p) +
+          (isBundle ? bundleActionHtml(p, c) : actionHtmlFor(p)) +
         '</div>';
       document.getElementById('productModal').classList.remove('hidden');
     }
@@ -1098,10 +1165,31 @@ box-shadow: 0 0 8px var(--accent);
         return p && !p.isDigital;
       });
     }
+    // True once every line in the cart is a data bundle (requires a recipient
+    // number, already collected per line) — the only case where asking a
+    // guest to also type their name and phone at checkout is pure repetition,
+    // since the Mobile Money number they confirm below identifies them just
+    // as well.
+    function cartIsBundleOnly() {
+      return cart.length > 0 && cart.every(function (line) {
+        var p = productById(line.productId);
+        return p && p.requiresRecipient;
+      });
+    }
     function updateAddressVisibility() {
       var needed = cartNeedsDelivery();
       document.getElementById('coAddressWrap').classList.toggle('hidden', !needed);
       if (!needed) document.getElementById('coAddress').value = '';
+      updateGuestFieldsVisibility();
+    }
+    function updateGuestFieldsVisibility() {
+      var simplify = !isLoggedIn && cartIsBundleOnly();
+      // Inline style, not a "hidden" class: this wrapper also carries the
+      // Tailwind "contents" class, and mixing two same-specificity display
+      // utilities left the outcome to CSS source order last time we tried
+      // that (see the login-screen bug) — inline style always wins cleanly.
+      document.getElementById('coNamePhoneWrap').style.display = simplify ? 'none' : 'contents';
+      document.getElementById('coGuestBundleNote').classList.toggle('hidden', !simplify);
     }
 
     function renderCartLines() {
@@ -1173,20 +1261,26 @@ box-shadow: 0 0 8px var(--accent);
     function submitOrder() {
       if (cart.length === 0) { toast('info', 'Cart Empty', 'Your cart is empty.'); return; }
       var needsDelivery = cartNeedsDelivery();
+      // A guest buying data bundles only never saw Name/Phone fields (see
+      // updateGuestFieldsVisibility) — the Mobile Money number they enter
+      // below doubles as both, so it's derived here rather than read from
+      // inputs that were never shown.
+      var simplifiedGuest = !isLoggedIn && cartIsBundleOnly();
+      var payerNumber = document.getElementById('coPayerNumber').value.trim();
       var payload = {
         isGuest: !isLoggedIn,
         username: isLoggedIn ? currentUser.username : '',
-        customerName: document.getElementById('coName').value.trim(),
-        phone: document.getElementById('coPhone').value.trim(),
+        customerName: simplifiedGuest ? ('Guest (' + (payerNumber || 'Data Bundle') + ')') : document.getElementById('coName').value.trim(),
+        phone: simplifiedGuest ? payerNumber : document.getElementById('coPhone').value.trim(),
         address: needsDelivery ? document.getElementById('coAddress').value.trim() : '',
         email: document.getElementById('coEmail').value.trim(),
         items: cart.map(function (c) { return { productId: c.productId, qty: c.qty, recipient: c.recipient || '' }; }),
         paymentMethodId: selectedPaymentMethodId,
-        payerNumber: document.getElementById('coPayerNumber').value.trim(),
+        payerNumber: payerNumber,
         transactionId: document.getElementById('coTransactionId').value.trim(),
         notes: document.getElementById('coNotes').value.trim()
       };
-      if (!payload.customerName || !payload.phone) { toast('warning', 'Missing Details', 'Please fill in your name and phone number.'); return; }
+      if (!simplifiedGuest && (!payload.customerName || !payload.phone)) { toast('warning', 'Missing Details', 'Please fill in your name and phone number.'); return; }
       if (needsDelivery && !payload.address) { toast('warning', 'Delivery Address', 'Please enter a delivery address for the physical item(s) in your cart.'); return; }
       if (!payload.paymentMethodId) { toast('warning', 'Payment Method', 'Please select a payment method.'); return; }
       if (!payload.payerNumber || !payload.transactionId) { toast('warning', 'Payment Confirmation', 'Enter the Mobile Money number used and the Transaction ID.'); return; }

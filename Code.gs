@@ -16,7 +16,7 @@ var SCHEMA_VERSION = '8';
 
 // Shown in the storefront footer and admin sidebar. If this doesn't match the
 // file you pasted, the deployment is still serving an older version.
-var BUILD_VERSION = '2026.08.17-15';
+var BUILD_VERSION = '2026.08.17-16';
 
 // ---------------------------------------------------------------------------
 // Sheet schema — single source of truth for headers used by the generic
@@ -755,7 +755,10 @@ function buildStorefrontData_() {
       confirmationNote: String(p.ConfirmationNote || (requiresRecipient ? (settings.BundleDisclaimer || DEFAULT_BUNDLE_DISCLAIMER) : '')),
       // Digital items (data bundles, source code, ...) never need a delivery
       // address; the storefront only asks for one when the cart needs it.
-      isDigital: toBool_(p.IsDigital)
+      isDigital: toBool_(p.IsDigital),
+      // Clean size label ("1GB") for the network-branded bundle card, kept
+      // separate from Name so the card doesn't have to parse it back out.
+      bundleSize: String(p.BundleSize || '')
     };
   });
 
