@@ -1,5 +1,5 @@
 <!-- index.html — Multi-Business Storefront -->
-<!-- MB_BUILD:2026.08.17-16 -->
+<!-- MB_BUILD:2026.08.17-17 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -73,7 +73,7 @@ box-shadow: 0 0 8px var(--accent);
     #fabMenu.closed { opacity: 0; transform: translateY(8px); pointer-events: none; }
   </style>
 </head>
-<body class="flex flex-col min-h-screen" data-mb-build="2026.08.17-16">
+<body class="flex flex-col min-h-screen" data-mb-build="2026.08.17-17">
 
   <div id="progressBar"></div>
 
@@ -905,9 +905,16 @@ box-shadow: 0 0 8px var(--accent);
     // meaning an admin never has to source or upload bundle artwork.
     function bundleCardHtml(p) {
       var c = networkColorFor(p.category);
-      return '<div class="rounded-lg shadow-md flex flex-col overflow-hidden cursor-pointer relative transition-shadow hover:shadow-lg" style="border:2px solid ' + c.bg + '" onclick="openProductModal(\'' + p.id + '\')">' +
+      // self-start: the product grid is a CSS Grid, which stretches every
+      // card to match the tallest one in its row by default. A bundle card
+      // sitting next to a tall photo+description product card would
+      // otherwise get stretched to that height too, and flex-grow on the
+      // padding div below would stretch right along with it — exactly the
+      // huge gap between price and button reported. self-start makes this
+      // card size to its own (short) content regardless of its row-mates.
+      return '<div class="self-start rounded-lg shadow-md flex flex-col overflow-hidden cursor-pointer relative transition-shadow hover:shadow-lg" style="border:2px solid ' + c.bg + '" onclick="openProductModal(\'' + p.id + '\')">' +
         (p.onSale ? '<span class="absolute top-2 right-2 z-10 text-white text-xs px-2 py-1 rounded" style="background:var(--accent)">' + esc(p.discountLabel || 'Sale') + '</span>' : '') +
-        '<div class="p-4 flex-grow" style="background:var(--surface)">' +
+        '<div class="p-4" style="background:var(--surface)">' +
           '<span class="inline-block text-xs font-bold uppercase tracking-wide px-3 py-1 rounded-full mb-3" style="background:' + c.bg + ';color:' + c.fg + '">' + esc(p.category) + '</span>' +
           '<p class="text-2xl sm:text-3xl font-extrabold mb-2">' + esc(p.bundleSize || p.name) + '</p>' +
           (p.onSale

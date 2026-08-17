@@ -1,5 +1,5 @@
 <!-- admin.html — Multi-Business Admin Portal -->
-<!-- MB_BUILD:2026.08.17-16 -->
+<!-- MB_BUILD:2026.08.17-17 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -67,7 +67,7 @@
     }
   </style>
 </head>
-<body class="min-h-screen" data-mb-build="2026.08.17-16">
+<body class="min-h-screen" data-mb-build="2026.08.17-17">
 
   <div id="progressBar"></div>
 
@@ -838,6 +838,25 @@
     function toast(icon, title, text) {
       Swal.fire({ icon: icon, title: title, text: text, timer: icon === 'success' ? 1600 : undefined, showConfirmButton: icon !== 'success' });
     }
+    function copyText(text, successMsg) {
+      var done = function () { toast('success', successMsg || 'Copied!', ''); };
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed'; ta.style.top = '-1000px';
+        document.body.appendChild(ta);
+        ta.select(); ta.setSelectionRange(0, 99999);
+        var ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        if (ok) { done(); return; }
+      } catch (e) { /* fall through */ }
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(done, function () { Swal.fire({ icon: 'info', title: 'Copy manually', text: text }); });
+      } else {
+        Swal.fire({ icon: 'info', title: 'Copy manually', text: text });
+      }
+    }
     function currency(n) { return ((cache.settings && cache.settings.CurrencySymbol) || 'GHS ') + Number(n || 0).toFixed(2); }
     function esc(s) {
       return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -1132,7 +1151,7 @@
           html: '<table style="margin:0 auto;font-size:13px">' + rows + '</table>' +
             '<hr style="margin:12px 0">' +
             '<div style="font-size:12px;text-align:left">' +
-              '<b>admin page build:</b> 2026.08.17-16<br>' +
+              '<b>admin page build:</b> 2026.08.17-17<br>' +
               '<b>Code.gs build:</b> ' + ((info && info.build) || 'could not read') + '<br>' +
               '<b>schema:</b> ' + ((info && info.setupVersion) || '?') +
             '</div>' +
@@ -1439,7 +1458,8 @@
           }
           tbody.innerHTML = orders.map(function (o) {
             var itemsSummary = (o.items || []).map(function (i) {
-              return esc(i.qty + '× ' + i.productName) + (i.recipient ? ' <span class="muted">(' + esc(i.recipient) + ')</span>' : '');
+              return esc(i.qty + '× ' + i.productName) + (i.recipient ? ' <strong class="text-primary">(' + esc(i.recipient) + ')</strong> ' +
+                '<button type="button" class="text-xs underline" title="Copy number" onclick="event.stopPropagation();copyText(\'' + esc(i.recipient) + '\',\'Number copied\')"><i class="fas fa-copy"></i></button>' : '');
             }).join('<br>');
             return '<tr>' +
               '<td>' + esc(o.orderId) + '</td>' +
@@ -1477,7 +1497,9 @@
       if (!o) return;
       var itemsHtml = (o.items || []).map(function (it) {
         return '<li>' + it.qty + '× ' + esc(it.productName) + ' <span class="muted">(' + esc(it.businessName) + ')</span>' +
-          (it.recipient ? '<br><span class="text-primary text-sm"><i class="fas fa-sim-card mr-1"></i>Deliver to: <strong>' + esc(it.recipient) + '</strong></span>' : '') +
+          (it.recipient ? '<br><span class="text-primary text-sm"><i class="fas fa-sim-card mr-1"></i>Deliver to: ' +
+            '<strong class="text-base" style="letter-spacing:.03em">' + esc(it.recipient) + '</strong> ' +
+            '<button type="button" class="text-xs underline" onclick="copyText(\'' + esc(it.recipient) + '\',\'Number copied\')"><i class="fas fa-copy mr-1"></i>Copy</button></span>' : '') +
           ' — ' + currency(it.subtotal) + '</li>';
       }).join('');
       document.getElementById('orderModalBody').innerHTML =
