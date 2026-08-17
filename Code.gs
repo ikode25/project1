@@ -12,11 +12,11 @@
 
 // Bump when SHEETS changes so ensureSetup_ re-runs and adds new columns to
 // spreadsheets created by an older version of this script.
-var SCHEMA_VERSION = '8';
+var SCHEMA_VERSION = '9';
 
 // Shown in the storefront footer and admin sidebar. If this doesn't match the
 // file you pasted, the deployment is still serving an older version.
-var BUILD_VERSION = '2026.08.17-17';
+var BUILD_VERSION = '2026.08.17-18';
 
 // ---------------------------------------------------------------------------
 // Sheet schema — single source of truth for headers used by the generic
@@ -38,7 +38,12 @@ var SHEETS = {
   SmsProviders:   ['ProviderID', 'Name', 'Type', 'SenderID', 'BaseURL', 'ExtraConfig', 'Active', 'SortOrder', 'CreatedAt'],
   SmsLog:         ['SmsID', 'CreatedAt', 'Phone', 'Message', 'ProviderID', 'ProviderName', 'Status', 'Response', 'Campaign', 'SentBy'],
   EmailLog:       ['EmailID', 'CreatedAt', 'ToEmail', 'Subject', 'Status', 'Response', 'Campaign', 'SentBy'],
-  Messages:       ['MessageID', 'CreatedAt', 'Name', 'Phone', 'Email', 'Subject', 'Body', 'Status', 'Reply', 'RepliedAt', 'RepliedBy']
+  Messages:       ['MessageID', 'CreatedAt', 'Name', 'Phone', 'Email', 'Subject', 'Body', 'Status', 'Reply', 'RepliedAt', 'RepliedBy'],
+  // One row per calendar day, not per visit — recordVisit() increments the
+  // count for today rather than appending a row per page load, so this stays
+  // small forever regardless of traffic.
+  VisitorStats:   ['Date', 'Count'],
+  WhatsAppAlertLog: ['AlertID', 'CreatedAt', 'Phone', 'Message', 'OrderID', 'Status', 'Response']
 };
 
 var LOW_STOCK_THRESHOLD = 5;
@@ -354,7 +359,14 @@ function seedDefaultSettings_() {
     ContactFormEnabled: 'TRUE',
     VideoAdvertURL: '',
     VideoAdvertTitle: '',
-    VideoAdvertEnabled: 'FALSE'
+    VideoAdvertEnabled: 'FALSE',
+    // WhatsApp order alerts go to the admin, not the customer — a separate
+    // concern from the WhatsAppNumber above, which is the storefront's
+    // customer-facing enquiry number.
+    WhatsAppAlertsEnabled: 'FALSE',
+    WhatsAppAlertsProvider: 'callmebot',
+    WhatsAppAlertsPhone: '',
+    WhatsAppAlertsCustomUrl: ''
   };
 
   var existing = {};
@@ -1248,6 +1260,44 @@ function adminGetAdmins(token) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Visitor tracking — one row per calendar day. The "D-" prefix keeps the key
+// as plain text: an unprefixed "2026-08-17" gets silently auto-converted to
+// a real Date by Sheets, and a Date read back doesn't round-trip through
+// String() the same way it was written, which would break same-day lookups
+// after the first one and start a fresh row per visit instead of counting.
+// ---------------------------------------------------------------------------
+function visitorDateKey_(daysAgo) {
+  var d = new Date();
+  if (daysAgo) d.setDate(d.getDate() - daysAgo);
+  var tz = Session.getScriptTimeZone() || 'Etc/UTC';
+  return 'D-' + Utilities.formatDate(d, tz, 'yyyy-MM-dd');
+}
+
+// Called once per calendar day per browser (the client throttles this via
+// localStorage — see maybeRecordVisit() in index.html), so this doubles as
+// a daily unique-visitor count without any server-side dedup bookkeeping.
+// Public/unauthenticated: any visitor can trigger it, same as loading the
+// storefront itself.
+function recordVisit() {
+  try {
+    var key = visitorDateKey_(0);
+    withLock_(function () {
+      var rows = sheetToObjects_('VisitorStats');
+      var row = rows.filter(function (r) { return String(r.Date) === key; })[0];
+      if (row) {
+        updateRowById_('VisitorStats', 'Date', key, { Count: toNum_(row.Count, 0) + 1 });
+      } else {
+        appendRowObject_('VisitorStats', { Date: key, Count: 1 });
+      }
+    });
+    return { success: true };
+  } catch (err) {
+    Logger.log('recordVisit failed: ' + err);
+    return { success: false };
+  }
+}
+
 // --- Dashboard -------------------------------------------------------------
 function adminGetDashboard(token) {
   requireAdmin_(token);
@@ -1279,6 +1329,13 @@ function adminGetDashboard(token) {
     } catch (err) { /* unparseable date, skip */ }
   });
   days.forEach(function (d) { d.total = round2_(d.total); });
+
+  var visitorStats = sheetToObjects_('VisitorStats');
+  visitorStats.forEach(function (v) {
+    var key = String(v.Date).replace(/^D-/, '');
+    if (dayIndex.hasOwnProperty(key)) days[dayIndex[key]].visitors = toNum_(v.Count, 0);
+  });
+  days.forEach(function (d) { if (!d.visitors) d.visitors = 0; });
 
   var confirmedOrderIds = {};
   confirmedOrders.forEach(function (o) { confirmedOrderIds[o.OrderID] = true; });
@@ -1312,7 +1369,9 @@ function adminGetDashboard(token) {
     salesByDay: days,
     businessBreakdown: businessBreakdown,
     topProducts: topProducts,
-    lowStock: lowStock
+    lowStock: lowStock,
+    todayVisitors: days[days.length - 1].visitors,
+    totalVisitors: visitorStats.reduce(function (s, v) { return s + toNum_(v.Count, 0); }, 0)
   };
 }
 
@@ -1998,6 +2057,84 @@ function adminGetSmsLog(token, limit) {
 }
 
 // ============================================================================
+// WHATSAPP ORDER ALERTS — pings the admin's own WhatsApp when a customer
+// checks out. Real WhatsApp Business messaging (Meta's Cloud API) needs a
+// verified business account and pre-approved message templates, which is
+// out of reach for a small shop owner setting this up alone — so the
+// default provider is CallMeBot, a free personal-WhatsApp relay: the admin
+// adds CallMeBot as a contact, sends it one activation message, gets an API
+// key back, and pastes that key here. See SETUP.md for the exact steps.
+// A "custom" provider is offered as an escape hatch for anyone who does
+// have a Cloud API-compatible webhook to point this at instead.
+// ============================================================================
+function sendOneWhatsAppAlert_(phone, message) {
+  var to = String(phone || '').replace(/\D/g, '');
+  if (!to) return { ok: false, response: 'No WhatsApp alert number configured.' };
+
+  var provider = String(getSettingValue_('WhatsAppAlertsProvider', 'callmebot')).toLowerCase();
+  var apiKey = PropertiesService.getScriptProperties().getProperty('WHATSAPP_ALERT_KEY') || '';
+  var url;
+
+  try {
+    if (provider === 'custom') {
+      var template = String(getSettingValue_('WhatsAppAlertsCustomUrl', ''));
+      if (!template) return { ok: false, response: 'No custom WhatsApp webhook URL configured.' };
+      url = template
+        .replace(/\{phone\}/g, encodeURIComponent(to))
+        .replace(/\{message\}/g, encodeURIComponent(message))
+        .replace(/\{apikey\}/g, encodeURIComponent(apiKey));
+    } else {
+      if (!apiKey) return { ok: false, response: 'No CallMeBot API key saved yet. See Settings -> Notifications & Sign-in.' };
+      url = 'https://api.callmebot.com/whatsapp.php?phone=' + encodeURIComponent(to) +
+        '&text=' + encodeURIComponent(message) + '&apikey=' + encodeURIComponent(apiKey);
+    }
+    var res = UrlFetchApp.fetch(url, { method: 'get', muteHttpExceptions: true });
+    var code = res.getResponseCode();
+    var body = res.getContentText();
+    // CallMeBot answers 200 even on some failures (e.g. not yet activated),
+    // signalling the real outcome in the body text instead.
+    var looksFailed = /error|not.*(activated|allowed)|invalid/i.test(body || '');
+    return { ok: code >= 200 && code < 300 && !looksFailed, response: (body || '').slice(0, 400) };
+  } catch (err) {
+    return { ok: false, response: String(err && err.message ? err.message : err) };
+  }
+}
+
+function logWhatsAppAlert_(orderId, phone, message, result) {
+  appendRowObject_('WhatsAppAlertLog', {
+    AlertID: genId_('WA'), CreatedAt: new Date(), Phone: phone, Message: message, OrderID: orderId || '',
+    Status: result.ok ? 'Sent' : 'Failed', Response: result.response
+  });
+}
+
+// The CallMeBot API key is a credential (if leaked, someone could relay
+// messages through it), so like SMS provider secrets it lives only in
+// Script Properties, never in the spreadsheet. Blank means "leave the
+// saved key alone", so re-saving the rest of the form doesn't wipe it.
+function adminSaveWhatsAppAlertKey(token, apiKey) {
+  requireAdmin_(token);
+  if (apiKey) PropertiesService.getScriptProperties().setProperty('WHATSAPP_ALERT_KEY', String(apiKey));
+  return { success: true };
+}
+
+function adminGetWhatsAppAlertStatus(token) {
+  requireAdmin_(token);
+  return { hasApiKey: !!PropertiesService.getScriptProperties().getProperty('WHATSAPP_ALERT_KEY') };
+}
+
+function adminSendTestWhatsAppAlert(token) {
+  requireAdmin_(token);
+  var phone = getSettingValue_('WhatsAppAlertsPhone', '');
+  if (!phone) return { success: false, message: 'Enter and save your WhatsApp number first.' };
+  var siteName = getSettingValue_('SiteName', 'Your Store');
+  var result = sendOneWhatsAppAlert_(phone, 'Test alert from ' + siteName + ' — WhatsApp order alerts are working!');
+  logWhatsAppAlert_('', phone, 'Test alert', result);
+  return result.ok
+    ? { success: true, message: 'Sent! Check your WhatsApp.' }
+    : { success: false, message: 'Could not send: ' + result.response };
+}
+
+// ============================================================================
 // EMAIL — branded HTML built from the store's own colors, logo and details
 // ============================================================================
 function buildEmailHtml_(title, bodyHtml, opts) {
@@ -2116,6 +2253,20 @@ function notifyOrderPlaced_(orderId) {
       var msg = (s.SiteName || 'Store') + ': Thank you ' + order.CustomerName + '! Order ' + order.OrderID +
         ' for ' + sym + Number(order.Total).toFixed(2) + ' received. We are verifying your payment.';
       sendSmsBatch_([order.Phone], msg, 'order-confirmation', 'system');
+    }
+    // Pings the admin, not the customer — a separate opt-in from the two
+    // notifications above.
+    if (String(s.WhatsAppAlertsEnabled).toUpperCase() === 'TRUE' && s.WhatsAppAlertsPhone) {
+      var currSym = s.CurrencySymbol || 'GHS ';
+      var itemsLine = items.map(function (it) {
+        return it.Qty + '× ' + it.ProductName + (it.RecipientNumber ? ' (' + it.RecipientNumber + ')' : '');
+      }).join(', ');
+      var waMsg = 'New order ' + order.OrderID + ' — ' + currSym + Number(order.Total).toFixed(2) +
+        '\nFrom: ' + order.CustomerName + ' (' + order.Phone + ')' +
+        '\nItems: ' + itemsLine +
+        '\nPaid via: ' + order.PaymentMethodLabel + ' · Txn ID: ' + order.TransactionID;
+      var waResult = sendOneWhatsAppAlert_(s.WhatsAppAlertsPhone, waMsg);
+      logWhatsAppAlert_(order.OrderID, s.WhatsAppAlertsPhone, waMsg, waResult);
     }
   } catch (err) {
     Logger.log('notifyOrderPlaced_ failed: ' + err);

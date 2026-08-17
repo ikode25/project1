@@ -1,5 +1,5 @@
 <!-- admin.html — Multi-Business Admin Portal -->
-<!-- MB_BUILD:2026.08.17-17 -->
+<!-- MB_BUILD:2026.08.17-18 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -67,7 +67,7 @@
     }
   </style>
 </head>
-<body class="min-h-screen" data-mb-build="2026.08.17-17">
+<body class="min-h-screen" data-mb-build="2026.08.17-18">
 
   <div id="progressBar"></div>
 
@@ -198,6 +198,7 @@
           <div class="kpi-card"><h3 class="font-semibold mb-3">Low Stock</h3><div id="lowStockList" class="text-sm space-y-1"></div></div>
           <div class="kpi-card"><h3 class="font-semibold mb-3">Sales by Business</h3><div id="bizBreakdown" class="text-sm space-y-1"></div></div>
           <div class="kpi-card"><h3 class="font-semibold mb-3">Top Selling Products</h3><div id="topProducts" class="text-sm space-y-1"></div></div>
+          <div class="kpi-card"><h3 class="font-semibold mb-3">Visitors — last 7 days</h3><div id="visitorsList" class="text-sm space-y-1"></div></div>
         </div>
       </section>
 
@@ -698,6 +699,31 @@
             </label>
           </div>
 
+          <div class="surface p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-3">
+            <h2 class="font-bold md:col-span-2">WhatsApp Order Alerts <span class="muted font-normal">(sent to you, not the customer)</span></h2>
+            <p class="text-sm muted md:col-span-2">Get an automatic WhatsApp message on your own phone the moment a customer checks out. The default option, CallMeBot, is free and needs no WhatsApp Business account — just a 2-minute one-time setup. See SETUP.md.</p>
+            <label class="flex items-center gap-2 text-sm md:col-span-2"><input type="checkbox" id="waEnabled"> Enable WhatsApp order alerts</label>
+            <label class="text-sm">Provider
+              <select id="waProvider" class="p-2 rounded-lg w-full mt-1" onchange="onWaProviderChange()">
+                <option value="callmebot">CallMeBot (free, personal WhatsApp)</option>
+                <option value="custom">Custom webhook</option>
+              </select>
+            </label>
+            <label class="text-sm">Your WhatsApp number <span class="muted">(with country code, no +)</span><input id="waPhone" placeholder="e.g. 233547359015" class="p-2 rounded-lg w-full mt-1"></label>
+            <label class="text-sm md:col-span-2" id="waApiKeyWrap">CallMeBot API Key
+              <input id="waApiKey" type="password" placeholder="Leave blank to keep the saved key" class="p-2 rounded-lg w-full mt-1">
+              <span class="text-xs muted" id="waApiKeyStatus"></span>
+            </label>
+            <label class="text-sm md:col-span-2 hidden" id="waCustomUrlWrap">Custom Webhook URL Template
+              <input id="waCustomUrl" placeholder="https://your-gateway.example.com/send?to={phone}&amp;text={message}&amp;key={apikey}" class="p-2 rounded-lg w-full mt-1">
+              <span class="text-xs muted">Placeholders: {phone} {message} {apikey} — requested as a GET.</span>
+            </label>
+            <div class="md:col-span-2 flex flex-wrap gap-2">
+              <button type="button" onclick="saveWhatsAppAlertConfig()" class="bg-primary px-4 py-2 rounded-lg text-sm">Save WhatsApp Alert Settings</button>
+              <button type="button" onclick="sendTestWhatsAppAlert()" class="surface-2 bordered px-4 py-2 rounded-lg text-sm">Send Test Alert</button>
+            </div>
+          </div>
+
           </div>
 
           <div class="set-pane space-y-6 hidden" data-pane="advanced">
@@ -1151,7 +1177,7 @@
           html: '<table style="margin:0 auto;font-size:13px">' + rows + '</table>' +
             '<hr style="margin:12px 0">' +
             '<div style="font-size:12px;text-align:left">' +
-              '<b>admin page build:</b> 2026.08.17-17<br>' +
+              '<b>admin page build:</b> 2026.08.17-18<br>' +
               '<b>Code.gs build:</b> ' + ((info && info.build) || 'could not read') + '<br>' +
               '<b>schema:</b> ' + ((info && info.setupVersion) || '?') +
             '</div>' +
@@ -1369,7 +1395,9 @@
           kpi('fa-receipt', 'Total Orders', d.totalOrders, 'text-primary'),
           kpi('fa-circle-check', 'Confirmed Orders', d.confirmedOrders, 'text-primary'),
           kpi('fa-building', 'Active Businesses', d.businessCount, 'text-purple-600'),
-          kpi('fa-box-open', 'Active Products', d.productCount, 'text-purple-600')
+          kpi('fa-box-open', 'Active Products', d.productCount, 'text-purple-600'),
+          kpi('fa-eye', "Today's Visitors", d.todayVisitors || 0, 'text-cyan-600'),
+          kpi('fa-users', 'All-Time Visitors', d.totalVisitors || 0, 'text-cyan-600')
         ].join('');
         drawSalesChart(d.salesByDay || []);
         loadSmsBalance(false);
@@ -1382,6 +1410,10 @@
         document.getElementById('topProducts').innerHTML = (d.topProducts || []).length
           ? d.topProducts.map(function (p) { return '<p class="flex justify-between gap-2"><span>' + esc(p.product) + '</span><span class="font-semibold">' + p.qty + ' sold</span></p>'; }).join('')
           : '<p class="muted">No sales yet.</p>';
+        var last7 = (d.salesByDay || []).slice(-7);
+        document.getElementById('visitorsList').innerHTML = last7.length
+          ? last7.map(function (day) { return '<p class="flex justify-between gap-2"><span>' + esc(day.date) + '</span><span class="font-semibold">' + (day.visitors || 0) + '</span></p>'; }).join('')
+          : '<p class="muted">No visits recorded yet.</p>';
       }).withFailureHandler(runFail).adminGetDashboard(adminToken);
     }
     // Blinks while the balance is low or unknown; calm once healthy.
@@ -2281,7 +2313,61 @@
         syncColorInputs();
         renderFeatureStatus();
         applyTheme(cache.settings);
+        loadWhatsAppAlertConfig();
       }).withFailureHandler(runFail).adminGetSettings(adminToken);
+    }
+
+    // WhatsApp Order Alerts kept out of SETTING_FIELDS/SETTING_TOGGLES and
+    // saved via its own button — the API key needs the same "blank means
+    // leave it alone" secret handling the SMS providers use, which the bulk
+    // Save All Settings button doesn't do.
+    function loadWhatsAppAlertConfig() {
+      document.getElementById('waEnabled').checked = String(cache.settings.WhatsAppAlertsEnabled).toUpperCase() === 'TRUE';
+      document.getElementById('waProvider').value = cache.settings.WhatsAppAlertsProvider || 'callmebot';
+      document.getElementById('waPhone').value = cache.settings.WhatsAppAlertsPhone || '';
+      document.getElementById('waCustomUrl').value = cache.settings.WhatsAppAlertsCustomUrl || '';
+      onWaProviderChange();
+      google.script.run.withSuccessHandler(function (s) {
+        document.getElementById('waApiKeyStatus').textContent = (s && s.hasApiKey)
+          ? 'A key is already saved — leave blank to keep it.' : 'No key saved yet.';
+      }).withFailureHandler(function () {}).adminGetWhatsAppAlertStatus(adminToken);
+    }
+    function onWaProviderChange() {
+      var custom = document.getElementById('waProvider').value === 'custom';
+      document.getElementById('waApiKeyWrap').classList.toggle('hidden', custom);
+      document.getElementById('waCustomUrlWrap').classList.toggle('hidden', !custom);
+    }
+    function saveWhatsAppAlertConfig() {
+      var cfg = {
+        WhatsAppAlertsEnabled: document.getElementById('waEnabled').checked ? 'TRUE' : 'FALSE',
+        WhatsAppAlertsProvider: document.getElementById('waProvider').value,
+        WhatsAppAlertsPhone: document.getElementById('waPhone').value.trim(),
+        WhatsAppAlertsCustomUrl: document.getElementById('waCustomUrl').value.trim()
+      };
+      var apiKey = document.getElementById('waApiKey').value.trim();
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function () {
+        Object.keys(cfg).forEach(function (k) { cache.settings[k] = cfg[k]; });
+        if (!apiKey) {
+          hideLoadingSpinner();
+          toast('success', 'WhatsApp alert settings saved', '');
+          return;
+        }
+        google.script.run.withSuccessHandler(function () {
+          hideLoadingSpinner();
+          document.getElementById('waApiKey').value = '';
+          toast('success', 'WhatsApp alert settings saved', '');
+          loadWhatsAppAlertConfig();
+        }).withFailureHandler(runFail).adminSaveWhatsAppAlertKey(adminToken, apiKey);
+      }).withFailureHandler(runFail).adminSaveSettings(adminToken, cfg);
+    }
+    function sendTestWhatsAppAlert() {
+      showLoadingSpinner();
+      google.script.run.withSuccessHandler(function (res) {
+        hideLoadingSpinner();
+        if (res.success) toast('success', res.message, '');
+        else toast('error', 'Test failed', res.message || '');
+      }).withFailureHandler(runFail).adminSendTestWhatsAppAlert(adminToken);
     }
     // These two features stay invisible on the storefront until they are
     // configured, so spell out their current state rather than leaving the

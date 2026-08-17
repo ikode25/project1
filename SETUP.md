@@ -104,12 +104,12 @@ Log in to the admin portal, then:
 Every image field is a **photo picker**: paste a URL or click *Choose Photo* to
 upload from your device, with a live thumbnail preview either way.
 
-The store ships with a demo catalog (Data Bundles, Electronics & Gadgets,
-Picture Frames, Security & Alarm Systems, Scripts & Source Code) so you can see
-how everything works. When you're ready, **Settings → Starter Content → Delete
-demo businesses & products** removes it in one click, leaving anything you
-created yourself untouched. Renaming a demo business also adopts it as your
-own, so it survives the cleanup.
+The store ships with a demo catalog (Electronics & Gadgets, Picture Frames,
+Security & Alarm Systems, Scripts & Source Code) so you can see how everything
+works. When you're ready, **Settings → Starter Content → Delete demo
+businesses & products** removes it in one click, leaving anything you created
+yourself untouched. Renaming a demo business also adopts it as your own, so it
+survives the cleanup.
 
 ### The two WhatsApp options on a product
 
@@ -120,6 +120,47 @@ own, so it survives the cleanup.
 
 Both keep showing the product's price and full description, so nothing is
 hidden behind "Contact for price" unless you actually leave the price at 0.
+
+## WhatsApp order alerts (to you, automatically)
+
+Get a WhatsApp message on your own phone the instant a customer checks out —
+customer name, phone, items, total, and payment reference, no need to keep
+the admin portal open. **Settings → Notifications & Sign-in → WhatsApp Order
+Alerts.**
+
+Real WhatsApp Business messaging (Meta's Cloud API) needs a verified business
+account, a phone number registered with Meta, and pre-approved message
+templates before it can send anything — out of reach for most small shops to
+set up alone. So the default provider here is **CallMeBot**, a free
+personal-WhatsApp relay that needs none of that:
+
+1. On the phone whose WhatsApp you want alerts sent to, add this contact:
+   **+34 644 59 71 67** (the official CallMeBot number).
+2. Send it this exact message (case matters): `I allow callmebot to send me messages`
+3. Within a minute or two it replies with your **API key**.
+4. In the admin portal, tick **Enable WhatsApp order alerts**, enter your
+   WhatsApp number with country code and no `+` (e.g. `233547359015`), paste
+   the API key, and **Save**. Use **Send Test Alert** to confirm it works.
+
+CallMeBot is a free community service intended for personal/low-volume
+notifications (roughly one message per second, which a small shop's order
+volume is nowhere near) — it is not affiliated with WhatsApp/Meta and could
+change or go down without notice. If that ever matters to you, the **Custom
+webhook** provider option lets you point this at a Meta Cloud API-compatible
+gateway (or your own relay) instead, using `{phone}` `{message}` `{apikey}`
+placeholders in a URL template sent as a GET request.
+
+This alert goes **to you** — it's separate from (and doesn't affect) the
+customer-facing WhatsApp enquiry number under Contact & Social, and separate
+from the customer's own order-confirmation email/SMS.
+
+## Visitor tracking
+
+The Dashboard shows **Today's Visitors**, **All-Time Visitors**, and a
+**Visitors — last 7 days** breakdown, alongside the sales chart. A visit is
+counted once per browser per calendar day (a repeat page load or refresh the
+same day doesn't inflate it), recorded automatically — nothing to configure.
+It only counts the customer storefront, not the admin portal itself.
 
 ## Admin login security
 

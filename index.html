@@ -1,5 +1,5 @@
 <!-- index.html — Multi-Business Storefront -->
-<!-- MB_BUILD:2026.08.17-17 -->
+<!-- MB_BUILD:2026.08.17-18 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -73,7 +73,7 @@ box-shadow: 0 0 8px var(--accent);
     #fabMenu.closed { opacity: 0; transform: translateY(8px); pointer-events: none; }
   </style>
 </head>
-<body class="flex flex-col min-h-screen" data-mb-build="2026.08.17-17">
+<body class="flex flex-col min-h-screen" data-mb-build="2026.08.17-18">
 
   <div id="progressBar"></div>
 
@@ -511,6 +511,7 @@ box-shadow: 0 0 8px var(--accent);
       document.getElementById('footerYear').textContent = new Date().getFullYear();
       restoreSession();
       applyStoredTheme();
+      maybeRecordVisit();
 
       var cached = null;
       try {
@@ -525,6 +526,20 @@ box-shadow: 0 0 8px var(--accent);
       google.script.run.withSuccessHandler(function (data) { onStoreLoaded(data, false); })
         .withFailureHandler(onStoreLoadFailed).getStorefrontData(false);
     };
+
+    // Counts a daily unique visit — throttled to once per calendar day per
+    // browser via localStorage, so refreshes/repeat visits the same day
+    // don't inflate the count and no server-side dedup bookkeeping is
+    // needed. Best-effort: never blocks or interrupts browsing if it fails
+    // (private-mode localStorage, network hiccup, etc.).
+    function maybeRecordVisit() {
+      try {
+        var today = new Date().toISOString().slice(0, 10);
+        if (localStorage.getItem('mb_last_visit_date') === today) return;
+        localStorage.setItem('mb_last_visit_date', today);
+        google.script.run.withFailureHandler(function () {}).recordVisit();
+      } catch (e) { /* localStorage unavailable — skip silently */ }
+    }
 
     function onStoreLoadFailed(err) {
       stopProgress();
