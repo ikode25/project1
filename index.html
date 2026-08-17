@@ -1,26 +1,1467 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>MySchool</title>
-</head>
-<body>
-  <iframe 
-    src="https://script.google.com/macros/s/AKfycbweB2UbaMxFiRbdJ9s71xnKL1C_Ak15HqS9bdLskkxrZzf4YWR5fcX-uOt4mUD8Va8/exec"
-    width="100%"
-    height="100%"
-    allowfullscreen="true"
-    style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; border: none;">
-  </iframe>
+<!--
+  ============================================================================
+  BARBER & SALON ENTERPRISE MANAGEMENT SYSTEM (Ghana)
+  Front-end — index.html
+  Public marketing/booking site + secured admin/staff dashboard, in one file.
+  Routing: '#admin' switches to the dashboard. Everything else is public.
+  ============================================================================
+-->
+<style>
+  :root {
+    --clr-primary: #1a1a1a;
+    --clr-secondary: #c9a227;
+    --clr-accent: #c9a227;
+    --clr-bg: #f7f5f2;
+    --clr-text: #1a1a1a;
+    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --radius: 10px;
+    --shadow: 0 2px 14px rgba(0,0,0,.08);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--font);
+    background: var(--clr-bg);
+    color: var(--clr-text);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  img { max-width: 100%; display: block; }
+  a { color: inherit; text-decoration: none; }
+  h1, h2, h3, h4 { margin: 0 0 .4em; line-height: 1.2; }
+  p { margin: 0 0 1em; }
+  button, input, select, textarea { font-family: inherit; font-size: 1rem; }
+  .container { max-width: 1180px; margin: 0 auto; padding: 0 20px; }
+  .hidden { display: none !important; }
+  .muted { color: #777; font-size: .9em; }
+  .btn {
+    display: inline-block; padding: 12px 24px; border-radius: 999px; border: none;
+    background: var(--clr-primary); color: #fff; cursor: pointer; font-weight: 600;
+    transition: opacity .15s ease, transform .1s ease;
+  }
+  .btn:hover { opacity: .88; }
+  .btn:active { transform: scale(.97); }
+  .btn-accent { background: var(--clr-accent); color: #1a1a1a; }
+  .btn-outline { background: transparent; border: 2px solid var(--clr-primary); color: var(--clr-primary); }
+  .btn-sm { padding: 7px 14px; font-size: .85rem; border-radius: 6px; }
+  .btn-danger { background: #c0392b; color: #fff; }
+  .btn-block { width: 100%; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .75rem; font-weight: 700; }
+  .badge-pending { background: #fff4d6; color: #8a6d00; }
+  .badge-confirmed { background: #dbeeff; color: #0b5da3; }
+  .badge-completed { background: #dcf5e3; color: #1c7c3c; }
+  .badge-cancelled, .badge-no-show { background: #fbe0e0; color: #b32424; }
 
-  <script>
-    window.onload = function() {
-      document.querySelector('iframe')
-        .requestFullscreen()
-        .catch((err) => {
-          console.error('Error attempting to enable full-screen mode:', err.message);
-        });
+  /* ---------- PUBLIC NAV ---------- */
+  #publicNav {
+    position: sticky; top: 0; z-index: 50; background: var(--clr-primary);
+    color: #fff; box-shadow: var(--shadow);
+  }
+  #publicNav .bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; }
+  #publicNav .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.15rem; }
+  #publicNav .brand img { height: 34px; width: 34px; border-radius: 8px; object-fit: cover; }
+  #publicNav nav { display: flex; gap: 18px; align-items: center; }
+  #publicNav nav a { font-size: .92rem; opacity: .9; }
+  #publicNav nav a:hover { opacity: 1; color: var(--clr-accent); }
+  #navToggle { display: none; background: none; border: none; color: #fff; font-size: 1.5rem; cursor: pointer; }
+  @media (max-width: 800px) {
+    #navToggle { display: block; }
+    #publicNav nav { position: absolute; top: 100%; left: 0; right: 0; background: var(--clr-primary); flex-direction: column; padding: 10px 20px 20px; display: none; }
+    #publicNav nav.open { display: flex; }
+  }
+
+  /* ---------- HERO CAROUSEL ---------- */
+  #hero { position: relative; height: 62vh; min-height: 380px; overflow: hidden; background: #111; }
+  #hero .slide {
+    position: absolute; inset: 0; background-size: cover; background-position: center;
+    opacity: 0; transition: opacity .8s ease; display: flex; align-items: center;
+  }
+  #hero .slide.active { opacity: 1; }
+  #hero .slide::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.72), rgba(0,0,0,.25)); }
+  #hero .slide-content { position: relative; z-index: 2; color: #fff; max-width: 640px; padding: 0 30px; }
+  #hero .slide-content h1 { font-size: 2.4rem; margin-bottom: .3em; }
+  #hero .slide-content p { font-size: 1.1rem; opacity: .92; }
+  #hero .dots { position: absolute; bottom: 18px; left: 0; right: 0; display: flex; justify-content: center; gap: 8px; z-index: 3; }
+  #hero .dots span { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,.5); cursor: pointer; }
+  #hero .dots span.active { background: var(--clr-accent); }
+  @media (max-width: 700px) { #hero .slide-content h1 { font-size: 1.7rem; } #hero { height: 52vh; } }
+
+  /* ---------- SECTIONS ---------- */
+  section.pub { padding: 60px 0; }
+  section.pub.alt { background: #fff; }
+  .section-title { text-align: center; margin-bottom: 8px; }
+  .section-sub { text-align: center; color: #777; margin-bottom: 36px; }
+
+  .branch-select-bar { display: flex; justify-content: center; margin-bottom: 30px; }
+  .branch-select-bar select { padding: 10px 16px; border-radius: 8px; border: 1px solid #ddd; min-width: 260px; }
+
+  .svc-category { margin-bottom: 30px; }
+  .svc-category h3 { color: var(--clr-secondary); border-bottom: 2px solid var(--clr-secondary); padding-bottom: 6px; margin-bottom: 14px; display: inline-block; }
+  .svc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .svc-card { background: #fff; border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px; }
+  .svc-card .price { font-size: 1.3rem; font-weight: 800; color: var(--clr-primary); }
+  .svc-card .dur { color: #888; font-size: .85rem; }
+
+  .staff-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+  .staff-card { background: #fff; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); text-align: center; }
+  .staff-card .photo { height: 180px; background-size: cover; background-position: center; background-color: #ddd; }
+  .staff-card .info { padding: 14px; }
+  .staff-card .role { color: var(--clr-secondary); font-weight: 700; font-size: .82rem; text-transform: uppercase; }
+
+  .book-wrap { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 30px; max-width: 640px; margin: 0 auto; }
+  .form-row { margin-bottom: 16px; }
+  .form-row label { display: block; margin-bottom: 6px; font-weight: 600; font-size: .9rem; }
+  .form-row input, .form-row select, .form-row textarea {
+    width: 100%; padding: 11px 12px; border-radius: 8px; border: 1px solid #ddd; background: #fafafa;
+  }
+  .form-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 560px) { .form-row2 { grid-template-columns: 1fr; } }
+  .form-hint { font-size: .8rem; color: #888; margin-top: 4px; }
+  .form-error { color: #c0392b; font-size: .85rem; margin-top: 6px; }
+  .form-success { background: #dcf5e3; color: #1c7c3c; padding: 14px 16px; border-radius: 8px; margin-top: 14px; }
+
+  .reviews-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: 16px; }
+  .review-card { background: #fff; border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
+  .stars { color: var(--clr-secondary); letter-spacing: 2px; }
+
+  .contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+  @media (max-width: 800px) { .contact-grid { grid-template-columns: 1fr; } }
+  .contact-item { display: flex; gap: 12px; margin-bottom: 14px; align-items: flex-start; }
+  .contact-item .ic { font-size: 1.3rem; }
+  .contact-grid iframe { width: 100%; height: 280px; border: 0; border-radius: var(--radius); }
+
+  footer.pub-footer { background: var(--clr-primary); color: #eee; padding: 30px 0; text-align: center; font-size: .85rem; }
+  footer.pub-footer a { color: var(--clr-secondary); }
+
+  #adminLoginLink { background: var(--clr-accent); color: #1a1a1a; padding: 7px 16px; border-radius: 999px; font-weight: 700; font-size: .85rem; }
+
+  /* ---------- LOADING / TOAST ---------- */
+  #loadingBar { position: fixed; top: 0; left: 0; height: 3px; background: var(--clr-accent); width: 0; z-index: 9999; transition: width .3s ease, opacity .3s ease; }
+  #toastHost { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; max-width: 340px; }
+  .toast { padding: 12px 16px; border-radius: 8px; color: #fff; background: #1a1a1a; box-shadow: var(--shadow); font-size: .9rem; animation: slidein .2s ease; }
+  .toast.error { background: #c0392b; }
+  .toast.success { background: #1c7c3c; }
+  @keyframes slidein { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+  /* ---------- ADMIN ---------- */
+  #adminApp { display: none; min-height: 100vh; background: #f1f2f5; color: #1a1a1a; }
+  #adminApp.dark { background: #14161a; color: #e8e8e8; }
+  #loginScreen {
+    display: none; min-height: 100vh; align-items: center; justify-content: center;
+    background: linear-gradient(135deg, #1a1a1a, #2c2c2c);
+  }
+  #loginScreen .box { background: #fff; padding: 40px; border-radius: var(--radius); width: 100%; max-width: 380px; box-shadow: var(--shadow); }
+  #loginScreen h2 { text-align: center; }
+  .admin-shell { display: grid; grid-template-columns: 230px 1fr; min-height: 100vh; }
+  @media (max-width: 860px) { .admin-shell { grid-template-columns: 1fr; } }
+  .admin-sidebar {
+    background: #1a1a1a; color: #fff; padding: 18px 0; position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  }
+  #adminApp.dark .admin-sidebar { background: #0c0d10; }
+  .admin-sidebar .logo { padding: 0 18px 18px; font-weight: 800; border-bottom: 1px solid #333; margin-bottom: 10px; }
+  .admin-sidebar .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 11px 18px; cursor: pointer; font-size: .9rem; opacity: .85;
+  }
+  .admin-sidebar .nav-item:hover { background: #2a2a2a; opacity: 1; }
+  .admin-sidebar .nav-item.active { background: var(--clr-accent); color: #1a1a1a; opacity: 1; font-weight: 700; }
+  @media (max-width: 860px) { .admin-sidebar { position: static; height: auto; display: flex; overflow-x: auto; padding: 10px; } .admin-sidebar .logo { display: none; } .admin-sidebar .nav-item { white-space: nowrap; } }
+
+  .admin-main { padding: 20px 26px 60px; }
+  .admin-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; flex-wrap: wrap; gap: 10px; }
+  .admin-topbar h2 { margin: 0; }
+  .admin-topbar-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  select.branch-switch { padding: 8px 12px; border-radius: 8px; border: 1px solid #ccc; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px,1fr)); gap: 14px; margin-bottom: 24px; }
+  .stat-card { background: #fff; border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
+  #adminApp.dark .stat-card, #adminApp.dark .panel, #adminApp.dark table { background: #1e2127; color: #e8e8e8; }
+  .stat-card .val { font-size: 1.7rem; font-weight: 800; }
+  .stat-card .lbl { color: #888; font-size: .85rem; }
+
+  .panel { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; margin-bottom: 22px; }
+  .panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+  .filters-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .filters-bar input, .filters-bar select { padding: 8px 10px; border-radius: 6px; border: 1px solid #ccc; }
+
+  table { width: 100%; border-collapse: collapse; font-size: .88rem; background: #fff; }
+  table th, table td { text-align: left; padding: 9px 10px; border-bottom: 1px solid #eee; }
+  table th { color: #888; font-weight: 700; text-transform: uppercase; font-size: .72rem; }
+  .table-wrap { overflow-x: auto; }
+  .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: flex-start; justify-content: center; z-index: 999; overflow-y: auto; padding: 40px 16px; }
+  .modal-box { background: #fff; border-radius: var(--radius); padding: 26px; width: 100%; max-width: 560px; box-shadow: var(--shadow); }
+  #adminApp.dark .modal-box { background: #1e2127; color: #e8e8e8; }
+  .modal-box h3 { margin-top: 0; }
+  .modal-close { float: right; background: none; border: none; font-size: 1.3rem; cursor: pointer; color: inherit; }
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 500px) { .field-grid { grid-template-columns: 1fr; } }
+  .field-grid label { font-size: .82rem; font-weight: 600; display: block; margin-bottom: 4px; }
+  .field-grid input, .field-grid select, .field-grid textarea { width: 100%; padding: 9px 10px; border-radius: 6px; border: 1px solid #ccc; }
+
+  /* POS */
+  .pos-layout { display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px; }
+  @media (max-width: 900px) { .pos-layout { grid-template-columns: 1fr; } }
+  .pos-item-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(150px,1fr)); gap: 10px; max-height: 480px; overflow-y: auto; }
+  .pos-item-card { background: #f7f7f7; border-radius: 8px; padding: 10px; cursor: pointer; border: 1px solid #eee; }
+  #adminApp.dark .pos-item-card { background: #262a31; border-color: #333; }
+  .pos-item-card:hover { border-color: var(--clr-accent); }
+  .cart-line { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; font-size: .88rem; }
+  .cart-tot-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: .92rem; }
+  .cart-tot-row.grand { font-weight: 800; font-size: 1.15rem; border-top: 2px solid #ddd; padding-top: 10px; margin-top: 8px; }
+
+  .theme-swatch { width: 36px; height: 36px; border-radius: 8px; border: 2px solid #ccc; cursor: pointer; display: inline-block; }
+  .color-field { display: flex; align-items: center; gap: 8px; }
+  .color-field input[type=color] { width: 46px; height: 36px; border: none; padding: 0; background: none; }
+
+  .receipt-box { font-family: monospace; font-size: .85rem; background: #fafafa; border: 1px dashed #999; padding: 16px; }
+  .receipt-box hr { border: none; border-top: 1px dashed #999; }
+
+  .bar-chart { display: flex; align-items: flex-end; gap: 6px; height: 160px; }
+  .bar-chart .bar { flex: 1; background: var(--clr-accent); border-radius: 4px 4px 0 0; position: relative; min-width: 6px; }
+  .bar-chart .bar span { position: absolute; top: -18px; left: 0; right: 0; text-align: center; font-size: .65rem; color: #888; }
+
+  @media print {
+    #adminApp .admin-sidebar, #adminApp .admin-topbar, .modal-backdrop .btn, #navToggle { display: none !important; }
+  }
+</style>
+
+<div id="loadingBar"></div>
+<div id="toastHost"></div>
+
+<!-- ============================================================ PUBLIC SITE ============================================================ -->
+<div id="publicApp">
+  <nav id="publicNav">
+    <div class="bar container">
+      <div class="brand"><img id="pubLogo" src="" alt="" class="hidden"><span id="pubBrandName">Salon</span></div>
+      <button id="navToggle">☰</button>
+      <nav id="pubNav">
+        <a href="#services">Services</a>
+        <a href="#team">Our Team</a>
+        <a href="#booking">Book Now</a>
+        <a href="#reviews">Reviews</a>
+        <a href="#contact">Contact</a>
+        <a href="#admin" id="adminLoginLink">Staff Login</a>
+      </nav>
+    </div>
+  </nav>
+
+  <div id="hero"></div>
+
+  <section class="pub" id="branchBar">
+    <div class="container branch-select-bar">
+      <select id="branchSelector"><option value="">All Branches</option></select>
+    </div>
+  </section>
+
+  <section class="pub alt" id="services">
+    <div class="container">
+      <h2 class="section-title">Services & Price List</h2>
+      <p class="section-sub">All prices in Ghana Cedis (GH₵)</p>
+      <div id="servicesList">Loading services…</div>
+    </div>
+  </section>
+
+  <section class="pub" id="team">
+    <div class="container">
+      <h2 class="section-title">Meet Our Team</h2>
+      <p class="section-sub">Experienced barbers &amp; stylists ready to serve you</p>
+      <div class="staff-grid" id="staffList">Loading team…</div>
+    </div>
+  </section>
+
+  <section class="pub alt" id="booking">
+    <div class="container">
+      <h2 class="section-title">Book an Appointment</h2>
+      <p class="section-sub">Fill the form below — we'll confirm by SMS/Email</p>
+      <div class="book-wrap">
+        <form id="bookingForm">
+          <div class="form-row">
+            <label>Branch *</label>
+            <select id="bkBranch" required></select>
+          </div>
+          <div class="form-row">
+            <label>Service *</label>
+            <select id="bkService" required></select>
+          </div>
+          <div class="form-row">
+            <label>Preferred Staff</label>
+            <select id="bkStaff"><option value="">Any available</option></select>
+          </div>
+          <div class="form-row2">
+            <div class="form-row">
+              <label>Date *</label>
+              <input type="date" id="bkDate" required>
+            </div>
+            <div class="form-row">
+              <label>Time *</label>
+              <input type="time" id="bkTime" required>
+            </div>
+          </div>
+          <div class="form-row2">
+            <div class="form-row">
+              <label>Full Name *</label>
+              <input type="text" id="bkName" required>
+            </div>
+            <div class="form-row">
+              <label>Phone Number *</label>
+              <input type="tel" id="bkPhone" placeholder="024XXXXXXX or +233XXXXXXXXX" required>
+            </div>
+          </div>
+          <div class="form-row">
+            <label>Email (optional)</label>
+            <input type="email" id="bkEmail">
+          </div>
+          <div class="form-row">
+            <label>Notes (optional)</label>
+            <textarea id="bkNotes" rows="2"></textarea>
+          </div>
+          <button type="submit" class="btn btn-accent btn-block" id="bkSubmitBtn">Request Appointment</button>
+          <div id="bkError" class="form-error hidden"></div>
+          <div id="bkSuccess" class="form-success hidden"></div>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section class="pub" id="reviews">
+    <div class="container">
+      <h2 class="section-title">What Our Customers Say</h2>
+      <div class="reviews-grid" id="reviewsList">Loading reviews…</div>
+    </div>
+  </section>
+
+  <section class="pub alt" id="contact">
+    <div class="container contact-grid">
+      <div>
+        <h2>Visit / Contact Us</h2>
+        <div class="contact-item"><span class="ic">📞</span><div><b>Call Us</b><br><a id="contactPhoneLink" href="#"></a></div></div>
+        <div class="contact-item"><span class="ic">💬</span><div><b>WhatsApp</b><br><a id="contactWaLink" href="#" target="_blank">Chat with us</a></div></div>
+        <div class="contact-item"><span class="ic">✉️</span><div><b>Email</b><br><a id="contactEmailLink" href="#"></a></div></div>
+        <div class="contact-item"><span class="ic">🕒</span><div><b>Opening Hours</b><br><span id="contactHours"></span></div></div>
+      </div>
+      <iframe id="contactMap" loading="lazy" src=""></iframe>
+    </div>
+  </section>
+
+  <footer class="pub-footer">
+    <div class="container">
+      <p id="footerBrand">© <span id="footerYear"></span> Salon</p>
+      <p><a href="#admin">Staff / Admin Login</a></p>
+    </div>
+  </footer>
+</div>
+
+<!-- ============================================================ ADMIN LOGIN ============================================================ -->
+<div id="loginScreen">
+  <div class="box">
+    <h2>Staff Login</h2>
+    <form id="loginForm">
+      <div class="form-row"><label>Username</label><input type="text" id="loginUsername" required autocomplete="username"></div>
+      <div class="form-row"><label>Password</label><input type="password" id="loginPassword" required autocomplete="current-password"></div>
+      <button type="submit" class="btn btn-block" id="loginBtn">Log In</button>
+      <div id="loginError" class="form-error hidden"></div>
+    </form>
+    <p class="muted" style="text-align:center;margin-top:16px;"><a href="#">← Back to website</a></p>
+  </div>
+</div>
+
+<!-- ============================================================ ADMIN APP ============================================================ -->
+<div id="adminApp">
+  <div class="admin-shell">
+    <div class="admin-sidebar" id="adminSidebar">
+      <div class="logo" id="sidebarBrand">Salon Admin</div>
+      <div id="navItems"></div>
+    </div>
+    <div class="admin-main">
+      <div class="admin-topbar">
+        <h2 id="pageTitle">Overview</h2>
+        <div class="admin-topbar-actions">
+          <select class="branch-switch hidden" id="ownerBranchSwitch"></select>
+          <button class="btn btn-sm btn-outline" id="darkModeToggle">🌙 Dark Mode</button>
+          <span class="muted" id="currentUserLabel"></span>
+          <button class="btn btn-sm btn-danger" id="logoutBtn">Logout</button>
+        </div>
+      </div>
+      <div id="adminContent"></div>
+    </div>
+  </div>
+</div>
+
+<div id="modalHost"></div>
+
+<script>
+/* =====================================================================
+ * GLOBAL STATE
+ * ===================================================================*/
+var STATE = {
+  token: null,
+  user: null,
+  settings: null,
+  branches: [],
+  publicData: null,
+  currentBranchFilter: '', // '' = all (owner)
+  adminPage: 'overview',
+  loadingCount: 0
+};
+
+/* =====================================================================
+ * API WRAPPER — google.script.run with loading + error handling
+ * ===================================================================*/
+function api(fnName) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  return new Promise(function (resolve, reject) {
+    setLoading(true);
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+      setLoading(false);
+      reject(new Error('This app must be opened as a deployed Google Apps Script Web App.'));
+      return;
+    }
+    google.script.run
+      .withSuccessHandler(function (res) { setLoading(false); resolve(res); })
+      .withFailureHandler(function (err) { setLoading(false); reject(err); })[fnName].apply(null, args);
+  });
+}
+
+function setLoading(on) {
+  STATE.loadingCount += on ? 1 : -1;
+  if (STATE.loadingCount < 0) STATE.loadingCount = 0;
+  var bar = document.getElementById('loadingBar');
+  bar.style.opacity = STATE.loadingCount > 0 ? '1' : '0';
+  bar.style.width = STATE.loadingCount > 0 ? '70%' : '0%';
+}
+
+function toast(msg, type) {
+  var host = document.getElementById('toastHost');
+  var el = document.createElement('div');
+  el.className = 'toast' + (type ? ' ' + type : '');
+  el.textContent = msg;
+  host.appendChild(el);
+  setTimeout(function () { el.remove(); }, 4200);
+}
+
+function showError(err) {
+  var msg = (err && err.message) ? err.message : String(err);
+  toast(msg, 'error');
+}
+
+function esc(s) {
+  return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+function money(n) {
+  var symbol = (STATE.settings && STATE.settings.Currency) || 'GH₵';
+  return symbol + Number(n || 0).toFixed(2);
+}
+
+/* =====================================================================
+ * THEME APPLICATION
+ * ===================================================================*/
+function applyTheme(settings) {
+  var r = document.documentElement;
+  r.style.setProperty('--clr-primary', settings.PrimaryColor || '#1a1a1a');
+  r.style.setProperty('--clr-secondary', settings.SecondaryColor || '#c9a227');
+  r.style.setProperty('--clr-accent', settings.AccentColor || '#c9a227');
+  r.style.setProperty('--clr-bg', settings.BackgroundColor || '#f7f5f2');
+  r.style.setProperty('--clr-text', settings.TextColor || '#1a1a1a');
+  r.style.setProperty('--font', settings.FontFamily || '-apple-system, sans-serif');
+}
+
+/* =====================================================================
+ * BOOT
+ * ===================================================================*/
+window.addEventListener('DOMContentLoaded', function () {
+  document.getElementById('navToggle').addEventListener('click', function () {
+    document.getElementById('pubNav').classList.toggle('open');
+  });
+  loadPublicSite();
+  bindPublicForms();
+  bindLoginForm();
+  window.addEventListener('hashchange', routeHash);
+  routeHash();
+
+  var savedDark = localStorage.getItem('salon_dark_mode') === '1';
+  if (savedDark) document.getElementById('adminApp').classList.add('dark');
+  document.getElementById('darkModeToggle').addEventListener('click', function () {
+    document.getElementById('adminApp').classList.toggle('dark');
+    localStorage.setItem('salon_dark_mode', document.getElementById('adminApp').classList.contains('dark') ? '1' : '0');
+  });
+  document.getElementById('logoutBtn').addEventListener('click', doLogout);
+});
+
+function routeHash() {
+  if (location.hash === '#admin') {
+    document.getElementById('publicApp').style.display = 'none';
+    if (STATE.token) {
+      showAdminApp();
+    } else {
+      document.getElementById('loginScreen').style.display = 'flex';
+      document.getElementById('adminApp').style.display = 'none';
+    }
+  } else {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('adminApp').style.display = 'none';
+    document.getElementById('publicApp').style.display = 'block';
+  }
+}
+
+/* =====================================================================
+ * PUBLIC SITE
+ * ===================================================================*/
+function loadPublicSite() {
+  api('getPublicData').then(function (data) {
+    STATE.publicData = data;
+    STATE.settings = data.settings;
+    STATE.branches = data.branches;
+    applyTheme(data.settings);
+    renderBranding(data.settings);
+    renderHero(data.heroSlides);
+    renderBranchSelector(data.branches);
+    renderServices(data.services, data.branches, '');
+    renderStaff(data.staff, '');
+    renderReviews(data.reviews);
+    renderContact(data.settings);
+    populateBookingSelectors(data);
+  }).catch(function (err) {
+    document.getElementById('servicesList').innerHTML = '<p class="form-error">Could not load site data. Please refresh. (' + esc(err.message) + ')</p>';
+  });
+}
+
+function renderBranding(s) {
+  document.title = s.BusinessName + ' — Book Online';
+  document.getElementById('pubBrandName').textContent = s.BusinessName;
+  document.getElementById('footerBrand').innerHTML = '© <span id="footerYear"></span> ' + esc(s.BusinessName) + ' — Powered by Google Apps Script';
+  document.getElementById('footerYear').textContent = new Date().getFullYear();
+  document.getElementById('sidebarBrand').textContent = s.BusinessName + ' Admin';
+  if (s.LogoURL) {
+    var logo = document.getElementById('pubLogo');
+    logo.src = s.LogoURL;
+    logo.classList.remove('hidden');
+  }
+}
+
+function renderHero(slides) {
+  var hero = document.getElementById('hero');
+  if (!slides.length) { hero.innerHTML = ''; return; }
+  hero.innerHTML = slides.map(function (s, i) {
+    return '<div class="slide' + (i === 0 ? ' active' : '') + '" style="background-image:url(\'' + esc(s.ImageURL) + '\')">' +
+      '<div class="slide-content"><h1>' + esc(s.Title) + '</h1><p>' + esc(s.Subtitle) + '</p>' +
+      (s.ButtonText ? '<a class="btn btn-accent" href="' + esc(s.ButtonLink || '#booking') + '">' + esc(s.ButtonText) + '</a>' : '') +
+      '</div></div>';
+  }).join('') + '<div class="dots">' + slides.map(function (_, i) { return '<span data-i="' + i + '" class="' + (i === 0 ? 'active' : '') + '"></span>'; }).join('') + '</div>';
+
+  var idx = 0;
+  document.querySelectorAll('#hero .dots span').forEach(function (dot) {
+    dot.addEventListener('click', function () { setSlide(Number(dot.dataset.i)); });
+  });
+  function setSlide(i) {
+    idx = i;
+    document.querySelectorAll('#hero .slide').forEach(function (el, j) { el.classList.toggle('active', j === i); });
+    document.querySelectorAll('#hero .dots span').forEach(function (el, j) { el.classList.toggle('active', j === i); });
+  }
+  if (slides.length > 1) {
+    setInterval(function () { setSlide((idx + 1) % slides.length); }, 5500);
+  }
+}
+
+function renderBranchSelector(branches) {
+  var sel = document.getElementById('branchSelector');
+  branches.forEach(function (b) {
+    var o = document.createElement('option'); o.value = b.BranchID; o.textContent = b.Name; sel.appendChild(o);
+  });
+  if (branches.length <= 1) document.getElementById('branchBar').classList.add('hidden');
+  sel.addEventListener('change', function () {
+    renderServices(STATE.publicData.services, STATE.publicData.branches, sel.value);
+    renderStaff(STATE.publicData.staff, sel.value);
+    document.getElementById('bkBranch').value = sel.value;
+    updateBookingServiceOptions();
+  });
+}
+
+function renderServices(services, branches, branchFilter) {
+  var list = branchFilter ? services.filter(function (s) { return s.BranchID === branchFilter; }) : services;
+  var byCategory = {};
+  list.forEach(function (s) {
+    if (!byCategory[s.Category]) byCategory[s.Category] = [];
+    byCategory[s.Category].push(s);
+  });
+  var branchMap = {}; branches.forEach(function (b) { branchMap[b.BranchID] = b.Name; });
+  var html = Object.keys(byCategory).sort().map(function (cat) {
+    return '<div class="svc-category"><h3>' + esc(cat) + '</h3><div class="svc-grid">' +
+      byCategory[cat].map(function (s) {
+        return '<div class="svc-card"><div><b>' + esc(s.Name) + '</b>' + (branches.length > 1 ? ' <span class="muted">— ' + esc(branchMap[s.BranchID] || '') + '</span>' : '') + '</div>' +
+          '<div class="muted">' + esc(s.Description || '') + '</div>' +
+          '<div class="dur">⏱ ' + s.DurationMinutes + ' mins</div>' +
+          '<div class="price">' + money(s.Price) + '</div>' +
+          '<button class="btn btn-sm btn-outline" onclick="quickBook(\'' + s.ServiceID + '\',\'' + s.BranchID + '\')">Book Now</button></div>';
+      }).join('') + '</div></div>';
+  }).join('');
+  document.getElementById('servicesList').innerHTML = html || '<p class="muted">No services available yet.</p>';
+}
+
+function quickBook(serviceId, branchId) {
+  document.getElementById('bkBranch').value = branchId;
+  updateBookingServiceOptions();
+  document.getElementById('bkService').value = serviceId;
+  location.hash = '#booking';
+  document.getElementById('bkName').focus();
+}
+
+function renderStaff(staff, branchFilter) {
+  var list = branchFilter ? staff.filter(function (s) { return s.BranchID === branchFilter; }) : staff;
+  document.getElementById('staffList').innerHTML = list.map(function (s) {
+    var photo = s.PhotoURL ? 'style="background-image:url(\'' + esc(s.PhotoURL) + '\')"' : '';
+    return '<div class="staff-card"><div class="photo" ' + photo + '>' + (s.PhotoURL ? '' : '<div style="display:flex;align-items:center;justify-content:center;height:100%;font-size:2rem;">👤</div>') + '</div>' +
+      '<div class="info"><b>' + esc(s.Name) + '</b><div class="role">' + esc(s.Role) + '</div><div class="muted">' + esc(s.Specialties || '') + '</div></div></div>';
+  }).join('') || '<p class="muted">No team members listed yet.</p>';
+}
+
+function renderReviews(reviews) {
+  var el = document.getElementById('reviewsList');
+  if (!reviews.length) { el.innerHTML = '<p class="muted">No reviews yet — be the first!</p>'; return; }
+  el.innerHTML = reviews.map(function (r) {
+    return '<div class="review-card"><div class="stars">' + '★'.repeat(r.Rating) + '☆'.repeat(5 - r.Rating) + '</div><p>' + esc(r.Comment || '') + '</p></div>';
+  }).join('');
+}
+
+function renderContact(s) {
+  document.getElementById('contactPhoneLink').textContent = s.ContactPhone;
+  document.getElementById('contactPhoneLink').href = 'tel:' + s.ContactPhone;
+  document.getElementById('contactEmailLink').textContent = s.ContactEmail;
+  document.getElementById('contactEmailLink').href = 'mailto:' + s.ContactEmail;
+  document.getElementById('contactWaLink').href = 'https://wa.me/' + String(s.WhatsAppNumber).replace(/\D/g, '');
+  document.getElementById('contactMap').src = s.MapEmbedURL || '';
+  var hoursHtml = STATE.branches.map(function (b) { return '<div><b>' + esc(b.Name) + ':</b> ' + esc(b.OpeningHours) + '</div>'; }).join('');
+  document.getElementById('contactHours').innerHTML = hoursHtml || 'Mon-Sat 8am-7pm';
+}
+
+function populateBookingSelectors(data) {
+  var branchSel = document.getElementById('bkBranch');
+  branchSel.innerHTML = '<option value="">Select branch</option>' + data.branches.map(function (b) { return '<option value="' + b.BranchID + '">' + esc(b.Name) + '</option>'; }).join('');
+  branchSel.addEventListener('change', updateBookingServiceOptions);
+  updateBookingServiceOptions();
+  var minDate = new Date().toISOString().slice(0, 10);
+  document.getElementById('bkDate').min = minDate;
+}
+
+function updateBookingServiceOptions() {
+  var branchId = document.getElementById('bkBranch').value;
+  var data = STATE.publicData;
+  var services = branchId ? data.services.filter(function (s) { return s.BranchID === branchId; }) : data.services;
+  var staff = branchId ? data.staff.filter(function (s) { return s.BranchID === branchId; }) : data.staff;
+  document.getElementById('bkService').innerHTML = '<option value="">Select service</option>' + services.map(function (s) {
+    return '<option value="' + s.ServiceID + '">' + esc(s.Name) + ' — ' + money(s.Price) + '</option>';
+  }).join('');
+  document.getElementById('bkStaff').innerHTML = '<option value="">Any available</option>' + staff.map(function (s) {
+    return '<option value="' + s.StaffID + '">' + esc(s.Name) + '</option>';
+  }).join('');
+}
+
+function bindPublicForms() {
+  document.getElementById('bookingForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var errEl = document.getElementById('bkError'), okEl = document.getElementById('bkSuccess');
+    errEl.classList.add('hidden'); okEl.classList.add('hidden');
+    var payload = {
+      branchId: document.getElementById('bkBranch').value,
+      serviceId: document.getElementById('bkService').value,
+      staffId: document.getElementById('bkStaff').value,
+      date: document.getElementById('bkDate').value,
+      timeSlot: document.getElementById('bkTime').value,
+      name: document.getElementById('bkName').value,
+      phone: document.getElementById('bkPhone').value,
+      email: document.getElementById('bkEmail').value,
+      notes: document.getElementById('bkNotes').value
     };
-  </script>
-</body>
-</html>
-        
+    var btn = document.getElementById('bkSubmitBtn');
+    btn.disabled = true; btn.textContent = 'Submitting…';
+    api('createAppointment', payload).then(function (res) {
+      okEl.textContent = res.message + ' Your reference: ' + res.reference;
+      okEl.classList.remove('hidden');
+      document.getElementById('bookingForm').reset();
+    }).catch(function (err) {
+      errEl.textContent = err.message;
+      errEl.classList.remove('hidden');
+    }).finally(function () {
+      btn.disabled = false; btn.textContent = 'Request Appointment';
+    });
+  });
+}
+
+/* =====================================================================
+ * LOGIN / SESSION
+ * ===================================================================*/
+function bindLoginForm() {
+  document.getElementById('loginForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var errEl = document.getElementById('loginError');
+    errEl.classList.add('hidden');
+    var btn = document.getElementById('loginBtn');
+    btn.disabled = true; btn.textContent = 'Logging in…';
+    api('login', document.getElementById('loginUsername').value, document.getElementById('loginPassword').value)
+      .then(function (res) {
+        STATE.token = res.token;
+        STATE.user = res.user;
+        sessionStorage.setItem('salon_token', res.token);
+        sessionStorage.setItem('salon_user', JSON.stringify(res.user));
+        showAdminApp();
+      }).catch(function (err) {
+        errEl.textContent = err.message;
+        errEl.classList.remove('hidden');
+      }).finally(function () {
+        btn.disabled = false; btn.textContent = 'Log In';
+      });
+  });
+
+  // resume session if we already have a token in this tab
+  var t = sessionStorage.getItem('salon_token');
+  var u = sessionStorage.getItem('salon_user');
+  if (t && u) { STATE.token = t; STATE.user = JSON.parse(u); }
+}
+
+function doLogout() {
+  api('logout', STATE.token).finally(function () {
+    STATE.token = null; STATE.user = null;
+    sessionStorage.removeItem('salon_token'); sessionStorage.removeItem('salon_user');
+    location.hash = '';
+    routeHash();
+  });
+}
+
+/* =====================================================================
+ * ADMIN APP SHELL
+ * ===================================================================*/
+var NAV_CONFIG = [
+  { key: 'overview', label: '📊 Overview', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] },
+  { key: 'appointments', label: '📅 Appointments', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] },
+  { key: 'pos', label: '🧾 Point of Sale', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] },
+  { key: 'customers', label: '👥 Customers', roles: ['Owner', 'Manager', 'Receptionist'] },
+  { key: 'staff', label: '💈 Staff', roles: ['Owner', 'Manager'] },
+  { key: 'inventory', label: '📦 Inventory', roles: ['Owner', 'Manager'] },
+  { key: 'branches', label: '🏢 Branches', roles: ['Owner'] },
+  { key: 'expenses', label: '💸 Expenses', roles: ['Owner', 'Manager'] },
+  { key: 'reports', label: '📈 Reports', roles: ['Owner', 'Manager'] },
+  { key: 'reviews', label: '⭐ Reviews', roles: ['Owner', 'Manager'] },
+  { key: 'heroSlides', label: '🖼️ Hero Carousel', roles: ['Owner', 'Manager'] },
+  { key: 'settings', label: '🎨 Branding & Theme', roles: ['Owner'] },
+  { key: 'users', label: '🔑 Users', roles: ['Owner'] },
+  { key: 'account', label: '⚙️ My Account', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] }
+];
+
+function showAdminApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('adminApp').style.display = 'block';
+  document.getElementById('currentUserLabel').textContent = STATE.user.username + ' (' + STATE.user.role + ')';
+
+  var branchSwitch = document.getElementById('ownerBranchSwitch');
+  if (STATE.user.role === 'Owner') {
+    branchSwitch.classList.remove('hidden');
+    branchSwitch.innerHTML = '<option value="">All Branches</option>' + STATE.branches.map(function (b) { return '<option value="' + b.BranchID + '">' + esc(b.Name) + '</option>'; }).join('');
+    branchSwitch.onchange = function () { STATE.currentBranchFilter = branchSwitch.value; renderAdminPage(); };
+  } else {
+    branchSwitch.classList.add('hidden');
+  }
+
+  renderSidebar();
+  renderAdminPage();
+}
+
+function renderSidebar() {
+  var host = document.getElementById('navItems');
+  host.innerHTML = '';
+  NAV_CONFIG.filter(function (n) { return n.roles.indexOf(STATE.user.role) > -1; }).forEach(function (n) {
+    var div = document.createElement('div');
+    div.className = 'nav-item' + (STATE.adminPage === n.key ? ' active' : '');
+    div.textContent = n.label;
+    div.addEventListener('click', function () { STATE.adminPage = n.key; renderSidebar(); renderAdminPage(); });
+    host.appendChild(div);
+  });
+}
+
+function renderAdminPage() {
+  var titleMap = {}; NAV_CONFIG.forEach(function (n) { titleMap[n.key] = n.label.replace(/^[^\s]+\s/, ''); });
+  document.getElementById('pageTitle').textContent = titleMap[STATE.adminPage] || '';
+  var content = document.getElementById('adminContent');
+  content.innerHTML = '<p class="muted">Loading…</p>';
+  var renderers = {
+    overview: renderOverview, appointments: renderAppointments, pos: renderPOS, customers: renderCustomers,
+    staff: renderStaffAdmin, inventory: renderInventory, branches: renderBranchesAdmin, expenses: renderExpenses,
+    reports: renderReports, reviews: renderReviewsAdmin, heroSlides: renderHeroAdmin, settings: renderSettingsAdmin,
+    users: renderUsersAdmin, account: renderAccount
+  };
+  (renderers[STATE.adminPage] || function () {})(content);
+}
+
+function branchArg() { return STATE.user.role === 'Owner' ? STATE.currentBranchFilter : STATE.user.branchId; }
+
+/* ---------- OVERVIEW ---------- */
+function renderOverview(content) {
+  api('getDashboardOverview', STATE.token, branchArg()).then(function (d) {
+    content.innerHTML =
+      '<div class="stat-grid">' +
+        statCard('Today\'s Revenue', money(d.todayRevenue)) +
+        statCard('Today\'s Sales', d.todaySalesCount) +
+        statCard('Today\'s Appointments', d.todayAppointments.length) +
+        statCard('Pending Bookings', d.pendingCount) +
+        statCard('Upcoming (7 days)', d.upcomingCount) +
+        statCard('Low Stock Items', d.lowStock.length) +
+      '</div>' +
+      '<div class="panel"><div class="panel-head"><h3>Today\'s Appointments</h3></div>' +
+        renderTable(['Time', 'Customer', 'Service', 'Staff', 'Status'], d.todayAppointments.map(function (a) {
+          return [a.TimeSlot, a.CustomerName, a.ServiceName, a.StaffName, statusBadge(a.Status)];
+        })) + '</div>' +
+      (d.lowStock.length ? '<div class="panel"><div class="panel-head"><h3>⚠️ Low Stock Alerts</h3></div>' +
+        renderTable(['Product', 'In Stock', 'Reorder Level'], d.lowStock.map(function (p) { return [p.Name, p.QuantityInStock, p.ReorderLevel]; })) + '</div>' : '');
+  }).catch(function (err) { content.innerHTML = errorPanel(err); });
+}
+
+function statCard(label, val) {
+  return '<div class="stat-card"><div class="val">' + val + '</div><div class="lbl">' + esc(label) + '</div></div>';
+}
+function statusBadge(status) {
+  return '<span class="badge badge-' + status.toLowerCase().replace(' ', '-') + '">' + status + '</span>';
+}
+function errorPanel(err) {
+  return '<div class="panel"><p class="form-error">⚠️ ' + esc(err.message || err) + '</p></div>';
+}
+function renderTable(headers, rows) {
+  if (!rows.length) return '<p class="muted">No records found.</p>';
+  return '<div class="table-wrap"><table><thead><tr>' + headers.map(function (h) { return '<th>' + h + '</th>'; }).join('') +
+    '</tr></thead><tbody>' + rows.map(function (r) { return '<tr>' + r.map(function (c) { return '<td>' + c + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>';
+}
+
+/* ---------- APPOINTMENTS ---------- */
+function renderAppointments(content) {
+  content.innerHTML =
+    '<div class="panel">' +
+    '<div class="panel-head"><h3>Appointments</h3><button class="btn btn-sm" onclick="openAppointmentModal()">+ New Appointment</button></div>' +
+    '<div class="filters-bar">' +
+      '<input type="date" id="apFilterDate">' +
+      '<select id="apFilterStatus"><option value="">All Statuses</option>' + ['Pending', 'Confirmed', 'Completed', 'No-show', 'Cancelled'].map(function (s) { return '<option value="' + s + '">' + s + '</option>'; }).join('') + '</select>' +
+      '<button class="btn btn-sm btn-outline" onclick="loadAppointmentsTable()">Filter</button>' +
+    '</div>' +
+    '<div id="apTableHost"><p class="muted">Loading…</p></div></div>';
+  loadAppointmentsTable();
+}
+
+function loadAppointmentsTable() {
+  var filters = { branchId: branchArg(), date: document.getElementById('apFilterDate').value, status: document.getElementById('apFilterStatus').value };
+  api('getAppointments', STATE.token, filters).then(function (rows) {
+    var host = document.getElementById('apTableHost');
+    if (!rows.length) { host.innerHTML = '<p class="muted">No appointments found.</p>'; return; }
+    host.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Ref</th><th>Date</th><th>Time</th><th>Customer</th><th>Phone</th><th>Service</th><th>Staff</th><th>Status</th><th>Actions</th></tr></thead><tbody>' +
+      rows.map(function (a) {
+        return '<tr><td>' + esc(a.Reference) + '</td><td>' + esc(a.Date) + '</td><td>' + esc(a.TimeSlot) + '</td><td>' + esc(a.CustomerName) + '</td><td>' + esc(a.CustomerPhone) + '</td><td>' + esc(a.ServiceName) + ' (' + money(a.ServicePrice) + ')</td><td>' + esc(a.StaffName) + '</td><td>' + statusBadge(a.Status) + '</td>' +
+          '<td class="row-actions">' +
+          (a.Status !== 'Confirmed' && a.Status !== 'Completed' ? '<button class="btn btn-sm" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'Confirmed\')">Confirm</button>' : '') +
+          (a.Status !== 'Completed' ? '<button class="btn btn-sm btn-accent" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'Completed\')">Complete</button>' : '') +
+          (a.Status !== 'Cancelled' && a.Status !== 'Completed' ? '<button class="btn btn-sm btn-outline" onclick="openRescheduleModal(\'' + a.AppointmentID + '\',\'' + a.Date + '\',\'' + a.TimeSlot + '\')">Reschedule</button><button class="btn btn-sm btn-danger" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'Cancelled\')">Cancel</button>' : '') +
+          (a.Status !== 'Completed' && a.Status !== 'Cancelled' ? '<button class="btn btn-sm btn-outline" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'No-show\')">No-show</button>' : '') +
+          '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }).catch(function (err) { document.getElementById('apTableHost').innerHTML = errorPanel(err); });
+}
+
+function setApptStatus(id, status) {
+  api('updateAppointmentStatus', STATE.token, id, status).then(function () {
+    toast('Appointment marked ' + status, 'success');
+    loadAppointmentsTable();
+  }).catch(showError);
+}
+
+function openRescheduleModal(id, date, time) {
+  openModal('Reschedule Appointment', '<div class="form-row"><label>New Date</label><input type="date" id="mDate" value="' + date + '"></div><div class="form-row"><label>New Time</label><input type="time" id="mTime" value="' + time + '"></div>',
+    function () {
+      api('rescheduleAppointment', STATE.token, id, document.getElementById('mDate').value, document.getElementById('mTime').value)
+        .then(function () { toast('Rescheduled', 'success'); closeModal(); loadAppointmentsTable(); }).catch(showError);
+    }, 'Save');
+}
+
+function openAppointmentModal() {
+  var branches = STATE.branches, services = STATE.publicData.services, staff = STATE.publicData.staff;
+  var branchOpts = branches.map(function (b) { return '<option value="' + b.BranchID + '">' + esc(b.Name) + '</option>'; }).join('');
+  var html =
+    '<div class="field-grid">' +
+    '<div><label>Branch</label><select id="naBranch">' + branchOpts + '</select></div>' +
+    '<div><label>Service</label><select id="naService"></select></div>' +
+    '<div><label>Staff</label><select id="naStaff"><option value="">Any</option></select></div>' +
+    '<div><label>Status</label><select id="naStatus">' + ['Pending', 'Confirmed'].map(function (s) { return '<option value="' + s + '">' + s + '</option>'; }).join('') + '</select></div>' +
+    '<div><label>Date</label><input type="date" id="naDate"></div>' +
+    '<div><label>Time</label><input type="time" id="naTime"></div>' +
+    '<div><label>Customer Name</label><input type="text" id="naName"></div>' +
+    '<div><label>Customer Phone</label><input type="text" id="naPhone" placeholder="024XXXXXXX"></div>' +
+    '</div>';
+  openModal('New Appointment', html, function () {
+    var payload = {
+      branchId: document.getElementById('naBranch').value, serviceId: document.getElementById('naService').value,
+      staffId: document.getElementById('naStaff').value, date: document.getElementById('naDate').value,
+      timeSlot: document.getElementById('naTime').value, name: document.getElementById('naName').value,
+      phone: document.getElementById('naPhone').value, status: document.getElementById('naStatus').value
+    };
+    api('createAppointmentAdmin', STATE.token, payload).then(function () {
+      toast('Appointment created', 'success'); closeModal(); loadAppointmentsTable();
+    }).catch(showError);
+  }, 'Create');
+
+  function refreshServiceOptions() {
+    var bId = document.getElementById('naBranch').value;
+    document.getElementById('naService').innerHTML = services.filter(function (s) { return s.BranchID === bId; }).map(function (s) { return '<option value="' + s.ServiceID + '">' + esc(s.Name) + '</option>'; }).join('');
+    document.getElementById('naStaff').innerHTML = '<option value="">Any</option>' + staff.filter(function (s) { return s.BranchID === bId; }).map(function (s) { return '<option value="' + s.StaffID + '">' + esc(s.Name) + '</option>'; }).join('');
+  }
+  document.getElementById('naBranch').addEventListener('change', refreshServiceOptions);
+  refreshServiceOptions();
+}
+
+/* ---------- POINT OF SALE ---------- */
+var POS_CART = [];
+function renderPOS(content) {
+  POS_CART = [];
+  var branchHint = (STATE.user.role === 'Owner' && !branchArg())
+    ? '<div class="panel" style="background:#fff4d6;"><b>⚠️ Select a branch</b> in the top-right switcher before checking out a sale.</div>' : '';
+  content.innerHTML = branchHint + '<div class="pos-layout">' +
+    '<div class="panel"><div class="panel-head"><h3>Services & Products</h3></div>' +
+    '<div class="filters-bar"><input type="text" id="posSearch" placeholder="Search…" oninput="renderPosItems()"></div>' +
+    '<div class="pos-item-grid" id="posItemGrid"></div></div>' +
+    '<div class="panel"><h3>Cart</h3><div id="posCart"><p class="muted">Cart is empty.</p></div>' +
+    '<div class="form-row"><label>Customer (optional lookup by phone)</label><input type="text" id="posCustPhone" placeholder="024XXXXXXX"><div class="form-hint" id="posCustHint"></div></div>' +
+    '<div class="field-grid"><div><label>New Customer Name</label><input type="text" id="posCustName"></div><div><label>Discount (GH₵)</label><input type="number" min="0" id="posDiscount" value="0"></div></div>' +
+    '<div class="form-row"><label>Payment Method</label><select id="posPayment">' + ['Cash', 'MTN MoMo', 'Vodafone Cash', 'Telecel Cash', 'AirtelTigo Money', 'Card'].map(function (p) { return '<option>' + p + '</option>'; }).join('') + '</select></div>' +
+    '<div id="posTotals"></div>' +
+    '<button class="btn btn-accent btn-block" onclick="checkoutSale()">Checkout</button></div></div>';
+  Promise.all([api('getServices', STATE.token, branchArg()), api('getProducts', STATE.token, branchArg())]).then(function (res) {
+    STATE.posServices = res[0]; STATE.posProducts = res[1];
+    renderPosItems();
+  }).catch(function (err) { document.getElementById('posItemGrid').innerHTML = errorPanel(err); });
+  document.getElementById('posCustPhone').addEventListener('change', function () {
+    var phone = this.value;
+    if (!phone) return;
+    api('getCustomers', STATE.token, phone).then(function (res) {
+      var hint = document.getElementById('posCustHint');
+      if (res.length) { STATE.posCustomer = res[0]; hint.textContent = 'Found: ' + res[0].Name + ' (Loyalty pts: ' + res[0].LoyaltyPoints + ')'; }
+      else { STATE.posCustomer = null; hint.textContent = 'New customer — enter name to register.'; }
+    });
+  });
+}
+
+function renderPosItems() {
+  var q = (document.getElementById('posSearch').value || '').toLowerCase();
+  var services = (STATE.posServices || []).filter(function (s) { return s.Name.toLowerCase().indexOf(q) > -1; });
+  var products = (STATE.posProducts || []).filter(function (p) { return p.Name.toLowerCase().indexOf(q) > -1; });
+  var html = services.map(function (s) {
+    return '<div class="pos-item-card" onclick="addToCart(\'service\',\'' + s.ServiceID + '\',\'' + esc(s.Name).replace(/'/g, "\\'") + '\',' + s.Price + ')"><b>' + esc(s.Name) + '</b><br><span class="muted">' + money(s.Price) + '</span></div>';
+  }).join('') + products.map(function (p) {
+    return '<div class="pos-item-card" onclick="addToCart(\'product\',\'' + p.ProductID + '\',\'' + esc(p.Name).replace(/'/g, "\\'") + '\',' + p.SellingPrice + ')"><b>📦 ' + esc(p.Name) + '</b><br><span class="muted">' + money(p.SellingPrice) + ' · Stock: ' + p.QuantityInStock + '</span></div>';
+  }).join('');
+  document.getElementById('posItemGrid').innerHTML = html || '<p class="muted">No items found.</p>';
+}
+
+function addToCart(type, id, name, price) {
+  var existing = POS_CART.find(function (c) { return c.type === type && c.id === id; });
+  if (existing) existing.qty += 1;
+  else POS_CART.push({ type: type, id: id, name: name, price: price, qty: 1 });
+  renderCart();
+}
+function renderCart() {
+  var host = document.getElementById('posCart');
+  if (!POS_CART.length) { host.innerHTML = '<p class="muted">Cart is empty.</p>'; document.getElementById('posTotals').innerHTML = ''; return; }
+  host.innerHTML = POS_CART.map(function (c, i) {
+    return '<div class="cart-line"><span>' + esc(c.name) + ' x' + c.qty + '</span><span>' + money(c.price * c.qty) +
+      ' <button class="btn btn-sm btn-outline" onclick="cartQty(' + i + ',1)">+</button> <button class="btn btn-sm btn-outline" onclick="cartQty(' + i + ',-1)">-</button></span></div>';
+  }).join('');
+  updateTotals();
+}
+function cartQty(i, delta) {
+  POS_CART[i].qty += delta;
+  if (POS_CART[i].qty <= 0) POS_CART.splice(i, 1);
+  renderCart();
+}
+function updateTotals() {
+  var subtotal = POS_CART.reduce(function (s, c) { return s + c.price * c.qty; }, 0);
+  var discount = Number(document.getElementById('posDiscount').value) || 0;
+  var taxRate = Number((STATE.settings && STATE.settings.TaxRatePercent) || 0);
+  var tax = (subtotal - discount) * (taxRate / 100);
+  var total = subtotal - discount + tax;
+  document.getElementById('posTotals').innerHTML =
+    '<div class="cart-tot-row"><span>Subtotal</span><span>' + money(subtotal) + '</span></div>' +
+    '<div class="cart-tot-row"><span>Discount</span><span>-' + money(discount) + '</span></div>' +
+    '<div class="cart-tot-row"><span>Tax (' + taxRate + '%)</span><span>' + money(tax) + '</span></div>' +
+    '<div class="cart-tot-row grand"><span>Total</span><span>' + money(total) + '</span></div>';
+}
+document.addEventListener('input', function (e) { if (e.target && e.target.id === 'posDiscount') updateTotals(); });
+
+function checkoutSale() {
+  if (!POS_CART.length) { toast('Cart is empty', 'error'); return; }
+  var saleBranchId = STATE.user.role === 'Owner' ? branchArg() : STATE.user.branchId;
+  if (!saleBranchId) { toast('Please select a specific branch (top-right) before checking out.', 'error'); return; }
+  var payload = {
+    branchId: saleBranchId,
+    items: POS_CART.map(function (c) { return { type: c.type, id: c.id, qty: c.qty }; }),
+    discount: Number(document.getElementById('posDiscount').value) || 0,
+    paymentMethod: document.getElementById('posPayment').value,
+    customerId: STATE.posCustomer ? STATE.posCustomer.CustomerID : '',
+    customerName: document.getElementById('posCustName').value,
+    customerPhone: document.getElementById('posCustPhone').value
+  };
+  api('createSale', STATE.token, payload).then(function (sale) {
+    toast('Sale completed: ' + sale.SaleID, 'success');
+    showReceipt(sale);
+    POS_CART = []; STATE.posCustomer = null;
+    renderPOS(document.getElementById('adminContent'));
+  }).catch(showError);
+}
+
+function showReceipt(sale) {
+  var html = '<div class="receipt-box" id="receiptPrint"><b>' + esc(STATE.settings.BusinessName) + '</b><br>' + esc(sale.SaleID) + '<br>' + esc(sale.Date) + '<hr>' +
+    sale.Items.map(function (i) { return i.name + ' x' + i.qty + ' — ' + money(i.lineTotal); }).join('<br>') + '<hr>' +
+    'Subtotal: ' + money(sale.Subtotal) + '<br>Discount: ' + money(sale.Discount) + '<br>Tax: ' + money(sale.Tax) + '<br><b>Total: ' + money(sale.Total) + '</b><br>Payment: ' + sale.PaymentMethod + '<hr>Thank you for your visit!</div>';
+  openModal('Receipt — ' + sale.SaleID, html, function () { window.print(); }, 'Print Receipt');
+}
+
+/* ---------- CUSTOMERS ---------- */
+function renderCustomers(content) {
+  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Customers</h3><input type="text" id="custSearch" placeholder="Search by name/phone" oninput="loadCustomers()"></div><div id="custTableHost"><p class="muted">Loading…</p></div></div>';
+  loadCustomers();
+}
+function loadCustomers() {
+  api('getCustomers', STATE.token, document.getElementById('custSearch').value).then(function (rows) {
+    document.getElementById('custTableHost').innerHTML = '<div class="table-wrap"><table><thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Loyalty Pts</th><th>Joined</th><th>Actions</th></tr></thead><tbody>' +
+      rows.map(function (c) {
+        return '<tr><td>' + esc(c.Name) + '</td><td>' + esc(c.Phone) + '</td><td>' + esc(c.Email) + '</td><td>' + c.LoyaltyPoints + '</td><td>' + String(c.DateJoined).slice(0, 10) + '</td>' +
+          '<td class="row-actions"><button class="btn btn-sm btn-outline" onclick="viewCustomerProfile(\'' + c.CustomerID + '\')">View</button></td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }).catch(function (err) { document.getElementById('custTableHost').innerHTML = errorPanel(err); });
+}
+function viewCustomerProfile(id) {
+  api('getCustomerProfile', STATE.token, id).then(function (d) {
+    var html = '<p><b>' + esc(d.customer.Name) + '</b> — ' + esc(d.customer.Phone) + '<br>Loyalty Points: ' + d.customer.LoyaltyPoints + '</p>' +
+      '<h4>Appointment History</h4>' + renderTable(['Date', 'Time', 'Status'], d.appointments.map(function (a) { return [a.Date, a.TimeSlot, a.Status]; })) +
+      '<h4>Purchase History</h4>' + renderTable(['Date', 'Total', 'Payment'], d.sales.map(function (s) { return [String(s.Date).slice(0, 10), money(s.Total), s.PaymentMethod]; }));
+    openModal('Customer Profile', html, null, null);
+  }).catch(showError);
+}
+
+/* ---------- STAFF ---------- */
+function renderStaffAdmin(content) {
+  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Staff</h3><button class="btn btn-sm" onclick="openStaffModal()">+ Add Staff</button></div><div id="staffTableHost"></div></div>';
+  loadStaffTable();
+}
+function loadStaffTable() {
+  api('getStaff', STATE.token, branchArg()).then(function (rows) {
+    document.getElementById('staffTableHost').innerHTML = '<div class="table-wrap"><table><thead><tr><th>Name</th><th>Role</th><th>Phone</th><th>Specialties</th><th>Commission %</th><th>Active</th><th>Actions</th></tr></thead><tbody>' +
+      rows.map(function (s) {
+        return '<tr><td>' + esc(s.Name) + '</td><td>' + esc(s.Role) + '</td><td>' + esc(s.Phone) + '</td><td>' + esc(s.Specialties) + '</td><td>' + s.CommissionRate + '</td><td>' + s.Active + '</td>' +
+          '<td class="row-actions"><button class="btn btn-sm btn-outline" onclick=\'openStaffModal(' + JSON.stringify(s).replace(/'/g, '&#39;') + ')\'>Edit</button><button class="btn btn-sm btn-danger" onclick="deleteStaffRow(\'' + s.StaffID + '\')">Delete</button></td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }).catch(function (err) { document.getElementById('staffTableHost').innerHTML = errorPanel(err); });
+}
+function openStaffModal(s) {
+  s = s || {};
+  var branchOpts = STATE.branches.map(function (b) { return '<option value="' + b.BranchID + '"' + (s.BranchID === b.BranchID ? ' selected' : '') + '>' + esc(b.Name) + '</option>'; }).join('');
+  var html = '<div class="field-grid">' +
+    '<div><label>Name</label><input id="sfName" value="' + esc(s.Name || '') + '"></div>' +
+    '<div><label>Role</label><select id="sfRole">' + ['Barber', 'Stylist', 'Receptionist', 'Manager'].map(function (r) { return '<option' + (s.Role === r ? ' selected' : '') + '>' + r + '</option>'; }).join('') + '</select></div>' +
+    '<div><label>Branch</label><select id="sfBranch">' + branchOpts + '</select></div>' +
+    '<div><label>Phone</label><input id="sfPhone" value="' + esc(s.Phone || '') + '"></div>' +
+    '<div><label>Specialties</label><input id="sfSpecialties" value="' + esc(s.Specialties || '') + '"></div>' +
+    '<div><label>Commission %</label><input type="number" id="sfCommission" value="' + (s.CommissionRate || 10) + '"></div>' +
+    '<div><label>Photo URL</label><input id="sfPhoto" value="' + esc(s.PhotoURL || '') + '"></div>' +
+    '<div><label>Upload Photo</label><input type="file" id="sfPhotoFile" accept="image/*"></div>' +
+    '<div><label>Active</label><select id="sfActive">' + ['Y', 'N'].map(function (a) { return '<option' + (s.Active === a ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select></div>' +
+    '</div>';
+  openModal(s.StaffID ? 'Edit Staff' : 'Add Staff', html, function () {
+    var save = function (photoUrl) {
+      api('saveStaff', STATE.token, {
+        StaffID: s.StaffID || '', Name: document.getElementById('sfName').value, Role: document.getElementById('sfRole').value,
+        BranchID: document.getElementById('sfBranch').value, Phone: document.getElementById('sfPhone').value,
+        Specialties: document.getElementById('sfSpecialties').value, PhotoURL: photoUrl || document.getElementById('sfPhoto').value,
+        CommissionRate: document.getElementById('sfCommission').value, Active: document.getElementById('sfActive').value
+      }).then(function () { toast('Staff saved', 'success'); closeModal(); loadStaffTable(); }).catch(showError);
+    };
+    var file = document.getElementById('sfPhotoFile').files[0];
+    if (file) uploadFileThen(file, save); else save();
+  }, 'Save');
+}
+function deleteStaffRow(id) {
+  if (!confirm('Delete this staff member?')) return;
+  api('deleteStaff', STATE.token, id).then(function () { toast('Deleted', 'success'); loadStaffTable(); }).catch(showError);
+}
+
+/* ---------- INVENTORY ---------- */
+function renderInventory(content) {
+  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Products / Inventory</h3><button class="btn btn-sm" onclick="openProductModal()">+ Add Product</button></div><div id="prodTableHost"></div></div>';
+  loadProductsTable();
+}
+function loadProductsTable() {
+  api('getProducts', STATE.token, branchArg()).then(function (rows) {
+    document.getElementById('prodTableHost').innerHTML = '<div class="table-wrap"><table><thead><tr><th>Name</th><th>Category</th><th>Cost</th><th>Selling Price</th><th>Stock</th><th>Reorder Lvl</th><th>Actions</th></tr></thead><tbody>' +
+      rows.map(function (p) {
+        var low = Number(p.QuantityInStock) <= Number(p.ReorderLevel);
+        return '<tr' + (low ? ' style="background:#fff4d6"' : '') + '><td>' + esc(p.Name) + '</td><td>' + esc(p.Category) + '</td><td>' + money(p.CostPrice) + '</td><td>' + money(p.SellingPrice) + '</td><td>' + p.QuantityInStock + '</td><td>' + p.ReorderLevel + '</td>' +
+          '<td class="row-actions"><button class="btn btn-sm btn-outline" onclick=\'openProductModal(' + JSON.stringify(p).replace(/'/g, '&#39;') + ')\'>Edit</button>' +
+          '<button class="btn btn-sm" onclick="restockPrompt(\'' + p.ProductID + '\')">Restock</button>' +
+          '<button class="btn btn-sm btn-danger" onclick="deleteProductRow(\'' + p.ProductID + '\')">Delete</button></td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }).catch(function (err) { document.getElementById('prodTableHost').innerHTML = errorPanel(err); });
+}
+function openProductModal(p) {
+  p = p || {};
+  var branchOpts = STATE.branches.map(function (b) { return '<option value="' + b.BranchID + '"' + (p.BranchID === b.BranchID ? ' selected' : '') + '>' + esc(b.Name) + '</option>'; }).join('');
+  var html = '<div class="field-grid">' +
+    '<div><label>Name</label><input id="pdName" value="' + esc(p.Name || '') + '"></div>' +
+    '<div><label>Category</label><input id="pdCategory" value="' + esc(p.Category || '') + '"></div>' +
+    '<div><label>Branch</label><select id="pdBranch">' + branchOpts + '</select></div>' +
+    '<div><label>Cost Price</label><input type="number" id="pdCost" value="' + (p.CostPrice || 0) + '"></div>' +
+    '<div><label>Selling Price</label><input type="number" id="pdPrice" value="' + (p.SellingPrice || 0) + '"></div>' +
+    '<div><label>Qty in Stock</label><input type="number" id="pdQty" value="' + (p.QuantityInStock || 0) + '"></div>' +
+    '<div><label>Reorder Level</label><input type="number" id="pdReorder" value="' + (p.ReorderLevel || 5) + '"></div>' +
+    '</div>';
+  openModal(p.ProductID ? 'Edit Product' : 'Add Product', html, function () {
+    api('saveProduct', STATE.token, {
+      ProductID: p.ProductID || '', Name: document.getElementById('pdName').value, Category: document.getElementById('pdCategory').value,
+      BranchID: document.getElementById('pdBranch').value, CostPrice: document.getElementById('pdCost').value,
+      SellingPrice: document.getElementById('pdPrice').value, QuantityInStock: document.getElementById('pdQty').value, ReorderLevel: document.getElementById('pdReorder').value
+    }).then(function () { toast('Product saved', 'success'); closeModal(); loadProductsTable(); }).catch(showError);
+  }, 'Save');
+}
+function deleteProductRow(id) {
+  if (!confirm('Delete this product?')) return;
+  api('deleteProduct', STATE.token, id).then(function () { toast('Deleted', 'success'); loadProductsTable(); }).catch(showError);
+}
+function restockPrompt(id) {
+  var qty = prompt('Quantity to add to stock:');
+  if (!qty) return;
+  api('restockProduct', STATE.token, id, qty).then(function () { toast('Stock updated', 'success'); loadProductsTable(); }).catch(showError);
+}
+
+/* ---------- BRANCHES ---------- */
+function renderBranchesAdmin(content) {
+  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Branches</h3><button class="btn btn-sm" onclick="openBranchModal()">+ Add Branch</button></div><div id="branchTableHost"></div></div>';
+  loadBranchesTable();
+}
+function loadBranchesTable() {
+  api('getBranches', STATE.token).then(function (rows) {
+    STATE.branches = rows;
+    document.getElementById('branchTableHost').innerHTML = renderTable(['Name', 'Location', 'Phone', 'Hours', 'Actions'], rows.map(function (b) {
+      return [esc(b.Name), esc(b.Location), esc(b.Phone), esc(b.OpeningHours),
+        '<button class="btn btn-sm btn-outline" onclick=\'openBranchModal(' + JSON.stringify(b).replace(/'/g, '&#39;') + ')\'>Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteBranchRow(\'' + b.BranchID + '\')">Delete</button>'];
+    }));
+  }).catch(function (err) { document.getElementById('branchTableHost').innerHTML = errorPanel(err); });
+}
+function openBranchModal(b) {
+  b = b || {};
+  var html = '<div class="field-grid">' +
+    '<div><label>Name</label><input id="brName" value="' + esc(b.Name || '') + '"></div>' +
+    '<div><label>Location</label><input id="brLocation" value="' + esc(b.Location || '') + '"></div>' +
+    '<div><label>Phone</label><input id="brPhone" value="' + esc(b.Phone || '') + '"></div>' +
+    '<div><label>Opening Hours</label><input id="brHours" value="' + esc(b.OpeningHours || '') + '"></div>' +
+    '</div>';
+  openModal(b.BranchID ? 'Edit Branch' : 'Add Branch', html, function () {
+    api('saveBranch', STATE.token, {
+      BranchID: b.BranchID || '', Name: document.getElementById('brName').value, Location: document.getElementById('brLocation').value,
+      Phone: document.getElementById('brPhone').value, OpeningHours: document.getElementById('brHours').value
+    }).then(function () { toast('Branch saved', 'success'); closeModal(); loadBranchesTable(); }).catch(showError);
+  }, 'Save');
+}
+function deleteBranchRow(id) {
+  if (!confirm('Delete this branch? This cannot be undone.')) return;
+  api('deleteBranch', STATE.token, id).then(function () { toast('Deleted', 'success'); loadBranchesTable(); }).catch(showError);
+}
+
+/* ---------- EXPENSES ---------- */
+function renderExpenses(content) {
+  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Expenses</h3><button class="btn btn-sm" onclick="openExpenseModal()">+ Add Expense</button></div><div id="expTableHost"></div></div>';
+  loadExpensesTable();
+}
+function loadExpensesTable() {
+  api('getExpenses', STATE.token, { branchId: branchArg() }).then(function (rows) {
+    document.getElementById('expTableHost').innerHTML = renderTable(['Date', 'Category', 'Amount', 'Description', 'Actions'], rows.map(function (e) {
+      return [e.Date, esc(e.Category), money(e.Amount), esc(e.Description), '<button class="btn btn-sm btn-danger" onclick="deleteExpenseRow(\'' + e.ExpenseID + '\')">Delete</button>'];
+    }));
+  }).catch(function (err) { document.getElementById('expTableHost').innerHTML = errorPanel(err); });
+}
+function openExpenseModal() {
+  var branchOpts = STATE.branches.map(function (b) { return '<option value="' + b.BranchID + '">' + esc(b.Name) + '</option>'; }).join('');
+  var html = '<div class="field-grid">' +
+    '<div><label>Branch</label><select id="exBranch">' + branchOpts + '</select></div>' +
+    '<div><label>Date</label><input type="date" id="exDate" value="' + new Date().toISOString().slice(0, 10) + '"></div>' +
+    '<div><label>Category</label><input id="exCategory" placeholder="Rent, Utilities, Supplies…"></div>' +
+    '<div><label>Amount (GH₵)</label><input type="number" id="exAmount"></div>' +
+    '<div style="grid-column:1/-1"><label>Description</label><textarea id="exDesc" rows="2"></textarea></div>' +
+    '</div>';
+  openModal('Add Expense', html, function () {
+    api('saveExpense', STATE.token, {
+      BranchID: document.getElementById('exBranch').value, Date: document.getElementById('exDate').value,
+      Category: document.getElementById('exCategory').value, Amount: document.getElementById('exAmount').value, Description: document.getElementById('exDesc').value
+    }).then(function () { toast('Expense saved', 'success'); closeModal(); loadExpensesTable(); }).catch(showError);
+  }, 'Save');
+}
+function deleteExpenseRow(id) {
+  if (!confirm('Delete this expense?')) return;
+  api('deleteExpense', STATE.token, id).then(function () { toast('Deleted', 'success'); loadExpensesTable(); }).catch(showError);
+}
+
+/* ---------- REPORTS ---------- */
+function renderReports(content) {
+  var today = new Date().toISOString().slice(0, 10);
+  var monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+  content.innerHTML = '<div class="panel"><div class="filters-bar">' +
+    '<input type="date" id="rpStart" value="' + monthAgo + '"><input type="date" id="rpEnd" value="' + today + '">' +
+    '<button class="btn btn-sm" onclick="loadReports()">Run Report</button>' +
+    '<button class="btn btn-sm btn-outline" onclick="exportCsv(\'sales\')">Export Sales CSV</button>' +
+    '<button class="btn btn-sm btn-outline" onclick="exportCsv(\'expenses\')">Export Expenses CSV</button>' +
+    '<button class="btn btn-sm btn-outline" onclick="exportPdf()">Export PDF</button>' +
+    '</div></div><div id="reportHost"></div>';
+  loadReports();
+}
+function loadReports() {
+  var params = { branchId: branchArg(), startDate: document.getElementById('rpStart').value, endDate: document.getElementById('rpEnd').value };
+  STATE.lastReportParams = params;
+  api('getReports', STATE.token, params).then(function (r) {
+    STATE.lastReport = r;
+    var maxRev = Math.max.apply(null, r.revenueByDay.map(function (d) { return d.revenue; }).concat([1]));
+    var chart = '<div class="bar-chart">' + r.revenueByDay.map(function (d) {
+      return '<div class="bar" style="height:' + Math.max(4, (d.revenue / maxRev) * 140) + 'px"><span>' + money(d.revenue) + '</span></div>';
+    }).join('') + '</div>';
+    document.getElementById('reportHost').innerHTML =
+      '<div class="stat-grid">' + statCard('Total Revenue', money(r.totalRevenue)) + statCard('Total Expenses', money(r.totalExpenses)) + statCard('Net Profit', money(r.netProfit)) + statCard('Sales Count', r.salesCount) + '</div>' +
+      '<div class="panel"><h3>Revenue by Day</h3>' + (r.revenueByDay.length ? chart : '<p class="muted">No sales in this period.</p>') + '</div>' +
+      '<div class="panel"><h3>Best-Selling Services</h3>' + renderTable(['Service', 'Qty Sold', 'Revenue'], r.bestSellers.map(function (b) { return [esc(b.name), b.qty, money(b.revenue)]; })) + '</div>' +
+      '<div class="panel"><h3>Staff Performance</h3>' + renderTable(['Staff', 'Sales', 'Revenue', 'Commission'], r.staffPerformance.map(function (s) { return [esc(s.name), s.salesCount, money(s.revenue), money(s.commission)]; })) + '</div>' +
+      '<div class="panel"><h3>Payment Method Breakdown</h3>' + renderTable(['Method', 'Total'], r.paymentBreakdown.map(function (p) { return [p.method, money(p.total)]; })) + '</div>';
+  }).catch(function (err) { document.getElementById('reportHost').innerHTML = errorPanel(err); });
+}
+function exportCsv(type) {
+  var fn = type === 'sales' ? 'exportSalesCsv' : 'exportExpensesCsv';
+  api(fn, STATE.token, STATE.lastReportParams).then(function (csv) {
+    downloadFile(csv, type + '_export.csv', 'text/csv');
+  }).catch(showError);
+}
+function exportPdf() {
+  api('exportReportPdf', STATE.token, STATE.lastReportParams).then(function (res) {
+    var link = document.createElement('a');
+    link.href = 'data:application/pdf;base64,' + res.base64;
+    link.download = res.filename;
+    link.click();
+  }).catch(showError);
+}
+function downloadFile(content, filename, mime) {
+  var blob = new Blob([content], { type: mime });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ---------- REVIEWS (admin view) ---------- */
+function renderReviewsAdmin(content) {
+  content.innerHTML = '<div class="panel"><h3>Customer Reviews</h3><div id="revTableHost"></div></div>';
+  api('getReviews', STATE.token).then(function (rows) {
+    document.getElementById('revTableHost').innerHTML = renderTable(['Date', 'Customer', 'Staff', 'Rating', 'Comment'], rows.map(function (r) {
+      return [String(r.Date).slice(0, 10), esc(r.CustomerName), esc(r.StaffName), '★'.repeat(r.Rating), esc(r.Comment)];
+    }));
+  }).catch(function (err) { document.getElementById('revTableHost').innerHTML = errorPanel(err); });
+}
+
+/* ---------- HERO CAROUSEL ADMIN ---------- */
+function renderHeroAdmin(content) {
+  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Hero Carousel Slides</h3><button class="btn btn-sm" onclick="openSlideModal()">+ Add Slide</button></div><div id="slideTableHost"></div></div>';
+  loadSlidesTable();
+}
+function loadSlidesTable() {
+  api('getHeroSlides', STATE.token).then(function (rows) {
+    document.getElementById('slideTableHost').innerHTML = renderTable(['Preview', 'Title', 'Order', 'Active', 'Actions'], rows.map(function (s) {
+      return ['<img src="' + esc(s.ImageURL) + '" style="width:90px;height:50px;object-fit:cover;border-radius:4px">', esc(s.Title), s.SortOrder, s.Active,
+        '<button class="btn btn-sm btn-outline" onclick=\'openSlideModal(' + JSON.stringify(s).replace(/'/g, '&#39;') + ')\'>Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteSlideRow(\'' + s.SlideID + '\')">Delete</button>'];
+    }));
+  }).catch(function (err) { document.getElementById('slideTableHost').innerHTML = errorPanel(err); });
+}
+function openSlideModal(s) {
+  s = s || {};
+  var html = '<div class="field-grid">' +
+    '<div style="grid-column:1/-1"><label>Image URL</label><input id="slImage" value="' + esc(s.ImageURL || '') + '"></div>' +
+    '<div style="grid-column:1/-1"><label>Or Upload Image</label><input type="file" id="slImageFile" accept="image/*"></div>' +
+    '<div><label>Title</label><input id="slTitle" value="' + esc(s.Title || '') + '"></div>' +
+    '<div><label>Subtitle</label><input id="slSubtitle" value="' + esc(s.Subtitle || '') + '"></div>' +
+    '<div><label>Button Text</label><input id="slBtnText" value="' + esc(s.ButtonText || 'Book Now') + '"></div>' +
+    '<div><label>Button Link</label><input id="slBtnLink" value="' + esc(s.ButtonLink || '#booking') + '"></div>' +
+    '<div><label>Sort Order</label><input type="number" id="slOrder" value="' + (s.SortOrder || 1) + '"></div>' +
+    '<div><label>Active</label><select id="slActive">' + ['Y', 'N'].map(function (a) { return '<option' + (s.Active === a ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select></div>' +
+    '</div>';
+  openModal(s.SlideID ? 'Edit Slide' : 'Add Slide', html, function () {
+    var save = function (imgUrl) {
+      api('saveHeroSlide', STATE.token, {
+        SlideID: s.SlideID || '', ImageURL: imgUrl || document.getElementById('slImage').value, Title: document.getElementById('slTitle').value,
+        Subtitle: document.getElementById('slSubtitle').value, ButtonText: document.getElementById('slBtnText').value,
+        ButtonLink: document.getElementById('slBtnLink').value, SortOrder: document.getElementById('slOrder').value, Active: document.getElementById('slActive').value
+      }).then(function () { toast('Slide saved', 'success'); closeModal(); loadSlidesTable(); }).catch(showError);
+    };
+    var file = document.getElementById('slImageFile').files[0];
+    if (file) uploadFileThen(file, save); else save();
+  }, 'Save');
+}
+function deleteSlideRow(id) {
+  if (!confirm('Delete this slide?')) return;
+  api('deleteHeroSlide', STATE.token, id).then(function () { toast('Deleted', 'success'); loadSlidesTable(); }).catch(showError);
+}
+
+function uploadFileThen(file, callback) {
+  var reader = new FileReader();
+  reader.onload = function () {
+    api('uploadImage', STATE.token, reader.result, file.name, file.type).then(function (res) {
+      callback(res.url);
+    }).catch(showError);
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ---------- SETTINGS / BRANDING / THEME ---------- */
+function renderSettingsAdmin(content) {
+  api('getSettings', STATE.token).then(function (s) {
+    STATE.adminSettings = s;
+    content.innerHTML =
+      '<div class="panel"><h3>Business Branding</h3><div class="field-grid">' +
+      field('Business Name', 'stBusinessName', s.BusinessName) +
+      field('Tagline', 'stTagline', s.Tagline) +
+      field('Logo URL', 'stLogoURL', s.LogoURL) +
+      '<div><label>Or Upload Logo</label><input type="file" id="stLogoFile" accept="image/*"></div>' +
+      field('WhatsApp Number (233...)', 'stWhatsAppNumber', s.WhatsAppNumber) +
+      field('Contact Phone', 'stContactPhone', s.ContactPhone) +
+      field('Contact Email', 'stContactEmail', s.ContactEmail) +
+      field('Google Maps Embed URL', 'stMapEmbedURL', s.MapEmbedURL) +
+      '</div></div>' +
+
+      '<div class="panel"><h3>Theme & Colors</h3><div class="field-grid">' +
+      colorField('Primary Color', 'stPrimaryColor', s.PrimaryColor) +
+      colorField('Secondary Color', 'stSecondaryColor', s.SecondaryColor) +
+      colorField('Accent Color', 'stAccentColor', s.AccentColor) +
+      colorField('Background Color', 'stBackgroundColor', s.BackgroundColor) +
+      colorField('Text Color', 'stTextColor', s.TextColor) +
+      '</div><button class="btn btn-sm btn-outline" style="margin-top:10px" onclick="previewTheme()">Preview Theme</button></div>' +
+
+      '<div class="panel"><h3>Payments & Loyalty</h3><div class="field-grid">' +
+      field('Tax Rate (%)', 'stTaxRatePercent', s.TaxRatePercent) +
+      field('Loyalty Points per GH₵1 spent', 'stLoyaltyPointsPerCedi', s.LoyaltyPointsPerCedi) +
+      field('Points needed for GH₵1 discount', 'stLoyaltyRedeemRate', s.LoyaltyRedeemRate) +
+      '</div></div>' +
+
+      '<div class="panel"><h3>SMS Gateway (for booking &amp; receipt notifications)</h3><div class="field-grid">' +
+      selectField('Provider', 'stSmsProvider', ['simulate', 'arkesel', 'hubtel'], s.SmsProvider) +
+      field('SMS Sender ID', 'stSmsSenderId', s.SmsSenderId) +
+      field('Arkesel API Key', 'stSmsApiKey', s.SmsApiKey) +
+      field('Hubtel Client ID', 'stHubtelClientId', s.HubtelClientId) +
+      field('Hubtel Client Secret', 'stHubtelClientSecret', s.HubtelClientSecret) +
+      '</div><p class="muted">"Simulate" logs messages to the Notifications sheet without sending — useful for testing before you have SMS gateway credentials.</p></div>' +
+
+      '<button class="btn btn-accent" onclick="saveAllSettings()">Save All Settings</button>';
+  }).catch(function (err) { content.innerHTML = errorPanel(err); });
+}
+function field(label, id, val) {
+  return '<div><label>' + label + '</label><input id="' + id + '" value="' + esc(val || '') + '"></div>';
+}
+function colorField(label, id, val) {
+  return '<div><label>' + label + '</label><div class="color-field"><input type="color" id="' + id + '" value="' + (val || '#000000') + '"><span>' + esc(val || '') + '</span></div></div>';
+}
+function selectField(label, id, options, val) {
+  return '<div><label>' + label + '</label><select id="' + id + '">' + options.map(function (o) { return '<option' + (o === val ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select></div>';
+}
+function previewTheme() {
+  applyTheme({
+    PrimaryColor: document.getElementById('stPrimaryColor').value, SecondaryColor: document.getElementById('stSecondaryColor').value,
+    AccentColor: document.getElementById('stAccentColor').value, BackgroundColor: document.getElementById('stBackgroundColor').value,
+    TextColor: document.getElementById('stTextColor').value, FontFamily: STATE.settings.FontFamily
+  });
+  toast('Preview applied — click "Save All Settings" to make it permanent', 'success');
+}
+function saveAllSettings() {
+  var save = function (logoUrl) {
+    var payload = {
+      BusinessName: document.getElementById('stBusinessName').value, Tagline: document.getElementById('stTagline').value,
+      LogoURL: logoUrl || document.getElementById('stLogoURL').value, WhatsAppNumber: document.getElementById('stWhatsAppNumber').value,
+      ContactPhone: document.getElementById('stContactPhone').value, ContactEmail: document.getElementById('stContactEmail').value,
+      MapEmbedURL: document.getElementById('stMapEmbedURL').value,
+      PrimaryColor: document.getElementById('stPrimaryColor').value, SecondaryColor: document.getElementById('stSecondaryColor').value,
+      AccentColor: document.getElementById('stAccentColor').value, BackgroundColor: document.getElementById('stBackgroundColor').value,
+      TextColor: document.getElementById('stTextColor').value,
+      TaxRatePercent: document.getElementById('stTaxRatePercent').value, LoyaltyPointsPerCedi: document.getElementById('stLoyaltyPointsPerCedi').value,
+      LoyaltyRedeemRate: document.getElementById('stLoyaltyRedeemRate').value,
+      SmsProvider: document.getElementById('stSmsProvider').value, SmsSenderId: document.getElementById('stSmsSenderId').value,
+      SmsApiKey: document.getElementById('stSmsApiKey').value, HubtelClientId: document.getElementById('stHubtelClientId').value,
+      HubtelClientSecret: document.getElementById('stHubtelClientSecret').value
+    };
+    api('updateSettings', STATE.token, payload).then(function (s) {
+      STATE.settings = s; applyTheme(s); toast('Settings saved', 'success');
+    }).catch(showError);
+  };
+  var file = document.getElementById('stLogoFile').files[0];
+  if (file) uploadFileThen(file, save); else save();
+}
+
+/* ---------- USERS ---------- */
+function renderUsersAdmin(content) {
+  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>System Users</h3><button class="btn btn-sm" onclick="openUserModal()">+ Add User</button></div><div id="userTableHost"></div></div>';
+  loadUsersTable();
+}
+function loadUsersTable() {
+  api('getUsers', STATE.token).then(function (rows) {
+    document.getElementById('userTableHost').innerHTML = renderTable(['Username', 'Role', 'Branch', 'Active', 'Actions'], rows.map(function (u) {
+      return [esc(u.Username), esc(u.Role), esc(u.BranchID), u.Active,
+        '<button class="btn btn-sm btn-outline" onclick=\'openUserModal(' + JSON.stringify(u).replace(/'/g, '&#39;') + ')\'>Edit</button> <button class="btn btn-sm btn-danger" onclick="deleteUserRow(\'' + u.Username + '\')">Delete</button>'];
+    }));
+  }).catch(function (err) { document.getElementById('userTableHost').innerHTML = errorPanel(err); });
+}
+function openUserModal(u) {
+  u = u || {};
+  var branchOpts = '<option value="ALL">All Branches</option>' + STATE.branches.map(function (b) { return '<option value="' + b.BranchID + '"' + (u.BranchID === b.BranchID ? ' selected' : '') + '>' + esc(b.Name) + '</option>'; }).join('');
+  var html = '<div class="field-grid">' +
+    '<div><label>Username</label><input id="usUsername" value="' + esc(u.Username || '') + '" ' + (u.Username ? 'readonly' : '') + '></div>' +
+    '<div><label>Password ' + (u.Username ? '(leave blank to keep)' : '') + '</label><input type="password" id="usPassword"></div>' +
+    '<div><label>Role</label><select id="usRole">' + ['Owner', 'Manager', 'Staff', 'Receptionist'].map(function (r) { return '<option' + (u.Role === r ? ' selected' : '') + '>' + r + '</option>'; }).join('') + '</select></div>' +
+    '<div><label>Branch</label><select id="usBranch">' + branchOpts + '</select></div>' +
+    '<div><label>Linked Staff ID (optional)</label><input id="usStaffID" value="' + esc(u.StaffID || '') + '"></div>' +
+    '<div><label>Email</label><input id="usEmail" value="' + esc(u.Email || '') + '"></div>' +
+    '<div><label>Phone</label><input id="usPhone" value="' + esc(u.Phone || '') + '"></div>' +
+    '<div><label>Active</label><select id="usActive">' + ['Y', 'N'].map(function (a) { return '<option' + (u.Active === a ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select></div>' +
+    '</div>';
+  openModal(u.Username ? 'Edit User' : 'Add User', html, function () {
+    api('saveUser', STATE.token, {
+      Username: document.getElementById('usUsername').value, Password: document.getElementById('usPassword').value,
+      Role: document.getElementById('usRole').value, BranchID: document.getElementById('usBranch').value,
+      StaffID: document.getElementById('usStaffID').value, Email: document.getElementById('usEmail').value,
+      Phone: document.getElementById('usPhone').value, Active: document.getElementById('usActive').value
+    }).then(function () { toast('User saved', 'success'); closeModal(); loadUsersTable(); }).catch(showError);
+  }, 'Save');
+}
+function deleteUserRow(username) {
+  if (!confirm('Delete user ' + username + '?')) return;
+  api('deleteUser', STATE.token, username).then(function () { toast('Deleted', 'success'); loadUsersTable(); }).catch(showError);
+}
+
+/* ---------- MY ACCOUNT ---------- */
+function renderAccount(content) {
+  content.innerHTML = '<div class="panel"><h3>Change Password</h3><div class="form-row"><label>Current Password</label><input type="password" id="pwOld"></div>' +
+    '<div class="form-row"><label>New Password</label><input type="password" id="pwNew"></div>' +
+    '<button class="btn btn-accent" onclick="changePw()">Update Password</button></div>';
+}
+function changePw() {
+  api('changeOwnPassword', STATE.token, document.getElementById('pwOld').value, document.getElementById('pwNew').value)
+    .then(function () { toast('Password updated', 'success'); document.getElementById('pwOld').value = ''; document.getElementById('pwNew').value = ''; }).catch(showError);
+}
+
+/* =====================================================================
+ * GENERIC MODAL
+ * ===================================================================*/
+function openModal(title, bodyHtml, onSave, saveLabel) {
+  var host = document.getElementById('modalHost');
+  host.innerHTML = '<div class="modal-backdrop" id="modalBackdrop"><div class="modal-box"><button class="modal-close" onclick="closeModal()">✕</button><h3>' + esc(title) + '</h3><div id="modalBody">' + bodyHtml + '</div>' +
+    (onSave ? '<div style="margin-top:16px;display:flex;gap:8px;"><button class="btn btn-accent" id="modalSaveBtn">' + (saveLabel || 'Save') + '</button><button class="btn btn-outline" onclick="closeModal()">Cancel</button></div>' : '') +
+    '</div></div>';
+  if (onSave) document.getElementById('modalSaveBtn').addEventListener('click', onSave);
+  document.getElementById('modalBackdrop').addEventListener('click', function (e) { if (e.target.id === 'modalBackdrop') closeModal(); });
+}
+function closeModal() {
+  document.getElementById('modalHost').innerHTML = '';
+}
+</script>
