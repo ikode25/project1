@@ -16,7 +16,7 @@ var SCHEMA_VERSION = '8';
 
 // Shown in the storefront footer and admin sidebar. If this doesn't match the
 // file you pasted, the deployment is still serving an older version.
-var BUILD_VERSION = '2026.08.17-14';
+var BUILD_VERSION = '2026.08.17-15';
 
 // ---------------------------------------------------------------------------
 // Sheet schema — single source of truth for headers used by the generic
@@ -389,12 +389,15 @@ function seedDefaultPaymentMethod_() {
 // store created on an older version picks up newly added samples on upgrade
 // without duplicating what's already there. Runs once per SCHEMA_VERSION.
 function seedSampleCatalog_() {
+  // No "Data Bundles" demo business/products here on purpose — bundles now
+  // have their own dedicated module (Data Bundles in the sidebar), which an
+  // admin sets up for whichever business sells them, so a hollow pre-filled
+  // demo network would only be extra clutter to delete.
   var businesses = [
-    { key: 'databundles', Name: 'Data Bundles', Description: 'Affordable mobile data bundles for all networks.', SortOrder: 1 },
-    { key: 'electronics', Name: 'Electronics & Gadgets', Description: 'Quality electronics, accessories and gadgets.', SortOrder: 2 },
-    { key: 'frames', Name: 'Picture Frames & Gifts', Description: 'Custom picture frames and gift items.', SortOrder: 3 },
-    { key: 'security', Name: 'Security & Alarm Systems', Description: 'School sirens, smart bells and alarm systems, supplied and installed.', SortOrder: 4 },
-    { key: 'code', Name: 'Scripts & Source Code', Description: 'Ready-made Google Apps Script and PHP project source code.', SortOrder: 5 }
+    { key: 'electronics', Name: 'Electronics & Gadgets', Description: 'Quality electronics, accessories and gadgets.', SortOrder: 1 },
+    { key: 'frames', Name: 'Picture Frames & Gifts', Description: 'Custom picture frames and gift items.', SortOrder: 2 },
+    { key: 'security', Name: 'Security & Alarm Systems', Description: 'School sirens, smart bells and alarm systems, supplied and installed.', SortOrder: 3 },
+    { key: 'code', Name: 'Scripts & Source Code', Description: 'Ready-made Google Apps Script and PHP project source code.', SortOrder: 4 }
   ];
 
   var existingByName = {};
@@ -416,15 +419,6 @@ function seedSampleCatalog_() {
   });
 
   var products = [
-    // Category is set to the network name (not "Data Bundles") on purpose —
-    // the storefront turns a business's distinct categories into a big
-    // toggle row automatically, which is exactly the MTN / Telecel /
-    // AirtelTigo switch a data-bundle shop needs.
-    { biz: 'databundles', Name: 'MTN 5GB Data Bundle', Description: 'MTN data bundle valid for 30 days. Delivered to any MTN number you provide at checkout.', Category: 'MTN', Price: 30, BasePrice: 24, BundleSize: '5GB', Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
-    { biz: 'databundles', Name: 'MTN 10GB Data Bundle', Description: 'MTN data bundle valid for 30 days. Delivered to any MTN number you provide at checkout.', Category: 'MTN', Price: 52, BasePrice: 43, BundleSize: '10GB', Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
-    { biz: 'databundles', Name: 'Telecel 5GB Data Bundle', Description: 'Telecel data bundle valid for 30 days. Delivered to any Telecel number you provide at checkout.', Category: 'Telecel', Price: 27, BasePrice: 21, BundleSize: '5GB', Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
-    { biz: 'databundles', Name: 'Telecel 10GB Data Bundle', Description: 'Telecel data bundle valid for 30 days. Delivered to any Telecel number you provide at checkout.', Category: 'Telecel', Price: 55, BasePrice: 45, BundleSize: '10GB', Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
-    { biz: 'databundles', Name: 'AirtelTigo 5GB Data Bundle', Description: 'AirtelTigo data bundle valid for 30 days. Delivered to any AirtelTigo number you provide at checkout.', Category: 'AirtelTigo', Price: 26, BasePrice: 20, BundleSize: '5GB', Stock: '', IsService: true, RequiresRecipient: true, IsDigital: true },
     { biz: 'electronics', Name: 'Bluetooth Speaker', Description: 'Portable wireless Bluetooth speaker with deep bass, USB/SD playback and up to 8 hours of battery life.', Category: 'Audio', Price: 180, Stock: 12, ShowWhatsApp: true },
     { biz: 'electronics', Name: 'Wireless Earbuds', Description: 'True wireless earbuds with charging case, touch controls and noise isolation.', Category: 'Audio', Price: 120, Stock: 15, ShowWhatsApp: true },
     { biz: 'electronics', Name: 'Extension Board with Surge Protection', Description: 'Four-socket extension board with USB ports and built-in surge protection for your electronics.', Category: 'Accessories', Price: 85, Stock: 25 },

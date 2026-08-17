@@ -1,5 +1,5 @@
 <!-- admin.html — Multi-Business Admin Portal -->
-<!-- MB_BUILD:2026.08.17-14 -->
+<!-- MB_BUILD:2026.08.17-15 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -67,7 +67,7 @@
     }
   </style>
 </head>
-<body class="min-h-screen" data-mb-build="2026.08.17-14">
+<body class="min-h-screen" data-mb-build="2026.08.17-15">
 
   <div id="progressBar"></div>
 
@@ -266,16 +266,19 @@
           <label class="text-sm">Stock <span class="muted">(blank = unlimited / digital)</span><input id="prdStock" type="number" placeholder="blank = unlimited" class="p-2 rounded-lg w-full mt-1"></label>
           <div class="md:col-span-2" id="picker-prdImage"></div>
           <textarea id="prdDescription" placeholder="Description" class="p-2 rounded-lg md:col-span-2"></textarea>
-          <textarea id="prdConfirmationNote" placeholder="Important note shown in the confirmation popup" class="p-2 rounded-lg md:col-span-2" rows="3"></textarea>
-          <p class="md:col-span-2 text-xs muted -mb-1"><i class="fas fa-circle-info mr-1"></i>Selling data bundles? Use the dedicated <a href="#" onclick="showTab('databundles');return false;" class="text-primary underline">Data Bundles</a> module instead — it sets everything this form would (recipient number prompt, digital delivery, network toggle) plus profit pricing per network.</p>
-          <div class="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-2 surface-2 bordered rounded-lg p-3">
-            <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdEnquireWhatsapp" class="mt-1"> <span>Send customers to WhatsApp <em>instead of</em> Add to Cart <span class="muted">(quote-only items)</span></span></label>
-            <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdShowWhatsapp" class="mt-1"> <span>Also show an "Ask a question" WhatsApp button <span class="muted">(keeps Add to Cart — good for source code, sirens, electronics)</span></span></label>
-            <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdIsService" class="mt-1"> <span>This is a service (not physical stock)</span></label>
-            <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdIsDigital" class="mt-1"> <span>Digital product <span class="muted">(data bundles, source code, ... — checkout skips asking for a delivery address)</span></span></label>
-            <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdInStock" class="mt-1" checked> <span>In stock <span class="muted">(untick to show "Out of Stock")</span></span></label>
-            <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdActive" class="mt-1" checked> <span>Active <span class="muted">(untick to hide from the store)</span></span></label>
-          </div>
+          <p class="md:col-span-2 text-xs muted -mb-1"><i class="fas fa-circle-info mr-1"></i>Selling data bundles? Use the dedicated <a href="#" onclick="showTab('databundles');return false;" class="text-primary underline">Data Bundles</a> module instead.</p>
+          <details class="md:col-span-2 surface-2 bordered rounded-lg">
+            <summary class="p-3 text-sm font-semibold cursor-pointer select-none">More options <span class="muted font-normal">(WhatsApp, digital delivery, visibility — optional)</span></summary>
+            <div class="p-3 pt-0 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <textarea id="prdConfirmationNote" placeholder="Important note shown in the confirmation popup (optional)" class="p-2 rounded-lg sm:col-span-2" rows="2"></textarea>
+              <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdEnquireWhatsapp" class="mt-1"> <span>Send customers to WhatsApp <em>instead of</em> Add to Cart <span class="muted">(quote-only items)</span></span></label>
+              <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdShowWhatsapp" class="mt-1"> <span>Also show an "Ask a question" WhatsApp button <span class="muted">(keeps Add to Cart)</span></span></label>
+              <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdIsService" class="mt-1"> <span>This is a service (not physical stock)</span></label>
+              <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdIsDigital" class="mt-1"> <span>Digital product <span class="muted">(checkout skips the delivery address)</span></span></label>
+              <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdInStock" class="mt-1" checked> <span>In stock <span class="muted">(untick to show "Out of Stock")</span></span></label>
+              <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="prdActive" class="mt-1" checked> <span>Active <span class="muted">(untick to hide from the store)</span></span></label>
+            </div>
+          </details>
           <div class="md:col-span-2 flex flex-wrap gap-2">
             <button type="submit" class="bg-primary px-4 py-2 rounded-lg">Save Product</button>
             <button type="button" onclick="resetProductForm()" class="surface-2 bordered px-4 py-2 rounded-lg">Clear</button>
@@ -298,14 +301,17 @@
             <select id="dbBusiness" class="p-2 rounded-lg w-full mt-1" onchange="onDbBusinessChange()"></select>
           </label>
           <label class="text-sm">Network
-            <select id="dbNetwork" class="p-2 rounded-lg w-full mt-1" onchange="onDbNetworkChange()"></select>
+            <div class="flex gap-2 mt-1">
+              <select id="dbNetwork" class="p-2 rounded-lg w-full" onchange="renderBundleTable()"></select>
+              <button type="button" class="surface-2 bordered px-3 rounded-lg whitespace-nowrap" onclick="showNewNetworkInput()">+ Add Network</button>
+            </div>
           </label>
           <div class="md:col-span-2 flex flex-wrap items-end gap-2" id="dbNewNetworkWrap" style="display:none">
-            <label class="text-sm flex-grow">New network name
+            <label class="text-sm flex-grow">New network name <span class="muted">(e.g. MTN, Telecel, AirtelTigo — spelled exactly the same on every bundle for it)</span>
               <input id="dbNewNetwork" placeholder="e.g. MTN" class="p-2 rounded-lg w-full mt-1">
             </label>
-            <button type="button" class="surface-2 bordered px-4 py-2 rounded-lg mb-0.5" onclick="confirmNewNetwork()">Use this network</button>
-            <button type="button" class="text-sm underline mb-2" onclick="cancelNewNetwork()">Cancel</button>
+            <button type="button" class="bg-primary px-4 py-2 rounded-lg mb-0.5" onclick="confirmNewNetwork()">Use this network</button>
+            <button type="button" class="text-sm underline mb-2" id="dbCancelNewNetworkBtn" onclick="cancelNewNetwork()" style="display:none">Cancel</button>
           </div>
         </div>
 
@@ -1126,7 +1132,7 @@
           html: '<table style="margin:0 auto;font-size:13px">' + rows + '</table>' +
             '<hr style="margin:12px 0">' +
             '<div style="font-size:12px;text-align:left">' +
-              '<b>admin page build:</b> 2026.08.17-14<br>' +
+              '<b>admin page build:</b> 2026.08.17-15<br>' +
               '<b>Code.gs build:</b> ' + ((info && info.build) || 'could not read') + '<br>' +
               '<b>schema:</b> ' + ((info && info.setupVersion) || '?') +
             '</div>' +
@@ -1694,6 +1700,11 @@
       document.getElementById('prdShowWhatsapp').checked = !!p.ShowWhatsApp;
       document.getElementById('prdInStock').checked = !!p.InStock;
       document.getElementById('prdActive').checked = !!p.Active;
+      // Auto-expand "More options" when editing a product that actually uses
+      // one of them, so nothing already set is hidden from the admin.
+      var hasAdvanced = p.ConfirmationNote || p.EnquireOnWhatsApp || p.ShowWhatsApp || p.IsService || p.IsDigital || !p.InStock || !p.Active;
+      var details = document.querySelector('#productForm details');
+      if (details) details.open = !!hasAdvanced;
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
     function resetProductForm() {
@@ -1703,6 +1714,8 @@
       document.getElementById('prdActive').checked = true;
       clearPicker('prdImageUrl');
       renderCategoryQuickPicks();
+      var details = document.querySelector('#productForm details');
+      if (details) details.open = false;
     }
     function saveProduct(e) {
       e.preventDefault();
@@ -1766,30 +1779,43 @@
       });
       return nets;
     }
+    // The network dropdown only ever holds networks that already have at
+    // least one bundle — there is no synthetic "add new" option living
+    // inside it. A brand new business/network combo has zero options, which
+    // would leave a <select> impossible to interact with (nothing to change
+    // *to*), so that case is handled by auto-opening the "new network" input
+    // instead of hiding the add-network flow behind the select itself.
     function renderNetworkOptions() {
       var bizId = currentDbBusiness();
       var nets = bundleNetworksForBusiness(bizId);
       var sel = document.getElementById('dbNetwork');
       var prev = sel.value;
-      sel.innerHTML = nets.map(function (n) { return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join('') +
-        '<option value="__new__">+ Add a new network…</option>';
-      if (nets.indexOf(prev) !== -1) sel.value = prev;
-      else if (nets.length) sel.value = nets[0];
+      if (!nets.length) {
+        sel.innerHTML = '<option value="">No networks yet for this business</option>';
+        sel.value = '';
+        showNewNetworkInput();
+      } else {
+        sel.innerHTML = nets.map(function (n) { return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join('');
+        sel.value = nets.indexOf(prev) !== -1 ? prev : nets[0];
+        document.getElementById('dbNewNetworkWrap').style.display = 'none';
+      }
       renderBundleTable();
     }
     function onDbBusinessChange() {
       resetBundleForm();
       renderNetworkOptions();
     }
-    function onDbNetworkChange() {
-      var sel = document.getElementById('dbNetwork');
-      if (sel.value === '__new__') {
-        document.getElementById('dbNewNetworkWrap').style.display = 'flex';
-        document.getElementById('dbNewNetwork').value = '';
-        document.getElementById('dbNewNetwork').focus();
-        return;
-      }
-      renderBundleTable();
+    // Always-visible "+ Add Network" button next to the dropdown — not a
+    // dropdown option, so it always works even when it's the only choice
+    // (re-selecting an already-selected <option> fires no change event).
+    function showNewNetworkInput() {
+      document.getElementById('dbNewNetworkWrap').style.display = 'flex';
+      document.getElementById('dbNewNetwork').value = '';
+      // Only offer Cancel when there's an existing network to fall back to —
+      // otherwise cancelling would leave the module with no usable network.
+      document.getElementById('dbCancelNewNetworkBtn').style.display =
+        bundleNetworksForBusiness(currentDbBusiness()).length ? 'inline' : 'none';
+      document.getElementById('dbNewNetwork').focus();
     }
     function confirmNewNetwork() {
       var name = document.getElementById('dbNewNetwork').value.trim();
@@ -1800,17 +1826,16 @@
         toast('error', 'That network already exists', 'Pick it from the dropdown instead so spelling matches exactly.');
         return;
       }
+      if (sel.options.length === 1 && sel.options[0].value === '') sel.innerHTML = '';
       var opt = document.createElement('option');
       opt.value = name; opt.textContent = name;
-      sel.insertBefore(opt, sel.lastChild);
+      sel.appendChild(opt);
       sel.value = name;
       document.getElementById('dbNewNetworkWrap').style.display = 'none';
       renderBundleTable();
     }
     function cancelNewNetwork() {
       document.getElementById('dbNewNetworkWrap').style.display = 'none';
-      var nets = bundleNetworksForBusiness(currentDbBusiness());
-      document.getElementById('dbNetwork').value = nets.length ? nets[0] : '__new__';
     }
     function updateBundleProfitPreview() {
       var base = parseFloat(document.getElementById('dbBasePrice').value) || 0;
@@ -1824,7 +1849,7 @@
       var bizId = currentDbBusiness();
       var network = currentDbNetwork();
       var list = (cache.dataBundles || []).filter(function (b) {
-        return b.BusinessID === bizId && (!network || network === '__new__' || b.Category === network);
+        return b.BusinessID === bizId && b.Category === network;
       }).sort(function (a, b) { return toNumSafe_(a.BasePrice) - toNumSafe_(b.BasePrice); });
       document.getElementById('bundleTableBody').innerHTML = list.map(function (b) {
         var profit = toNumSafe_(b.Price) - toNumSafe_(b.BasePrice);
@@ -1894,7 +1919,7 @@
     function saveBundle(e) {
       e.preventDefault();
       var network = currentDbNetwork();
-      if (!network || network === '__new__') { toast('error', 'Choose or add a network first', ''); return; }
+      if (!network) { toast('error', 'Choose or add a network first', 'Use the + Add Network button above.'); return; }
       var b = {
         ProductID: document.getElementById('dbId').value,
         BusinessID: currentDbBusiness(),
