@@ -237,6 +237,10 @@
   }
   #loginScreen .box { background: #fff; padding: 40px; border-radius: var(--radius); width: 100%; max-width: 380px; box-shadow: var(--shadow); }
   #loginScreen h2 { text-align: center; }
+  .password-field { position: relative; }
+  .password-field input { padding-right: 42px; }
+  .pw-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #888; padding: 6px; display: flex; align-items: center; }
+  .pw-toggle:hover { color: #333; }
   .admin-shell { display: grid; grid-template-columns: 230px 1fr; min-height: 100vh; }
   @media (max-width: 860px) { .admin-shell { grid-template-columns: 1fr; } }
   .admin-sidebar {
@@ -249,13 +253,32 @@
   }
   .admin-sidebar .nav-item:hover { background: #2a2a2a; opacity: 1; }
   .admin-sidebar .nav-item.active { background: var(--clr-accent); color: #1a1a1a; opacity: 1; font-weight: 700; }
-  @media (max-width: 860px) { .admin-sidebar { position: static; height: auto; display: flex; overflow-x: auto; padding: 10px; } .admin-sidebar .logo { display: none; } .admin-sidebar .nav-item { white-space: nowrap; } }
+  @media (max-width: 860px) {
+    /* On mobile the sidebar collapses into a single sticky, horizontally
+       scrollable strip of compact icon-over-label chips (like a tab bar)
+       instead of a full-height vertical list that pushes all page content
+       off-screen. */
+    .admin-sidebar { position: sticky; top: 0; z-index: 40; height: auto; padding: 8px 0; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+    .admin-sidebar .logo { display: none; }
+    #navItems { display: flex; overflow-x: auto; gap: 2px; padding: 0 8px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    #navItems::-webkit-scrollbar { display: none; }
+    .admin-sidebar .nav-item {
+      flex: 0 0 auto; flex-direction: column; gap: 4px; padding: 8px 12px; font-size: .68rem;
+      text-align: center; white-space: nowrap; border-radius: 10px;
+    }
+  }
 
   .admin-main { padding: 20px 26px 60px; }
   .admin-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; flex-wrap: wrap; gap: 10px; }
   .admin-topbar h2 { margin: 0; }
   .admin-topbar-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   select.branch-switch { padding: 8px 12px; border-radius: 8px; border: 1px solid #ccc; }
+  @media (max-width: 860px) {
+    .admin-main { padding: 14px 14px 40px; }
+    .admin-topbar h2 { font-size: 1.2rem; }
+    .admin-topbar-actions { width: 100%; }
+    .admin-topbar-actions #currentUserLabel { width: 100%; order: 5; }
+  }
 
   .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px,1fr)); gap: 14px; margin-bottom: 24px; }
   .stat-card { background: #fff; border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
@@ -292,6 +315,9 @@
   .pos-item-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(150px,1fr)); gap: 10px; max-height: 480px; overflow-y: auto; }
   .pos-item-card { background: #f7f7f7; border-radius: 8px; padding: 10px; cursor: pointer; border: 1px solid #eee; }
   #adminApp.dark .pos-item-card { background: #262a31; border-color: #333; }
+  .pos-item-photo { width: 100%; aspect-ratio: 4/3; border-radius: 6px; background-size: cover; background-position: center; background-color: #eee; margin-bottom: 8px; }
+  .pos-item-photo-empty { display: flex; align-items: center; justify-content: center; color: #aaa; }
+  #adminApp.dark .pos-item-photo { background-color: #333; }
   .pos-item-card:hover { border-color: var(--clr-accent); }
   .pos-item-card .item-name { display: flex; align-items: center; gap: 6px; font-weight: 700; }
   .cart-line { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; font-size: .88rem; }
@@ -426,14 +452,41 @@
 <!-- ============================================================ ADMIN LOGIN ============================================================ -->
 <div id="loginScreen">
   <div class="box">
-    <h2>Staff Login</h2>
+    <h2 id="authTitle">Staff Login</h2>
     <form id="loginForm">
       <div class="form-row"><label>Username</label><input type="text" id="loginUsername" required autocomplete="username"></div>
-      <div class="form-row"><label>Password</label><input type="password" id="loginPassword" required autocomplete="current-password"></div>
+      <div class="form-row">
+        <label>Password</label>
+        <div class="password-field">
+          <input type="password" id="loginPassword" required autocomplete="current-password">
+          <button type="button" class="pw-toggle" data-target="loginPassword" aria-label="Show password"></button>
+        </div>
+      </div>
       <button type="submit" class="btn btn-block" id="loginBtn">Log In</button>
       <div id="loginError" class="form-error hidden"></div>
     </form>
-    <p class="muted" style="text-align:center;margin-top:16px;"><a href="#">← Back to website</a></p>
+    <form id="registerForm" class="hidden">
+      <div class="form-row"><label>Full Name</label><input type="text" id="regName" required></div>
+      <div class="form-row"><label>Username</label><input type="text" id="regUsername" required minlength="3"></div>
+      <div class="form-row">
+        <label>Password</label>
+        <div class="password-field">
+          <input type="password" id="regPassword" required minlength="6" autocomplete="new-password">
+          <button type="button" class="pw-toggle" data-target="regPassword" aria-label="Show password"></button>
+        </div>
+        <div class="form-hint">At least 6 characters.</div>
+      </div>
+      <div class="form-row2">
+        <div class="form-row"><label>Phone</label><input type="text" id="regPhone" placeholder="024XXXXXXX"></div>
+        <div class="form-row"><label>Email</label><input type="email" id="regEmail"></div>
+      </div>
+      <button type="submit" class="btn btn-block btn-accent" id="registerBtn">Create Account</button>
+      <div id="registerError" class="form-error hidden"></div>
+      <div id="registerSuccess" class="form-success hidden"></div>
+      <p class="form-hint" style="margin-top:10px;">New accounts start inactive until an owner reviews and approves access.</p>
+    </form>
+    <p class="muted" style="text-align:center;margin-top:16px;"><a href="#" id="authToggleLink">New staff member? Create an account</a></p>
+    <p class="muted" style="text-align:center;margin-top:8px;"><a href="#">← Back to website</a></p>
   </div>
 </div>
 
@@ -501,7 +554,9 @@ var ICONS = {
   check: '<polyline points="20 6 9 17 4 12"/>',
   checkCircle: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
   alertTriangle: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
-  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>'
+  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
+  eye: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+  eyeOff: '<path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
 };
 function icon(name, size, cls) {
   size = size || 20;
@@ -633,6 +688,9 @@ window.addEventListener('DOMContentLoaded', function () {
   loadPublicSite();
   bindReviewForm();
   bindLoginForm();
+  bindPasswordToggles();
+  bindAuthToggle();
+  bindRegisterForm();
   window.addEventListener('hashchange', routeHash);
   routeHash();
 
@@ -1148,6 +1206,55 @@ function bindLoginForm() {
   if (t && u) { STATE.token = t; STATE.user = JSON.parse(u); }
 }
 
+function bindPasswordToggles() {
+  document.querySelectorAll('.pw-toggle').forEach(function (btn) {
+    btn.innerHTML = icon('eye', 18);
+    btn.addEventListener('click', function () {
+      var input = document.getElementById(btn.dataset.target);
+      var nowShowing = input.type === 'password';
+      input.type = nowShowing ? 'text' : 'password';
+      btn.innerHTML = icon(nowShowing ? 'eyeOff' : 'eye', 18);
+      btn.setAttribute('aria-label', nowShowing ? 'Hide password' : 'Show password');
+    });
+  });
+}
+
+var SHOWING_REGISTER_FORM = false;
+function bindAuthToggle() {
+  document.getElementById('authToggleLink').addEventListener('click', function (e) {
+    e.preventDefault();
+    SHOWING_REGISTER_FORM = !SHOWING_REGISTER_FORM;
+    document.getElementById('loginForm').classList.toggle('hidden', SHOWING_REGISTER_FORM);
+    document.getElementById('registerForm').classList.toggle('hidden', !SHOWING_REGISTER_FORM);
+    document.getElementById('authTitle').textContent = SHOWING_REGISTER_FORM ? 'Create Staff Account' : 'Staff Login';
+    this.textContent = SHOWING_REGISTER_FORM ? '← Back to login' : 'New staff member? Create an account';
+  });
+}
+
+function bindRegisterForm() {
+  document.getElementById('registerForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var errEl = document.getElementById('registerError'), okEl = document.getElementById('registerSuccess');
+    errEl.classList.add('hidden'); okEl.classList.add('hidden');
+    var btn = document.getElementById('registerBtn');
+    btn.disabled = true; btn.textContent = 'Creating…';
+    api('registerAccount', {
+      name: document.getElementById('regName').value, username: document.getElementById('regUsername').value,
+      password: document.getElementById('regPassword').value, phone: document.getElementById('regPhone').value,
+      email: document.getElementById('regEmail').value
+    }).then(function (res) {
+      okEl.textContent = res.message;
+      okEl.classList.remove('hidden');
+      document.getElementById('registerForm').reset();
+    }).catch(function (err) {
+      errEl.textContent = err.message;
+      errEl.classList.remove('hidden');
+    }).finally(function () {
+      btn.disabled = false; btn.textContent = 'Create Account';
+    });
+  });
+}
+
 function doLogout() {
   api('logout', STATE.token).finally(function () {
     STATE.token = null; STATE.user = null;
@@ -1214,7 +1321,8 @@ var NAV_CONFIG = [
   { key: 'appointments', icon: 'calendar', label: 'Appointments', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] },
   { key: 'pos', icon: 'cart', label: 'Point of Sale', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] },
   { key: 'customers', icon: 'users', label: 'Customers', roles: ['Owner', 'Manager', 'Receptionist'] },
-  { key: 'staff', icon: 'scissors', label: 'Staff', roles: ['Owner', 'Manager'] },
+  { key: 'services', icon: 'scissors', label: 'Services (POS Menu)', roles: ['Owner', 'Manager'] },
+  { key: 'staff', icon: 'user', label: 'Staff', roles: ['Owner', 'Manager'] },
   { key: 'inventory', icon: 'box', label: 'Inventory', roles: ['Owner', 'Manager'] },
   { key: 'branches', icon: 'mapPin', label: 'Branches', roles: ['Owner'] },
   { key: 'expenses', icon: 'card', label: 'Expenses', roles: ['Owner', 'Manager'] },
@@ -1264,9 +1372,9 @@ function renderAdminPage() {
   content.innerHTML = '<p class="muted">Loading…</p>';
   var renderers = {
     overview: renderOverview, appointments: renderAppointments, pos: renderPOS, customers: renderCustomers,
-    staff: renderStaffAdmin, inventory: renderInventory, branches: renderBranchesAdmin, expenses: renderExpenses,
-    reports: renderReports, reviews: renderReviewsAdmin, gallery: renderGalleryAdmin, heroSlides: renderHeroAdmin,
-    settings: renderSettingsAdmin, users: renderUsersAdmin, account: renderAccount
+    services: renderServicesAdmin, staff: renderStaffAdmin, inventory: renderInventory, branches: renderBranchesAdmin,
+    expenses: renderExpenses, reports: renderReports, reviews: renderReviewsAdmin, gallery: renderGalleryAdmin,
+    heroSlides: renderHeroAdmin, settings: renderSettingsAdmin, users: renderUsersAdmin, account: renderAccount
   };
   (renderers[STATE.adminPage] || function () {})(content);
 }
@@ -1397,8 +1505,11 @@ function openAppointmentModal() {
 
 /* ---------- POINT OF SALE ---------- */
 var POS_CART = [];
+var POS_CUST_FIELDS_VISIBLE = false;
 function renderPOS(content) {
   POS_CART = [];
+  STATE.posCustomer = null;
+  POS_CUST_FIELDS_VISIBLE = false;
   var branchHint = (STATE.user.role === 'Owner' && !branchArg())
     ? '<div class="panel" style="background:#fff4d6;"><b class="warn-line">' + icon('alertTriangle', 16) + ' Select a branch</b> in the top-right switcher before checking out a sale.</div>' : '';
   content.innerHTML = branchHint + '<div class="pos-layout">' +
@@ -1406,8 +1517,15 @@ function renderPOS(content) {
     '<div class="filters-bar"><input type="text" id="posSearch" placeholder="Search…" oninput="renderPosItems()"></div>' +
     '<div class="pos-item-grid" id="posItemGrid"></div></div>' +
     '<div class="panel"><h3>Cart</h3><div id="posCart"><p class="muted">Cart is empty.</p></div>' +
-    '<div class="form-row"><label>Customer (optional lookup by phone)</label><input type="text" id="posCustPhone" placeholder="024XXXXXXX"><div class="form-hint" id="posCustHint"></div></div>' +
-    '<div class="field-grid"><div><label>New Customer Name</label><input type="text" id="posCustName"></div><div><label>Discount (GH₵)</label><input type="number" min="0" id="posDiscount" value="0"></div></div>' +
+    '<div class="form-row">' +
+    '<label style="display:flex;align-items:center;justify-content:space-between;">Customer <a href="#" id="posCustToggle">' + icon('users', 13) + ' Register customer</a></label>' +
+    '<div class="form-hint" id="posWalkinLabel">Most sales here are walk-ins — this is left as a walk-in sale by default. No loyalty points are recorded without a registered customer.</div>' +
+    '<div id="posCustFields" class="hidden">' +
+    '<input type="text" id="posCustPhone" placeholder="Customer phone — 024XXXXXXX" style="margin-bottom:8px;">' +
+    '<div class="form-hint" id="posCustHint"></div>' +
+    '<input type="text" id="posCustName" placeholder="Customer name (only needed if new)" style="margin-top:8px;">' +
+    '</div></div>' +
+    '<div class="form-row"><label>Discount (GH₵)</label><input type="number" min="0" id="posDiscount" value="0"></div>' +
     '<div class="form-row"><label>Payment Method</label><select id="posPayment">' + ['Cash', 'MTN MoMo', 'Vodafone Cash', 'Telecel Cash', 'AirtelTigo Money', 'Card'].map(function (p) { return '<option>' + p + '</option>'; }).join('') + '</select></div>' +
     '<div id="posTotals"></div>' +
     '<button class="btn btn-accent btn-block" onclick="checkoutSale()">Checkout</button></div></div>';
@@ -1415,6 +1533,13 @@ function renderPOS(content) {
     STATE.posServices = res[0]; STATE.posProducts = res[1];
     renderPosItems();
   }).catch(function (err) { document.getElementById('posItemGrid').innerHTML = errorPanel(err); });
+  document.getElementById('posCustToggle').addEventListener('click', function (e) {
+    e.preventDefault();
+    POS_CUST_FIELDS_VISIBLE = !POS_CUST_FIELDS_VISIBLE;
+    document.getElementById('posCustFields').classList.toggle('hidden', !POS_CUST_FIELDS_VISIBLE);
+    document.getElementById('posWalkinLabel').classList.toggle('hidden', POS_CUST_FIELDS_VISIBLE);
+    this.innerHTML = icon('users', 13) + (POS_CUST_FIELDS_VISIBLE ? ' Walk-in sale instead' : ' Register customer');
+  });
   document.getElementById('posCustPhone').addEventListener('change', function () {
     var phone = this.value;
     if (!phone) return;
@@ -1430,10 +1555,15 @@ function renderPosItems() {
   var q = (document.getElementById('posSearch').value || '').toLowerCase();
   var services = (STATE.posServices || []).filter(function (s) { return s.Name.toLowerCase().indexOf(q) > -1; });
   var products = (STATE.posProducts || []).filter(function (p) { return p.Name.toLowerCase().indexOf(q) > -1; });
+  function thumb(url, fallbackIcon) {
+    return url ? '<div class="pos-item-photo" style="background-image:url(\'' + esc(url) + '\')"></div>' : '<div class="pos-item-photo pos-item-photo-empty">' + icon(fallbackIcon, 20) + '</div>';
+  }
   var html = services.map(function (s) {
-    return '<div class="pos-item-card" onclick="addToCart(\'service\',\'' + s.ServiceID + '\',\'' + esc(s.Name).replace(/'/g, "\\'") + '\',' + s.Price + ')"><div class="item-name">' + icon('scissors', 14) + esc(s.Name) + '</div><span class="muted">' + money(s.Price) + '</span></div>';
+    return '<div class="pos-item-card" onclick="addToCart(\'service\',\'' + s.ServiceID + '\',\'' + esc(s.Name).replace(/'/g, "\\'") + '\',' + s.Price + ')">' + thumb(s.ImageURL, 'scissors') +
+      '<div class="item-name">' + esc(s.Name) + '</div><span class="muted">' + money(s.Price) + '</span></div>';
   }).join('') + products.map(function (p) {
-    return '<div class="pos-item-card" onclick="addToCart(\'product\',\'' + p.ProductID + '\',\'' + esc(p.Name).replace(/'/g, "\\'") + '\',' + p.SellingPrice + ')"><div class="item-name">' + icon('box', 14) + esc(p.Name) + '</div><span class="muted">' + money(p.SellingPrice) + ' · Stock: ' + p.QuantityInStock + '</span></div>';
+    return '<div class="pos-item-card" onclick="addToCart(\'product\',\'' + p.ProductID + '\',\'' + esc(p.Name).replace(/'/g, "\\'") + '\',' + p.SellingPrice + ')">' + thumb(p.ImageURL, 'box') +
+      '<div class="item-name">' + esc(p.Name) + '</div><span class="muted">' + money(p.SellingPrice) + ' · Stock: ' + p.QuantityInStock + '</span></div>';
   }).join('');
   document.getElementById('posItemGrid').innerHTML = html || '<p class="muted">No items found.</p>';
 }
@@ -1523,6 +1653,53 @@ function viewCustomerProfile(id) {
   }).catch(showError);
 }
 
+/* ---------- SERVICES (the menu POS sells from) ---------- */
+function renderServicesAdmin(content) {
+  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Services</h3><button class="btn btn-sm" onclick="openServiceModal()">' + icon('plus', 14) + ' Add Service</button></div>' +
+    '<p class="muted">These are exactly the items your Point of Sale screen offers to sell — add a photo so staff can spot them quickly on the POS grid.</p>' +
+    '<div id="serviceTableHost"></div></div>';
+  loadServicesTable();
+}
+function loadServicesTable() {
+  api('getServices', STATE.token, branchArg()).then(function (rows) {
+    document.getElementById('serviceTableHost').innerHTML = '<div class="table-wrap"><table><thead><tr><th>Photo</th><th>Name</th><th>Category</th><th>Duration</th><th>Price</th><th>Active</th><th>Actions</th></tr></thead><tbody>' +
+      rows.map(function (s) {
+        var thumb = s.ImageURL ? '<img src="' + esc(s.ImageURL) + '" style="width:50px;height:50px;object-fit:cover;border-radius:6px">' : '<div style="width:50px;height:50px;border-radius:6px;background:#eee;display:flex;align-items:center;justify-content:center;color:#aaa;">' + icon('scissors', 18) + '</div>';
+        return '<tr><td>' + thumb + '</td><td>' + esc(s.Name) + '</td><td>' + esc(s.Category) + '</td><td>' + s.DurationMinutes + ' min</td><td>' + money(s.Price) + '</td><td>' + s.Active + '</td>' +
+          '<td class="row-actions"><button class="btn btn-sm btn-outline" onclick=\'openServiceModal(' + JSON.stringify(s).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button><button class="btn btn-sm btn-danger" onclick="deleteServiceRow(\'' + s.ServiceID + '\')">' + icon('trash', 13) + '</button></td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }).catch(function (err) { document.getElementById('serviceTableHost').innerHTML = errorPanel(err); });
+}
+function openServiceModal(s) {
+  s = s || {};
+  var branchOpts = STATE.branches.map(function (b) { return '<option value="' + b.BranchID + '"' + (s.BranchID === b.BranchID ? ' selected' : '') + '>' + esc(b.Name) + '</option>'; }).join('');
+  var html = '<div class="field-grid">' +
+    '<div><label>Name</label><input id="svName" value="' + esc(s.Name || '') + '"></div>' +
+    '<div><label>Category</label><input id="svCategory" value="' + esc(s.Category || '') + '" placeholder="Haircut, Shave, Braids…"></div>' +
+    '<div><label>Branch</label><select id="svBranch">' + branchOpts + '</select></div>' +
+    '<div><label>Duration (minutes)</label><input type="number" id="svDuration" value="' + (s.DurationMinutes || 30) + '"></div>' +
+    '<div><label>Price (GH₵)</label><input type="number" id="svPrice" value="' + (s.Price || 0) + '"></div>' +
+    '<div><label>Active</label><select id="svActive">' + ['Y', 'N'].map(function (a) { return '<option' + (s.Active === a ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select></div>' +
+    '<div style="grid-column:1/-1"><label>Description</label><textarea id="svDescription" rows="2">' + esc(s.Description || '') + '</textarea></div>' +
+    '<div style="grid-column:1/-1"><label>Photo (shown on the website &amp; POS)</label>' + photoPickerHtml('sv', s.ImageURL) + '</div>' +
+    '</div>';
+  openModal(s.ServiceID ? 'Edit Service' : 'Add Service', html, function () {
+    resolvePhotoPicker('sv', function (photoUrl) {
+      api('saveService', STATE.token, {
+        ServiceID: s.ServiceID || '', Name: document.getElementById('svName').value, Category: document.getElementById('svCategory').value,
+        Description: document.getElementById('svDescription').value, DurationMinutes: document.getElementById('svDuration').value,
+        Price: document.getElementById('svPrice').value, BranchID: document.getElementById('svBranch').value,
+        Active: document.getElementById('svActive').value, ImageURL: photoUrl
+      }).then(function () { toast('Service saved', 'success'); closeModal(); loadServicesTable(); }).catch(showError);
+    });
+  }, 'Save');
+  bindPhotoPicker('sv');
+}
+function deleteServiceRow(id) {
+  if (!confirm('Delete this service? It will no longer be bookable or sellable.')) return;
+  api('deleteService', STATE.token, id).then(function () { toast('Deleted', 'success'); loadServicesTable(); }).catch(showError);
+}
+
 /* ---------- STAFF ---------- */
 function renderStaffAdmin(content) {
   content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Staff</h3><button class="btn btn-sm" onclick="openStaffModal()">' + icon('plus', 14) + ' Add Staff</button></div><div id="staffTableHost"></div></div>';
@@ -1583,10 +1760,11 @@ function renderInventory(content) {
 }
 function loadProductsTable() {
   api('getProducts', STATE.token, branchArg()).then(function (rows) {
-    document.getElementById('prodTableHost').innerHTML = '<div class="table-wrap"><table><thead><tr><th>Name</th><th>Category</th><th>Cost</th><th>Selling Price</th><th>Stock</th><th>Reorder Lvl</th><th>Actions</th></tr></thead><tbody>' +
+    document.getElementById('prodTableHost').innerHTML = '<div class="table-wrap"><table><thead><tr><th>Photo</th><th>Name</th><th>Category</th><th>Cost</th><th>Selling Price</th><th>Stock</th><th>Reorder Lvl</th><th>Actions</th></tr></thead><tbody>' +
       rows.map(function (p) {
         var low = Number(p.QuantityInStock) <= Number(p.ReorderLevel);
-        return '<tr' + (low ? ' style="background:#fff4d6"' : '') + '><td>' + esc(p.Name) + '</td><td>' + esc(p.Category) + '</td><td>' + money(p.CostPrice) + '</td><td>' + money(p.SellingPrice) + '</td><td>' + p.QuantityInStock + '</td><td>' + p.ReorderLevel + '</td>' +
+        var thumb = p.ImageURL ? '<img src="' + esc(p.ImageURL) + '" style="width:44px;height:44px;object-fit:cover;border-radius:6px">' : '<div style="width:44px;height:44px;border-radius:6px;background:#eee;display:flex;align-items:center;justify-content:center;color:#aaa;">' + icon('box', 16) + '</div>';
+        return '<tr' + (low ? ' style="background:#fff4d6"' : '') + '><td>' + thumb + '</td><td>' + esc(p.Name) + '</td><td>' + esc(p.Category) + '</td><td>' + money(p.CostPrice) + '</td><td>' + money(p.SellingPrice) + '</td><td>' + p.QuantityInStock + '</td><td>' + p.ReorderLevel + '</td>' +
           '<td class="row-actions"><button class="btn btn-sm btn-outline" onclick=\'openProductModal(' + JSON.stringify(p).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button>' +
           '<button class="btn btn-sm" onclick="restockPrompt(\'' + p.ProductID + '\')">' + icon('plus', 13) + ' Restock</button>' +
           '<button class="btn btn-sm btn-danger" onclick="deleteProductRow(\'' + p.ProductID + '\')">' + icon('trash', 13) + '</button></td></tr>';
@@ -1604,14 +1782,19 @@ function openProductModal(p) {
     '<div><label>Selling Price</label><input type="number" id="pdPrice" value="' + (p.SellingPrice || 0) + '"></div>' +
     '<div><label>Qty in Stock</label><input type="number" id="pdQty" value="' + (p.QuantityInStock || 0) + '"></div>' +
     '<div><label>Reorder Level</label><input type="number" id="pdReorder" value="' + (p.ReorderLevel || 5) + '"></div>' +
+    '<div style="grid-column:1/-1"><label>Photo (shown on the website &amp; POS)</label>' + photoPickerHtml('pd', p.ImageURL) + '</div>' +
     '</div>';
   openModal(p.ProductID ? 'Edit Product' : 'Add Product', html, function () {
-    api('saveProduct', STATE.token, {
-      ProductID: p.ProductID || '', Name: document.getElementById('pdName').value, Category: document.getElementById('pdCategory').value,
-      BranchID: document.getElementById('pdBranch').value, CostPrice: document.getElementById('pdCost').value,
-      SellingPrice: document.getElementById('pdPrice').value, QuantityInStock: document.getElementById('pdQty').value, ReorderLevel: document.getElementById('pdReorder').value
-    }).then(function () { toast('Product saved', 'success'); closeModal(); loadProductsTable(); }).catch(showError);
+    resolvePhotoPicker('pd', function (photoUrl) {
+      api('saveProduct', STATE.token, {
+        ProductID: p.ProductID || '', Name: document.getElementById('pdName').value, Category: document.getElementById('pdCategory').value,
+        BranchID: document.getElementById('pdBranch').value, CostPrice: document.getElementById('pdCost').value,
+        SellingPrice: document.getElementById('pdPrice').value, QuantityInStock: document.getElementById('pdQty').value,
+        ReorderLevel: document.getElementById('pdReorder').value, ImageURL: photoUrl
+      }).then(function () { toast('Product saved', 'success'); closeModal(); loadProductsTable(); }).catch(showError);
+    });
   }, 'Save');
+  bindPhotoPicker('pd');
 }
 function deleteProductRow(id) {
   if (!confirm('Delete this product?')) return;
@@ -1939,6 +2122,13 @@ function renderSettingsAdmin(content) {
       colorField('Text Color', 'stTextColor', s.TextColor) +
       '</div><button class="btn btn-sm btn-outline" style="margin-top:10px" onclick="previewTheme()">Preview Theme</button></div>' +
 
+      '<div class="panel"><h3>Booking QR Code</h3><p class="muted">Print this and display it at your shop — customers scan it to jump straight to the booking form.</p>' +
+      '<div id="qrCardHost"></div>' +
+      '<div style="text-align:center;margin-top:16px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">' +
+      '<button class="btn btn-sm" onclick="printQrCard()">' + icon('image', 13) + ' Print QR Card</button>' +
+      '<a class="btn btn-sm btn-outline" id="qrRawLink" target="_blank" rel="noopener">Open QR Image Only</a>' +
+      '</div></div>' +
+
       '<div class="panel"><h3>Booking Availability</h3><div class="field-grid">' +
       field('Booking Start Hour (24h)', 'stBookingStartHour', s.BookingStartHour) +
       field('Booking End Hour (24h)', 'stBookingEndHour', s.BookingEndHour) +
@@ -1961,7 +2151,35 @@ function renderSettingsAdmin(content) {
 
       '<button class="btn btn-accent" onclick="saveAllSettings()">Save All Settings</button>';
     bindPhotoPicker('stLogo');
+    renderQrCard(s);
   }).catch(function (err) { content.innerHTML = errorPanel(err); });
+}
+
+/** A "Scan to Book" card, styled with the salon's own theme colors and logo. */
+function renderQrCard(s) {
+  var bookingUrl = location.href.split('#')[0].split('?')[0] + '#booking';
+  var qrImgUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=360x360&margin=12&data=' + encodeURIComponent(bookingUrl);
+  var accent = s.AccentColor || '#c9a227';
+  var primary = s.PrimaryColor || '#1a1a1a';
+  var cardHtml =
+    '<div style="max-width:320px;margin:0 auto;background:#fff;border:3px solid ' + accent + ';border-radius:16px;padding:26px;text-align:center;font-family:Arial,Helvetica,sans-serif;">' +
+    (s.LogoURL ? '<img src="' + esc(s.LogoURL) + '" style="height:50px;border-radius:8px;margin-bottom:10px;">' : '') +
+    '<div style="font-weight:800;font-size:1.15rem;color:' + primary + ';">' + esc(s.BusinessName) + '</div>' +
+    (s.Tagline ? '<div style="color:#888;font-size:.8rem;margin:4px 0 16px;">' + esc(s.Tagline) + '</div>' : '<div style="margin-bottom:16px;"></div>') +
+    '<div style="display:inline-block;padding:12px;border:2px solid #f0f0f0;border-radius:10px;"><img src="' + qrImgUrl + '" width="220" height="220" alt="Booking QR Code"></div>' +
+    '<div style="margin-top:14px;font-weight:800;letter-spacing:.5px;color:' + primary + ';font-size:.85rem;">SCAN TO BOOK YOUR APPOINTMENT</div>' +
+    '</div>';
+  document.getElementById('qrCardHost').innerHTML = cardHtml;
+  document.getElementById('qrRawLink').href = qrImgUrl;
+  STATE.qrCardHtml = cardHtml;
+}
+function printQrCard() {
+  if (!STATE.qrCardHtml) return;
+  var w = window.open('', '_blank', 'width=500,height=650');
+  if (!w) { toast('Please allow pop-ups to print the QR card', 'error'); return; }
+  w.document.write('<html><head><title>Booking QR Code</title></head><body style="display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#f4f3f1;">' + STATE.qrCardHtml + '</body></html>');
+  w.document.close();
+  setTimeout(function () { w.focus(); w.print(); }, 700);
 }
 function field(label, id, val) {
   return '<div><label>' + label + '</label><input id="' + id + '" value="' + esc(val || '') + '"></div>';
@@ -2011,8 +2229,11 @@ function renderUsersAdmin(content) {
 }
 function loadUsersTable() {
   api('getUsers', STATE.token).then(function (rows) {
-    document.getElementById('userTableHost').innerHTML = renderTable(['Username', 'Role', 'Branch', 'Active', 'Actions'], rows.map(function (u) {
-      return [esc(u.Username), esc(u.Role), esc(u.BranchID), u.Active,
+    var pending = rows.filter(function (u) { return u.Active === 'N'; }).length;
+    var hint = pending ? '<p class="muted warn-line">' + icon('alertTriangle', 14) + ' ' + pending + ' account(s) awaiting approval (shown as inactive below).</p>' : '';
+    document.getElementById('userTableHost').innerHTML = hint + renderTable(['Full Name', 'Username', 'Role', 'Branch', 'Status', 'Actions'], rows.map(function (u) {
+      return [esc(u.FullName || '—'), esc(u.Username), esc(u.Role), esc(u.BranchID || '—'),
+        u.Active === 'Y' ? statusBadge('Confirmed') : '<span class="badge badge-pending">Pending</span>',
         '<button class="btn btn-sm btn-outline" onclick=\'openUserModal(' + JSON.stringify(u).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button> <button class="btn btn-sm btn-danger" onclick="deleteUserRow(\'' + u.Username + '\')">' + icon('trash', 13) + '</button>'];
     }));
   }).catch(function (err) { document.getElementById('userTableHost').innerHTML = errorPanel(err); });
@@ -2021,6 +2242,7 @@ function openUserModal(u) {
   u = u || {};
   var branchOpts = '<option value="ALL">All Branches</option>' + STATE.branches.map(function (b) { return '<option value="' + b.BranchID + '"' + (u.BranchID === b.BranchID ? ' selected' : '') + '>' + esc(b.Name) + '</option>'; }).join('');
   var html = '<div class="field-grid">' +
+    '<div><label>Full Name</label><input id="usFullName" value="' + esc(u.FullName || '') + '"></div>' +
     '<div><label>Username</label><input id="usUsername" value="' + esc(u.Username || '') + '" ' + (u.Username ? 'readonly' : '') + '></div>' +
     '<div><label>Password ' + (u.Username ? '(leave blank to keep)' : '') + '</label><input type="password" id="usPassword"></div>' +
     '<div><label>Role</label><select id="usRole">' + ['Owner', 'Manager', 'Staff', 'Receptionist'].map(function (r) { return '<option' + (u.Role === r ? ' selected' : '') + '>' + r + '</option>'; }).join('') + '</select></div>' +
@@ -2028,11 +2250,12 @@ function openUserModal(u) {
     '<div><label>Linked Staff ID (optional)</label><input id="usStaffID" value="' + esc(u.StaffID || '') + '"></div>' +
     '<div><label>Email</label><input id="usEmail" value="' + esc(u.Email || '') + '"></div>' +
     '<div><label>Phone</label><input id="usPhone" value="' + esc(u.Phone || '') + '"></div>' +
-    '<div><label>Active</label><select id="usActive">' + ['Y', 'N'].map(function (a) { return '<option' + (u.Active === a ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select></div>' +
+    '<div><label>Active</label><select id="usActive">' + ['Y', 'N'].map(function (a) { return '<option value="' + a + '"' + (u.Active === a ? ' selected' : '') + '>' + (a === 'Y' ? 'Y — Active' : 'N — Inactive/Pending') + '</option>'; }).join('') + '</select></div>' +
     '</div>';
   openModal(u.Username ? 'Edit User' : 'Add User', html, function () {
     api('saveUser', STATE.token, {
       Username: document.getElementById('usUsername').value, Password: document.getElementById('usPassword').value,
+      FullName: document.getElementById('usFullName').value,
       Role: document.getElementById('usRole').value, BranchID: document.getElementById('usBranch').value,
       StaffID: document.getElementById('usStaffID').value, Email: document.getElementById('usEmail').value,
       Phone: document.getElementById('usPhone').value, Active: document.getElementById('usActive').value

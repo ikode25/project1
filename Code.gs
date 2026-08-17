@@ -46,14 +46,14 @@ var UPLOAD_FOLDER_NAME = 'SalonSystem_Uploads';
 // Column schema for every tab. Order matters — it defines the sheet column order.
 var SCHEMA = {
   Branches:      ['BranchID', 'Name', 'Location', 'Phone', 'OpeningHours'],
-  Services:      ['ServiceID', 'Name', 'Category', 'Description', 'DurationMinutes', 'Price', 'BranchID', 'Active'],
+  Services:      ['ServiceID', 'Name', 'Category', 'Description', 'DurationMinutes', 'Price', 'BranchID', 'Active', 'ImageURL'],
   Staff:         ['StaffID', 'Name', 'Role', 'BranchID', 'Phone', 'Specialties', 'PhotoURL', 'Active', 'CommissionRate', 'WorkDays'],
   Customers:     ['CustomerID', 'Name', 'Phone', 'Email', 'DateJoined', 'LoyaltyPoints', 'Notes'],
   Appointments:  ['AppointmentID', 'Reference', 'CustomerID', 'StaffID', 'ServiceID', 'BranchID', 'Date', 'TimeSlot', 'Status', 'CreatedAt', 'Notes'],
   Sales:         ['SaleID', 'Date', 'BranchID', 'CustomerID', 'StaffID', 'Items', 'Subtotal', 'Discount', 'Tax', 'Total', 'PaymentMethod', 'PaymentStatus'],
-  Products:      ['ProductID', 'Name', 'Category', 'CostPrice', 'SellingPrice', 'QuantityInStock', 'ReorderLevel', 'BranchID'],
+  Products:      ['ProductID', 'Name', 'Category', 'CostPrice', 'SellingPrice', 'QuantityInStock', 'ReorderLevel', 'BranchID', 'ImageURL'],
   Expenses:      ['ExpenseID', 'Date', 'BranchID', 'Category', 'Amount', 'Description'],
-  Users:         ['Username', 'PasswordHash', 'Salt', 'Role', 'BranchID', 'Active', 'StaffID', 'Email', 'Phone'],
+  Users:         ['Username', 'PasswordHash', 'Salt', 'Role', 'BranchID', 'Active', 'StaffID', 'Email', 'Phone', 'FullName'],
   Reviews:       ['ReviewID', 'CustomerID', 'StaffID', 'Rating', 'Comment', 'Date'],
   Settings:      ['Key', 'Value'],
   HeroSlides:    ['SlideID', 'ImageURL', 'Title', 'Subtitle', 'ButtonText', 'ButtonLink', 'SortOrder', 'Active'],
@@ -192,21 +192,21 @@ function seedIfEmpty_() {
   // Services
   if (readAll_('Services').length === 0) {
     var svc = [
-      ['Skin Fade', 'Haircut', 'Precision skin fade with clean lineup', 40, 40, 'BR-0001'],
-      ['Classic Haircut', 'Haircut', 'Standard haircut & styling', 30, 25, 'BR-0001'],
-      ['Beard Trim & Shape', 'Shave', 'Beard shaping with hot towel', 20, 20, 'BR-0001'],
-      ['Hot Towel Shave', 'Shave', 'Traditional straight razor shave', 30, 30, 'BR-0001'],
-      ['Box Braids', 'Braids', 'Medium box braids, shoulder length', 180, 150, 'BR-0001'],
-      ['Cornrows', 'Braids', 'Classic cornrow styling', 90, 80, 'BR-0001'],
-      ['Manicure', 'Manicure', 'Full manicure with polish', 45, 60, 'BR-0002'],
-      ['Pedicure', 'Manicure', 'Full pedicure with polish', 50, 70, 'BR-0002'],
-      ['Facial Treatment', 'Facial', 'Deep cleanse & moisturising facial', 60, 90, 'BR-0002'],
-      ['Kids Haircut', 'Haircut', 'Haircut for children under 12', 25, 20, 'BR-0002']
+      ['Skin Fade', 'Haircut', 'Precision skin fade with clean lineup', 40, 40, 'BR-0001', 'https://images.unsplash.com/photo-1599351431202-1e0f0137899a?q=80&w=800&auto=format&fit=crop'],
+      ['Classic Haircut', 'Haircut', 'Standard haircut & styling', 30, 25, 'BR-0001', 'https://images.unsplash.com/photo-1503951914875-452162b0f3f1?q=80&w=800&auto=format&fit=crop'],
+      ['Beard Trim & Shape', 'Shave', 'Beard shaping with hot towel', 20, 20, 'BR-0001', 'https://images.unsplash.com/photo-1622286346003-c5c7e63ff123?q=80&w=800&auto=format&fit=crop'],
+      ['Hot Towel Shave', 'Shave', 'Traditional straight razor shave', 30, 30, 'BR-0001', 'https://images.unsplash.com/photo-1621605815971-fbc98d665033?q=80&w=800&auto=format&fit=crop'],
+      ['Box Braids', 'Braids', 'Medium box braids, shoulder length', 180, 150, 'BR-0001', 'https://images.unsplash.com/photo-1519345182560-3f2917c472ef?q=80&w=800&auto=format&fit=crop'],
+      ['Cornrows', 'Braids', 'Classic cornrow styling', 90, 80, 'BR-0001', 'https://images.unsplash.com/photo-1595959183082-7b570b7e08e2?q=80&w=800&auto=format&fit=crop'],
+      ['Manicure', 'Manicure', 'Full manicure with polish', 45, 60, 'BR-0002', 'https://images.unsplash.com/photo-1560066984-138dadb4c035?q=80&w=800&auto=format&fit=crop'],
+      ['Pedicure', 'Manicure', 'Full pedicure with polish', 50, 70, 'BR-0002', 'https://images.unsplash.com/photo-1519014816548-bf5fe059798b?q=80&w=800&auto=format&fit=crop'],
+      ['Facial Treatment', 'Facial', 'Deep cleanse & moisturising facial', 60, 90, 'BR-0002', 'https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?q=80&w=800&auto=format&fit=crop'],
+      ['Kids Haircut', 'Haircut', 'Haircut for children under 12', 25, 20, 'BR-0002', '']
     ];
     svc.forEach(function (s, i) {
       appendRow_('Services', {
         ServiceID: 'SV-' + String(i + 1).padStart(4, '0'), Name: s[0], Category: s[1], Description: s[2],
-        DurationMinutes: s[3], Price: s[4], BranchID: s[5], Active: 'Y'
+        DurationMinutes: s[3], Price: s[4], BranchID: s[5], Active: 'Y', ImageURL: s[6]
       });
     });
   }
@@ -232,15 +232,15 @@ function seedIfEmpty_() {
   // Products
   if (readAll_('Products').length === 0) {
     var prod = [
-      ['Pomade - Matte Finish', 'Hair Products', 15, 30, 25, 5, 'BR-0001'],
-      ['Beard Oil', 'Grooming', 12, 25, 20, 5, 'BR-0001'],
-      ['Hair Relaxer Kit', 'Hair Products', 20, 45, 15, 4, 'BR-0002'],
-      ['Nail Polish Set', 'Nail Products', 10, 22, 30, 6, 'BR-0002']
+      ['Pomade - Matte Finish', 'Hair Products', 15, 30, 25, 5, 'BR-0001', 'https://images.unsplash.com/photo-1621607512214-68297480165e?q=80&w=800&auto=format&fit=crop'],
+      ['Beard Oil', 'Grooming', 12, 25, 20, 5, 'BR-0001', 'https://images.unsplash.com/photo-1621607150430-9c3f9c3e6d5b?q=80&w=800&auto=format&fit=crop'],
+      ['Hair Relaxer Kit', 'Hair Products', 20, 45, 15, 4, 'BR-0002', ''],
+      ['Nail Polish Set', 'Nail Products', 10, 22, 30, 6, 'BR-0002', 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?q=80&w=800&auto=format&fit=crop']
     ];
     prod.forEach(function (p, i) {
       appendRow_('Products', {
         ProductID: 'PR-' + String(i + 1).padStart(4, '0'), Name: p[0], Category: p[1], CostPrice: p[2],
-        SellingPrice: p[3], QuantityInStock: p[4], ReorderLevel: p[5], BranchID: p[6]
+        SellingPrice: p[3], QuantityInStock: p[4], ReorderLevel: p[5], BranchID: p[6], ImageURL: p[7]
       });
     });
   }
@@ -329,6 +329,25 @@ function getSheet_(name) {
   return sheet;
 }
 
+/**
+ * Google Sheets auto-detects date/time-looking strings (like the ones
+ * nowIso_() writes) and silently stores them as real Date values. Reading
+ * such a cell back then returns a native Date object instead of a string —
+ * and google.script.run has no way to serialize a Date inside a returned
+ * object, so it silently delivers `null` to the client instead of throwing.
+ * Every cell value is normalized back to a plain string/number/boolean here,
+ * at the single point all sheet reads pass through, so nothing downstream
+ * (internal string comparisons like `a.Date === '2026-01-01'`, or the JSON
+ * sent back to the browser) can ever see a raw Date again.
+ */
+function normalizeCellValue_(v) {
+  if (v instanceof Date) {
+    var isMidnight = v.getHours() === 0 && v.getMinutes() === 0 && v.getSeconds() === 0;
+    return Utilities.formatDate(v, TIMEZONE, isMidnight ? 'yyyy-MM-dd' : "yyyy-MM-dd'T'HH:mm:ss");
+  }
+  return v;
+}
+
 function readAll_(sheetName) {
   var sheet = getSheet_(sheetName);
   var lastRow = sheet.getLastRow();
@@ -339,7 +358,7 @@ function readAll_(sheetName) {
   return values
     .map(function (row, idx) {
       var obj = { _row: idx + 2 };
-      headers.forEach(function (h, i) { obj[h] = row[i]; });
+      headers.forEach(function (h, i) { obj[h] = normalizeCellValue_(row[i]); });
       return obj;
     })
     .filter(function (obj) {
@@ -380,7 +399,7 @@ function updateById_(sheetName, idField, idValue, updates) {
   });
   sheet.getRange(rowIndex, 1, 1, headers.length).setValues([current]);
   var result = {};
-  headers.forEach(function (h, i) { result[h] = current[i]; });
+  headers.forEach(function (h, i) { result[h] = normalizeCellValue_(current[i]); });
   return result;
 }
 
@@ -440,6 +459,44 @@ function login(username, password) {
 function logout(token) {
   if (token) CacheService.getScriptCache().remove('session_' + token);
   return true;
+}
+
+/**
+ * Public, unauthenticated self-registration from the Staff Login screen.
+ * For security, a self-registered account is never granted an elevated
+ * role or branch access automatically: it is created as an inactive
+ * 'Staff' account with no branch assigned. An Owner must review it and
+ * assign a role/branch/active status from the Users admin page before it
+ * can log in — this prevents anyone who finds the login page from
+ * creating themselves a privileged account.
+ */
+function registerAccount(data) {
+  data = data || {};
+  var name = String(data.name || '').trim();
+  var username = String(data.username || '').trim();
+  var password = String(data.password || '');
+
+  if (!name) throw new Error('Please enter your full name.');
+  if (!username || username.length < 3) throw new Error('Please choose a username of at least 3 characters.');
+  if (!password || password.length < 6) throw new Error('Password must be at least 6 characters.');
+
+  var existing = readAll_('Users').find(function (u) { return String(u.Username).toLowerCase() === username.toLowerCase(); });
+  if (existing) throw new Error('That username is already taken.');
+
+  var phone = '';
+  if (data.phone) {
+    phone = normalizeGhanaPhone_(data.phone);
+    if (!phone) throw new Error('Please enter a valid Ghana phone number, e.g. 024XXXXXXX or +233XXXXXXXXX.');
+  }
+
+  var salt = Utilities.getUuid();
+  appendRow_('Users', {
+    Username: username, PasswordHash: hashPassword_(password, salt), Salt: salt,
+    Role: 'Staff', BranchID: '', Active: 'N', StaffID: '', Email: String(data.email || '').trim(), Phone: phone,
+    FullName: name
+  });
+
+  return { message: 'Account created! An admin will review your details and activate your access before you can log in.' };
 }
 
 function requireAuth_(token) {
@@ -1128,7 +1185,7 @@ function getUsers(token) {
   var user = requireAuth_(token);
   requireRole_(user, ['Owner', 'Manager']);
   return readAll_('Users').map(function (u) {
-    return { Username: u.Username, Role: u.Role, BranchID: u.BranchID, Active: u.Active, StaffID: u.StaffID, Email: u.Email, Phone: u.Phone };
+    return { Username: u.Username, Role: u.Role, BranchID: u.BranchID, Active: u.Active, StaffID: u.StaffID, Email: u.Email, Phone: u.Phone, FullName: u.FullName };
   });
 }
 
@@ -1139,7 +1196,7 @@ function saveUser(token, userData) {
 
   var existing = readAll_('Users').find(function (u) { return u.Username === userData.Username; });
   if (existing) {
-    var updates = { Role: userData.Role, BranchID: userData.BranchID, Active: userData.Active, StaffID: userData.StaffID || '', Email: userData.Email || '', Phone: userData.Phone || '' };
+    var updates = { Role: userData.Role, BranchID: userData.BranchID, Active: userData.Active, StaffID: userData.StaffID || '', Email: userData.Email || '', Phone: userData.Phone || '', FullName: userData.FullName || existing.FullName || '' };
     if (userData.Password) {
       var salt = Utilities.getUuid();
       updates.Salt = salt;
@@ -1160,7 +1217,8 @@ function saveUser(token, userData) {
     Active: userData.Active === 'N' ? 'N' : 'Y',
     StaffID: userData.StaffID || '',
     Email: userData.Email || '',
-    Phone: userData.Phone || ''
+    Phone: userData.Phone || '',
+    FullName: userData.FullName || ''
   });
   return { success: true };
 }
@@ -1477,14 +1535,77 @@ function logNotification_(type, recipient, message, status) {
   });
 }
 
-function sendEmail_(email, subject, body) {
+/**
+ * Sends an email. `plainBody` is always required (used as the fallback for
+ * clients that don't render HTML); `htmlBody`, when provided, is the
+ * branded HTML version built with buildEmailHtml_() and is what most
+ * customers will actually see.
+ */
+function sendEmail_(email, subject, plainBody, htmlBody) {
   if (!email) return;
   try {
-    MailApp.sendEmail(email, subject, body);
+    var settings = getSettingsMap_();
+    var options = { name: settings.BusinessName };
+    if (htmlBody) options.htmlBody = htmlBody;
+    MailApp.sendEmail(email, subject, plainBody, options);
     logNotification_('Email', email, subject, 'Sent');
   } catch (err) {
     logNotification_('Email', email, subject, 'Failed: ' + err.message);
   }
+}
+
+function esc_(s) {
+  return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+function getWebAppUrl_() {
+  try { return ScriptApp.getService().getUrl() || ''; } catch (e) { return ''; }
+}
+
+function formatNiceDateServer_(dateStr) {
+  if (!dateStr) return '';
+  try { return Utilities.formatDate(new Date(dateStr + 'T00:00:00'), TIMEZONE, 'EEEE, MMMM d, yyyy'); }
+  catch (e) { return dateStr; }
+}
+
+/** A clean [label, value] details table used inside branded emails. */
+function emailDetailTable_(rows) {
+  return '<table style="width:100%;border-collapse:collapse;margin:14px 0;">' +
+    rows.map(function (r) {
+      return '<tr><td style="padding:8px 0;border-bottom:1px solid #eee;color:#888;font-size:13px;">' + esc_(r[0]) + '</td>' +
+        '<td style="padding:8px 0;border-bottom:1px solid #eee;text-align:right;font-weight:700;font-size:13px;">' + esc_(r[1]) + '</td></tr>';
+    }).join('') + '</table>';
+}
+
+/**
+ * Wraps a message in a branded HTML email shell — business logo, name, and
+ * tagline in a header banner colored with the salon's own theme, the message
+ * body, an optional call-to-action button, and a footer with contact info —
+ * so notification emails read as a professional, legitimate business email
+ * rather than plain text.
+ */
+function buildEmailHtml_(headline, bodyHtml, ctaText, ctaLink) {
+  var s = getSettingsMap_();
+  var primary = s.PrimaryColor || '#1a1a1a';
+  var accent = s.AccentColor || '#c9a227';
+  var logoImg = s.LogoURL ? '<img src="' + esc_(s.LogoURL) + '" alt="' + esc_(s.BusinessName) + '" style="height:46px;border-radius:8px;margin-bottom:12px;display:inline-block;">' : '';
+  return '<div style="font-family:Arial,Helvetica,sans-serif;background:#f4f3f1;padding:24px 12px;">' +
+    '<div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.08);">' +
+    '<div style="background:' + primary + ';padding:28px 30px;text-align:center;color:#ffffff;">' + logoImg +
+    '<div style="font-size:20px;font-weight:800;">' + esc_(s.BusinessName) + '</div>' +
+    (s.Tagline ? '<div style="opacity:.75;font-size:12px;margin-top:4px;">' + esc_(s.Tagline) + '</div>' : '') +
+    '</div>' +
+    '<div style="padding:30px;color:#1a1a1a;">' +
+    '<h2 style="margin:0 0 14px;color:' + primary + ';font-size:19px;">' + esc_(headline) + '</h2>' +
+    bodyHtml +
+    (ctaText && ctaLink ? '<div style="text-align:center;margin-top:26px;"><a href="' + esc_(ctaLink) + '" style="background:' + accent + ';color:#1a1a1a;padding:12px 28px;border-radius:999px;text-decoration:none;font-weight:700;font-size:14px;display:inline-block;">' + esc_(ctaText) + '</a></div>' : '') +
+    '</div>' +
+    '<div style="background:#f7f5f2;padding:18px 30px;text-align:center;font-size:12px;color:#888;">' +
+    esc_(s.ContactPhone || '') + (s.WhatsAppNumber ? ' &middot; WhatsApp: ' + esc_(s.WhatsAppNumber) : '') + '<br>' +
+    '&copy; ' + new Date().getFullYear() + ' ' + esc_(s.BusinessName) +
+    '</div></div></div>';
 }
 
 /**
@@ -1530,8 +1651,16 @@ function sendAppointmentConfirmation_(appt, customer, service, branch) {
     '- ' + settings.BusinessName;
   sendSms_(customer.Phone, msg);
   if (customer.Email) {
+    var bodyHtml = '<p>Hi ' + esc_(customer.Name) + ',</p>' +
+      '<p>Thank you for booking with us! Your appointment request has been received and is <b>pending confirmation</b>. Here are the details:</p>' +
+      emailDetailTable_([
+        ['Reference', appt.Reference], ['Service', service.Name], ['Branch', branch.Name],
+        ['Date', formatNiceDateServer_(appt.Date)], ['Time', appt.TimeSlot]
+      ]) +
+      '<p>We\'ll confirm your appointment shortly by SMS/Email. Need to make changes? Just reply to this email or give us a call.</p>';
     sendEmail_(customer.Email, 'Booking Received — ' + appt.Reference,
-      msg + '\n\nWe will confirm your appointment shortly. Thank you for choosing ' + settings.BusinessName + '.');
+      msg + '\n\nWe will confirm your appointment shortly. Thank you for choosing ' + settings.BusinessName + '.',
+      buildEmailHtml_('Booking Received!', bodyHtml, 'Visit Our Website', getWebAppUrl_()));
   }
 }
 
@@ -1539,7 +1668,10 @@ function sendAppointmentStatusUpdate_(appt, customer, statusText) {
   var settings = getSettingsMap_();
   var msg = 'Hi ' + customer.Name + ', your appointment (' + appt.Reference + ') has been ' + statusText + '. - ' + settings.BusinessName;
   sendSms_(customer.Phone, msg);
-  if (customer.Email) sendEmail_(customer.Email, 'Appointment Update — ' + appt.Reference, msg);
+  if (customer.Email) {
+    var bodyHtml = '<p>Hi ' + esc_(customer.Name) + ',</p><p>Your appointment <b>' + esc_(appt.Reference) + '</b> has been <b>' + esc_(statusText) + '</b>.</p>';
+    sendEmail_(customer.Email, 'Appointment Update — ' + appt.Reference, msg, buildEmailHtml_('Appointment Update', bodyHtml));
+  }
 }
 
 function sendCompletionThankYou_(appt, customer, service, pointsEarned) {
@@ -1547,7 +1679,13 @@ function sendCompletionThankYou_(appt, customer, service, pointsEarned) {
   var msg = 'Thank you for visiting ' + settings.BusinessName + ', ' + customer.Name + '! Your ' + service.Name +
     ' is complete. You earned ' + pointsEarned + ' loyalty points (total: ' + customer.LoyaltyPoints + '). See you again soon!';
   sendSms_(customer.Phone, msg);
-  if (customer.Email) sendEmail_(customer.Email, 'Thank You For Visiting ' + settings.BusinessName, msg);
+  if (customer.Email) {
+    var bodyHtml = '<p>Hi ' + esc_(customer.Name) + ',</p><p>Thank you for visiting us! Your <b>' + esc_(service.Name) + '</b> service is complete.</p>' +
+      emailDetailTable_([['Loyalty Points Earned', '+' + pointsEarned], ['Total Points Balance', customer.LoyaltyPoints]]) +
+      '<p>We hope to see you again soon!</p>';
+    sendEmail_(customer.Email, 'Thank You For Visiting ' + settings.BusinessName, msg,
+      buildEmailHtml_('Thank You!', bodyHtml, 'Book Your Next Visit', getWebAppUrl_()));
+  }
 }
 
 function sendSaleReceipt_(sale, customer, lineItems, pointsEarned) {
@@ -1557,6 +1695,20 @@ function sendSaleReceipt_(sale, customer, lineItems, pointsEarned) {
     ' paid via ' + sale.PaymentMethod + '. You earned ' + pointsEarned + ' loyalty points. Thank you for visiting ' + settings.BusinessName + '!';
   sendSms_(customer.Phone, msg);
   if (customer.Email) {
+    var itemsHtml = '<table style="width:100%;border-collapse:collapse;margin:14px 0;">' +
+      lineItems.map(function (li) {
+        return '<tr><td style="padding:6px 0;border-bottom:1px solid #eee;font-size:13px;">' + esc_(li.name) + ' x' + li.qty + '</td>' +
+          '<td style="padding:6px 0;border-bottom:1px solid #eee;text-align:right;font-size:13px;">' + CURRENCY_SYMBOL + li.lineTotal.toFixed(2) + '</td></tr>';
+      }).join('') + '</table>';
+    var bodyHtml = '<p>Hi ' + esc_(customer.Name) + ',</p><p>Thank you for your purchase! Here is your receipt:</p>' + itemsHtml +
+      emailDetailTable_([
+        ['Subtotal', CURRENCY_SYMBOL + Number(sale.Subtotal).toFixed(2)],
+        ['Discount', '-' + CURRENCY_SYMBOL + Number(sale.Discount).toFixed(2)],
+        ['Tax', CURRENCY_SYMBOL + Number(sale.Tax).toFixed(2)],
+        ['Total', CURRENCY_SYMBOL + Number(sale.Total).toFixed(2)],
+        ['Payment Method', sale.PaymentMethod],
+        ['Loyalty Points Earned', '+' + pointsEarned]
+      ]);
     sendEmail_(customer.Email, 'Your Receipt — ' + sale.SaleID,
       'Thank you for visiting ' + settings.BusinessName + '!\n\n' + itemLines +
       '\n\nSubtotal: ' + CURRENCY_SYMBOL + Number(sale.Subtotal).toFixed(2) +
@@ -1565,7 +1717,8 @@ function sendSaleReceipt_(sale, customer, lineItems, pointsEarned) {
       '\nTotal: ' + CURRENCY_SYMBOL + Number(sale.Total).toFixed(2) +
       '\nPayment Method: ' + sale.PaymentMethod +
       '\n\nLoyalty points earned: ' + pointsEarned +
-      '\n\nSee you again soon!');
+      '\n\nSee you again soon!',
+      buildEmailHtml_('Payment Receipt', bodyHtml));
   }
 }
 
@@ -1585,7 +1738,11 @@ function sendUpcomingAppointmentReminders() {
     if (!c) return;
     var msg = 'Reminder: Hi ' + c.Name + ', you have a ' + (s ? s.Name : 'appointment') + ' booked tomorrow (' + a.Date + ' ' + a.TimeSlot + ') at ' + settings.BusinessName + '. See you then!';
     sendSms_(c.Phone, msg);
-    if (c.Email) sendEmail_(c.Email, 'Appointment Reminder — Tomorrow', msg);
+    if (c.Email) {
+      var bodyHtml = '<p>Hi ' + esc_(c.Name) + ',</p><p>This is a friendly reminder that you have a <b>' + esc_(s ? s.Name : 'appointment') + '</b> booked for tomorrow.</p>' +
+        emailDetailTable_([['Date', formatNiceDateServer_(a.Date)], ['Time', a.TimeSlot]]);
+      sendEmail_(c.Email, 'Appointment Reminder — Tomorrow', msg, buildEmailHtml_('See You Tomorrow!', bodyHtml));
+    }
   });
   return appts.length + ' reminder(s) sent.';
 }

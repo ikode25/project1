@@ -33,10 +33,14 @@ A complete, production-ready **Barber & Salon management system for Ghana**, bui
 - **Theme customization** — Owner can change primary/secondary/accent/background/text colors live from Settings, plus business name, tagline, and logo (photo picker with preview)
 - **Photo gallery manager** — Owner/Manager can add/edit/reorder photos that showcase the salon's work on the public site
 - **Hero carousel & image manager** — Owner/Manager can add/edit/reorder hero slides and upload images directly to Google Drive (no external image host needed)
-- Every "image URL" field across Staff, Hero Slides, Gallery, and the Logo uses the same **upload-or-paste photo picker with a live thumbnail preview**
-- Dark/light mode toggle for the dashboard UI
-- SMS + Email notifications: booking confirmation, status updates, appointment reminders, **post-service "thank you" SMS/Email with loyalty points earned**, sales receipts — via `MailApp` and a pluggable SMS gateway (Arkesel or Hubtel, both popular in Ghana), with a "simulate" mode for testing before you have SMS credentials
-- User management (create staff logins, assign roles/branches, reset passwords)
+- **Services page** — a dedicated admin screen to add/edit/photograph exactly the menu the POS sells from (name, category, price, duration, branch, active flag, photo)
+- Point of Sale item grid shows a **photo thumbnail** for every service/product; the cart defaults to a **walk-in sale** (no customer lookup required) with a one-click "Register customer" toggle for the times you do want to capture loyalty points
+- Every "image URL" field across Staff, Services, Products, Hero Slides, Gallery, and the Logo uses the same **upload-or-paste photo picker with a live thumbnail preview**
+- **Booking QR code** — a "Scan to Book" card styled with your logo and theme colors, generated live in Branding & Theme, with a one-click Print button (save as PDF or print to hand out at the shop)
+- Dark/light mode toggle for the dashboard UI; the admin sidebar collapses into a compact scrollable icon strip on mobile instead of pushing content off-screen
+- SMS + **branded HTML Email** notifications (business logo, name, and theme colors in a proper header banner, not plain text): booking confirmation, status updates, appointment reminders, **post-service "thank you" with loyalty points earned**, sales receipts — via `MailApp` and a pluggable SMS gateway (Arkesel or Hubtel, both popular in Ghana), with a "simulate" mode for testing before you have SMS credentials
+- User management (create staff logins, assign roles/branches, reset passwords); staff can also **self-register** from the login screen — new accounts are created inactive with the lowest-privilege role until an Owner reviews and activates them in Users
+- Login screen has a show/hide password toggle
 
 ### Ghana-specific details
 - All monetary values shown as **GH₵** with 2 decimal places
@@ -51,21 +55,23 @@ A complete, production-ready **Barber & Salon management system for Ghana**, bui
 | Sheet | Columns |
 |---|---|
 | Branches | BranchID, Name, Location, Phone, OpeningHours |
-| Services | ServiceID, Name, Category, Description, DurationMinutes, Price, BranchID, Active |
+| Services | ServiceID, Name, Category, Description, DurationMinutes, Price, BranchID, Active, ImageURL |
 | Staff | StaffID, Name, Role, BranchID, Phone, Specialties, PhotoURL, Active, CommissionRate, WorkDays |
 | Customers | CustomerID, Name, Phone, Email, DateJoined, LoyaltyPoints, Notes |
 | Appointments | AppointmentID, Reference, CustomerID, StaffID, ServiceID, BranchID, Date, TimeSlot, Status, CreatedAt, Notes |
 | Sales | SaleID, Date, BranchID, CustomerID, StaffID, Items (JSON), Subtotal, Discount, Tax, Total, PaymentMethod, PaymentStatus |
-| Products | ProductID, Name, Category, CostPrice, SellingPrice, QuantityInStock, ReorderLevel, BranchID |
+| Products | ProductID, Name, Category, CostPrice, SellingPrice, QuantityInStock, ReorderLevel, BranchID, ImageURL |
 | Expenses | ExpenseID, Date, BranchID, Category, Amount, Description |
-| Users | Username, PasswordHash, Salt, Role, BranchID, Active, StaffID, Email, Phone |
+| Users | Username, PasswordHash, Salt, Role, BranchID, Active, StaffID, Email, Phone, FullName |
 | Reviews | ReviewID, CustomerID, StaffID, Rating, Comment, Date |
 | Settings | Key, Value (branding, theme colors, tax rate, loyalty rules, SMS gateway config…) |
 | HeroSlides | SlideID, ImageURL, Title, Subtitle, ButtonText, ButtonLink, SortOrder, Active |
 | Gallery | GalleryID, ImageURL, Caption, Category, BranchID, SortOrder, Active |
 | Notifications | NotificationID, Type, Recipient, Message, Status, Date |
 
-`Staff.WorkDays` is a comma-separated list of weekday abbreviations (e.g. `Mon,Tue,Wed,Thu,Fri,Sat`) that drives each stylist's "Available/Not Available" status and the calendar in the public booking wizard. `Settings` also stores `BookingStartHour`, `BookingEndHour`, and `SlotIntervalMinutes`, which control the time slots offered in the wizard (defaults: 9am–6pm, 30-minute slots).
+`Staff.WorkDays` is a comma-separated list of weekday abbreviations (e.g. `Mon,Tue,Wed,Thu,Fri,Sat`) that drives each stylist's "Available/Not Available" status and the calendar in the public booking wizard. `Settings` also stores `BookingStartHour`, `BookingEndHour`, and `SlotIntervalMinutes`, which control the time slots offered in the wizard (defaults: 9am–6pm, 30-minute slots). `Users.FullName` is captured so an Owner can tell who a pending self-registered account actually belongs to before approving it.
+
+The schema self-heals: if a sheet or column above is missing from an already-deployed spreadsheet (e.g. you update to a newer version of this app that added a column), the next page load automatically creates/fixes it — no manual re-run of `setupSheets()` needed.
 
 Sample data (2 branches, 10 services, 5 staff with working days, 4 products, 5 customers, 8 reviews, 2 hero slides, 6 gallery photos) is seeded automatically on first run so the app is immediately demoable.
 
