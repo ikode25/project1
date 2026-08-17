@@ -1420,10 +1420,10 @@ function getSettings() {
       stored[key] = decodeSettingValue(key, data[i][SETTINGS_VALUE_COL]);
     }
     const merged = Object.assign({}, DEFAULT_SETTINGS, stored);
-    return migrateLegacyDriveUrls(merged);
+    return toSafeResult(migrateLegacyDriveUrls(merged));
   } catch (e) {
     Logger.log('Error in getSettings: ' + e.toString());
-    return DEFAULT_SETTINGS;
+    return toSafeResult(DEFAULT_SETTINGS);
   }
 }
 
@@ -1448,10 +1448,46 @@ function migrateLegacyDriveUrls(settings) {
 }
 
 /**
+ * Guarantees whatever this returns to the client is a plain, JSON-safe
+ * object and never bare null/undefined - google.script.run's success
+ * handler is only ever seen to fire with `null` when the return value
+ * couldn't be delivered as-is (e.g. it wasn't valid JSON), so round-
+ * tripping through JSON here defends against that even if something
+ * upstream sneaks a non-plain value (Date, etc.) into the result.
+ */
+function toSafeResult(value) {
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (e) {
+    Logger.log('toSafeResult: value was not JSON-safe: ' + e.toString());
+    return { success: false, message: 'Server produced a non-serializable result: ' + e.toString() };
+  }
+}
+
+/**
  * Upserts a partial settings object (only the keys provided are changed).
  * Returns the freshly merged settings object.
+ *
+ * This is a thin, bulletproof wrapper around doSaveSettings(): whatever
+ * happens inside, it always returns a plain JSON-safe object (see
+ * toSafeResult), and every stage is logged via Logger.log so the Apps
+ * Script Executions panel shows exactly how far execution got even if
+ * the client only ever sees "null".
  */
 function saveSettings(partialSettings) {
+  Logger.log('saveSettings: called with keys = ' + Object.keys(partialSettings || {}).join(', '));
+  let result;
+  try {
+    result = doSaveSettings(partialSettings);
+  } catch (e) {
+    Logger.log('saveSettings: doSaveSettings threw: ' + e.toString());
+    result = { success: false, message: 'Unhandled error in saveSettings: ' + (e && e.message ? e.message : e) };
+  }
+  Logger.log('saveSettings: returning ' + JSON.stringify(result).slice(0, 500));
+  return toSafeResult(result);
+}
+
+function doSaveSettings(partialSettings) {
   // Each stage is caught separately so a failure always reports exactly
   // which step broke, instead of a generic/empty message.
   let stage = 'starting';
@@ -1460,19 +1496,23 @@ function saveSettings(partialSettings) {
     if (keys.length === 0) return { success: true, message: 'Nothing to save', settings: getSettings() };
 
     stage = 'opening the Settings sheet';
+    Logger.log('doSaveSettings: ' + stage);
     const sheet = getOrCreateSettingsSheet();
 
     stage = 'reading existing settings rows';
+    Logger.log('doSaveSettings: ' + stage);
     const lastRow = sheet.getLastRow();
     const data = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
     const rowByKey = {};
     data.forEach((row, i) => { if (row[SETTINGS_KEY_COL]) rowByKey[row[SETTINGS_KEY_COL]] = i + 2; }); // 1-based sheet row
+    Logger.log('doSaveSettings: found ' + data.length + ' existing rows, ' + Object.keys(rowByKey).length + ' with keys');
 
     // Batch every brand-new key into a single appended range instead of one
     // appendRow() call per key - keeps a first-time save (30+ keys) to ~1-2
     // Sheets API calls instead of dozens, which is both faster and avoids
     // hitting per-second write quotas.
     stage = 'encoding values';
+    Logger.log('doSaveSettings: ' + stage);
     const newRows = [];
     const updates = [];
     keys.forEach(key => {
@@ -1483,6 +1523,7 @@ function saveSettings(partialSettings) {
         newRows.push([key, encoded]);
       }
     });
+    Logger.log('doSaveSettings: ' + updates.length + ' updates, ' + newRows.length + ' new rows');
 
     stage = 'updating existing rows';
     updates.forEach(([rowNum, encoded]) => {
@@ -1491,19 +1532,23 @@ function saveSettings(partialSettings) {
 
     if (newRows.length > 0) {
       stage = 'appending new setting rows';
+      Logger.log('doSaveSettings: ' + stage);
       sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, 2).setValues(newRows);
     }
 
     try { logActivity('admin', 'SETTINGS_UPDATED', 'Keys: ' + keys.join(', ')); }
-    catch (logErr) { Logger.log('saveSettings: activity log failed (non-fatal): ' + logErr.toString()); }
+    catch (logErr) { Logger.log('doSaveSettings: activity log failed (non-fatal): ' + logErr.toString()); }
 
     stage = 'reloading merged settings';
+    Logger.log('doSaveSettings: ' + stage);
     const merged = getSettings();
 
+    stage = 'done';
+    Logger.log('doSaveSettings: done, returning success');
     return { success: true, message: 'Settings saved successfully', settings: merged };
   } catch (e) {
     const detail = 'Failed while ' + stage + ': ' + (e && e.message ? e.message : e);
-    Logger.log('Error in saveSettings: ' + detail);
+    Logger.log('Error in doSaveSettings: ' + detail);
     return { success: false, message: detail };
   }
 }
