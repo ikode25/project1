@@ -420,6 +420,9 @@
   table th { color: #888; font-weight: 700; text-transform: uppercase; font-size: .72rem; }
   .table-wrap { overflow-x: auto; }
   .pager { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 14px 0 4px; flex-wrap: wrap; }
+  th.sortable-th { cursor: pointer; user-select: none; white-space: nowrap; }
+  th.sortable-th:hover { color: var(--clr-accent); }
+  th.sortable-th svg { vertical-align: -2px; }
   .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
   .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: flex-start; justify-content: center; z-index: 999; overflow-y: auto; padding: 40px 16px; }
@@ -887,6 +890,8 @@ var ICONS = {
   sun: '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>',
   chevronLeft: '<polyline points="15 18 9 12 15 6"/>',
   chevronRight: '<polyline points="9 18 15 12 9 6"/>',
+  chevronUp: '<polyline points="18 15 12 9 6 15"/>',
+  chevronDown: '<polyline points="6 9 12 15 18 9"/>',
   plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
   trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>',
   edit: '<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>',
@@ -1398,6 +1403,15 @@ function bindReviewForm() {
   });
 }
 
+/** Formats a bare 24h hour number ("9", "18") from Settings as a friendly 12h label ("9:00 AM", "6:00 PM"). */
+function formatHour12_(hourStr) {
+  var h = parseInt(hourStr, 10);
+  if (isNaN(h)) return '';
+  var ampm = h >= 12 ? 'PM' : 'AM';
+  var h12 = h % 12; if (h12 === 0) h12 = 12;
+  return h12 + ':00 ' + ampm;
+}
+
 function renderContact(s) {
   document.getElementById('contactPhoneLink').textContent = s.ContactPhone;
   document.getElementById('contactPhoneLink').href = 'tel:' + s.ContactPhone;
@@ -1405,7 +1419,11 @@ function renderContact(s) {
   document.getElementById('contactEmailLink').href = 'mailto:' + s.ContactEmail;
   document.getElementById('contactWaLink').href = 'https://wa.me/' + String(s.WhatsAppNumber).replace(/\D/g, '');
   document.getElementById('contactMap').src = s.MapEmbedURL || '';
-  var hoursHtml = STATE.branches.map(function (b) { return '<div><b>' + esc(b.Name) + ':</b> ' + esc(b.OpeningHours) + '</div>'; }).join('');
+  var businessHours = '<div><b>Working Hours:</b> ' + formatHour12_(s.BookingStartHour) + ' – ' + formatHour12_(s.BookingEndHour) + '</div>';
+  var hasBranches = s.HasBranches !== 'N' && STATE.branches.length > 1;
+  var hoursHtml = hasBranches
+    ? STATE.branches.map(function (b) { return '<div><b>' + esc(b.Name) + ':</b> ' + esc(b.OpeningHours) + '</div>'; }).join('')
+    : businessHours;
   document.getElementById('contactHours').innerHTML = hoursHtml || 'Mon-Sat 8am-7pm';
 }
 
@@ -2215,7 +2233,7 @@ var NAV_CONFIG = [
   { key: 'staff', icon: 'user', label: 'Staff', roles: ['Owner', 'Manager'], group: 'Catalog' },
   { key: 'inventory', icon: 'box', label: 'Inventory', roles: ['Owner', 'Manager'], group: 'Catalog' },
   { key: 'branches', icon: 'mapPin', label: 'Branches', roles: ['Owner'], group: 'Catalog' },
-  { key: 'expenses', icon: 'card', label: 'Expenses', roles: ['Owner', 'Manager'], group: 'Finance' },
+  { key: 'expenses', icon: 'card', label: 'Income & Expenses', roles: ['Owner', 'Manager'], group: 'Finance' },
   { key: 'reports', icon: 'barChart', label: 'Reports', roles: ['Owner', 'Manager'], group: 'Finance' },
   { key: 'reviews', icon: 'star', label: 'Reviews', roles: ['Owner', 'Manager'], group: 'Marketing' },
   { key: 'gallery', icon: 'copy', label: 'Gallery', roles: ['Owner', 'Manager'], group: 'Marketing' },
@@ -2235,7 +2253,8 @@ function showAdminApp() {
   document.getElementById('currentUserLabel').textContent = STATE.user.username + ' (' + STATE.user.role + ')';
 
   var branchSwitch = document.getElementById('ownerBranchSwitch');
-  if (STATE.user.role === 'Owner') {
+  var hasBranches = (STATE.settings && STATE.settings.HasBranches) !== 'N';
+  if (STATE.user.role === 'Owner' && hasBranches) {
     branchSwitch.classList.remove('hidden');
     branchSwitch.innerHTML = '<option value="">All Branches</option>' + STATE.branches.map(function (b) { return '<option value="' + b.BranchID + '">' + esc(b.Name) + '</option>'; }).join('');
     branchSwitch.onchange = function () { STATE.currentBranchFilter = branchSwitch.value; renderAdminPage(); };
@@ -2289,9 +2308,11 @@ function renderSidebar() {
   var activeItem = items.find(function (n) { return n.key === STATE.adminPage; });
   if (activeItem && activeItem.group && !(activeItem.group in openState)) openState[activeItem.group] = true; // auto-open the group holding the current page
 
+  var hasBranches = !STATE.settings || STATE.settings.HasBranches !== 'N';
   function navItemHtml(n, sub) {
+    var label = (n.key === 'branches' && !hasBranches) ? 'Shop Info' : n.label;
     return '<div class="nav-item' + (sub ? ' nav-sub-item' : '') + (STATE.adminPage === n.key ? ' active' : '') + '" data-key="' + n.key + '">' +
-      icon(n.icon, 18) + '<span>' + esc(n.label) + '</span></div>';
+      icon(n.icon, 18) + '<span>' + esc(label) + '</span></div>';
   }
 
   var groups = {}; // name -> items, in first-seen order
@@ -2360,16 +2381,29 @@ function errorPanel(err) {
  * pageKey even for small lists. Omit it for the old unpaginated behavior.
  */
 var TABLE_PAGE_STATE = {};
+var TABLE_SORT_STATE = {};
+function stripTags_(html) { return String(html === null || html === undefined ? '' : html).replace(/<[^>]*>/g, '').trim(); }
 function renderTable(headers, rows, pageKey, pageSize) {
   if (!rows.length) return '<p class="muted">No records found.</p>';
   pageSize = pageSize || 15;
-  var pageRows = rows, pagerHtml = '';
+  var sortState = pageKey ? TABLE_SORT_STATE[pageKey] : null;
+  var sortedRows = rows;
+  if (sortState) {
+    sortedRows = rows.slice().sort(function (a, b) {
+      var av = stripTags_(a[sortState.col]), bv = stripTags_(b[sortState.col]);
+      var an = parseFloat(av.replace(/[^0-9.\-]/g, '')), bn = parseFloat(bv.replace(/[^0-9.\-]/g, ''));
+      var numeric = av !== '' && bv !== '' && !isNaN(an) && !isNaN(bn);
+      var cmp = numeric ? (an - bn) : av.localeCompare(bv);
+      return sortState.dir === 'desc' ? -cmp : cmp;
+    });
+  }
+  var pageRows = sortedRows, pagerHtml = '';
   if (pageKey) {
-    var totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+    var totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize));
     var page = Math.min(Math.max(1, TABLE_PAGE_STATE[pageKey] || 1), totalPages);
     TABLE_PAGE_STATE[pageKey] = page;
     var start = (page - 1) * pageSize;
-    pageRows = rows.slice(start, start + pageSize);
+    pageRows = sortedRows.slice(start, start + pageSize);
     if (totalPages > 1) {
       pagerHtml = '<div class="pager" data-pager="' + esc(pageKey) + '">' +
         '<button type="button" class="btn btn-sm btn-outline" data-pg="prev"' + (page <= 1 ? ' disabled' : '') + '>' + icon('chevronLeft', 14) + ' Prev</button>' +
@@ -2378,17 +2412,34 @@ function renderTable(headers, rows, pageKey, pageSize) {
         '</div>';
     }
   }
-  return '<div class="table-wrap"><table><thead><tr>' + headers.map(function (h) { return '<th>' + h + '</th>'; }).join('') +
+  var headHtml = headers.map(function (h, i) {
+    if (!pageKey) return '<th>' + h + '</th>';
+    var active = sortState && sortState.col === i;
+    var arrowIcon = active ? icon(sortState.dir === 'asc' ? 'chevronUp' : 'chevronDown', 12) : '';
+    return '<th class="sortable-th" data-sortcol="' + i + '">' + h + ' ' + arrowIcon + '</th>';
+  }).join('');
+  return '<div class="table-wrap"><table><thead><tr>' + headHtml +
     '</tr></thead><tbody>' + pageRows.map(function (r) { return '<tr>' + r.map(function (c) { return '<td>' + c + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>' + pagerHtml;
 }
-/** Wires up the Prev/Next buttons rendered by renderTable's pager; `onChange` should just re-run the same render call (it reads the new page from TABLE_PAGE_STATE automatically). */
+/** Wires up both the Prev/Next pager buttons and the sortable column headers rendered by renderTable; `onChange` should just re-run the same render call (it reads the current page/sort from TABLE_PAGE_STATE/TABLE_SORT_STATE automatically). */
 function bindTablePager(container, pageKey, onChange) {
-  var el = container.querySelector('.pager[data-pager="' + pageKey + '"]');
-  if (!el) return;
-  el.querySelectorAll('button[data-pg]').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      if (btn.disabled) return;
-      TABLE_PAGE_STATE[pageKey] = (TABLE_PAGE_STATE[pageKey] || 1) + (btn.dataset.pg === 'prev' ? -1 : 1);
+  var pagerEl = container.querySelector('.pager[data-pager="' + pageKey + '"]');
+  if (pagerEl) {
+    pagerEl.querySelectorAll('button[data-pg]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (btn.disabled) return;
+        TABLE_PAGE_STATE[pageKey] = (TABLE_PAGE_STATE[pageKey] || 1) + (btn.dataset.pg === 'prev' ? -1 : 1);
+        onChange();
+      });
+    });
+  }
+  container.querySelectorAll('th.sortable-th').forEach(function (th) {
+    th.addEventListener('click', function () {
+      var col = Number(th.dataset.sortcol);
+      var cur = TABLE_SORT_STATE[pageKey];
+      var dir = (cur && cur.col === col && cur.dir === 'asc') ? 'desc' : 'asc';
+      TABLE_SORT_STATE[pageKey] = { col: col, dir: dir };
+      TABLE_PAGE_STATE[pageKey] = 1;
       onChange();
     });
   });
@@ -2435,15 +2486,22 @@ function renderRecordGrid(rows, cardFn) {
 
 /* ---------- OVERVIEW ---------- */
 function renderOverview(content) {
+  // Hairstylists (Staff) don't handle the money side of the business, so
+  // the revenue-by-day report is never even fetched for them — not just
+  // hidden in the UI — to keep the figures off their session entirely.
+  var isStaff = STATE.user.role === 'Staff';
   Promise.all([
     api('getDashboardOverview', STATE.token, branchArg()),
-    api('getReports', STATE.token, { branchId: branchArg(), startDate: isoDaysAgo(6), endDate: isoToday() }),
+    isStaff ? Promise.resolve({ revenueByDay: [] }) : api('getReports', STATE.token, { branchId: branchArg(), startDate: isoDaysAgo(6), endDate: isoToday() }),
     api('getVisitorStats', STATE.token)
   ]).then(function (res) {
     var d = res[0], rpt = res[1], visits = res[2];
+    var customersTodaySet = {};
+    d.todayAppointments.forEach(function (a) { customersTodaySet[a.CustomerID || a.CustomerName] = true; });
+    var customersTodayCount = Object.keys(customersTodaySet).length;
     content.innerHTML =
       '<div class="stat-grid">' +
-      statCard('Today\'s Revenue', money(d.todayRevenue)) +
+      (isStaff ? statCard('Customers Today', customersTodayCount) : statCard('Today\'s Revenue', money(d.todayRevenue))) +
       statCard('Today\'s Sales', d.todaySalesCount) +
       statCard('Today\'s Appointments', d.todayAppointments.length) +
       statCard('Pending Bookings', d.pendingCount) +
@@ -2457,7 +2515,7 @@ function renderOverview(content) {
       statCard('Next Week', d.bookingsNextWeek) +
       statCard('This Month', d.bookingsThisMonth) +
       '</div></div>' +
-      '<div class="panel"><h3>7-Day Revenue Trend</h3>' + renderLineChart(rpt.revenueByDay.map(function (r) { return { label: r.date, value: r.revenue }; }), { height: 180 }) + '</div>' +
+      (isStaff ? '' : '<div class="panel"><h3>7-Day Revenue Trend</h3>' + renderLineChart(rpt.revenueByDay.map(function (r) { return { label: r.date, value: r.revenue }; }), { height: 180 }) + '</div>') +
       '<div class="panel"><h3>Website Visitors (7 days)</h3><p class="muted">Roughly-unique visitors per day, counted once per browser per day — not tied to any personal info.</p>' +
       renderLineChart(visits.trend.map(function (t) { return { label: t.date, value: t.visitors }; }), { height: 140 }) + '</div>' +
       '<div class="panel"><div class="panel-head"><h3>Today\'s Appointments</h3></div>' +
@@ -2482,7 +2540,7 @@ function renderAppointments(content) {
     '<div class="filters-bar">' +
     '<input type="date" id="apFilterDate">' +
     '<select id="apFilterStatus"><option value="">All Statuses</option>' + ['Pending', 'Confirmed', 'Completed', 'No-show', 'Cancelled'].map(function (s) { return '<option value="' + s + '">' + s + '</option>'; }).join('') + '</select>' +
-    '<button class="btn btn-sm btn-outline" onclick="loadAppointmentsTable()">Filter</button>' +
+    '<button class="btn btn-sm btn-outline" onclick="loadAppointmentsTable()">' + icon('search', 13) + ' Filter</button>' +
     '</div>' +
     (APPT_VIEW === 'kanban' ? '<p class="muted">Drag a card to a different column to change its status.</p>' : '') +
     '<div id="apTableHost"><p class="muted">Loading…</p></div></div>';
@@ -2517,10 +2575,10 @@ function renderAppointmentsTable(host, rows) {
 }
 
 function apptActionButtons_(a) {
-  return (a.Status !== 'Confirmed' && a.Status !== 'Completed' ? '<button class="btn btn-sm" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'Confirmed\')">Confirm</button>' : '') +
-    (a.Status !== 'Completed' ? '<button class="btn btn-sm btn-accent" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'Completed\')">Complete</button>' : '') +
-    (a.Status !== 'Cancelled' && a.Status !== 'Completed' ? '<button class="btn btn-sm btn-outline" onclick="openRescheduleModal(\'' + a.AppointmentID + '\',\'' + a.Date + '\',\'' + a.TimeSlot + '\')">Reschedule</button><button class="btn btn-sm btn-danger" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'Cancelled\')">Cancel</button>' : '') +
-    (a.Status !== 'Completed' && a.Status !== 'Cancelled' ? '<button class="btn btn-sm btn-outline" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'No-show\')">No-show</button>' : '') +
+  return (a.Status !== 'Confirmed' && a.Status !== 'Completed' ? '<button class="btn btn-sm" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'Confirmed\')">' + icon('checkCircle', 13) + ' Confirm</button>' : '') +
+    (a.Status !== 'Completed' ? '<button class="btn btn-sm btn-accent" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'Completed\')">' + icon('check', 13) + ' Complete</button>' : '') +
+    (a.Status !== 'Cancelled' && a.Status !== 'Completed' ? '<button class="btn btn-sm btn-outline" onclick="openRescheduleModal(\'' + a.AppointmentID + '\',\'' + a.Date + '\',\'' + a.TimeSlot + '\')">' + icon('calendar', 13) + ' Reschedule</button><button class="btn btn-sm btn-danger" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'Cancelled\')">' + icon('close', 13) + ' Cancel</button>' : '') +
+    (a.Status !== 'Completed' && a.Status !== 'Cancelled' ? '<button class="btn btn-sm btn-outline" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'No-show\')">' + icon('alertTriangle', 13) + ' No-show</button>' : '') +
     (a.PaymentStatus === 'Pending Verification' ? '<button class="btn btn-sm btn-accent" onclick="verifyApptPayment(\'' + a.AppointmentID + '\')">' + icon('check', 13) + ' Verify Payment</button>' : '');
 }
 
@@ -2784,14 +2842,14 @@ function loadCustomers() {
         return {
           fallbackIcon: 'users', title: c.Name,
           lines: [esc(c.Phone), esc(c.Email || '—'), '<b>' + c.LoyaltyPoints + '</b> loyalty pts', 'Joined ' + String(c.DateJoined).slice(0, 10)],
-          actions: '<button class="btn btn-sm btn-outline" onclick="viewCustomerProfile(\'' + c.CustomerID + '\')">View</button>'
+          actions: '<button class="btn btn-sm btn-outline" onclick="viewCustomerProfile(\'' + c.CustomerID + '\')">' + icon('eye', 13) + ' View</button>'
         };
       });
     } else {
       var draw = function () {
         host.innerHTML = renderTable(['Name', 'Phone', 'Email', 'Loyalty Pts', 'Joined', 'Actions'], rows.map(function (c) {
           return [esc(c.Name), esc(c.Phone), esc(c.Email), c.LoyaltyPoints, String(c.DateJoined).slice(0, 10),
-            '<button class="btn btn-sm btn-outline" onclick="viewCustomerProfile(\'' + c.CustomerID + '\')">View</button>'];
+            '<button class="btn btn-sm btn-outline" onclick="viewCustomerProfile(\'' + c.CustomerID + '\')">' + icon('eye', 13) + ' View</button>'];
         }), 'customers');
         bindTablePager(host, 'customers', draw);
       };
@@ -3002,16 +3060,26 @@ function restockPrompt(id) {
 
 /* ---------- BRANCHES ---------- */
 function renderBranchesAdmin(content) {
-  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Branches</h3><button class="btn btn-sm" onclick="openBranchModal()">' + icon('plus', 14) + ' Add Branch</button></div><div id="branchTableHost"></div></div>';
+  var hasBranches = !STATE.settings || STATE.settings.HasBranches !== 'N';
+  content.innerHTML = hasBranches
+    ? '<div class="panel"><div class="panel-head"><h3>Branches</h3><button class="btn btn-sm" onclick="openBranchModal()">' + icon('plus', 14) + ' Add Branch</button></div><div id="branchTableHost"></div></div>'
+    : '<div class="panel"><h3>Shop Info</h3><p class="muted">Your business is set to a single shop (change this in Settings → Booking if that ever changes). This is the name, location, phone, and hours shown to customers.</p><div id="branchTableHost"></div></div>';
   loadBranchesTable();
 }
 function loadBranchesTable() {
+  var hasBranches = !STATE.settings || STATE.settings.HasBranches !== 'N';
   api('getBranches', STATE.token).then(function (rows) {
     STATE.branches = rows;
-    document.getElementById('branchTableHost').innerHTML = renderTable(['Name', 'Location', 'Phone', 'Hours', 'Actions'], rows.map(function (b) {
-      return [esc(b.Name), esc(b.Location), esc(b.Phone), esc(b.OpeningHours),
-        '<button class="btn btn-sm btn-outline" onclick=\'openBranchModal(' + JSON.stringify(b).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button> <button class="btn btn-sm btn-danger" onclick="deleteBranchRow(\'' + b.BranchID + '\')">' + icon('trash', 13) + '</button>'];
-    }));
+    var host = document.getElementById('branchTableHost');
+    function draw() {
+      host.innerHTML = renderTable(['Name', 'Location', 'Phone', 'Hours', 'Actions'], rows.map(function (b) {
+        return [esc(b.Name), esc(b.Location), esc(b.Phone), esc(b.OpeningHours),
+          '<button class="btn btn-sm btn-outline" onclick=\'openBranchModal(' + JSON.stringify(b).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + ' Edit</button>' +
+          (hasBranches ? ' <button class="btn btn-sm btn-danger" onclick="deleteBranchRow(\'' + b.BranchID + '\')">' + icon('trash', 13) + '</button>' : '')];
+      }), 'branches');
+      bindTablePager(host, 'branches', draw);
+    }
+    draw();
   }).catch(function (err) { document.getElementById('branchTableHost').innerHTML = errorPanel(err); });
 }
 function openBranchModal(b) {
@@ -3036,14 +3104,41 @@ function deleteBranchRow(id) {
 
 /* ---------- EXPENSES ---------- */
 function renderExpenses(content) {
-  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Expenses</h3><button class="btn btn-sm" onclick="openExpenseModal()">' + icon('plus', 14) + ' Add Expense</button></div><div id="expTableHost"></div></div>';
+  content.innerHTML =
+    '<div id="incomeSummaryHost"><p class="muted">Loading…</p></div>' +
+    '<div class="panel"><h3>Income (auto-recorded from Point of Sale)</h3><p class="muted">Every completed sale is already logged the moment it is rung up — nothing to enter here.</p><div id="incomeTableHost"></div></div>' +
+    '<div class="panel"><div class="panel-head"><h3>Expenses</h3><button class="btn btn-sm" onclick="openExpenseModal()">' + icon('plus', 14) + ' Add Expense</button></div><div id="expTableHost"></div></div>';
+  loadIncomeExpenseSummary();
   loadExpensesTable();
+}
+function loadIncomeExpenseSummary() {
+  api('getIncomeExpenseSummary', STATE.token, { branchId: branchArg(), startDate: isoDaysAgo(29), endDate: isoToday() }).then(function (sum) {
+    document.getElementById('incomeSummaryHost').innerHTML =
+      '<div class="stat-grid">' +
+      statCard('Income (30 days)', money(sum.totalIncome)) +
+      statCard('Expenses (30 days)', money(sum.totalExpense)) +
+      statCard('Net (30 days)', money(sum.net)) +
+      '</div>';
+    var host = document.getElementById('incomeTableHost');
+    function draw() {
+      host.innerHTML = renderTable(['Date', 'Income', 'Expenses', 'Net'], sum.days.map(function (d) {
+        return [d.date, money(d.income), money(d.expense), money(d.net)];
+      }), 'income');
+      bindTablePager(host, 'income', draw);
+    }
+    draw();
+  }).catch(function (err) { document.getElementById('incomeSummaryHost').innerHTML = errorPanel(err); });
 }
 function loadExpensesTable() {
   api('getExpenses', STATE.token, { branchId: branchArg() }).then(function (rows) {
-    document.getElementById('expTableHost').innerHTML = renderTable(['Date', 'Category', 'Amount', 'Description', 'Actions'], rows.map(function (e) {
-      return [e.Date, esc(e.Category), money(e.Amount), esc(e.Description), '<button class="btn btn-sm btn-danger" onclick="deleteExpenseRow(\'' + e.ExpenseID + '\')">' + icon('trash', 13) + '</button>'];
-    }));
+    var host = document.getElementById('expTableHost');
+    function draw() {
+      host.innerHTML = renderTable(['Date', 'Category', 'Amount', 'Description', 'Actions'], rows.map(function (e) {
+        return [e.Date, esc(e.Category), money(e.Amount), esc(e.Description), '<button class="btn btn-sm btn-danger" onclick="deleteExpenseRow(\'' + e.ExpenseID + '\')">' + icon('trash', 13) + ' Delete</button>'];
+      }), 'expenses');
+      bindTablePager(host, 'expenses', draw);
+    }
+    draw();
   }).catch(function (err) { document.getElementById('expTableHost').innerHTML = errorPanel(err); });
 }
 function openExpenseModal() {
@@ -3059,12 +3154,12 @@ function openExpenseModal() {
     api('saveExpense', STATE.token, {
       BranchID: document.getElementById('exBranch').value, Date: document.getElementById('exDate').value,
       Category: document.getElementById('exCategory').value, Amount: document.getElementById('exAmount').value, Description: document.getElementById('exDesc').value
-    }).then(function () { toast('Expense saved', 'success'); closeModal(); loadExpensesTable(); }).catch(showError);
+    }).then(function () { toast('Expense saved', 'success'); closeModal(); loadExpensesTable(); loadIncomeExpenseSummary(); }).catch(showError);
   }, 'Save');
 }
 function deleteExpenseRow(id) {
   if (!confirm('Delete this expense?')) return;
-  api('deleteExpense', STATE.token, id).then(function () { toast('Deleted', 'success'); loadExpensesTable(); }).catch(showError);
+  api('deleteExpense', STATE.token, id).then(function () { toast('Deleted', 'success'); loadExpensesTable(); loadIncomeExpenseSummary(); }).catch(showError);
 }
 
 /* =====================================================================
@@ -3187,7 +3282,7 @@ function renderReports(content) {
   var monthAgo = isoDaysAgo(30);
   content.innerHTML = '<div class="panel"><div class="filters-bar">' +
     '<input type="date" id="rpStart" value="' + monthAgo + '"><input type="date" id="rpEnd" value="' + today + '">' +
-    '<button class="btn btn-sm" onclick="loadReports()">Run Report</button>' +
+    '<button class="btn btn-sm" onclick="loadReports()">' + icon('barChart', 13) + ' Run Report</button>' +
     '<button class="btn btn-sm btn-outline" onclick="exportCsv(\'sales\')">' + icon('upload', 13) + ' Sales CSV</button>' +
     '<button class="btn btn-sm btn-outline" onclick="exportCsv(\'expenses\')">' + icon('upload', 13) + ' Expenses CSV</button>' +
     '<button class="btn btn-sm btn-outline" onclick="exportPdf()">' + icon('upload', 13) + ' PDF</button>' +
@@ -3255,10 +3350,15 @@ function renderGalleryAdmin(content) {
 }
 function loadGalleryTable() {
   api('getGallery', STATE.token).then(function (rows) {
-    document.getElementById('galleryTableHost').innerHTML = renderTable(['Preview', 'Caption', 'Category', 'Order', 'Active', 'Actions'], rows.map(function (g) {
-      return ['<img src="' + esc(g.ImageURL) + '" style="width:80px;height:50px;object-fit:cover;border-radius:6px">', esc(g.Caption), esc(g.Category), g.SortOrder, g.Active,
-        '<div class="row-actions"><button class="btn btn-sm btn-outline" onclick=\'openGalleryModal(' + JSON.stringify(g).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button> <button class="btn btn-sm btn-danger" onclick="deleteGalleryRow(\'' + g.GalleryID + '\')">' + icon('trash', 13) + '</button></div>'];
-    }));
+    var host = document.getElementById('galleryTableHost');
+    function draw() {
+      host.innerHTML = renderTable(['Preview', 'Caption', 'Category', 'Order', 'Active', 'Actions'], rows.map(function (g) {
+        return ['<img src="' + esc(g.ImageURL) + '" style="width:80px;height:50px;object-fit:cover;border-radius:6px">', esc(g.Caption), esc(g.Category), g.SortOrder, g.Active,
+          '<div class="row-actions"><button class="btn btn-sm btn-outline" onclick=\'openGalleryModal(' + JSON.stringify(g).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button> <button class="btn btn-sm btn-danger" onclick="deleteGalleryRow(\'' + g.GalleryID + '\')">' + icon('trash', 13) + '</button></div>'];
+      }), 'gallery');
+      bindTablePager(host, 'gallery', draw);
+    }
+    draw();
   }).catch(function (err) { document.getElementById('galleryTableHost').innerHTML = errorPanel(err); });
 }
 function openGalleryModal(g) {
@@ -3296,10 +3396,15 @@ function renderHeroAdmin(content) {
 }
 function loadSlidesTable() {
   api('getHeroSlides', STATE.token).then(function (rows) {
-    document.getElementById('slideTableHost').innerHTML = renderTable(['Preview', 'Title', 'Order', 'Active', 'Actions'], rows.map(function (s) {
-      return ['<img src="' + esc(s.ImageURL) + '" style="width:90px;height:50px;object-fit:cover;border-radius:4px">', esc(s.Title), s.SortOrder, s.Active,
-        '<button class="btn btn-sm btn-outline" onclick=\'openSlideModal(' + JSON.stringify(s).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button> <button class="btn btn-sm btn-danger" onclick="deleteSlideRow(\'' + s.SlideID + '\')">' + icon('trash', 13) + '</button>'];
-    }));
+    var host = document.getElementById('slideTableHost');
+    function draw() {
+      host.innerHTML = renderTable(['Preview', 'Title', 'Order', 'Active', 'Actions'], rows.map(function (s) {
+        return ['<img src="' + esc(s.ImageURL) + '" style="width:90px;height:50px;object-fit:cover;border-radius:4px">', esc(s.Title), s.SortOrder, s.Active,
+          '<button class="btn btn-sm btn-outline" onclick=\'openSlideModal(' + JSON.stringify(s).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button> <button class="btn btn-sm btn-danger" onclick="deleteSlideRow(\'' + s.SlideID + '\')">' + icon('trash', 13) + '</button>'];
+      }), 'heroSlides');
+      bindTablePager(host, 'heroSlides', draw);
+    }
+    draw();
   }).catch(function (err) { document.getElementById('slideTableHost').innerHTML = errorPanel(err); });
 }
 function openSlideModal(s) {
@@ -3339,10 +3444,15 @@ function renderVideosAdmin(content) {
 }
 function loadVideosTable() {
   api('getVideos', STATE.token).then(function (rows) {
-    document.getElementById('videoTableHost').innerHTML = renderTable(['Title', 'URL', 'Order', 'Active', 'Actions'], rows.map(function (v) {
-      return [esc(v.Title || '(untitled)'), '<a href="' + esc(v.VideoURL) + '" target="_blank" rel="noopener" style="word-break:break-all;">' + esc(v.VideoURL) + '</a>', v.SortOrder, v.Active,
-        '<div class="row-actions"><button class="btn btn-sm btn-outline" onclick=\'openVideoModal(' + JSON.stringify(v).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button> <button class="btn btn-sm btn-danger" onclick="deleteVideoRow(\'' + v.VideoID + '\')">' + icon('trash', 13) + '</button></div>'];
-    }));
+    var host = document.getElementById('videoTableHost');
+    function draw() {
+      host.innerHTML = renderTable(['Title', 'URL', 'Order', 'Active', 'Actions'], rows.map(function (v) {
+        return [esc(v.Title || '(untitled)'), '<a href="' + esc(v.VideoURL) + '" target="_blank" rel="noopener" style="word-break:break-all;">' + esc(v.VideoURL) + '</a>', v.SortOrder, v.Active,
+          '<div class="row-actions"><button class="btn btn-sm btn-outline" onclick=\'openVideoModal(' + JSON.stringify(v).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button> <button class="btn btn-sm btn-danger" onclick="deleteVideoRow(\'' + v.VideoID + '\')">' + icon('trash', 13) + '</button></div>'];
+      }), 'videos');
+      bindTablePager(host, 'videos', draw);
+    }
+    draw();
   }).catch(function (err) { document.getElementById('videoTableHost').innerHTML = errorPanel(err); });
 }
 function openVideoModal(v) {
@@ -3400,7 +3510,7 @@ function renderSettingsAdmin(content) {
       colorField('Background Color', 'stBackgroundColor', s.BackgroundColor) +
       colorField('Text Color', 'stTextColor', s.TextColor) +
       fontField(s.FontFamily) +
-      '</div><button type="button" class="btn btn-sm btn-outline" style="margin-top:10px" onclick="previewTheme()">Preview Theme</button></div></div>' +
+      '</div><button type="button" class="btn btn-sm btn-outline" style="margin-top:10px" onclick="previewTheme()">' + icon('eye', 13) + ' Preview Theme</button></div></div>' +
 
       '<div class="settings-panel hidden" data-panel="social"><div class="panel"><div class="field-grid">' +
       field('WhatsApp Number (233...)', 'stWhatsAppNumber', s.WhatsAppNumber) +
@@ -3415,10 +3525,14 @@ function renderSettingsAdmin(content) {
       '</div><p class="muted">Only the platforms you fill in appear as icons on your public site footer.</p></div></div>' +
 
       '<div class="settings-panel hidden" data-panel="booking"><div class="panel"><div class="field-grid">' +
-      field('Booking Start Hour (24h)', 'stBookingStartHour', s.BookingStartHour) +
-      field('Booking End Hour (24h)', 'stBookingEndHour', s.BookingEndHour) +
+      '<div><label>Does your business have multiple branches/locations?</label><select id="stHasBranches">' +
+      '<option value="Y"' + (s.HasBranches !== 'N' ? ' selected' : '') + '>Yes — I manage multiple branches</option>' +
+      '<option value="N"' + (s.HasBranches === 'N' ? ' selected' : '') + '>No — just one shop</option>' +
+      '</select></div>' +
+      field('Working Hours — Opens (24h)', 'stBookingStartHour', s.BookingStartHour) +
+      field('Working Hours — Closes (24h)', 'stBookingEndHour', s.BookingEndHour) +
       field('Slot Interval (minutes)', 'stSlotIntervalMinutes', s.SlotIntervalMinutes) +
-      '</div><p class="muted">Need to close a specific date/time (e.g. a lunch break)? Use <b>Manage Slots</b> in the sidebar.</p></div></div>' +
+      '</div><p class="muted">"No" switches the sidebar\'s Branches page to a simple Shop Info page and hides the branch picker everywhere else — for a business with just one shop. Working Hours control both the time slots offered in the booking wizard <b>and</b> the hours shown to customers on the public site. Need to close a specific date/time (e.g. a lunch break)? Use <b>Manage Slots</b> in the sidebar.</p></div></div>' +
 
       '<div class="settings-panel hidden" data-panel="payments"><div class="panel"><div class="field-grid">' +
       field('Tax Rate (%)', 'stTaxRatePercent', s.TaxRatePercent) +
@@ -3451,7 +3565,7 @@ function renderSettingsAdmin(content) {
       '<a class="btn btn-sm btn-outline" id="qrRawLink" target="_blank" rel="noopener">Open QR Image Only</a>' +
       '</div></div></div>' +
 
-      '<button class="btn btn-accent" style="margin-top:8px;" onclick="saveAllSettings()">Save All Settings</button>';
+      '<button class="btn btn-accent" style="margin-top:8px;" onclick="saveAllSettings()">' + icon('check', 14) + ' Save All Settings</button>';
 
     document.querySelectorAll('.settings-tab').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -3568,6 +3682,7 @@ function saveAllSettings() {
       PrimaryColor: document.getElementById('stPrimaryColor').value, SecondaryColor: document.getElementById('stSecondaryColor').value,
       AccentColor: document.getElementById('stAccentColor').value, BackgroundColor: document.getElementById('stBackgroundColor').value,
       TextColor: document.getElementById('stTextColor').value, FontFamily: document.getElementById('stFontFamily').value,
+      HasBranches: document.getElementById('stHasBranches').value,
       BookingStartHour: document.getElementById('stBookingStartHour').value, BookingEndHour: document.getElementById('stBookingEndHour').value,
       SlotIntervalMinutes: document.getElementById('stSlotIntervalMinutes').value,
       TaxRatePercent: document.getElementById('stTaxRatePercent').value, LoyaltyPointsPerCedi: document.getElementById('stLoyaltyPointsPerCedi').value,
@@ -3582,6 +3697,9 @@ function saveAllSettings() {
     };
     api('updateSettings', STATE.token, payload).then(function (s) {
       STATE.settings = s; applyTheme(s); toast('Settings saved', 'success');
+      renderSidebar(); // picks up the Branches → Shop Info rename immediately if HasBranches changed
+      var branchSwitch = document.getElementById('ownerBranchSwitch');
+      if (branchSwitch) branchSwitch.classList.toggle('hidden', STATE.user.role !== 'Owner' || s.HasBranches === 'N');
     }).catch(showError);
   });
 }
@@ -3685,14 +3803,22 @@ function toggleSlotAdmin(timeSlot, el) {
   var branchId = document.getElementById('slotBranch').value;
   var date = document.getElementById('slotDate').value;
   // Optimistic UI: flip the clicked slot immediately so the click always
-  // feels instant, then reconcile with the server's actual result.
+  // feels instant.
   var wasBlocked = el.classList.contains('slot-blocked');
   el.classList.toggle('slot-blocked', !wasBlocked);
   el.style.pointerEvents = 'none';
   el.style.opacity = '.55';
   api('toggleBlockedSlot', STATE.token, branchId, date, timeSlot).then(function (res) {
+    // Trust the toggle call's own result directly instead of re-fetching
+    // the whole grid afterward — the mutation's response IS the ground
+    // truth for what was just written, so this is both faster (one round
+    // trip instead of two) and immune to the closed state ever appearing
+    // to "not stick" the way a stale/edge-case re-read could show.
+    el.classList.toggle('slot-blocked', res.blocked);
+    el.innerHTML = formatTime12(timeSlot) + (res.blocked ? '<br><span style="font-size:.68rem;">Closed</span>' : '');
+    el.title = res.blocked ? 'Closed — click to reopen' : 'Open — click to close';
+    el.style.pointerEvents = ''; el.style.opacity = '';
     toast(res.blocked ? ('Closed ' + formatTime12(timeSlot)) : ('Reopened ' + formatTime12(timeSlot)), 'success');
-    loadSlotsAdmin();
   }).catch(function (err) {
     el.classList.toggle('slot-blocked', wasBlocked); // revert optimistic change
     el.style.pointerEvents = ''; el.style.opacity = '';
@@ -3747,22 +3873,59 @@ function sendStaffSmsNow() {
 
 /* ---------- ABOUT ---------- */
 function renderAbout(content) {
+  // Built straight from NAV_CONFIG's own `roles` arrays, so this table can
+  // never drift out of sync with what the sidebar actually shows each role.
+  var roleCols = ['Owner', 'Manager', 'Staff', 'Receptionist'];
+  var permRows = NAV_CONFIG.filter(function (n) { return n.key !== 'account' && n.key !== 'about'; }).map(function (n) {
+    return '<tr><td>' + esc(n.label) + '</td>' + roleCols.map(function (r) {
+      return '<td style="text-align:center;">' + (n.roles.indexOf(r) > -1 ? icon('checkCircle', 15) : '<span class="muted">—</span>') + '</td>';
+    }).join('') + '</tr>';
+  }).join('');
+
   content.innerHTML =
-    '<div class="panel" style="text-align:center;max-width:520px;margin:0 auto;">' +
+    '<div class="panel" style="max-width:780px;margin:0 auto;">' +
+    '<div style="text-align:center;">' +
     '<h3>' + esc(STATE.settings.BusinessName) + ' Management System</h3>' +
     '<p class="muted">Built on Google Apps Script &amp; Google Sheets — a complete booking, POS, inventory, and CRM platform for barbershops &amp; salons in Ghana.</p>' +
-    '<hr style="border:none;border-top:1px solid #eee;margin:20px 0;">' +
+    '</div>' +
+
+    '<h4 style="margin-top:26px;">What Is This App?</h4>' +
+    '<p>A single web app that runs your whole shop: a public booking website your customers use directly (nothing to download or install), and a secured admin dashboard your team logs into for appointments, point of sale, inventory, customers, and reports. Everything lives in a Google Sheet you own — no separate database, server, or hosting bill.</p>' +
+
+    '<h4 style="margin-top:22px;">Key Features</h4>' +
+    '<ul style="line-height:1.9;">' +
+    '<li>Public booking website — step-by-step wizard, live availability, Cash/Mobile Money/Bank Transfer payment at booking with proof upload, "My Bookings" lookup by phone or reference</li>' +
+    '<li>Point of Sale — cart, discounts, receipts, and loyalty points</li>' +
+    '<li>Appointments (Table &amp; Kanban views), Manage Slots, and automatic SMS/Email confirmations</li>' +
+    '<li>Customer CRM, Staff scheduling, Inventory, Income &amp; Expenses, and reports with built-in charts</li>' +
+    '<li>Fully brandable — logo, theme colors, font, social links, business hours — no code changes needed</li>' +
+    '<li>Role-based access so each team member only sees what their job needs</li>' +
+    '</ul>' +
+
+    '<h4 style="margin-top:22px;">User Roles Overview</h4>' +
+    '<ul style="line-height:1.9;">' +
+    '<li><b>Owner</b> — full access: every page, every branch, financials, and system settings.</li>' +
+    '<li><b>Manager</b> — runs day-to-day operations: appointments, POS, staff, inventory, reports — everything except system settings and user accounts.</li>' +
+    '<li><b>Receptionist</b> — front-desk operations: appointments, Manage Slots, POS, and customers.</li>' +
+    '<li><b>Staff (Hairstylist/Barber)</b> — their own appointments and POS; sees a customer count instead of revenue figures, since they work for the owner rather than handle the business&rsquo;s money.</li>' +
+    '</ul>' +
+
+    '<h4 style="margin-top:22px;">Permissions Table</h4>' +
+    '<div class="table-wrap"><table><thead><tr><th>Page</th><th>Owner</th><th>Manager</th><th>Staff</th><th>Receptionist</th></tr></thead><tbody>' + permRows + '</tbody></table></div>' +
+
+    '<hr style="border:none;border-top:1px solid #eee;margin:24px 0;">' +
+    '<div style="text-align:center;">' +
     '<p style="font-weight:700;">Developed by Quecci Manuel (Manuel Scripts)</p>' +
     '<p><a class="btn btn-sm btn-outline" href="https://wa.me/233547359015" target="_blank" rel="noopener">' + icon('chat', 14) + ' WhatsApp — Custom Projects</a></p>' +
     '<p><a class="btn btn-sm btn-outline" href="https://www.youtube.com/@manuelspctips" target="_blank" rel="noopener">' + icon('smartphone', 14) + ' YouTube — @manuelspctips</a></p>' +
-    '</div>';
+    '</div></div>';
 }
 
 /* ---------- MY ACCOUNT ---------- */
 function renderAccount(content) {
   content.innerHTML = '<div class="panel"><h3>Change Password</h3><div class="form-row"><label>Current Password</label><input type="password" id="pwOld"></div>' +
     '<div class="form-row"><label>New Password</label><input type="password" id="pwNew"></div>' +
-    '<button class="btn btn-accent" onclick="changePw()">Update Password</button></div>';
+    '<button class="btn btn-accent" onclick="changePw()">' + icon('lock', 14) + ' Update Password</button></div>';
 }
 function changePw() {
   api('changeOwnPassword', STATE.token, document.getElementById('pwOld').value, document.getElementById('pwNew').value)
@@ -3775,18 +3938,18 @@ function changePw() {
 function openModal(title, bodyHtml, onSave, saveLabel) {
   var host = document.getElementById('modalHost');
   host.innerHTML = '<div class="modal-backdrop" id="modalBackdrop"><div class="modal-box"><button class="modal-close" onclick="closeModal()">' + icon('close', 18) + '</button><h3>' + esc(title) + '</h3><div id="modalBody">' + bodyHtml + '</div>' +
-    (onSave ? '<div style="margin-top:16px;display:flex;gap:8px;"><button class="btn btn-accent" id="modalSaveBtn">' + (saveLabel || 'Save') + '</button><button class="btn btn-outline" onclick="closeModal()">Cancel</button></div>' : '') +
+    (onSave ? '<div style="margin-top:16px;display:flex;gap:8px;"><button class="btn btn-accent" id="modalSaveBtn">' + icon('check', 14) + ' ' + (saveLabel || 'Save') + '</button><button class="btn btn-outline" onclick="closeModal()">' + icon('close', 14) + ' Cancel</button></div>' : '') +
     '</div></div>';
   if (onSave) {
     document.getElementById('modalSaveBtn').addEventListener('click', function () {
       var btn = document.getElementById('modalSaveBtn');
       btn.disabled = true;
-      var original = btn.textContent;
-      btn.textContent = 'Saving…';
+      var original = btn.innerHTML;
+      btn.innerHTML = 'Saving…';
       // Safety net: the modal normally closes on success (removing this
       // button entirely), so this only matters if something goes wrong
       // without calling closeModal() — re-enable so the admin isn't stuck.
-      setTimeout(function () { if (document.body.contains(btn)) { btn.disabled = false; btn.textContent = original; } }, 8000);
+      setTimeout(function () { if (document.body.contains(btn)) { btn.disabled = false; btn.innerHTML = original; } }, 8000);
       onSave();
     });
   }

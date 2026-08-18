@@ -115,7 +115,12 @@ var DEFAULT_SETTINGS = {
   // Comma-separated subset of PAYMENT_METHODS that customers are actually
   // offered at checkout — lets the Owner hide networks/methods they don't
   // support instead of showing all six to every customer.
-  ActivePaymentMethods: 'Cash,MTN MoMo,Vodafone Cash,Telecel Cash,AirtelTigo Money,Bank Transfer'
+  ActivePaymentMethods: 'Cash,MTN MoMo,Vodafone Cash,Telecel Cash,AirtelTigo Money,Bank Transfer',
+  // 'N' means "one shop, no separate branches" — hides the multi-branch
+  // switcher/step UI everywhere and treats the single existing Branches
+  // row as just that shop's info (name/location/phone/hours), not a list
+  // to manage. Not every barbershop has multiple locations.
+  HasBranches: 'Y'
 };
 
 var PAYMENT_METHODS = ['Cash', 'MTN MoMo', 'Vodafone Cash', 'Telecel Cash', 'AirtelTigo Money', 'Bank Transfer'];
@@ -1359,6 +1364,45 @@ function getLowStockProducts(token, branchId) {
  * 12. EXPENSES
  * ==========================================================================*/
 
+/**
+ * Income & Expenses summary. Income is never manually entered — it's
+ * derived automatically from every completed POS sale in the Sales
+ * sheet (which is already recorded the moment a checkout happens), so
+ * "the system records daily income automatically" just means reading
+ * Sales instead of asking the admin to log it a second time. Expenses
+ * are still the existing manually-logged Expenses sheet.
+ */
+function getIncomeExpenseSummary(token, filters) {
+  var user = requireAuth_(token);
+  filters = filters || {};
+  var scoped = scopeBranch_(user, filters.branchId);
+  var startDate = filters.startDate || Utilities.formatDate(addDaysDate_(new Date(), -30), TIMEZONE, 'yyyy-MM-dd');
+  var endDate = filters.endDate || Utilities.formatDate(new Date(), TIMEZONE, 'yyyy-MM-dd');
+
+  var sales = readAll_('Sales');
+  if (scoped) sales = sales.filter(function (s) { return s.BranchID === scoped; });
+  sales = sales.filter(function (s) { var d = String(s.Date).slice(0, 10); return d >= startDate && d <= endDate; });
+
+  var expenses = readAll_('Expenses');
+  if (scoped) expenses = expenses.filter(function (e) { return e.BranchID === scoped; });
+  expenses = expenses.filter(function (e) { return e.Date >= startDate && e.Date <= endDate; });
+
+  var byDate = {};
+  function dayRow(d) { if (!byDate[d]) byDate[d] = { date: d, income: 0, expense: 0 }; return byDate[d]; }
+  sales.forEach(function (s) { dayRow(String(s.Date).slice(0, 10)).income += Number(s.Total) || 0; });
+  expenses.forEach(function (e) { dayRow(e.Date).expense += Number(e.Amount) || 0; });
+
+  var days = Object.keys(byDate).sort().reverse().map(function (d) {
+    var row = byDate[d];
+    return { date: row.date, income: round2_(row.income), expense: round2_(row.expense), net: round2_(row.income - row.expense) };
+  });
+
+  var totalIncome = sales.reduce(function (sum, s) { return sum + (Number(s.Total) || 0); }, 0);
+  var totalExpense = expenses.reduce(function (sum, e) { return sum + (Number(e.Amount) || 0); }, 0);
+
+  return { days: days, totalIncome: round2_(totalIncome), totalExpense: round2_(totalExpense), net: round2_(totalIncome - totalExpense) };
+}
+
 function getExpenses(token, filters) {
   var user = requireAuth_(token);
   filters = filters || {};
@@ -1488,19 +1532,37 @@ function getSettings(token) {
   return getSettingsMap_();
 }
 
+/**
+ * Saving settings used to call findRowIndexById_/updateById_/appendRow_ per
+ * key — each one its own getValues()/setValues() round trip — so saving
+ * ~30 settings at once meant ~30+ separate Sheets API calls in serial,
+ * which was the actual cause of "Save All Settings" feeling slow. This
+ * reads the whole (small) Settings sheet once, updates everything in
+ * memory, then writes existing rows back in a single setValues() call and
+ * appends any brand-new keys in one appendRows-style batch.
+ */
 function updateSettings(token, settingsObj) {
   var user = requireAuth_(token);
   requireRole_(user, ['Owner']);
+  var sheet = getSheet_('Settings');
+  var lastRow = sheet.getLastRow();
+  var existing = lastRow >= 2 ? sheet.getRange(2, 1, lastRow - 1, 2).getValues() : [];
+  var rowIndexByKey = {};
+  existing.forEach(function (row, i) { rowIndexByKey[row[0]] = i; });
+
+  var newRows = [];
   Object.keys(settingsObj).forEach(function (key) {
-    if (DEFAULT_SETTINGS.hasOwnProperty(key)) {
-      var rowIndex = findRowIndexById_('Settings', 'Key', key);
-      if (rowIndex === -1) {
-        appendRow_('Settings', { Key: key, Value: settingsObj[key] });
-      } else {
-        updateById_('Settings', 'Key', key, { Value: settingsObj[key] });
-      }
+    if (!DEFAULT_SETTINGS.hasOwnProperty(key)) return;
+    if (rowIndexByKey.hasOwnProperty(key)) {
+      existing[rowIndexByKey[key]][1] = settingsObj[key];
+    } else {
+      newRows.push([key, settingsObj[key]]);
     }
   });
+
+  if (existing.length) sheet.getRange(2, 1, existing.length, 2).setValues(existing);
+  if (newRows.length) sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, 2).setValues(newRows);
+
   return getSettingsMap_();
 }
 
@@ -1620,7 +1682,11 @@ function getDashboardOverview(token, branchId) {
       o.StaffName = staffMap[a.StaffID] ? staffMap[a.StaffID].Name : 'Any available';
       return o;
     }),
-    todayRevenue: round2_(todayRevenue),
+    // A hairstylist (Staff) works for the owner and doesn't handle the
+    // money side of the business — the owner explicitly doesn't want
+    // revenue visible to them, so it's withheld here (not just hidden in
+    // the UI) rather than trusting the client to hide a number it already has.
+    todayRevenue: user.role === 'Staff' ? null : round2_(todayRevenue),
     todaySalesCount: todaySales.length,
     upcomingCount: upcoming.length,
     lowStock: lowStock.map(stripRow_),
