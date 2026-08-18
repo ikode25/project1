@@ -466,6 +466,16 @@
     position: absolute; top: 46px; right: 0; width: 300px; background: #fff; border-radius: 12px; box-shadow: var(--shadow);
     padding: 10px; z-index: 60; max-height: 360px; overflow-y: auto;
   }
+  /* On narrow screens the bell button can sit close enough to the left edge
+     that a 300px dropdown anchored to *it* (right:0, growing leftward)
+     overflows off-screen — the reported symptom was its left side ("New
+     Bookings", "View All Appointments") getting clipped by the viewport
+     edge. Anchoring to the viewport instead of the bell button guarantees
+     it always fits, matching the same top offset used by the mobile chat
+     panel in this topbar. */
+  @media (max-width: 860px) {
+    .bell-dropdown { position: fixed; top: 66px; left: 12px; right: 12px; width: auto; max-height: calc(100vh - 100px); }
+  }
   #adminApp.dark .bell-dropdown { background: #1e2127; }
   .bell-item { display: block; padding: 10px 10px; border-radius: 8px; font-size: .82rem; border-bottom: 1px solid #f0f0f0; }
   #adminApp.dark .bell-item { border-bottom-color: #2a2e37; }

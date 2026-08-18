@@ -45,7 +45,7 @@ var UPLOAD_FOLDER_NAME = 'SalonSystem_Uploads';
 // Bump this whenever a fix needs to force-run against an EXISTING spreadsheet
 // (e.g. a cell-formatting or data-repair migration) even though its sheet
 // headers already match SCHEMA and would otherwise skip setupSheets().
-var SETUP_VERSION = 2;
+var SETUP_VERSION = 3;
 
 // Column schema for every tab. Order matters — it defines the sheet column order.
 var SCHEMA = {
@@ -260,6 +260,18 @@ function summarizeWeeklyHours_(weeklyHours) {
 
 function doGet(e) {
   ensureSetup_();
+
+  // Serving an uploaded image by its Drive file ID (?img=<fileId>). Every
+  // browser fetches this from the exact same origin as the web app itself,
+  // so there's no cross-domain Drive hotlink, no session-cookie-gated
+  // redirect, and no undocumented CDN trick that can silently break on one
+  // browser and not another (the actual cause of images that showed fine
+  // in Chrome but never loaded in Safari) — this is the one image-serving
+  // approach that behaves identically everywhere.
+  if (e && e.parameter && e.parameter.img) {
+    return serveUploadedImage_(e.parameter.img);
+  }
+
   var page = (e && e.parameter && e.parameter.page) || 'app';
   var tpl = HtmlService.createTemplateFromFile('index');
   tpl.initialPage = page;
@@ -267,6 +279,20 @@ function doGet(e) {
     .setTitle('Salon & Barber Management System')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/** Streams an uploaded file's bytes straight from Drive. A missing/bad file ID falls back to a blank transparent pixel instead of throwing, so a stale URL degrades to an empty image rather than a page error. */
+function serveUploadedImage_(fileId) {
+  try {
+    return DriveApp.getFileById(fileId).getBlob();
+  } catch (err) {
+    return Utilities.newBlob(Utilities.base64Decode('R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='), 'image/gif', 'blank.gif');
+  }
+}
+
+/** The current web app's own /exec URL — uploaded images are linked back through this same origin (see doGet's ?img= handler) rather than hotlinked from Drive directly. */
+function getAppUrl_() {
+  return ScriptApp.getService().getUrl();
 }
 
 function include(filename) {
@@ -316,7 +342,70 @@ function setupSheets() {
   seedIfEmpty_();
   repairPhoneColumns_();
   repairTimeSlotColumns_();
+  repairImageUrlColumns_();
   return 'Setup complete';
+}
+
+/**
+ * One-time data repair: images uploaded under either of the two earlier
+ * Drive-hotlink URL formats (`drive.google.com/thumbnail?id=...` and
+ * `lh3.googleusercontent.com/d/...`) are rewritten to the current
+ * same-origin `?img=<fileId>` format served by doGet/serveUploadedImage_.
+ * Both old formats embed the Drive file ID in a recognizable spot, so the
+ * ID can be recovered and the URL rebuilt without losing anything — a
+ * logo, staff photo, service photo, etc. that never displayed in Safari
+ * before this fix now does, without the Owner having to re-upload it.
+ * Anything already using the new format, or an external (non-Drive) URL
+ * like the seeded Unsplash sample photos, is left untouched.
+ */
+function repairImageUrlColumns_() {
+  var appUrl = getAppUrl_();
+  var oldFormat = /(?:drive\.google\.com\/thumbnail\?id=|lh3\.googleusercontent\.com\/d\/)([a-zA-Z0-9_-]{15,})/;
+  var targets = [
+    { sheet: 'Services', col: 'ImageURL' },
+    { sheet: 'Staff', col: 'PhotoURL' },
+    { sheet: 'Products', col: 'ImageURL' },
+    { sheet: 'HeroSlides', col: 'ImageURL' },
+    { sheet: 'Gallery', col: 'ImageURL' },
+    { sheet: 'Appointments', col: 'PaymentProofURL' }
+  ];
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  targets.forEach(function (t) {
+    var sheet = ss.getSheetByName(t.sheet);
+    if (!sheet) return;
+    var col = SCHEMA[t.sheet].indexOf(t.col) + 1;
+    if (!col) return;
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return;
+    var range = sheet.getRange(2, col, lastRow - 1, 1);
+    var values = range.getValues();
+    var changed = false;
+    var fixed = values.map(function (row) {
+      var v = String(row[0] || '');
+      var m = v.match(oldFormat);
+      if (!m) return [row[0]];
+      changed = true;
+      return [appUrl + '?img=' + m[1]];
+    });
+    if (changed) range.setValues(fixed);
+  });
+
+  // Settings.LogoURL lives in the Key/Value Settings sheet, not a fixed column.
+  var settingsSheet = ss.getSheetByName('Settings');
+  if (settingsSheet) {
+    var lastRow = settingsSheet.getLastRow();
+    if (lastRow >= 2) {
+      var rows = settingsSheet.getRange(2, 1, lastRow - 1, 2).getValues();
+      var changed = false;
+      rows.forEach(function (row) {
+        if (row[0] === 'LogoURL') {
+          var m = String(row[1] || '').match(oldFormat);
+          if (m) { row[1] = appUrl + '?img=' + m[1]; changed = true; }
+        }
+      });
+      if (changed) settingsSheet.getRange(2, 1, rows.length, 2).setValues(rows);
+    }
+  }
 }
 
 /**
@@ -1832,17 +1921,19 @@ function uploadImageToDrive_(base64Data, filename, mimeType) {
   var file = folder.createFile(blob);
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   return {
-    // Two Drive hotlink formats were tried and both had cross-browser
-    // gaps: `uc?export=view` can serve an interstitial "can't scan for
-    // viruses" HTML page instead of image bytes, and `drive.google.com/
-    // thumbnail` — reliable on Chrome — was reported not loading at all
-    // in Safari (likely Safari's stricter handling of drive.google.com's
-    // session-cookie-gated redirects). `lh3.googleusercontent.com/d/...`
-    // is the format Google's own products (Sites, Blogger) use to embed
-    // Drive images externally and is served from a plain CDN host with no
-    // cookie/session dependency, which is why it works consistently
-    // across Chrome, Safari, and Firefox alike.
-    url: 'https://lh3.googleusercontent.com/d/' + file.getId() + '=w1000',
+    // Two Drive hotlink URL tricks were tried before this and both left a
+    // cross-browser gap: `uc?export=view` can serve an interstitial "can't
+    // scan for viruses" HTML page instead of image bytes, and both
+    // `drive.google.com/thumbnail` and `lh3.googleusercontent.com/d/...`
+    // are undocumented, reverse-engineered CDN redirects that Chrome
+    // tolerates but Safari was reported to fail on entirely. Rather than
+    // trying a fourth guess at a Drive URL format, the image is now
+    // streamed back through this very web app instead — doGet(e) serves
+    // the file's bytes directly when called with ?img=<fileId> (see
+    // serveUploadedImage_), so the browser is just fetching same-origin
+    // content, with no external host or redirect involved at all. That
+    // makes it behave identically in every browser by construction.
+    url: getAppUrl_() + '?img=' + file.getId(),
     fileId: file.getId()
   };
 }
