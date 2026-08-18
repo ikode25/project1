@@ -135,6 +135,13 @@ var DEFAULT_SETTINGS = {
   // row as just that shop's info (name/location/phone/hours), not a list
   // to manage. Not every barbershop has multiple locations.
   HasBranches: 'Y',
+  // Comma-separated list of service categories the Owner has defined — the
+  // Services admin page picks from this instead of retyping a category
+  // name (and risking "Haircut" vs "Haircuts" splitting the price list).
+  ServiceCategories: 'Haircut,Shave,Braids,Manicure,Facial',
+  // 'Y'/'N' toggles for optional public-site sections.
+  ShowGreetingBanner: 'Y',
+  ShowTeamSection: 'Y',
   // Per-weekday opening hours (JSON), the single source of truth for both
   // what's shown to customers and which time slots the booking wizard
   // offers on a given date. Keys are the 3-letter weekday abbreviations
@@ -1825,13 +1832,17 @@ function uploadImageToDrive_(base64Data, filename, mimeType) {
   var file = folder.createFile(blob);
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   return {
-    // Drive's `uc?export=view` link frequently fails to render in a plain
-    // <img> tag — it can serve an interstitial "can't scan this file for
-    // viruses" HTML page instead of the raw image, especially for larger
-    // photos. The `thumbnail` endpoint reliably returns actual image bytes
-    // for anyone-with-link-view files, which is what every photo/logo
-    // picker in this app relies on to actually display.
-    url: 'https://drive.google.com/thumbnail?id=' + file.getId() + '&sz=w1000',
+    // Two Drive hotlink formats were tried and both had cross-browser
+    // gaps: `uc?export=view` can serve an interstitial "can't scan for
+    // viruses" HTML page instead of image bytes, and `drive.google.com/
+    // thumbnail` — reliable on Chrome — was reported not loading at all
+    // in Safari (likely Safari's stricter handling of drive.google.com's
+    // session-cookie-gated redirects). `lh3.googleusercontent.com/d/...`
+    // is the format Google's own products (Sites, Blogger) use to embed
+    // Drive images externally and is served from a plain CDN host with no
+    // cookie/session dependency, which is why it works consistently
+    // across Chrome, Safari, and Firefox alike.
+    url: 'https://lh3.googleusercontent.com/d/' + file.getId() + '=w1000',
     fileId: file.getId()
   };
 }

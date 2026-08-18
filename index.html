@@ -70,16 +70,30 @@
   #publicNav .bar { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; }
   #publicNav .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.2rem; letter-spacing: -.01em; }
   #publicNav .brand img { height: 36px; width: 36px; border-radius: 9px; object-fit: cover; }
-  .shop-status-badge { display: inline-flex; align-items: center; gap: 5px; font-size: .72rem; font-weight: 700; letter-spacing: .02em; padding: 4px 10px 4px 8px; border-radius: 999px; text-transform: uppercase; }
-  .shop-status-badge::before { content: ''; width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+  .shop-status-badge {
+    display: inline-flex; align-items: center; gap: 6px; font-size: .72rem; font-weight: 800; letter-spacing: .04em;
+    padding: 5px 12px 5px 9px; border-radius: 999px; text-transform: uppercase; box-shadow: 0 1px 4px rgba(0,0,0,.12);
+  }
+  .shop-status-badge::before { content: ''; width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
   .shop-status-badge.open { background: #dcf5e3; color: #1c7c3c; }
-  .shop-status-badge.open::before { background: #1c7c3c; }
+  .shop-status-badge.open::before { background: #1c7c3c; animation: statusBeep 1.6s ease-in-out infinite; }
   .shop-status-badge.closed { background: #fbe0e0; color: #b32424; }
   .shop-status-badge.closed::before { background: #b32424; }
+  @keyframes statusBeep {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(28,124,60,.55); }
+    50% { box-shadow: 0 0 0 5px rgba(28,124,60,0); }
+  }
   .pub-greeting-strip { background: var(--clr-accent); color: #1a1a1a; padding: 8px 0; text-align: center; font-size: .85rem; font-weight: 600; }
   .branch-status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
   .branch-status-dot.open { background: #1c7c3c; }
   .branch-status-dot.closed { background: #b32424; }
+  .nav-right-group { display: flex; align-items: center; gap: 14px; }
+  .pub-reload-btn {
+    display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%;
+    background: rgba(255,255,255,.1); border: none; color: #fff; cursor: pointer; flex-shrink: 0;
+  }
+  .pub-reload-btn:hover { background: rgba(255,255,255,.2); }
+  .pub-reload-btn.spinning svg { animation: spin .6s linear; }
   #publicNav nav { display: flex; gap: 22px; align-items: center; }
   #publicNav nav a { font-size: .92rem; font-weight: 600; opacity: .88; position: relative; padding: 4px 0; transition: opacity .15s, color .15s; }
   #publicNav nav a:not(#adminLoginLink)::after { content: ''; position: absolute; left: 0; right: 0; bottom: -4px; height: 2px; background: var(--clr-accent); transform: scaleX(0); transition: transform .18s ease; }
@@ -294,6 +308,11 @@
   .day-chip { padding: 6px 12px; border-radius: 999px; background: #eee; font-size: .78rem; cursor: pointer; font-weight: 600; }
   #adminApp.dark .day-chip { background: #2a2e37; }
   .day-chip.active { background: var(--clr-accent); color: #1a1a1a; }
+  .chip-remove { display: inline-flex; vertical-align: -2px; margin-left: 4px; opacity: .6; cursor: pointer; }
+  .chip-remove:hover { opacity: 1; }
+  .chip-toggle { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: #eee; font-size: .85rem; font-weight: 600; cursor: pointer; }
+  #adminApp.dark .chip-toggle { background: #2a2e37; }
+  .chip-toggle input { accent-color: var(--clr-accent); cursor: pointer; }
 
   /* ---------- WEEKLY WORKING HOURS EDITOR ---------- */
   .wh-editor { display: flex; flex-direction: column; gap: 4px; }
@@ -690,17 +709,20 @@
   <nav id="publicNav">
     <div class="bar container">
       <div class="brand"><img id="pubLogo" src="" alt="" class="hidden"><span id="pubBrandName">Salon</span><span id="shopStatusBadge" class="shop-status-badge hidden"></span></div>
-      <button id="navToggle" aria-label="Menu"></button>
-      <nav id="pubNav">
-        <a href="#services">Services</a>
-        <a href="#team">Our Team</a>
-        <a href="#gallery">Gallery</a>
-        <a href="#booking">Book Now</a>
-        <a href="#mybookings">My Bookings</a>
-        <a href="#reviews">Reviews</a>
-        <a href="#contact">Contact</a>
-        <a href="#admin" id="adminLoginLink" title="Staff Login" aria-label="Staff Login"></a>
-      </nav>
+      <div class="nav-right-group">
+        <button id="pubReloadBtn" class="pub-reload-btn" title="Refresh page data" aria-label="Refresh page data"></button>
+        <button id="navToggle" aria-label="Menu"></button>
+        <nav id="pubNav">
+          <a href="#services">Services</a>
+          <a href="#team" id="teamNavLink">Our Team</a>
+          <a href="#gallery">Gallery</a>
+          <a href="#booking">Book Now</a>
+          <a href="#mybookings">My Bookings</a>
+          <a href="#reviews">Reviews</a>
+          <a href="#contact">Contact</a>
+          <a href="#admin" id="adminLoginLink" title="Staff Login" aria-label="Staff Login"></a>
+        </nav>
+      </div>
     </div>
   </nav>
 
@@ -1101,6 +1123,7 @@ window.addEventListener('DOMContentLoaded', function () {
   document.getElementById('adminLoginLink').innerHTML = icon('lock', 18);
   document.getElementById('darkModeToggle').innerHTML = icon('moon', 17);
   document.getElementById('reloadBtn').innerHTML = icon('refresh', 17);
+  document.getElementById('pubReloadBtn').innerHTML = icon('refresh', 17);
   document.getElementById('bellBtn').innerHTML = icon('bell', 17);
   document.getElementById('logoutBtn').innerHTML = icon('logout', 14) + ' Logout';
   document.getElementById('hamburgerBtn').innerHTML = icon('menu', 20);
@@ -1169,6 +1192,12 @@ window.addEventListener('DOMContentLoaded', function () {
     var done = function () { btn.classList.remove('spinning'); };
     if (STATE.token) { renderAdminPage(); refreshBell(); setTimeout(done, 500); }
     else { loadPublicSite(); setTimeout(done, 500); }
+  });
+  document.getElementById('pubReloadBtn').addEventListener('click', function () {
+    var btn = this;
+    btn.classList.add('spinning');
+    loadPublicSite();
+    setTimeout(function () { btn.classList.remove('spinning'); toast('Page refreshed', 'success'); }, 500);
   });
 
   document.getElementById('bellBtn').addEventListener('click', function (e) {
@@ -1320,6 +1349,12 @@ function renderBranding(s) {
   }
   var greeting = document.getElementById('pubGreeting');
   if (greeting) greeting.textContent = getGreetingWord_() + '! Welcome to ' + s.BusinessName + '.';
+  var greetingStrip = document.querySelector('.pub-greeting-strip');
+  if (greetingStrip) greetingStrip.classList.toggle('hidden', s.ShowGreetingBanner === 'N');
+  var teamSection = document.getElementById('team');
+  if (teamSection) teamSection.classList.toggle('hidden', s.ShowTeamSection === 'N');
+  var teamNavLink = document.getElementById('teamNavLink');
+  if (teamNavLink) teamNavLink.classList.toggle('hidden', s.ShowTeamSection === 'N');
 }
 
 function renderHero(slides) {
@@ -2495,7 +2530,31 @@ function renderAdminPage() {
   (renderers[STATE.adminPage] || function () {})(content);
 }
 
-function branchArg() { return STATE.user.role === 'Owner' ? STATE.currentBranchFilter : STATE.user.branchId; }
+/**
+ * The branch ID to scope the current admin page/action to. In single-shop
+ * mode with exactly one branch on record, there is nothing to choose —
+ * that one branch is always used, with no picker shown anywhere and no
+ * "select a branch first" dead end (POS checkout, appointment creation,
+ * etc. all go through this one function).
+ */
+function branchArg() {
+  if (STATE.settings && STATE.settings.HasBranches === 'N' && STATE.branches.length === 1) return STATE.branches[0].BranchID;
+  return STATE.user.role === 'Owner' ? STATE.currentBranchFilter : STATE.user.branchId;
+}
+/** Whether branch pickers should show at all — false once there's only one branch to pick from anyway (single-shop mode, or a business that just hasn't added a second branch yet). */
+function showBranchPicker_() { return STATE.branches.length > 1; }
+/** A branch <select> field, or '' when there's only one branch (nothing to pick). */
+function branchSelectHtml(id, selectedId, label) {
+  if (!showBranchPicker_()) return '';
+  var opts = STATE.branches.map(function (b) { return '<option value="' + b.BranchID + '"' + (selectedId === b.BranchID ? ' selected' : '') + '>' + esc(b.Name) + '</option>'; }).join('');
+  return '<div><label>' + (label || 'Branch') + '</label><select id="' + id + '">' + opts + '</select></div>';
+}
+/** Reads a branchSelectHtml() field's value — or, when it wasn't rendered (only one branch), that one branch's ID directly. */
+function branchSelectValue(id) {
+  var el = document.getElementById(id);
+  if (el) return el.value;
+  return STATE.branches[0] ? STATE.branches[0].BranchID : '';
+}
 function statCard(label, val) {
   return '<div class="stat-card"><div class="val">' + val + '</div><div class="lbl">' + esc(label) + '</div></div>';
 }
@@ -2780,11 +2839,10 @@ function openRescheduleModal(id, date, time) {
 }
 
 function openAppointmentModal() {
-  var branches = STATE.branches, services = STATE.publicData.services, staff = STATE.publicData.staff;
-  var branchOpts = branches.map(function (b) { return '<option value="' + b.BranchID + '">' + esc(b.Name) + '</option>'; }).join('');
+  var services = STATE.publicData.services, staff = STATE.publicData.staff;
   var html =
     '<div class="field-grid">' +
-    '<div><label>Branch</label><select id="naBranch">' + branchOpts + '</select></div>' +
+    branchSelectHtml('naBranch', STATE.branches[0] && STATE.branches[0].BranchID) +
     '<div><label>Service</label><select id="naService"></select></div>' +
     '<div><label>Staff</label><select id="naStaff"><option value="">Any</option></select></div>' +
     '<div><label>Status</label><select id="naStatus">' + ['Pending', 'Confirmed'].map(function (s) { return '<option value="' + s + '">' + s + '</option>'; }).join('') + '</select></div>' +
@@ -2795,7 +2853,7 @@ function openAppointmentModal() {
     '</div>';
   openModal('New Appointment', html, function () {
     var payload = {
-      branchId: document.getElementById('naBranch').value, serviceId: document.getElementById('naService').value,
+      branchId: branchSelectValue('naBranch'), serviceId: document.getElementById('naService').value,
       staffId: document.getElementById('naStaff').value, date: document.getElementById('naDate').value,
       timeSlot: document.getElementById('naTime').value, name: document.getElementById('naName').value,
       phone: document.getElementById('naPhone').value, status: document.getElementById('naStatus').value
@@ -2806,11 +2864,12 @@ function openAppointmentModal() {
   }, 'Create');
 
   function refreshServiceOptions() {
-    var bId = document.getElementById('naBranch').value;
+    var bId = branchSelectValue('naBranch');
     document.getElementById('naService').innerHTML = services.filter(function (s) { return s.BranchID === bId; }).map(function (s) { return '<option value="' + s.ServiceID + '">' + esc(s.Name) + '</option>'; }).join('');
     document.getElementById('naStaff').innerHTML = '<option value="">Any</option>' + staff.filter(function (s) { return s.BranchID === bId; }).map(function (s) { return '<option value="' + s.StaffID + '">' + esc(s.Name) + '</option>'; }).join('');
   }
-  document.getElementById('naBranch').addEventListener('change', refreshServiceOptions);
+  var naBranchEl = document.getElementById('naBranch');
+  if (naBranchEl) naBranchEl.addEventListener('change', refreshServiceOptions);
   refreshServiceOptions();
 }
 
@@ -2998,12 +3057,48 @@ function viewCustomerProfile(id) {
 }
 
 /* ---------- SERVICES (the menu POS sells from) ---------- */
+function serviceCategoriesFrom_(s) {
+  return String((s && s.ServiceCategories) || '').split(',').map(function (c) { return c.trim(); }).filter(Boolean);
+}
 function renderServicesAdmin(content) {
-  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Services</h3><div style="display:flex;gap:10px;align-items:center;">' + viewToggleHtml('services') + '<button class="btn btn-sm" onclick="openServiceModal()">' + icon('plus', 14) + ' Add Service</button></div></div>' +
+  content.innerHTML =
+    '<div class="panel"><h3>Service Categories</h3><p class="muted">Manage the category list once here — pick from it when adding/editing a service, instead of retyping a name each time.</p>' +
+    '<div class="day-picker" id="svcCategoryChips">' + serviceCategoriesFrom_(STATE.settings).map(function (c) {
+      return '<span class="day-chip active">' + esc(c) + ' <span class="chip-remove" data-remove="' + esc(c) + '" title="Remove">' + icon('close', 11) + '</span></span>';
+    }).join('') + '</div>' +
+    '<div style="display:flex;gap:8px;margin-top:12px;max-width:360px;">' +
+    '<input type="text" id="svcNewCategory" placeholder="New category name">' +
+    '<button type="button" class="btn btn-sm btn-outline" id="svcAddCategoryBtn">' + icon('plus', 13) + ' Add</button>' +
+    '</div></div>' +
+    '<div class="panel"><div class="panel-head"><h3>Services</h3><div style="display:flex;gap:10px;align-items:center;">' + viewToggleHtml('services') + '<button class="btn btn-sm" onclick="openServiceModal()">' + icon('plus', 14) + ' Add Service</button></div></div>' +
     '<p class="muted">These are exactly the items your Point of Sale screen offers to sell — add a photo so staff can spot them quickly on the POS grid.</p>' +
     '<div id="serviceTableHost"></div></div>';
+  bindServiceCategoryEditor();
   bindViewToggle(content, 'services', function () { loadServicesTable(); });
   loadServicesTable();
+}
+function bindServiceCategoryEditor() {
+  document.getElementById('svcAddCategoryBtn').addEventListener('click', function () {
+    var input = document.getElementById('svcNewCategory');
+    var name = input.value.trim();
+    if (!name) return;
+    var list = serviceCategoriesFrom_(STATE.settings);
+    if (list.indexOf(name) === -1) list.push(name);
+    saveServiceCategories_(list);
+  });
+  document.querySelectorAll('#svcCategoryChips [data-remove]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var list = serviceCategoriesFrom_(STATE.settings).filter(function (c) { return c !== btn.dataset.remove; });
+      saveServiceCategories_(list);
+    });
+  });
+}
+function saveServiceCategories_(list) {
+  api('updateSettings', STATE.token, { ServiceCategories: list.join(',') }).then(function (s) {
+    STATE.settings = s;
+    toast('Categories updated', 'success');
+    renderServicesAdmin(document.getElementById('adminContent'));
+  }).catch(showError);
 }
 function loadServicesTable() {
   api('getServices', STATE.token, branchArg()).then(function (rows) {
@@ -3028,11 +3123,15 @@ function loadServicesTable() {
 }
 function openServiceModal(s) {
   s = s || {};
-  var branchOpts = STATE.branches.map(function (b) { return '<option value="' + b.BranchID + '"' + (s.BranchID === b.BranchID ? ' selected' : '') + '>' + esc(b.Name) + '</option>'; }).join('');
+  var categories = serviceCategoriesFrom_(STATE.settings);
+  if (s.Category && categories.indexOf(s.Category) === -1) categories = categories.concat(s.Category); // keep an existing service's category selectable even if it was since removed from the list
+  var categoryField = categories.length
+    ? '<div><label>Category</label><select id="svCategory">' + categories.map(function (c) { return '<option' + (s.Category === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select></div>'
+    : '<div><label>Category</label><input id="svCategory" value="' + esc(s.Category || '') + '" placeholder="Haircut, Shave, Braids…"></div>';
   var html = '<div class="field-grid">' +
     '<div><label>Name</label><input id="svName" value="' + esc(s.Name || '') + '"></div>' +
-    '<div><label>Category</label><input id="svCategory" value="' + esc(s.Category || '') + '" placeholder="Haircut, Shave, Braids…"></div>' +
-    '<div><label>Branch</label><select id="svBranch">' + branchOpts + '</select></div>' +
+    categoryField +
+    branchSelectHtml('svBranch', s.BranchID || (STATE.branches[0] && STATE.branches[0].BranchID)) +
     '<div><label>Duration (minutes)</label><input type="number" id="svDuration" value="' + (s.DurationMinutes || 30) + '"></div>' +
     '<div><label>Price (GH₵)</label><input type="number" id="svPrice" value="' + (s.Price || 0) + '"></div>' +
     '<div><label>Active</label><select id="svActive">' + ['Y', 'N'].map(function (a) { return '<option' + (s.Active === a ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select></div>' +
@@ -3044,7 +3143,7 @@ function openServiceModal(s) {
       api('saveService', STATE.token, {
         ServiceID: s.ServiceID || '', Name: document.getElementById('svName').value, Category: document.getElementById('svCategory').value,
         Description: document.getElementById('svDescription').value, DurationMinutes: document.getElementById('svDuration').value,
-        Price: document.getElementById('svPrice').value, BranchID: document.getElementById('svBranch').value,
+        Price: document.getElementById('svPrice').value, BranchID: branchSelectValue('svBranch'),
         Active: document.getElementById('svActive').value, ImageURL: photoUrl
       }).then(function () { toast('Service saved', 'success'); closeModal(); loadServicesTable(); }).catch(showError);
     });
@@ -3084,14 +3183,13 @@ function loadStaffTable() {
 }
 function openStaffModal(s) {
   s = s || {};
-  var branchOpts = STATE.branches.map(function (b) { return '<option value="' + b.BranchID + '"' + (s.BranchID === b.BranchID ? ' selected' : '') + '>' + esc(b.Name) + '</option>'; }).join('');
   var days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   var selectedDays = String(s.WorkDays || 'Mon,Tue,Wed,Thu,Fri,Sat').split(',').map(function (d) { return d.trim(); });
   var dayChips = days.map(function (d) { return '<span class="day-chip' + (selectedDays.indexOf(d) > -1 ? ' active' : '') + '" data-day="' + d + '">' + d + '</span>'; }).join('');
   var html = '<div class="field-grid">' +
     '<div><label>Name</label><input id="sfName" value="' + esc(s.Name || '') + '"></div>' +
     '<div><label>Role</label><select id="sfRole">' + ['Barber', 'Stylist', 'Receptionist', 'Manager'].map(function (r) { return '<option' + (s.Role === r ? ' selected' : '') + '>' + r + '</option>'; }).join('') + '</select></div>' +
-    '<div><label>Branch</label><select id="sfBranch">' + branchOpts + '</select></div>' +
+    branchSelectHtml('sfBranch', s.BranchID || (STATE.branches[0] && STATE.branches[0].BranchID)) +
     '<div><label>Phone</label><input id="sfPhone" value="' + esc(s.Phone || '') + '"></div>' +
     '<div><label>Specialties</label><input id="sfSpecialties" value="' + esc(s.Specialties || '') + '"></div>' +
     '<div><label>Commission %</label><input type="number" id="sfCommission" value="' + (s.CommissionRate || 10) + '"></div>' +
@@ -3104,7 +3202,7 @@ function openStaffModal(s) {
       var workDays = Array.prototype.slice.call(document.querySelectorAll('#sfDayPicker .day-chip.active')).map(function (el) { return el.dataset.day; }).join(',');
       api('saveStaff', STATE.token, {
         StaffID: s.StaffID || '', Name: document.getElementById('sfName').value, Role: document.getElementById('sfRole').value,
-        BranchID: document.getElementById('sfBranch').value, Phone: document.getElementById('sfPhone').value,
+        BranchID: branchSelectValue('sfBranch'), Phone: document.getElementById('sfPhone').value,
         Specialties: document.getElementById('sfSpecialties').value, PhotoURL: photoUrl,
         CommissionRate: document.getElementById('sfCommission').value, Active: document.getElementById('sfActive').value,
         WorkDays: workDays
@@ -3189,11 +3287,10 @@ function loadProductsTable() {
 }
 function openProductModal(p) {
   p = p || {};
-  var branchOpts = STATE.branches.map(function (b) { return '<option value="' + b.BranchID + '"' + (p.BranchID === b.BranchID ? ' selected' : '') + '>' + esc(b.Name) + '</option>'; }).join('');
   var html = '<div class="field-grid">' +
     '<div><label>Name</label><input id="pdName" value="' + esc(p.Name || '') + '"></div>' +
     '<div><label>Category</label><input id="pdCategory" value="' + esc(p.Category || '') + '"></div>' +
-    '<div><label>Branch</label><select id="pdBranch">' + branchOpts + '</select></div>' +
+    branchSelectHtml('pdBranch', p.BranchID || (STATE.branches[0] && STATE.branches[0].BranchID)) +
     '<div><label>Cost Price</label><input type="number" id="pdCost" value="' + (p.CostPrice || 0) + '"></div>' +
     '<div><label>Selling Price</label><input type="number" id="pdPrice" value="' + (p.SellingPrice || 0) + '"></div>' +
     '<div><label>Qty in Stock</label><input type="number" id="pdQty" value="' + (p.QuantityInStock || 0) + '"></div>' +
@@ -3204,7 +3301,7 @@ function openProductModal(p) {
     resolvePhotoPicker('pd', function (photoUrl) {
       api('saveProduct', STATE.token, {
         ProductID: p.ProductID || '', Name: document.getElementById('pdName').value, Category: document.getElementById('pdCategory').value,
-        BranchID: document.getElementById('pdBranch').value, CostPrice: document.getElementById('pdCost').value,
+        BranchID: branchSelectValue('pdBranch'), CostPrice: document.getElementById('pdCost').value,
         SellingPrice: document.getElementById('pdPrice').value, QuantityInStock: document.getElementById('pdQty').value,
         ReorderLevel: document.getElementById('pdReorder').value, ImageURL: photoUrl
       }).then(function () { toast('Product saved', 'success'); closeModal(); loadProductsTable(); }).catch(showError);
@@ -3308,9 +3405,8 @@ function loadExpensesTable() {
   }).catch(function (err) { document.getElementById('expTableHost').innerHTML = errorPanel(err); });
 }
 function openExpenseModal() {
-  var branchOpts = STATE.branches.map(function (b) { return '<option value="' + b.BranchID + '">' + esc(b.Name) + '</option>'; }).join('');
   var html = '<div class="field-grid">' +
-    '<div><label>Branch</label><select id="exBranch">' + branchOpts + '</select></div>' +
+    branchSelectHtml('exBranch', STATE.branches[0] && STATE.branches[0].BranchID) +
     '<div><label>Date</label><input type="date" id="exDate" value="' + new Date().toISOString().slice(0, 10) + '"></div>' +
     '<div><label>Category</label><input id="exCategory" placeholder="Rent, Utilities, Supplies…"></div>' +
     '<div><label>Amount (GH₵)</label><input type="number" id="exAmount"></div>' +
@@ -3318,7 +3414,7 @@ function openExpenseModal() {
     '</div>';
   openModal('Add Expense', html, function () {
     api('saveExpense', STATE.token, {
-      BranchID: document.getElementById('exBranch').value, Date: document.getElementById('exDate').value,
+      BranchID: branchSelectValue('exBranch'), Date: document.getElementById('exDate').value,
       Category: document.getElementById('exCategory').value, Amount: document.getElementById('exAmount').value, Description: document.getElementById('exDesc').value
     }).then(function () { toast('Expense saved', 'success'); closeModal(); loadExpensesTable(); loadIncomeExpenseSummary(); }).catch(showError);
   }, 'Save');
@@ -3529,21 +3625,24 @@ function loadGalleryTable() {
 }
 function openGalleryModal(g) {
   g = g || {};
-  var branchOpts = '<option value="">All Branches</option>' + STATE.branches.map(function (b) { return '<option value="' + b.BranchID + '"' + (g.BranchID === b.BranchID ? ' selected' : '') + '>' + esc(b.Name) + '</option>'; }).join('');
+  var branchField = showBranchPicker_()
+    ? '<div><label>Branch</label><select id="galBranch"><option value="">All Branches</option>' + STATE.branches.map(function (b) { return '<option value="' + b.BranchID + '"' + (g.BranchID === b.BranchID ? ' selected' : '') + '>' + esc(b.Name) + '</option>'; }).join('') + '</select></div>'
+    : '';
   var html = '<div class="field-grid">' +
     '<div style="grid-column:1/-1">' + photoPickerHtml('gal', g.ImageURL) + '</div>' +
     '<div><label>Caption</label><input id="galCaption" value="' + esc(g.Caption || '') + '"></div>' +
     '<div><label>Category</label><input id="galCategory" value="' + esc(g.Category || '') + '" placeholder="Haircuts, Braids…"></div>' +
-    '<div><label>Branch</label><select id="galBranch">' + branchOpts + '</select></div>' +
+    branchField +
     '<div><label>Sort Order</label><input type="number" id="galOrder" value="' + (g.SortOrder || 1) + '"></div>' +
     '<div><label>Active</label><select id="galActive">' + ['Y', 'N'].map(function (a) { return '<option' + (g.Active === a ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select></div>' +
     '</div>';
   openModal(g.GalleryID ? 'Edit Photo' : 'Add Photo', html, function () {
     resolvePhotoPicker('gal', function (url) {
       if (!url) { toast('Please choose an image', 'error'); return; }
+      var galBranchEl = document.getElementById('galBranch');
       api('saveGalleryItem', STATE.token, {
         GalleryID: g.GalleryID || '', ImageURL: url, Caption: document.getElementById('galCaption').value,
-        Category: document.getElementById('galCategory').value, BranchID: document.getElementById('galBranch').value,
+        Category: document.getElementById('galCategory').value, BranchID: galBranchEl ? galBranchEl.value : '',
         SortOrder: document.getElementById('galOrder').value, Active: document.getElementById('galActive').value
       }).then(function () { toast('Photo saved', 'success'); closeModal(); loadGalleryTable(); }).catch(showError);
     });
@@ -3667,6 +3766,10 @@ function renderSettingsAdmin(content) {
       field('Business Name', 'stBusinessName', s.BusinessName) +
       field('Tagline', 'stTagline', s.Tagline) +
       '<div style="grid-column:1/-1"><label>Logo</label>' + photoPickerHtml('stLogo', s.LogoURL) + '</div>' +
+      '</div><h4 style="margin:20px 0 4px;">Public Site Sections</h4><p class="muted" style="margin-bottom:10px;">Turn any of these off if you\'d rather not show them.</p>' +
+      '<div class="day-picker">' +
+      '<label class="chip-toggle"><input type="checkbox" id="stShowGreeting"' + (s.ShowGreetingBanner !== 'N' ? ' checked' : '') + '> Greeting banner</label>' +
+      '<label class="chip-toggle"><input type="checkbox" id="stShowTeam"' + (s.ShowTeamSection !== 'N' ? ' checked' : '') + '> Our Team section</label>' +
       '</div></div></div>' +
 
       '<div class="settings-panel hidden" data-panel="theme"><div class="panel"><div class="field-grid">' +
@@ -3943,7 +4046,10 @@ function saveAllSettings() {
   resolvePhotoPicker('stLogo', function (logoUrl) {
     var payload = {
       BusinessName: document.getElementById('stBusinessName').value, Tagline: document.getElementById('stTagline').value,
-      LogoURL: logoUrl, WhatsAppNumber: document.getElementById('stWhatsAppNumber').value,
+      LogoURL: logoUrl,
+      ShowGreetingBanner: document.getElementById('stShowGreeting').checked ? 'Y' : 'N',
+      ShowTeamSection: document.getElementById('stShowTeam').checked ? 'Y' : 'N',
+      WhatsAppNumber: document.getElementById('stWhatsAppNumber').value,
       ContactPhone: document.getElementById('stContactPhone').value, ContactEmail: document.getElementById('stContactEmail').value,
       MapEmbedURL: document.getElementById('stMapEmbedURL').value,
       SocialFacebook: document.getElementById('stSocialFacebook').value, SocialInstagram: document.getElementById('stSocialInstagram').value,
@@ -4029,31 +4135,37 @@ function deleteUserRow(username) {
 
 /* ---------- MANAGE SLOTS ("Admin can set slots") ---------- */
 function renderSlotsAdmin(content) {
-  var branchOpts = STATE.branches.map(function (b) { return '<option value="' + b.BranchID + '">' + esc(b.Name) + '</option>'; }).join('');
+  var hasPicker = showBranchPicker_();
+  var branchField = hasPicker
+    ? '<select id="slotBranch">' + STATE.branches.map(function (b) { return '<option value="' + b.BranchID + '">' + esc(b.Name) + '</option>'; }).join('') + '</select>'
+    : '';
   var defaultBranch = STATE.user.role === 'Owner' ? (branchArg() || (STATE.branches[0] && STATE.branches[0].BranchID) || '') : STATE.user.branchId;
   content.innerHTML = '<div class="panel">' +
     '<h3>Manage Time Slots</h3>' +
     '<div class="pay-instructions" style="margin-bottom:16px;">' +
     '<p><b>How this works:</b></p>' +
-    '<p>1. Pick a branch and date below — the day\'s slots load automatically.</p>' +
+    '<p>1. ' + (hasPicker ? 'Pick a branch and date below' : 'Pick a date below') + ' — the day\'s slots load automatically.</p>' +
     '<p>2. Click any <b>white</b> time to close it (lunch break, fully booked, holiday) — it turns pink and customers will no longer be offered it in the booking wizard.</p>' +
     '<p>3. Click a <b>pink</b> (closed) time again to reopen it.</p>' +
     '<p><b>Grey</b> times already have a booking and can\'t be closed from here — cancel or reschedule the booking first if you need to.</p>' +
     '</div>' +
     '<div class="filters-bar">' +
-    '<select id="slotBranch">' + branchOpts + '</select>' +
+    branchField +
     '<input type="date" id="slotDate" value="' + isoToday() + '">' +
     '<button class="btn btn-sm btn-outline" onclick="loadSlotsAdmin()">' + icon('refresh', 14) + ' Refresh</button>' +
     '</div>' +
     '<div id="slotGridHost"><p class="muted">Loading…</p></div>' +
     '</div>';
-  if (defaultBranch) document.getElementById('slotBranch').value = defaultBranch;
-  document.getElementById('slotBranch').addEventListener('change', loadSlotsAdmin);
+  var slotBranchEl = document.getElementById('slotBranch');
+  if (slotBranchEl) {
+    if (defaultBranch) slotBranchEl.value = defaultBranch;
+    slotBranchEl.addEventListener('change', loadSlotsAdmin);
+  }
   document.getElementById('slotDate').addEventListener('change', loadSlotsAdmin);
   loadSlotsAdmin();
 }
 function loadSlotsAdmin() {
-  var branchId = document.getElementById('slotBranch').value;
+  var branchId = branchSelectValue('slotBranch') || branchArg();
   var date = document.getElementById('slotDate').value;
   var host = document.getElementById('slotGridHost');
   if (!branchId || !date) return;
