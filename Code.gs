@@ -146,6 +146,14 @@ function setupSheets() {
       sheet.setFrozenRows(1);
       sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#1a1a1a').setFontColor('#ffffff');
     }
+    // Force every data cell to Plain Text format. Without this, Google
+    // Sheets silently "smart-formats" values that look like numbers or
+    // times — e.g. a phone number "0247123456" loses its leading zero,
+    // and a TimeSlot like "09:00" gets converted into an actual time
+    // value — which then breaks exact-string matches (phone lookups,
+    // slot-availability checks) elsewhere in this file. This must be set
+    // BEFORE data is written; it cannot recover a value already mangled.
+    sheet.getRange(1, 1, Math.max(sheet.getMaxRows(), 3000), headers.length).setNumberFormat('@');
   });
 
   // Remove the default "Sheet1" if it is empty and unused
@@ -159,15 +167,18 @@ function setupSheets() {
 }
 
 /**
- * Self-healing check run on every request: if any tab the current schema
- * expects is missing entirely (e.g. this deployment predates a newer sheet
- * like "Gallery" being added to SCHEMA) or has an outdated header row (e.g.
- * a new column like Staff.WorkDays was added later), re-run setupSheets()
- * to create/fix it. setupSheets() is idempotent — it only touches headers
- * that don't already match and only seeds a tab that is completely empty —
- * so this check-and-heal is cheap and safe to run on every request.
+ * Self-healing check, but only actually performed once per cache window:
+ * verifying every sheet's headers is 13+ extra Sheets API calls, so doing
+ * it on literally every request (as an earlier version of this function
+ * did) made every page load and every save noticeably slower. The result
+ * is now cached for an hour — most requests take the fast path (a single
+ * cheap CacheService read) and skip the verification entirely; it quietly
+ * re-checks itself within an hour of any future schema change.
  */
 function ensureSetup_() {
+  var cache = CacheService.getScriptCache();
+  if (cache.get('setup_verified') === '1') return;
+
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheetsByName = {};
   ss.getSheets().forEach(function (sheet) { sheetsByName[sheet.getName()] = sheet; });
@@ -179,6 +190,7 @@ function ensureSetup_() {
     return headers.some(function (h, i) { return existing[i] !== h; });
   });
   if (needsSetup) setupSheets();
+  cache.put('setup_verified', '1', 3600);
 }
 
 function seedIfEmpty_() {
@@ -1701,15 +1713,29 @@ function lookupMyBookings(phone) {
   var appts = readAll_('Appointments').filter(function (a) { return a.CustomerID === customer.CustomerID; });
   appts.sort(function (a, b) { return (b.Date + b.TimeSlot).localeCompare(a.Date + a.TimeSlot); });
 
-  return appts.map(function (a) {
-    return {
-      AppointmentID: a.AppointmentID, Reference: a.Reference, Date: a.Date, TimeSlot: a.TimeSlot, Status: a.Status,
-      ServiceName: services[a.ServiceID] ? services[a.ServiceID].Name : '',
-      ServicePrice: services[a.ServiceID] ? services[a.ServiceID].Price : 0,
-      StaffName: staffMap[a.StaffID] ? staffMap[a.StaffID].Name : 'Any available',
-      BranchName: branches[a.BranchID] ? branches[a.BranchID].Name : ''
-    };
-  });
+  return appts.map(function (a) { return bookingSummary_(a, services, staffMap, branches); });
+}
+
+/** Public: look up a single booking by its reference code (e.g. BOOK-260818-0002) — no phone needed. */
+function lookupBookingByReference(reference) {
+  reference = String(reference || '').trim().toUpperCase();
+  if (!reference) throw new Error('Please enter a booking reference.');
+  var appt = readAll_('Appointments').find(function (a) { return String(a.Reference).toUpperCase() === reference; });
+  if (!appt) return null;
+  var services = keyBy_(readAll_('Services'), 'ServiceID');
+  var staffMap = keyBy_(readAll_('Staff'), 'StaffID');
+  var branches = keyBy_(readAll_('Branches'), 'BranchID');
+  return bookingSummary_(appt, services, staffMap, branches);
+}
+
+function bookingSummary_(a, services, staffMap, branches) {
+  return {
+    AppointmentID: a.AppointmentID, Reference: a.Reference, Date: a.Date, TimeSlot: a.TimeSlot, Status: a.Status,
+    ServiceName: services[a.ServiceID] ? services[a.ServiceID].Name : '',
+    ServicePrice: services[a.ServiceID] ? services[a.ServiceID].Price : 0,
+    StaffName: staffMap[a.StaffID] ? staffMap[a.StaffID].Name : 'Any available',
+    BranchName: branches[a.BranchID] ? branches[a.BranchID].Name : ''
+  };
 }
 
 /** Public: lets a customer cancel their own upcoming booking, verified by matching phone number. */
@@ -1725,6 +1751,19 @@ function cancelMyAppointment(phone, appointmentId) {
 
   var updated = updateById_('Appointments', 'AppointmentID', appointmentId, { Status: 'Cancelled' });
   sendAppointmentStatusUpdate_(updated, customer, 'cancelled at your request');
+  return { success: true };
+}
+
+/** Public: cancel a booking using only its reference code (no phone number needed). */
+function cancelBookingByReference(reference) {
+  reference = String(reference || '').trim().toUpperCase();
+  var appt = readAll_('Appointments').find(function (a) { return String(a.Reference).toUpperCase() === reference; });
+  if (!appt) throw new Error('Booking reference not found.');
+  if (appt.Status === 'Completed' || appt.Status === 'Cancelled') throw new Error('This booking can no longer be cancelled.');
+
+  var customer = readAll_('Customers').find(function (c) { return c.CustomerID === appt.CustomerID; });
+  var updated = updateById_('Appointments', 'AppointmentID', appt.AppointmentID, { Status: 'Cancelled' });
+  if (customer) sendAppointmentStatusUpdate_(updated, customer, 'cancelled at your request');
   return { success: true };
 }
 

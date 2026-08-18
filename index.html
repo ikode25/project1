@@ -504,6 +504,42 @@
   #adminApp.dark .chat-panel-input { border-top-color: #2a2e37; }
   .chat-panel-input input { flex: 1; }
   .chat-panel-input button { background: var(--clr-accent); color: #1a1a1a; border: none; border-radius: 10px; width: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+
+  /* ---------- My Bookings tabs ---------- */
+  .mb-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+  .mb-tab { flex: 1; padding: 10px; border-radius: 10px; border: 1.5px solid #e3e0d8; background: #fff; font-weight: 700; font-size: .85rem; cursor: pointer; }
+  .mb-tab.active { background: var(--clr-primary); color: #fff; border-color: var(--clr-primary); }
+
+  /* ---------- Kanban board (public read-only + admin drag-and-drop) ---------- */
+  .kanban-board { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(230px, 1fr); gap: 14px; overflow-x: auto; padding-bottom: 8px; }
+  .kanban-col { background: #f2f0eb; border-radius: 14px; padding: 10px; min-height: 80px; }
+  #adminApp.dark .kanban-col { background: #1a1d22; }
+  .kanban-col.drag-over { outline: 2px dashed var(--clr-accent); outline-offset: -2px; }
+  .kanban-col-head { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px 10px; font-weight: 800; font-size: .82rem; text-transform: uppercase; letter-spacing: .4px; }
+  .kanban-count { background: rgba(0,0,0,.08); border-radius: 999px; padding: 1px 9px; font-size: .74rem; }
+  #adminApp.dark .kanban-count { background: rgba(255,255,255,.1); }
+  .kanban-card { background: #fff; border-radius: 10px; padding: 12px; margin-bottom: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.06); font-size: .82rem; cursor: grab; }
+  #adminApp.dark .kanban-card { background: #23262d; }
+  .kanban-card:active { cursor: grabbing; }
+  .kanban-card b { display: block; margin-bottom: 2px; }
+  .kanban-card .muted { font-size: .76rem; }
+  .kanban-card .row-actions { margin-top: 8px; }
+  .kanban-empty { color: #999; font-size: .78rem; text-align: center; padding: 14px 6px; }
+  .view-toggle { display: inline-flex; border: 1.5px solid #e3e0d8; border-radius: 10px; overflow: hidden; }
+  .view-toggle button { background: #fff; border: none; padding: 7px 14px; font-size: .8rem; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+  .view-toggle button.active { background: var(--clr-accent); color: #1a1a1a; }
+  #adminApp.dark .view-toggle button { background: #23262d; color: #e8e8e8; }
+
+  /* ---------- Generic record grid (admin "grid view" for any list) ---------- */
+  .record-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+  .record-card { background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,.06); overflow: hidden; }
+  #adminApp.dark .record-card { background: #1e2127; }
+  .record-card .rc-photo { height: 110px; background-size: cover; background-position: center; background-color: #eee; display: flex; align-items: center; justify-content: center; color: #aaa; }
+  #adminApp.dark .record-card .rc-photo { background-color: #333; }
+  .record-card .rc-body { padding: 12px 14px; font-size: .84rem; }
+  .record-card .rc-title { font-weight: 800; margin-bottom: 2px; }
+  .record-card .rc-line { color: #888; font-size: .78rem; margin-bottom: 2px; }
+  .record-card .row-actions { margin-top: 10px; }
 </style>
 
 <div id="loadingBar"></div>
@@ -571,11 +607,19 @@
   <section class="pub alt" id="mybookings">
     <div class="container">
       <h2 class="section-title">Track Your Bookings</h2>
-      <p class="section-sub">Enter the phone number you booked with to see your appointment history</p>
-      <div class="book-wrap">
-        <form id="myBookingsForm" style="display:flex;gap:10px;flex-wrap:wrap;">
+      <p class="section-sub">Look up by the phone number you booked with, or by your booking reference</p>
+      <div class="book-wrap" style="max-width:760px;">
+        <div class="mb-tabs">
+          <button type="button" class="mb-tab active" data-mode="phone">Search by Phone</button>
+          <button type="button" class="mb-tab" data-mode="ref">Search by Reference</button>
+        </div>
+        <form id="myBookingsPhoneForm" style="display:flex;gap:10px;flex-wrap:wrap;">
           <input type="tel" id="mbPhone" placeholder="024XXXXXXX or +233XXXXXXXXX" style="flex:1;min-width:220px;" required>
           <button type="submit" class="btn btn-accent">Find My Bookings</button>
+        </form>
+        <form id="myBookingsRefForm" class="hidden" style="display:flex;gap:10px;flex-wrap:wrap;">
+          <input type="text" id="mbReference" placeholder="e.g. BOOK-260818-0002" style="flex:1;min-width:220px;text-transform:uppercase;" required>
+          <button type="submit" class="btn btn-accent">Find Booking</button>
         </form>
         <div id="myBookingsResults" style="margin-top:20px;"></div>
       </div>
@@ -1145,36 +1189,77 @@ function setupWaFloat(s) {
 /* =====================================================================
  * "MY BOOKINGS" — public self-service lookup
  * ===================================================================*/
+var MB_LAST = { mode: 'phone', key: '' };
+
 function bindMyBookingsForm() {
-  document.getElementById('myBookingsForm').addEventListener('submit', function (e) {
+  document.querySelectorAll('.mb-tab').forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      document.querySelectorAll('.mb-tab').forEach(function (t) { t.classList.remove('active'); });
+      tab.classList.add('active');
+      var isPhone = tab.dataset.mode === 'phone';
+      document.getElementById('myBookingsPhoneForm').classList.toggle('hidden', !isPhone);
+      document.getElementById('myBookingsRefForm').classList.toggle('hidden', isPhone);
+      document.getElementById('myBookingsResults').innerHTML = '';
+    });
+  });
+
+  document.getElementById('myBookingsPhoneForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var host = document.getElementById('myBookingsResults');
     var phone = document.getElementById('mbPhone').value;
+    MB_LAST = { mode: 'phone', key: phone };
     host.innerHTML = '<p class="muted">Searching…</p>';
     api('lookupMyBookings', phone).then(function (rows) {
-      if (!rows.length) { host.innerHTML = '<p class="muted">No bookings found for that phone number.</p>'; return; }
-      host.innerHTML = rows.map(function (a) {
-        var canCancel = a.Status === 'Pending' || a.Status === 'Confirmed';
-        return '<div class="review-card" style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">' +
-          '<div><b>' + esc(a.ServiceName) + '</b><div class="muted">' + esc(a.BranchName) + ' &middot; ' + esc(a.StaffName) + '</div>' +
-          '<div class="muted">' + esc(formatNiceDate(a.Date)) + ' at ' + esc(formatTime12(a.TimeSlot)) + '</div>' +
-          '<div class="muted">Ref: ' + esc(a.Reference) + '</div></div>' +
-          '<div style="text-align:right;">' + statusBadgePublic(a.Status) +
-          (canCancel ? '<br><button class="btn btn-sm btn-outline" style="margin-top:8px;" onclick="cancelMyBookingRow(\'' + a.AppointmentID + '\')">Cancel</button>' : '') +
-          '</div></div></div>';
-      }).join('');
+      if (!rows.length) {
+        host.innerHTML = '<p class="muted">No bookings found for that exact phone number. Double-check it matches what you typed when booking, or try "Search by Reference" using the code from your confirmation screen.</p>';
+        return;
+      }
+      renderBookingsKanban(host, rows);
+    }).catch(showError);
+  });
+
+  document.getElementById('myBookingsRefForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var host = document.getElementById('myBookingsResults');
+    var reference = document.getElementById('mbReference').value;
+    MB_LAST = { mode: 'ref', key: reference };
+    host.innerHTML = '<p class="muted">Searching…</p>';
+    api('lookupBookingByReference', reference).then(function (a) {
+      if (!a) { host.innerHTML = '<p class="muted">No booking found with that reference. Please check it and try again.</p>'; return; }
+      renderBookingsKanban(host, [a]);
     }).catch(showError);
   });
 }
+
 function statusBadgePublic(status) {
   return '<span class="badge badge-' + status.toLowerCase().replace(' ', '-') + '">' + esc(status) + '</span>';
 }
+
+/** Renders a customer's bookings grouped into a Kanban board by status. */
+function renderBookingsKanban(host, rows) {
+  var columns = ['Pending', 'Confirmed', 'Completed', 'No-show', 'Cancelled'];
+  host.innerHTML = '<div class="kanban-board">' + columns.map(function (col) {
+    var items = rows.filter(function (a) { return a.Status === col; });
+    return '<div class="kanban-col"><div class="kanban-col-head"><span>' + col + '</span><span class="kanban-count">' + items.length + '</span></div>' +
+      (items.length ? items.map(function (a) {
+        var canCancel = a.Status === 'Pending' || a.Status === 'Confirmed';
+        return '<div class="kanban-card"><b>' + esc(a.ServiceName) + '</b>' +
+          '<div class="muted">' + esc(a.BranchName) + ' &middot; ' + esc(a.StaffName) + '</div>' +
+          '<div class="muted">' + esc(formatNiceDate(a.Date)) + '</div>' +
+          '<div class="muted">' + esc(formatTime12(a.TimeSlot)) + ' &middot; Ref: ' + esc(a.Reference) + '</div>' +
+          (canCancel ? '<div class="row-actions"><button class="btn btn-sm btn-outline" onclick="cancelMyBookingRow(\'' + a.AppointmentID + '\')">Cancel</button></div>' : '') +
+          '</div>';
+      }).join('') : '<div class="kanban-empty">None</div>') +
+      '</div>';
+  }).join('') + '</div>';
+}
+
 function cancelMyBookingRow(appointmentId) {
   if (!confirm('Cancel this booking?')) return;
-  var phone = document.getElementById('mbPhone').value;
-  api('cancelMyAppointment', phone, appointmentId).then(function () {
+  var req = MB_LAST.mode === 'ref' ? api('cancelBookingByReference', MB_LAST.key) : api('cancelMyAppointment', MB_LAST.key, appointmentId);
+  req.then(function () {
     toast('Booking cancelled', 'success');
-    document.getElementById('myBookingsForm').dispatchEvent(new Event('submit'));
+    document.getElementById(MB_LAST.mode === 'ref' ? 'myBookingsRefForm' : 'myBookingsPhoneForm').dispatchEvent(new Event('submit'));
   }).catch(showError);
 }
 
@@ -1837,6 +1922,45 @@ function renderTable(headers, rows) {
     '</tr></thead><tbody>' + rows.map(function (r) { return '<tr>' + r.map(function (c) { return '<td>' + c + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>';
 }
 
+/* =====================================================================
+ * GENERIC TABLE ⇄ GRID VIEW TOGGLE — reused by any admin list page so
+ * the admin can flip any set of records between a table and a photo
+ * grid of cards.
+ * ===================================================================*/
+function getViewMode(key) { return localStorage.getItem('salon_view_' + key) || 'table'; }
+function setViewMode(key, mode) { localStorage.setItem('salon_view_' + key, mode); }
+function viewToggleHtml(key) {
+  var mode = getViewMode(key);
+  return '<div class="view-toggle" data-viewkey="' + key + '">' +
+    '<button type="button" data-view="table" class="' + (mode === 'table' ? 'active' : '') + '">' + icon('grid', 14) + ' Table</button>' +
+    '<button type="button" data-view="grid" class="' + (mode === 'grid' ? 'active' : '') + '">' + icon('copy', 14) + ' Grid</button>' +
+    '</div>';
+}
+function bindViewToggle(container, key, onChange) {
+  var el = container.querySelector('.view-toggle[data-viewkey="' + key + '"]');
+  if (!el) return;
+  el.querySelectorAll('button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      setViewMode(key, btn.dataset.view);
+      el.querySelectorAll('button').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      onChange(btn.dataset.view);
+    });
+  });
+}
+/** Renders a generic photo-card grid. cardFn(row) must return {photo, title, lines:[], actions} */
+function renderRecordGrid(rows, cardFn) {
+  if (!rows.length) return '<p class="muted">No records found.</p>';
+  return '<div class="record-grid">' + rows.map(function (r) {
+    var c = cardFn(r);
+    var photo = c.photo ? '<div class="rc-photo" style="background-image:url(\'' + esc(c.photo) + '\')"></div>' : '<div class="rc-photo">' + icon(c.fallbackIcon || 'image', 24) + '</div>';
+    return '<div class="record-card">' + photo + '<div class="rc-body"><div class="rc-title">' + esc(c.title) + '</div>' +
+      (c.lines || []).map(function (l) { return '<div class="rc-line">' + l + '</div>'; }).join('') +
+      (c.actions ? '<div class="row-actions">' + c.actions + '</div>' : '') +
+      '</div></div>';
+  }).join('') + '</div>';
+}
+
 /* ---------- OVERVIEW ---------- */
 function renderOverview(content) {
   Promise.all([
@@ -1870,16 +1994,29 @@ function renderOverview(content) {
 }
 
 /* ---------- APPOINTMENTS ---------- */
+var APPT_VIEW = localStorage.getItem('salon_appt_view') || 'table';
+
 function renderAppointments(content) {
   content.innerHTML =
     '<div class="panel">' +
-    '<div class="panel-head"><h3>Appointments</h3><button class="btn btn-sm" onclick="openAppointmentModal()">' + icon('plus', 14) + ' New Appointment</button></div>' +
+    '<div class="panel-head"><h3>Appointments</h3><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">' +
+    '<div class="view-toggle"><button type="button" data-view="table" class="' + (APPT_VIEW === 'table' ? 'active' : '') + '">' + icon('grid', 14) + ' Table</button><button type="button" data-view="kanban" class="' + (APPT_VIEW === 'kanban' ? 'active' : '') + '">' + icon('copy', 14) + ' Kanban</button></div>' +
+    '<button class="btn btn-sm" onclick="openAppointmentModal()">' + icon('plus', 14) + ' New Appointment</button>' +
+    '</div></div>' +
     '<div class="filters-bar">' +
     '<input type="date" id="apFilterDate">' +
     '<select id="apFilterStatus"><option value="">All Statuses</option>' + ['Pending', 'Confirmed', 'Completed', 'No-show', 'Cancelled'].map(function (s) { return '<option value="' + s + '">' + s + '</option>'; }).join('') + '</select>' +
     '<button class="btn btn-sm btn-outline" onclick="loadAppointmentsTable()">Filter</button>' +
     '</div>' +
+    (APPT_VIEW === 'kanban' ? '<p class="muted">Drag a card to a different column to change its status.</p>' : '') +
     '<div id="apTableHost"><p class="muted">Loading…</p></div></div>';
+  content.querySelectorAll('.view-toggle button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      APPT_VIEW = btn.dataset.view;
+      localStorage.setItem('salon_appt_view', APPT_VIEW);
+      renderAppointments(content);
+    });
+  });
   loadAppointmentsTable();
 }
 
@@ -1888,17 +2025,58 @@ function loadAppointmentsTable() {
   api('getAppointments', STATE.token, filters).then(function (rows) {
     var host = document.getElementById('apTableHost');
     if (!rows.length) { host.innerHTML = '<p class="muted">No appointments found.</p>'; return; }
-    host.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Ref</th><th>Date</th><th>Time</th><th>Customer</th><th>Phone</th><th>Service</th><th>Staff</th><th>Status</th><th>Actions</th></tr></thead><tbody>' +
-      rows.map(function (a) {
-        return '<tr><td>' + esc(a.Reference) + '</td><td>' + esc(a.Date) + '</td><td>' + esc(a.TimeSlot) + '</td><td>' + esc(a.CustomerName) + '</td><td>' + esc(a.CustomerPhone) + '</td><td>' + esc(a.ServiceName) + ' (' + money(a.ServicePrice) + ')</td><td>' + esc(a.StaffName) + '</td><td>' + statusBadge(a.Status) + '</td>' +
-          '<td class="row-actions">' +
-          (a.Status !== 'Confirmed' && a.Status !== 'Completed' ? '<button class="btn btn-sm" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'Confirmed\')">Confirm</button>' : '') +
-          (a.Status !== 'Completed' ? '<button class="btn btn-sm btn-accent" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'Completed\')">Complete</button>' : '') +
-          (a.Status !== 'Cancelled' && a.Status !== 'Completed' ? '<button class="btn btn-sm btn-outline" onclick="openRescheduleModal(\'' + a.AppointmentID + '\',\'' + a.Date + '\',\'' + a.TimeSlot + '\')">Reschedule</button><button class="btn btn-sm btn-danger" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'Cancelled\')">Cancel</button>' : '') +
-          (a.Status !== 'Completed' && a.Status !== 'Cancelled' ? '<button class="btn btn-sm btn-outline" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'No-show\')">No-show</button>' : '') +
-          '</td></tr>';
-      }).join('') + '</tbody></table></div>';
+    if (APPT_VIEW === 'kanban') renderAppointmentsKanban(host, rows);
+    else renderAppointmentsTable(host, rows);
   }).catch(function (err) { document.getElementById('apTableHost').innerHTML = errorPanel(err); });
+}
+
+function renderAppointmentsTable(host, rows) {
+  host.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Ref</th><th>Date</th><th>Time</th><th>Customer</th><th>Phone</th><th>Service</th><th>Staff</th><th>Status</th><th>Actions</th></tr></thead><tbody>' +
+    rows.map(function (a) {
+      return '<tr><td>' + esc(a.Reference) + '</td><td>' + esc(a.Date) + '</td><td>' + esc(a.TimeSlot) + '</td><td>' + esc(a.CustomerName) + '</td><td>' + esc(a.CustomerPhone) + '</td><td>' + esc(a.ServiceName) + ' (' + money(a.ServicePrice) + ')</td><td>' + esc(a.StaffName) + '</td><td>' + statusBadge(a.Status) + '</td>' +
+        '<td class="row-actions">' + apptActionButtons_(a) + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
+}
+
+function apptActionButtons_(a) {
+  return (a.Status !== 'Confirmed' && a.Status !== 'Completed' ? '<button class="btn btn-sm" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'Confirmed\')">Confirm</button>' : '') +
+    (a.Status !== 'Completed' ? '<button class="btn btn-sm btn-accent" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'Completed\')">Complete</button>' : '') +
+    (a.Status !== 'Cancelled' && a.Status !== 'Completed' ? '<button class="btn btn-sm btn-outline" onclick="openRescheduleModal(\'' + a.AppointmentID + '\',\'' + a.Date + '\',\'' + a.TimeSlot + '\')">Reschedule</button><button class="btn btn-sm btn-danger" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'Cancelled\')">Cancel</button>' : '') +
+    (a.Status !== 'Completed' && a.Status !== 'Cancelled' ? '<button class="btn btn-sm btn-outline" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'No-show\')">No-show</button>' : '');
+}
+
+/** Kanban board grouped by status, with native HTML5 drag-and-drop to change status. */
+function renderAppointmentsKanban(host, rows) {
+  var columns = ['Pending', 'Confirmed', 'Completed', 'No-show', 'Cancelled'];
+  host.innerHTML = '<div class="kanban-board">' + columns.map(function (col) {
+    var items = rows.filter(function (a) { return a.Status === col; });
+    return '<div class="kanban-col" data-status="' + col + '"><div class="kanban-col-head"><span>' + col + '</span><span class="kanban-count">' + items.length + '</span></div><div class="kanban-col-body">' +
+      (items.length ? items.map(function (a) {
+        return '<div class="kanban-card" draggable="true" data-id="' + a.AppointmentID + '">' +
+          '<b>' + esc(a.CustomerName) + '</b><div class="muted">' + esc(a.ServiceName) + ' &middot; ' + esc(a.StaffName) + '</div>' +
+          '<div class="muted">' + esc(a.Date) + ' ' + esc(a.TimeSlot) + '</div><div class="muted">' + esc(a.Reference) + '</div>' +
+          '<div class="row-actions">' + apptActionButtons_(a) + '</div>' +
+          '</div>';
+      }).join('') : '<div class="kanban-empty">None</div>') +
+      '</div></div>';
+  }).join('') + '</div>';
+
+  var draggedId = null;
+  host.querySelectorAll('.kanban-card').forEach(function (card) {
+    card.addEventListener('dragstart', function () { draggedId = card.dataset.id; setTimeout(function () { card.style.opacity = '.4'; }, 0); });
+    card.addEventListener('dragend', function () { card.style.opacity = ''; });
+  });
+  host.querySelectorAll('.kanban-col').forEach(function (col) {
+    col.addEventListener('dragover', function (e) { e.preventDefault(); col.classList.add('drag-over'); });
+    col.addEventListener('dragleave', function () { col.classList.remove('drag-over'); });
+    col.addEventListener('drop', function (e) {
+      e.preventDefault();
+      col.classList.remove('drag-over');
+      if (!draggedId) return;
+      var newStatus = col.dataset.status;
+      setApptStatus(draggedId, newStatus);
+    });
+  });
 }
 
 function setApptStatus(id, status) {
@@ -2096,16 +2274,30 @@ function showReceipt(sale) {
 
 /* ---------- CUSTOMERS ---------- */
 function renderCustomers(content) {
-  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Customers</h3><input type="text" id="custSearch" placeholder="Search by name/phone" oninput="loadCustomers()"></div><div id="custTableHost"><p class="muted">Loading…</p></div></div>';
+  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Customers</h3>' + viewToggleHtml('customers') + '</div>' +
+    '<div class="filters-bar"><input type="text" id="custSearch" placeholder="Search by name/phone" oninput="loadCustomers()"></div>' +
+    '<div id="custTableHost"><p class="muted">Loading…</p></div></div>';
+  bindViewToggle(content, 'customers', function () { loadCustomers(); });
   loadCustomers();
 }
 function loadCustomers() {
   api('getCustomers', STATE.token, document.getElementById('custSearch').value).then(function (rows) {
-    document.getElementById('custTableHost').innerHTML = '<div class="table-wrap"><table><thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Loyalty Pts</th><th>Joined</th><th>Actions</th></tr></thead><tbody>' +
-      rows.map(function (c) {
-        return '<tr><td>' + esc(c.Name) + '</td><td>' + esc(c.Phone) + '</td><td>' + esc(c.Email) + '</td><td>' + c.LoyaltyPoints + '</td><td>' + String(c.DateJoined).slice(0, 10) + '</td>' +
-          '<td class="row-actions"><button class="btn btn-sm btn-outline" onclick="viewCustomerProfile(\'' + c.CustomerID + '\')">View</button></td></tr>';
-      }).join('') + '</tbody></table></div>';
+    var host = document.getElementById('custTableHost');
+    if (getViewMode('customers') === 'grid') {
+      host.innerHTML = renderRecordGrid(rows, function (c) {
+        return {
+          fallbackIcon: 'users', title: c.Name,
+          lines: [esc(c.Phone), esc(c.Email || '—'), '<b>' + c.LoyaltyPoints + '</b> loyalty pts', 'Joined ' + String(c.DateJoined).slice(0, 10)],
+          actions: '<button class="btn btn-sm btn-outline" onclick="viewCustomerProfile(\'' + c.CustomerID + '\')">View</button>'
+        };
+      });
+    } else {
+      host.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Loyalty Pts</th><th>Joined</th><th>Actions</th></tr></thead><tbody>' +
+        rows.map(function (c) {
+          return '<tr><td>' + esc(c.Name) + '</td><td>' + esc(c.Phone) + '</td><td>' + esc(c.Email) + '</td><td>' + c.LoyaltyPoints + '</td><td>' + String(c.DateJoined).slice(0, 10) + '</td>' +
+            '<td class="row-actions"><button class="btn btn-sm btn-outline" onclick="viewCustomerProfile(\'' + c.CustomerID + '\')">View</button></td></tr>';
+        }).join('') + '</tbody></table></div>';
+    }
   }).catch(function (err) { document.getElementById('custTableHost').innerHTML = errorPanel(err); });
 }
 function viewCustomerProfile(id) {
@@ -2119,19 +2311,31 @@ function viewCustomerProfile(id) {
 
 /* ---------- SERVICES (the menu POS sells from) ---------- */
 function renderServicesAdmin(content) {
-  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Services</h3><button class="btn btn-sm" onclick="openServiceModal()">' + icon('plus', 14) + ' Add Service</button></div>' +
+  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Services</h3><div style="display:flex;gap:10px;align-items:center;">' + viewToggleHtml('services') + '<button class="btn btn-sm" onclick="openServiceModal()">' + icon('plus', 14) + ' Add Service</button></div></div>' +
     '<p class="muted">These are exactly the items your Point of Sale screen offers to sell — add a photo so staff can spot them quickly on the POS grid.</p>' +
     '<div id="serviceTableHost"></div></div>';
+  bindViewToggle(content, 'services', function () { loadServicesTable(); });
   loadServicesTable();
 }
 function loadServicesTable() {
   api('getServices', STATE.token, branchArg()).then(function (rows) {
-    document.getElementById('serviceTableHost').innerHTML = '<div class="table-wrap"><table><thead><tr><th>Photo</th><th>Name</th><th>Category</th><th>Duration</th><th>Price</th><th>Active</th><th>Actions</th></tr></thead><tbody>' +
-      rows.map(function (s) {
-        var thumb = s.ImageURL ? '<img src="' + esc(s.ImageURL) + '" style="width:50px;height:50px;object-fit:cover;border-radius:6px">' : '<div style="width:50px;height:50px;border-radius:6px;background:#eee;display:flex;align-items:center;justify-content:center;color:#aaa;">' + icon('scissors', 18) + '</div>';
-        return '<tr><td>' + thumb + '</td><td>' + esc(s.Name) + '</td><td>' + esc(s.Category) + '</td><td>' + s.DurationMinutes + ' min</td><td>' + money(s.Price) + '</td><td>' + s.Active + '</td>' +
-          '<td class="row-actions"><button class="btn btn-sm btn-outline" onclick=\'openServiceModal(' + JSON.stringify(s).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button><button class="btn btn-sm btn-danger" onclick="deleteServiceRow(\'' + s.ServiceID + '\')">' + icon('trash', 13) + '</button></td></tr>';
-      }).join('') + '</tbody></table></div>';
+    var host = document.getElementById('serviceTableHost');
+    if (getViewMode('services') === 'grid') {
+      host.innerHTML = renderRecordGrid(rows, function (s) {
+        return {
+          photo: s.ImageURL, fallbackIcon: 'scissors', title: s.Name,
+          lines: [esc(s.Category), s.DurationMinutes + ' min', '<b>' + money(s.Price) + '</b>', s.Active === 'Y' ? statusBadge('Confirmed') : '<span class="badge badge-cancelled">Inactive</span>'],
+          actions: '<button class="btn btn-sm btn-outline" onclick=\'openServiceModal(' + JSON.stringify(s).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button><button class="btn btn-sm btn-danger" onclick="deleteServiceRow(\'' + s.ServiceID + '\')">' + icon('trash', 13) + '</button>'
+        };
+      });
+    } else {
+      host.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Photo</th><th>Name</th><th>Category</th><th>Duration</th><th>Price</th><th>Active</th><th>Actions</th></tr></thead><tbody>' +
+        rows.map(function (s) {
+          var thumb = s.ImageURL ? '<img src="' + esc(s.ImageURL) + '" style="width:50px;height:50px;object-fit:cover;border-radius:6px">' : '<div style="width:50px;height:50px;border-radius:6px;background:#eee;display:flex;align-items:center;justify-content:center;color:#aaa;">' + icon('scissors', 18) + '</div>';
+          return '<tr><td>' + thumb + '</td><td>' + esc(s.Name) + '</td><td>' + esc(s.Category) + '</td><td>' + s.DurationMinutes + ' min</td><td>' + money(s.Price) + '</td><td>' + s.Active + '</td>' +
+            '<td class="row-actions"><button class="btn btn-sm btn-outline" onclick=\'openServiceModal(' + JSON.stringify(s).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button><button class="btn btn-sm btn-danger" onclick="deleteServiceRow(\'' + s.ServiceID + '\')">' + icon('trash', 13) + '</button></td></tr>';
+        }).join('') + '</tbody></table></div>';
+    }
   }).catch(function (err) { document.getElementById('serviceTableHost').innerHTML = errorPanel(err); });
 }
 function openServiceModal(s) {
@@ -2166,16 +2370,28 @@ function deleteServiceRow(id) {
 
 /* ---------- STAFF ---------- */
 function renderStaffAdmin(content) {
-  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Staff</h3><button class="btn btn-sm" onclick="openStaffModal()">' + icon('plus', 14) + ' Add Staff</button></div><div id="staffTableHost"></div></div>';
+  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Staff</h3><div style="display:flex;gap:10px;align-items:center;">' + viewToggleHtml('staff') + '<button class="btn btn-sm" onclick="openStaffModal()">' + icon('plus', 14) + ' Add Staff</button></div></div><div id="staffTableHost"></div></div>';
+  bindViewToggle(content, 'staff', function () { loadStaffTable(); });
   loadStaffTable();
 }
 function loadStaffTable() {
   api('getStaff', STATE.token, branchArg()).then(function (rows) {
-    document.getElementById('staffTableHost').innerHTML = '<div class="table-wrap"><table><thead><tr><th>Name</th><th>Role</th><th>Phone</th><th>Specialties</th><th>Commission %</th><th>Active</th><th>Actions</th></tr></thead><tbody>' +
-      rows.map(function (s) {
-        return '<tr><td>' + esc(s.Name) + '</td><td>' + esc(s.Role) + '</td><td>' + esc(s.Phone) + '</td><td>' + esc(s.Specialties) + '</td><td>' + s.CommissionRate + '</td><td>' + s.Active + '</td>' +
-          '<td class="row-actions"><button class="btn btn-sm btn-outline" onclick=\'openStaffModal(' + JSON.stringify(s).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button><button class="btn btn-sm btn-danger" onclick="deleteStaffRow(\'' + s.StaffID + '\')">' + icon('trash', 13) + '</button></td></tr>';
-      }).join('') + '</tbody></table></div>';
+    var host = document.getElementById('staffTableHost');
+    if (getViewMode('staff') === 'grid') {
+      host.innerHTML = renderRecordGrid(rows, function (s) {
+        return {
+          photo: s.PhotoURL, fallbackIcon: 'user', title: s.Name,
+          lines: [esc(s.Role), esc(s.Phone), esc(s.Specialties || '—'), s.CommissionRate + '% commission', s.Active === 'Y' ? statusBadge('Confirmed') : '<span class="badge badge-cancelled">Inactive</span>'],
+          actions: '<button class="btn btn-sm btn-outline" onclick=\'openStaffModal(' + JSON.stringify(s).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button><button class="btn btn-sm btn-danger" onclick="deleteStaffRow(\'' + s.StaffID + '\')">' + icon('trash', 13) + '</button>'
+        };
+      });
+    } else {
+      host.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Name</th><th>Role</th><th>Phone</th><th>Specialties</th><th>Commission %</th><th>Active</th><th>Actions</th></tr></thead><tbody>' +
+        rows.map(function (s) {
+          return '<tr><td>' + esc(s.Name) + '</td><td>' + esc(s.Role) + '</td><td>' + esc(s.Phone) + '</td><td>' + esc(s.Specialties) + '</td><td>' + s.CommissionRate + '</td><td>' + s.Active + '</td>' +
+            '<td class="row-actions"><button class="btn btn-sm btn-outline" onclick=\'openStaffModal(' + JSON.stringify(s).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button><button class="btn btn-sm btn-danger" onclick="deleteStaffRow(\'' + s.StaffID + '\')">' + icon('trash', 13) + '</button></td></tr>';
+        }).join('') + '</tbody></table></div>';
+    }
   }).catch(function (err) { document.getElementById('staffTableHost').innerHTML = errorPanel(err); });
 }
 function openStaffModal(s) {
@@ -2219,20 +2435,35 @@ function deleteStaffRow(id) {
 
 /* ---------- INVENTORY ---------- */
 function renderInventory(content) {
-  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Products / Inventory</h3><button class="btn btn-sm" onclick="openProductModal()">' + icon('plus', 14) + ' Add Product</button></div><div id="prodTableHost"></div></div>';
+  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Products / Inventory</h3><div style="display:flex;gap:10px;align-items:center;">' + viewToggleHtml('inventory') + '<button class="btn btn-sm" onclick="openProductModal()">' + icon('plus', 14) + ' Add Product</button></div></div><div id="prodTableHost"></div></div>';
+  bindViewToggle(content, 'inventory', function () { loadProductsTable(); });
   loadProductsTable();
 }
 function loadProductsTable() {
   api('getProducts', STATE.token, branchArg()).then(function (rows) {
-    document.getElementById('prodTableHost').innerHTML = '<div class="table-wrap"><table><thead><tr><th>Photo</th><th>Name</th><th>Category</th><th>Cost</th><th>Selling Price</th><th>Stock</th><th>Reorder Lvl</th><th>Actions</th></tr></thead><tbody>' +
-      rows.map(function (p) {
+    var host = document.getElementById('prodTableHost');
+    if (getViewMode('inventory') === 'grid') {
+      host.innerHTML = renderRecordGrid(rows, function (p) {
         var low = Number(p.QuantityInStock) <= Number(p.ReorderLevel);
-        var thumb = p.ImageURL ? '<img src="' + esc(p.ImageURL) + '" style="width:44px;height:44px;object-fit:cover;border-radius:6px">' : '<div style="width:44px;height:44px;border-radius:6px;background:#eee;display:flex;align-items:center;justify-content:center;color:#aaa;">' + icon('box', 16) + '</div>';
-        return '<tr' + (low ? ' style="background:#fff4d6"' : '') + '><td>' + thumb + '</td><td>' + esc(p.Name) + '</td><td>' + esc(p.Category) + '</td><td>' + money(p.CostPrice) + '</td><td>' + money(p.SellingPrice) + '</td><td>' + p.QuantityInStock + '</td><td>' + p.ReorderLevel + '</td>' +
-          '<td class="row-actions"><button class="btn btn-sm btn-outline" onclick=\'openProductModal(' + JSON.stringify(p).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button>' +
-          '<button class="btn btn-sm" onclick="restockPrompt(\'' + p.ProductID + '\')">' + icon('plus', 13) + ' Restock</button>' +
-          '<button class="btn btn-sm btn-danger" onclick="deleteProductRow(\'' + p.ProductID + '\')">' + icon('trash', 13) + '</button></td></tr>';
-      }).join('') + '</tbody></table></div>';
+        return {
+          photo: p.ImageURL, fallbackIcon: 'box', title: p.Name,
+          lines: [esc(p.Category), 'Cost ' + money(p.CostPrice) + ' &middot; Sell ' + money(p.SellingPrice), (low ? '<b class="warn-line" style="display:inline-flex;">' + icon('alertTriangle', 12) + ' ' : '') + p.QuantityInStock + ' in stock' + (low ? '</b>' : '')],
+          actions: '<button class="btn btn-sm btn-outline" onclick=\'openProductModal(' + JSON.stringify(p).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button>' +
+            '<button class="btn btn-sm" onclick="restockPrompt(\'' + p.ProductID + '\')">' + icon('plus', 13) + '</button>' +
+            '<button class="btn btn-sm btn-danger" onclick="deleteProductRow(\'' + p.ProductID + '\')">' + icon('trash', 13) + '</button>'
+        };
+      });
+    } else {
+      host.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Photo</th><th>Name</th><th>Category</th><th>Cost</th><th>Selling Price</th><th>Stock</th><th>Reorder Lvl</th><th>Actions</th></tr></thead><tbody>' +
+        rows.map(function (p) {
+          var low = Number(p.QuantityInStock) <= Number(p.ReorderLevel);
+          var thumb = p.ImageURL ? '<img src="' + esc(p.ImageURL) + '" style="width:44px;height:44px;object-fit:cover;border-radius:6px">' : '<div style="width:44px;height:44px;border-radius:6px;background:#eee;display:flex;align-items:center;justify-content:center;color:#aaa;">' + icon('box', 16) + '</div>';
+          return '<tr' + (low ? ' style="background:#fff4d6"' : '') + '><td>' + thumb + '</td><td>' + esc(p.Name) + '</td><td>' + esc(p.Category) + '</td><td>' + money(p.CostPrice) + '</td><td>' + money(p.SellingPrice) + '</td><td>' + p.QuantityInStock + '</td><td>' + p.ReorderLevel + '</td>' +
+            '<td class="row-actions"><button class="btn btn-sm btn-outline" onclick=\'openProductModal(' + JSON.stringify(p).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button>' +
+            '<button class="btn btn-sm" onclick="restockPrompt(\'' + p.ProductID + '\')">' + icon('plus', 13) + ' Restock</button>' +
+            '<button class="btn btn-sm btn-danger" onclick="deleteProductRow(\'' + p.ProductID + '\')">' + icon('trash', 13) + '</button></td></tr>';
+        }).join('') + '</tbody></table></div>';
+    }
   }).catch(function (err) { document.getElementById('prodTableHost').innerHTML = errorPanel(err); });
 }
 function openProductModal(p) {
@@ -2825,7 +3056,7 @@ function loadSlotsAdmin() {
     host.innerHTML = '<div class="time-grid">' + slots.map(function (s) {
       var booked = s.bookedCount > 0;
       var cls = 'time-slot' + (s.blocked ? ' slot-blocked' : '') + (booked ? ' slot-booked' : '');
-      return '<div class="' + cls + '" ' + (booked ? '' : 'onclick="toggleSlotAdmin(\'' + s.time + '\')"') + ' title="' + (booked ? s.bookedCount + ' booking(s) at this time' : (s.blocked ? 'Closed — click to reopen' : 'Open — click to close')) + '">' +
+      return '<div class="' + cls + '" data-time="' + s.time + '" ' + (booked ? '' : 'onclick="toggleSlotAdmin(\'' + s.time + '\', this)"') + ' title="' + (booked ? s.bookedCount + ' booking(s) at this time' : (s.blocked ? 'Closed — click to reopen' : 'Open — click to close')) + '">' +
         formatTime12(s.time) + (booked ? '<br><span style="font-size:.68rem;">' + s.bookedCount + ' booked</span>' : (s.blocked ? '<br><span style="font-size:.68rem;">Closed</span>' : '')) + '</div>';
     }).join('') + '</div>' +
     '<div style="margin-top:16px;display:flex;gap:16px;flex-wrap:wrap;font-size:.8rem;color:#888;">' +
@@ -2835,10 +3066,23 @@ function loadSlotsAdmin() {
     '</div>';
   }).catch(function (err) { host.innerHTML = errorPanel(err); });
 }
-function toggleSlotAdmin(timeSlot) {
+function toggleSlotAdmin(timeSlot, el) {
   var branchId = document.getElementById('slotBranch').value;
   var date = document.getElementById('slotDate').value;
-  api('toggleBlockedSlot', STATE.token, branchId, date, timeSlot).then(function () { loadSlotsAdmin(); }).catch(showError);
+  // Optimistic UI: flip the clicked slot immediately so the click always
+  // feels instant, then reconcile with the server's actual result.
+  var wasBlocked = el.classList.contains('slot-blocked');
+  el.classList.toggle('slot-blocked', !wasBlocked);
+  el.style.pointerEvents = 'none';
+  el.style.opacity = '.55';
+  api('toggleBlockedSlot', STATE.token, branchId, date, timeSlot).then(function (res) {
+    toast(res.blocked ? ('Closed ' + formatTime12(timeSlot)) : ('Reopened ' + formatTime12(timeSlot)), 'success');
+    loadSlotsAdmin();
+  }).catch(function (err) {
+    el.classList.toggle('slot-blocked', wasBlocked); // revert optimistic change
+    el.style.pointerEvents = ''; el.style.opacity = '';
+    showError(err);
+  });
 }
 
 /* ---------- SMS MODULE ---------- */
@@ -2913,7 +3157,19 @@ function openModal(title, bodyHtml, onSave, saveLabel) {
   host.innerHTML = '<div class="modal-backdrop" id="modalBackdrop"><div class="modal-box"><button class="modal-close" onclick="closeModal()">' + icon('close', 18) + '</button><h3>' + esc(title) + '</h3><div id="modalBody">' + bodyHtml + '</div>' +
     (onSave ? '<div style="margin-top:16px;display:flex;gap:8px;"><button class="btn btn-accent" id="modalSaveBtn">' + (saveLabel || 'Save') + '</button><button class="btn btn-outline" onclick="closeModal()">Cancel</button></div>' : '') +
     '</div></div>';
-  if (onSave) document.getElementById('modalSaveBtn').addEventListener('click', onSave);
+  if (onSave) {
+    document.getElementById('modalSaveBtn').addEventListener('click', function () {
+      var btn = document.getElementById('modalSaveBtn');
+      btn.disabled = true;
+      var original = btn.textContent;
+      btn.textContent = 'Saving…';
+      // Safety net: the modal normally closes on success (removing this
+      // button entirely), so this only matters if something goes wrong
+      // without calling closeModal() — re-enable so the admin isn't stuck.
+      setTimeout(function () { if (document.body.contains(btn)) { btn.disabled = false; btn.textContent = original; } }, 8000);
+      onSave();
+    });
+  }
   document.getElementById('modalBackdrop').addEventListener('click', function (e) { if (e.target.id === 'modalBackdrop') closeModal(); });
 }
 function closeModal() {
