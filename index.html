@@ -180,6 +180,8 @@
   .pay-instructions { background: #fff7e6; border: 1px solid #f0dca0; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
   .pay-instructions p { margin: 0 0 4px; }
   .pay-instructions .pay-amt { font-size: 1.1rem; font-weight: 800; color: var(--clr-primary); }
+  .copy-value { font-family: 'Courier New', monospace; font-weight: 700; letter-spacing: .03em; }
+  .copy-btn { padding: 3px 10px; font-size: .75rem; }
 
   .cal-nav { display: flex; align-items: center; justify-content: center; gap: 18px; margin-bottom: 14px; font-weight: 700; }
   .cal-nav button { background: #f2f2f2; border: none; cursor: pointer; color: var(--clr-primary); width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
@@ -287,7 +289,12 @@
     display: flex; flex-direction: column; transition: width .2s ease, transform .2s ease;
   }
   #adminApp.dark .admin-sidebar { background: #0c0d10; }
-  .admin-sidebar .logo { padding: 18px 18px 18px; font-weight: 800; border-bottom: 1px solid #333; margin-bottom: 10px; white-space: nowrap; overflow: hidden; }
+  .admin-sidebar .logo {
+    padding: 16px 18px; font-weight: 800; font-size: .92rem; line-height: 1.25; border-bottom: 1px solid #333; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .admin-sidebar .logo img { width: 34px; height: 34px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: #fff; }
+  .admin-sidebar .logo span { overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   #navItems { flex: 1; }
   .admin-sidebar .nav-item {
     display: flex; align-items: center; gap: 10px; padding: 11px 18px; cursor: pointer; font-size: .9rem; opacity: .85; white-space: nowrap;
@@ -295,17 +302,33 @@
   .admin-sidebar .nav-item:hover { background: #2a2a2a; opacity: 1; }
   .admin-sidebar .nav-item.active { background: var(--clr-accent); color: #1a1a1a; opacity: 1; font-weight: 700; }
   .admin-sidebar .nav-item span { overflow: hidden; text-overflow: ellipsis; }
+  .nav-group-head {
+    display: flex; align-items: center; gap: 10px; padding: 11px 18px; cursor: pointer; font-size: .74rem;
+    text-transform: uppercase; letter-spacing: .05em; color: #888; margin-top: 8px; white-space: nowrap;
+  }
+  .nav-group-head:hover { color: #fff; }
+  .nav-group-head .chev { margin-left: auto; transition: transform .15s ease; flex-shrink: 0; }
+  .nav-group-head.open .chev { transform: rotate(90deg); }
+  .nav-group-body { display: none; }
+  .nav-group-body.open { display: block; }
+  .admin-sidebar .nav-sub-item { padding-left: 34px; }
   .sidebar-collapse-btn {
     display: flex; align-items: center; gap: 8px; background: none; border: none; color: #999; cursor: pointer;
     padding: 13px 18px; font-size: .78rem; border-top: 1px solid #333; white-space: nowrap; flex-shrink: 0;
   }
   .sidebar-collapse-btn:hover { color: #fff; background: #2a2a2a; }
 
-  /* Desktop: collapses to a narrow icon-only rail */
+  /* Desktop: collapses to a narrow icon-only rail (the logo mark stays visible, just its text hides) */
   .admin-sidebar.collapsed { width: 64px; }
-  .admin-sidebar.collapsed .logo, .admin-sidebar.collapsed .nav-item span, .admin-sidebar.collapsed .sidebar-collapse-btn span { display: none; }
+  .admin-sidebar.collapsed .logo { padding: 14px 0; justify-content: center; }
+  .admin-sidebar.collapsed .logo span, .admin-sidebar.collapsed .nav-item span, .admin-sidebar.collapsed .sidebar-collapse-btn span { display: none; }
   .admin-sidebar.collapsed .nav-item { justify-content: center; padding: 12px 0; }
   .admin-sidebar.collapsed .sidebar-collapse-btn { justify-content: center; padding: 13px 0; }
+  /* Collapsed rail: group headers (just a label + chevron) don't fit, so
+     hide them and always show their sub-items flattened as plain icons. */
+  .admin-sidebar.collapsed .nav-group-head { display: none; }
+  .admin-sidebar.collapsed .nav-group-body { display: block; }
+  .admin-sidebar.collapsed .nav-sub-item { padding-left: 0; }
 
   .sidebar-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 44; }
   .sidebar-backdrop.show { display: block; }
@@ -322,9 +345,15 @@
     }
     .admin-sidebar.mobile-open { transform: translateX(0); }
     .admin-sidebar.collapsed { width: 250px; }
-    .admin-sidebar.collapsed .logo, .admin-sidebar.collapsed .nav-item span, .admin-sidebar.collapsed .sidebar-collapse-btn span { display: block; }
+    .admin-sidebar.collapsed .logo { padding: 16px 18px; justify-content: flex-start; }
+    .admin-sidebar.collapsed .logo span { display: -webkit-box; }
+    .admin-sidebar.collapsed .nav-item span, .admin-sidebar.collapsed .sidebar-collapse-btn span { display: block; }
     .admin-sidebar.collapsed .nav-item { justify-content: flex-start; padding: 11px 18px; }
     .admin-sidebar.collapsed .sidebar-collapse-btn { justify-content: flex-start; padding: 13px 18px; }
+    .admin-sidebar.collapsed .nav-group-head { display: flex; }
+    .admin-sidebar.collapsed .nav-group-body { display: none; }
+    .admin-sidebar.collapsed .nav-group-body.open { display: block; }
+    .admin-sidebar.collapsed .nav-sub-item { padding-left: 34px; }
     .hamburger-btn { display: flex; }
   }
 
@@ -390,6 +419,7 @@
   table th, table td { text-align: left; padding: 9px 10px; border-bottom: 1px solid #eee; }
   table th { color: #888; font-weight: 700; text-transform: uppercase; font-size: .72rem; }
   .table-wrap { overflow-x: auto; }
+  .pager { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 14px 0 4px; flex-wrap: wrap; }
   .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
   .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: flex-start; justify-content: center; z-index: 999; overflow-y: auto; padding: 40px 16px; }
@@ -791,7 +821,10 @@
   <div class="admin-shell">
     <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
     <div class="admin-sidebar" id="adminSidebar">
-      <div class="logo" id="sidebarBrand">Salon Admin</div>
+      <div class="logo" id="sidebarBrandBox">
+        <img id="sidebarLogoImg" class="hidden" alt="">
+        <span id="sidebarBrand">Salon Admin</span>
+      </div>
       <div id="navItems"></div>
       <button class="sidebar-collapse-btn" id="sidebarCollapseBtn"><span id="sidebarCollapseIcon"></span><span>Collapse</span></button>
     </div>
@@ -1108,8 +1141,30 @@ function routeHash() {
 var PUBLIC_DATA_CACHE_KEY = 'salon_swr_publicData_v1';
 var PUBLIC_DATA_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+/** A stable per-browser id (not tied to any personal info) so the admin's "Visitors Today" count is roughly unique visitors, not raw page loads. */
+function getOrCreateVisitorKey_() {
+  var key = null;
+  try { key = localStorage.getItem('salon_visitor_key'); } catch (e) {}
+  if (!key) {
+    key = 'v_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+    try { localStorage.setItem('salon_visitor_key', key); } catch (e) {}
+  }
+  return key;
+}
+/** Records one visit at most once per calendar day per browser (the server independently dedupes the same way, so this is just to avoid a pointless extra call). */
+function trackVisitOncePerDay_() {
+  var today = isoToday();
+  var last = null;
+  try { last = localStorage.getItem('salon_last_visit_tracked'); } catch (e) {}
+  if (last === today) return;
+  api('trackVisit', getOrCreateVisitorKey_()).then(function () {
+    try { localStorage.setItem('salon_last_visit_tracked', today); } catch (e) {}
+  }).catch(function () { /* non-critical — don't bother the visitor about it */ });
+}
+
 function loadPublicSite() {
   var firstRenderDone = false;
+  trackVisitOncePerDay_();
 
   function applyFull(data) {
     STATE.publicData = data;
@@ -1177,11 +1232,15 @@ function renderBranding(s) {
   document.getElementById('pubBrandName').textContent = s.BusinessName;
   document.getElementById('footerBrand').innerHTML = '© <span id="footerYear"></span> ' + esc(s.BusinessName) + ' — Powered by Google Apps Script';
   document.getElementById('footerYear').textContent = new Date().getFullYear();
-  document.getElementById('sidebarBrand').textContent = s.BusinessName + ' Admin';
+  document.getElementById('sidebarBrand').textContent = s.BusinessName;
   if (s.LogoURL) {
     var logo = document.getElementById('pubLogo');
     logo.src = s.LogoURL;
     logo.classList.remove('hidden');
+    var sidebarLogo = document.getElementById('sidebarLogoImg');
+    sidebarLogo.src = s.LogoURL;
+    sidebarLogo.alt = s.BusinessName;
+    sidebarLogo.classList.remove('hidden');
   }
 }
 
@@ -1723,7 +1782,7 @@ function renderWizardStep(stepKey) {
   if (stepKey === 'payment') {
     var settings = data.settings || {};
     var service0 = data.services.find(function (s) { return s.ServiceID === BOOKING.serviceId; });
-    var payOpts = [
+    var allPayOpts = [
       { key: 'Cash', label: 'Cash at Front Desk', desc: 'Pay when you arrive for your appointment — nothing to do now.' },
       { key: 'MTN MoMo', label: 'MTN Mobile Money', desc: 'Pay now via MTN MoMo, then upload your payment screenshot.' },
       { key: 'Vodafone Cash', label: 'Vodafone Cash', desc: 'Pay now via Vodafone Cash, then upload your payment screenshot.' },
@@ -1731,6 +1790,13 @@ function renderWizardStep(stepKey) {
       { key: 'AirtelTigo Money', label: 'AirtelTigo Money', desc: 'Pay now via AirtelTigo Money, then upload your payment screenshot.' },
       { key: 'Bank Transfer', label: 'Bank Transfer', desc: 'Pay now via bank transfer, then upload your payment screenshot.' }
     ];
+    // Only offer the methods the Owner has switched on in Settings → Payments & Loyalty.
+    var activeKeys = String(settings.ActivePaymentMethods || '').split(',').map(function (m) { return m.trim(); }).filter(Boolean);
+    if (!activeKeys.length) activeKeys = allPayOpts.map(function (o) { return o.key; });
+    var payOpts = allPayOpts.filter(function (o) { return activeKeys.indexOf(o.key) > -1; });
+    if (!payOpts.length) payOpts = [allPayOpts[0]]; // safety net — always offer Cash even if settings are misconfigured
+    if (!payOpts.some(function (o) { return o.key === BOOKING.paymentMethod; })) BOOKING.paymentMethod = payOpts[0].key;
+
     var momoNetworks = ['MTN MoMo', 'Vodafone Cash', 'Telecel Cash', 'AirtelTigo Money'];
     var isMomo = momoNetworks.indexOf(BOOKING.paymentMethod) > -1;
     var isBank = BOOKING.paymentMethod === 'Bank Transfer';
@@ -1739,16 +1805,21 @@ function renderWizardStep(stepKey) {
       return '<div class="pay-option' + (sel ? ' selected' : '') + '" data-pay="' + o.key + '"><div class="pay-option-radio"></div>' +
         '<div><h4>' + o.label + '</h4><p class="muted">' + o.desc + '</p></div></div>';
     }).join('') + '</div>';
+    function copyRow(label, value) {
+      if (!value) return '<p><b>' + label + ':</b> Contact us for details</p>';
+      return '<p><b>' + label + ':</b> <span class="copy-value">' + esc(value) + '</span> ' +
+        '<button type="button" class="btn btn-sm btn-outline copy-btn" data-copy="' + esc(value) + '">' + icon('copy', 12) + ' Copy</button></p>';
+    }
     var instructionsHtml = '';
     if (isMomo) {
       instructionsHtml = '<div class="pay-instructions"><p class="pay-amt">Amount: ' + money(service0 ? service0.Price : 0) + '</p>' +
-        '<p><b>Send to:</b> ' + esc(settings.MomoNumber || 'Contact us for the MoMo number') + '</p>' +
+        copyRow('Send to', settings.MomoNumber) +
         (settings.MomoName ? '<p><b>Name on account:</b> ' + esc(settings.MomoName) + '</p>' : '') + '</div>';
     } else if (isBank) {
       instructionsHtml = '<div class="pay-instructions"><p class="pay-amt">Amount: ' + money(service0 ? service0.Price : 0) + '</p>' +
         (settings.BankName ? '<p><b>Bank:</b> ' + esc(settings.BankName) + '</p>' : '') +
         (settings.BankAccountName ? '<p><b>Account Name:</b> ' + esc(settings.BankAccountName) + '</p>' : '') +
-        (settings.BankAccountNumber ? '<p><b>Account Number:</b> ' + esc(settings.BankAccountNumber) + '</p>' : '') + '</div>';
+        copyRow('Account Number', settings.BankAccountNumber) + '</div>';
     }
     var proofHtml = (isMomo || isBank)
       ? '<div class="form-row"><label>Upload Payment Screenshot *</label>' + payProofPickerHtml() +
@@ -1811,8 +1882,28 @@ function bindWizardStepEvents(stepKey) {
         refreshWizardBody();
       });
     });
+    body.querySelectorAll('.copy-btn').forEach(function (el) {
+      el.addEventListener('click', function () { copyToClipboard(el.dataset.copy); });
+    });
     bindPayProofPicker();
   }
+}
+
+function copyToClipboard(text) {
+  function done(ok) { toast(ok ? 'Copied to clipboard' : 'Could not copy — please copy it manually', ok ? 'success' : 'error'); }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
+    return;
+  }
+  // Fallback for browsers without the async Clipboard API
+  try {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    var ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    done(ok);
+  } catch (e) { done(false); }
 }
 
 function shiftCalMonth(delta) {
@@ -2110,28 +2201,33 @@ function uploadFileThen(file, callback) {
 /* =====================================================================
  * ADMIN APP SHELL
  * ===================================================================*/
+// `group` is optional — items without one render as top-level, always-visible
+// links (the pages used daily). Grouped items render under a collapsible
+// sub-navigation header instead, so the sidebar doesn't dump 20 links on
+// screen at once.
 var NAV_CONFIG = [
   { key: 'overview', icon: 'grid', label: 'Overview', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] },
   { key: 'appointments', icon: 'calendar', label: 'Appointments', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] },
   { key: 'slots', icon: 'clock', label: 'Manage Slots', roles: ['Owner', 'Manager', 'Receptionist'] },
   { key: 'pos', icon: 'cart', label: 'Point of Sale', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] },
   { key: 'customers', icon: 'users', label: 'Customers', roles: ['Owner', 'Manager', 'Receptionist'] },
-  { key: 'services', icon: 'scissors', label: 'Services (POS Menu)', roles: ['Owner', 'Manager'] },
-  { key: 'staff', icon: 'user', label: 'Staff', roles: ['Owner', 'Manager'] },
-  { key: 'inventory', icon: 'box', label: 'Inventory', roles: ['Owner', 'Manager'] },
-  { key: 'branches', icon: 'mapPin', label: 'Branches', roles: ['Owner'] },
-  { key: 'expenses', icon: 'card', label: 'Expenses', roles: ['Owner', 'Manager'] },
-  { key: 'reports', icon: 'barChart', label: 'Reports', roles: ['Owner', 'Manager'] },
-  { key: 'reviews', icon: 'star', label: 'Reviews', roles: ['Owner', 'Manager'] },
-  { key: 'gallery', icon: 'copy', label: 'Gallery', roles: ['Owner', 'Manager'] },
-  { key: 'heroSlides', icon: 'image', label: 'Hero Carousel', roles: ['Owner', 'Manager'] },
-  { key: 'videos', icon: 'play', label: 'Videos', roles: ['Owner', 'Manager'] },
-  { key: 'settings', icon: 'droplet', label: 'Branding & Theme', roles: ['Owner'] },
-  { key: 'sms', icon: 'smartphone', label: 'SMS', roles: ['Owner', 'Manager'] },
-  { key: 'users', icon: 'lock', label: 'Users', roles: ['Owner'] },
+  { key: 'services', icon: 'scissors', label: 'Services (POS Menu)', roles: ['Owner', 'Manager'], group: 'Catalog' },
+  { key: 'staff', icon: 'user', label: 'Staff', roles: ['Owner', 'Manager'], group: 'Catalog' },
+  { key: 'inventory', icon: 'box', label: 'Inventory', roles: ['Owner', 'Manager'], group: 'Catalog' },
+  { key: 'branches', icon: 'mapPin', label: 'Branches', roles: ['Owner'], group: 'Catalog' },
+  { key: 'expenses', icon: 'card', label: 'Expenses', roles: ['Owner', 'Manager'], group: 'Finance' },
+  { key: 'reports', icon: 'barChart', label: 'Reports', roles: ['Owner', 'Manager'], group: 'Finance' },
+  { key: 'reviews', icon: 'star', label: 'Reviews', roles: ['Owner', 'Manager'], group: 'Marketing' },
+  { key: 'gallery', icon: 'copy', label: 'Gallery', roles: ['Owner', 'Manager'], group: 'Marketing' },
+  { key: 'heroSlides', icon: 'image', label: 'Hero Carousel', roles: ['Owner', 'Manager'], group: 'Marketing' },
+  { key: 'videos', icon: 'play', label: 'Videos', roles: ['Owner', 'Manager'], group: 'Marketing' },
+  { key: 'settings', icon: 'droplet', label: 'Branding & Theme', roles: ['Owner'], group: 'Settings' },
+  { key: 'sms', icon: 'smartphone', label: 'SMS', roles: ['Owner', 'Manager'], group: 'Settings' },
+  { key: 'users', icon: 'lock', label: 'Users', roles: ['Owner'], group: 'Settings' },
   { key: 'account', icon: 'sliders', label: 'My Account', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] },
   { key: 'about', icon: 'info', label: 'About', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] }
 ];
+var NAV_GROUP_ICONS = { Catalog: 'box', Finance: 'card', Marketing: 'star', Settings: 'droplet' };
 
 function showAdminApp() {
   document.getElementById('loginScreen').style.display = 'none';
@@ -2177,18 +2273,58 @@ function goToAppointment(reference) {
   renderAdminPage();
 }
 
+function getNavGroupOpenState_() {
+  try { return JSON.parse(localStorage.getItem('salon_nav_groups_open') || '{}'); } catch (e) { return {}; }
+}
+function setNavGroupOpen_(name, open) {
+  var state = getNavGroupOpenState_();
+  state[name] = open;
+  try { localStorage.setItem('salon_nav_groups_open', JSON.stringify(state)); } catch (e) {}
+}
+
 function renderSidebar() {
   var host = document.getElementById('navItems');
-  host.innerHTML = '';
-  NAV_CONFIG.filter(function (n) { return n.roles.indexOf(STATE.user.role) > -1; }).forEach(function (n) {
-    var div = document.createElement('div');
-    div.className = 'nav-item' + (STATE.adminPage === n.key ? ' active' : '');
-    div.innerHTML = icon(n.icon, 18) + '<span>' + n.label + '</span>';
-    div.addEventListener('click', function () {
-      STATE.adminPage = n.key; renderSidebar(); renderAdminPage();
+  var items = NAV_CONFIG.filter(function (n) { return n.roles.indexOf(STATE.user.role) > -1; });
+  var openState = getNavGroupOpenState_();
+  var activeItem = items.find(function (n) { return n.key === STATE.adminPage; });
+  if (activeItem && activeItem.group && !(activeItem.group in openState)) openState[activeItem.group] = true; // auto-open the group holding the current page
+
+  function navItemHtml(n, sub) {
+    return '<div class="nav-item' + (sub ? ' nav-sub-item' : '') + (STATE.adminPage === n.key ? ' active' : '') + '" data-key="' + n.key + '">' +
+      icon(n.icon, 18) + '<span>' + esc(n.label) + '</span></div>';
+  }
+
+  var groups = {}; // name -> items, in first-seen order
+  var groupOrder = [];
+  var html = items.filter(function (n) { return !n.group; }).map(function (n) { return navItemHtml(n, false); }).join('');
+  items.filter(function (n) { return n.group; }).forEach(function (n) {
+    if (!groups[n.group]) { groups[n.group] = []; groupOrder.push(n.group); }
+    groups[n.group].push(n);
+  });
+  html += groupOrder.map(function (g) {
+    var isOpen = !!openState[g];
+    return '<div class="nav-group" data-group="' + esc(g) + '">' +
+      '<div class="nav-group-head' + (isOpen ? ' open' : '') + '" data-grouphead="' + esc(g) + '">' + icon(NAV_GROUP_ICONS[g] || 'grid', 15) + '<span>' + esc(g) + '</span>' + icon('chevronRight', 13) + '</div>' +
+      '<div class="nav-group-body' + (isOpen ? ' open' : '') + '" data-groupbody="' + esc(g) + '">' + groups[g].map(function (n) { return navItemHtml(n, true); }).join('') + '</div>' +
+      '</div>';
+  }).join('');
+  host.innerHTML = html;
+
+  host.querySelectorAll('.nav-item[data-key]').forEach(function (el) {
+    el.addEventListener('click', function () {
+      STATE.adminPage = el.dataset.key; renderSidebar(); renderAdminPage();
       if (window.closeMobileSidebar) window.closeMobileSidebar();
     });
-    host.appendChild(div);
+  });
+  host.querySelectorAll('.nav-group-head').forEach(function (el) {
+    el.addEventListener('click', function () {
+      var g = el.dataset.grouphead;
+      var willOpen = !el.classList.contains('open');
+      setNavGroupOpen_(g, willOpen);
+      el.classList.toggle('open', willOpen);
+      var body = host.querySelector('.nav-group-body[data-groupbody="' + g + '"]');
+      if (body) body.classList.toggle('open', willOpen);
+    });
   });
 }
 
@@ -2217,10 +2353,45 @@ function statusBadge(status) {
 function errorPanel(err) {
   return '<div class="panel"><p class="form-error">' + icon('alertTriangle', 15) + ' ' + esc(err.message || err) + '</p></div>';
 }
-function renderTable(headers, rows) {
+/**
+ * Renders a table. Pass `pageKey` (any stable string unique to this list)
+ * to also get client-side pagination — the pager only appears once there
+ * are more rows than fit on one page, so it's always safe to pass a
+ * pageKey even for small lists. Omit it for the old unpaginated behavior.
+ */
+var TABLE_PAGE_STATE = {};
+function renderTable(headers, rows, pageKey, pageSize) {
   if (!rows.length) return '<p class="muted">No records found.</p>';
+  pageSize = pageSize || 15;
+  var pageRows = rows, pagerHtml = '';
+  if (pageKey) {
+    var totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+    var page = Math.min(Math.max(1, TABLE_PAGE_STATE[pageKey] || 1), totalPages);
+    TABLE_PAGE_STATE[pageKey] = page;
+    var start = (page - 1) * pageSize;
+    pageRows = rows.slice(start, start + pageSize);
+    if (totalPages > 1) {
+      pagerHtml = '<div class="pager" data-pager="' + esc(pageKey) + '">' +
+        '<button type="button" class="btn btn-sm btn-outline" data-pg="prev"' + (page <= 1 ? ' disabled' : '') + '>' + icon('chevronLeft', 14) + ' Prev</button>' +
+        '<span class="muted">Page ' + page + ' of ' + totalPages + ' &middot; ' + rows.length + ' total</span>' +
+        '<button type="button" class="btn btn-sm btn-outline" data-pg="next"' + (page >= totalPages ? ' disabled' : '') + '>Next ' + icon('chevronRight', 14) + '</button>' +
+        '</div>';
+    }
+  }
   return '<div class="table-wrap"><table><thead><tr>' + headers.map(function (h) { return '<th>' + h + '</th>'; }).join('') +
-    '</tr></thead><tbody>' + rows.map(function (r) { return '<tr>' + r.map(function (c) { return '<td>' + c + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>';
+    '</tr></thead><tbody>' + pageRows.map(function (r) { return '<tr>' + r.map(function (c) { return '<td>' + c + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>' + pagerHtml;
+}
+/** Wires up the Prev/Next buttons rendered by renderTable's pager; `onChange` should just re-run the same render call (it reads the new page from TABLE_PAGE_STATE automatically). */
+function bindTablePager(container, pageKey, onChange) {
+  var el = container.querySelector('.pager[data-pager="' + pageKey + '"]');
+  if (!el) return;
+  el.querySelectorAll('button[data-pg]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      if (btn.disabled) return;
+      TABLE_PAGE_STATE[pageKey] = (TABLE_PAGE_STATE[pageKey] || 1) + (btn.dataset.pg === 'prev' ? -1 : 1);
+      onChange();
+    });
+  });
 }
 
 /* =====================================================================
@@ -2266,9 +2437,10 @@ function renderRecordGrid(rows, cardFn) {
 function renderOverview(content) {
   Promise.all([
     api('getDashboardOverview', STATE.token, branchArg()),
-    api('getReports', STATE.token, { branchId: branchArg(), startDate: isoDaysAgo(6), endDate: isoToday() })
+    api('getReports', STATE.token, { branchId: branchArg(), startDate: isoDaysAgo(6), endDate: isoToday() }),
+    api('getVisitorStats', STATE.token)
   ]).then(function (res) {
-    var d = res[0], rpt = res[1];
+    var d = res[0], rpt = res[1], visits = res[2];
     content.innerHTML =
       '<div class="stat-grid">' +
       statCard('Today\'s Revenue', money(d.todayRevenue)) +
@@ -2277,6 +2449,7 @@ function renderOverview(content) {
       statCard('Pending Bookings', d.pendingCount) +
       statCard('Upcoming (7 days)', d.upcomingCount) +
       statCard('Low Stock Items', d.lowStock.length) +
+      statCard('Visitors Today', visits.today) +
       '</div>' +
       '<div class="panel"><h3>Booking Volume</h3><div class="stat-grid">' +
       statCard('Tomorrow', d.bookingsTomorrow) +
@@ -2285,6 +2458,8 @@ function renderOverview(content) {
       statCard('This Month', d.bookingsThisMonth) +
       '</div></div>' +
       '<div class="panel"><h3>7-Day Revenue Trend</h3>' + renderLineChart(rpt.revenueByDay.map(function (r) { return { label: r.date, value: r.revenue }; }), { height: 180 }) + '</div>' +
+      '<div class="panel"><h3>Website Visitors (7 days)</h3><p class="muted">Roughly-unique visitors per day, counted once per browser per day — not tied to any personal info.</p>' +
+      renderLineChart(visits.trend.map(function (t) { return { label: t.date, value: t.visitors }; }), { height: 140 }) + '</div>' +
       '<div class="panel"><div class="panel-head"><h3>Today\'s Appointments</h3></div>' +
       renderTable(['Time', 'Customer', 'Service', 'Staff', 'Status'], d.todayAppointments.map(function (a) {
         return [a.TimeSlot, a.CustomerName, a.ServiceName, a.StaffName, statusBadge(a.Status)];
@@ -2332,11 +2507,13 @@ function loadAppointmentsTable() {
 }
 
 function renderAppointmentsTable(host, rows) {
-  host.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Ref</th><th>Date</th><th>Time</th><th>Customer</th><th>Phone</th><th>Service</th><th>Staff</th><th>Status</th><th>Payment</th><th>Actions</th></tr></thead><tbody>' +
-    rows.map(function (a) {
-      return '<tr><td>' + esc(a.Reference) + '</td><td>' + esc(a.Date) + '</td><td>' + esc(a.TimeSlot) + '</td><td>' + esc(a.CustomerName) + '</td><td>' + esc(a.CustomerPhone) + '</td><td>' + esc(a.ServiceName) + ' (' + money(a.ServicePrice) + ')</td><td>' + esc(a.StaffName) + '</td><td>' + statusBadge(a.Status) + '</td><td>' + paymentInfoHtml_(a) + '</td>' +
-        '<td class="row-actions">' + apptActionButtons_(a) + '</td></tr>';
-    }).join('') + '</tbody></table></div>';
+  function draw() {
+    host.innerHTML = renderTable(['Ref', 'Date', 'Time', 'Customer', 'Phone', 'Service', 'Staff', 'Status', 'Payment', 'Actions'], rows.map(function (a) {
+      return [esc(a.Reference), esc(a.Date), esc(a.TimeSlot), esc(a.CustomerName), esc(a.CustomerPhone), esc(a.ServiceName) + ' (' + money(a.ServicePrice) + ')', esc(a.StaffName), statusBadge(a.Status), paymentInfoHtml_(a), apptActionButtons_(a)];
+    }), 'appointments');
+    bindTablePager(host, 'appointments', draw);
+  }
+  draw();
 }
 
 function apptActionButtons_(a) {
@@ -2611,11 +2788,14 @@ function loadCustomers() {
         };
       });
     } else {
-      host.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Loyalty Pts</th><th>Joined</th><th>Actions</th></tr></thead><tbody>' +
-        rows.map(function (c) {
-          return '<tr><td>' + esc(c.Name) + '</td><td>' + esc(c.Phone) + '</td><td>' + esc(c.Email) + '</td><td>' + c.LoyaltyPoints + '</td><td>' + String(c.DateJoined).slice(0, 10) + '</td>' +
-            '<td class="row-actions"><button class="btn btn-sm btn-outline" onclick="viewCustomerProfile(\'' + c.CustomerID + '\')">View</button></td></tr>';
-        }).join('') + '</tbody></table></div>';
+      var draw = function () {
+        host.innerHTML = renderTable(['Name', 'Phone', 'Email', 'Loyalty Pts', 'Joined', 'Actions'], rows.map(function (c) {
+          return [esc(c.Name), esc(c.Phone), esc(c.Email), c.LoyaltyPoints, String(c.DateJoined).slice(0, 10),
+            '<button class="btn btn-sm btn-outline" onclick="viewCustomerProfile(\'' + c.CustomerID + '\')">View</button>'];
+        }), 'customers');
+        bindTablePager(host, 'customers', draw);
+      };
+      draw();
     }
   }).catch(function (err) { document.getElementById('custTableHost').innerHTML = errorPanel(err); });
 }
@@ -3057,9 +3237,14 @@ function downloadFile(content, filename, mime) {
 function renderReviewsAdmin(content) {
   content.innerHTML = '<div class="panel"><h3>Customer Reviews</h3><div id="revTableHost"></div></div>';
   api('getReviews', STATE.token).then(function (rows) {
-    document.getElementById('revTableHost').innerHTML = renderTable(['Date', 'Customer', 'Staff', 'Rating', 'Comment'], rows.map(function (r) {
-      return [String(r.Date).slice(0, 10), esc(r.CustomerName), esc(r.StaffName), starRow(r.Rating, 13), esc(r.Comment)];
-    }));
+    var host = document.getElementById('revTableHost');
+    function draw() {
+      host.innerHTML = renderTable(['Date', 'Customer', 'Staff', 'Rating', 'Comment'], rows.map(function (r) {
+        return [String(r.Date).slice(0, 10), esc(r.CustomerName), esc(r.StaffName), starRow(r.Rating, 13), esc(r.Comment)];
+      }), 'reviews');
+      bindTablePager(host, 'reviews', draw);
+    }
+    draw();
   }).catch(function (err) { document.getElementById('revTableHost').innerHTML = errorPanel(err); });
 }
 
@@ -3239,7 +3424,11 @@ function renderSettingsAdmin(content) {
       field('Tax Rate (%)', 'stTaxRatePercent', s.TaxRatePercent) +
       field('Loyalty Points per GH₵1 spent', 'stLoyaltyPointsPerCedi', s.LoyaltyPointsPerCedi) +
       field('Points needed for GH₵1 discount', 'stLoyaltyRedeemRate', s.LoyaltyRedeemRate) +
-      '</div><h4 style="margin:20px 0 4px;">Pay-at-Booking Details</h4><p class="muted" style="margin-bottom:12px;">Shown to customers at checkout when they choose Mobile Money or Bank Transfer, so they know where to send payment before uploading their screenshot.</p><div class="field-grid">' +
+      '</div><h4 style="margin:20px 0 4px;">Accepted Payment Methods</h4><p class="muted" style="margin-bottom:10px;">Tap to switch which options customers see at checkout — hide any network or method you don\'t actually support. Keep at least one on.</p>' +
+      '<div class="day-picker" id="stPaymentMethodsPicker">' + PAYMENT_METHOD_OPTIONS.map(function (m) {
+        return '<span class="day-chip' + (activePaymentMethodsFrom_(s).indexOf(m) > -1 ? ' active' : '') + '" data-method="' + esc(m) + '">' + esc(m) + '</span>';
+      }).join('') + '</div>' +
+      '<h4 style="margin:20px 0 4px;">Pay-at-Booking Details</h4><p class="muted" style="margin-bottom:12px;">Shown to customers at checkout when they choose Mobile Money or Bank Transfer, so they know where to send payment before uploading their screenshot.</p><div class="field-grid">' +
       field('MTN/Vodafone/Telecel/AirtelTigo Number', 'stMomoNumber', s.MomoNumber) +
       field('Name on Mobile Money Account', 'stMomoName', s.MomoName) +
       field('Bank Name', 'stBankName', s.BankName) +
@@ -3274,6 +3463,7 @@ function renderSettingsAdmin(content) {
     });
     bindPhotoPicker('stLogo');
     bindFontPresetField();
+    bindPaymentMethodsPicker();
     renderQrCard(s);
   }).catch(function (err) { content.innerHTML = errorPanel(err); });
 }
@@ -3306,6 +3496,22 @@ function printQrCard() {
 }
 function field(label, id, val) {
   return '<div><label>' + label + '</label><input id="' + id + '" value="' + esc(val || '') + '"></div>';
+}
+var PAYMENT_METHOD_OPTIONS = ['Cash', 'MTN MoMo', 'Vodafone Cash', 'Telecel Cash', 'AirtelTigo Money', 'Bank Transfer'];
+function activePaymentMethodsFrom_(s) {
+  var list = String(s.ActivePaymentMethods || '').split(',').map(function (m) { return m.trim(); }).filter(Boolean);
+  return list.length ? list : PAYMENT_METHOD_OPTIONS.slice();
+}
+function bindPaymentMethodsPicker() {
+  var host = document.getElementById('stPaymentMethodsPicker');
+  if (!host) return;
+  host.querySelectorAll('.day-chip').forEach(function (el) {
+    el.addEventListener('click', function () {
+      var active = host.querySelectorAll('.day-chip.active');
+      if (active.length === 1 && el.classList.contains('active')) { toast('At least one payment method must stay on', 'error'); return; }
+      el.classList.toggle('active');
+    });
+  });
 }
 var FONT_PRESETS = {
   'System Default': "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
@@ -3369,6 +3575,7 @@ function saveAllSettings() {
       MomoNumber: document.getElementById('stMomoNumber').value, MomoName: document.getElementById('stMomoName').value,
       BankName: document.getElementById('stBankName').value, BankAccountName: document.getElementById('stBankAccountName').value,
       BankAccountNumber: document.getElementById('stBankAccountNumber').value,
+      ActivePaymentMethods: Array.prototype.slice.call(document.querySelectorAll('#stPaymentMethodsPicker .day-chip.active')).map(function (el) { return el.dataset.method; }).join(','),
       SmsProvider: document.getElementById('stSmsProvider').value, SmsSenderId: document.getElementById('stSmsSenderId').value,
       SmsApiKey: document.getElementById('stSmsApiKey').value, HubtelClientId: document.getElementById('stHubtelClientId').value,
       HubtelClientSecret: document.getElementById('stHubtelClientSecret').value
@@ -3388,11 +3595,16 @@ function loadUsersTable() {
   api('getUsers', STATE.token).then(function (rows) {
     var pending = rows.filter(function (u) { return u.Active === 'N'; }).length;
     var hint = pending ? '<p class="muted warn-line">' + icon('alertTriangle', 14) + ' ' + pending + ' account(s) awaiting approval (shown as inactive below).</p>' : '';
-    document.getElementById('userTableHost').innerHTML = hint + renderTable(['Full Name', 'Username', 'Role', 'Branch', 'Status', 'Actions'], rows.map(function (u) {
-      return [esc(u.FullName || '—'), esc(u.Username), esc(u.Role), esc(u.BranchID || '—'),
-        u.Active === 'Y' ? statusBadge('Confirmed') : '<span class="badge badge-pending">Pending</span>',
-        '<button class="btn btn-sm btn-outline" onclick=\'openUserModal(' + JSON.stringify(u).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button> <button class="btn btn-sm btn-danger" onclick="deleteUserRow(\'' + u.Username + '\')">' + icon('trash', 13) + '</button>'];
-    }));
+    var host = document.getElementById('userTableHost');
+    function draw() {
+      host.innerHTML = hint + renderTable(['Full Name', 'Username', 'Role', 'Branch', 'Status', 'Actions'], rows.map(function (u) {
+        return [esc(u.FullName || '—'), esc(u.Username), esc(u.Role), esc(u.BranchID || '—'),
+          u.Active === 'Y' ? statusBadge('Confirmed') : '<span class="badge badge-pending">Pending</span>',
+          '<button class="btn btn-sm btn-outline" onclick=\'openUserModal(' + JSON.stringify(u).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button> <button class="btn btn-sm btn-danger" onclick="deleteUserRow(\'' + u.Username + '\')">' + icon('trash', 13) + '</button>'];
+      }), 'users');
+      bindTablePager(host, 'users', draw);
+    }
+    draw();
   }).catch(function (err) { document.getElementById('userTableHost').innerHTML = errorPanel(err); });
 }
 function openUserModal(u) {
@@ -3429,15 +3641,24 @@ function renderSlotsAdmin(content) {
   var branchOpts = STATE.branches.map(function (b) { return '<option value="' + b.BranchID + '">' + esc(b.Name) + '</option>'; }).join('');
   var defaultBranch = STATE.user.role === 'Owner' ? (branchArg() || (STATE.branches[0] && STATE.branches[0].BranchID) || '') : STATE.user.branchId;
   content.innerHTML = '<div class="panel">' +
-    '<h3>Manage Time Slots</h3><p class="muted">Close specific times on a specific date (lunch break, fully booked, holiday) — closed slots won\'t be offered in the public booking wizard for anyone.</p>' +
+    '<h3>Manage Time Slots</h3>' +
+    '<div class="pay-instructions" style="margin-bottom:16px;">' +
+    '<p><b>How this works:</b></p>' +
+    '<p>1. Pick a branch and date below — the day\'s slots load automatically.</p>' +
+    '<p>2. Click any <b>white</b> time to close it (lunch break, fully booked, holiday) — it turns pink and customers will no longer be offered it in the booking wizard.</p>' +
+    '<p>3. Click a <b>pink</b> (closed) time again to reopen it.</p>' +
+    '<p><b>Grey</b> times already have a booking and can\'t be closed from here — cancel or reschedule the booking first if you need to.</p>' +
+    '</div>' +
     '<div class="filters-bar">' +
     '<select id="slotBranch">' + branchOpts + '</select>' +
     '<input type="date" id="slotDate" value="' + isoToday() + '">' +
-    '<button class="btn btn-sm" onclick="loadSlotsAdmin()">Load</button>' +
+    '<button class="btn btn-sm btn-outline" onclick="loadSlotsAdmin()">' + icon('refresh', 14) + ' Refresh</button>' +
     '</div>' +
-    '<div id="slotGridHost"><p class="muted">Choose a branch and date, then click Load.</p></div>' +
+    '<div id="slotGridHost"><p class="muted">Loading…</p></div>' +
     '</div>';
   if (defaultBranch) document.getElementById('slotBranch').value = defaultBranch;
+  document.getElementById('slotBranch').addEventListener('change', loadSlotsAdmin);
+  document.getElementById('slotDate').addEventListener('change', loadSlotsAdmin);
   loadSlotsAdmin();
 }
 function loadSlotsAdmin() {
@@ -3454,8 +3675,8 @@ function loadSlotsAdmin() {
         formatTime12(s.time) + (booked ? '<br><span style="font-size:.68rem;">' + s.bookedCount + ' booked</span>' : (s.blocked ? '<br><span style="font-size:.68rem;">Closed</span>' : '')) + '</div>';
     }).join('') + '</div>' +
     '<div style="margin-top:16px;display:flex;gap:16px;flex-wrap:wrap;font-size:.8rem;color:#888;">' +
-    '<span><span class="status-dot avail" style="display:inline-block;"></span> Open</span>' +
-    '<span><span class="status-dot unavail" style="display:inline-block;"></span> Closed by you</span>' +
+    '<span><span class="status-dot avail" style="display:inline-block;"></span> Open — click to close</span>' +
+    '<span><span class="time-slot slot-blocked" style="display:inline-block;width:14px;height:14px;padding:0;"></span> Closed by you — click to reopen</span>' +
     '<span>Grey = already booked (can\'t be closed here)</span>' +
     '</div>';
   }).catch(function (err) { host.innerHTML = errorPanel(err); });
@@ -3499,13 +3720,18 @@ function renderSmsAdmin(content) {
       '</div></div>' +
       '<div style="grid-column:1/-1"><label>Message</label><textarea id="smsMessage" rows="3" maxlength="300" placeholder="Type your message…"></textarea></div>' +
       '</div><button class="btn btn-accent" onclick="sendStaffSmsNow()">' + icon('send', 14) + ' Send SMS</button></div>' +
-      '<div class="panel"><h3>SMS History</h3>' +
-      renderTable(['Date', 'Recipient', 'Status', 'Message'], stats.history.map(function (n) {
-        return [String(n.Date).slice(0, 16).replace('T', ' '), esc(n.Recipient), n.Status.indexOf('Failed') === 0 ? statusBadge('Cancelled') : (n.Status.indexOf('Simulated') === 0 ? '<span class="badge badge-pending">Simulated</span>' : statusBadge('Confirmed')), esc(n.Message)];
-      })) + '</div>';
+      '<div class="panel"><h3>SMS History</h3><div id="smsHistoryHost"></div></div>';
     document.querySelectorAll('#smsStaffPicker .day-chip').forEach(function (el) {
       el.addEventListener('click', function () { el.classList.toggle('active'); });
     });
+    var historyHost = document.getElementById('smsHistoryHost');
+    function drawHistory() {
+      historyHost.innerHTML = renderTable(['Date', 'Recipient', 'Status', 'Message'], stats.history.map(function (n) {
+        return [String(n.Date).slice(0, 16).replace('T', ' '), esc(n.Recipient), n.Status.indexOf('Failed') === 0 ? statusBadge('Cancelled') : (n.Status.indexOf('Simulated') === 0 ? '<span class="badge badge-pending">Simulated</span>' : statusBadge('Confirmed')), esc(n.Message)];
+      }), 'smsHistory');
+      bindTablePager(historyHost, 'smsHistory', drawHistory);
+    }
+    drawHistory();
   }).catch(function (err) { content.innerHTML = errorPanel(err); });
 }
 function sendStaffSmsNow() {

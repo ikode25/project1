@@ -64,13 +64,14 @@ var SCHEMA = {
   Gallery:       ['GalleryID', 'ImageURL', 'Caption', 'Category', 'BranchID', 'SortOrder', 'Active'],
   Notifications: ['NotificationID', 'Type', 'Recipient', 'Message', 'Status', 'Date'],
   BlockedSlots:  ['BlockedSlotID', 'BranchID', 'Date', 'TimeSlot'],
-  Videos:        ['VideoID', 'VideoURL', 'Title', 'Caption', 'SortOrder', 'Active']
+  Videos:        ['VideoID', 'VideoURL', 'Title', 'Caption', 'SortOrder', 'Active'],
+  Visits:        ['VisitID', 'Date', 'Timestamp', 'VisitorKey']
 };
 
 var ID_PREFIX = {
   Branches: 'BR', Services: 'SV', Staff: 'ST', Customers: 'CU', Appointments: 'AP',
   Sales: 'SL', Products: 'PR', Expenses: 'EX', Reviews: 'RV', HeroSlides: 'HS', Gallery: 'GL',
-  Notifications: 'NT', BlockedSlots: 'BL', Videos: 'VD'
+  Notifications: 'NT', BlockedSlots: 'BL', Videos: 'VD', Visits: 'VS'
 };
 
 var ROLES = ['Owner', 'Manager', 'Staff', 'Receptionist'];
@@ -110,8 +111,14 @@ var DEFAULT_SETTINGS = {
   MomoName: '',
   BankName: '',
   BankAccountName: '',
-  BankAccountNumber: ''
+  BankAccountNumber: '',
+  // Comma-separated subset of PAYMENT_METHODS that customers are actually
+  // offered at checkout — lets the Owner hide networks/methods they don't
+  // support instead of showing all six to every customer.
+  ActivePaymentMethods: 'Cash,MTN MoMo,Vodafone Cash,Telecel Cash,AirtelTigo Money,Bank Transfer'
 };
+
+var PAYMENT_METHODS = ['Cash', 'MTN MoMo', 'Vodafone Cash', 'Telecel Cash', 'AirtelTigo Money', 'Bank Transfer'];
 
 /* ============================================================================
  * 2. WEB APP ENTRY POINT
@@ -734,8 +741,9 @@ function createAppointment(data) {
   // Find or create the customer by phone number
   var customer = findOrCreateCustomerByPhone_(name, phone, email);
 
-  var validPaymentMethods = ['Cash', 'MTN MoMo', 'Vodafone Cash', 'Telecel Cash', 'AirtelTigo Money', 'Bank Transfer'];
-  var paymentMethod = validPaymentMethods.indexOf(data.paymentMethod) > -1 ? data.paymentMethod : 'Cash';
+  var activeMethods = String(getSettingsMap_().ActivePaymentMethods || '').split(',').map(function (m) { return m.trim(); }).filter(Boolean);
+  if (!activeMethods.length) activeMethods = PAYMENT_METHODS.slice();
+  var paymentMethod = activeMethods.indexOf(data.paymentMethod) > -1 ? data.paymentMethod : 'Cash';
   var paymentProofURL = String(data.paymentProofURL || '').trim();
   var paymentStatus = paymentMethod === 'Cash' ? 'Pay at Shop' : (paymentProofURL ? 'Pending Verification' : 'Awaiting Payment');
 
@@ -1552,7 +1560,13 @@ function uploadImageToDrive_(base64Data, filename, mimeType) {
   var file = folder.createFile(blob);
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   return {
-    url: 'https://drive.google.com/uc?export=view&id=' + file.getId(),
+    // Drive's `uc?export=view` link frequently fails to render in a plain
+    // <img> tag — it can serve an interstitial "can't scan this file for
+    // viruses" HTML page instead of the raw image, especially for larger
+    // photos. The `thumbnail` endpoint reliably returns actual image bytes
+    // for anyone-with-link-view files, which is what every photo/logo
+    // picker in this app relies on to actually display.
+    url: 'https://drive.google.com/thumbnail?id=' + file.getId() + '&sz=w1000',
     fileId: file.getId()
   };
 }
@@ -1921,6 +1935,47 @@ function cancelBookingByReference(reference) {
   var updated = updateById_('Appointments', 'AppointmentID', appt.AppointmentID, { Status: 'Cancelled' });
   if (customer) sendAppointmentStatusUpdate_(updated, customer, 'cancelled at your request');
   return { success: true };
+}
+
+/**
+ * Public: records one website visit, at most once per (day, visitorKey)
+ * pair — the client generates and persists visitorKey itself (a random
+ * id in localStorage) and only calls this once per calendar day, but the
+ * server-side dedupe here is what actually keeps a "Visitors Today" count
+ * honest even if the client calls it more than once.
+ */
+function trackVisit(visitorKey) {
+  visitorKey = String(visitorKey || '').trim();
+  if (!visitorKey) return { success: false };
+  var today = Utilities.formatDate(new Date(), TIMEZONE, 'yyyy-MM-dd');
+  var already = readAll_('Visits').some(function (v) { return v.Date === today && v.VisitorKey === visitorKey; });
+  if (!already) {
+    appendRow_('Visits', { VisitID: nextId_('Visits', 'VisitID'), Date: today, Timestamp: nowIso_(), VisitorKey: visitorKey });
+  }
+  return { success: true };
+}
+
+/** Admin: visitor counts for today and the last 7 days (unique VisitorKey per day). */
+function getVisitorStats(token) {
+  requireAuth_(token);
+  var rows = readAll_('Visits');
+  var today = Utilities.formatDate(new Date(), TIMEZONE, 'yyyy-MM-dd');
+  var byDay = {};
+  rows.forEach(function (v) {
+    if (!byDay[v.Date]) byDay[v.Date] = {};
+    byDay[v.Date][v.VisitorKey] = true;
+  });
+  var trend = [];
+  for (var i = 6; i >= 0; i--) {
+    var d = addDays_(today, -i);
+    trend.push({ date: d, visitors: byDay[d] ? Object.keys(byDay[d]).length : 0 });
+  }
+  return {
+    today: byDay[today] ? Object.keys(byDay[today]).length : 0,
+    last7Days: trend.reduce(function (sum, t) { return sum + t.visitors; }, 0),
+    trend: trend,
+    allTimeUnique: Object.keys(rows.reduce(function (acc, v) { acc[v.VisitorKey] = true; return acc; }, {})).length
+  };
 }
 
 /** Public: a website visitor's "Contact Us" message, emailed straight to the business's ContactEmail. */
