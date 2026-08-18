@@ -49,7 +49,7 @@ var SETUP_VERSION = 2;
 
 // Column schema for every tab. Order matters — it defines the sheet column order.
 var SCHEMA = {
-  Branches:      ['BranchID', 'Name', 'Location', 'Phone', 'OpeningHours'],
+  Branches:      ['BranchID', 'Name', 'Location', 'Phone', 'OpeningHours', 'WeeklyHours'],
   Services:      ['ServiceID', 'Name', 'Category', 'Description', 'DurationMinutes', 'Price', 'BranchID', 'Active', 'ImageURL'],
   Staff:         ['StaffID', 'Name', 'Role', 'BranchID', 'Phone', 'Specialties', 'PhotoURL', 'Active', 'CommissionRate', 'WorkDays'],
   Customers:     ['CustomerID', 'Name', 'Phone', 'Email', 'DateJoined', 'LoyaltyPoints', 'Notes'],
@@ -65,13 +65,14 @@ var SCHEMA = {
   Notifications: ['NotificationID', 'Type', 'Recipient', 'Message', 'Status', 'Date'],
   BlockedSlots:  ['BlockedSlotID', 'BranchID', 'Date', 'TimeSlot'],
   Videos:        ['VideoID', 'VideoURL', 'Title', 'Caption', 'SortOrder', 'Active'],
-  Visits:        ['VisitID', 'Date', 'Timestamp', 'VisitorKey']
+  Visits:        ['VisitID', 'Date', 'Timestamp', 'VisitorKey'],
+  StaffLeave:    ['LeaveID', 'StaffID', 'Date', 'Reason']
 };
 
 var ID_PREFIX = {
   Branches: 'BR', Services: 'SV', Staff: 'ST', Customers: 'CU', Appointments: 'AP',
   Sales: 'SL', Products: 'PR', Expenses: 'EX', Reviews: 'RV', HeroSlides: 'HS', Gallery: 'GL',
-  Notifications: 'NT', BlockedSlots: 'BL', Videos: 'VD', Visits: 'VS'
+  Notifications: 'NT', BlockedSlots: 'BL', Videos: 'VD', Visits: 'VS', StaffLeave: 'LV'
 };
 
 var ROLES = ['Owner', 'Manager', 'Staff', 'Receptionist'];
@@ -107,14 +108,27 @@ var DEFAULT_SETTINGS = {
   SocialTwitter: '',
   SocialTiktok: '',
   SocialYoutube: '',
+  // Each mobile money network is a genuinely separate wallet/SIM number in
+  // Ghana, so each gets its own number+name rather than sharing one field
+  // — a customer can't send Vodafone Cash to an MTN number. MomoNumber/
+  // MomoName (kept under their original name for backward compatibility)
+  // are specifically the MTN MoMo details.
   MomoNumber: '',
   MomoName: '',
+  VodafoneCashNumber: '',
+  VodafoneCashName: '',
+  TelecelCashNumber: '',
+  TelecelCashName: '',
+  AirtelTigoMoneyNumber: '',
+  AirtelTigoMoneyName: '',
   BankName: '',
   BankAccountName: '',
   BankAccountNumber: '',
   // Comma-separated subset of PAYMENT_METHODS that customers are actually
   // offered at checkout — lets the Owner hide networks/methods they don't
-  // support instead of showing all six to every customer.
+  // support instead of showing all six to every customer. Note a method
+  // only actually shows if BOTH this list includes it AND its own
+  // number/account details below are filled in — see paymentMethodDetailsFilled_().
   ActivePaymentMethods: 'Cash,MTN MoMo,Vodafone Cash,Telecel Cash,AirtelTigo Money,Bank Transfer',
   // 'N' means "one shop, no separate branches" — hides the multi-branch
   // switcher/step UI everywhere and treats the single existing Branches
@@ -138,21 +152,37 @@ var DEFAULT_SETTINGS = {
 };
 
 var PAYMENT_METHODS = ['Cash', 'MTN MoMo', 'Vodafone Cash', 'Telecel Cash', 'AirtelTigo Money', 'Bank Transfer'];
+
+/** Whether a payment method's own number/account details are actually filled in — mirrors the client-side gating so a method can't be paid into even by a direct API call if nothing was ever entered for it. */
+function paymentMethodDetailsFilled_(settings, method) {
+  if (method === 'Cash') return true;
+  if (method === 'Bank Transfer') return !!settings.BankAccountNumber;
+  var numberKey = { 'MTN MoMo': 'MomoNumber', 'Vodafone Cash': 'VodafoneCashNumber', 'Telecel Cash': 'TelecelCashNumber', 'AirtelTigo Money': 'AirtelTigoMoneyNumber' }[method];
+  return !!(numberKey && settings[numberKey]);
+}
 var WEEKDAY_KEYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-/** Parses Settings.WeeklyHours, falling back to the legacy flat BookingStartHour/BookingEndHour (every day open) if it's missing or malformed. */
-function parseWeeklyHours_(settings) {
+/** Parses a WeeklyHours JSON string, falling back to every day open start-end if missing/malformed. */
+function parseWeeklyHoursJson_(jsonStr, fallbackStart, fallbackEnd) {
   try {
-    var parsed = JSON.parse(settings.WeeklyHours);
+    var parsed = JSON.parse(jsonStr);
     if (parsed && typeof parsed === 'object') return parsed;
-  } catch (e) { /* fall through to legacy default below */ }
+  } catch (e) { /* fall through to the default below */ }
+  var fallback = {};
+  WEEKDAY_KEYS.forEach(function (d) { fallback[d] = { open: true, is24: false, start: fallbackStart || '09:00', end: fallbackEnd || '18:00' }; });
+  return fallback;
+}
+/** Parses Settings.WeeklyHours — used in single-shop mode (HasBranches='N'), falling back to the legacy flat BookingStartHour/BookingEndHour if missing/malformed. */
+function parseWeeklyHours_(settings) {
   var startH = Number(settings.BookingStartHour) || 9;
   var endH = Number(settings.BookingEndHour) || 18;
   var start = (startH < 10 ? '0' : '') + startH + ':00';
   var end = (endH < 10 ? '0' : '') + endH + ':00';
-  var fallback = {};
-  WEEKDAY_KEYS.forEach(function (d) { fallback[d] = { open: true, is24: false, start: start, end: end }; });
-  return fallback;
+  return parseWeeklyHoursJson_(settings.WeeklyHours, start, end);
+}
+/** Parses one Branch row's own WeeklyHours — used in multi-branch mode, where each branch can run different hours. */
+function parseBranchWeeklyHours_(branch) {
+  return parseWeeklyHoursJson_(branch && branch.WeeklyHours, '09:00', '18:00');
 }
 
 /** Converts a WeeklyHours day entry into { open, startMin, endMin } (minutes since midnight), for slot-generation math. */
@@ -181,9 +211,8 @@ function formatHourMinute12_(hhmm) {
   return h12 + ':' + m + ' ' + ampm;
 }
 
-/** Whether the shop is open right now (Africa/Accra time) plus today's hours label, for the public site and every admin dashboard. */
-function computeShopStatus_(settings) {
-  var weeklyHours = parseWeeklyHours_(settings);
+/** Whether "open now" (Africa/Accra time) plus today's/every day's hours label, given an already-parsed WeeklyHours object. Works the same for the single global schedule or one branch's own schedule. */
+function computeShopStatus_(weeklyHours) {
   var now = new Date();
   var weekday = Utilities.formatDate(now, TIMEZONE, 'EEE');
   var nowMin = Number(Utilities.formatDate(now, TIMEZONE, 'H')) * 60 + Number(Utilities.formatDate(now, TIMEZONE, 'm'));
@@ -195,6 +224,27 @@ function computeShopStatus_(settings) {
     todayLabel: formatDayHoursLabel_(today),
     weekLabels: WEEKDAY_KEYS.map(function (d) { return { day: d, label: formatDayHoursLabel_(weeklyHours[d]) }; })
   };
+}
+
+/**
+ * Collapses a WeeklyHours object into a short human-readable summary by
+ * grouping consecutive days that share the exact same hours, e.g.
+ * "Mon-Sat 8:00 AM – 7:00 PM, Sun 12:00 PM – 5:00 PM". Auto-computed from
+ * the structured per-day editor so there's never a separate free-text
+ * "opening hours" value to keep in sync by hand.
+ */
+function summarizeWeeklyHours_(weeklyHours) {
+  var groups = [];
+  WEEKDAY_KEYS.forEach(function (d) {
+    var label = formatDayHoursLabel_(weeklyHours[d]);
+    var last = groups[groups.length - 1];
+    if (last && last.label === label) last.days.push(d);
+    else groups.push({ label: label, days: [d] });
+  });
+  return groups.map(function (g) {
+    var dayLabel = g.days.length > 1 ? g.days[0] + '-' + g.days[g.days.length - 1] : g.days[0];
+    return dayLabel + ' ' + g.label;
+  }).join(', ');
 }
 
 /* ============================================================================
@@ -383,8 +433,10 @@ function seedIfEmpty_() {
 
   // Branches
   if (readAll_('Branches').length === 0) {
-    appendRow_('Branches', { BranchID: 'BR-0001', Name: 'Osu Main Branch', Location: 'Oxford Street, Osu, Accra', Phone: '0241234567', OpeningHours: 'Mon-Sat 8:00am-7:00pm, Sun 12pm-5pm' });
-    appendRow_('Branches', { BranchID: 'BR-0002', Name: 'East Legon Branch', Location: 'American House Rd, East Legon, Accra', Phone: '0209876543', OpeningHours: 'Mon-Sat 8:00am-8:00pm' });
+    var osuHours = { Sun: { open: true, is24: false, start: '12:00', end: '17:00' }, Mon: { open: true, is24: false, start: '08:00', end: '19:00' }, Tue: { open: true, is24: false, start: '08:00', end: '19:00' }, Wed: { open: true, is24: false, start: '08:00', end: '19:00' }, Thu: { open: true, is24: false, start: '08:00', end: '19:00' }, Fri: { open: true, is24: false, start: '08:00', end: '19:00' }, Sat: { open: true, is24: false, start: '08:00', end: '19:00' } };
+    var elHours = { Sun: { open: false, is24: false, start: '08:00', end: '20:00' }, Mon: { open: true, is24: false, start: '08:00', end: '20:00' }, Tue: { open: true, is24: false, start: '08:00', end: '20:00' }, Wed: { open: true, is24: false, start: '08:00', end: '20:00' }, Thu: { open: true, is24: false, start: '08:00', end: '20:00' }, Fri: { open: true, is24: false, start: '08:00', end: '20:00' }, Sat: { open: true, is24: false, start: '08:00', end: '20:00' } };
+    appendRow_('Branches', { BranchID: 'BR-0001', Name: 'Osu Main Branch', Location: 'Oxford Street, Osu, Accra', Phone: '0241234567', OpeningHours: summarizeWeeklyHours_(osuHours), WeeklyHours: JSON.stringify(osuHours) });
+    appendRow_('Branches', { BranchID: 'BR-0002', Name: 'East Legon Branch', Location: 'American House Rd, East Legon, Accra', Phone: '0209876543', OpeningHours: summarizeWeeklyHours_(elHours), WeeklyHours: JSON.stringify(elHours) });
   }
 
   // Services
@@ -645,7 +697,7 @@ function login(username, password) {
   var token = Utilities.getUuid();
   var sessionData = {
     username: user.Username, role: user.Role, branchId: user.BranchID,
-    staffId: user.StaffID, email: user.Email
+    staffId: user.StaffID, email: user.Email, fullName: user.FullName
   };
   CacheService.getScriptCache().put('session_' + token, JSON.stringify(sessionData), SESSION_TTL_SECONDS);
   return {
@@ -730,6 +782,13 @@ function getCurrentUser(token) {
 function getPublicData() {
   var settings = getSettingsMap_();
   var branches = readAll_('Branches');
+  // Single-shop mode: no matter how many branch rows still exist in the
+  // sheet (e.g. left over from before the Owner switched this off, or
+  // sample data), the public site and booking wizard only ever see the
+  // first one — never a branch picker. The Owner can still see/manage
+  // every row from the admin Branches/Shop Info page (getBranches is a
+  // separate, unfiltered call), so nothing is lost if they switch back.
+  if (settings.HasBranches === 'N' && branches.length > 1) branches = branches.slice(0, 1);
   var services = readAll_('Services').filter(function (s) { return String(s.Active).toUpperCase() === 'Y'; });
   var staff = readAll_('Staff').filter(function (s) { return String(s.Active).toUpperCase() === 'Y'; });
   var heroSlides = readAll_('HeroSlides')
@@ -751,6 +810,19 @@ function getPublicData() {
     return o;
   });
 
+  // Single-shop mode has one global schedule (Settings → Booking). Multi-
+  // branch mode: each branch owns its hours, since a business with
+  // different locations can genuinely keep different hours at each one.
+  // The single top-level shopStatus badge only makes sense when there's
+  // exactly one branch to be unambiguous about; branchStatus always has
+  // one entry per branch for per-branch displays (branch cards, etc).
+  var branchStatus = branches.map(function (b) {
+    return { BranchID: b.BranchID, status: computeShopStatus_(parseBranchWeeklyHours_(b)) };
+  });
+  var shopStatus = settings.HasBranches === 'N'
+    ? computeShopStatus_(parseWeeklyHours_(settings))
+    : (branchStatus.length === 1 ? branchStatus[0].status : null);
+
   return {
     settings: settings,
     branches: branches.map(stripRow_),
@@ -760,7 +832,8 @@ function getPublicData() {
     gallery: gallery.map(stripRow_),
     videos: videos.map(stripRow_),
     reviews: reviews,
-    shopStatus: computeShopStatus_(settings)
+    shopStatus: shopStatus,
+    branchStatus: branchStatus
   };
 }
 
@@ -819,9 +892,10 @@ function createAppointment(data) {
   // Find or create the customer by phone number
   var customer = findOrCreateCustomerByPhone_(name, phone, email);
 
-  var activeMethods = String(getSettingsMap_().ActivePaymentMethods || '').split(',').map(function (m) { return m.trim(); }).filter(Boolean);
+  var paySettings = getSettingsMap_();
+  var activeMethods = String(paySettings.ActivePaymentMethods || '').split(',').map(function (m) { return m.trim(); }).filter(Boolean);
   if (!activeMethods.length) activeMethods = PAYMENT_METHODS.slice();
-  var paymentMethod = activeMethods.indexOf(data.paymentMethod) > -1 ? data.paymentMethod : 'Cash';
+  var paymentMethod = (activeMethods.indexOf(data.paymentMethod) > -1 && paymentMethodDetailsFilled_(paySettings, data.paymentMethod)) ? data.paymentMethod : 'Cash';
   var paymentProofURL = String(data.paymentProofURL || '').trim();
   var paymentStatus = paymentMethod === 'Cash' ? 'Pay at Shop' : (paymentProofURL ? 'Pending Verification' : 'Awaiting Payment');
 
@@ -875,6 +949,18 @@ function submitReview(data) {
 }
 
 /**
+ * Single-shop mode (HasBranches='N') has one global weekly schedule set in
+ * Settings → Booking. Multi-branch mode gives each branch its own —
+ * different locations can genuinely keep different hours — so this picks
+ * whichever is actually authoritative for a given branch right now.
+ */
+function getEffectiveWeeklyHours_(settings, branchId) {
+  if (settings.HasBranches === 'N') return parseWeeklyHours_(settings);
+  var branch = readAll_('Branches').find(function (b) { return b.BranchID === branchId; });
+  return parseBranchWeeklyHours_(branch);
+}
+
+/**
  * Returns bookable time slots for a branch/date, optionally scoped to one
  * stylist ("Anyone" when staffId is ''). Used by the public booking wizard
  * to render a live availability grid, and defensively by createAppointment()
@@ -885,11 +971,18 @@ function getAvailableSlots(branchId, staffId, date) {
   var settings = getSettingsMap_();
   var interval = Number(settings.SlotIntervalMinutes) || 30;
   var weekday = Utilities.formatDate(new Date(date + 'T00:00:00'), TIMEZONE, 'EEE');
-  var window = dayWindowMinutes_(parseWeeklyHours_(settings)[weekday]);
+  var window = dayWindowMinutes_(getEffectiveWeeklyHours_(settings, branchId)[weekday]);
 
   var branchStaff = readAll_('Staff').filter(function (s) {
     return s.BranchID === branchId && String(s.Active).toUpperCase() === 'Y';
   });
+
+  // A specific date the staff member has taken off (StaffLeave) — checked
+  // alongside their regular weekly WorkDays pattern, so a one-off absence
+  // doesn't require touching their permanent schedule.
+  var staffOnLeaveToday = {};
+  readAll_('StaffLeave').filter(function (l) { return l.Date === date; }).forEach(function (l) { staffOnLeaveToday[l.StaffID] = true; });
+  function staffWorksToday_(s) { return worksOnDay_(s, weekday) && !staffOnLeaveToday[s.StaffID]; }
 
   // The shop's own weekly hours gate the day first — no staff schedule can
   // open a day the shop itself is closed on.
@@ -899,10 +992,10 @@ function getAvailableSlots(branchId, staffId, date) {
     if (staffId) {
       var chosen = branchStaff.find(function (s) { return s.StaffID === staffId; });
       if (!chosen) return { slots: [], dayAvailable: false };
-      dayAvailable = worksOnDay_(chosen, weekday);
+      dayAvailable = staffWorksToday_(chosen);
       candidateStaff = [chosen];
     } else {
-      dayAvailable = branchStaff.some(function (s) { return worksOnDay_(s, weekday); });
+      dayAvailable = branchStaff.some(staffWorksToday_);
     }
   }
 
@@ -919,7 +1012,7 @@ function getAvailableSlots(branchId, staffId, date) {
       var h = Math.floor(mins / 60), m = mins % 60;
       var label = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
       var available = dayAvailable && !blockedTimes[label] && candidateStaff.some(function (s) {
-        if (!worksOnDay_(s, weekday)) return false;
+        if (!staffWorksToday_(s)) return false;
         return !existing.some(function (a) { return a.StaffID === s.StaffID && a.TimeSlot === label; });
       });
       slots.push({ time: label, available: available, blocked: !!blockedTimes[label] });
@@ -936,7 +1029,7 @@ function getSlotsForAdmin(token, branchId, date) {
   var settings = getSettingsMap_();
   var interval = Number(settings.SlotIntervalMinutes) || 30;
   var weekday = Utilities.formatDate(new Date(date + 'T00:00:00'), TIMEZONE, 'EEE');
-  var window = dayWindowMinutes_(parseWeeklyHours_(settings)[weekday]);
+  var window = dayWindowMinutes_(getEffectiveWeeklyHours_(settings, branchId)[weekday]);
   var blocked = readAll_('BlockedSlots').filter(function (b) { return b.BranchID === branchId && b.Date === date; });
   var blockedTimes = {};
   blocked.forEach(function (b) { blockedTimes[b.TimeSlot] = true; });
@@ -1045,6 +1138,10 @@ function getBranches(token) {
 function saveBranch(token, branch) {
   var user = requireAuth_(token);
   requireRole_(user, ['Owner']);
+  // OpeningHours is never typed by hand — it's auto-derived from the
+  // structured per-day WeeklyHours editor so there's only one place
+  // (WeeklyHours) that can ever go out of sync with what's displayed.
+  if (branch.WeeklyHours) branch.OpeningHours = summarizeWeeklyHours_(parseBranchWeeklyHours_(branch));
   if (branch.BranchID) {
     return stripRow_(updateById_('Branches', 'BranchID', branch.BranchID, branch));
   }
@@ -1109,6 +1206,31 @@ function deleteStaff(token, staffId) {
   var user = requireAuth_(token);
   requireRole_(user, ['Owner', 'Manager']);
   return deleteById_('Staff', 'StaffID', staffId);
+}
+
+/* ---------- Staff time off (one-off absences, separate from the permanent weekly WorkDays schedule) ---------- */
+
+function getStaffLeave(token, staffId) {
+  requireAuth_(token);
+  var today = Utilities.formatDate(new Date(), TIMEZONE, 'yyyy-MM-dd');
+  return readAll_('StaffLeave')
+    .filter(function (l) { return l.StaffID === staffId && l.Date >= today; })
+    .sort(function (a, b) { return a.Date.localeCompare(b.Date); })
+    .map(stripRow_);
+}
+
+function addStaffLeave(token, staffId, date, reason) {
+  var user = requireAuth_(token);
+  requireRole_(user, ['Owner', 'Manager']);
+  var already = readAll_('StaffLeave').find(function (l) { return l.StaffID === staffId && l.Date === date; });
+  if (already) return stripRow_(already); // idempotent — adding the same day off twice is a no-op, not a duplicate
+  return stripRow_(appendRow_('StaffLeave', { LeaveID: nextId_('StaffLeave', 'LeaveID'), StaffID: staffId, Date: date, Reason: String(reason || '').trim() }));
+}
+
+function removeStaffLeave(token, leaveId) {
+  var user = requireAuth_(token);
+  requireRole_(user, ['Owner', 'Manager']);
+  return deleteById_('StaffLeave', 'LeaveID', leaveId);
 }
 
 /* ============================================================================

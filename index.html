@@ -76,6 +76,10 @@
   .shop-status-badge.open::before { background: #1c7c3c; }
   .shop-status-badge.closed { background: #fbe0e0; color: #b32424; }
   .shop-status-badge.closed::before { background: #b32424; }
+  .pub-greeting-strip { background: var(--clr-accent); color: #1a1a1a; padding: 8px 0; text-align: center; font-size: .85rem; font-weight: 600; }
+  .branch-status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .branch-status-dot.open { background: #1c7c3c; }
+  .branch-status-dot.closed { background: #b32424; }
   #publicNav nav { display: flex; gap: 22px; align-items: center; }
   #publicNav nav a { font-size: .92rem; font-weight: 600; opacity: .88; position: relative; padding: 4px 0; transition: opacity .15s, color .15s; }
   #publicNav nav a:not(#adminLoginLink)::after { content: ''; position: absolute; left: 0; right: 0; bottom: -4px; height: 2px; background: var(--clr-accent); transform: scaleX(0); transition: transform .18s ease; }
@@ -125,7 +129,7 @@
     display: flex; flex-direction: column; transition: transform .2s ease, box-shadow .2s ease;
   }
   .svc-card:hover { transform: translateY(-4px); box-shadow: 0 10px 26px rgba(0,0,0,.12); }
-  .svc-photo { height: 140px; background-size: cover; background-position: center; background-color: #eee; }
+  .svc-photo { height: 140px; background-size: cover; background-position: center; background-color: #eee; cursor: pointer; }
   .svc-photo-empty { display: flex; align-items: center; justify-content: center; color: #b8b4a8; }
   .svc-card-body { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
   .svc-card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 1.02rem; }
@@ -418,6 +422,20 @@
   .icon-btn.spinning svg { animation: spin .6s linear; }
   @keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
 
+  /* Admin chat bubble: floats bottom-right on desktop as usual; on mobile
+     it moves into the topbar itself (a plain icon button there instead)
+     so it doesn't float over content the admin is trying to reach. */
+  #topbarChatBtn { display: none; }
+  @media (max-width: 860px) {
+    #topbarChatBtn { display: flex; }
+    #adminChatWidget .chat-bubble-btn { display: none; }
+    #adminChatWidget .chat-panel { top: 66px; bottom: auto; right: 12px; max-height: calc(100vh - 100px); }
+  }
+
+  .admin-greeting { padding: 0 26px 16px; font-size: .93rem; color: #777; }
+  #adminApp.dark .admin-greeting { color: #9aa1ad; }
+  .admin-greeting b { font-weight: 800; color: inherit; }
+
   .bell-wrap { position: relative; }
   .bell-badge {
     position: absolute; top: -5px; right: -5px; background: #c0392b; color: #fff; font-size: .65rem; font-weight: 800;
@@ -686,6 +704,7 @@
     </div>
   </nav>
 
+  <div class="pub-greeting-strip"><div class="container"><span id="pubGreeting"></span></div></div>
   <div id="hero"></div>
 
   <section class="pub" id="branchBar">
@@ -888,11 +907,13 @@
             <span class="bell-badge hidden" id="bellBadge">0</span>
             <div class="bell-dropdown hidden" id="bellDropdown"></div>
           </div>
+          <button class="icon-btn" id="topbarChatBtn" title="Help" aria-label="Help"></button>
           <button class="icon-btn" id="darkModeToggle" title="Toggle dark mode" aria-label="Toggle dark mode"></button>
           <span class="muted" id="currentUserLabel"></span>
           <button class="btn btn-sm btn-danger" id="logoutBtn"></button>
         </div>
       </div>
+      <div class="admin-greeting" id="adminGreeting"></div>
       <div id="adminContent"></div>
     </div>
   </div>
@@ -1084,6 +1105,11 @@ window.addEventListener('DOMContentLoaded', function () {
   document.getElementById('logoutBtn').innerHTML = icon('logout', 14) + ' Logout';
   document.getElementById('hamburgerBtn').innerHTML = icon('menu', 20);
   document.getElementById('sidebarCollapseIcon').innerHTML = icon('chevronLeft', 16);
+  document.getElementById('topbarChatBtn').innerHTML = icon('robot', 17);
+  document.getElementById('topbarChatBtn').addEventListener('click', function () {
+    var floatingToggle = document.getElementById('adminChatWidgetToggle');
+    if (floatingToggle) floatingToggle.click();
+  });
   ['icPhone', 'icChat', 'icMail', 'icClock'].forEach(function (id, i) {
     document.getElementById(id).innerHTML = icon(['phone', 'chat', 'mail', 'clock'][i], 20);
   });
@@ -1292,6 +1318,8 @@ function renderBranding(s) {
     sidebarLogo.alt = s.BusinessName;
     sidebarLogo.classList.remove('hidden');
   }
+  var greeting = document.getElementById('pubGreeting');
+  if (greeting) greeting.textContent = getGreetingWord_() + '! Welcome to ' + s.BusinessName + '.';
 }
 
 function renderHero(slides) {
@@ -1341,7 +1369,7 @@ function renderServices(services, branches, branchFilter) {
   var html = Object.keys(byCategory).sort().map(function (cat) {
     return '<div class="svc-category"><h3>' + esc(cat) + '</h3><div class="svc-grid">' +
       byCategory[cat].map(function (s) {
-        var photo = s.ImageURL ? '<div class="svc-photo" style="background-image:url(\'' + esc(s.ImageURL) + '\')"></div>' : '<div class="svc-photo svc-photo-empty">' + icon('scissors', 26) + '</div>';
+        var photo = s.ImageURL ? '<div class="svc-photo" onclick="openImageLightbox(\'' + esc(s.ImageURL) + '\',\'' + esc(s.Name) + '\')" title="Click to see the full photo" style="background-image:url(\'' + esc(s.ImageURL) + '\')"></div>' : '<div class="svc-photo svc-photo-empty">' + icon('scissors', 26) + '</div>';
         return '<div class="svc-card">' + photo + '<div class="svc-card-body">' +
           '<div class="svc-card-head"><b>' + esc(s.Name) + '</b>' + (branches.length > 1 ? '<span class="muted">' + esc(branchMap[s.BranchID] || '') + '</span>' : '') + '</div>' +
           '<div class="muted">' + esc(s.Description || '') + '</div>' +
@@ -1375,9 +1403,14 @@ function openLightbox(i) {
   var items = STATE.publicData.gallery || [];
   var g = items[i];
   if (!g) return;
+  openImageLightbox(g.ImageURL, g.Caption || '');
+}
+/** Generic full-screen image viewer — used by the Gallery lightbox and by clicking a service's photo. */
+function openImageLightbox(url, caption) {
+  if (!url) return;
   var overlay = document.createElement('div');
   overlay.className = 'lightbox-overlay';
-  overlay.innerHTML = '<button class="lightbox-close">' + icon('close', 20) + '</button><img src="' + esc(g.ImageURL) + '"><div class="lightbox-caption">' + esc(g.Caption || '') + '</div>';
+  overlay.innerHTML = '<button class="lightbox-close">' + icon('close', 20) + '</button><img src="' + esc(url) + '"><div class="lightbox-caption">' + esc(caption || '') + '</div>';
   document.body.appendChild(overlay);
   overlay.addEventListener('click', function (e) { if (e.target === overlay || e.target.closest('.lightbox-close')) overlay.remove(); });
 }
@@ -1458,6 +1491,25 @@ function renderShopStatusBadge_(elId, shopStatus) {
   el.title = 'Today: ' + shopStatus.todayLabel;
 }
 
+function getGreetingWord_() {
+  var h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+function niceDateTimeNow_() {
+  var now = new Date();
+  var dateStr = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  var timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return dateStr + ' · ' + timeStr;
+}
+function renderAdminGreeting() {
+  var el = document.getElementById('adminGreeting');
+  if (!el || !STATE.user) return;
+  var name = STATE.user.fullName || STATE.user.username || 'there';
+  el.innerHTML = '<b>' + getGreetingWord_() + ', ' + esc(name) + '.</b> ' + niceDateTimeNow_();
+}
+
 function renderContact(s, shopStatus) {
   document.getElementById('contactPhoneLink').textContent = s.ContactPhone;
   document.getElementById('contactPhoneLink').href = 'tel:' + s.ContactPhone;
@@ -1469,7 +1521,13 @@ function renderContact(s, shopStatus) {
   var hasBranches = s.HasBranches !== 'N' && STATE.branches.length > 1;
   var hoursHtml;
   if (hasBranches) {
-    hoursHtml = STATE.branches.map(function (b) { return '<div><b>' + esc(b.Name) + ':</b> ' + esc(b.OpeningHours) + '</div>'; }).join('');
+    var branchStatusMap = {};
+    (STATE.publicData && STATE.publicData.branchStatus || []).forEach(function (bs) { branchStatusMap[bs.BranchID] = bs.status; });
+    hoursHtml = STATE.branches.map(function (b) {
+      var bs = branchStatusMap[b.BranchID];
+      var dot = bs ? '<span class="branch-status-dot ' + (bs.open ? 'open' : 'closed') + '" title="' + (bs.open ? 'Open Now' : 'Closed Now') + '"></span>' : '';
+      return '<div>' + dot + '<b>' + esc(b.Name) + ':</b> ' + esc(b.OpeningHours) + '</div>';
+    }).join('');
   } else if (shopStatus && shopStatus.weekLabels) {
     var todayDay = WEEKDAY_ORDER[new Date().getDay()];
     hoursHtml = shopStatus.weekLabels.map(function (w) {
@@ -1855,6 +1913,16 @@ function renderWizardStep(stepKey) {
   if (stepKey === 'payment') {
     var settings = data.settings || {};
     var service0 = data.services.find(function (s) { return s.ServiceID === BOOKING.serviceId; });
+    // Each mobile money network needs its own number actually filled in —
+    // a customer can't send Vodafone Cash to an MTN number — so a network
+    // (or Bank Transfer) is only ever offered once its own details exist,
+    // regardless of the Active Payment Methods toggle in Settings.
+    var momoFields = {
+      'MTN MoMo': { number: settings.MomoNumber, name: settings.MomoName },
+      'Vodafone Cash': { number: settings.VodafoneCashNumber, name: settings.VodafoneCashName },
+      'Telecel Cash': { number: settings.TelecelCashNumber, name: settings.TelecelCashName },
+      'AirtelTigo Money': { number: settings.AirtelTigoMoneyNumber, name: settings.AirtelTigoMoneyName }
+    };
     var allPayOpts = [
       { key: 'Cash', label: 'Cash at Front Desk', desc: 'Pay when you arrive for your appointment — nothing to do now.' },
       { key: 'MTN MoMo', label: 'MTN Mobile Money', desc: 'Pay now via MTN MoMo, then upload your payment screenshot.' },
@@ -1866,12 +1934,16 @@ function renderWizardStep(stepKey) {
     // Only offer the methods the Owner has switched on in Settings → Payments & Loyalty.
     var activeKeys = String(settings.ActivePaymentMethods || '').split(',').map(function (m) { return m.trim(); }).filter(Boolean);
     if (!activeKeys.length) activeKeys = allPayOpts.map(function (o) { return o.key; });
-    var payOpts = allPayOpts.filter(function (o) { return activeKeys.indexOf(o.key) > -1; });
-    if (!payOpts.length) payOpts = [allPayOpts[0]]; // safety net — always offer Cash even if settings are misconfigured
+    var payOpts = allPayOpts.filter(function (o) {
+      if (activeKeys.indexOf(o.key) === -1) return false;
+      if (o.key === 'Cash') return true;
+      if (o.key === 'Bank Transfer') return !!settings.BankAccountNumber;
+      return !!(momoFields[o.key] && momoFields[o.key].number);
+    });
+    if (!payOpts.length) payOpts = [allPayOpts[0]]; // safety net — always offer Cash even if nothing else is configured
     if (!payOpts.some(function (o) { return o.key === BOOKING.paymentMethod; })) BOOKING.paymentMethod = payOpts[0].key;
 
-    var momoNetworks = ['MTN MoMo', 'Vodafone Cash', 'Telecel Cash', 'AirtelTigo Money'];
-    var isMomo = momoNetworks.indexOf(BOOKING.paymentMethod) > -1;
+    var isMomo = !!momoFields[BOOKING.paymentMethod];
     var isBank = BOOKING.paymentMethod === 'Bank Transfer';
     var optionsHtml = '<div class="pay-options">' + payOpts.map(function (o) {
       var sel = BOOKING.paymentMethod === o.key;
@@ -1885,9 +1957,10 @@ function renderWizardStep(stepKey) {
     }
     var instructionsHtml = '';
     if (isMomo) {
+      var mf = momoFields[BOOKING.paymentMethod];
       instructionsHtml = '<div class="pay-instructions"><p class="pay-amt">Amount: ' + money(service0 ? service0.Price : 0) + '</p>' +
-        copyRow('Send to', settings.MomoNumber) +
-        (settings.MomoName ? '<p><b>Name on account:</b> ' + esc(settings.MomoName) + '</p>' : '') + '</div>';
+        copyRow('Send to', mf.number) +
+        (mf.name ? '<p><b>Name on account:</b> ' + esc(mf.name) + '</p>' : '') + '</div>';
     } else if (isBank) {
       instructionsHtml = '<div class="pay-instructions"><p class="pay-amt">Amount: ' + money(service0 ? service0.Price : 0) + '</p>' +
         (settings.BankName ? '<p><b>Bank:</b> ' + esc(settings.BankName) + '</p>' : '') +
@@ -2307,6 +2380,8 @@ function showAdminApp() {
   document.getElementById('adminApp').style.display = 'block';
   document.getElementById('currentUserLabel').textContent = STATE.user.username + ' (' + STATE.user.role + ')';
   if (STATE.publicData) renderShopStatusBadge_('adminShopStatusBadge', STATE.publicData.shopStatus);
+  renderAdminGreeting();
+  if (!STATE.greetingInterval) STATE.greetingInterval = setInterval(renderAdminGreeting, 60000);
 
   var branchSwitch = document.getElementById('ownerBranchSwitch');
   var hasBranches = (STATE.settings && STATE.settings.HasBranches) !== 'N';
@@ -2995,14 +3070,14 @@ function loadStaffTable() {
         return {
           photo: s.PhotoURL, fallbackIcon: 'user', title: s.Name,
           lines: [esc(s.Role), esc(s.Phone), esc(s.Specialties || '—'), s.CommissionRate + '% commission', s.Active === 'Y' ? statusBadge('Confirmed') : '<span class="badge badge-cancelled">Inactive</span>'],
-          actions: '<button class="btn btn-sm btn-outline" onclick=\'openStaffModal(' + JSON.stringify(s).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button><button class="btn btn-sm btn-danger" onclick="deleteStaffRow(\'' + s.StaffID + '\')">' + icon('trash', 13) + '</button>'
+          actions: '<button class="btn btn-sm btn-outline" onclick=\'openStaffModal(' + JSON.stringify(s).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button><button class="btn btn-sm btn-outline" onclick="openStaffLeaveModal(\'' + s.StaffID + '\',\'' + esc(s.Name).replace(/'/g, '&#39;') + '\')" title="Time Off">' + icon('calendar', 13) + '</button><button class="btn btn-sm btn-danger" onclick="deleteStaffRow(\'' + s.StaffID + '\')">' + icon('trash', 13) + '</button>'
         };
       });
     } else {
       host.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Name</th><th>Role</th><th>Phone</th><th>Specialties</th><th>Commission %</th><th>Active</th><th>Actions</th></tr></thead><tbody>' +
         rows.map(function (s) {
           return '<tr><td>' + esc(s.Name) + '</td><td>' + esc(s.Role) + '</td><td>' + esc(s.Phone) + '</td><td>' + esc(s.Specialties) + '</td><td>' + s.CommissionRate + '</td><td>' + s.Active + '</td>' +
-            '<td class="row-actions"><button class="btn btn-sm btn-outline" onclick=\'openStaffModal(' + JSON.stringify(s).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button><button class="btn btn-sm btn-danger" onclick="deleteStaffRow(\'' + s.StaffID + '\')">' + icon('trash', 13) + '</button></td></tr>';
+            '<td class="row-actions"><button class="btn btn-sm btn-outline" onclick=\'openStaffModal(' + JSON.stringify(s).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button><button class="btn btn-sm btn-outline" onclick="openStaffLeaveModal(\'' + s.StaffID + '\',\'' + esc(s.Name).replace(/'/g, '&#39;') + '\')">' + icon('calendar', 13) + ' Time Off</button><button class="btn btn-sm btn-danger" onclick="deleteStaffRow(\'' + s.StaffID + '\')">' + icon('trash', 13) + '</button></td></tr>';
         }).join('') + '</tbody></table></div>';
     }
   }).catch(function (err) { document.getElementById('staffTableHost').innerHTML = errorPanel(err); });
@@ -3044,6 +3119,39 @@ function openStaffModal(s) {
 function deleteStaffRow(id) {
   if (!confirm('Delete this staff member?')) return;
   api('deleteStaff', STATE.token, id).then(function () { toast('Deleted', 'success'); loadStaffTable(); }).catch(showError);
+}
+
+/** "Time Off" — one-off days a stylist won't be in, separate from their permanent weekly WorkDays schedule. Booking availability excludes them on these dates automatically. */
+function openStaffLeaveModal(staffId, staffName) {
+  var html = '<p class="muted">' + esc(staffName) + ' won\'t be offered as available on these dates, in the public booking wizard and Manage Slots. Their regular weekly schedule is unaffected.</p>' +
+    '<div class="form-row2"><div class="form-row"><label>Date</label><input type="date" id="leaveDate" value="' + isoToday() + '"></div>' +
+    '<div class="form-row"><label>Reason (optional)</label><input type="text" id="leaveReason" placeholder="Sick, vacation…"></div></div>' +
+    '<button type="button" class="btn btn-sm btn-accent" id="leaveAddBtn">' + icon('plus', 13) + ' Add Day Off</button>' +
+    '<h4 style="margin:18px 0 8px;">Upcoming Days Off</h4><div id="leaveListHost"><p class="muted">Loading…</p></div>';
+  openModal('Time Off — ' + staffName, html, null, null);
+  document.getElementById('leaveAddBtn').addEventListener('click', function () {
+    var date = document.getElementById('leaveDate').value;
+    if (!date) { toast('Pick a date', 'error'); return; }
+    api('addStaffLeave', STATE.token, staffId, date, document.getElementById('leaveReason').value).then(function () {
+      toast('Day off added', 'success');
+      document.getElementById('leaveReason').value = '';
+      loadStaffLeaveList(staffId);
+    }).catch(showError);
+  });
+  loadStaffLeaveList(staffId);
+}
+function loadStaffLeaveList(staffId) {
+  api('getStaffLeave', STATE.token, staffId).then(function (rows) {
+    var host = document.getElementById('leaveListHost');
+    if (!host) return; // modal may have been closed before this resolved
+    if (!rows.length) { host.innerHTML = '<p class="muted">No upcoming days off.</p>'; return; }
+    host.innerHTML = renderTable(['Date', 'Reason', ''], rows.map(function (l) {
+      return [esc(formatNiceDate(l.Date)), esc(l.Reason || '—'), '<button class="btn btn-sm btn-outline" onclick="removeStaffLeaveRow(\'' + l.LeaveID + '\',\'' + staffId + '\')">' + icon('trash', 13) + '</button>'];
+    }));
+  }).catch(function (err) { var host = document.getElementById('leaveListHost'); if (host) host.innerHTML = errorPanel(err); });
+}
+function removeStaffLeaveRow(leaveId, staffId) {
+  api('removeStaffLeave', STATE.token, leaveId).then(function () { toast('Removed', 'success'); loadStaffLeaveList(staffId); }).catch(showError);
 }
 
 /* ---------- INVENTORY ---------- */
@@ -3144,14 +3252,16 @@ function openBranchModal(b) {
     '<div><label>Name</label><input id="brName" value="' + esc(b.Name || '') + '"></div>' +
     '<div><label>Location</label><input id="brLocation" value="' + esc(b.Location || '') + '"></div>' +
     '<div><label>Phone</label><input id="brPhone" value="' + esc(b.Phone || '') + '"></div>' +
-    '<div><label>Opening Hours</label><input id="brHours" value="' + esc(b.OpeningHours || '') + '"></div>' +
-    '</div>';
+    '</div>' +
+    '<h4 style="margin:18px 0 4px;">Working Hours</h4><p class="muted" style="margin-bottom:10px;">This branch\'s own hours — shown to customers and used to generate its booking time slots.</p>' +
+    weeklyHoursEditorHtml(parseWeeklyHoursClient_(b));
   openModal(b.BranchID ? 'Edit Branch' : 'Add Branch', html, function () {
     api('saveBranch', STATE.token, {
       BranchID: b.BranchID || '', Name: document.getElementById('brName').value, Location: document.getElementById('brLocation').value,
-      Phone: document.getElementById('brPhone').value, OpeningHours: document.getElementById('brHours').value
+      Phone: document.getElementById('brPhone').value, WeeklyHours: collectWeeklyHours()
     }).then(function () { toast('Branch saved', 'success'); closeModal(); loadBranchesTable(); }).catch(showError);
   }, 'Save');
+  bindWeeklyHoursEditor();
 }
 function deleteBranchRow(id) {
   if (!confirm('Delete this branch? This cannot be undone.')) return;
@@ -3587,7 +3697,11 @@ function renderSettingsAdmin(content) {
       '</select></div>' +
       field('Slot Interval (minutes)', 'stSlotIntervalMinutes', s.SlotIntervalMinutes) +
       '</div>' +
-      '<h4 style="margin:20px 0 4px;">Working Hours</h4><p class="muted" style="margin-bottom:12px;">Set when you\'re open each day. This controls the time slots offered in the booking wizard <b>and</b> what\'s shown to customers on the public site, including a live Open/Closed indicator. Need to close one specific date (a holiday, a one-off closure)? Use <b>Manage Slots</b> in the sidebar instead.</p>' +
+      '<h4 style="margin:20px 0 4px;">Working Hours' + (s.HasBranches === 'N' ? '' : ' (single-shop mode only)') + '</h4><p class="muted" style="margin-bottom:12px;">' +
+      (s.HasBranches === 'N'
+        ? 'Set when you\'re open each day. This controls the time slots offered in the booking wizard <b>and</b> what\'s shown to customers on the public site, including a live Open/Closed indicator.'
+        : 'You have multiple branches switched on, so <b>each branch sets its own hours instead</b> — edit them from the branch\'s own Edit button on the Branches page. This schedule here only takes effect if you switch back to "just one shop" above.') +
+      ' Need to close one specific date (a holiday, a one-off closure)? Use <b>Manage Slots</b> in the sidebar instead.</p>' +
       weeklyHoursEditorHtml(parseWeeklyHoursClient_(s)) +
       '</div></div>' +
 
@@ -3595,13 +3709,19 @@ function renderSettingsAdmin(content) {
       field('Tax Rate (%)', 'stTaxRatePercent', s.TaxRatePercent) +
       field('Loyalty Points per GH₵1 spent', 'stLoyaltyPointsPerCedi', s.LoyaltyPointsPerCedi) +
       field('Points needed for GH₵1 discount', 'stLoyaltyRedeemRate', s.LoyaltyRedeemRate) +
-      '</div><h4 style="margin:20px 0 4px;">Accepted Payment Methods</h4><p class="muted" style="margin-bottom:10px;">Tap to switch which options customers see at checkout — hide any network or method you don\'t actually support. Keep at least one on.</p>' +
+      '</div><h4 style="margin:20px 0 4px;">Accepted Payment Methods</h4><p class="muted" style="margin-bottom:10px;">Tap to switch which options customers see at checkout. A mobile money network or Bank Transfer only actually shows to customers once you\'ve also filled in its number/account details below — an empty one is hidden automatically even if switched on here. Keep at least one on.</p>' +
       '<div class="day-picker" id="stPaymentMethodsPicker">' + PAYMENT_METHOD_OPTIONS.map(function (m) {
         return '<span class="day-chip' + (activePaymentMethodsFrom_(s).indexOf(m) > -1 ? ' active' : '') + '" data-method="' + esc(m) + '">' + esc(m) + '</span>';
       }).join('') + '</div>' +
-      '<h4 style="margin:20px 0 4px;">Pay-at-Booking Details</h4><p class="muted" style="margin-bottom:12px;">Shown to customers at checkout when they choose Mobile Money or Bank Transfer, so they know where to send payment before uploading their screenshot.</p><div class="field-grid">' +
-      field('MTN/Vodafone/Telecel/AirtelTigo Number', 'stMomoNumber', s.MomoNumber) +
-      field('Name on Mobile Money Account', 'stMomoName', s.MomoName) +
+      '<h4 style="margin:20px 0 4px;">Pay-at-Booking Details</h4><p class="muted" style="margin-bottom:12px;">Shown to customers at checkout when they choose one of these to pay now, so they know exactly where to send payment before uploading their screenshot. Leave a network blank if you don\'t use it — it just won\'t be offered.</p><div class="field-grid">' +
+      field('MTN MoMo Number', 'stMomoNumber', s.MomoNumber) +
+      field('Name on MTN MoMo Account', 'stMomoName', s.MomoName) +
+      field('Vodafone Cash Number', 'stVodafoneCashNumber', s.VodafoneCashNumber) +
+      field('Name on Vodafone Cash Account', 'stVodafoneCashName', s.VodafoneCashName) +
+      field('Telecel Cash Number', 'stTelecelCashNumber', s.TelecelCashNumber) +
+      field('Name on Telecel Cash Account', 'stTelecelCashName', s.TelecelCashName) +
+      field('AirtelTigo Money Number', 'stAirtelTigoMoneyNumber', s.AirtelTigoMoneyNumber) +
+      field('Name on AirtelTigo Money Account', 'stAirtelTigoMoneyName', s.AirtelTigoMoneyName) +
       field('Bank Name', 'stBankName', s.BankName) +
       field('Bank Account Name', 'stBankAccountName', s.BankAccountName) +
       field('Bank Account Number', 'stBankAccountNumber', s.BankAccountNumber) +
@@ -3838,6 +3958,9 @@ function saveAllSettings() {
       TaxRatePercent: document.getElementById('stTaxRatePercent').value, LoyaltyPointsPerCedi: document.getElementById('stLoyaltyPointsPerCedi').value,
       LoyaltyRedeemRate: document.getElementById('stLoyaltyRedeemRate').value,
       MomoNumber: document.getElementById('stMomoNumber').value, MomoName: document.getElementById('stMomoName').value,
+      VodafoneCashNumber: document.getElementById('stVodafoneCashNumber').value, VodafoneCashName: document.getElementById('stVodafoneCashName').value,
+      TelecelCashNumber: document.getElementById('stTelecelCashNumber').value, TelecelCashName: document.getElementById('stTelecelCashName').value,
+      AirtelTigoMoneyNumber: document.getElementById('stAirtelTigoMoneyNumber').value, AirtelTigoMoneyName: document.getElementById('stAirtelTigoMoneyName').value,
       BankName: document.getElementById('stBankName').value, BankAccountName: document.getElementById('stBankAccountName').value,
       BankAccountNumber: document.getElementById('stBankAccountNumber').value,
       ActivePaymentMethods: Array.prototype.slice.call(document.querySelectorAll('#stPaymentMethodsPicker .day-chip.active')).map(function (el) { return el.dataset.method; }).join(','),
@@ -3937,7 +4060,7 @@ function loadSlotsAdmin() {
   host.innerHTML = '<p class="muted">Loading…</p>';
   api('getSlotsForAdmin', STATE.token, branchId, date).then(function (res) {
     if (!res.dayOpen) {
-      host.innerHTML = '<p class="muted">' + icon('info', 15) + ' The shop is closed on this day per your Working Hours (Settings → Booking) — no slots to manage.</p>';
+      host.innerHTML = '<p class="muted">' + icon('info', 15) + ' This branch is closed on this day per its Working Hours — no slots to manage.</p>';
       return;
     }
     var slots = res.slots;
