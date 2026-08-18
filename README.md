@@ -16,31 +16,36 @@ A complete, production-ready **Barber & Salon management system for Ghana**, bui
 - **Step-by-step booking wizard**: Branch → Service (with category filter) → Stylist (with live "Available/Not Available" status and working-day tags, or "Anyone") → a real calendar with a live availability grid per time slot → your details → a review-and-confirm summary — ending in a polished confirmation screen with your booking reference. Ghana phone number validation throughout (`0XXXXXXXXX` or `+233XXXXXXXXX`)
 - SMS/Email confirmation the moment a booking is submitted
 - Customer reviews display **plus a public "Leave a Review" star-rating form**
-- Contact section: click-to-call, WhatsApp deep link, embedded Google Map, opening hours
+- **"My Bookings"** — a customer enters the phone number they booked with to see their full appointment history and reference numbers, and can self-cancel an upcoming Pending/Confirmed booking
+- Contact section: click-to-call, WhatsApp deep link, embedded Google Map, opening hours, **social media icon row** (only shows platforms the Owner has filled in)
+- A floating **WhatsApp button** (pre-filled "I'd like to book an appointment" message) and a floating **chat-bubble FAQ assistant** that answers from your live services/prices/hours/contact data — a fast rule-based assistant, not a paid generative AI, so it works with no API key or ongoing cost
 - A small hand-built inline-SVG icon set throughout (no emoji, no icon-font download)
 
 ### Admin / staff dashboard (role-based: Owner, Manager, Staff, Receptionist)
-- Secure login (SHA-256 salted password hashing, session tokens via `CacheService`)
-- Overview dashboard: today's revenue, today's appointments, upcoming bookings, low-stock alerts, plus a **7-day revenue trend chart**
+- Secure login (SHA-256 salted password hashing, session tokens via `CacheService`); show/hide password toggle; staff can **self-register**, created inactive with the lowest-privilege role until an Owner approves them in Users
+- Overview dashboard: today's revenue, today's appointments, upcoming bookings, low-stock alerts, a **7-day revenue trend chart**, and **Tomorrow / This Week / Next Week / This Month** booking-volume counters
+- A **notification bell** in the topbar badges new Pending bookings in real time (polls every 60s) with a quick-view dropdown, plus a one-click **refresh** button
 - Appointment management: confirm / reschedule / cancel / mark completed / no-show, filter by branch, staff, date, status; live per-slot availability prevents double-booking
-- Point of Sale (POS): add services/products to a cart, discounts, **Cash / MTN MoMo / Vodafone Cash / Telecel Cash / AirtelTigo Money / Card**, printable receipt
-- Staff management with commission rates, **working-day scheduling** (drives booking-wizard availability), and a photo picker (upload or paste a URL, with live preview)
+- **Manage Slots** — pick a branch and date and click any time slot to close it (lunch break, fully booked, holiday) so it's never offered in the public booking wizard; already-booked slots are shown separately and can't be closed out from under a customer
+- Point of Sale (POS): add services/products to a cart (with **photo thumbnails**), discounts, **Cash / MTN MoMo / Vodafone Cash / Telecel Cash / AirtelTigo Money / Card**, a **modern, colorful branded receipt** (your logo/theme colors, not plain text) with a Print button. The cart defaults to a **walk-in sale** (no customer lookup required) with a one-click "Register customer" toggle for when you do want to capture loyalty points
+- **Services page** — a dedicated admin screen to add/edit/photograph exactly the menu the POS sells from (name, category, price, duration, branch, active flag, photo)
+- Staff management with commission rates, **working-day scheduling** (drives booking-wizard availability, and is shown to customers on the public Team section too), and a photo picker
 - Inventory management with low-stock alerts and restock logging
 - Customer CRM: profiles, visit & purchase history, loyalty points
 - Multi-branch support with an "All Branches" consolidated view for the Owner
-- Reports: revenue by day, best-selling services, staff performance/commissions, expenses vs income, **CSV and PDF export**, all shown as **built-in inline-SVG charts** (revenue trend line, best-seller bars, payment-method donut, staff performance bars) — no external charting library
+- Reports: revenue by day, best-selling services, staff performance/commissions, expenses vs income, **CSV and PDF export**, shown as **vibrant built-in inline-SVG charts** — a revenue trend line, best-seller/staff-performance bar charts, and a true **pie chart** for payment methods that separates every Mobile Money network (MTN MoMo, Vodafone Cash, Telecel Cash, AirtelTigo Money) plus Cash and Card, by both amount **and transaction count** — no external charting library
 - Expense tracking per branch
-- **Theme customization** — Owner can change primary/secondary/accent/background/text colors live from Settings, plus business name, tagline, and logo (photo picker with preview)
-- **Photo gallery manager** — Owner/Manager can add/edit/reorder photos that showcase the salon's work on the public site
-- **Hero carousel & image manager** — Owner/Manager can add/edit/reorder hero slides and upload images directly to Google Drive (no external image host needed)
-- **Services page** — a dedicated admin screen to add/edit/photograph exactly the menu the POS sells from (name, category, price, duration, branch, active flag, photo)
-- Point of Sale item grid shows a **photo thumbnail** for every service/product; the cart defaults to a **walk-in sale** (no customer lookup required) with a one-click "Register customer" toggle for the times you do want to capture loyalty points
+- **Branding & Theme, now organized into tabs** — Branding, Theme & Colors (with live preview), Social & Contact, Booking, Payments & Loyalty, SMS Gateway, and QR Code
+- **Social media links** — Owner adds Facebook/Instagram/Twitter(X)/TikTok/YouTube URLs once; only the ones filled in appear as icons on the public site
+- **Photo gallery manager** and **Hero carousel manager** — add/edit/reorder site photos and slides, uploaded straight to Google Drive
 - Every "image URL" field across Staff, Services, Products, Hero Slides, Gallery, and the Logo uses the same **upload-or-paste photo picker with a live thumbnail preview**
-- **Booking QR code** — a "Scan to Book" card styled with your logo and theme colors, generated live in Branding & Theme, with a one-click Print button (save as PDF or print to hand out at the shop)
-- Dark/light mode toggle for the dashboard UI; the admin sidebar collapses into a compact scrollable icon strip on mobile instead of pushing content off-screen
+- **Booking QR code** — a "Scan to Book" card styled with your logo and theme colors, with a one-click Print button
+- **SMS module** — a dedicated page showing sent/failed/simulated counts, live Arkesel balance (when configured), full delivery history, and a form to **broadcast an SMS to selected staff**
+- **Admin FAQ chat assistant** (bottom-right bubble) answers "how do I…" questions with instructions tailored to this dashboard's own pages
+- **About page** with system credit
+- Dark/light mode toggle (now a clearly visible icon button in both themes); the admin sidebar collapses into a compact scrollable icon strip on mobile instead of pushing content off-screen; every input/select/search field across the whole app shares one modern rounded, focus-ringed style; toast notifications got a modern icon+color redesign
 - SMS + **branded HTML Email** notifications (business logo, name, and theme colors in a proper header banner, not plain text): booking confirmation, status updates, appointment reminders, **post-service "thank you" with loyalty points earned**, sales receipts — via `MailApp` and a pluggable SMS gateway (Arkesel or Hubtel, both popular in Ghana), with a "simulate" mode for testing before you have SMS credentials
-- User management (create staff logins, assign roles/branches, reset passwords); staff can also **self-register** from the login screen — new accounts are created inactive with the lowest-privilege role until an Owner reviews and activates them in Users
-- Login screen has a show/hide password toggle
+- User management (create staff logins, assign roles/branches, reset passwords, approve self-registrations)
 
 ### Ghana-specific details
 - All monetary values shown as **GH₵** with 2 decimal places
@@ -68,8 +73,9 @@ A complete, production-ready **Barber & Salon management system for Ghana**, bui
 | HeroSlides | SlideID, ImageURL, Title, Subtitle, ButtonText, ButtonLink, SortOrder, Active |
 | Gallery | GalleryID, ImageURL, Caption, Category, BranchID, SortOrder, Active |
 | Notifications | NotificationID, Type, Recipient, Message, Status, Date |
+| BlockedSlots | BlockedSlotID, BranchID, Date, TimeSlot |
 
-`Staff.WorkDays` is a comma-separated list of weekday abbreviations (e.g. `Mon,Tue,Wed,Thu,Fri,Sat`) that drives each stylist's "Available/Not Available" status and the calendar in the public booking wizard. `Settings` also stores `BookingStartHour`, `BookingEndHour`, and `SlotIntervalMinutes`, which control the time slots offered in the wizard (defaults: 9am–6pm, 30-minute slots). `Users.FullName` is captured so an Owner can tell who a pending self-registered account actually belongs to before approving it.
+`Staff.WorkDays` is a comma-separated list of weekday abbreviations (e.g. `Mon,Tue,Wed,Thu,Fri,Sat`) that drives each stylist's "Available/Not Available" status and the calendar in the public booking wizard. `Settings` also stores `BookingStartHour`, `BookingEndHour`, `SlotIntervalMinutes` (control the time slots offered — defaults: 9am–6pm, 30-minute slots), and `SocialFacebook`/`SocialInstagram`/`SocialTwitter`/`SocialTiktok`/`SocialYoutube`. `Users.FullName` is captured so an Owner can tell who a pending self-registered account actually belongs to before approving it. A row in `BlockedSlots` closes one time slot, branch-wide, on one date — managed from the **Manage Slots** admin page.
 
 The schema self-heals: if a sheet or column above is missing from an already-deployed spreadsheet (e.g. you update to a newer version of this app that added a column), the next page load automatically creates/fixes it — no manual re-run of `setupSheets()` needed.
 

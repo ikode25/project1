@@ -99,12 +99,22 @@
   .branch-select-bar { display: flex; justify-content: center; margin-bottom: 30px; }
   .branch-select-bar select { padding: 10px 16px; border-radius: 8px; border: 1px solid #ddd; min-width: 260px; }
 
-  .svc-category { margin-bottom: 30px; }
-  .svc-category h3 { color: var(--clr-secondary); border-bottom: 2px solid var(--clr-secondary); padding-bottom: 6px; margin-bottom: 14px; display: inline-block; }
-  .svc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
-  .svc-card { background: #fff; border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px; }
-  .svc-card .price { font-size: 1.3rem; font-weight: 800; color: var(--clr-primary); }
-  .svc-card .dur { color: #888; font-size: .85rem; display: flex; align-items: center; gap: 5px; }
+  .svc-category { margin-bottom: 34px; }
+  .svc-category h3 { color: var(--clr-secondary); border-bottom: 2px solid var(--clr-secondary); padding-bottom: 6px; margin-bottom: 16px; display: inline-block; font-size: 1.1rem; letter-spacing: .3px; }
+  .svc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; }
+  .svc-card {
+    background: #fff; border-radius: 16px; box-shadow: 0 3px 16px rgba(0,0,0,.06); overflow: hidden;
+    display: flex; flex-direction: column; transition: transform .2s ease, box-shadow .2s ease;
+  }
+  .svc-card:hover { transform: translateY(-4px); box-shadow: 0 10px 26px rgba(0,0,0,.12); }
+  .svc-photo { height: 140px; background-size: cover; background-position: center; background-color: #eee; }
+  .svc-photo-empty { display: flex; align-items: center; justify-content: center; color: #b8b4a8; }
+  .svc-card-body { padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 6px; flex: 1; }
+  .svc-card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 1.02rem; }
+  .svc-card-head .muted { font-size: .76rem; }
+  .svc-card-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; margin-bottom: 6px; }
+  .svc-card .price { font-size: 1.25rem; font-weight: 800; color: var(--clr-primary); }
+  .svc-card .dur { color: #888; font-size: .82rem; display: flex; align-items: center; gap: 5px; }
 
   .staff-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
   .staff-card { background: #fff; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); text-align: center; }
@@ -142,8 +152,8 @@
   .wizard-card.disabled { opacity: .45; cursor: not-allowed; }
   .wizard-card h4 { margin: 0 0 4px; }
   .wizard-card .price { font-weight: 800; margin-top: 8px; }
-  .wizard-card .tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0; }
-  .wizard-card .tag { background: #eee; border-radius: 999px; padding: 2px 9px; font-size: .72rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+  .tags { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0; }
+  .tag { background: #eee; border-radius: 999px; padding: 2px 9px; font-size: .72rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
   .wizard-card .status { display: flex; align-items: center; gap: 6px; font-size: .8rem; font-weight: 700; margin-top: 6px; }
   .wizard-card .status.avail { color: #1c7c3c; }
   .wizard-card.selected .status.avail { color: #145c2c; }
@@ -165,6 +175,11 @@
   .time-slot { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px; border-radius: 8px; background: #fafafa; cursor: pointer; font-size: .85rem; font-weight: 600; border: 2px solid transparent; }
   .time-slot.unavailable { opacity: .4; cursor: not-allowed; text-decoration: line-through; }
   .time-slot.selected { border-color: var(--clr-accent); background: var(--clr-accent); color: #1a1a1a; }
+  .time-slot.slot-blocked { background: #fbe0e0; color: #b32424; font-weight: 700; }
+  .time-slot.slot-booked { background: #e8e8e8; color: #999; cursor: not-allowed; font-weight: 700; }
+  #adminApp.dark .time-slot { background: #262a31; }
+  #adminApp.dark .time-slot.slot-blocked { background: #3a2020; color: #ff9d9d; }
+  #adminApp.dark .time-slot.slot-booked { background: #2a2e37; color: #777; }
 
   .confirm-card { background: #fafafa; border-radius: 10px; padding: 20px; margin-bottom: 18px; }
   .confirm-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; font-size: .92rem; gap: 12px; }
@@ -273,6 +288,37 @@
   .admin-topbar h2 { margin: 0; }
   .admin-topbar-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   select.branch-switch { padding: 8px 12px; border-radius: 8px; border: 1px solid #ccc; }
+
+  /* Icon-only topbar buttons (dark mode, refresh, notifications) — explicit
+     colors on both themes so they're never invisible-on-invisible. */
+  .icon-btn {
+    display: flex; align-items: center; justify-content: center; width: 38px; height: 38px;
+    border-radius: 10px; border: 1.5px solid #ddd; background: #fff; color: #1a1a1a; cursor: pointer; flex-shrink: 0;
+  }
+  .icon-btn:hover { border-color: var(--clr-accent); color: var(--clr-accent); }
+  #adminApp.dark .icon-btn { background: #23262d; border-color: #383d47; color: #e8e8e8; }
+  #adminApp.dark .icon-btn:hover { border-color: var(--clr-accent); color: var(--clr-accent); }
+  .icon-btn.spinning svg { animation: spin .6s linear; }
+  @keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+
+  .bell-wrap { position: relative; }
+  .bell-badge {
+    position: absolute; top: -5px; right: -5px; background: #c0392b; color: #fff; font-size: .65rem; font-weight: 800;
+    min-width: 18px; height: 18px; border-radius: 999px; display: flex; align-items: center; justify-content: center; padding: 0 4px;
+    border: 2px solid #fff;
+  }
+  #adminApp.dark .bell-badge { border-color: #14161a; }
+  .bell-dropdown {
+    position: absolute; top: 46px; right: 0; width: 300px; background: #fff; border-radius: 12px; box-shadow: var(--shadow);
+    padding: 10px; z-index: 60; max-height: 360px; overflow-y: auto;
+  }
+  #adminApp.dark .bell-dropdown { background: #1e2127; }
+  .bell-item { display: block; padding: 10px 10px; border-radius: 8px; font-size: .82rem; border-bottom: 1px solid #f0f0f0; }
+  #adminApp.dark .bell-item { border-bottom-color: #2a2e37; }
+  .bell-item:hover { background: #f7f5f2; }
+  #adminApp.dark .bell-item:hover { background: #262a31; }
+  .bell-item b { display: block; }
+  .bell-empty { padding: 14px; text-align: center; color: #888; font-size: .85rem; }
   @media (max-width: 860px) {
     .admin-main { padding: 14px 14px 40px; }
     .admin-topbar h2 { font-size: 1.2rem; }
@@ -327,8 +373,30 @@
   .color-field { display: flex; align-items: center; gap: 8px; }
   .color-field input[type=color] { width: 46px; height: 36px; border: none; padding: 0; background: none; }
 
+  .settings-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; border-bottom: 1px solid #e5e2da; padding-bottom: 10px; }
+  #adminApp.dark .settings-tabs { border-bottom-color: #2a2e37; }
+  .settings-tab {
+    display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; border: 1.5px solid #e5e2da;
+    background: #fff; color: inherit; font-size: .82rem; font-weight: 600; cursor: pointer;
+  }
+  #adminApp.dark .settings-tab { background: #1e2127; border-color: #2a2e37; }
+  .settings-tab.active { background: var(--clr-accent); border-color: var(--clr-accent); color: #1a1a1a; }
+  .settings-tab:hover:not(.active) { border-color: var(--clr-accent); }
+
   .receipt-box { font-family: monospace; font-size: .85rem; background: #fafafa; border: 1px dashed #999; padding: 16px; }
   .receipt-box hr { border: none; border-top: 1px dashed #999; }
+
+  .receipt-modern { border-radius: 14px; overflow: hidden; box-shadow: 0 6px 20px rgba(0,0,0,.12); }
+  .receipt-modern .rh { background: linear-gradient(135deg, var(--clr-primary), var(--clr-accent)); color: #fff; padding: 24px 22px 18px; text-align: center; }
+  .receipt-modern .rh img { height: 38px; border-radius: 8px; margin: 0 auto 8px; }
+  .receipt-modern .rh .check { color: #fff; }
+  .receipt-modern .rbody { background: #fff; padding: 20px 22px; color: #1a1a1a; }
+  .receipt-line { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #eee; font-size: .9rem; }
+  .receipt-line .qty { color: #888; font-size: .78rem; }
+  .receipt-total-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: .88rem; color: #666; }
+  .receipt-total-row.grand { font-size: 1.2rem; font-weight: 800; color: var(--clr-primary); border-top: 2px solid #eee; margin-top: 8px; padding-top: 12px; }
+  .receipt-pay-badge { display: inline-flex; align-items: center; gap: 6px; background: #f0eee8; padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: .8rem; margin-top: 10px; }
+  .receipt-footer { text-align: center; padding: 14px; color: #888; font-size: .78rem; background: #fafaf8; }
 
   /* Charts */
   .hbar-chart { display: flex; flex-direction: column; gap: 10px; }
@@ -346,6 +414,96 @@
   @media print {
     #adminApp .admin-sidebar, #adminApp .admin-topbar, .modal-backdrop .btn, #navToggle { display: none !important; }
   }
+
+  /* ============================================================
+     GLOBAL MODERN FIELD STYLING — every text-like input, select,
+     and textarea site-wide (public + admin), including any not
+     wrapped in a specific layout class, so nothing looks like a
+     raw browser-default field. Declared last so it wins the
+     cascade over the earlier layout-specific rules for border/
+     background/radius while leaving their width/margin alone.
+     ============================================================ */
+  input[type="text"], input[type="search"], input[type="tel"], input[type="email"],
+  input[type="password"], input[type="number"], input[type="date"], input[type="time"],
+  input[type="url"], select, textarea {
+    border: 1.5px solid #e3e0d8;
+    border-radius: 10px;
+    background: #fafaf8;
+    padding: 10px 13px;
+    color: inherit;
+    transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+  }
+  input[type="text"]:focus, input[type="search"]:focus, input[type="tel"]:focus, input[type="email"]:focus,
+  input[type="password"]:focus, input[type="number"]:focus, input[type="date"]:focus, input[type="time"]:focus,
+  input[type="url"]:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--clr-accent);
+    box-shadow: 0 0 0 1px var(--clr-accent), 0 0 0 4px rgba(0,0,0,.05);
+    background: #ffffff;
+  }
+  input::placeholder, textarea::placeholder { color: #a8a49a; }
+  #adminApp.dark input, #adminApp.dark select, #adminApp.dark textarea { background: #23262d; border-color: #383d47; color: #e8e8e8; }
+  #adminApp.dark input:focus, #adminApp.dark select:focus, #adminApp.dark textarea:focus { background: #262a31; box-shadow: 0 0 0 1px var(--clr-accent), 0 0 0 4px rgba(0,0,0,.35); }
+  #adminApp.dark input::placeholder, #adminApp.dark textarea::placeholder { color: #6b7280; }
+  input[type="color"] { border: none; border-radius: 8px; cursor: pointer; }
+
+  /* ---------- Modern toast ---------- */
+  .toast {
+    display: flex; align-items: center; gap: 10px; padding: 14px 18px 14px 16px; border-radius: 12px;
+    color: #fff; background: rgba(26,26,26,.94); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 10px 30px rgba(0,0,0,.22); font-size: .88rem; font-weight: 600;
+    border-left: 4px solid var(--clr-accent); animation: toastIn .28s cubic-bezier(.2,.8,.2,1);
+  }
+  .toast.success { background: rgba(22,101,52,.96); border-left-color: #6fe6a0; }
+  .toast.error { background: rgba(176,42,42,.96); border-left-color: #ffb4ab; }
+  .toast .toast-ic { flex-shrink: 0; display: flex; }
+  @keyframes toastIn { from { transform: translateY(14px) scale(.96); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+
+  /* ---------- Social icons, credit line ---------- */
+  .social-row { display: flex; gap: 10px; margin-top: 18px; }
+  .social-badge {
+    width: 38px; height: 38px; border-radius: 50%; background: var(--clr-primary); color: #fff;
+    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: .85rem;
+    transition: transform .15s ease, background .15s ease;
+  }
+  .social-badge:hover { background: var(--clr-accent); color: #1a1a1a; transform: translateY(-2px); }
+  .credit-line { font-size: .74rem; opacity: .6; margin-top: 10px; }
+  .credit-line a { text-decoration: underline; }
+
+  /* ---------- Floating WhatsApp button ---------- */
+  .wa-float {
+    position: fixed; bottom: 24px; right: 24px; width: 56px; height: 56px; border-radius: 50%;
+    background: #25d366; color: #fff; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 20px rgba(0,0,0,.25); z-index: 500; animation: waPulse 2.4s ease-in-out infinite;
+  }
+  @keyframes waPulse { 0%, 100% { box-shadow: 0 6px 20px rgba(0,0,0,.25), 0 0 0 0 rgba(37,211,102,.5); } 50% { box-shadow: 0 6px 20px rgba(0,0,0,.25), 0 0 0 10px rgba(37,211,102,0); } }
+
+  /* ---------- Chat widget (FAQ assistant) ---------- */
+  .chat-bubble-btn {
+    position: fixed; bottom: 24px; right: 92px; width: 56px; height: 56px; border-radius: 50%;
+    background: var(--clr-primary); color: #fff; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 20px rgba(0,0,0,.25); z-index: 500; cursor: pointer; border: none;
+  }
+  #adminApp.dark .chat-bubble-btn { background: var(--clr-accent); color: #1a1a1a; }
+  .chat-panel {
+    position: fixed; bottom: 90px; right: 24px; width: 320px; max-width: calc(100vw - 40px); max-height: 440px;
+    background: #fff; border-radius: 16px; box-shadow: 0 14px 40px rgba(0,0,0,.25); display: flex; flex-direction: column;
+    z-index: 500; overflow: hidden;
+  }
+  #adminApp.dark .chat-panel { background: #1e2127; color: #e8e8e8; }
+  .chat-panel-head { background: var(--clr-primary); color: #fff; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; }
+  .chat-panel-body { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; min-height: 180px; }
+  .chat-msg { max-width: 85%; padding: 9px 12px; border-radius: 12px; font-size: .84rem; line-height: 1.4; }
+  .chat-msg.bot { background: #f2f0eb; align-self: flex-start; border-bottom-left-radius: 4px; }
+  #adminApp.dark .chat-msg.bot { background: #262a31; }
+  .chat-msg.user { background: var(--clr-accent); color: #1a1a1a; align-self: flex-end; border-bottom-right-radius: 4px; }
+  .chat-quick-replies { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 10px; }
+  .chat-quick-replies button { background: #f2f0eb; border: 1px solid #e5e2da; border-radius: 999px; padding: 6px 12px; font-size: .76rem; cursor: pointer; }
+  #adminApp.dark .chat-quick-replies button { background: #262a31; border-color: #383d47; color: #e8e8e8; }
+  .chat-panel-input { display: flex; gap: 8px; padding: 10px; border-top: 1px solid #eee; }
+  #adminApp.dark .chat-panel-input { border-top-color: #2a2e37; }
+  .chat-panel-input input { flex: 1; }
+  .chat-panel-input button { background: var(--clr-accent); color: #1a1a1a; border: none; border-radius: 10px; width: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 </style>
 
 <div id="loadingBar"></div>
@@ -362,6 +520,7 @@
         <a href="#team">Our Team</a>
         <a href="#gallery">Gallery</a>
         <a href="#booking">Book Now</a>
+        <a href="#mybookings">My Bookings</a>
         <a href="#reviews">Reviews</a>
         <a href="#contact">Contact</a>
         <a href="#admin" id="adminLoginLink" title="Staff Login" aria-label="Staff Login"></a>
@@ -409,7 +568,21 @@
     </div>
   </section>
 
-  <section class="pub alt" id="reviews">
+  <section class="pub alt" id="mybookings">
+    <div class="container">
+      <h2 class="section-title">Track Your Bookings</h2>
+      <p class="section-sub">Enter the phone number you booked with to see your appointment history</p>
+      <div class="book-wrap">
+        <form id="myBookingsForm" style="display:flex;gap:10px;flex-wrap:wrap;">
+          <input type="tel" id="mbPhone" placeholder="024XXXXXXX or +233XXXXXXXXX" style="flex:1;min-width:220px;" required>
+          <button type="submit" class="btn btn-accent">Find My Bookings</button>
+        </form>
+        <div id="myBookingsResults" style="margin-top:20px;"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="pub" id="reviews">
     <div class="container">
       <h2 class="section-title">What Our Customers Say</h2>
       <div class="reviews-grid" id="reviewsList">Loading reviews…</div>
@@ -436,6 +609,7 @@
         <div class="contact-item"><span class="ic" id="icChat"></span><div><b>WhatsApp</b><br><a id="contactWaLink" href="#" target="_blank">Chat with us</a></div></div>
         <div class="contact-item"><span class="ic" id="icMail"></span><div><b>Email</b><br><a id="contactEmailLink" href="#"></a></div></div>
         <div class="contact-item"><span class="ic" id="icClock"></span><div><b>Opening Hours</b><br><span id="contactHours"></span></div></div>
+        <div class="social-row" id="socialRow"></div>
       </div>
       <iframe id="contactMap" loading="lazy" src=""></iframe>
     </div>
@@ -445,8 +619,15 @@
     <div class="container">
       <p id="footerBrand">© <span id="footerYear"></span> Salon</p>
       <p><a href="#admin">Staff / Admin Login</a></p>
+      <p class="credit-line">Powered by this system &middot; Developed by Quecci Manuel (Manuel Scripts) &middot;
+        <a href="https://wa.me/233547359015" target="_blank" rel="noopener">WhatsApp</a> &middot;
+        <a href="https://www.youtube.com/@manuelspctips" target="_blank" rel="noopener">YouTube</a>
+      </p>
     </div>
   </footer>
+
+  <a href="#" id="waFloatBtn" class="wa-float" target="_blank" rel="noopener" title="Chat on WhatsApp" aria-label="Chat on WhatsApp"></a>
+  <div id="chatWidget"></div>
 </div>
 
 <!-- ============================================================ ADMIN LOGIN ============================================================ -->
@@ -502,7 +683,13 @@
         <h2 id="pageTitle">Overview</h2>
         <div class="admin-topbar-actions">
           <select class="branch-switch hidden" id="ownerBranchSwitch"></select>
-          <button class="btn btn-sm btn-outline" id="darkModeToggle"></button>
+          <button class="icon-btn" id="reloadBtn" title="Refresh this page's data" aria-label="Refresh"></button>
+          <div class="bell-wrap">
+            <button class="icon-btn" id="bellBtn" title="New bookings" aria-label="Notifications"></button>
+            <span class="bell-badge hidden" id="bellBadge">0</span>
+            <div class="bell-dropdown hidden" id="bellDropdown"></div>
+          </div>
+          <button class="icon-btn" id="darkModeToggle" title="Toggle dark mode" aria-label="Toggle dark mode"></button>
           <span class="muted" id="currentUserLabel"></span>
           <button class="btn btn-sm btn-danger" id="logoutBtn"></button>
         </div>
@@ -510,6 +697,7 @@
       <div id="adminContent"></div>
     </div>
   </div>
+  <div id="adminChatWidget"></div>
 </div>
 
 <div id="modalHost"></div>
@@ -556,7 +744,14 @@ var ICONS = {
   alertTriangle: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
   logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
   eye: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
-  eyeOff: '<path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>'
+  eyeOff: '<path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>',
+  refresh: '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
+  bell: '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+  robot: '<rect x="3" y="9" width="18" height="12" rx="2"/><circle cx="8.5" cy="15" r="1.3"/><circle cx="15.5" cy="15" r="1.3"/><path d="M12 9V5"/><circle cx="12" cy="3.5" r="1.5"/><line x1="3" y1="13" x2="1" y2="13"/><line x1="23" y1="13" x2="21" y2="13"/>',
+  send: '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',
+  smartphone: '<rect x="6" y="2" width="12" height="20" rx="2"/><line x1="10" y1="18" x2="14" y2="18"/>',
+  info: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>',
+  globe: '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 0 20 15.3 15.3 0 0 1 0-20z"/>'
 };
 function icon(name, size, cls) {
   size = size || 20;
@@ -616,9 +811,15 @@ function toast(msg, type) {
   var host = document.getElementById('toastHost');
   var el = document.createElement('div');
   el.className = 'toast' + (type ? ' ' + type : '');
-  el.textContent = msg;
+  var iconName = type === 'success' ? 'checkCircle' : (type === 'error' ? 'alertTriangle' : 'checkCircle');
+  el.innerHTML = '<span class="toast-ic">' + icon(iconName, 18) + '</span><span>' + esc(msg) + '</span>';
   host.appendChild(el);
-  setTimeout(function () { el.remove(); }, 4200);
+  setTimeout(function () {
+    el.style.transition = 'opacity .2s ease, transform .2s ease';
+    el.style.opacity = '0';
+    el.style.transform = 'translateY(6px)';
+    setTimeout(function () { el.remove(); }, 200);
+  }, 4200);
 }
 
 function showError(err) {
@@ -674,7 +875,9 @@ function applyTheme(settings) {
 window.addEventListener('DOMContentLoaded', function () {
   document.getElementById('navToggle').innerHTML = icon('menu', 22);
   document.getElementById('adminLoginLink').innerHTML = icon('lock', 18);
-  document.getElementById('darkModeToggle').innerHTML = icon('moon', 15) + ' Dark Mode';
+  document.getElementById('darkModeToggle').innerHTML = icon('moon', 17);
+  document.getElementById('reloadBtn').innerHTML = icon('refresh', 17);
+  document.getElementById('bellBtn').innerHTML = icon('bell', 17);
   document.getElementById('logoutBtn').innerHTML = icon('logout', 14) + ' Logout';
   ['icPhone', 'icChat', 'icMail', 'icClock'].forEach(function (id, i) {
     document.getElementById(id).innerHTML = icon(['phone', 'chat', 'mail', 'clock'][i], 20);
@@ -691,19 +894,41 @@ window.addEventListener('DOMContentLoaded', function () {
   bindPasswordToggles();
   bindAuthToggle();
   bindRegisterForm();
+  bindMyBookingsForm();
+  initChatWidget();
   window.addEventListener('hashchange', routeHash);
   routeHash();
 
   var savedDark = localStorage.getItem('salon_dark_mode') === '1';
-  if (savedDark) document.getElementById('adminApp').classList.add('dark');
+  if (savedDark) { document.getElementById('adminApp').classList.add('dark'); document.getElementById('darkModeToggle').innerHTML = icon('sun', 17); }
   document.getElementById('darkModeToggle').addEventListener('click', function () {
     document.getElementById('adminApp').classList.toggle('dark');
     var dark = document.getElementById('adminApp').classList.contains('dark');
     localStorage.setItem('salon_dark_mode', dark ? '1' : '0');
-    document.getElementById('darkModeToggle').innerHTML = icon(dark ? 'sun' : 'moon', 15) + (dark ? ' Light Mode' : ' Dark Mode');
+    document.getElementById('darkModeToggle').innerHTML = icon(dark ? 'sun' : 'moon', 17);
+    document.getElementById('darkModeToggle').title = dark ? 'Switch to light mode' : 'Switch to dark mode';
     if (STATE.token && ['overview', 'reports'].indexOf(STATE.adminPage) > -1) renderAdminPage();
   });
   document.getElementById('logoutBtn').addEventListener('click', doLogout);
+
+  document.getElementById('reloadBtn').addEventListener('click', function () {
+    var btn = this;
+    btn.classList.add('spinning');
+    var done = function () { btn.classList.remove('spinning'); };
+    if (STATE.token) { renderAdminPage(); refreshBell(); setTimeout(done, 500); }
+    else { loadPublicSite(); setTimeout(done, 500); }
+  });
+
+  document.getElementById('bellBtn').addEventListener('click', function (e) {
+    e.stopPropagation();
+    var dd = document.getElementById('bellDropdown');
+    dd.classList.toggle('hidden');
+    if (!dd.classList.contains('hidden')) refreshBell();
+  });
+  document.addEventListener('click', function (e) {
+    var dd = document.getElementById('bellDropdown');
+    if (!dd.classList.contains('hidden') && !e.target.closest('.bell-wrap')) dd.classList.add('hidden');
+  });
 });
 
 function routeHash() {
@@ -739,6 +964,8 @@ function loadPublicSite() {
     renderGallery(data.gallery || []);
     renderReviews(data.reviews);
     renderContact(data.settings);
+    renderSocialRow(data.settings);
+    setupWaFloat(data.settings);
     initBookingWizard();
   }).catch(function (err) {
     var msg = '<p class="form-error">' + icon('alertTriangle', 15) + ' Could not load site data. Please refresh. (' + esc(err.message) + ')</p>';
@@ -809,11 +1036,13 @@ function renderServices(services, branches, branchFilter) {
   var html = Object.keys(byCategory).sort().map(function (cat) {
     return '<div class="svc-category"><h3>' + esc(cat) + '</h3><div class="svc-grid">' +
       byCategory[cat].map(function (s) {
-        return '<div class="svc-card"><div><b>' + esc(s.Name) + '</b>' + (branches.length > 1 ? ' <span class="muted">— ' + esc(branchMap[s.BranchID] || '') + '</span>' : '') + '</div>' +
+        var photo = s.ImageURL ? '<div class="svc-photo" style="background-image:url(\'' + esc(s.ImageURL) + '\')"></div>' : '<div class="svc-photo svc-photo-empty">' + icon('scissors', 26) + '</div>';
+        return '<div class="svc-card">' + photo + '<div class="svc-card-body">' +
+          '<div class="svc-card-head"><b>' + esc(s.Name) + '</b>' + (branches.length > 1 ? '<span class="muted">' + esc(branchMap[s.BranchID] || '') + '</span>' : '') + '</div>' +
           '<div class="muted">' + esc(s.Description || '') + '</div>' +
-          '<div class="dur">' + icon('clock', 14) + ' ' + s.DurationMinutes + ' mins</div>' +
-          '<div class="price">' + money(s.Price) + '</div>' +
-          '<button class="btn btn-sm btn-outline" onclick="quickBook(\'' + s.ServiceID + '\',\'' + s.BranchID + '\')">Book Now</button></div>';
+          '<div class="svc-card-foot"><div class="dur">' + icon('clock', 14) + ' ' + s.DurationMinutes + ' mins</div><div class="price">' + money(s.Price) + '</div></div>' +
+          '<button class="btn btn-sm btn-outline btn-block" onclick="quickBook(\'' + s.ServiceID + '\',\'' + s.BranchID + '\')">Book Now</button>' +
+          '</div></div>';
       }).join('') + '</div></div>';
   }).join('');
   document.getElementById('servicesList').innerHTML = html || '<p class="muted">No services available yet.</p>';
@@ -823,8 +1052,10 @@ function renderStaff(staff, branchFilter) {
   var list = branchFilter ? staff.filter(function (s) { return s.BranchID === branchFilter; }) : staff;
   document.getElementById('staffList').innerHTML = list.map(function (s) {
     var photo = s.PhotoURL ? 'style="background-image:url(\'' + esc(s.PhotoURL) + '\')"' : '';
+    var days = String(s.WorkDays || '').split(',').map(function (d) { return d.trim(); }).filter(Boolean);
+    var dayTags = days.length ? '<div class="tags" style="justify-content:center;margin-top:6px;">' + days.map(function (d) { return '<span class="tag">' + d + '</span>'; }).join('') + '</div>' : '';
     return '<div class="staff-card"><div class="photo" ' + photo + '>' + (s.PhotoURL ? '' : icon('user', 46)) + '</div>' +
-      '<div class="info"><b>' + esc(s.Name) + '</b><div class="role">' + esc(s.Role) + '</div><div class="muted">' + esc(s.Specialties || '') + '</div></div></div>';
+      '<div class="info"><b>' + esc(s.Name) + '</b><div class="role">' + esc(s.Role) + '</div><div class="muted">' + esc(s.Specialties || '') + '</div>' + dayTags + '</div></div>';
   }).join('') || '<p class="muted">No team members listed yet.</p>';
 }
 
@@ -888,6 +1119,186 @@ function renderContact(s) {
   document.getElementById('contactMap').src = s.MapEmbedURL || '';
   var hoursHtml = STATE.branches.map(function (b) { return '<div><b>' + esc(b.Name) + ':</b> ' + esc(b.OpeningHours) + '</div>'; }).join('');
   document.getElementById('contactHours').innerHTML = hoursHtml || 'Mon-Sat 8am-7pm';
+}
+
+function renderSocialRow(s) {
+  var platforms = [
+    { key: 'SocialFacebook', letter: 'f', label: 'Facebook' },
+    { key: 'SocialInstagram', letter: 'IG', label: 'Instagram' },
+    { key: 'SocialTwitter', letter: 'X', label: 'Twitter / X' },
+    { key: 'SocialTiktok', letter: 'TT', label: 'TikTok' },
+    { key: 'SocialYoutube', letter: 'YT', label: 'YouTube' }
+  ];
+  var html = platforms.filter(function (p) { return s[p.key]; }).map(function (p) {
+    return '<a class="social-badge" href="' + esc(s[p.key]) + '" target="_blank" rel="noopener" title="' + p.label + '" aria-label="' + p.label + '">' + p.letter + '</a>';
+  }).join('');
+  document.getElementById('socialRow').innerHTML = html;
+}
+
+function setupWaFloat(s) {
+  var digits = String(s.WhatsAppNumber || '').replace(/\D/g, '');
+  var btn = document.getElementById('waFloatBtn');
+  btn.innerHTML = icon('chat', 26);
+  btn.href = digits ? 'https://wa.me/' + digits + '?text=' + encodeURIComponent('Hi, I\'d like to book an appointment.') : 'https://wa.me/';
+}
+
+/* =====================================================================
+ * "MY BOOKINGS" — public self-service lookup
+ * ===================================================================*/
+function bindMyBookingsForm() {
+  document.getElementById('myBookingsForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var host = document.getElementById('myBookingsResults');
+    var phone = document.getElementById('mbPhone').value;
+    host.innerHTML = '<p class="muted">Searching…</p>';
+    api('lookupMyBookings', phone).then(function (rows) {
+      if (!rows.length) { host.innerHTML = '<p class="muted">No bookings found for that phone number.</p>'; return; }
+      host.innerHTML = rows.map(function (a) {
+        var canCancel = a.Status === 'Pending' || a.Status === 'Confirmed';
+        return '<div class="review-card" style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">' +
+          '<div><b>' + esc(a.ServiceName) + '</b><div class="muted">' + esc(a.BranchName) + ' &middot; ' + esc(a.StaffName) + '</div>' +
+          '<div class="muted">' + esc(formatNiceDate(a.Date)) + ' at ' + esc(formatTime12(a.TimeSlot)) + '</div>' +
+          '<div class="muted">Ref: ' + esc(a.Reference) + '</div></div>' +
+          '<div style="text-align:right;">' + statusBadgePublic(a.Status) +
+          (canCancel ? '<br><button class="btn btn-sm btn-outline" style="margin-top:8px;" onclick="cancelMyBookingRow(\'' + a.AppointmentID + '\')">Cancel</button>' : '') +
+          '</div></div></div>';
+      }).join('');
+    }).catch(showError);
+  });
+}
+function statusBadgePublic(status) {
+  return '<span class="badge badge-' + status.toLowerCase().replace(' ', '-') + '">' + esc(status) + '</span>';
+}
+function cancelMyBookingRow(appointmentId) {
+  if (!confirm('Cancel this booking?')) return;
+  var phone = document.getElementById('mbPhone').value;
+  api('cancelMyAppointment', phone, appointmentId).then(function () {
+    toast('Booking cancelled', 'success');
+    document.getElementById('myBookingsForm').dispatchEvent(new Event('submit'));
+  }).catch(showError);
+}
+
+/* =====================================================================
+ * CHAT WIDGET — a rule-based FAQ assistant (not a generative LLM). It
+ * answers from the business's own live data (services/prices/hours) on
+ * the public site, and from canned "how do I…" admin help on the
+ * dashboard. Same UI component, two rule sets.
+ * ===================================================================*/
+function initChatWidget() { buildChatWidget('chatWidget', 'public'); }
+function initAdminChatWidget() { if (!document.getElementById('adminChatWidgetToggle')) buildChatWidget('adminChatWidget', 'admin'); }
+
+function buildChatWidget(containerId, mode) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  var panelId = containerId + 'Panel';
+  container.innerHTML =
+    '<button class="chat-bubble-btn" id="' + containerId + 'Toggle" aria-label="Chat">' + icon('robot', 24) + '</button>' +
+    '<div class="chat-panel hidden" id="' + panelId + '">' +
+    '<div class="chat-panel-head"><b>' + (mode === 'admin' ? 'Admin Help' : 'Ask Us Anything') + '</b><button type="button" style="background:none;border:none;color:#fff;cursor:pointer;display:flex;" id="' + containerId + 'Close">' + icon('close', 18) + '</button></div>' +
+    '<div class="chat-panel-body" id="' + containerId + 'Body"></div>' +
+    '<div class="chat-quick-replies" id="' + containerId + 'Quick"></div>' +
+    '<div class="chat-panel-input"><input type="text" id="' + containerId + 'Input" placeholder="Ask a question…"><button type="button" id="' + containerId + 'Send">' + icon('send', 16) + '</button></div>' +
+    '</div>';
+
+  document.getElementById(containerId + 'Toggle').addEventListener('click', function () {
+    var panel = document.getElementById(panelId);
+    var opening = panel.classList.contains('hidden');
+    panel.classList.toggle('hidden');
+    if (opening && !container.dataset.greeted) {
+      container.dataset.greeted = '1';
+      addChatMsg(containerId, 'bot', mode === 'admin' ? 'Hi! Ask me how to do something — e.g. "how do I add a service" or "how do I block a time slot".' : 'Hi! Ask me about our services, prices, hours, or how to book. 👋');
+      renderQuickReplies(containerId, mode);
+    }
+  });
+  document.getElementById(containerId + 'Close').addEventListener('click', function () {
+    document.getElementById(panelId).classList.add('hidden');
+  });
+  document.getElementById(containerId + 'Send').addEventListener('click', function () { sendChatMessage(containerId, mode); });
+  document.getElementById(containerId + 'Input').addEventListener('keydown', function (e) { if (e.key === 'Enter') sendChatMessage(containerId, mode); });
+}
+
+function addChatMsg(containerId, who, text) {
+  var body = document.getElementById(containerId + 'Body');
+  var el = document.createElement('div');
+  el.className = 'chat-msg ' + who;
+  el.textContent = text;
+  body.appendChild(el);
+  body.scrollTop = body.scrollHeight;
+}
+
+function renderQuickReplies(containerId, mode) {
+  var quick = document.getElementById(containerId + 'Quick');
+  var options = mode === 'admin'
+    ? ['How do I add a service?', 'How do I block a time slot?', 'How do I send SMS to staff?', 'How do I change the theme?']
+    : ['What are your hours?', 'How much is a haircut?', 'How do I book?', 'Where are you located?'];
+  quick.innerHTML = options.map(function (o) { return '<button type="button">' + esc(o) + '</button>'; }).join('');
+  quick.querySelectorAll('button').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.getElementById(containerId + 'Input').value = btn.textContent;
+      sendChatMessage(containerId, mode);
+    });
+  });
+}
+
+function sendChatMessage(containerId, mode) {
+  var input = document.getElementById(containerId + 'Input');
+  var text = input.value.trim();
+  if (!text) return;
+  addChatMsg(containerId, 'user', text);
+  input.value = '';
+  var reply = mode === 'admin' ? answerAdminFaq(text) : answerPublicFaq(text);
+  setTimeout(function () { addChatMsg(containerId, 'bot', reply); }, 300);
+}
+
+function answerPublicFaq(q) {
+  var s = STATE.settings || {};
+  var data = STATE.publicData || {};
+  var lower = q.toLowerCase();
+  if (/hour|open|close/.test(lower)) {
+    var b = data.branches && data.branches[0];
+    return b ? (b.Name + ': ' + b.OpeningHours) : 'Please check our Contact section for opening hours.';
+  }
+  if (/where|location|address|direction/.test(lower)) {
+    var loc = (data.branches || []).map(function (br) { return br.Name + ' — ' + br.Location; }).join('; ');
+    return loc || 'Please check our Contact section for our location.';
+  }
+  if (/book|appointment|reserve|schedule/.test(lower)) {
+    return 'You can book online in the "Book Now" section above — pick a branch, service, stylist, and time. Takes under a minute!';
+  }
+  if (/cancel/.test(lower)) {
+    return 'Go to "My Bookings" above, enter the phone number you booked with, and you\'ll see a Cancel button next to any upcoming booking.';
+  }
+  if (/price|cost|how much|fee|charge/.test(lower)) {
+    var svc = (data.services || []).find(function (sv) { return lower.indexOf(String(sv.Name).toLowerCase().split(' ')[0]) > -1; });
+    if (svc) return svc.Name + ' costs ' + money(svc.Price) + ' and takes about ' + svc.DurationMinutes + ' minutes.';
+    var list = (data.services || []).slice(0, 5).map(function (sv) { return sv.Name + ' (' + money(sv.Price) + ')'; }).join(', ');
+    return list ? ('Here are some of our prices: ' + list + '. See the full list in the Services section above.') : 'Please see our Services section above for the full price list.';
+  }
+  if (/contact|phone|call|whatsapp|reach/.test(lower)) {
+    return 'Call us on ' + (s.ContactPhone || 'the number above') + ' or WhatsApp ' + (s.WhatsAppNumber || 'us') + '.';
+  }
+  if (/loyalty|point|reward/.test(lower)) {
+    return 'You earn loyalty points every time you pay in-store — ask our staff for your balance and redemption options!';
+  }
+  if (/staff|barber|stylist|team|who/.test(lower)) {
+    var names = (data.staff || []).slice(0, 5).map(function (st) { return st.Name; }).join(', ');
+    return names ? ('Our team includes: ' + names + '.') : 'See the Our Team section above for our full team.';
+  }
+  return 'I\'m not sure about that yet — please call us on ' + (s.ContactPhone || 'the number in our Contact section') + ' or WhatsApp us, and our team will help right away!';
+}
+
+function answerAdminFaq(q) {
+  var lower = q.toLowerCase();
+  if (/service/.test(lower) && /add|new|create|edit|photo/.test(lower)) return 'Go to "Services (POS Menu)" in the sidebar → "+ Add Service". This is exactly what shows on the website and in POS, photo included.';
+  if (/slot|block|close|lunch/.test(lower)) return 'Go to "Manage Slots" in the sidebar, pick a branch and date, then click any time to open/close it for booking.';
+  if (/sms/.test(lower) && /staff|send|broadcast/.test(lower)) return 'Go to "SMS" in the sidebar → select staff members → type your message → Send SMS.';
+  if (/theme|color|logo|brand/.test(lower)) return 'Go to "Branding & Theme" → the "Theme & Colors" tab to change colors, or "Branding" tab to change your logo/name.';
+  if (/staff/.test(lower) && /add|new|day|schedule/.test(lower)) return 'Go to "Staff" in the sidebar → "+ Add Staff". You can set their working days there too, which controls availability in the booking wizard.';
+  if (/product|inventory|stock|restock/.test(lower)) return 'Go to "Inventory" in the sidebar to add products, and use "Restock" to top up stock levels.';
+  if (/report|revenue|sales|chart/.test(lower)) return 'Go to "Reports" for revenue trends, best-sellers, staff performance, and payment-method breakdowns — with CSV/PDF export.';
+  if (/qr/.test(lower)) return 'Go to "Branding & Theme" → "QR Code" tab for a printable "Scan to Book" card.';
+  if (/user|account|password|register/.test(lower)) return 'Go to "Users" (Owner only) to manage staff logins/approvals, or "My Account" to change your own password.';
+  return 'Try asking about: adding a service, blocking a time slot, sending SMS to staff, changing the theme, or viewing reports.';
 }
 
 /* =====================================================================
@@ -1258,6 +1669,7 @@ function bindRegisterForm() {
 function doLogout() {
   api('logout', STATE.token).finally(function () {
     STATE.token = null; STATE.user = null;
+    if (STATE.bellInterval) { clearInterval(STATE.bellInterval); STATE.bellInterval = null; }
     sessionStorage.removeItem('salon_token'); sessionStorage.removeItem('salon_user');
     location.hash = '';
     routeHash();
@@ -1319,6 +1731,7 @@ function uploadFileThen(file, callback) {
 var NAV_CONFIG = [
   { key: 'overview', icon: 'grid', label: 'Overview', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] },
   { key: 'appointments', icon: 'calendar', label: 'Appointments', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] },
+  { key: 'slots', icon: 'clock', label: 'Manage Slots', roles: ['Owner', 'Manager', 'Receptionist'] },
   { key: 'pos', icon: 'cart', label: 'Point of Sale', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] },
   { key: 'customers', icon: 'users', label: 'Customers', roles: ['Owner', 'Manager', 'Receptionist'] },
   { key: 'services', icon: 'scissors', label: 'Services (POS Menu)', roles: ['Owner', 'Manager'] },
@@ -1331,8 +1744,10 @@ var NAV_CONFIG = [
   { key: 'gallery', icon: 'copy', label: 'Gallery', roles: ['Owner', 'Manager'] },
   { key: 'heroSlides', icon: 'image', label: 'Hero Carousel', roles: ['Owner', 'Manager'] },
   { key: 'settings', icon: 'droplet', label: 'Branding & Theme', roles: ['Owner'] },
+  { key: 'sms', icon: 'smartphone', label: 'SMS', roles: ['Owner', 'Manager'] },
   { key: 'users', icon: 'lock', label: 'Users', roles: ['Owner'] },
-  { key: 'account', icon: 'sliders', label: 'My Account', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] }
+  { key: 'account', icon: 'sliders', label: 'My Account', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] },
+  { key: 'about', icon: 'info', label: 'About', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] }
 ];
 
 function showAdminApp() {
@@ -1349,6 +1764,32 @@ function showAdminApp() {
     branchSwitch.classList.add('hidden');
   }
 
+  renderSidebar();
+  renderAdminPage();
+  refreshBell();
+  initAdminChatWidget();
+  if (!STATE.bellInterval) STATE.bellInterval = setInterval(refreshBell, 60000);
+}
+
+function refreshBell() {
+  if (!STATE.token) return;
+  api('getNotificationBell', STATE.token, branchArg()).then(function (res) {
+    var badge = document.getElementById('bellBadge');
+    if (res.pendingCount > 0) { badge.textContent = res.pendingCount > 99 ? '99+' : res.pendingCount; badge.classList.remove('hidden'); }
+    else badge.classList.add('hidden');
+    var dd = document.getElementById('bellDropdown');
+    if (!res.recent.length) {
+      dd.innerHTML = '<div class="bell-empty">No new pending bookings.</div>';
+    } else {
+      dd.innerHTML = '<div style="font-weight:800;padding:6px 10px;">New Bookings</div>' + res.recent.map(function (a) {
+        return '<a href="#" class="bell-item" onclick="event.preventDefault();goToAppointment(\'' + a.Reference + '\');"><b>' + esc(a.CustomerName) + '</b>' + esc(a.ServiceName) + ' — ' + esc(a.Date) + ' ' + esc(a.TimeSlot) + '</a>';
+      }).join('') + '<a href="#" class="bell-item" style="text-align:center;font-weight:700;" onclick="event.preventDefault();goToAppointment();">View All Appointments</a>';
+    }
+  }).catch(function () { /* silent — this is a background poll */ });
+}
+function goToAppointment(reference) {
+  document.getElementById('bellDropdown').classList.add('hidden');
+  STATE.adminPage = 'appointments';
   renderSidebar();
   renderAdminPage();
 }
@@ -1371,10 +1812,11 @@ function renderAdminPage() {
   var content = document.getElementById('adminContent');
   content.innerHTML = '<p class="muted">Loading…</p>';
   var renderers = {
-    overview: renderOverview, appointments: renderAppointments, pos: renderPOS, customers: renderCustomers,
+    overview: renderOverview, appointments: renderAppointments, slots: renderSlotsAdmin, pos: renderPOS, customers: renderCustomers,
     services: renderServicesAdmin, staff: renderStaffAdmin, inventory: renderInventory, branches: renderBranchesAdmin,
     expenses: renderExpenses, reports: renderReports, reviews: renderReviewsAdmin, gallery: renderGalleryAdmin,
-    heroSlides: renderHeroAdmin, settings: renderSettingsAdmin, users: renderUsersAdmin, account: renderAccount
+    heroSlides: renderHeroAdmin, settings: renderSettingsAdmin, sms: renderSmsAdmin, users: renderUsersAdmin,
+    account: renderAccount, about: renderAbout
   };
   (renderers[STATE.adminPage] || function () {})(content);
 }
@@ -1411,6 +1853,12 @@ function renderOverview(content) {
       statCard('Upcoming (7 days)', d.upcomingCount) +
       statCard('Low Stock Items', d.lowStock.length) +
       '</div>' +
+      '<div class="panel"><h3>Booking Volume</h3><div class="stat-grid">' +
+      statCard('Tomorrow', d.bookingsTomorrow) +
+      statCard('This Week', d.bookingsThisWeek) +
+      statCard('Next Week', d.bookingsNextWeek) +
+      statCard('This Month', d.bookingsThisMonth) +
+      '</div></div>' +
       '<div class="panel"><h3>7-Day Revenue Trend</h3>' + renderLineChart(rpt.revenueByDay.map(function (r) { return { label: r.date, value: r.revenue }; }), { height: 180 }) + '</div>' +
       '<div class="panel"><div class="panel-head"><h3>Today\'s Appointments</h3></div>' +
       renderTable(['Time', 'Customer', 'Service', 'Staff', 'Status'], d.todayAppointments.map(function (a) {
@@ -1624,9 +2072,25 @@ function checkoutSale() {
 }
 
 function showReceipt(sale) {
-  var html = '<div class="receipt-box" id="receiptPrint"><b>' + esc(STATE.settings.BusinessName) + '</b><br>' + esc(sale.SaleID) + '<br>' + esc(sale.Date) + '<hr>' +
-    sale.Items.map(function (i) { return i.name + ' x' + i.qty + ' — ' + money(i.lineTotal); }).join('<br>') + '<hr>' +
-    'Subtotal: ' + money(sale.Subtotal) + '<br>Discount: ' + money(sale.Discount) + '<br>Tax: ' + money(sale.Tax) + '<br><b>Total: ' + money(sale.Total) + '</b><br>Payment: ' + sale.PaymentMethod + '<hr>Thank you for your visit!</div>';
+  var s = STATE.settings;
+  var html = '<div class="receipt-modern" id="receiptPrint">' +
+    '<div class="rh">' + (s.LogoURL ? '<img src="' + esc(s.LogoURL) + '">' : '') +
+    '<div class="check">' + icon('checkCircle', 34) + '</div>' +
+    '<div style="font-weight:800;font-size:1.1rem;">' + esc(s.BusinessName) + '</div>' +
+    '<div style="opacity:.85;font-size:.78rem;margin-top:2px;">' + esc(sale.SaleID) + ' &middot; ' + esc(String(sale.Date).replace('T', ' ').slice(0, 16)) + '</div>' +
+    '</div>' +
+    '<div class="rbody">' +
+    sale.Items.map(function (i) {
+      return '<div class="receipt-line"><span>' + esc(i.name) + ' <span class="qty">x' + i.qty + '</span></span><span>' + money(i.lineTotal) + '</span></div>';
+    }).join('') +
+    '<div class="receipt-total-row"><span>Subtotal</span><span>' + money(sale.Subtotal) + '</span></div>' +
+    '<div class="receipt-total-row"><span>Discount</span><span>-' + money(sale.Discount) + '</span></div>' +
+    '<div class="receipt-total-row"><span>Tax</span><span>' + money(sale.Tax) + '</span></div>' +
+    '<div class="receipt-total-row grand"><span>Total</span><span>' + money(sale.Total) + '</span></div>' +
+    '<div style="text-align:center;"><span class="receipt-pay-badge">' + icon('card', 14) + ' ' + esc(sale.PaymentMethod) + '</span></div>' +
+    '</div>' +
+    '<div class="receipt-footer">Thank you for visiting ' + esc(s.BusinessName) + '! ' + (s.ContactPhone ? esc(s.ContactPhone) : '') + '</div>' +
+    '</div>';
   openModal('Receipt — ' + sale.SaleID, html, function () { window.print(); }, 'Print Receipt');
 }
 
@@ -1883,7 +2347,7 @@ function chartTheme() {
     text: dark ? '#aab0bd' : '#888888',
     grid: dark ? '#2a2e37' : '#eeeeee',
     accent: accent,
-    palette: [accent, '#3b7dd8', '#1c7c3c', '#c0392b', '#8e44ad', '#16a2a2']
+    palette: [accent, '#3b82f6', '#22c55e', '#f43f5e', '#a855f7', '#14b8a6', '#f59e0b', '#ec4899']
   };
 }
 
@@ -1950,9 +2414,41 @@ function renderDonutChart(data) {
     return seg;
   }).join('');
   var legend = data.map(function (d, i) {
-    return '<div class="legend-row"><span class="legend-dot" style="background:' + theme.palette[i % theme.palette.length] + '"></span>' + esc(d.label) + ' — <b>' + money(d.value) + '</b></div>';
+    return '<div class="legend-row"><span class="legend-dot" style="background:' + theme.palette[i % theme.palette.length] + '"></span>' + esc(d.label) + ' — <b>' + money(d.value) + '</b>' + (d.count !== undefined ? ' <span class="muted">(' + d.count + ' sale' + (d.count === 1 ? '' : 's') + ')</span>' : '') + '</div>';
   }).join('');
   return '<div class="donut-wrap"><svg viewBox="0 0 124 124" width="124" height="124">' + segs + '</svg><div class="legend-list">' + legend + '</div></div>';
+}
+
+/** A true filled pie chart (wedges from center), distinct from the ring-style donut above. */
+function renderPieChart(data) {
+  if (!data.length) return '<p class="muted">No data yet.</p>';
+  var theme = chartTheme();
+  var total = data.reduce(function (s, d) { return s + d.value; }, 0) || 1;
+  var cx = 70, cy = 70, r = 64;
+  var nonZero = data.filter(function (d) { return d.value > 0; });
+  var svgBody;
+  if (nonZero.length <= 1) {
+    var onlyIdx = nonZero.length ? data.indexOf(nonZero[0]) : 0;
+    svgBody = '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + theme.palette[onlyIdx % theme.palette.length] + '" stroke="#fff" stroke-width="1.5"></circle>';
+  } else {
+    var startAngle = -90;
+    svgBody = data.map(function (d, i) {
+      if (!d.value) return '';
+      var angle = (d.value / total) * 360;
+      var endAngle = startAngle + angle;
+      var large = angle > 180 ? 1 : 0;
+      var x1 = cx + r * Math.cos(startAngle * Math.PI / 180), y1 = cy + r * Math.sin(startAngle * Math.PI / 180);
+      var x2 = cx + r * Math.cos(endAngle * Math.PI / 180), y2 = cy + r * Math.sin(endAngle * Math.PI / 180);
+      var d0 = 'M' + cx + ',' + cy + ' L' + x1 + ',' + y1 + ' A' + r + ',' + r + ' 0 ' + large + ' 1 ' + x2 + ',' + y2 + ' Z';
+      var seg = '<path d="' + d0 + '" fill="' + theme.palette[i % theme.palette.length] + '" stroke="#fff" stroke-width="1.5"><title>' + esc(d.label) + ': ' + money(d.value) + '</title></path>';
+      startAngle = endAngle;
+      return seg;
+    }).join('');
+  }
+  var legend = data.map(function (d, i) {
+    return '<div class="legend-row"><span class="legend-dot" style="background:' + theme.palette[i % theme.palette.length] + '"></span>' + esc(d.label) + ' — <b>' + money(d.value) + '</b>' + (d.count !== undefined ? ' <span class="muted">(' + d.count + ' sale' + (d.count === 1 ? '' : 's') + ')</span>' : '') + '</div>';
+  }).join('');
+  return '<div class="donut-wrap"><svg viewBox="0 0 140 140" width="140" height="140">' + svgBody + '</svg><div class="legend-list">' + legend + '</div></div>';
 }
 
 /* ---------- REPORTS ---------- */
@@ -1978,7 +2474,7 @@ function loadReports() {
       '<div class="panel"><h3>Revenue Trend</h3>' + renderLineChart(r.revenueByDay.map(function (d) { return { label: d.date, value: d.revenue }; })) + '</div>' +
       '<div class="chart-row">' +
       '<div class="panel"><h3>Best-Selling Services</h3>' + renderBarChart(r.bestSellers.map(function (b) { return { label: b.name, value: b.revenue, display: money(b.revenue) }; })) + '</div>' +
-      '<div class="panel"><h3>Payment Methods</h3>' + renderDonutChart(r.paymentBreakdown.map(function (p) { return { label: p.method, value: p.total }; })) + '</div>' +
+      '<div class="panel"><h3>Payment Methods</h3><p class="muted">Breaks down every Mobile Money network separately (MTN MoMo, Vodafone Cash, Telecel Cash, AirtelTigo Money), plus Cash and Card.</p>' + renderPieChart(r.paymentBreakdown.map(function (p) { return { label: p.method, value: p.total, count: p.count }; })) + '</div>' +
       '</div>' +
       '<div class="panel"><h3>Staff Performance</h3>' + renderBarChart(r.staffPerformance.map(function (s) { return { label: s.name, value: s.revenue, display: money(s.revenue) }; })) +
       (r.staffPerformance.length ? '<div style="margin-top:16px">' + renderTable(['Staff', 'Sales', 'Revenue', 'Commission'], r.staffPerformance.map(function (s) { return [esc(s.name), s.salesCount, money(s.revenue), money(s.commission)]; })) + '</div>' : '') +
@@ -2100,56 +2596,89 @@ function deleteSlideRow(id) {
 }
 
 /* ---------- SETTINGS / BRANDING / THEME ---------- */
+var SETTINGS_TABS = [
+  { key: 'branding', label: 'Branding', icon: 'droplet' },
+  { key: 'theme', label: 'Theme & Colors', icon: 'droplet' },
+  { key: 'social', label: 'Social & Contact', icon: 'globe' },
+  { key: 'booking', label: 'Booking', icon: 'calendar' },
+  { key: 'payments', label: 'Payments & Loyalty', icon: 'card' },
+  { key: 'sms', label: 'SMS Gateway', icon: 'smartphone' },
+  { key: 'qr', label: 'QR Code', icon: 'image' }
+];
+
 function renderSettingsAdmin(content) {
   api('getSettings', STATE.token).then(function (s) {
     STATE.adminSettings = s;
+    // All tab panels are rendered into the DOM at once (just hidden/shown) so
+    // field values survive switching tabs and "Save All" can read every field.
     content.innerHTML =
-      '<div class="panel"><h3>Business Branding</h3><div class="field-grid">' +
+      '<div class="settings-tabs" id="settingsTabs">' + SETTINGS_TABS.map(function (t, i) {
+        return '<button type="button" class="settings-tab' + (i === 0 ? ' active' : '') + '" data-tab="' + t.key + '">' + icon(t.icon, 15) + ' ' + t.label + '</button>';
+      }).join('') + '</div>' +
+
+      '<div class="settings-panel' + '" data-panel="branding"><div class="panel"><div class="field-grid">' +
       field('Business Name', 'stBusinessName', s.BusinessName) +
       field('Tagline', 'stTagline', s.Tagline) +
       '<div style="grid-column:1/-1"><label>Logo</label>' + photoPickerHtml('stLogo', s.LogoURL) + '</div>' +
-      field('WhatsApp Number (233...)', 'stWhatsAppNumber', s.WhatsAppNumber) +
-      field('Contact Phone', 'stContactPhone', s.ContactPhone) +
-      field('Contact Email', 'stContactEmail', s.ContactEmail) +
-      field('Google Maps Embed URL', 'stMapEmbedURL', s.MapEmbedURL) +
-      '</div></div>' +
+      '</div></div></div>' +
 
-      '<div class="panel"><h3>Theme & Colors</h3><div class="field-grid">' +
+      '<div class="settings-panel hidden" data-panel="theme"><div class="panel"><div class="field-grid">' +
       colorField('Primary Color', 'stPrimaryColor', s.PrimaryColor) +
       colorField('Secondary Color', 'stSecondaryColor', s.SecondaryColor) +
       colorField('Accent Color', 'stAccentColor', s.AccentColor) +
       colorField('Background Color', 'stBackgroundColor', s.BackgroundColor) +
       colorField('Text Color', 'stTextColor', s.TextColor) +
-      '</div><button class="btn btn-sm btn-outline" style="margin-top:10px" onclick="previewTheme()">Preview Theme</button></div>' +
+      '</div><button type="button" class="btn btn-sm btn-outline" style="margin-top:10px" onclick="previewTheme()">Preview Theme</button></div></div>' +
 
-      '<div class="panel"><h3>Booking QR Code</h3><p class="muted">Print this and display it at your shop — customers scan it to jump straight to the booking form.</p>' +
-      '<div id="qrCardHost"></div>' +
-      '<div style="text-align:center;margin-top:16px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">' +
-      '<button class="btn btn-sm" onclick="printQrCard()">' + icon('image', 13) + ' Print QR Card</button>' +
-      '<a class="btn btn-sm btn-outline" id="qrRawLink" target="_blank" rel="noopener">Open QR Image Only</a>' +
-      '</div></div>' +
+      '<div class="settings-panel hidden" data-panel="social"><div class="panel"><div class="field-grid">' +
+      field('WhatsApp Number (233...)', 'stWhatsAppNumber', s.WhatsAppNumber) +
+      field('Contact Phone', 'stContactPhone', s.ContactPhone) +
+      field('Contact Email', 'stContactEmail', s.ContactEmail) +
+      field('Google Maps Embed URL', 'stMapEmbedURL', s.MapEmbedURL) +
+      field('Facebook Page URL', 'stSocialFacebook', s.SocialFacebook) +
+      field('Instagram URL', 'stSocialInstagram', s.SocialInstagram) +
+      field('Twitter / X URL', 'stSocialTwitter', s.SocialTwitter) +
+      field('TikTok URL', 'stSocialTiktok', s.SocialTiktok) +
+      field('YouTube URL', 'stSocialYoutube', s.SocialYoutube) +
+      '</div><p class="muted">Only the platforms you fill in appear as icons on your public site footer.</p></div></div>' +
 
-      '<div class="panel"><h3>Booking Availability</h3><div class="field-grid">' +
+      '<div class="settings-panel hidden" data-panel="booking"><div class="panel"><div class="field-grid">' +
       field('Booking Start Hour (24h)', 'stBookingStartHour', s.BookingStartHour) +
       field('Booking End Hour (24h)', 'stBookingEndHour', s.BookingEndHour) +
       field('Slot Interval (minutes)', 'stSlotIntervalMinutes', s.SlotIntervalMinutes) +
-      '</div></div>' +
+      '</div><p class="muted">Need to close a specific date/time (e.g. a lunch break)? Use <b>Manage Slots</b> in the sidebar.</p></div></div>' +
 
-      '<div class="panel"><h3>Payments & Loyalty</h3><div class="field-grid">' +
+      '<div class="settings-panel hidden" data-panel="payments"><div class="panel"><div class="field-grid">' +
       field('Tax Rate (%)', 'stTaxRatePercent', s.TaxRatePercent) +
       field('Loyalty Points per GH₵1 spent', 'stLoyaltyPointsPerCedi', s.LoyaltyPointsPerCedi) +
       field('Points needed for GH₵1 discount', 'stLoyaltyRedeemRate', s.LoyaltyRedeemRate) +
-      '</div></div>' +
+      '</div></div></div>' +
 
-      '<div class="panel"><h3>SMS Gateway (for booking &amp; receipt notifications)</h3><div class="field-grid">' +
+      '<div class="settings-panel hidden" data-panel="sms"><div class="panel"><div class="field-grid">' +
       selectField('Provider', 'stSmsProvider', ['simulate', 'arkesel', 'hubtel'], s.SmsProvider) +
       field('SMS Sender ID', 'stSmsSenderId', s.SmsSenderId) +
       field('Arkesel API Key', 'stSmsApiKey', s.SmsApiKey) +
       field('Hubtel Client ID', 'stHubtelClientId', s.HubtelClientId) +
       field('Hubtel Client Secret', 'stHubtelClientSecret', s.HubtelClientSecret) +
-      '</div><p class="muted">"Simulate" logs messages to the Notifications sheet without sending — useful for testing before you have SMS gateway credentials.</p></div>' +
+      '</div><p class="muted">"Simulate" logs messages without sending — useful for testing before you have gateway credentials. See <b>SMS</b> in the sidebar for delivery stats, balance, and history.</p></div></div>' +
 
-      '<button class="btn btn-accent" onclick="saveAllSettings()">Save All Settings</button>';
+      '<div class="settings-panel hidden" data-panel="qr"><div class="panel"><p class="muted">Print this and display it at your shop — customers scan it to jump straight to the booking form.</p>' +
+      '<div id="qrCardHost"></div>' +
+      '<div style="text-align:center;margin-top:16px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">' +
+      '<button type="button" class="btn btn-sm" onclick="printQrCard()">' + icon('image', 13) + ' Print QR Card</button>' +
+      '<a class="btn btn-sm btn-outline" id="qrRawLink" target="_blank" rel="noopener">Open QR Image Only</a>' +
+      '</div></div></div>' +
+
+      '<button class="btn btn-accent" style="margin-top:8px;" onclick="saveAllSettings()">Save All Settings</button>';
+
+    document.querySelectorAll('.settings-tab').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('.settings-tab').forEach(function (b) { b.classList.remove('active'); });
+        document.querySelectorAll('.settings-panel').forEach(function (p) { p.classList.add('hidden'); });
+        btn.classList.add('active');
+        document.querySelector('.settings-panel[data-panel="' + btn.dataset.tab + '"]').classList.remove('hidden');
+      });
+    });
     bindPhotoPicker('stLogo');
     renderQrCard(s);
   }).catch(function (err) { content.innerHTML = errorPanel(err); });
@@ -2205,6 +2734,9 @@ function saveAllSettings() {
       LogoURL: logoUrl, WhatsAppNumber: document.getElementById('stWhatsAppNumber').value,
       ContactPhone: document.getElementById('stContactPhone').value, ContactEmail: document.getElementById('stContactEmail').value,
       MapEmbedURL: document.getElementById('stMapEmbedURL').value,
+      SocialFacebook: document.getElementById('stSocialFacebook').value, SocialInstagram: document.getElementById('stSocialInstagram').value,
+      SocialTwitter: document.getElementById('stSocialTwitter').value, SocialTiktok: document.getElementById('stSocialTiktok').value,
+      SocialYoutube: document.getElementById('stSocialYoutube').value,
       PrimaryColor: document.getElementById('stPrimaryColor').value, SecondaryColor: document.getElementById('stSecondaryColor').value,
       AccentColor: document.getElementById('stAccentColor').value, BackgroundColor: document.getElementById('stBackgroundColor').value,
       TextColor: document.getElementById('stTextColor').value,
@@ -2265,6 +2797,101 @@ function openUserModal(u) {
 function deleteUserRow(username) {
   if (!confirm('Delete user ' + username + '?')) return;
   api('deleteUser', STATE.token, username).then(function () { toast('Deleted', 'success'); loadUsersTable(); }).catch(showError);
+}
+
+/* ---------- MANAGE SLOTS ("Admin can set slots") ---------- */
+function renderSlotsAdmin(content) {
+  var branchOpts = STATE.branches.map(function (b) { return '<option value="' + b.BranchID + '">' + esc(b.Name) + '</option>'; }).join('');
+  var defaultBranch = STATE.user.role === 'Owner' ? (branchArg() || (STATE.branches[0] && STATE.branches[0].BranchID) || '') : STATE.user.branchId;
+  content.innerHTML = '<div class="panel">' +
+    '<h3>Manage Time Slots</h3><p class="muted">Close specific times on a specific date (lunch break, fully booked, holiday) — closed slots won\'t be offered in the public booking wizard for anyone.</p>' +
+    '<div class="filters-bar">' +
+    '<select id="slotBranch">' + branchOpts + '</select>' +
+    '<input type="date" id="slotDate" value="' + isoToday() + '">' +
+    '<button class="btn btn-sm" onclick="loadSlotsAdmin()">Load</button>' +
+    '</div>' +
+    '<div id="slotGridHost"><p class="muted">Choose a branch and date, then click Load.</p></div>' +
+    '</div>';
+  if (defaultBranch) document.getElementById('slotBranch').value = defaultBranch;
+  loadSlotsAdmin();
+}
+function loadSlotsAdmin() {
+  var branchId = document.getElementById('slotBranch').value;
+  var date = document.getElementById('slotDate').value;
+  var host = document.getElementById('slotGridHost');
+  if (!branchId || !date) return;
+  host.innerHTML = '<p class="muted">Loading…</p>';
+  api('getSlotsForAdmin', STATE.token, branchId, date).then(function (slots) {
+    host.innerHTML = '<div class="time-grid">' + slots.map(function (s) {
+      var booked = s.bookedCount > 0;
+      var cls = 'time-slot' + (s.blocked ? ' slot-blocked' : '') + (booked ? ' slot-booked' : '');
+      return '<div class="' + cls + '" ' + (booked ? '' : 'onclick="toggleSlotAdmin(\'' + s.time + '\')"') + ' title="' + (booked ? s.bookedCount + ' booking(s) at this time' : (s.blocked ? 'Closed — click to reopen' : 'Open — click to close')) + '">' +
+        formatTime12(s.time) + (booked ? '<br><span style="font-size:.68rem;">' + s.bookedCount + ' booked</span>' : (s.blocked ? '<br><span style="font-size:.68rem;">Closed</span>' : '')) + '</div>';
+    }).join('') + '</div>' +
+    '<div style="margin-top:16px;display:flex;gap:16px;flex-wrap:wrap;font-size:.8rem;color:#888;">' +
+    '<span><span class="status-dot avail" style="display:inline-block;"></span> Open</span>' +
+    '<span><span class="status-dot unavail" style="display:inline-block;"></span> Closed by you</span>' +
+    '<span>Grey = already booked (can\'t be closed here)</span>' +
+    '</div>';
+  }).catch(function (err) { host.innerHTML = errorPanel(err); });
+}
+function toggleSlotAdmin(timeSlot) {
+  var branchId = document.getElementById('slotBranch').value;
+  var date = document.getElementById('slotDate').value;
+  api('toggleBlockedSlot', STATE.token, branchId, date, timeSlot).then(function () { loadSlotsAdmin(); }).catch(showError);
+}
+
+/* ---------- SMS MODULE ---------- */
+function renderSmsAdmin(content) {
+  content.innerHTML = '<p class="muted">Loading…</p>';
+  Promise.all([api('getSmsStats', STATE.token), api('getStaff', STATE.token, branchArg())]).then(function (res) {
+    var stats = res[0], staff = res[1];
+    STATE.smsStaff = staff;
+    var balanceHtml = stats.balance.available
+      ? statCard('SMS Balance', stats.balance.balance + ' ' + (stats.balance.currency || ''))
+      : statCard('SMS Balance', '—');
+    content.innerHTML =
+      '<div class="stat-grid">' +
+      statCard('Total SMS', stats.total) + statCard('Sent', stats.sent) + statCard('Failed', stats.failed) + statCard('Simulated', stats.simulated) + balanceHtml +
+      '</div>' +
+      (stats.balance.available ? '' : '<p class="muted">' + esc(stats.balance.message || '') + '</p>') +
+      '<div class="panel"><h3>Send SMS to Staff</h3>' +
+      '<div class="field-grid"><div style="grid-column:1/-1"><label>Recipients</label><div class="day-picker" id="smsStaffPicker">' +
+      staff.map(function (s) { return '<span class="day-chip" data-staff="' + s.StaffID + '">' + esc(s.Name) + '</span>'; }).join('') +
+      '</div></div>' +
+      '<div style="grid-column:1/-1"><label>Message</label><textarea id="smsMessage" rows="3" maxlength="300" placeholder="Type your message…"></textarea></div>' +
+      '</div><button class="btn btn-accent" onclick="sendStaffSmsNow()">' + icon('send', 14) + ' Send SMS</button></div>' +
+      '<div class="panel"><h3>SMS History</h3>' +
+      renderTable(['Date', 'Recipient', 'Status', 'Message'], stats.history.map(function (n) {
+        return [String(n.Date).slice(0, 16).replace('T', ' '), esc(n.Recipient), n.Status.indexOf('Failed') === 0 ? statusBadge('Cancelled') : (n.Status.indexOf('Simulated') === 0 ? '<span class="badge badge-pending">Simulated</span>' : statusBadge('Confirmed')), esc(n.Message)];
+      })) + '</div>';
+    document.querySelectorAll('#smsStaffPicker .day-chip').forEach(function (el) {
+      el.addEventListener('click', function () { el.classList.toggle('active'); });
+    });
+  }).catch(function (err) { content.innerHTML = errorPanel(err); });
+}
+function sendStaffSmsNow() {
+  var ids = Array.prototype.slice.call(document.querySelectorAll('#smsStaffPicker .day-chip.active')).map(function (el) { return el.dataset.staff; });
+  var message = document.getElementById('smsMessage').value.trim();
+  if (!ids.length) { toast('Select at least one staff member', 'error'); return; }
+  if (!message) { toast('Enter a message', 'error'); return; }
+  api('sendStaffSms', STATE.token, ids, message).then(function (res) {
+    toast('SMS sent to ' + res.sentCount + ' staff member(s)', 'success');
+    renderSmsAdmin(document.getElementById('adminContent'));
+  }).catch(showError);
+}
+
+/* ---------- ABOUT ---------- */
+function renderAbout(content) {
+  content.innerHTML =
+    '<div class="panel" style="text-align:center;max-width:520px;margin:0 auto;">' +
+    '<h3>' + esc(STATE.settings.BusinessName) + ' Management System</h3>' +
+    '<p class="muted">Built on Google Apps Script &amp; Google Sheets — a complete booking, POS, inventory, and CRM platform for barbershops &amp; salons in Ghana.</p>' +
+    '<hr style="border:none;border-top:1px solid #eee;margin:20px 0;">' +
+    '<p style="font-weight:700;">Developed by Quecci Manuel (Manuel Scripts)</p>' +
+    '<p><a class="btn btn-sm btn-outline" href="https://wa.me/233547359015" target="_blank" rel="noopener">' + icon('chat', 14) + ' WhatsApp — Custom Projects</a></p>' +
+    '<p><a class="btn btn-sm btn-outline" href="https://www.youtube.com/@manuelspctips" target="_blank" rel="noopener">' + icon('smartphone', 14) + ' YouTube — @manuelspctips</a></p>' +
+    '</div>';
 }
 
 /* ---------- MY ACCOUNT ---------- */

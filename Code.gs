@@ -58,12 +58,14 @@ var SCHEMA = {
   Settings:      ['Key', 'Value'],
   HeroSlides:    ['SlideID', 'ImageURL', 'Title', 'Subtitle', 'ButtonText', 'ButtonLink', 'SortOrder', 'Active'],
   Gallery:       ['GalleryID', 'ImageURL', 'Caption', 'Category', 'BranchID', 'SortOrder', 'Active'],
-  Notifications: ['NotificationID', 'Type', 'Recipient', 'Message', 'Status', 'Date']
+  Notifications: ['NotificationID', 'Type', 'Recipient', 'Message', 'Status', 'Date'],
+  BlockedSlots:  ['BlockedSlotID', 'BranchID', 'Date', 'TimeSlot']
 };
 
 var ID_PREFIX = {
   Branches: 'BR', Services: 'SV', Staff: 'ST', Customers: 'CU', Appointments: 'AP',
-  Sales: 'SL', Products: 'PR', Expenses: 'EX', Reviews: 'RV', HeroSlides: 'HS', Gallery: 'GL', Notifications: 'NT'
+  Sales: 'SL', Products: 'PR', Expenses: 'EX', Reviews: 'RV', HeroSlides: 'HS', Gallery: 'GL',
+  Notifications: 'NT', BlockedSlots: 'BL'
 };
 
 var ROLES = ['Owner', 'Manager', 'Staff', 'Receptionist'];
@@ -93,7 +95,12 @@ var DEFAULT_SETTINGS = {
   Currency: 'GH₵',
   BookingStartHour: '9',
   BookingEndHour: '18',
-  SlotIntervalMinutes: '30'
+  SlotIntervalMinutes: '30',
+  SocialFacebook: '',
+  SocialInstagram: '',
+  SocialTwitter: '',
+  SocialTiktok: '',
+  SocialYoutube: ''
 };
 
 /* ============================================================================
@@ -694,18 +701,62 @@ function getAvailableSlots(branchId, staffId, date) {
   var existing = readAll_('Appointments').filter(function (a) {
     return a.BranchID === branchId && a.Date === date && a.Status !== 'Cancelled' && a.Status !== 'No-show';
   });
+  var blocked = readAll_('BlockedSlots').filter(function (b) { return b.BranchID === branchId && b.Date === date; });
+  var blockedTimes = {};
+  blocked.forEach(function (b) { blockedTimes[b.TimeSlot] = true; });
 
   var slots = [];
   for (var mins = startHour * 60; mins < endHour * 60; mins += interval) {
     var h = Math.floor(mins / 60), m = mins % 60;
     var label = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
-    var available = dayAvailable && candidateStaff.some(function (s) {
+    var available = dayAvailable && !blockedTimes[label] && candidateStaff.some(function (s) {
       if (!worksOnDay_(s, weekday)) return false;
       return !existing.some(function (a) { return a.StaffID === s.StaffID && a.TimeSlot === label; });
     });
-    slots.push({ time: label, available: available });
+    slots.push({ time: label, available: available, blocked: !!blockedTimes[label] });
   }
   return { slots: slots, dayAvailable: dayAvailable };
+}
+
+/* ---------- Manual slot blocking ("Admin can set slots") ---------- */
+
+/** Returns every bookable slot for a branch/date plus whether it's admin-blocked, for the Manage Slots admin page. */
+function getSlotsForAdmin(token, branchId, date) {
+  requireAuth_(token);
+  var settings = getSettingsMap_();
+  var startHour = Number(settings.BookingStartHour) || 9;
+  var endHour = Number(settings.BookingEndHour) || 18;
+  var interval = Number(settings.SlotIntervalMinutes) || 30;
+  var blocked = readAll_('BlockedSlots').filter(function (b) { return b.BranchID === branchId && b.Date === date; });
+  var blockedTimes = {};
+  blocked.forEach(function (b) { blockedTimes[b.TimeSlot] = true; });
+  var existing = readAll_('Appointments').filter(function (a) {
+    return a.BranchID === branchId && a.Date === date && a.Status !== 'Cancelled' && a.Status !== 'No-show';
+  });
+  var bookedTimes = {};
+  existing.forEach(function (a) { bookedTimes[a.TimeSlot] = (bookedTimes[a.TimeSlot] || 0) + 1; });
+
+  var slots = [];
+  for (var mins = startHour * 60; mins < endHour * 60; mins += interval) {
+    var h = Math.floor(mins / 60), m = mins % 60;
+    var label = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+    slots.push({ time: label, blocked: !!blockedTimes[label], bookedCount: bookedTimes[label] || 0 });
+  }
+  return slots;
+}
+
+/** Toggles a slot between blocked/open for every stylist at a branch on a given date. */
+function toggleBlockedSlot(token, branchId, date, timeSlot) {
+  var user = requireAuth_(token);
+  requireRole_(user, ['Owner', 'Manager', 'Receptionist']);
+  var rows = readAll_('BlockedSlots');
+  var existing = rows.find(function (b) { return b.BranchID === branchId && b.Date === date && b.TimeSlot === timeSlot; });
+  if (existing) {
+    deleteById_('BlockedSlots', 'BlockedSlotID', existing.BlockedSlotID);
+    return { blocked: false };
+  }
+  appendRow_('BlockedSlots', { BlockedSlotID: nextId_('BlockedSlots', 'BlockedSlotID'), BranchID: branchId, Date: date, TimeSlot: timeSlot });
+  return { blocked: true };
 }
 
 function worksOnDay_(staffMember, weekday) {
@@ -1371,6 +1422,14 @@ function getDashboardOverview(token, branchId) {
   var services = keyBy_(readAll_('Services'), 'ServiceID');
   var staffMap = keyBy_(readAll_('Staff'), 'StaffID');
 
+  var tomorrow = addDays_(today, 1);
+  var weekStart = mondayOf_(today);
+  var weekEnd = addDays_(weekStart, 6);
+  var nextWeekStart = addDays_(weekStart, 7);
+  var nextWeekEnd = addDays_(weekStart, 13);
+  var monthPrefix = today.slice(0, 7);
+  var notCancelled = appts.filter(function (a) { return a.Status !== 'Cancelled'; });
+
   return {
     todayAppointments: todayAppts.map(function (a) {
       var o = stripRow_(a);
@@ -1383,7 +1442,39 @@ function getDashboardOverview(token, branchId) {
     todaySalesCount: todaySales.length,
     upcomingCount: upcoming.length,
     lowStock: lowStock.map(stripRow_),
-    pendingCount: appts.filter(function (a) { return a.Status === 'Pending'; }).length
+    pendingCount: appts.filter(function (a) { return a.Status === 'Pending'; }).length,
+    bookingsTomorrow: notCancelled.filter(function (a) { return a.Date === tomorrow; }).length,
+    bookingsThisWeek: notCancelled.filter(function (a) { return a.Date >= weekStart && a.Date <= weekEnd; }).length,
+    bookingsNextWeek: notCancelled.filter(function (a) { return a.Date >= nextWeekStart && a.Date <= nextWeekEnd; }).length,
+    bookingsThisMonth: notCancelled.filter(function (a) { return a.Date.slice(0, 7) === monthPrefix; }).length
+  };
+}
+
+function mondayOf_(dateStr) {
+  var d = new Date(dateStr + 'T00:00:00');
+  var day = d.getDay();
+  var diff = (day === 0 ? -6 : 1 - day);
+  return addDays_(dateStr, diff);
+}
+
+/** Lightweight counts for the admin topbar notification bell — new/pending bookings. */
+function getNotificationBell(token, branchId) {
+  var user = requireAuth_(token);
+  var scoped = scopeBranch_(user, branchId);
+  var appts = readAll_('Appointments').filter(function (a) { return a.Status === 'Pending'; });
+  if (scoped) appts = appts.filter(function (a) { return a.BranchID === scoped; });
+  var customers = keyBy_(readAll_('Customers'), 'CustomerID');
+  var services = keyBy_(readAll_('Services'), 'ServiceID');
+  appts.sort(function (a, b) { return String(b.CreatedAt).localeCompare(String(a.CreatedAt)); });
+  return {
+    pendingCount: appts.length,
+    recent: appts.slice(0, 6).map(function (a) {
+      return {
+        Reference: a.Reference, AppointmentID: a.AppointmentID, Date: a.Date, TimeSlot: a.TimeSlot,
+        CustomerName: customers[a.CustomerID] ? customers[a.CustomerID].Name : 'Walk-in',
+        ServiceName: services[a.ServiceID] ? services[a.ServiceID].Name : ''
+      };
+    })
   };
 }
 
@@ -1459,11 +1550,12 @@ function getReports(token, params) {
 }
 
 function paymentBreakdown_(sales) {
-  var map = {};
+  var totals = {}, counts = {};
   sales.forEach(function (s) {
-    map[s.PaymentMethod] = (map[s.PaymentMethod] || 0) + Number(s.Total);
+    totals[s.PaymentMethod] = (totals[s.PaymentMethod] || 0) + Number(s.Total);
+    counts[s.PaymentMethod] = (counts[s.PaymentMethod] || 0) + 1;
   });
-  return Object.keys(map).map(function (k) { return { method: k, total: round2_(map[k]) }; });
+  return Object.keys(totals).map(function (k) { return { method: k, total: round2_(totals[k]), count: counts[k] }; });
 }
 
 function exportSalesCsv(token, params) {
@@ -1533,6 +1625,107 @@ function logNotification_(type, recipient, message, status) {
     NotificationID: nextId_('Notifications', 'NotificationID'),
     Type: type, Recipient: recipient, Message: message, Status: status, Date: nowIso_()
   });
+}
+
+/**
+ * SMS module: sent/failed/simulated counts, recent history, and — for
+ * Arkesel accounts with an API key configured — the live account balance.
+ */
+function getSmsStats(token) {
+  var user = requireAuth_(token);
+  requireRole_(user, ['Owner', 'Manager']);
+  var rows = readAll_('Notifications').filter(function (n) { return n.Type === 'SMS'; });
+  rows.sort(function (a, b) { return String(b.Date).localeCompare(String(a.Date)); });
+
+  var sent = 0, failed = 0, simulated = 0;
+  rows.forEach(function (n) {
+    var status = String(n.Status || '');
+    if (status.indexOf('Failed') === 0) failed++;
+    else if (status.indexOf('Simulated') === 0) simulated++;
+    else sent++;
+  });
+
+  return {
+    total: rows.length, sent: sent, failed: failed, simulated: simulated,
+    history: rows.slice(0, 100).map(stripRow_),
+    balance: getSmsBalance_()
+  };
+}
+
+function getSmsBalance_() {
+  var settings = getSettingsMap_();
+  if (settings.SmsProvider === 'arkesel' && settings.SmsApiKey) {
+    try {
+      var res = UrlFetchApp.fetch('https://sms.arkesel.com/api/v2/clients/balance-details', {
+        headers: { 'api-key': settings.SmsApiKey }, muteHttpExceptions: true
+      });
+      var data = JSON.parse(res.getContentText());
+      if (data && data.data) return { provider: 'Arkesel', balance: data.data.sms_balance, currency: 'credits', available: true };
+      return { provider: 'Arkesel', available: false, message: 'Could not read balance from Arkesel.' };
+    } catch (e) {
+      return { provider: 'Arkesel', available: false, message: e.message };
+    }
+  }
+  return { provider: settings.SmsProvider || 'simulate', available: false, message: 'Balance lookup is only supported for Arkesel right now.' };
+}
+
+/** Owner/Manager broadcast — send an SMS to one or more staff members' phones. */
+function sendStaffSms(token, staffIds, message) {
+  var user = requireAuth_(token);
+  requireRole_(user, ['Owner', 'Manager']);
+  message = String(message || '').trim();
+  if (!message) throw new Error('Please enter a message.');
+  if (!staffIds || !staffIds.length) throw new Error('Please select at least one staff member.');
+
+  var staffMap = keyBy_(readAll_('Staff'), 'StaffID');
+  var sentCount = 0;
+  staffIds.forEach(function (id) {
+    var s = staffMap[id];
+    if (s && s.Phone) { sendSms_(s.Phone, message); sentCount++; }
+  });
+  return { sentCount: sentCount };
+}
+
+/* ---------- "My Bookings" — public self-service lookup ---------- */
+
+/** Public: a customer looks up their own bookings by the phone number they booked with. */
+function lookupMyBookings(phone) {
+  var normalized = normalizeGhanaPhone_(phone);
+  if (!normalized) throw new Error('Please enter a valid Ghana phone number, e.g. 024XXXXXXX or +233XXXXXXXXX.');
+  var customer = readAll_('Customers').find(function (c) { return normalizeGhanaPhone_(c.Phone) === normalized; });
+  if (!customer) return [];
+
+  var services = keyBy_(readAll_('Services'), 'ServiceID');
+  var staffMap = keyBy_(readAll_('Staff'), 'StaffID');
+  var branches = keyBy_(readAll_('Branches'), 'BranchID');
+  var appts = readAll_('Appointments').filter(function (a) { return a.CustomerID === customer.CustomerID; });
+  appts.sort(function (a, b) { return (b.Date + b.TimeSlot).localeCompare(a.Date + a.TimeSlot); });
+
+  return appts.map(function (a) {
+    return {
+      AppointmentID: a.AppointmentID, Reference: a.Reference, Date: a.Date, TimeSlot: a.TimeSlot, Status: a.Status,
+      ServiceName: services[a.ServiceID] ? services[a.ServiceID].Name : '',
+      ServicePrice: services[a.ServiceID] ? services[a.ServiceID].Price : 0,
+      StaffName: staffMap[a.StaffID] ? staffMap[a.StaffID].Name : 'Any available',
+      BranchName: branches[a.BranchID] ? branches[a.BranchID].Name : ''
+    };
+  });
+}
+
+/** Public: lets a customer cancel their own upcoming booking, verified by matching phone number. */
+function cancelMyAppointment(phone, appointmentId) {
+  var normalized = normalizeGhanaPhone_(phone);
+  if (!normalized) throw new Error('Please enter a valid Ghana phone number.');
+  var customer = readAll_('Customers').find(function (c) { return normalizeGhanaPhone_(c.Phone) === normalized; });
+  if (!customer) throw new Error('No bookings found for that phone number.');
+
+  var appt = readAll_('Appointments').find(function (a) { return a.AppointmentID === appointmentId; });
+  if (!appt || appt.CustomerID !== customer.CustomerID) throw new Error('That booking was not found for this phone number.');
+  if (appt.Status === 'Completed' || appt.Status === 'Cancelled') throw new Error('This booking can no longer be cancelled.');
+
+  var updated = updateById_('Appointments', 'AppointmentID', appointmentId, { Status: 'Cancelled' });
+  sendAppointmentStatusUpdate_(updated, customer, 'cancelled at your request');
+  return { success: true };
 }
 
 /**
