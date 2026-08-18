@@ -1,0 +1,1770 @@
+<script>
+/* =====================================================================================
+   KEY & DEED — client-side SPA. Vanilla ES6+, no framework.
+   Sections: Icons & helpers -> API wrapper -> State/Storage -> Router -> Layout ->
+             Charts -> Public Portal -> Tenancy Form -> Auth screens -> Admin screens ->
+             Form Builder -> Bootstrap.
+   ===================================================================================== */
+
+// ---- Icon helper --------------------------------------------------------------------
+function icon(name, size) {
+  size = size || 20;
+  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" aria-hidden="true"><use href="#ic-' + name + '"></use></svg>';
+}
+
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function fmtGHS(n) {
+  n = Number(n) || 0;
+  var fixed = n.toFixed(2);
+  var parts = fixed.split('.');
+  var intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return 'GH₵ ' + intPart + '.' + parts[1];
+}
+
+function fmtDate(d) {
+  if (!d) return '';
+  var date = (d instanceof Date) ? d : new Date(d);
+  if (isNaN(date.getTime())) return String(d);
+  var dd = String(date.getDate()).padStart(2, '0');
+  var mm = String(date.getMonth() + 1).padStart(2, '0');
+  return dd + '/' + mm + '/' + date.getFullYear();
+}
+
+function qs(sel, root) { return (root || document).querySelector(sel); }
+function qsa(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+function el(html) { var d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstChild; }
+function debounce(fn, ms) { var t; return function () { var a = arguments, ctx = this; clearTimeout(t); t = setTimeout(function () { fn.apply(ctx, a); }, ms); }; }
+
+// ---- Toasts ---------------------------------------------------------------------------
+function toast(message, type) {
+  var stack = document.getElementById('toast-stack');
+  var node = el('<div class="toast ' + (type || '') + '">' + esc(message) + '</div>');
+  stack.appendChild(node);
+  setTimeout(function () { node.style.opacity = '0'; node.style.transition = 'opacity .3s'; setTimeout(function () { node.remove(); }, 300); }, 3600);
+}
+
+// ---- API wrapper: promisified google.script.run -----------------------------------
+function api(fnName) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  return new Promise(function (resolve, reject) {
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+      reject(new Error('Server connection unavailable.'));
+      return;
+    }
+    google.script.run
+      .withSuccessHandler(function (resp) {
+        if (resp && resp.ok === false) { reject(new Error(resp.error || 'Request failed.')); return; }
+        resolve(resp ? resp.data : resp);
+      })
+      .withFailureHandler(function (err) { reject(new Error(err && err.message ? err.message : String(err))); })[fnName].apply(null, args);
+  });
+}
+
+// Convenience wrapper that auto-injects the current session token as the first arg.
+function apiAuth(fnName) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  return api.apply(null, [fnName, STATE.token].concat(args));
+}
+
+// ---- State & local storage ----------------------------------------------------------
+var STATE = {
+  token: localStorage.getItem('kd_token') || null,
+  user: JSON.parse(localStorage.getItem('kd_user') || 'null'),
+  tenantToken: localStorage.getItem('kd_tenant_token') || null,
+  tenant: JSON.parse(localStorage.getItem('kd_tenant') || 'null'),
+  theme: localStorage.getItem('kd_theme') || 'system',
+  listingsCache: null,
+  schemaCache: null
+};
+
+function setAdminSession(token, user) {
+  STATE.token = token; STATE.user = user;
+  localStorage.setItem('kd_token', token || '');
+  localStorage.setItem('kd_user', JSON.stringify(user || null));
+}
+function clearAdminSession() { setAdminSession(null, null); }
+
+function setTenantSession(token, tenant) {
+  STATE.tenantToken = token; STATE.tenant = tenant;
+  localStorage.setItem('kd_tenant_token', token || '');
+  localStorage.setItem('kd_tenant', JSON.stringify(tenant || null));
+}
+function clearTenantSession() { setTenantSession(null, null); }
+
+function applyTheme() {
+  var root = document.documentElement;
+  if (STATE.theme === 'dark') root.setAttribute('data-theme', 'dark');
+  else if (STATE.theme === 'light') root.setAttribute('data-theme', 'light');
+  else root.removeAttribute('data-theme');
+}
+function toggleTheme() {
+  STATE.theme = STATE.theme === 'dark' ? 'light' : (STATE.theme === 'light' ? 'system' : 'dark');
+  localStorage.setItem('kd_theme', STATE.theme);
+  applyTheme();
+}
+
+// ---- Skeleton loader ------------------------------------------------------------------
+function skeletonCards(n) {
+  var out = '<div class="grid grid-3">';
+  for (var i = 0; i < n; i++) out += '<div class="card skeleton skeleton-card"></div>';
+  return out + '</div>';
+}
+function skeletonLines(n) {
+  var out = '<div class="card">';
+  for (var i = 0; i < n; i++) out += '<div class="skeleton skeleton-line" style="width:' + (60 + Math.random() * 35) + '%"></div>';
+  return out + '</div>';
+}
+
+
+// ---- Router ---------------------------------------------------------------------------
+var ROUTES = [
+  { re: /^#\/?$/, handler: renderPublicHome },
+  { re: /^#\/room\/([^/]+)$/, handler: renderRoomDetail },
+  { re: /^#\/apply\/([^/]+)$/, handler: renderApplyForm },
+  { re: /^#\/apply-success\/(.+)$/, handler: renderApplySuccess },
+  { re: /^#\/portal\/login$/, handler: renderPortalLogin },
+  { re: /^#\/portal\/home$/, handler: renderPortalHome },
+  { re: /^#\/admin\/login$/, handler: renderAdminLogin },
+  { re: /^#\/admin\/onboarding$/, handler: renderOnboarding },
+  { re: /^#\/admin\/dashboard$/, handler: renderDashboard },
+  { re: /^#\/admin\/properties$/, handler: renderProperties },
+  { re: /^#\/admin\/rooms$/, handler: renderRooms },
+  { re: /^#\/admin\/tenants$/, handler: renderTenants },
+  { re: /^#\/admin\/tenants\/([^/]+)$/, handler: renderTenantProfile },
+  { re: /^#\/admin\/applications$/, handler: renderApplications },
+  { re: /^#\/admin\/ledger$/, handler: renderLedger },
+  { re: /^#\/admin\/expiry$/, handler: renderExpiryBoard },
+  { re: /^#\/admin\/maintenance$/, handler: renderMaintenance },
+  { re: /^#\/admin\/form-builder$/, handler: renderFormBuilder },
+  { re: /^#\/admin\/messaging$/, handler: renderMessaging },
+  { re: /^#\/admin\/settings$/, handler: renderSettings },
+  { re: /^#\/admin\/users$/, handler: renderUsers },
+  { re: /^#\/admin\/health$/, handler: renderHealth }
+];
+
+var ADMIN_NAV = [
+  { route: '#/admin/dashboard', icon: 'home', label: 'Dashboard' },
+  { route: '#/admin/properties', icon: 'building', label: 'Properties' },
+  { route: '#/admin/rooms', icon: 'door', label: 'Rooms' },
+  { route: '#/admin/tenants', icon: 'users', label: 'Tenants' },
+  { route: '#/admin/applications', icon: 'file-text', label: 'Applications' },
+  { route: '#/admin/ledger', icon: 'cash', label: 'Rent Ledger' },
+  { route: '#/admin/expiry', icon: 'clock', label: 'Expiry Board' },
+  { route: '#/admin/maintenance', icon: 'wrench', label: 'Maintenance' },
+  { route: '#/admin/messaging', icon: 'bell', label: 'Messaging' },
+  { route: '#/admin/form-builder', icon: 'edit', label: 'Form Builder' },
+  { route: '#/admin/settings', icon: 'settings', label: 'Settings' },
+  { route: '#/admin/health', icon: 'shield', label: 'Health Check' }
+];
+
+// Caretakers can log/view maintenance and see tenants, but not money, notices, messaging,
+// the form builder, settings or user management. Viewers get read-only screens only.
+var ROLE_NAV_ALLOW = {
+  SuperAdmin: null, // null = all
+  Landlord: ['#/admin/dashboard', '#/admin/properties', '#/admin/rooms', '#/admin/tenants', '#/admin/applications',
+    '#/admin/ledger', '#/admin/expiry', '#/admin/maintenance', '#/admin/messaging', '#/admin/form-builder',
+    '#/admin/settings', '#/admin/health'],
+  Caretaker: ['#/admin/dashboard', '#/admin/properties', '#/admin/rooms', '#/admin/tenants', '#/admin/maintenance'],
+  Viewer: ['#/admin/dashboard', '#/admin/properties', '#/admin/rooms', '#/admin/tenants', '#/admin/expiry', '#/admin/maintenance']
+};
+function navForRole(role) {
+  var allow = ROLE_NAV_ALLOW[role];
+  if (!allow) return ADMIN_NAV;
+  return ADMIN_NAV.filter(function (item) { return allow.indexOf(item.route) !== -1; });
+}
+
+function navigate(hash) { window.location.hash = hash; }
+
+function isAdminRoute(hash) { return hash.indexOf('#/admin/') === 0 && hash !== '#/admin/login' && hash !== '#/admin/onboarding'; }
+function isPortalRoute(hash) { return hash.indexOf('#/portal/') === 0 && hash !== '#/portal/login'; }
+
+function onRouteChange() {
+  var hash = window.location.hash || '#/';
+  if (isAdminRoute(hash) && !STATE.token) { navigate('#/admin/login'); return; }
+  if (isPortalRoute(hash) && !STATE.tenantToken) { navigate('#/portal/login'); return; }
+  for (var i = 0; i < ROUTES.length; i++) {
+    var m = ROUTES[i].re.exec(hash);
+    if (m) {
+      window.scrollTo(0, 0);
+      ROUTES[i].handler.apply(null, m.slice(1));
+      renderChrome(hash);
+      return;
+    }
+  }
+  renderNotFound();
+}
+
+function root() { return document.getElementById('app-root'); }
+
+/** Renders the topbar/sidebar/bottomnav shell appropriate to the current section. */
+function renderChrome(hash) {
+  var appHolder = document.getElementById('app');
+  var appRoot = document.getElementById('app-root');
+  // Always reset app-root to be a direct child of #app first, so no wrapper nests pile up.
+  if (appRoot.parentNode !== appHolder) appHolder.appendChild(appRoot);
+  var existingChrome = document.getElementById('chrome');
+  if (existingChrome) existingChrome.remove();
+  var existingLayout = document.getElementById('layout-wrap');
+  if (existingLayout) existingLayout.remove();
+
+  var isAdmin = hash.indexOf('#/admin/') === 0 && hash !== '#/admin/login' && hash !== '#/admin/onboarding';
+  if (!isAdmin) return;
+
+  var visibleNav = navForRole(STATE.user ? STATE.user.role : 'Viewer');
+  var navItems = visibleNav.map(function (item) {
+    var active = hash === item.route ? ' active' : '';
+    return '<div class="nav-item' + active + '" data-route="' + item.route + '">' + icon(item.icon) + '<span>' + item.label + '</span></div>';
+  }).join('');
+
+  var chrome = el('<div id="chrome">' +
+    '<div class="topbar">' +
+    '<div class="brand">' + icon('building') + '<span id="brand-name">KEY &amp; DEED</span></div>' +
+    '<div class="spacer"></div>' +
+    '<button class="icon-btn" id="theme-toggle" title="Toggle theme">' + icon('sun') + '</button>' +
+    '<button class="icon-btn" id="logout-btn" title="Log out">' + icon('logout') + '</button>' +
+    '</div></div>');
+  appHolder.insertBefore(chrome, appHolder.firstChild);
+
+  var layout = el('<div id="layout-wrap" class="layout">' +
+    '<div class="sidebar"><nav>' + navItems + '</nav></div>' +
+    '<div class="main"></div>' +
+    '<div class="bottomnav">' + visibleNav.slice(0, 5).map(function (item) {
+      var active = hash === item.route ? ' active' : '';
+      return '<div class="nav-item' + active + '" data-route="' + item.route + '">' + icon(item.icon) + '<span>' + item.label + '</span></div>';
+    }).join('') + '</div>' +
+    '</div>');
+  appHolder.appendChild(layout);
+  qs('.main', layout).appendChild(appRoot);
+
+  qsa('.nav-item', layout).forEach(function (n) { n.addEventListener('click', function () { navigate(n.getAttribute('data-route')); }); });
+  qs('#theme-toggle', chrome).addEventListener('click', toggleTheme);
+  qs('#logout-btn', chrome).addEventListener('click', async function () {
+    await api('adminLogout', STATE.token).catch(function () {});
+    clearAdminSession();
+    navigate('#/admin/login');
+  });
+  if (STATE.user) qs('#brand-name', chrome).textContent = STATE.user.name + ' · ' + STATE.user.role;
+}
+
+function renderNotFound() {
+  root().innerHTML = '<div class="empty-state">' + icon('alert', 40) + '<h3>Page not found</h3><a href="#/">Go home</a></div>';
+}
+
+
+// ---- SVG chart generators (hand-written, no chart library) --------------------------
+
+function svgDonut(occupied, vacant) {
+  var total = occupied + vacant || 1;
+  var pct = occupied / total;
+  var r = 54, c = 2 * Math.PI * r;
+  var offset = c * (1 - pct);
+  return '<svg width="140" height="140" viewBox="0 0 140 140">' +
+    '<circle cx="70" cy="70" r="' + r + '" fill="none" stroke="var(--border)" stroke-width="16"/>' +
+    '<circle cx="70" cy="70" r="' + r + '" fill="none" stroke="var(--accent)" stroke-width="16" ' +
+    'stroke-dasharray="' + c + '" stroke-dashoffset="' + offset + '" stroke-linecap="round" transform="rotate(-90 70 70)"/>' +
+    '<text x="70" y="66" text-anchor="middle" font-size="22" font-weight="700" fill="var(--ink)">' + Math.round(pct * 100) + '%</text>' +
+    '<text x="70" y="86" text-anchor="middle" font-size="11" fill="var(--muted)">occupied</text>' +
+    '</svg>';
+}
+
+function svgBarChart(data, width, height) {
+  width = width || 320; height = height || 140;
+  var max = Math.max.apply(null, data.map(function (d) { return d.value; }).concat([1]));
+  var barW = (width / data.length) * 0.6;
+  var gap = (width / data.length) * 0.4;
+  var bars = data.map(function (d, i) {
+    var barH = max ? (d.value / max) * (height - 28) : 0;
+    var x = i * (barW + gap) + gap / 2;
+    var y = height - 20 - barH;
+    return '<rect x="' + x + '" y="' + y + '" width="' + barW + '" height="' + Math.max(barH, 1) + '" rx="2" fill="var(--accent)"></rect>' +
+      '<text x="' + (x + barW / 2) + '" y="' + (height - 6) + '" text-anchor="middle" font-size="9" fill="var(--muted)">' + esc(d.label) + '</text>';
+  }).join('');
+  return '<svg width="100%" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="xMidYMid meet">' + bars + '</svg>';
+}
+
+function svgTimeline(data, width, height) {
+  width = width || 640; height = height || 120;
+  var max = Math.max.apply(null, data.map(function (d) { return d.value; }).concat([1]));
+  var stepX = width / data.length;
+  var points = data.map(function (d, i) {
+    var x = stepX * i + stepX / 2;
+    var y = height - 24 - (max ? (d.value / max) * (height - 44) : 0);
+    return { x: x, y: y, d: d };
+  });
+  var path = points.map(function (p, i) { return (i === 0 ? 'M' : 'L') + p.x + ' ' + p.y; }).join(' ');
+  var dots = points.map(function (p) {
+    return '<circle cx="' + p.x + '" cy="' + p.y + '" r="3" fill="var(--accent)"></circle>' +
+      (p.d.value ? '<text x="' + p.x + '" y="' + (p.y - 8) + '" text-anchor="middle" font-size="9" fill="var(--ink)">' + p.d.value + '</text>' : '') +
+      '<text x="' + p.x + '" y="' + (height - 6) + '" text-anchor="middle" font-size="8" fill="var(--muted)">' + esc(p.d.label) + '</text>';
+  }).join('');
+  return '<svg width="100%" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="xMidYMid meet">' +
+    '<path d="' + path + '" fill="none" stroke="var(--accent)" stroke-width="2"/>' + dots + '</svg>';
+}
+
+
+// ---- Public Portal ---------------------------------------------------------------------
+
+async function loadListings() {
+  if (STATE.listingsCache) return STATE.listingsCache;
+  var data = await api('getPublicListings');
+  STATE.listingsCache = data;
+  return data;
+}
+
+function renderPublicHome() {
+  root().innerHTML = '<div class="hero"><h1>Find a place to call home</h1><p>Browse vacant rooms and apartments listed by verified landlords across Ghana.</p></div>' +
+    '<div id="filter-bar" class="filter-bar"></div>' +
+    '<div id="listing-grid">' + skeletonCards(6) + '</div>';
+
+  loadListings().then(function (data) {
+    if (!data.enabled) {
+      root().querySelector('#listing-grid').innerHTML = '<div class="empty-state">' + icon('building', 40) + '<h3>Portal not available</h3><p>The public listings portal is currently disabled.</p></div>';
+      return;
+    }
+    renderFilterBar(data);
+    renderListingGrid(data.rooms);
+  }).catch(function (e) { toast(e.message, 'error'); });
+
+  var adminLink = el('<div style="text-align:center;margin-top:32px;"><a href="#/admin/login" class="muted">Landlord / Admin login</a> &nbsp;·&nbsp; <a href="#/portal/login" class="muted">Tenant portal login</a></div>');
+  root().appendChild(adminLink);
+}
+
+function renderFilterBar(data) {
+  var regions = ['All Regions'].concat(data.regions);
+  var bar = qs('#filter-bar');
+  bar.innerHTML =
+    '<select id="f-region">' + regions.map(function (r) { return '<option>' + esc(r) + '</option>'; }).join('') + '</select>' +
+    '<select id="f-type"><option>All Types</option>' + PROPERTY_TYPES_CLIENT.map(function (t) { return '<option>' + esc(t) + '</option>'; }).join('') + '</select>' +
+    '<select id="f-beds"><option value="">Any Bedrooms</option>' + [0, 1, 2, 3, 4].map(function (b) { return '<option value="' + b + '">' + b + '+ bed</option>'; }).join('') + '</select>' +
+    '<select id="f-furnished"><option value="">Furnished: Any</option><option value="Y">Furnished</option><option value="N">Unfurnished</option></select>' +
+    '<input id="f-max-rent" type="number" placeholder="Max rent GH₵">';
+  qsa('select, input', bar).forEach(function (n) { n.addEventListener('input', debounce(function () { applyFilters(data); }, 150)); });
+}
+
+var PROPERTY_TYPES_CLIENT = ['Single Room', 'Chamber and Hall', 'Self-Contained', '1-Bedroom Apartment',
+  '2-Bedroom Apartment', '3-Bedroom Apartment', '4-Bedroom Apartment', 'Compound House Room',
+  "Boys' Quarters", 'Townhouse', 'Detached House', 'Store/Shop', 'Office Space', 'Warehouse'];
+
+function applyFilters(data) {
+  var region = qs('#f-region').value, type = qs('#f-type').value, beds = qs('#f-beds').value;
+  var furnished = qs('#f-furnished').value, maxRent = Number(qs('#f-max-rent').value) || Infinity;
+  var filtered = data.rooms.filter(function (r) {
+    if (region !== 'All Regions' && r.region !== region) return false;
+    if (type !== 'All Types' && r.propertyType !== type) return false;
+    if (beds && Number(r.bedrooms) < Number(beds)) return false;
+    if (furnished && r.furnished !== furnished) return false;
+    if (Number(r.monthlyRent) > maxRent) return false;
+    return true;
+  });
+  renderListingGrid(filtered);
+}
+
+function renderListingGrid(rooms) {
+  var grid = qs('#listing-grid');
+  if (!rooms.length) {
+    grid.innerHTML = '<div class="empty-state">' + icon('door', 40) + '<h3>No rooms match your search</h3><p>Try widening your filters.</p></div>';
+    return;
+  }
+  grid.className = 'grid grid-3';
+  grid.innerHTML = rooms.map(function (r) {
+    var photo = r.photoFileIds[0] || r.propertyPhotoFileIds[0];
+    var thumb = photo ? 'https://drive.google.com/thumbnail?id=' + photo + '&sz=w500' : '';
+    return '<div class="card room-card" data-room="' + r.roomId + '">' +
+      (thumb ? '<img class="thumb" loading="lazy" src="' + thumb + '" alt="' + esc(r.roomLabel) + '">' : '<div class="thumb"></div>') +
+      '<div class="body"><h3 style="margin-bottom:2px;">' + esc(r.roomLabel) + '</h3>' +
+      '<div class="muted" style="font-size:13px;margin-bottom:8px;">' + esc(r.propertyName) + ' &middot; ' + esc(r.town) + ', ' + esc(r.region) + '</div>' +
+      '<div class="rent">' + r.rentFormatted + '<span class="muted" style="font-size:12px;font-weight:400;"> /month</span></div>' +
+      '<div class="muted" style="font-size:12px;">Min advance: ' + esc(String(r.minAdvanceMonths)) + ' months</div>' +
+      '<div class="row" style="margin-top:8px;flex-wrap:wrap;">' + r.amenities.slice(0, 3).map(function (a) { return '<span class="chip">' + esc(a) + '</span>'; }).join('') + '</div>' +
+      '</div></div>';
+  }).join('');
+  qsa('.room-card', grid).forEach(function (c) { c.addEventListener('click', function () { navigate('#/room/' + c.getAttribute('data-room')); }); });
+}
+
+function renderRoomDetail(roomId) {
+  root().innerHTML = skeletonLines(6);
+  api('getRoomDetail', roomId).then(function (data) {
+    var r = data.room, p = data.property;
+    var photos = data.photoFileIds.length ? data.photoFileIds : data.propertyPhotoFileIds;
+    var gallery = photos.length
+      ? '<div class="gallery">' + photos.map(function (id) { return '<img loading="lazy" src="https://drive.google.com/thumbnail?id=' + id + '&sz=w800">'; }).join('') + '</div>'
+      : '';
+    var waLink = 'https://wa.me/' + (data.landlordPhone || '').replace(/\D/g, '') + '?text=' + encodeURIComponent('Hello, I am interested in ' + r.RoomLabel + ' at ' + p.PropertyName);
+    var mapsLink = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(p.GhanaPostGPS || (p.Town + ' ' + p.Region));
+    root().innerHTML =
+      '<button class="btn btn-ghost" id="back-btn">' + icon('arrow-left') + ' Back to listings</button>' +
+      gallery +
+      '<h1>' + esc(r.RoomLabel) + '</h1>' +
+      '<p class="muted">' + esc(p.PropertyName) + ' &middot; ' + esc(p.PropertyType) + ' &middot; ' + esc(p.Town) + ', ' + esc(p.Region) + '</p>' +
+      '<div class="card">' +
+      '<div class="row-between"><h2 class="mb-0">' + data.rentFormatted + ' <span class="muted" style="font-size:13px;font-weight:400;">/month</span></h2>' +
+      '<span class="badge badge-green">Vacant</span></div>' +
+      '<div class="grid grid-2 mt-4">' +
+      '<div><div class="muted" style="font-size:12px;">Deposit</div><div>' + data.depositFormatted + '</div></div>' +
+      '<div><div class="muted" style="font-size:12px;">Minimum advance</div><div>' + esc(String(r.MinAdvanceMonths)) + ' months</div></div>' +
+      '<div><div class="muted" style="font-size:12px;">Bedrooms / Bathrooms</div><div>' + esc(String(r.Bedrooms)) + ' bed / ' + esc(String(r.Bathrooms)) + ' bath</div></div>' +
+      '<div><div class="muted" style="font-size:12px;">Furnished</div><div>' + (r.Furnished === 'Y' ? 'Yes' : 'No') + '</div></div>' +
+      '</div></div>' +
+      '<div class="card mt-4"><h3>Description</h3><p>' + esc(p.Description || 'No description provided.') + '</p></div>' +
+      '<div class="card mt-4"><h3>Amenities</h3><div class="row" style="flex-wrap:wrap;">' + data.amenities.map(function (a) { return '<span class="chip">' + esc(a) + '</span>'; }).join('') + '</div></div>' +
+      '<div class="card mt-4"><h3>Utilities</h3><p>' + esc(r.UtilitiesIncluded || 'To be confirmed with the landlord/caretaker.') + '</p></div>' +
+      '<div class="card mt-4"><h3>Location</h3><div class="row"><span>' + icon('map-pin') + '</span><span>' + esc(p.GhanaPostGPS || 'GPS address not provided') + '</span></div>' +
+      '<a class="btn btn-sm mt-2" target="_blank" href="' + mapsLink + '">Get directions</a></div>' +
+      '<div class="row mt-4" style="gap:12px;">' +
+      '<button class="btn btn-primary btn-block" id="apply-btn">Apply / Fill Tenancy Form</button>' +
+      '</div>' +
+      '<a class="wa-link mt-4" style="display:inline-flex;" target="_blank" href="' + waLink + '">' + icon('whatsapp') + ' Enquire on WhatsApp</a>';
+    qs('#back-btn').addEventListener('click', function () { navigate('#/'); });
+    qs('#apply-btn').addEventListener('click', function () { navigate('#/apply/' + r.ID); });
+  }).catch(function (e) { toast(e.message, 'error'); navigate('#/'); });
+}
+
+
+// ---- Tenancy Application Form (multi-step wizard, schema-driven) ----------------------
+
+var TF = null; // active tenancy-form state, rebuilt each time renderApplyForm runs
+
+function tfDraftKey(roomId) { return 'kd_draft_' + roomId; }
+
+async function renderApplyForm(roomId) {
+  root().innerHTML = skeletonLines(8);
+  try {
+    var schemaResp = await api('getFormSchema');
+    var roomResp = await api('getRoomDetail', roomId);
+    var sections = [];
+    schemaResp.fields.forEach(function (f) { if (sections.indexOf(f.Section) === -1) sections.push(f.Section); });
+    var docIdx = sections.indexOf('Documents');
+    if (docIdx === -1) docIdx = sections.length;
+    sections.splice(docIdx, 0, 'Property & Terms');
+    sections.push('Review');
+
+    TF = {
+      schema: schemaResp.fields, steps: sections, stepIndex: 0, answers: {},
+      roomId: roomId, room: roomResp.room, property: roomResp.property, sigPad: null, submitting: false
+    };
+
+    var saved = localStorage.getItem(tfDraftKey(roomId));
+    if (saved) {
+      try {
+        var parsed = JSON.parse(saved);
+        TF.answers = parsed.answers || {};
+        TF.stepIndex = Math.min(parsed.stepIndex || 0, TF.steps.length - 1);
+        toast('Restored your saved draft.', 'success');
+      } catch (e) { /* ignore corrupt draft */ }
+    }
+    tfRenderShell();
+    tfAutosaveStart();
+  } catch (e) {
+    toast(e.message, 'error');
+    navigate('#/room/' + roomId);
+  }
+}
+
+function tfAutosaveStart() {
+  if (TF._autosaveTimer) clearInterval(TF._autosaveTimer);
+  TF._autosaveTimer = setInterval(function () {
+    if (!TF) return;
+    localStorage.setItem(tfDraftKey(TF.roomId), JSON.stringify({ answers: TF.answers, stepIndex: TF.stepIndex }));
+  }, 10000);
+}
+
+function tfRenderShell() {
+  root().innerHTML =
+    '<button class="btn btn-ghost" id="tf-back">' + icon('arrow-left') + ' Back</button>' +
+    '<h1>Tenancy Application</h1>' +
+    '<p class="muted">' + esc(TF.room.RoomLabel) + ' at ' + esc(TF.property.PropertyName) + '</p>' +
+    '<div class="stepper" id="tf-stepper"></div>' +
+    '<div class="step-label" id="tf-step-label"></div>' +
+    '<form id="tf-form" class="card"></form>' +
+    '<div class="row-between mt-4">' +
+    '<button class="btn" id="tf-prev">Previous</button>' +
+    '<button class="btn btn-primary" id="tf-next">Next</button>' +
+    '</div>';
+  qs('#tf-back').addEventListener('click', function () { navigate('#/room/' + TF.roomId); });
+  qs('#tf-prev').addEventListener('click', tfPrev);
+  qs('#tf-next').addEventListener('click', tfNext);
+  tfRenderStep();
+}
+
+function tfRenderStepper() {
+  var stepper = qs('#tf-stepper');
+  stepper.innerHTML = TF.steps.map(function (s, i) {
+    var cls = i < TF.stepIndex ? 'done' : (i === TF.stepIndex ? 'active' : '');
+    return '<div class="step ' + cls + '"></div>';
+  }).join('');
+  qs('#tf-step-label').textContent = 'Step ' + (TF.stepIndex + 1) + ' of ' + TF.steps.length + ' — ' + TF.steps[TF.stepIndex];
+  qs('#tf-prev').style.visibility = TF.stepIndex === 0 ? 'hidden' : 'visible';
+  qs('#tf-next').textContent = TF.stepIndex === TF.steps.length - 1 ? 'Submit Application' : 'Next';
+}
+
+function tfFieldsForSection(section) { return TF.schema.filter(function (f) { return f.Section === section; }); }
+
+function tfRenderStep() {
+  tfRenderStepper();
+  var section = TF.steps[TF.stepIndex];
+  var formEl = qs('#tf-form');
+  if (section === 'Property & Terms') {
+    var r = TF.room, p = TF.property;
+    var advisory = Number(r.MinAdvanceMonths) > 6
+      ? '<p style="color:var(--warning);">Advisory: Act 220 caps residential rent advance at 6 months. This landlord is asking for ' + esc(String(r.MinAdvanceMonths)) + ' months, as is common practice — you may discuss terms directly.</p>' : '';
+    formEl.innerHTML =
+      '<h3>Room &amp; Terms Summary</h3>' +
+      '<table class="data-table"><tr><td data-label="Room">Room</td><td data-label="Value">' + esc(r.RoomLabel) + '</td></tr>' +
+      '<tr><td data-label="Property">Property</td><td data-label="Value">' + esc(p.PropertyName) + '</td></tr>' +
+      '<tr><td data-label="Rent">Monthly Rent</td><td data-label="Value">' + fmtGHS(r.MonthlyRent) + '</td></tr>' +
+      '<tr><td data-label="Advance">Minimum Advance</td><td data-label="Value">' + esc(String(r.MinAdvanceMonths)) + ' months</td></tr>' +
+      '<tr><td data-label="Deposit">Deposit</td><td data-label="Value">' + fmtGHS(r.Deposit) + '</td></tr></table>' +
+      advisory +
+      '<div class="field"><label for="DesiredAdvanceMonths">I wish to pay advance for (months)</label>' +
+      '<input type="number" min="1" id="DesiredAdvanceMonths" name="DesiredAdvanceMonths" value="' +
+      esc(TF.answers.DesiredAdvanceMonths || r.MinAdvanceMonths) + '"></div>';
+  } else if (section === 'Review') {
+    formEl.innerHTML = tfRenderReview();
+  } else {
+    var fields = tfFieldsForSection(section);
+    formEl.innerHTML = fields.map(tfRenderField).join('');
+    fields.filter(function (f) { return f.Type === 'signature'; }).forEach(function (f) { tfInitSignaturePad(f.FieldKey); });
+    fields.filter(function (f) { return f.Type === 'file'; }).forEach(function (f) {
+      qs('#' + f.FieldKey + '_input').addEventListener('change', function (ev) { tfHandleFileInput(ev.target, f.FieldKey); });
+    });
+  }
+  // Rehydrate previously entered plain-input values.
+  qsa('input[name], select[name], textarea[name]', formEl).forEach(function (inp) {
+    var key = inp.name;
+    if (TF.answers[key] === undefined) return;
+    if (inp.type === 'checkbox') inp.checked = !!TF.answers[key];
+    else if (inp.type !== 'file') inp.value = TF.answers[key];
+  });
+}
+
+function tfRenderField(f) {
+  if (f.Type === 'heading') return '<h3 class="mt-4">' + esc(f.Label) + '</h3>';
+  if (f.Type === 'divider') return '<hr style="border:none;border-top:1px solid var(--border);margin:16px 0;">';
+  var req = f.Required === 'Y' ? ' <span style="color:var(--danger)">*</span>' : '';
+  var help = f.HelpText ? '<div class="help">' + esc(f.HelpText) + '</div>' : '';
+  if (f.Type === 'select') {
+    var opts = (f.Options || '').split(',').filter(Boolean);
+    return '<div class="field"><label>' + esc(f.Label) + req + '</label><select name="' + f.FieldKey + '">' +
+      '<option value="">Select...</option>' + opts.map(function (o) { return '<option value="' + esc(o) + '">' + esc(o) + '</option>'; }).join('') +
+      '</select>' + help + '</div>';
+  }
+  if (f.Type === 'radio') {
+    var ropts = (f.Options || '').split(',').filter(Boolean);
+    return '<div class="field"><label>' + esc(f.Label) + req + '</label>' + ropts.map(function (o) {
+      return '<div class="checkbox-row"><input type="radio" name="' + f.FieldKey + '" value="' + esc(o) + '" id="' + f.FieldKey + '_' + esc(o) + '">' +
+        '<label for="' + f.FieldKey + '_' + esc(o) + '">' + esc(o) + '</label></div>';
+    }).join('') + help + '</div>';
+  }
+  if (f.Type === 'checkbox') {
+    return '<div class="field checkbox-row"><input type="checkbox" name="' + f.FieldKey + '" id="' + f.FieldKey + '">' +
+      '<label for="' + f.FieldKey + '">' + esc(f.Label) + req + '</label></div>' + help;
+  }
+  if (f.Type === 'textarea') {
+    return '<div class="field"><label>' + esc(f.Label) + req + '</label><textarea name="' + f.FieldKey + '" placeholder="' + esc(f.Placeholder) + '"></textarea>' + help + '</div>';
+  }
+  if (f.Type === 'file') {
+    var existing = TF.answers[f.FieldKey];
+    return '<div class="field"><label>' + esc(f.Label) + req + '</label>' +
+      '<input type="file" accept="image/*" id="' + f.FieldKey + '_input">' +
+      '<input type="hidden" name="' + f.FieldKey + '" value="' + esc(existing || '') + '">' +
+      '<div id="' + f.FieldKey + '_status" class="help">' + (existing ? 'Uploaded.' : 'Max 5MB. Images are resized automatically.') + '</div>' + help + '</div>';
+  }
+  if (f.Type === 'signature') {
+    var existingSig = TF.answers[f.FieldKey];
+    return '<div class="field"><label>' + esc(f.Label) + req + '</label>' +
+      '<div class="sigpad-wrap"><canvas id="' + f.FieldKey + '_canvas"></canvas></div>' +
+      '<div class="sigpad-actions"><button type="button" class="btn btn-sm" id="' + f.FieldKey + '_clear">Clear</button>' +
+      '<button type="button" class="btn btn-sm" id="' + f.FieldKey + '_undo">Undo</button>' +
+      '<label class="btn btn-sm" style="cursor:pointer;">Upload image<input type="file" accept="image/*" id="' + f.FieldKey + '_upload" style="display:none;"></label></div>' +
+      '<input type="hidden" name="' + f.FieldKey + '" value="' + esc(existingSig || '') + '">' +
+      '<div id="' + f.FieldKey + '_status" class="help">' + (existingSig ? 'Signature captured.' : 'Draw with your finger/mouse, or upload an image.') + '</div>' + help + '</div>';
+  }
+  var type = f.Type || 'text';
+  return '<div class="field"><label>' + esc(f.Label) + req + '</label>' +
+    '<input type="' + type + '" name="' + f.FieldKey + '" placeholder="' + esc(f.Placeholder || '') + '"></input>' + help + '</div>';
+}
+
+function tfRenderReview() {
+  var out = '';
+  TF.steps.filter(function (s) { return s !== 'Review' && s !== 'Property & Terms'; }).forEach(function (section) {
+    var fields = tfFieldsForSection(section).filter(function (f) { return f.Type !== 'heading' && f.Type !== 'divider' && f.Type !== 'signature' && f.Type !== 'file'; });
+    if (!fields.length) return;
+    out += '<h3>' + esc(section) + '</h3><table class="data-table">' + fields.map(function (f) {
+      var v = TF.answers[f.FieldKey];
+      return '<tr><td data-label="Field">' + esc(f.Label) + '</td><td data-label="Value">' + esc(v === true ? 'Yes' : (v || '—')) + '</td></tr>';
+    }).join('') + '</table>';
+  });
+  out += '<h3>Property &amp; Terms</h3><p>' + esc(TF.room.RoomLabel) + ' at ' + esc(TF.property.PropertyName) +
+    ' &middot; Desired advance: ' + esc(String(TF.answers.DesiredAdvanceMonths || TF.room.MinAdvanceMonths)) + ' months</p>';
+  out += '<p class="muted" style="font-size:12px;">By submitting, you confirm the information above is accurate to the best of your knowledge.</p>';
+  return out;
+}
+
+
+// ---- Signature pad (canvas, mouse + touch, Clear/Undo) ---------------------------------
+
+function tfInitSignaturePad(fieldKey) {
+  var canvas = qs('#' + fieldKey + '_canvas');
+  var ctx = canvas.getContext('2d');
+  function resize() {
+    var ratio = window.devicePixelRatio || 1;
+    var rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * ratio; canvas.height = rect.height * ratio;
+    ctx.scale(ratio, ratio);
+    ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#111827';
+  }
+  resize();
+  var strokes = []; var currentStroke = null; var drawing = false;
+
+  function pos(ev) {
+    var rect = canvas.getBoundingClientRect();
+    var point = ev.touches ? ev.touches[0] : ev;
+    return { x: point.clientX - rect.left, y: point.clientY - rect.top };
+  }
+  function redraw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    strokes.forEach(function (stroke) {
+      ctx.beginPath();
+      stroke.forEach(function (p, i) { if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y); });
+      ctx.stroke();
+    });
+  }
+  function start(ev) { ev.preventDefault(); drawing = true; currentStroke = [pos(ev)]; strokes.push(currentStroke); }
+  function move(ev) { if (!drawing) return; ev.preventDefault(); currentStroke.push(pos(ev)); redraw(); }
+  function end() { drawing = false; currentStroke = null; tfExportSignature(fieldKey, canvas, strokes.length > 0); }
+
+  canvas.addEventListener('mousedown', start); canvas.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
+  canvas.addEventListener('touchstart', start, { passive: false }); canvas.addEventListener('touchmove', move, { passive: false }); canvas.addEventListener('touchend', end);
+
+  qs('#' + fieldKey + '_clear').addEventListener('click', function () { strokes = []; redraw(); tfExportSignature(fieldKey, canvas, false); });
+  qs('#' + fieldKey + '_undo').addEventListener('click', function () { strokes.pop(); redraw(); tfExportSignature(fieldKey, canvas, strokes.length > 0); });
+  qs('#' + fieldKey + '_upload').addEventListener('change', function (ev) {
+    var file = ev.target.files[0]; if (!file) return;
+    tfDownscaleImage(file, 900, 0.85).then(function (dataUrl) {
+      var img = new Image();
+      img.onload = function () {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        var ratio = window.devicePixelRatio || 1;
+        ctx.drawImage(img, 0, 0, canvas.width / ratio, canvas.height / ratio);
+        canvas.toBlob(function () {}); // ensure canvas painted
+        tfUploadSignatureBlob(fieldKey, dataUrl);
+      };
+      img.src = dataUrl;
+    });
+  });
+
+  TF.sigPad = TF.sigPad || {}; TF.sigPad[fieldKey] = { canvas: canvas };
+}
+
+function tfExportSignature(fieldKey, canvas, hasContent) {
+  if (!hasContent) { qs('#' + fieldKey + '_status').textContent = 'Draw with your finger/mouse, or upload an image.'; return; }
+  var dataUrl = canvas.toDataURL('image/png');
+  tfUploadSignatureBlob(fieldKey, dataUrl);
+}
+
+function tfUploadSignatureBlob(fieldKey, dataUrl) {
+  qs('#' + fieldKey + '_status').textContent = 'Saving signature...';
+  api('uploadFile', { kind: 'signature', base64: dataUrl, mimeType: 'image/png', filename: fieldKey + '.png' })
+    .then(function (res) {
+      TF.answers[fieldKey] = res.fileId;
+      qs('input[name="' + fieldKey + '"]').value = res.fileId;
+      qs('#' + fieldKey + '_status').textContent = 'Signature captured.';
+    })
+    .catch(function (e) { qs('#' + fieldKey + '_status').textContent = 'Upload failed: ' + e.message; });
+}
+
+// ---- File upload with client-side downscale (speed + 5MB guard) -----------------------
+
+function tfDownscaleImage(file, maxDim, quality) {
+  return new Promise(function (resolve, reject) {
+    if (file.size > 5 * 1024 * 1024) { reject(new Error('File exceeds 5MB limit.')); return; }
+    var reader = new FileReader();
+    reader.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        var canvas = document.createElement('canvas');
+        canvas.width = img.width * scale; canvas.height = img.height * scale;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', quality || 0.82));
+      };
+      img.onerror = function () { reject(new Error('Could not read image.')); };
+      img.src = reader.result;
+    };
+    reader.onerror = function () { reject(new Error('Could not read file.')); };
+    reader.readAsDataURL(file);
+  });
+}
+
+function tfHandleFileInput(input, fieldKey) {
+  var file = input.files[0]; if (!file) return;
+  var statusEl = qs('#' + fieldKey + '_status');
+  statusEl.textContent = 'Uploading...';
+  tfDownscaleImage(file, 1200, 0.82).then(function (dataUrl) {
+    return api('uploadFile', { kind: 'idDoc', base64: dataUrl, mimeType: 'image/jpeg', filename: fieldKey + '.jpg' });
+  }).then(function (res) {
+    TF.answers[fieldKey] = res.fileId;
+    qs('input[name="' + fieldKey + '"]').value = res.fileId;
+    statusEl.textContent = 'Uploaded successfully.';
+  }).catch(function (e) { statusEl.textContent = 'Upload failed: ' + e.message; toast(e.message, 'error'); });
+}
+
+// ---- Wizard navigation, validation, submit ---------------------------------------------
+
+function tfCollectStepAnswers() {
+  var section = TF.steps[TF.stepIndex];
+  if (section === 'Review') return true;
+  var formEl = qs('#tf-form');
+  var fields = section === 'Property & Terms'
+    ? [{ FieldKey: 'DesiredAdvanceMonths', Label: 'Desired advance months', Required: 'N', Type: 'number' }]
+    : tfFieldsForSection(section);
+  var valid = true;
+  fields.forEach(function (f) {
+    if (f.Type === 'heading' || f.Type === 'divider' || f.Type === 'file' || f.Type === 'signature') return;
+    var value;
+    if (f.Type === 'checkbox') { value = qs('[name="' + f.FieldKey + '"]', formEl).checked; }
+    else if (f.Type === 'radio') { var checked = qs('[name="' + f.FieldKey + '"]:checked', formEl); value = checked ? checked.value : ''; }
+    else { var inputEl = qs('[name="' + f.FieldKey + '"]', formEl); value = inputEl ? inputEl.value.trim() : ''; }
+    TF.answers[f.FieldKey] = value;
+    if (f.Required === 'Y' && !value) { valid = false; }
+    if (f.Validation && value) {
+      try { if (!(new RegExp(f.Validation)).test(value)) valid = false; } catch (e) { /* ignore bad regex */ }
+    }
+  });
+  // Required file/signature fields, checked from stored answers (already uploaded).
+  fields = section === 'Property & Terms' ? [] : tfFieldsForSection(section);
+  fields.filter(function (f) { return f.Type === 'file' || f.Type === 'signature'; }).forEach(function (f) {
+    if (f.Required === 'Y' && !TF.answers[f.FieldKey]) valid = false;
+  });
+  if (!valid) toast('Please complete all required fields correctly.', 'error');
+  return valid;
+}
+
+function tfNext() {
+  if (!tfCollectStepAnswers()) return;
+  localStorage.setItem(tfDraftKey(TF.roomId), JSON.stringify({ answers: TF.answers, stepIndex: TF.stepIndex }));
+  if (TF.stepIndex === TF.steps.length - 1) { tfSubmit(); return; }
+  TF.stepIndex++;
+  tfRenderStep();
+}
+function tfPrev() {
+  if (TF.stepIndex === 0) return;
+  TF.stepIndex--;
+  tfRenderStep();
+}
+
+function tfSubmit() {
+  if (TF.submitting) return;
+  TF.submitting = true;
+  var btn = qs('#tf-next'); btn.disabled = true; btn.textContent = 'Submitting...';
+  var payload = { roomId: TF.roomId, answers: TF.answers };
+  api('submitApplication', payload).then(function (res) {
+    localStorage.removeItem(tfDraftKey(TF.roomId));
+    sessionStorage.setItem('kd_last_app_' + res.applicationId, JSON.stringify(res));
+    navigate('#/apply-success/' + res.applicationId);
+  }).catch(function (e) {
+    // Offline-tolerant: queue the submission and retry when connection returns.
+    if (!navigator.onLine) {
+      tfQueueOffline(payload);
+      toast('No connection. Your application has been saved and will be submitted automatically when you are back online.', 'success');
+    } else {
+      toast(e.message, 'error');
+    }
+    TF.submitting = false; btn.disabled = false; btn.textContent = 'Submit Application';
+  });
+}
+
+// ---- Offline submission queue -----------------------------------------------------------
+
+function tfQueueOffline(payload) {
+  var queue = JSON.parse(localStorage.getItem('kd_offline_queue') || '[]');
+  queue.push({ payload: payload, queuedAt: Date.now() });
+  localStorage.setItem('kd_offline_queue', JSON.stringify(queue));
+}
+function tfFlushOfflineQueue() {
+  var queue = JSON.parse(localStorage.getItem('kd_offline_queue') || '[]');
+  if (!queue.length) return;
+  var remaining = [];
+  var chain = Promise.resolve();
+  queue.forEach(function (item) {
+    chain = chain.then(function () {
+      return api('submitApplication', item.payload).then(function () {
+        toast('A queued application was submitted successfully.', 'success');
+      }).catch(function () { remaining.push(item); });
+    });
+  });
+  chain.then(function () { localStorage.setItem('kd_offline_queue', JSON.stringify(remaining)); });
+}
+window.addEventListener('online', tfFlushOfflineQueue);
+
+function renderApplySuccess(applicationId) {
+  var raw = sessionStorage.getItem('kd_last_app_' + applicationId);
+  var data = raw ? JSON.parse(raw) : null;
+  root().innerHTML =
+    '<div class="empty-state">' + icon('check', 48) + '<h2>Application submitted</h2>' +
+    '<p>Thank you. A copy of your draft tenancy agreement has been emailed to you' + (data ? '' : '') + '.</p>' +
+    (data ? '<a class="btn btn-primary" href="' + data.downloadUrl + '" target="_blank">' + icon('download') + ' Download PDF</a>' : '') +
+    '<div class="mt-4"><a href="#/">Back to listings</a></div></div>';
+}
+
+
+// ---- Admin Login ------------------------------------------------------------------------
+
+function renderAdminLogin() {
+  root().innerHTML =
+    '<div class="card" style="max-width:380px;margin:60px auto;">' +
+    '<h2 style="text-align:center;">' + icon('shield', 28) + '</h2>' +
+    '<h2 style="text-align:center;">Landlord / Admin Login</h2>' +
+    '<form id="login-form">' +
+    '<div class="field"><label>Email</label><input type="email" id="login-email" required></div>' +
+    '<div class="field"><label>Password</label><input type="password" id="login-password" required></div>' +
+    '<button class="btn btn-primary btn-block" type="submit">Log In</button>' +
+    '</form>' +
+    '<p class="mt-4" style="text-align:center;"><a href="#/">Back to public portal</a></p>' +
+    '</div>';
+  qs('#login-form').addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    try {
+      var res = await api('adminLogin', qs('#login-email').value, qs('#login-password').value);
+      setAdminSession(res.token, res.user);
+      toast('Welcome back, ' + res.user.name + '.', 'success');
+      navigate(res.onboardingDone ? '#/admin/dashboard' : '#/admin/onboarding');
+    } catch (e) { toast(e.message, 'error'); }
+  });
+}
+
+// ---- Tenant Self-Service Portal -----------------------------------------------------
+
+function renderPortalLogin() {
+  root().innerHTML =
+    '<div class="card" style="max-width:380px;margin:60px auto;">' +
+    '<h2 style="text-align:center;">Tenant Portal</h2>' +
+    '<p class="muted" style="text-align:center;">Log in with your phone number to view your tenancy, receipts and notices.</p>' +
+    '<div id="portal-step-phone">' +
+    '<div class="field"><label>Phone Number</label><input type="tel" id="portal-phone" placeholder="024 XXX XXXX"></div>' +
+    '<button class="btn btn-primary btn-block" id="portal-request-btn">Send Login Code</button>' +
+    '</div>' +
+    '<div id="portal-step-code" class="hidden">' +
+    '<div class="field"><label>6-digit code</label><input type="text" inputmode="numeric" maxlength="6" id="portal-code"></div>' +
+    '<button class="btn btn-primary btn-block" id="portal-verify-btn">Verify &amp; Log In</button>' +
+    '</div>' +
+    '<p class="mt-4" style="text-align:center;"><a href="#/">Back to public portal</a></p>' +
+    '</div>';
+  var phoneVal = '';
+  qs('#portal-request-btn').addEventListener('click', async function () {
+    try {
+      phoneVal = qs('#portal-phone').value;
+      await api('tenantRequestCode', phoneVal);
+      toast('Code sent by SMS.', 'success');
+      qs('#portal-step-phone').classList.add('hidden');
+      qs('#portal-step-code').classList.remove('hidden');
+    } catch (e) { toast(e.message, 'error'); }
+  });
+  qs('#portal-verify-btn').addEventListener('click', async function () {
+    try {
+      var res = await api('tenantVerifyCode', phoneVal, qs('#portal-code').value);
+      setTenantSession(res.token, res.tenant);
+      navigate('#/portal/home');
+    } catch (e) { toast(e.message, 'error'); }
+  });
+}
+
+async function renderPortalHome() {
+  root().innerHTML = skeletonLines(6);
+  try {
+    var profile = await apiAuthTenant('getTenantProfile', STATE.tenant.tenantId);
+    var activeTenancy = profile.tenancies.find(function (t) { return t.Status === 'Active' || t.Status === 'ExpiringSoon'; }) || profile.tenancies[0];
+    var ledger = activeTenancy ? await apiAuthTenant('getLedger', activeTenancy.ID) : { payments: [], totalPaid: 0, arrears: 0 };
+    var daysLeft = activeTenancy ? Math.round((new Date(activeTenancy.EndDate) - new Date()) / 86400000) : null;
+
+    root().innerHTML =
+      '<div class="row-between"><h1>Hello, ' + esc(profile.tenant.FullName) + '</h1>' +
+      '<button class="btn btn-ghost btn-sm" id="portal-logout">' + icon('logout') + ' Log out</button></div>' +
+      (activeTenancy ? (
+        '<div class="card"><h3>Your Tenancy</h3>' +
+        '<div class="grid grid-2">' +
+        '<div><div class="muted" style="font-size:12px;">Ends</div><div>' + fmtDate(activeTenancy.EndDate) + '</div></div>' +
+        '<div><div class="muted" style="font-size:12px;">Days remaining</div><div style="font-weight:700;color:' + (daysLeft < 30 ? 'var(--danger)' : 'var(--accent)') + ';">' + daysLeft + '</div></div>' +
+        '</div>' +
+        (activeTenancy.AgreementPdfFileId ? '<a class="btn btn-sm mt-2" target="_blank" href="https://drive.google.com/uc?export=download&id=' + activeTenancy.AgreementPdfFileId + '">' + icon('download') + ' Download Agreement</a>' : '') +
+        '</div>' +
+        '<div class="card mt-4"><h3>Payment Ledger</h3><div class="row-between"><span>Total Paid</span><strong>' + fmtGHS(ledger.totalPaid) + '</strong></div>' +
+        '<div class="row-between"><span>Outstanding</span><strong style="color:' + (ledger.arrears > 0 ? 'var(--danger)' : 'var(--accent)') + ';">' + fmtGHS(ledger.arrears) + '</strong></div>' +
+        '<table class="data-table mt-2">' + ledger.payments.map(function (p) {
+          return '<tr><td data-label="Date">' + fmtDate(p.PaymentDate) + '</td><td data-label="Amount">' + fmtGHS(p.AmountGHS) + '</td>' +
+            '<td data-label="Receipt">' + (p.ReceiptPdfFileId ? '<a target="_blank" href="https://drive.google.com/uc?export=download&id=' + p.ReceiptPdfFileId + '">' + esc(p.ReceiptNumber) + '</a>' : esc(p.ReceiptNumber)) + '</td></tr>';
+        }).join('') + '</table></div>'
+      ) : '<div class="card"><p>No active tenancy on file yet.</p></div>') +
+      '<div class="card mt-4"><h3>Notices</h3>' + (profile.notices.length ? profile.notices.map(function (n) {
+        return '<div class="row-between"><span>' + esc(n.Type) + ' — effective ' + fmtDate(n.EffectiveDate) + '</span>' +
+          (n.PdfFileId ? '<a target="_blank" href="https://drive.google.com/uc?export=download&id=' + n.PdfFileId + '">View</a>' : '') + '</div>';
+      }).join('') : '<p class="muted">No notices on file.</p>') + '</div>' +
+      '<div class="card mt-4"><h3>Report a Maintenance Issue</h3>' +
+      '<div class="field"><label>Category</label><select id="pt-category"><option>Plumbing</option><option>Electrical</option><option>Structural</option><option>Other</option></select></div>' +
+      '<div class="field"><label>Description</label><textarea id="pt-desc"></textarea></div>' +
+      '<button class="btn btn-primary" id="pt-submit">Submit Ticket</button></div>' +
+      '<div class="card mt-4"><h3>Your Maintenance Tickets</h3><table class="data-table">' + profile.tickets.map(function (t) {
+        return '<tr><td data-label="Category">' + esc(t.Category) + '</td><td data-label="Status"><span class="badge badge-gray">' + esc(t.Status) + '</span></td></tr>';
+      }).join('') + '</table></div>';
+
+    qs('#portal-logout').addEventListener('click', function () { clearTenantSession(); navigate('#/'); });
+    qs('#pt-submit').addEventListener('click', async function () {
+      try {
+        await apiTenant('tenantSaveMaintenanceTicket', {
+          PropertyID: activeTenancy ? activeTenancy.PropertyID : '', RoomID: activeTenancy ? activeTenancy.RoomID : '',
+          Category: qs('#pt-category').value, Description: qs('#pt-desc').value, Priority: 'Medium'
+        });
+        toast('Ticket submitted.', 'success');
+        renderPortalHome();
+      } catch (e) { toast(e.message, 'error'); }
+    });
+  } catch (e) {
+    toast(e.message, 'error');
+    if (/session/i.test(e.message)) { clearTenantSession(); navigate('#/portal/login'); }
+  }
+}
+
+function apiTenant(fnName) { var args = Array.prototype.slice.call(arguments, 1); return api.apply(null, [fnName, STATE.tenantToken].concat(args)); }
+function apiAuthTenant(fnName) { var args = Array.prototype.slice.call(arguments, 1); return api.apply(null, [fnName, STATE.tenantToken].concat(args)); }
+
+
+// ---- Onboarding Wizard (first launch) ---------------------------------------------------
+
+function renderOnboarding() {
+  root().innerHTML =
+    '<div class="card" style="max-width:520px;margin:40px auto;">' +
+    '<h2>Welcome to KEY &amp; DEED</h2><p class="muted">Let\'s set up your account. This takes about two minutes.</p>' +
+    '<form id="ob-form">' +
+    '<div class="field"><label>App / Business Name</label><input id="ob-appname" value="KEY &amp; DEED"></div>' +
+    '<div class="field"><label>Your Name</label><input id="ob-name" required></div>' +
+    '<div class="field"><label>Phone Number</label><input id="ob-phone" type="tel" placeholder="024 XXX XXXX" required></div>' +
+    '<div class="field"><label>Email</label><input id="ob-email" type="email" required></div>' +
+    '<div class="field"><label>Arkesel API Key (optional, for SMS)</label><input id="ob-arkesel-key"></div>' +
+    '<div class="field"><label>Arkesel Sender ID</label><input id="ob-arkesel-sender" value="KEYDEED"></div>' +
+    '<h3 class="mt-4">Your First Property</h3>' +
+    '<div class="field"><label>Property Name</label><input id="ob-prop-name"></div>' +
+    '<div class="field"><label>Region</label><select id="ob-prop-region">' + GHANA_REGIONS_CLIENT.map(function (r) { return '<option>' + r + '</option>'; }).join('') + '</select></div>' +
+    '<div class="field"><label>Town</label><input id="ob-prop-town"></div>' +
+    '<button class="btn btn-primary btn-block" type="submit">Finish Setup</button>' +
+    '</form></div>';
+  qs('#ob-form').addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    try {
+      await apiAuth('completeOnboarding', {
+        appName: qs('#ob-appname').value, landlordName: qs('#ob-name').value, landlordPhone: qs('#ob-phone').value,
+        landlordEmail: qs('#ob-email').value, arkeselApiKey: qs('#ob-arkesel-key').value, arkeselSenderId: qs('#ob-arkesel-sender').value,
+        firstProperty: qs('#ob-prop-name').value ? {
+          PropertyName: qs('#ob-prop-name').value, PropertyType: 'Self-Contained', Region: qs('#ob-prop-region').value,
+          Town: qs('#ob-prop-town').value, TotalRooms: 0
+        } : null
+      });
+      toast('Setup complete!', 'success');
+      navigate('#/admin/dashboard');
+    } catch (e) { toast(e.message, 'error'); }
+  });
+}
+
+var GHANA_REGIONS_CLIENT = ['Greater Accra', 'Ashanti', 'Western', 'Western North', 'Central', 'Eastern', 'Volta',
+  'Oti', 'Northern', 'Savannah', 'North East', 'Upper East', 'Upper West', 'Bono', 'Bono East', 'Ahafo'];
+
+// ---- Admin Dashboard ---------------------------------------------------------------------
+
+async function renderDashboard() {
+  root().innerHTML = skeletonCards(4) + skeletonLines(4);
+  try {
+    var d = await apiAuth('getDashboard');
+    var k = d.kpis;
+    root().innerHTML =
+      '<h1>Dashboard</h1>' +
+      '<div class="grid grid-4">' +
+      kpiTile('Total Properties', k.totalProperties, '') +
+      kpiTile('Total Rooms', k.totalRooms, k.occupied + ' occupied · ' + k.vacant + ' vacant') +
+      kpiTile('Occupancy', k.occupancyPct + '%', '') +
+      kpiTile('Active Tenancies', k.activeTenancies, k.expiring30 + ' expiring in 30 days') +
+      kpiTile('Rent Collected (YTD)', k.collectedThisYearFormatted, '') +
+      kpiTile('Outstanding Arrears', k.outstandingFormatted, '') +
+      kpiTile('Open Maintenance Tickets', k.openTickets, '') +
+      '</div>' +
+      '<div class="grid grid-3 mt-4">' +
+      '<div class="card"><h3>Occupancy</h3>' + svgDonut(k.occupied, k.vacant) + '</div>' +
+      '<div class="card" style="grid-column:span 2;"><h3>Monthly Collections (12 months)</h3>' + svgBarChart(d.charts.monthlyCollections) + '</div>' +
+      '</div>' +
+      '<div class="card mt-4"><h3>Tenancy Expiry Timeline (next 12 months)</h3>' + svgTimeline(d.charts.expiryTimeline) + '</div>' +
+      '<div class="card mt-4"><h3>Arrears Ageing</h3><div class="grid grid-4">' +
+      ['0-30', '31-60', '61-90', '90+'].map(function (b) {
+        return '<div><div class="muted" style="font-size:12px;">' + b + ' days</div><div style="font-weight:700;">' + fmtGHS(d.charts.ageing[b]) + '</div></div>';
+      }).join('') + '</div></div>' +
+      '<div class="card mt-4"><h3>Rent Advance Countdown</h3><table class="data-table">' +
+      '<thead><tr><th>Tenant</th><th>Property/Room</th><th>Ends</th><th>Days Left</th></tr></thead><tbody>' +
+      d.rentCountdown.map(function (r) {
+        var color = r.daysLeft < 0 ? 'var(--danger)' : (r.daysLeft <= 30 ? 'var(--warning)' : 'var(--accent)');
+        return '<tr><td data-label="Tenant">' + esc(r.tenantName) + '</td><td data-label="Property">' + esc(r.propertyName) + ' / ' + esc(r.roomLabel) + '</td>' +
+          '<td data-label="Ends">' + esc(r.endDate) + '</td><td data-label="Days Left" style="color:' + color + ';font-weight:700;">' + r.daysLeft + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+function kpiTile(label, value, sub) {
+  return '<div class="card kpi-tile"><div class="kpi-label">' + esc(label) + '</div><div class="kpi-value">' + value + '</div>' +
+    (sub ? '<div class="kpi-sub">' + esc(sub) + '</div>' : '') + '</div>';
+}
+
+
+// ---- Modal helper -------------------------------------------------------------------
+
+function openModal(title, bodyHtml) {
+  closeModal();
+  var backdrop = el('<div class="modal-backdrop" id="modal-backdrop">' +
+    '<div class="modal"><div class="modal-head"><h2 class="mb-0">' + esc(title) + '</h2>' +
+    '<button class="icon-btn" id="modal-close">' + icon('close') + '</button></div>' +
+    '<div id="modal-body">' + bodyHtml + '</div></div></div>');
+  document.body.appendChild(backdrop);
+  qs('#modal-close', backdrop).addEventListener('click', closeModal);
+  backdrop.addEventListener('click', function (ev) { if (ev.target === backdrop) closeModal(); });
+  return backdrop;
+}
+function closeModal() { var m = document.getElementById('modal-backdrop'); if (m) m.remove(); }
+
+// Generic admin form-field renderer, distinct from the tenant-facing FormSchema engine.
+function adminFieldHtml(f, value) {
+  value = value === undefined || value === null ? '' : value;
+  if (f.type === 'select') {
+    return '<div class="field"><label>' + esc(f.label) + '</label><select id="af-' + f.key + '">' +
+      f.options.map(function (o) { return '<option value="' + esc(o) + '"' + (String(value) === o ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') + '</select></div>';
+  }
+  if (f.type === 'textarea') return '<div class="field"><label>' + esc(f.label) + '</label><textarea id="af-' + f.key + '">' + esc(value) + '</textarea></div>';
+  return '<div class="field"><label>' + esc(f.label) + '</label><input type="' + (f.type || 'text') + '" id="af-' + f.key + '" value="' + esc(value) + '"></div>';
+}
+function adminCollect(fields) {
+  var out = {};
+  fields.forEach(function (f) { out[f.key] = qs('#af-' + f.key).value; });
+  return out;
+}
+
+// ---- Properties ------------------------------------------------------------------------
+
+var PROPERTY_FIELDS = [
+  { key: 'PropertyName', label: 'Property Name' },
+  { key: 'PropertyType', label: 'Property Type', type: 'select', options: PROPERTY_TYPES_CLIENT },
+  { key: 'Region', label: 'Region', type: 'select', options: GHANA_REGIONS_CLIENT },
+  { key: 'Town', label: 'Town / Suburb' },
+  { key: 'GhanaPostGPS', label: 'Ghana Post GPS (AK-484-9321)' },
+  { key: 'StreetAddress', label: 'Street Address' },
+  { key: 'Landmark', label: 'Landmark' },
+  { key: 'Description', label: 'Description', type: 'textarea' },
+  { key: 'TotalRooms', label: 'Total Rooms', type: 'number' },
+  { key: 'CaretakerName', label: 'Caretaker Name' },
+  { key: 'CaretakerPhone', label: 'Caretaker Phone' },
+  { key: 'Status', label: 'Status', type: 'select', options: ['Active', 'Inactive'] }
+];
+
+async function renderProperties() {
+  root().innerHTML = '<div class="row-between"><h1>Properties</h1><button class="btn btn-primary" id="add-property">' + icon('plus') + ' Add Property</button></div><div id="prop-list">' + skeletonLines(4) + '</div>';
+  qs('#add-property').addEventListener('click', function () { openPropertyModal(null); });
+  loadProperties();
+}
+async function loadProperties() {
+  try {
+    var res = await apiAuth('listProperties');
+    var list = qs('#prop-list');
+    if (!res.properties.length) { list.innerHTML = '<div class="empty-state">' + icon('building', 40) + '<h3>No properties yet</h3><p>Add your first property to get started.</p></div>'; return; }
+    list.innerHTML = '<table class="data-table"><thead><tr><th>Name</th><th>Type</th><th>Town/Region</th><th>Rooms</th><th>Status</th><th></th></tr></thead><tbody>' +
+      res.properties.map(function (p) {
+        return '<tr><td data-label="Name">' + esc(p.PropertyName) + '</td><td data-label="Type">' + esc(p.PropertyType) + '</td>' +
+          '<td data-label="Location">' + esc(p.Town) + ', ' + esc(p.Region) + '</td><td data-label="Rooms">' + esc(String(p.TotalRooms)) + '</td>' +
+          '<td data-label="Status"><span class="badge ' + (p.Status === 'Active' ? 'badge-green' : 'badge-gray') + '">' + esc(p.Status) + '</span></td>' +
+          '<td data-label="Edit"><button class="btn btn-sm" data-id="' + p.ID + '">' + icon('edit', 16) + '</button></td></tr>';
+      }).join('') + '</tbody></table>';
+    qsa('button[data-id]', list).forEach(function (b) {
+      b.addEventListener('click', function () { openPropertyModal(res.properties.find(function (p) { return p.ID === b.getAttribute('data-id'); })); });
+    });
+  } catch (e) { toast(e.message, 'error'); }
+}
+function openPropertyModal(property) {
+  var body = '<form id="property-form">' + PROPERTY_FIELDS.map(function (f) { return adminFieldHtml(f, property ? property[f.key] : ''); }).join('') +
+    '<button class="btn btn-primary btn-block" type="submit">Save Property</button></form>';
+  openModal(property ? 'Edit Property' : 'Add Property', body);
+  qs('#property-form').addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    try {
+      var data = adminCollect(PROPERTY_FIELDS);
+      if (property) data.ID = property.ID;
+      await apiAuth('saveProperty', data);
+      toast('Property saved.', 'success');
+      closeModal();
+      loadProperties();
+    } catch (e) { toast(e.message, 'error'); }
+  });
+}
+
+// ---- Rooms -----------------------------------------------------------------------------
+
+var ROOM_FIELDS = [
+  { key: 'RoomLabel', label: 'Room Label (e.g. Room 3)' },
+  { key: 'RoomType', label: 'Room Type', type: 'select', options: PROPERTY_TYPES_CLIENT },
+  { key: 'Bedrooms', label: 'Bedrooms', type: 'number' },
+  { key: 'Bathrooms', label: 'Bathrooms', type: 'number' },
+  { key: 'Furnished', label: 'Furnished', type: 'select', options: ['Y', 'N'] },
+  { key: 'MonthlyRent', label: 'Monthly Rent (GHS)', type: 'number' },
+  { key: 'MinAdvanceMonths', label: 'Minimum Advance (months)', type: 'number' },
+  { key: 'Deposit', label: 'Deposit (GHS)', type: 'number' },
+  { key: 'UtilitiesIncluded', label: 'Utilities / Levies Note', type: 'textarea' },
+  { key: 'Amenities', label: 'Amenities (comma-separated)' },
+  { key: 'Status', label: 'Status', type: 'select', options: ['Vacant', 'Occupied', 'Reserved', 'Maintenance'] },
+  { key: 'ListedPublicly', label: 'Listed Publicly', type: 'select', options: ['Y', 'N'] }
+];
+
+async function renderRooms() {
+  root().innerHTML = '<div class="row-between"><h1>Rooms</h1><button class="btn btn-primary" id="add-room">' + icon('plus') + ' Add Room</button></div><div id="room-list">' + skeletonLines(4) + '</div>';
+  qs('#add-room').addEventListener('click', async function () {
+    var props = await apiAuth('listProperties');
+    if (!props.properties.length) { toast('Add a property first.', 'error'); return; }
+    openRoomModal(null, props.properties);
+  });
+  loadRooms();
+}
+async function loadRooms() {
+  try {
+    var res = await apiAuth('listRooms');
+    var propsRes = await apiAuth('listProperties');
+    var propMap = {}; propsRes.properties.forEach(function (p) { propMap[p.ID] = p; });
+    var list = qs('#room-list');
+    if (!res.rooms.length) { list.innerHTML = '<div class="empty-state">' + icon('door', 40) + '<h3>No rooms yet</h3></div>'; return; }
+    list.innerHTML = '<table class="data-table"><thead><tr><th>Room</th><th>Property</th><th>Rent</th><th>Status</th><th></th><th></th></tr></thead><tbody>' +
+      res.rooms.map(function (r) {
+        var pname = (propMap[r.PropertyID] || {}).PropertyName || '';
+        return '<tr><td data-label="Room">' + esc(r.RoomLabel) + '</td><td data-label="Property">' + esc(pname) + '</td>' +
+          '<td data-label="Rent">' + fmtGHS(r.MonthlyRent) + '</td>' +
+          '<td data-label="Status"><span class="badge ' + (r.Status === 'Vacant' ? 'badge-green' : (r.Status === 'Occupied' ? 'badge-gray' : 'badge-amber')) + '">' + esc(r.Status) + '</span></td>' +
+          '<td data-label="Flyer"><button class="btn btn-sm" data-flyer="' + r.ID + '">Flyer</button></td>' +
+          '<td data-label="Edit"><button class="btn btn-sm" data-id="' + r.ID + '">' + icon('edit', 16) + '</button></td></tr>';
+      }).join('') + '</tbody></table>';
+    qsa('button[data-id]', list).forEach(function (b) {
+      b.addEventListener('click', function () { openRoomModal(res.rooms.find(function (r) { return r.ID === b.getAttribute('data-id'); }), propsRes.properties); });
+    });
+    qsa('button[data-flyer]', list).forEach(function (b) {
+      b.addEventListener('click', async function () {
+        try { var flyer = await apiAuth('generateVacancyFlyer', b.getAttribute('data-flyer')); window.open(flyer.url, '_blank'); } catch (e) { toast(e.message, 'error'); }
+      });
+    });
+  } catch (e) { toast(e.message, 'error'); }
+}
+function openRoomModal(room, properties) {
+  var propSelect = '<div class="field"><label>Property</label><select id="af-PropertyID">' +
+    properties.map(function (p) { return '<option value="' + p.ID + '"' + (room && room.PropertyID === p.ID ? ' selected' : '') + '>' + esc(p.PropertyName) + '</option>'; }).join('') + '</select></div>';
+  var body = '<form id="room-form">' + propSelect + ROOM_FIELDS.map(function (f) { return adminFieldHtml(f, room ? room[f.key] : ''); }).join('') +
+    '<button class="btn btn-primary btn-block" type="submit">Save Room</button></form>';
+  openModal(room ? 'Edit Room' : 'Add Room', body);
+  qs('#room-form').addEventListener('submit', async function (ev) {
+    ev.preventDefault();
+    try {
+      var data = adminCollect(ROOM_FIELDS);
+      data.PropertyID = qs('#af-PropertyID').value;
+      if (room) data.ID = room.ID;
+      await apiAuth('saveRoom', data);
+      toast('Room saved.', 'success');
+      closeModal();
+      loadRooms();
+    } catch (e) { toast(e.message, 'error'); }
+  });
+}
+
+
+// ---- Tenants directory & profile --------------------------------------------------------
+
+async function renderTenants() {
+  root().innerHTML = '<h1>Tenants</h1><input id="tenant-search" placeholder="Search by name or phone" class="mt-2"><div id="tenant-list" class="mt-4">' + skeletonLines(4) + '</div>';
+  var all = [];
+  try { all = (await apiAuth('listTenants')).tenants; } catch (e) { toast(e.message, 'error'); }
+  function draw(rows) {
+    var list = qs('#tenant-list');
+    if (!rows.length) { list.innerHTML = '<div class="empty-state">' + icon('users', 40) + '<h3>No tenants found</h3></div>'; return; }
+    list.innerHTML = '<table class="data-table"><thead><tr><th>Name</th><th>Phone</th><th>Status</th><th></th></tr></thead><tbody>' +
+      rows.map(function (t) {
+        var wa = 'https://wa.me/' + t.Phone.replace(/\D/g, '');
+        return '<tr><td data-label="Name">' + esc(t.FullName) + '</td>' +
+          '<td data-label="Phone">' + esc(t.Phone) + ' <a class="wa-link" target="_blank" href="' + wa + '">' + icon('whatsapp', 15) + '</a></td>' +
+          '<td data-label="Status"><span class="badge badge-gray">' + esc(t.Status) + '</span></td>' +
+          '<td data-label="Open"><button class="btn btn-sm" data-id="' + t.ID + '">Open</button></td></tr>';
+      }).join('') + '</tbody></table>';
+    qsa('button[data-id]', list).forEach(function (b) { b.addEventListener('click', function () { navigate('#/admin/tenants/' + b.getAttribute('data-id')); }); });
+  }
+  draw(all);
+  qs('#tenant-search').addEventListener('input', debounce(function (ev) {
+    var q = ev.target.value.toLowerCase();
+    draw(all.filter(function (t) { return t.FullName.toLowerCase().indexOf(q) !== -1 || (t.Phone || '').indexOf(q) !== -1; }));
+  }, 150));
+}
+
+async function renderTenantProfile(tenantId) {
+  root().innerHTML = skeletonLines(6);
+  try {
+    var p = await apiAuth('getTenantProfile', tenantId);
+    var activeTenancy = p.tenancies.find(function (t) { return t.Status === 'Active' || t.Status === 'ExpiringSoon'; });
+    root().innerHTML =
+      '<button class="btn btn-ghost" id="back-btn">' + icon('arrow-left') + ' Back to Tenants</button>' +
+      '<h1>' + esc(p.tenant.FullName) + '</h1>' +
+      '<div class="grid grid-2">' +
+      '<div class="card"><h3>Details</h3>' +
+      '<p><strong>Phone:</strong> ' + esc(p.tenant.Phone) + ' <a class="wa-link" target="_blank" href="https://wa.me/' + p.tenant.Phone.replace(/\D/g, '') + '">' + icon('whatsapp', 15) + '</a></p>' +
+      '<p><strong>Ghana Card:</strong> ' + esc(p.tenant.GhanaCardNumber) + '</p>' +
+      '<p><strong>Guarantor:</strong> ' + esc(p.tenant.GuarantorName) + ' (' + esc(p.tenant.GuarantorPhone) + ')</p>' +
+      '<p><strong>Status:</strong> <span class="badge badge-gray">' + esc(p.tenant.Status) + '</span></p></div>' +
+      '<div class="card"><h3>Active Tenancy</h3>' + (activeTenancy ? (
+        '<p><strong>Ends:</strong> ' + fmtDate(activeTenancy.EndDate) + '</p>' +
+        '<p><strong>Advance:</strong> ' + fmtGHS(activeTenancy.AdvanceAmount) + ' (' + esc(String(activeTenancy.AdvanceMonths)) + ' months)</p>' +
+        '<div class="row mt-2">' +
+        '<button class="btn btn-sm" id="renew-btn">Renew Tenancy</button>' +
+        '<button class="btn btn-sm btn-danger" id="notice-btn">Issue 3-Month Notice</button>' +
+        '<button class="btn btn-sm" id="statement-btn">Yearly Statement</button>' +
+        '</div>'
+      ) : '<p class="muted">No active tenancy.</p>') + '</div></div>' +
+      '<div class="card mt-4"><h3>Payment History</h3><table class="data-table">' + p.payments.map(function (pay) {
+        return '<tr><td data-label="Date">' + fmtDate(pay.PaymentDate) + '</td><td data-label="Amount">' + fmtGHS(pay.AmountGHS) + '</td><td data-label="Channel">' + esc(pay.Channel) + '</td></tr>';
+      }).join('') + '</table></div>' +
+      '<div class="card mt-4"><h3>Notices</h3><table class="data-table">' + p.notices.map(function (n) {
+        return '<tr><td data-label="Type">' + esc(n.Type) + '</td><td data-label="Effective">' + fmtDate(n.EffectiveDate) + '</td></tr>';
+      }).join('') + '</table></div>' +
+      '<div class="card mt-4"><h3>Maintenance Tickets</h3><table class="data-table">' + p.tickets.map(function (t) {
+        return '<tr><td data-label="Category">' + esc(t.Category) + '</td><td data-label="Status">' + esc(t.Status) + '</td></tr>';
+      }).join('') + '</table></div>';
+    qs('#back-btn').addEventListener('click', function () { navigate('#/admin/tenants'); });
+    if (activeTenancy) {
+      qs('#renew-btn').addEventListener('click', function () { openRenewModal(activeTenancy); });
+      qs('#notice-btn').addEventListener('click', function () { openNoticeModal(activeTenancy); });
+      qs('#statement-btn').addEventListener('click', async function () {
+        try { var s = await apiAuth('getYearlyStatement', activeTenancy.ID); window.open(s.url, '_blank'); } catch (e) { toast(e.message, 'error'); }
+      });
+    }
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+function openRenewModal(tenancy) {
+  var body = '<div class="field"><label>Advance Period (months)</label><input type="number" id="renew-months" value="' + tenancy.AdvanceMonths + '"></div>' +
+    '<button class="btn btn-primary btn-block" id="renew-confirm">Generate Renewal Agreement</button>';
+  openModal('Renew Tenancy', body);
+  qs('#renew-confirm').addEventListener('click', async function () {
+    try {
+      var res = await apiAuth('renewTenancy', tenancy.ID, { advanceMonths: qs('#renew-months').value });
+      toast('Tenancy renewed.', 'success');
+      window.open('https://drive.google.com/uc?export=download&id=' + res.pdfFileId, '_blank');
+      closeModal();
+      renderTenantProfile(tenancy.TenantID);
+    } catch (e) { toast(e.message, 'error'); }
+  });
+}
+
+function openNoticeModal(tenancy) {
+  var reasons = [['non-renewal', 'Non-renewal of tenancy'], ['landlord-occupation', 'Landlord requires premises'],
+    ['redevelopment', 'Redevelopment / renovation'], ['breach', 'Breach of covenants'], ['other', 'Other (specify)']];
+  var body = '<div class="field"><label>Reason</label><select id="notice-reason">' +
+    reasons.map(function (r) { return '<option value="' + r[0] + '">' + r[1] + '</option>'; }).join('') + '</select></div>' +
+    '<div class="field"><label>Details (if Other)</label><textarea id="notice-custom"></textarea></div>' +
+    '<p class="muted">This will compute an effective date exactly 3 calendar months from today, generate the formal notice PDF, and send it by SMS and email.</p>' +
+    '<button class="btn btn-danger btn-block" id="notice-confirm">Issue Notice to Quit</button>';
+  openModal('Issue 3-Month Notice to Quit', body);
+  qs('#notice-confirm').addEventListener('click', async function () {
+    try {
+      var res = await apiAuth('issueNoticeToQuit', tenancy.ID, qs('#notice-reason').value, qs('#notice-custom').value);
+      toast('Notice issued, effective ' + res.effectiveDate + '.', 'success');
+      closeModal();
+      renderTenantProfile(tenancy.TenantID);
+    } catch (e) { toast(e.message, 'error'); }
+  });
+}
+
+
+// ---- Applications inbox ------------------------------------------------------------------
+
+async function renderApplications() {
+  root().innerHTML = '<h1>Applications</h1><div id="app-list">' + skeletonLines(4) + '</div>';
+  try {
+    var res = await apiAuth('listApplications');
+    var list = qs('#app-list');
+    if (!res.applications.length) { list.innerHTML = '<div class="empty-state">' + icon('file-text', 40) + '<h3>No applications yet</h3></div>'; return; }
+    list.innerHTML = res.applications.map(function (a) {
+      return '<div class="card"><div class="row-between">' +
+        '<div><strong>' + esc(a.tenantName) + '</strong><div class="muted" style="font-size:13px;">' + esc(a.roomLabel) + ' &middot; ' + fmtDate(a.SubmittedAt) + '</div></div>' +
+        '<span class="badge ' + (a.Status === 'New' ? 'badge-amber' : (a.Status === 'Approved' ? 'badge-green' : (a.Status === 'Rejected' ? 'badge-red' : 'badge-gray'))) + '">' + esc(a.Status) + '</span></div>' +
+        (a.Status === 'New' || a.Status === 'Reviewed' ? '<div class="row mt-2">' +
+          '<button class="btn btn-sm btn-primary" data-approve="' + a.ID + '">Approve</button>' +
+          '<button class="btn btn-sm btn-danger" data-reject="' + a.ID + '">Reject</button>' +
+          (a.PdfFileId ? '<a class="btn btn-sm" target="_blank" href="https://drive.google.com/uc?export=download&id=' + a.PdfFileId + '">View Draft PDF</a>' : '') +
+          '</div>' : '') +
+        '</div>';
+    }).join('');
+    qsa('button[data-approve]', list).forEach(function (b) { b.addEventListener('click', function () { openApproveModal(b.getAttribute('data-approve')); }); });
+    qsa('button[data-reject]', list).forEach(function (b) {
+      b.addEventListener('click', async function () {
+        var reason = prompt('Reason for rejection:');
+        if (reason === null) return;
+        try { await apiAuth('rejectApplication', b.getAttribute('data-reject'), reason); toast('Application rejected.', 'success'); renderApplications(); }
+        catch (e) { toast(e.message, 'error'); }
+      });
+    });
+  } catch (e) { toast(e.message, 'error'); }
+}
+function openApproveModal(applicationId) {
+  var body = '<div class="field"><label>Move-in / Start Date</label><input type="date" id="ap-start" value="' + new Date().toISOString().substring(0, 10) + '"></div>' +
+    '<div class="field"><label>Advance Months</label><input type="number" id="ap-months" value="12"></div>' +
+    '<div class="field"><label>Payment Mode</label><select id="ap-mode"><option value="Advance">Advance (lump sum)</option><option value="Monthly">Monthly</option></select></div>' +
+    '<button class="btn btn-primary btn-block" id="ap-confirm">Approve &amp; Generate Agreement</button>';
+  openModal('Approve Application', body);
+  qs('#ap-confirm').addEventListener('click', async function () {
+    try {
+      var res = await apiAuth('approveApplication', applicationId, { startDate: qs('#ap-start').value, advanceMonths: qs('#ap-months').value, paymentMode: qs('#ap-mode').value });
+      toast('Application approved. Tenancy created.', 'success');
+      window.open('https://drive.google.com/uc?export=download&id=' + res.pdfFileId, '_blank');
+      closeModal();
+      renderApplications();
+    } catch (e) { toast(e.message, 'error'); }
+  });
+}
+
+// ---- Rent Ledger ---------------------------------------------------------------------
+
+async function renderLedger() {
+  root().innerHTML = '<h1>Rent Ledger</h1><div id="ledger-body">' + skeletonLines(4) + '</div>';
+  try {
+    var tenancies = (await apiAuth('listTenants')).tenants; // used to build selector via tenant->tenancy lookup below
+    var tenantMap = {}; tenancies.forEach(function (t) { tenantMap[t.ID] = t; });
+    var allTenancies = [];
+    var propsRes = await apiAuth('listProperties'); var propMap = {}; propsRes.properties.forEach(function (p) { propMap[p.ID] = p; });
+    var roomsRes = await apiAuth('listRooms'); var roomMap = {}; roomsRes.rooms.forEach(function (r) { roomMap[r.ID] = r; });
+    var expiryRes = await apiAuth('getExpiryBoard'); // not directly used but confirms endpoint reachable
+    var body = qs('#ledger-body');
+    body.innerHTML = '<button class="btn btn-primary" id="record-payment">' + icon('plus') + ' Record Payment</button>' +
+      '<div class="card mt-4"><p class="muted">Select a tenant from the Tenants directory to view their full ledger and record payments against their active tenancy, or use the button above for a quick record.</p></div>';
+    qs('#record-payment').addEventListener('click', function () { openRecordPaymentPicker(tenancies); });
+  } catch (e) { toast(e.message, 'error'); }
+}
+async function openRecordPaymentPicker(tenants) {
+  var body = '<div class="field"><label>Tenant</label><select id="rp-tenant">' +
+    tenants.map(function (t) { return '<option value="' + t.ID + '">' + esc(t.FullName) + '</option>'; }).join('') + '</select></div>' +
+    '<div id="rp-tenancy-wrap"></div>';
+  openModal('Record Payment', body);
+  async function loadTenancySelect() {
+    var tid = qs('#rp-tenant').value;
+    var profile = await apiAuth('getTenantProfile', tid);
+    var active = profile.tenancies.filter(function (t) { return t.Status !== 'Terminated'; });
+    var wrap = qs('#rp-tenancy-wrap');
+    if (!active.length) { wrap.innerHTML = '<p class="muted">This tenant has no tenancy on file.</p>'; return; }
+    wrap.innerHTML = '<div class="field"><label>Tenancy</label><select id="rp-tenancy">' +
+      active.map(function (t) { return '<option value="' + t.ID + '">Ends ' + fmtDate(t.EndDate) + '</option>'; }).join('') + '</select></div>' +
+      '<div class="field"><label>Amount (GHS)</label><input type="number" id="rp-amount"></div>' +
+      '<div class="field"><label>Channel</label><select id="rp-channel">' + PAYMENT_CHANNELS_CLIENT.map(function (c) { return '<option>' + c + '</option>'; }).join('') + '</select></div>' +
+      '<div class="field"><label>Reference</label><input id="rp-ref"></div>' +
+      '<div class="field"><label>Payment Date</label><input type="date" id="rp-date" value="' + new Date().toISOString().substring(0, 10) + '"></div>' +
+      '<button class="btn btn-primary btn-block" id="rp-confirm">Save &amp; Generate Receipt</button>';
+    qs('#rp-confirm').addEventListener('click', async function () {
+      try {
+        var res = await apiAuth('recordPayment', {
+          TenancyID: qs('#rp-tenancy').value, AmountGHS: qs('#rp-amount').value, Channel: qs('#rp-channel').value,
+          Reference: qs('#rp-ref').value, PaymentDate: qs('#rp-date').value
+        });
+        toast('Payment recorded: ' + res.payment.ReceiptNumber, 'success');
+        window.open('https://drive.google.com/uc?export=download&id=' + res.pdfFileId, '_blank');
+        closeModal();
+      } catch (e) { toast(e.message, 'error'); }
+    });
+  }
+  qs('#rp-tenant').addEventListener('change', loadTenancySelect);
+  loadTenancySelect();
+}
+var PAYMENT_CHANNELS_CLIENT = ['MTN MoMo', 'Telecel Cash', 'AT Money', 'Bank Transfer', 'Cheque', 'Cash'];
+
+// ---- Expiry Board (Kanban) ---------------------------------------------------------------
+
+async function renderExpiryBoard() {
+  root().innerHTML = '<h1>Expiry Board</h1><div id="board">' + skeletonLines(4) + '</div>';
+  try {
+    var res = await apiAuth('getExpiryBoard');
+    var b = res.board;
+    function col(title, items, cls) {
+      return '<div class="card"><h3>' + title + ' <span class="badge ' + cls + '">' + items.length + '</span></h3>' +
+        (items.length ? items.map(function (i) {
+          return '<div class="row-between mt-2" style="border-bottom:1px solid var(--border);padding-bottom:8px;">' +
+            '<div><strong>' + esc(i.tenantName) + '</strong><div class="muted" style="font-size:12px;">' + esc(i.propertyName) + ' / ' + esc(i.roomLabel) + '</div></div>' +
+            '<div class="text-right"><div style="font-weight:700;">' + i.daysLeft + 'd</div><a href="#/admin/tenants/' + i.tenancyId + '"></a></div></div>';
+        }).join('') : '<p class="muted">None</p>') + '</div>';
+    }
+    qs('#board').outerHTML = '<div id="board" class="grid grid-4">' +
+      col('90 Days', b.d90, 'badge-gray') + col('60 Days', b.d60, 'badge-amber') + col('30 Days', b.d30, 'badge-amber') + col('Overdue', b.overdue, 'badge-red') + '</div>';
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+// ---- Maintenance board -------------------------------------------------------------------
+
+async function renderMaintenance() {
+  root().innerHTML = '<div class="row-between"><h1>Maintenance</h1><button class="btn btn-primary" id="add-ticket">' + icon('plus') + ' New Ticket</button></div><div id="mt-board">' + skeletonLines(4) + '</div>';
+  qs('#add-ticket').addEventListener('click', function () { openTicketModal(); });
+  loadMaintenance();
+}
+async function loadMaintenance() {
+  try {
+    var res = await apiAuth('listMaintenance');
+    var statuses = ['Open', 'In Progress', 'Resolved'];
+    var board = qs('#mt-board');
+    board.className = 'grid grid-3';
+    board.innerHTML = statuses.map(function (s) {
+      var items = res.tickets.filter(function (t) { return t.Status === s; });
+      return '<div class="card"><h3>' + s + ' <span class="badge badge-gray">' + items.length + '</span></h3>' +
+        items.map(function (t) {
+          return '<div class="mt-2" style="border-bottom:1px solid var(--border);padding-bottom:8px;">' +
+            '<div class="row-between"><strong>' + esc(t.Category) + '</strong><span class="badge ' + (t.Priority === 'Urgent' ? 'badge-red' : 'badge-gray') + '">' + esc(t.Priority) + '</span></div>' +
+            '<div class="muted" style="font-size:13px;">' + esc(t.Description) + '</div>' +
+            (s !== 'Resolved' ? '<button class="btn btn-sm mt-2" data-advance="' + t.ID + '" data-next="' + (s === 'Open' ? 'In Progress' : 'Resolved') + '">Move to ' + (s === 'Open' ? 'In Progress' : 'Resolved') + '</button>' : '') +
+            '</div>';
+        }).join('') + '</div>';
+    }).join('');
+    qsa('button[data-advance]', board).forEach(function (b) {
+      b.addEventListener('click', async function () {
+        try { await apiAuth('saveMaintenanceTicket', { ID: b.getAttribute('data-advance'), Status: b.getAttribute('data-next') }); loadMaintenance(); }
+        catch (e) { toast(e.message, 'error'); }
+      });
+    });
+  } catch (e) { toast(e.message, 'error'); }
+}
+async function openTicketModal() {
+  var props = (await apiAuth('listProperties')).properties;
+  var body = '<div class="field"><label>Property</label><select id="tk-prop">' + props.map(function (p) { return '<option value="' + p.ID + '">' + esc(p.PropertyName) + '</option>'; }).join('') + '</select></div>' +
+    '<div class="field"><label>Category</label><select id="tk-cat"><option>Plumbing</option><option>Electrical</option><option>Structural</option><option>Other</option></select></div>' +
+    '<div class="field"><label>Priority</label><select id="tk-priority"><option>Low</option><option selected>Medium</option><option>High</option><option>Urgent</option></select></div>' +
+    '<div class="field"><label>Description</label><textarea id="tk-desc"></textarea></div>' +
+    '<button class="btn btn-primary btn-block" id="tk-save">Save Ticket</button>';
+  openModal('New Maintenance Ticket', body);
+  qs('#tk-save').addEventListener('click', async function () {
+    try {
+      await apiAuth('saveMaintenanceTicket', { PropertyID: qs('#tk-prop').value, Category: qs('#tk-cat').value, Priority: qs('#tk-priority').value, Description: qs('#tk-desc').value, Status: 'Open' });
+      toast('Ticket created.', 'success'); closeModal(); loadMaintenance();
+    } catch (e) { toast(e.message, 'error'); }
+  });
+}
+
+
+// ---- Form Builder (drag-and-drop reorder, live preview) ---------------------------------
+
+var FB_STATE = null;
+var FB_CORE_KEYS = ['FullName', 'Phone', 'GhanaCardNumber', 'Signature'];
+
+async function renderFormBuilder() {
+  root().innerHTML = skeletonLines(6);
+  try {
+    var res = await apiAuth('getFormSchemaAdmin');
+    FB_STATE = { fields: res.fields.sort(function (a, b) { return Number(a.SortOrder) - Number(b.SortOrder); }) };
+    fbRenderShell();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+function fbRenderShell() {
+  root().innerHTML =
+    '<div class="row-between"><h1>Form Builder</h1>' +
+    '<div class="row"><button class="btn btn-primary" id="fb-publish">Publish New Version</button>' +
+    '<button class="btn" id="fb-add">' + icon('plus') + ' Add Field</button></div></div>' +
+    '<div class="grid grid-2 mt-4">' +
+    '<div id="fb-list"></div>' +
+    '<div class="card"><h3>Live Preview</h3><div id="fb-preview"></div></div>' +
+    '</div>';
+  qs('#fb-add').addEventListener('click', function () { openFieldEditor(null); });
+  qs('#fb-publish').addEventListener('click', async function () {
+    try { var res = await apiAuth('publishFormSchema'); toast('Published v' + res.version + '.', 'success'); } catch (e) { toast(e.message, 'error'); }
+  });
+  fbRenderList();
+  fbRenderPreview();
+}
+
+function fbRenderList() {
+  var list = qs('#fb-list');
+  list.innerHTML = FB_STATE.fields.map(function (f) {
+    return '<div class="fb-field" draggable="true" data-id="' + f.ID + '">' +
+      '<span class="drag-handle">' + icon('drag') + '</span>' +
+      '<div class="fb-meta"><div>' + esc(f.Label) + (FB_CORE_KEYS.indexOf(f.FieldKey) !== -1 ? ' <span class="badge badge-gray">core</span>' : '') + '</div>' +
+      '<div class="k">' + esc(f.Section) + ' &middot; ' + esc(f.Type) + (f.Required === 'Y' ? ' &middot; required' : '') + '</div></div>' +
+      '<button class="icon-btn" data-edit="' + f.ID + '">' + icon('edit', 16) + '</button>' +
+      (FB_CORE_KEYS.indexOf(f.FieldKey) === -1 ? '<button class="icon-btn" data-del="' + f.ID + '">' + icon('trash', 16) + '</button>' : '') +
+      '</div>';
+  }).join('');
+  var dragged = null;
+  qsa('.fb-field', list).forEach(function (node) {
+    node.addEventListener('dragstart', function () { dragged = node; node.classList.add('dragging'); });
+    node.addEventListener('dragend', function () { node.classList.remove('dragging'); fbPersistOrder(); });
+    node.addEventListener('dragover', function (ev) {
+      ev.preventDefault();
+      var bounding = node.getBoundingClientRect();
+      var offset = ev.clientY - bounding.top - bounding.height / 2;
+      if (offset < 0 && node !== dragged) list.insertBefore(dragged, node);
+      else if (offset >= 0 && node !== dragged) list.insertBefore(dragged, node.nextSibling);
+    });
+  });
+  qsa('button[data-edit]', list).forEach(function (b) { b.addEventListener('click', function () { openFieldEditor(FB_STATE.fields.find(function (f) { return f.ID === b.getAttribute('data-edit'); })); }); });
+  qsa('button[data-del]', list).forEach(function (b) {
+    b.addEventListener('click', async function () {
+      if (!confirm('Delete this field?')) return;
+      try { await apiAuth('deleteFormField', b.getAttribute('data-del')); toast('Field deleted.', 'success'); renderFormBuilder(); } catch (e) { toast(e.message, 'error'); }
+    });
+  });
+}
+
+async function fbPersistOrder() {
+  var ids = qsa('.fb-field', qs('#fb-list')).map(function (n) { return n.getAttribute('data-id'); });
+  try { await apiAuth('reorderFormFields', ids); FB_STATE.fields = ids.map(function (id) { return FB_STATE.fields.find(function (f) { return f.ID === id; }); }); fbRenderPreview(); }
+  catch (e) { toast(e.message, 'error'); }
+}
+
+function fbRenderPreview() {
+  var visible = FB_STATE.fields.filter(function (f) { return f.Visible === 'Y'; });
+  qs('#fb-preview').innerHTML = visible.map(function (f) {
+    var wrapped = { schema: FB_STATE.fields }; // reuse tfRenderField without full TF context
+    return tfRenderFieldPreview(f);
+  }).join('');
+}
+function tfRenderFieldPreview(f) {
+  // Simplified static preview (no live signature/file handlers — this is a visual reference only).
+  if (f.Type === 'heading') return '<h3 class="mt-4">' + esc(f.Label) + '</h3>';
+  if (f.Type === 'divider') return '<hr style="border:none;border-top:1px solid var(--border);margin:16px 0;">';
+  var req = f.Required === 'Y' ? ' *' : '';
+  if (f.Type === 'select' || f.Type === 'radio') {
+    return '<div class="field"><label>' + esc(f.Label) + req + '</label><select disabled><option>' + (f.Options || '').split(',')[0] + '</option></select></div>';
+  }
+  if (f.Type === 'checkbox') return '<div class="field checkbox-row"><input type="checkbox" disabled><label>' + esc(f.Label) + req + '</label></div>';
+  if (f.Type === 'textarea') return '<div class="field"><label>' + esc(f.Label) + req + '</label><textarea disabled placeholder="' + esc(f.Placeholder) + '"></textarea></div>';
+  if (f.Type === 'file') return '<div class="field"><label>' + esc(f.Label) + req + '</label><input type="file" disabled></div>';
+  if (f.Type === 'signature') return '<div class="field"><label>' + esc(f.Label) + req + '</label><div class="sigpad-wrap" style="height:60px;"></div></div>';
+  return '<div class="field"><label>' + esc(f.Label) + req + '</label><input type="' + (f.Type || 'text') + '" disabled placeholder="' + esc(f.Placeholder || '') + '"></div>';
+}
+
+function openFieldEditor(field) {
+  var isCore = field && FB_CORE_KEYS.indexOf(field.FieldKey) !== -1;
+  var body = '<div class="field"><label>Label</label><input id="fe-label" value="' + esc(field ? field.Label : '') + '"></div>' +
+    '<div class="field"><label>Field Key (no spaces)</label><input id="fe-key" value="' + esc(field ? field.FieldKey : '') + '" ' + (isCore ? 'disabled' : '') + '></div>' +
+    '<div class="field"><label>Section</label><input id="fe-section" value="' + esc(field ? field.Section : 'Personal Details') + '"></div>' +
+    '<div class="field"><label>Type</label><select id="fe-type">' +
+    ['text', 'tel', 'email', 'number', 'date', 'select', 'radio', 'checkbox', 'textarea', 'file', 'signature', 'heading', 'divider'].map(function (t) {
+      return '<option' + (field && field.Type === t ? ' selected' : '') + '>' + t + '</option>';
+    }).join('') + '</select></div>' +
+    '<div class="field"><label>Options (comma-separated, for select/radio)</label><input id="fe-options" value="' + esc(field ? field.Options : '') + '"></div>' +
+    '<div class="field"><label>Placeholder</label><input id="fe-placeholder" value="' + esc(field ? field.Placeholder : '') + '"></div>' +
+    '<div class="field"><label>Help Text</label><input id="fe-help" value="' + esc(field ? field.HelpText : '') + '"></div>' +
+    '<div class="field"><label>Validation Regex (optional)</label><input id="fe-validation" value="' + esc(field ? field.Validation : '') + '"></div>' +
+    '<div class="checkbox-row"><input type="checkbox" id="fe-required" ' + (field && field.Required === 'Y' ? 'checked' : '') + '><label for="fe-required">Required</label></div>' +
+    '<div class="checkbox-row mt-2"><input type="checkbox" id="fe-visible" ' + (!field || field.Visible === 'Y' ? 'checked' : '') + '><label for="fe-visible">Visible</label></div>' +
+    '<button class="btn btn-primary btn-block mt-4" id="fe-save">Save Field</button>';
+  openModal(field ? 'Edit Field' : 'Add Field', body);
+  qs('#fe-save').addEventListener('click', async function () {
+    try {
+      var payload = {
+        ID: field ? field.ID : undefined, Label: qs('#fe-label').value, FieldKey: isCore ? field.FieldKey : qs('#fe-key').value,
+        Section: qs('#fe-section').value, Type: qs('#fe-type').value, Options: qs('#fe-options').value,
+        Placeholder: qs('#fe-placeholder').value, HelpText: qs('#fe-help').value, Validation: qs('#fe-validation').value,
+        Required: qs('#fe-required').checked ? 'Y' : 'N', Visible: qs('#fe-visible').checked ? 'Y' : 'N',
+        SortOrder: field ? field.SortOrder : (FB_STATE.fields.length + 1), Version: field ? field.Version : 1
+      };
+      await apiAuth('saveFormField', payload);
+      toast('Field saved.', 'success');
+      closeModal();
+      renderFormBuilder();
+    } catch (e) { toast(e.message, 'error'); }
+  });
+}
+
+
+// ---- Bulk Messaging screen ----------------------------------------------------------
+
+async function renderMessaging() {
+  root().innerHTML = skeletonLines(6);
+  try {
+    var tenants = (await apiAuth('listTenants')).tenants;
+    root().innerHTML =
+      '<h1>Messaging</h1>' +
+      '<div class="card"><h3>Select Recipients</h3>' +
+      '<div class="row mt-2"><button class="btn btn-sm" id="msg-select-all">Select All</button><button class="btn btn-sm" id="msg-select-none">Clear</button></div>' +
+      '<div class="mt-2" style="max-height:220px;overflow-y:auto;">' + tenants.map(function (t) {
+        return '<div class="checkbox-row"><input type="checkbox" class="msg-recipient" value="' + t.ID + '" id="mr-' + t.ID + '"><label for="mr-' + t.ID + '">' + esc(t.FullName) + ' (' + esc(t.Phone) + ')</label></div>';
+      }).join('') + '</div></div>' +
+      '<div class="card mt-4"><h3>Compose</h3>' +
+      '<div class="checkbox-row"><input type="checkbox" id="msg-sms" checked><label for="msg-sms">SMS</label></div>' +
+      '<div class="checkbox-row mt-2"><input type="checkbox" id="msg-email" checked><label for="msg-email">Email</label></div>' +
+      '<div class="field mt-2"><textarea id="msg-body" placeholder="Type your message. Merge tokens like {{TenantName}} are supported in automated reminders."></textarea></div>' +
+      '<div class="row-between"><span id="msg-counter" class="muted" style="font-size:12px;"></span>' +
+      '<button class="btn btn-sm" id="msg-estimate">Estimate SMS Cost</button></div>' +
+      '<div id="msg-cost" class="mt-2"></div>' +
+      '<button class="btn btn-primary btn-block mt-4" id="msg-send">Send Now</button></div>';
+    qs('#msg-select-all').addEventListener('click', function () { qsa('.msg-recipient').forEach(function (c) { c.checked = true; }); });
+    qs('#msg-select-none').addEventListener('click', function () { qsa('.msg-recipient').forEach(function (c) { c.checked = false; }); });
+    qs('#msg-body').addEventListener('input', function () {
+      var len = qs('#msg-body').value.length;
+      var segs = len === 0 ? 0 : (len <= 160 ? 1 : Math.ceil(len / 153));
+      qs('#msg-counter').textContent = len + ' characters / ' + segs + ' SMS segment(s)';
+    });
+    qs('#msg-estimate').addEventListener('click', async function () {
+      var ids = qsa('.msg-recipient:checked').map(function (c) { return c.value; });
+      if (!ids.length) { toast('Select at least one recipient.', 'error'); return; }
+      try {
+        var est = await apiAuth('estimateSmsCost', ids, qs('#msg-body').value);
+        qs('#msg-cost').innerHTML = '<div class="chip">' + est.recipients + ' recipients &times; ' + est.segments + ' segments &asymp; ' + fmtGHS(est.estimatedCostGHS) + '</div>';
+      } catch (e) { toast(e.message, 'error'); }
+    });
+    qs('#msg-send').addEventListener('click', async function () {
+      var ids = qsa('.msg-recipient:checked').map(function (c) { return c.value; });
+      if (!ids.length) { toast('Select at least one recipient.', 'error'); return; }
+      var channels = [];
+      if (qs('#msg-sms').checked) channels.push('SMS');
+      if (qs('#msg-email').checked) channels.push('Email');
+      try {
+        var res = await apiAuth('sendManualMessage', ids, qs('#msg-body').value, channels);
+        toast('Message sent to ' + res.results.length + ' recipient(s).', 'success');
+      } catch (e) { toast(e.message, 'error'); }
+    });
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+
+// ---- Settings ---------------------------------------------------------------------------
+
+var SETTINGS_TEXT_FIELDS = [
+  ['AppName', 'App / Business Name'], ['LandlordName', 'Landlord/Landlady Name'], ['LandlordPhone', 'Landlord Phone'],
+  ['LandlordEmail', 'Landlord Email'], ['AdminEmails', 'Admin Notification Emails (comma-separated)'],
+  ['ArkeselApiKey', 'Arkesel API Key'], ['ArkeselSenderId', 'Arkesel Sender ID'], ['ReceiptPrefix', 'Receipt Number Prefix'],
+  ['SmsRatePerSegment', 'SMS Rate per Segment (GHS)']
+];
+var SETTINGS_TEMPLATE_FIELDS = [
+  ['MessageTemplateRent1Month', '1-Month Rent Reminder'], ['MessageTemplateRent1Week', '1-Week Rent Reminder'],
+  ['MessageTemplateRent1Day', '1-Day Rent Reminder'], ['MessageTemplateOverdue', 'Overdue Escalation'],
+  ['MessageTemplateNotice3Month', '3-Month Notice']
+];
+
+async function renderSettings() {
+  root().innerHTML = skeletonLines(8);
+  try {
+    var res = await apiAuth('getSettingsAdmin');
+    var s = res.settings;
+    root().innerHTML =
+      '<h1>Settings</h1>' +
+      '<div class="card"><h3>Branding &amp; Contact</h3><form id="settings-form">' +
+      SETTINGS_TEXT_FIELDS.map(function (f) { return '<div class="field"><label>' + f[1] + '</label><input id="s-' + f[0] + '" value="' + esc(s[f[0]]) + '"></div>'; }).join('') +
+      '<div class="checkbox-row"><input type="checkbox" id="s-SmsEnabled" ' + (s.SmsEnabled === 'Y' ? 'checked' : '') + '><label for="s-SmsEnabled">Enable SMS sending</label></div>' +
+      '<div class="checkbox-row mt-2"><input type="checkbox" id="s-EmailEnabled" ' + (s.EmailEnabled === 'Y' ? 'checked' : '') + '><label for="s-EmailEnabled">Enable Email sending</label></div>' +
+      '<div class="checkbox-row mt-2"><input type="checkbox" id="s-PublicPortalEnabled" ' + (s.PublicPortalEnabled === 'Y' ? 'checked' : '') + '><label for="s-PublicPortalEnabled">Public portal enabled</label></div>' +
+      '<h3 class="mt-4">Message Templates</h3><p class="muted" style="font-size:12px;">Merge tokens: {{TenantName}} {{PropertyName}} {{RoomLabel}} {{Amount}} {{DueDate}} {{DaysLeft}} {{LandlordName}} {{LandlordPhone}}</p>' +
+      SETTINGS_TEMPLATE_FIELDS.map(function (f) { return '<div class="field"><label>' + f[1] + '</label><textarea id="s-' + f[0] + '">' + esc(s[f[0]]) + '</textarea></div>'; }).join('') +
+      '<button class="btn btn-primary btn-block" type="submit">Save Settings</button></form></div>' +
+      '<div class="card mt-4"><h3>Maintenance</h3>' +
+      '<div class="row" style="flex-wrap:wrap;">' +
+      '<button class="btn" id="btn-backup">Backup Database Now</button>' +
+      '<button class="btn" id="btn-rebuild">Rebuild Database</button>' +
+      '<button class="btn" id="btn-triggers">Install Reminder Trigger</button>' +
+      '<button class="btn" id="btn-export">Export Tenants CSV</button>' +
+      '</div></div>';
+    qs('#settings-form').addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      try {
+        var patch = {};
+        SETTINGS_TEXT_FIELDS.concat(SETTINGS_TEMPLATE_FIELDS).forEach(function (f) { patch[f[0]] = qs('#s-' + f[0]).value; });
+        patch.SmsEnabled = qs('#s-SmsEnabled').checked ? 'Y' : 'N';
+        patch.EmailEnabled = qs('#s-EmailEnabled').checked ? 'Y' : 'N';
+        patch.PublicPortalEnabled = qs('#s-PublicPortalEnabled').checked ? 'Y' : 'N';
+        await apiAuth('saveSettings', patch);
+        toast('Settings saved.', 'success');
+      } catch (e) { toast(e.message, 'error'); }
+    });
+    qs('#btn-backup').addEventListener('click', async function () {
+      try { var b = await apiAuth('backupDatabase'); toast('Backup created.', 'success'); window.open(b.url, '_blank'); } catch (e) { toast(e.message, 'error'); }
+    });
+    qs('#btn-rebuild').addEventListener('click', async function () {
+      try { await api('setup'); toast('Database repaired.', 'success'); } catch (e) { toast(e.message, 'error'); }
+    });
+    qs('#btn-triggers').addEventListener('click', async function () {
+      try { await apiAuth('installTriggersAdmin'); toast('Daily reminders trigger installed.', 'success'); } catch (e) { toast(e.message, 'error'); }
+    });
+    qs('#btn-export').addEventListener('click', async function () {
+      try {
+        var csvRes = await apiAuth('exportTableCsv', 'Tenants');
+        var blob = new Blob([csvRes.csv], { type: 'text/csv' });
+        var link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = csvRes.filename;
+        document.body.appendChild(link); link.click(); link.remove();
+      } catch (e) { toast(e.message, 'error'); }
+    });
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+// ---- Users (SuperAdmin only) --------------------------------------------------------
+
+async function renderUsers() {
+  root().innerHTML = '<div class="row-between"><h1>Users</h1><button class="btn btn-primary" id="add-user">' + icon('plus') + ' Add User</button></div><div id="user-list">' + skeletonLines(4) + '</div>';
+  qs('#add-user').addEventListener('click', function () { openUserModal(null); });
+  loadUsers();
+}
+async function loadUsers() {
+  try {
+    var res = await apiAuth('listUsers');
+    var list = qs('#user-list');
+    list.innerHTML = '<table class="data-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Active</th><th></th></tr></thead><tbody>' +
+      res.users.map(function (u) {
+        return '<tr><td data-label="Name">' + esc(u.Name) + '</td><td data-label="Email">' + esc(u.Email) + '</td>' +
+          '<td data-label="Role"><span class="badge badge-gray">' + esc(u.Role) + '</span></td>' +
+          '<td data-label="Active">' + (u.Active === 'Y' ? 'Yes' : 'No') + '</td>' +
+          '<td data-label="Edit"><button class="btn btn-sm" data-id="' + u.ID + '">' + icon('edit', 16) + '</button></td></tr>';
+      }).join('') + '</tbody></table>';
+    qsa('button[data-id]', list).forEach(function (b) { b.addEventListener('click', function () { openUserModal(res.users.find(function (u) { return u.ID === b.getAttribute('data-id'); })); }); });
+  } catch (e) { toast(e.message, 'error'); }
+}
+function openUserModal(user) {
+  var body = '<div class="field"><label>Name</label><input id="u-name" value="' + esc(user ? user.Name : '') + '"></div>' +
+    '<div class="field"><label>Email</label><input id="u-email" value="' + esc(user ? user.Email : '') + '"></div>' +
+    '<div class="field"><label>Phone</label><input id="u-phone" value="' + esc(user ? user.Phone : '') + '"></div>' +
+    '<div class="field"><label>Role</label><select id="u-role">' +
+    ['SuperAdmin', 'Landlord', 'Caretaker', 'Viewer'].map(function (r) { return '<option' + (user && user.Role === r ? ' selected' : '') + '>' + r + '</option>'; }).join('') + '</select></div>' +
+    '<div class="field"><label>' + (user ? 'New Password (leave blank to keep)' : 'Password') + '</label><input type="password" id="u-password"></div>' +
+    '<div class="checkbox-row"><input type="checkbox" id="u-active" ' + (!user || user.Active === 'Y' ? 'checked' : '') + '><label for="u-active">Active</label></div>' +
+    '<button class="btn btn-primary btn-block mt-4" id="u-save">Save User</button>';
+  openModal(user ? 'Edit User' : 'Add User', body);
+  qs('#u-save').addEventListener('click', async function () {
+    try {
+      var payload = { ID: user ? user.ID : undefined, Name: qs('#u-name').value, Email: qs('#u-email').value, Phone: qs('#u-phone').value, Role: qs('#u-role').value, Active: qs('#u-active').checked ? 'Y' : 'N' };
+      if (qs('#u-password').value) payload.NewPassword = qs('#u-password').value;
+      await apiAuth('saveUser', payload);
+      toast('User saved.', 'success'); closeModal(); loadUsers();
+    } catch (e) { toast(e.message, 'error'); }
+  });
+}
+
+// ---- Health Check ---------------------------------------------------------------------
+
+async function renderHealth() {
+  root().innerHTML = '<h1>Health Check</h1><div id="health-list">' + skeletonLines(4) + '</div>';
+  loadHealth();
+}
+async function loadHealth() {
+  try {
+    var res = await apiAuth('healthCheck');
+    qs('#health-list').innerHTML = res.checks.map(function (c) {
+      return '<div class="card row-between"><div class="row">' + icon(c.ok ? 'check' : 'alert', 22) +
+        '<div><strong>' + esc(c.label) + '</strong><div class="muted" style="font-size:13px;">' + esc(c.detail) + '</div></div></div>' +
+        (!c.ok && c.fixable ? '<button class="btn btn-sm" data-fix="' + c.key + '">Fix it</button>' : '<span class="badge ' + (c.ok ? 'badge-green' : 'badge-red') + '">' + (c.ok ? 'OK' : 'Issue') + '</span>') +
+        '</div>';
+    }).join('');
+    qsa('button[data-fix]', qs('#health-list')).forEach(function (b) {
+      b.addEventListener('click', async function () {
+        try { await apiAuth('healthCheckFix', b.getAttribute('data-fix')); toast('Fixed.', 'success'); loadHealth(); } catch (e) { toast(e.message, 'error'); }
+      });
+    });
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+
+// ---- Bootstrap ---------------------------------------------------------------------------
+
+window.addEventListener('hashchange', onRouteChange);
+
+document.addEventListener('DOMContentLoaded', function () {
+  applyTheme();
+  if (!window.location.hash) window.location.hash = '#/';
+  onRouteChange();
+  tfFlushOfflineQueue();
+});
+</script>

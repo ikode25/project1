@@ -119,6 +119,7 @@ var DEFAULT_SETTINGS = {
   RentControlDisclaimer: 'This document is provided for administrative convenience and does not constitute legal advice. Parties are encouraged to confirm terms with the Rent Control Division, Ministry of Works and Housing, under the Rent Act, 1963 (Act 220).',
   Theme: 'light',
   PublicPortalEnabled: 'Y',
+  OnboardingDone: 'N',
   ReceiptPrefix: 'KD',
   SmsRatePerSegment: '0.03',
   MessageTemplateRent1Month: 'Dear {{TenantName}}, your rent advance for {{RoomLabel}} at {{PropertyName}} expires on {{DueDate}} ({{DaysLeft}} days left). Please contact {{LandlordName}} on {{LandlordPhone}} to renew. - KEY & DEED',
@@ -865,7 +866,7 @@ function adminLogin(email, password) {
     CacheService.getScriptCache().put(CACHE_PREFIX + 'sess_' + token, JSON.stringify(session), SESSION_TTL_SEC);
     updateById_(SHEETS.USERS, user.ID, { LastLoginAt: new Date() });
     logAudit_(user.Name, 'LOGIN', 'User', user.ID, 'Admin login');
-    return { token: token, user: session };
+    return { token: token, user: session, onboardingDone: getSettings_().OnboardingDone === 'Y' };
   });
 }
 
@@ -1485,7 +1486,11 @@ function buildReceiptEmailHtml_(payment, tenant, settings) {
 
 function getLedger(token, tenancyId) {
   return safeCall_('getLedger', function () {
-    requireRole_(token, ['SuperAdmin', 'Landlord', 'Caretaker', 'Viewer']);
+    var session = requireRole_(token, ['SuperAdmin', 'Landlord', 'Caretaker', 'Viewer', 'Tenant']);
+    if (session.role === 'Tenant') {
+      var owned = getById_(SHEETS.TENANCIES, tenancyId);
+      if (!owned || owned.TenantID !== session.tenantId) throw new Error('Not authorised to view this ledger.');
+    }
     var payments = findBy_(SHEETS.PAYMENTS, 'TenancyID', tenancyId)
       .sort(function (a, b) { return new Date(b.PaymentDate) - new Date(a.PaymentDate); });
     var tenancy = getById_(SHEETS.TENANCIES, tenancyId);
@@ -1963,7 +1968,8 @@ function listTenants(token) {
 
 function getTenantProfile(token, tenantId) {
   return safeCall_('getTenantProfile', function () {
-    requireRole_(token, ['SuperAdmin', 'Landlord', 'Caretaker', 'Viewer']);
+    var session = requireRole_(token, ['SuperAdmin', 'Landlord', 'Caretaker', 'Viewer', 'Tenant']);
+    if (session.role === 'Tenant' && session.tenantId !== tenantId) throw new Error('Not authorised to view this profile.');
     var tenant = getById_(SHEETS.TENANTS, tenantId);
     if (!tenant) throw new Error('Tenant not found.');
     var tenancies = findBy_(SHEETS.TENANCIES, 'TenantID', tenantId);
@@ -2242,7 +2248,7 @@ function completeOnboarding(token, data) {
       AppName: data.appName || DEFAULT_SETTINGS.AppName, LandlordName: data.landlordName,
       LandlordPhone: normalizePhoneGh_(data.landlordPhone) || data.landlordPhone,
       LandlordEmail: data.landlordEmail, ArkeselApiKey: data.arkeselApiKey || '', ArkeselSenderId: data.arkeselSenderId || 'KEYDEED',
-      SmsEnabled: data.arkeselApiKey ? 'Y' : 'N'
+      SmsEnabled: data.arkeselApiKey ? 'Y' : 'N', OnboardingDone: 'Y'
     });
     var property = null;
     if (data.firstProperty && data.firstProperty.PropertyName) {

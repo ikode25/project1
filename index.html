@@ -1,26 +1,61 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>MySchool</title>
+  <base target="_top">
+  <meta charset="utf-8">
+  <title><?= appName ?></title>
+  <?!= include('Styles'); ?>
 </head>
 <body>
-  <iframe 
-    src="https://script.google.com/macros/s/AKfycbweB2UbaMxFiRbdJ9s71xnKL1C_Ak15HqS9bdLskkxrZzf4YWR5fcX-uOt4mUD8Va8/exec"
-    width="100%"
-    height="100%"
-    allowfullscreen="true"
-    style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; border: none;">
-  </iframe>
+  <!-- ===================================================================================
+       Inline SVG icon sprite — stroke-based, 1.5px, currentColor, hand-drawn.
+       No icon font, no external library, no emoji anywhere in this app.
+       =================================================================================== -->
+  <svg style="display:none">
+    <defs>
+      <g id="ic-home"><path d="M4 11 12 4l8 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10v9h12v-9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 19v-5h4v5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <g id="ic-building"><rect x="5" y="4" width="14" height="16" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M9 8h1M14 8h1M9 12h1M14 12h1M9 16h1M14 16h1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></g>
+      <g id="ic-door"><rect x="6" y="3" width="12" height="18" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="14.5" cy="12" r="1" fill="currentColor"/></g>
+      <g id="ic-users"><circle cx="9" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="17" cy="9" r="2.4" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M15.5 14.2c2.6.4 4.5 2.5 4.5 5.3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></g>
+      <g id="ic-file-text"><path d="M7 3h7l4 4v14H7z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M14 3v4h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M9.5 12h6M9.5 15h6M9.5 18h3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></g>
+      <g id="ic-cash"><rect x="3" y="7" width="18" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="12.5" r="2.6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 7V5.5A1.5 1.5 0 0 1 7.5 4h12A1.5 1.5 0 0 1 21 5.5V15" fill="none" stroke="currentColor" stroke-width="1.5"/></g>
+      <g id="ic-bell"><path d="M6 10a6 6 0 1 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 14 6 10Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 19a2 2 0 0 0 4 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></g>
+      <g id="ic-wrench"><path d="M14.7 6.3a4 4 0 0 0-5.4 5l-6 6 2.4 2.4 6-6a4 4 0 0 0 5-5.4l-2.6 2.6-2-2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></g>
+      <g id="ic-settings"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 3v2.2M12 18.8V21M21 12h-2.2M5.2 12H3M18.4 5.6l-1.6 1.6M7.2 16.8l-1.6 1.6M18.4 18.4l-1.6-1.6M7.2 7.2 5.6 5.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></g>
+      <g id="ic-menu"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></g>
+      <g id="ic-close"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></g>
+      <g id="ic-chevron-right"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <g id="ic-chevron-left"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <g id="ic-plus"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></g>
+      <g id="ic-search"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M20 20l-4.3-4.3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></g>
+      <g id="ic-check"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <g id="ic-map-pin"><path d="M12 21s7-6.3 7-11.5A7 7 0 0 0 5 9.5C5 14.7 12 21 12 21Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="12" cy="9.5" r="2.3" fill="none" stroke="currentColor" stroke-width="1.5"/></g>
+      <g id="ic-phone"><path d="M6.6 4h2.8l1.4 4-2 1.4a12 12 0 0 0 5.8 5.8l1.4-2 4 1.4v2.8a1.6 1.6 0 0 1-1.7 1.6C11 18.6 5.4 13 5 5.7 5 4.8 5.7 4 6.6 4Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></g>
+      <g id="ic-mail"><rect x="3.5" y="5.5" width="17" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M4.5 6.5l7.5 6 7.5-6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></g>
+      <g id="ic-whatsapp"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8.5 15.5c1 .8 2.2 1.2 3.5 1.2 3 0 5.4-2.4 5.4-5.4S15 5.9 12 5.9 6.6 8.3 6.6 11.3c0 1.1.3 2.1.9 3l-.7 2.6 2.7-.6Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></g>
+      <g id="ic-camera"><rect x="3" y="7" width="18" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="13.5" r="3.3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M9 7l1.2-2h3.6L15 7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></g>
+      <g id="ic-upload"><path d="M12 16V5M8 9l4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></g>
+      <g id="ic-download"><path d="M12 4v11M8 11l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></g>
+      <g id="ic-edit"><path d="M4 20h4L18.5 9.5a1.5 1.5 0 0 0 0-2.1l-1.9-1.9a1.5 1.5 0 0 0-2.1 0L4 15v5Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></g>
+      <g id="ic-trash"><path d="M5 7h14M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-9 0 1 12a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <g id="ic-alert"><path d="M12 3 2 20h20L12 3Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 9v5M12 17h.01" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></g>
+      <g id="ic-clock"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 7v5l3.5 2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <g id="ic-drag"><circle cx="9" cy="6" r="1.1" fill="currentColor"/><circle cx="15" cy="6" r="1.1" fill="currentColor"/><circle cx="9" cy="12" r="1.1" fill="currentColor"/><circle cx="15" cy="12" r="1.1" fill="currentColor"/><circle cx="9" cy="18" r="1.1" fill="currentColor"/><circle cx="15" cy="18" r="1.1" fill="currentColor"/></g>
+      <g id="ic-sun"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></g>
+      <g id="ic-moon"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></g>
+      <g id="ic-shield"><path d="M12 3l7 3v6c0 4.5-3 7.7-7 9-4-1.3-7-4.5-7-9V6l7-3Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M9 12l2 2 4-4.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <g id="ic-arrow-left"><path d="M19 12H5M11 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+      <g id="ic-bed"><path d="M3 18v-7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v7M3 18v2M21 18v2M3 13h18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/><rect x="5" y="9" width="6" height="4" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/></g>
+      <g id="ic-info"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 11v5.5M12 8v.01" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></g>
+      <g id="ic-logout"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 17l5-5-5-5M21 12H9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+    </defs>
+  </svg>
 
-  <script>
-    window.onload = function() {
-      document.querySelector('iframe')
-        .requestFullscreen()
-        .catch((err) => {
-          console.error('Error attempting to enable full-screen mode:', err.message);
-        });
-    };
-  </script>
+  <div id="toast-stack" class="toast-stack" aria-live="polite"></div>
+  <div id="app">
+    <div id="app-root"></div>
+  </div>
+
+  <?!= include('Scripts'); ?>
 </body>
 </html>
-        
