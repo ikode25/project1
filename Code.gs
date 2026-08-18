@@ -42,6 +42,10 @@ var TIMEZONE = 'Africa/Accra';
 var CURRENCY_SYMBOL = 'GH₵';
 var SESSION_TTL_SECONDS = 6 * 60 * 60; // 6 hours
 var UPLOAD_FOLDER_NAME = 'SalonSystem_Uploads';
+// Bump this whenever a fix needs to force-run against an EXISTING spreadsheet
+// (e.g. a cell-formatting or data-repair migration) even though its sheet
+// headers already match SCHEMA and would otherwise skip setupSheets().
+var SETUP_VERSION = 2;
 
 // Column schema for every tab. Order matters — it defines the sheet column order.
 var SCHEMA = {
@@ -49,7 +53,7 @@ var SCHEMA = {
   Services:      ['ServiceID', 'Name', 'Category', 'Description', 'DurationMinutes', 'Price', 'BranchID', 'Active', 'ImageURL'],
   Staff:         ['StaffID', 'Name', 'Role', 'BranchID', 'Phone', 'Specialties', 'PhotoURL', 'Active', 'CommissionRate', 'WorkDays'],
   Customers:     ['CustomerID', 'Name', 'Phone', 'Email', 'DateJoined', 'LoyaltyPoints', 'Notes'],
-  Appointments:  ['AppointmentID', 'Reference', 'CustomerID', 'StaffID', 'ServiceID', 'BranchID', 'Date', 'TimeSlot', 'Status', 'CreatedAt', 'Notes'],
+  Appointments:  ['AppointmentID', 'Reference', 'CustomerID', 'StaffID', 'ServiceID', 'BranchID', 'Date', 'TimeSlot', 'Status', 'CreatedAt', 'Notes', 'PaymentMethod', 'PaymentStatus', 'PaymentProofURL'],
   Sales:         ['SaleID', 'Date', 'BranchID', 'CustomerID', 'StaffID', 'Items', 'Subtotal', 'Discount', 'Tax', 'Total', 'PaymentMethod', 'PaymentStatus'],
   Products:      ['ProductID', 'Name', 'Category', 'CostPrice', 'SellingPrice', 'QuantityInStock', 'ReorderLevel', 'BranchID', 'ImageURL'],
   Expenses:      ['ExpenseID', 'Date', 'BranchID', 'Category', 'Amount', 'Description'],
@@ -59,13 +63,14 @@ var SCHEMA = {
   HeroSlides:    ['SlideID', 'ImageURL', 'Title', 'Subtitle', 'ButtonText', 'ButtonLink', 'SortOrder', 'Active'],
   Gallery:       ['GalleryID', 'ImageURL', 'Caption', 'Category', 'BranchID', 'SortOrder', 'Active'],
   Notifications: ['NotificationID', 'Type', 'Recipient', 'Message', 'Status', 'Date'],
-  BlockedSlots:  ['BlockedSlotID', 'BranchID', 'Date', 'TimeSlot']
+  BlockedSlots:  ['BlockedSlotID', 'BranchID', 'Date', 'TimeSlot'],
+  Videos:        ['VideoID', 'VideoURL', 'Title', 'Caption', 'SortOrder', 'Active']
 };
 
 var ID_PREFIX = {
   Branches: 'BR', Services: 'SV', Staff: 'ST', Customers: 'CU', Appointments: 'AP',
   Sales: 'SL', Products: 'PR', Expenses: 'EX', Reviews: 'RV', HeroSlides: 'HS', Gallery: 'GL',
-  Notifications: 'NT', BlockedSlots: 'BL'
+  Notifications: 'NT', BlockedSlots: 'BL', Videos: 'VD'
 };
 
 var ROLES = ['Owner', 'Manager', 'Staff', 'Receptionist'];
@@ -100,7 +105,12 @@ var DEFAULT_SETTINGS = {
   SocialInstagram: '',
   SocialTwitter: '',
   SocialTiktok: '',
-  SocialYoutube: ''
+  SocialYoutube: '',
+  MomoNumber: '',
+  MomoName: '',
+  BankName: '',
+  BankAccountName: '',
+  BankAccountNumber: ''
 };
 
 /* ============================================================================
@@ -163,7 +173,78 @@ function setupSheets() {
   }
 
   seedIfEmpty_();
+  repairPhoneColumns_();
+  repairTimeSlotColumns_();
   return 'Setup complete';
+}
+
+/**
+ * One-time data repair: a TimeSlot value like "09:00" or "02:00" reads
+ * exactly like a clock time, so before the Plain Text format above took
+ * effect, Sheets silently stored it as a real Time value. normalizeCellValue_
+ * then reads that back as a Date anchored at the Sheets time epoch
+ * (1899-12-30) and formats it as a full ISO datetime string instead of
+ * "HH:mm" — so it can never again match a plain "HH:mm" lookup key. That
+ * silently broke slot-blocking (a blocked slot's color wouldn't survive a
+ * reload) and could affect availability checks. Any TimeSlot cell still
+ * holding a raw Date is unambiguous and safe to convert back to "HH:mm".
+ */
+function repairTimeSlotColumns_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  ['Appointments', 'BlockedSlots'].forEach(function (sheetName) {
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet) return;
+    var headers = SCHEMA[sheetName];
+    var col = headers.indexOf('TimeSlot') + 1;
+    if (!col) return;
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return;
+    var range = sheet.getRange(2, col, lastRow - 1, 1);
+    var values = range.getValues();
+    var changed = false;
+    var fixed = values.map(function (row) {
+      var v = row[0];
+      if (v instanceof Date) {
+        changed = true;
+        var h = v.getHours(), m = v.getMinutes();
+        return [(h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m];
+      }
+      return [v];
+    });
+    if (changed) range.setValues(fixed);
+  });
+}
+
+/**
+ * One-time data repair: earlier deployments could write a phone number
+ * before the Plain Text cell format above was in effect, so Sheets
+ * "smart-formatted" it into a number and silently dropped the leading
+ * zero (e.g. "0247123456" -> 247123456). Any 9-digit value left in a
+ * Phone column is unambiguously a Ghana mobile number missing that zero,
+ * so it's safe to restore automatically. Idempotent — already-correct
+ * 10-digit numbers are left untouched.
+ */
+function repairPhoneColumns_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  ['Customers', 'Staff', 'Users', 'Branches'].forEach(function (sheetName) {
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet) return;
+    var headers = SCHEMA[sheetName];
+    var phoneCol = headers.indexOf('Phone') + 1;
+    if (!phoneCol) return;
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return;
+    var range = sheet.getRange(2, phoneCol, lastRow - 1, 1);
+    var values = range.getValues();
+    var changed = false;
+    var fixed = values.map(function (row) {
+      var v = row[0];
+      var digits = typeof v === 'number' ? String(Math.round(v)) : String(v || '').trim();
+      if (/^\d{9}$/.test(digits)) { changed = true; return ['0' + digits]; }
+      return [typeof v === 'number' ? digits : v];
+    });
+    if (changed) range.setValues(fixed);
+  });
 }
 
 /**
@@ -174,23 +255,37 @@ function setupSheets() {
  * is now cached for an hour — most requests take the fast path (a single
  * cheap CacheService read) and skip the verification entirely; it quietly
  * re-checks itself within an hour of any future schema change.
+ *
+ * Header-matching alone isn't enough to decide whether setupSheets() can
+ * be skipped, though: a sheet created by an older deployment can already
+ * have the right headers while still missing a later fix that setupSheets()
+ * itself carries (Plain Text cell formatting, phone-column repair, etc).
+ * SETUP_VERSION is stored durably (PropertiesService, not the 1-hour
+ * cache) so any such fix is guaranteed to actually run at least once
+ * against every existing spreadsheet, no matter how old its headers are.
  */
 function ensureSetup_() {
   var cache = CacheService.getScriptCache();
-  if (cache.get('setup_verified') === '1') return;
+  if (cache.get('setup_verified_v' + SETUP_VERSION) === '1') return;
+
+  var props = PropertiesService.getScriptProperties();
+  var storedVersion = Number(props.getProperty('setupVersion') || '0');
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheetsByName = {};
   ss.getSheets().forEach(function (sheet) { sheetsByName[sheet.getName()] = sheet; });
-  var needsSetup = Object.keys(SCHEMA).some(function (name) {
+  var needsHeaderSetup = Object.keys(SCHEMA).some(function (name) {
     var sheet = sheetsByName[name];
     if (!sheet) return true;
     var headers = SCHEMA[name];
     var existing = sheet.getRange(1, 1, 1, headers.length).getValues()[0];
     return headers.some(function (h, i) { return existing[i] !== h; });
   });
-  if (needsSetup) setupSheets();
-  cache.put('setup_verified', '1', 3600);
+  if (needsHeaderSetup || storedVersion < SETUP_VERSION) {
+    setupSheets();
+    props.setProperty('setupVersion', String(SETUP_VERSION));
+  }
+  cache.put('setup_verified_v' + SETUP_VERSION, '1', 3600);
 }
 
 function seedIfEmpty_() {
@@ -559,6 +654,9 @@ function getPublicData() {
   var gallery = readAll_('Gallery')
     .filter(function (g) { return String(g.Active).toUpperCase() === 'Y'; })
     .sort(function (a, b) { return Number(a.SortOrder) - Number(b.SortOrder); });
+  var videos = readAll_('Videos')
+    .filter(function (v) { return String(v.Active).toUpperCase() === 'Y'; })
+    .sort(function (a, b) { return Number(a.SortOrder) - Number(b.SortOrder); });
   var reviewRows = readAll_('Reviews');
   var customersMap = keyBy_(readAll_('Customers'), 'CustomerID');
   var staffMapForReviews = keyBy_(readAll_('Staff'), 'StaffID');
@@ -576,6 +674,7 @@ function getPublicData() {
     staff: staff.map(function (s) { return stripRow_(sanitizeStaff_(s)); }),
     heroSlides: heroSlides.map(stripRow_),
     gallery: gallery.map(stripRow_),
+    videos: videos.map(stripRow_),
     reviews: reviews
   };
 }
@@ -635,6 +734,11 @@ function createAppointment(data) {
   // Find or create the customer by phone number
   var customer = findOrCreateCustomerByPhone_(name, phone, email);
 
+  var validPaymentMethods = ['Cash', 'MTN MoMo', 'Vodafone Cash', 'Telecel Cash', 'AirtelTigo Money', 'Bank Transfer'];
+  var paymentMethod = validPaymentMethods.indexOf(data.paymentMethod) > -1 ? data.paymentMethod : 'Cash';
+  var paymentProofURL = String(data.paymentProofURL || '').trim();
+  var paymentStatus = paymentMethod === 'Cash' ? 'Pay at Shop' : (paymentProofURL ? 'Pending Verification' : 'Awaiting Payment');
+
   var appointmentId = nextId_('Appointments', 'AppointmentID');
   var reference = 'BOOK-' + Utilities.formatDate(new Date(), TIMEZONE, 'yyMMdd') + '-' + appointmentId.split('-')[1];
 
@@ -649,7 +753,10 @@ function createAppointment(data) {
     TimeSlot: timeSlot,
     Status: 'Pending',
     CreatedAt: nowIso_(),
-    Notes: String(data.notes || '')
+    Notes: String(data.notes || ''),
+    PaymentMethod: paymentMethod,
+    PaymentStatus: paymentStatus,
+    PaymentProofURL: paymentProofURL
   });
 
   sendAppointmentConfirmation_(appt, customer, service, branch);
@@ -803,6 +910,33 @@ function deleteGalleryItem(token, galleryId) {
   var user = requireAuth_(token);
   requireRole_(user, ['Owner', 'Manager']);
   return deleteById_('Gallery', 'GalleryID', galleryId);
+}
+
+/* ---------- Videos (public showcase + admin management) ----------
+ * Admin pastes a video URL (YouTube, Vimeo, or a direct .mp4 link) —
+ * no large file upload through Apps Script, which would be slow and
+ * hit execution/size limits. */
+
+function getVideos(token) {
+  requireAuth_(token);
+  return readAll_('Videos').sort(function (a, b) { return Number(a.SortOrder) - Number(b.SortOrder); }).map(stripRow_);
+}
+
+function saveVideo(token, item) {
+  var user = requireAuth_(token);
+  requireRole_(user, ['Owner', 'Manager']);
+  if (!item.VideoURL) throw new Error('Please enter a video URL.');
+  item.SortOrder = Number(item.SortOrder) || 1;
+  item.Active = item.Active === 'N' ? 'N' : 'Y';
+  if (item.VideoID) return stripRow_(updateById_('Videos', 'VideoID', item.VideoID, item));
+  item.VideoID = nextId_('Videos', 'VideoID');
+  return stripRow_(appendRow_('Videos', item));
+}
+
+function deleteVideo(token, videoId) {
+  var user = requireAuth_(token);
+  requireRole_(user, ['Owner', 'Manager']);
+  return deleteById_('Videos', 'VideoID', videoId);
 }
 
 /* ============================================================================
@@ -1023,6 +1157,14 @@ function rescheduleAppointment(token, appointmentId, date, timeSlot) {
   var customer = readAll_('Customers').find(function (c) { return c.CustomerID === appt.CustomerID; });
   if (customer) sendAppointmentStatusUpdate_(appt, customer, 'rescheduled to ' + date + ' ' + timeSlot);
   return stripRow_(appt);
+}
+
+/** Owner/Manager/Receptionist marks a manually-verified mobile money/bank payment as confirmed. */
+function verifyAppointmentPayment(token, appointmentId) {
+  var user = requireAuth_(token);
+  requireRole_(user, ['Owner', 'Manager', 'Receptionist']);
+  var updated = updateById_('Appointments', 'AppointmentID', appointmentId, { PaymentStatus: 'Paid' });
+  return stripRow_(updated);
 }
 
 function createAppointmentAdmin(token, data) {
@@ -1388,8 +1530,22 @@ function deleteHeroSlide(token, slideId) {
 function uploadImage(token, base64Data, filename, mimeType) {
   var user = requireAuth_(token);
   requireRole_(user, ['Owner', 'Manager']);
-  if (!base64Data) throw new Error('No image data received.');
+  return uploadImageToDrive_(base64Data, filename, mimeType);
+}
 
+/**
+ * Public, unauthenticated upload used only for a customer's mobile
+ * money/bank payment-proof screenshot at booking time — same low-risk
+ * profile as the public booking submission itself (it only ever adds an
+ * image to Drive, tied to one specific booking, and is not used for any
+ * of the site's own branding/content).
+ */
+function uploadPaymentProof(base64Data, filename, mimeType) {
+  return uploadImageToDrive_(base64Data, filename, mimeType);
+}
+
+function uploadImageToDrive_(base64Data, filename, mimeType) {
+  if (!base64Data) throw new Error('No image data received.');
   var folder = getOrCreateUploadFolder_();
   var bytes = Utilities.base64Decode(base64Data.split(',').pop());
   var blob = Utilities.newBlob(bytes, mimeType || 'image/jpeg', filename || ('upload_' + Date.now()));
@@ -1764,6 +1920,32 @@ function cancelBookingByReference(reference) {
   var customer = readAll_('Customers').find(function (c) { return c.CustomerID === appt.CustomerID; });
   var updated = updateById_('Appointments', 'AppointmentID', appt.AppointmentID, { Status: 'Cancelled' });
   if (customer) sendAppointmentStatusUpdate_(updated, customer, 'cancelled at your request');
+  return { success: true };
+}
+
+/** Public: a website visitor's "Contact Us" message, emailed straight to the business's ContactEmail. */
+function sendContactMessage(data) {
+  data = data || {};
+  var name = String(data.name || '').trim();
+  var email = String(data.email || '').trim();
+  var phone = String(data.phone || '').trim();
+  var message = String(data.message || '').trim();
+  if (!name) throw new Error('Please enter your name.');
+  if (!message) throw new Error('Please enter a message.');
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error('Please enter a valid email address.');
+  if (!email && !phone) throw new Error('Please leave an email or phone number so we can reply to you.');
+
+  var settings = getSettingsMap_();
+  var to = settings.ContactEmail;
+  if (!to) throw new Error('This site has not set up a contact email yet — please call or WhatsApp us instead.');
+
+  var bodyHtml = '<p><b>From:</b> ' + esc_(name) + '</p>' +
+    (phone ? '<p><b>Phone:</b> ' + esc_(phone) + '</p>' : '') +
+    (email ? '<p><b>Email:</b> ' + esc_(email) + '</p>' : '') +
+    '<p style="white-space:pre-wrap;background:#f7f5f2;padding:14px;border-radius:8px;margin-top:10px;">' + esc_(message) + '</p>';
+  var html = buildEmailHtml_('New Website Message', bodyHtml);
+  var plain = 'New message from ' + name + (phone ? ' (' + phone + ')' : '') + (email ? ' <' + email + '>' : '') + ':\n\n' + message;
+  sendEmail_(to, 'New website message from ' + name, plain, html);
   return { success: true };
 }
 

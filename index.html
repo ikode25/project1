@@ -124,6 +124,12 @@
 
   /* ---------- GALLERY ---------- */
   .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+  .video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+  .video-card { background: #fff; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+  .video-frame { position: relative; width: 100%; aspect-ratio: 16/9; background: #111; }
+  .video-frame iframe, .video-frame video { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .video-card-body { padding: 12px 16px; }
+  .video-card-body b { display: block; }
   .gallery-item { position: relative; border-radius: var(--radius); overflow: hidden; cursor: pointer; box-shadow: var(--shadow); aspect-ratio: 4/3; }
   .gallery-item img { width: 100%; height: 100%; object-fit: cover; transition: transform .3s ease; }
   .gallery-item:hover img { transform: scale(1.06); }
@@ -161,6 +167,19 @@
   .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
   .status-dot.avail { background: #1c7c3c; }
   .status-dot.unavail { background: #c0392b; }
+
+  /* ---------- BOOKING: PAYMENT METHOD ---------- */
+  .pay-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+  .pay-option { display: flex; align-items: flex-start; gap: 12px; background: #fafafa; border: 2px solid transparent; border-radius: 10px; padding: 14px 16px; cursor: pointer; transition: .15s; }
+  .pay-option:hover { border-color: #ddd; }
+  .pay-option.selected { border-color: var(--clr-accent); background: rgba(0,0,0,.03); }
+  .pay-option h4 { margin: 0 0 3px; }
+  .pay-option-radio { width: 20px; height: 20px; border-radius: 50%; border: 2px solid #ccc; flex-shrink: 0; margin-top: 2px; position: relative; }
+  .pay-option.selected .pay-option-radio { border-color: var(--clr-accent); }
+  .pay-option.selected .pay-option-radio::after { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--clr-accent); }
+  .pay-instructions { background: #fff7e6; border: 1px solid #f0dca0; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .pay-instructions p { margin: 0 0 4px; }
+  .pay-instructions .pay-amt { font-size: 1.1rem; font-weight: 800; color: var(--clr-primary); }
 
   .cal-nav { display: flex; align-items: center; justify-content: center; gap: 18px; margin-bottom: 14px; font-weight: 700; }
   .cal-nav button { background: #f2f2f2; border: none; cursor: pointer; color: var(--clr-primary); width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
@@ -218,6 +237,7 @@
   .contact-item { display: flex; gap: 12px; margin-bottom: 14px; align-items: flex-start; }
   .contact-item .ic { color: var(--clr-secondary); margin-top: 2px; }
   .contact-grid iframe { width: 100%; height: 280px; border: 0; border-radius: var(--radius); }
+  .contact-form-wrap { max-width: 560px; margin: 30px auto 0; background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px; }
 
   footer.pub-footer { background: var(--clr-primary); color: #eee; padding: 30px 0; text-align: center; font-size: .85rem; }
   footer.pub-footer a { color: var(--clr-secondary); }
@@ -244,7 +264,7 @@
   .day-chip.active { background: var(--clr-accent); color: #1a1a1a; }
 
   /* ---------- ADMIN ---------- */
-  #adminApp { display: none; min-height: 100vh; background: #f1f2f5; color: #1a1a1a; }
+  #adminApp { display: none; height: 100vh; overflow: hidden; background: #f1f2f5; color: #1a1a1a; }
   #adminApp.dark { background: #14161a; color: #e8e8e8; }
   #loginScreen {
     display: none; min-height: 100vh; align-items: center; justify-content: center;
@@ -256,38 +276,64 @@
   .password-field input { padding-right: 42px; }
   .pw-toggle { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #888; padding: 6px; display: flex; align-items: center; }
   .pw-toggle:hover { color: #333; }
-  .admin-shell { display: grid; grid-template-columns: 230px 1fr; min-height: 100vh; }
-  @media (max-width: 860px) { .admin-shell { grid-template-columns: 1fr; } }
+  /* App-shell layout: the outer page never scrolls (kills the iOS/Android
+     rubber-band "bounce" that plagued the old whole-page-scrolls layout);
+     only #adminContent scrolls internally, independent of the fixed
+     sidebar and topbar. */
+  html, body { overscroll-behavior-y: none; }
+  .admin-shell { display: flex; height: 100vh; overflow: hidden; }
   .admin-sidebar {
-    background: #1a1a1a; color: #fff; padding: 18px 0; position: sticky; top: 0; height: 100vh; overflow-y: auto;
+    width: 230px; flex-shrink: 0; background: #1a1a1a; color: #fff; height: 100vh; overflow-y: auto;
+    display: flex; flex-direction: column; transition: width .2s ease, transform .2s ease;
   }
   #adminApp.dark .admin-sidebar { background: #0c0d10; }
-  .admin-sidebar .logo { padding: 0 18px 18px; font-weight: 800; border-bottom: 1px solid #333; margin-bottom: 10px; }
+  .admin-sidebar .logo { padding: 18px 18px 18px; font-weight: 800; border-bottom: 1px solid #333; margin-bottom: 10px; white-space: nowrap; overflow: hidden; }
+  #navItems { flex: 1; }
   .admin-sidebar .nav-item {
-    display: flex; align-items: center; gap: 10px; padding: 11px 18px; cursor: pointer; font-size: .9rem; opacity: .85;
+    display: flex; align-items: center; gap: 10px; padding: 11px 18px; cursor: pointer; font-size: .9rem; opacity: .85; white-space: nowrap;
   }
   .admin-sidebar .nav-item:hover { background: #2a2a2a; opacity: 1; }
   .admin-sidebar .nav-item.active { background: var(--clr-accent); color: #1a1a1a; opacity: 1; font-weight: 700; }
+  .admin-sidebar .nav-item span { overflow: hidden; text-overflow: ellipsis; }
+  .sidebar-collapse-btn {
+    display: flex; align-items: center; gap: 8px; background: none; border: none; color: #999; cursor: pointer;
+    padding: 13px 18px; font-size: .78rem; border-top: 1px solid #333; white-space: nowrap; flex-shrink: 0;
+  }
+  .sidebar-collapse-btn:hover { color: #fff; background: #2a2a2a; }
+
+  /* Desktop: collapses to a narrow icon-only rail */
+  .admin-sidebar.collapsed { width: 64px; }
+  .admin-sidebar.collapsed .logo, .admin-sidebar.collapsed .nav-item span, .admin-sidebar.collapsed .sidebar-collapse-btn span { display: none; }
+  .admin-sidebar.collapsed .nav-item { justify-content: center; padding: 12px 0; }
+  .admin-sidebar.collapsed .sidebar-collapse-btn { justify-content: center; padding: 13px 0; }
+
+  .sidebar-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 44; }
+  .sidebar-backdrop.show { display: block; }
+  .hamburger-btn { display: none; }
+
   @media (max-width: 860px) {
-    /* On mobile the sidebar collapses into a single sticky, horizontally
-       scrollable strip of compact icon-over-label chips (like a tab bar)
-       instead of a full-height vertical list that pushes all page content
-       off-screen. */
-    .admin-sidebar { position: sticky; top: 0; z-index: 40; height: auto; padding: 8px 0; box-shadow: 0 2px 8px rgba(0,0,0,.25); }
-    .admin-sidebar .logo { display: none; }
-    #navItems { display: flex; overflow-x: auto; gap: 2px; padding: 0 8px; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-    #navItems::-webkit-scrollbar { display: none; }
-    .admin-sidebar .nav-item {
-      flex: 0 0 auto; flex-direction: column; gap: 4px; padding: 8px 12px; font-size: .68rem;
-      text-align: center; white-space: nowrap; border-radius: 10px;
+    /* On mobile the sidebar becomes an off-canvas drawer: hidden by
+       default, slides in over the content when the hamburger button is
+       tapped, closes on backdrop tap or nav selection. "Collapsed" has no
+       separate meaning here — it's a binary open/closed drawer. */
+    .admin-sidebar {
+      position: fixed; top: 0; left: 0; z-index: 50; width: 250px; transform: translateX(-100%);
+      box-shadow: 4px 0 24px rgba(0,0,0,.35);
     }
+    .admin-sidebar.mobile-open { transform: translateX(0); }
+    .admin-sidebar.collapsed { width: 250px; }
+    .admin-sidebar.collapsed .logo, .admin-sidebar.collapsed .nav-item span, .admin-sidebar.collapsed .sidebar-collapse-btn span { display: block; }
+    .admin-sidebar.collapsed .nav-item { justify-content: flex-start; padding: 11px 18px; }
+    .admin-sidebar.collapsed .sidebar-collapse-btn { justify-content: flex-start; padding: 13px 18px; }
+    .hamburger-btn { display: flex; }
   }
 
-  .admin-main { padding: 20px 26px 60px; }
-  .admin-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; flex-wrap: wrap; gap: 10px; }
+  .admin-main { flex: 1; min-width: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+  .admin-topbar { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding: 20px 26px 16px; }
   .admin-topbar h2 { margin: 0; }
   .admin-topbar-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
   select.branch-switch { padding: 8px 12px; border-radius: 8px; border: 1px solid #ccc; }
+  #adminContent { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 0 26px 60px; }
 
   /* Icon-only topbar buttons (dark mode, refresh, notifications) — explicit
      colors on both themes so they're never invisible-on-invisible. */
@@ -320,7 +366,8 @@
   .bell-item b { display: block; }
   .bell-empty { padding: 14px; text-align: center; color: #888; font-size: .85rem; }
   @media (max-width: 860px) {
-    .admin-main { padding: 14px 14px 40px; }
+    .admin-topbar { padding: 14px 14px 12px; }
+    #adminContent { padding: 0 14px 40px; }
     .admin-topbar h2 { font-size: 1.2rem; }
     .admin-topbar-actions { width: 100%; }
     .admin-topbar-actions #currentUserLabel { width: 100%; order: 5; }
@@ -596,6 +643,14 @@
     </div>
   </section>
 
+  <section class="pub" id="videos-section" style="display:none;">
+    <div class="container">
+      <h2 class="section-title">Watch</h2>
+      <p class="section-sub">See our work in action</p>
+      <div class="video-grid" id="videoGrid"></div>
+    </div>
+  </section>
+
   <section class="pub" id="booking">
     <div class="container">
       <h2 class="section-title">Book an Appointment</h2>
@@ -656,6 +711,22 @@
         <div class="social-row" id="socialRow"></div>
       </div>
       <iframe id="contactMap" loading="lazy" src=""></iframe>
+    </div>
+    <div class="container">
+      <div class="contact-form-wrap">
+        <h3>Send Us a Message</h3>
+        <p class="muted">Prefer email? Fill this in and it goes straight to our inbox.</p>
+        <form id="contactMsgForm">
+          <div class="form-row"><label>Your Name *</label><input type="text" id="cmName" required></div>
+          <div class="form-row2">
+            <div class="form-row"><label>Email</label><input type="email" id="cmEmail"></div>
+            <div class="form-row"><label>Phone</label><input type="tel" id="cmPhone"></div>
+          </div>
+          <div class="form-row"><label>Message *</label><textarea id="cmMessage" rows="4" required></textarea></div>
+          <button type="submit" class="btn btn-accent" id="cmSubmitBtn">Send Message</button>
+          <div id="cmResult"></div>
+        </form>
+      </div>
     </div>
   </section>
 
@@ -718,13 +789,18 @@
 <!-- ============================================================ ADMIN APP ============================================================ -->
 <div id="adminApp">
   <div class="admin-shell">
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
     <div class="admin-sidebar" id="adminSidebar">
       <div class="logo" id="sidebarBrand">Salon Admin</div>
       <div id="navItems"></div>
+      <button class="sidebar-collapse-btn" id="sidebarCollapseBtn"><span id="sidebarCollapseIcon"></span><span>Collapse</span></button>
     </div>
     <div class="admin-main">
       <div class="admin-topbar">
-        <h2 id="pageTitle">Overview</h2>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button class="icon-btn hamburger-btn" id="hamburgerBtn" title="Menu" aria-label="Open menu"></button>
+          <h2 id="pageTitle">Overview</h2>
+        </div>
         <div class="admin-topbar-actions">
           <select class="branch-switch hidden" id="ownerBranchSwitch"></select>
           <button class="icon-btn" id="reloadBtn" title="Refresh this page's data" aria-label="Refresh"></button>
@@ -795,7 +871,9 @@ var ICONS = {
   send: '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',
   smartphone: '<rect x="6" y="2" width="12" height="20" rx="2"/><line x1="10" y1="18" x2="14" y2="18"/>',
   info: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>',
-  globe: '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 0 20 15.3 15.3 0 0 1 0-20z"/>'
+  globe: '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 0 20 15.3 15.3 0 0 1 0-20z"/>',
+  play: '<polygon points="5 3 19 12 5 21 5 3"/>',
+  landmark: '<line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7 12 2"/>'
 };
 function icon(name, size, cls) {
   size = size || 20;
@@ -923,6 +1001,8 @@ window.addEventListener('DOMContentLoaded', function () {
   document.getElementById('reloadBtn').innerHTML = icon('refresh', 17);
   document.getElementById('bellBtn').innerHTML = icon('bell', 17);
   document.getElementById('logoutBtn').innerHTML = icon('logout', 14) + ' Logout';
+  document.getElementById('hamburgerBtn').innerHTML = icon('menu', 20);
+  document.getElementById('sidebarCollapseIcon').innerHTML = icon('chevronLeft', 16);
   ['icPhone', 'icChat', 'icMail', 'icClock'].forEach(function (id, i) {
     document.getElementById(id).innerHTML = icon(['phone', 'chat', 'mail', 'clock'][i], 20);
   });
@@ -939,6 +1019,7 @@ window.addEventListener('DOMContentLoaded', function () {
   bindAuthToggle();
   bindRegisterForm();
   bindMyBookingsForm();
+  bindContactForm();
   initChatWidget();
   window.addEventListener('hashchange', routeHash);
   routeHash();
@@ -954,6 +1035,26 @@ window.addEventListener('DOMContentLoaded', function () {
     if (STATE.token && ['overview', 'reports'].indexOf(STATE.adminPage) > -1) renderAdminPage();
   });
   document.getElementById('logoutBtn').addEventListener('click', doLogout);
+
+  // Sidebar: desktop collapse-to-rail + mobile off-canvas drawer.
+  var sidebar = document.getElementById('adminSidebar');
+  var backdrop = document.getElementById('sidebarBackdrop');
+  if (localStorage.getItem('salon_sidebar_collapsed') === '1') {
+    sidebar.classList.add('collapsed');
+    document.getElementById('sidebarCollapseIcon').innerHTML = icon('chevronRight', 16);
+  }
+  document.getElementById('sidebarCollapseBtn').addEventListener('click', function () {
+    var collapsed = sidebar.classList.toggle('collapsed');
+    localStorage.setItem('salon_sidebar_collapsed', collapsed ? '1' : '0');
+    document.getElementById('sidebarCollapseIcon').innerHTML = icon(collapsed ? 'chevronRight' : 'chevronLeft', 16);
+  });
+  function openMobileSidebar() { sidebar.classList.add('mobile-open'); backdrop.classList.add('show'); }
+  function closeMobileSidebar() { sidebar.classList.remove('mobile-open'); backdrop.classList.remove('show'); }
+  document.getElementById('hamburgerBtn').addEventListener('click', function () {
+    if (sidebar.classList.contains('mobile-open')) closeMobileSidebar(); else openMobileSidebar();
+  });
+  backdrop.addEventListener('click', closeMobileSidebar);
+  window.closeMobileSidebar = closeMobileSidebar;
 
   document.getElementById('reloadBtn').addEventListener('click', function () {
     var btn = this;
@@ -994,8 +1095,23 @@ function routeHash() {
 /* =====================================================================
  * PUBLIC SITE
  * ===================================================================*/
+/*
+ * Stale-while-revalidate: the public site's data rarely changes minute to
+ * minute, but every visit otherwise waits on a fresh Apps Script round-trip
+ * before anything renders. If a recent copy is sitting in localStorage,
+ * paint it immediately (so the site feels instant) and quietly refetch in
+ * the background — only the parts that are safe to redraw without
+ * duplicating listeners/options or disturbing an in-progress booking
+ * (branch selector, hero slider, and the wizard) are updated on that
+ * second pass.
+ */
+var PUBLIC_DATA_CACHE_KEY = 'salon_swr_publicData_v1';
+var PUBLIC_DATA_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 function loadPublicSite() {
-  api('getPublicData').then(function (data) {
+  var firstRenderDone = false;
+
+  function applyFull(data) {
     STATE.publicData = data;
     STATE.settings = data.settings;
     STATE.branches = data.branches;
@@ -1006,12 +1122,48 @@ function loadPublicSite() {
     renderServices(data.services, data.branches, '');
     renderStaff(data.staff, '');
     renderGallery(data.gallery || []);
+    renderVideos(data.videos || []);
     renderReviews(data.reviews);
     renderContact(data.settings);
     renderSocialRow(data.settings);
     setupWaFloat(data.settings);
     initBookingWizard();
+    firstRenderDone = true;
+  }
+
+  function revalidateInPlace(data) {
+    var branchFilter = document.getElementById('branchSelector') ? document.getElementById('branchSelector').value : '';
+    STATE.publicData = data;
+    STATE.settings = data.settings;
+    STATE.branches = data.branches;
+    applyTheme(data.settings);
+    renderBranding(data.settings);
+    renderServices(data.services, data.branches, branchFilter);
+    renderStaff(data.staff, branchFilter);
+    renderGallery(data.gallery || []);
+    renderVideos(data.videos || []);
+    renderReviews(data.reviews);
+    renderContact(data.settings);
+    renderSocialRow(data.settings);
+  }
+
+  var cached = null;
+  try {
+    var raw = localStorage.getItem(PUBLIC_DATA_CACHE_KEY);
+    if (raw) {
+      var parsed = JSON.parse(raw);
+      if (parsed && parsed.t && (Date.now() - parsed.t) < PUBLIC_DATA_CACHE_TTL_MS) cached = parsed.d;
+    }
+  } catch (e) { /* localStorage unavailable — fall through to a normal live load */ }
+
+  if (cached) applyFull(cached);
+
+  api('getPublicData').then(function (data) {
+    try { localStorage.setItem(PUBLIC_DATA_CACHE_KEY, JSON.stringify({ t: Date.now(), d: data })); } catch (e) {}
+    if (firstRenderDone) revalidateInPlace(data);
+    else applyFull(data);
   }).catch(function (err) {
+    if (firstRenderDone) return; // already showing (possibly stale) cached data — don't blow it away over a failed refresh
     var msg = '<p class="form-error">' + icon('alertTriangle', 15) + ' Could not load site data. Please refresh. (' + esc(err.message) + ')</p>';
     ['servicesList', 'staffList', 'galleryGrid', 'bookingWizardHost', 'reviewsList'].forEach(function (id) {
       var el = document.getElementById(id);
@@ -1121,6 +1273,39 @@ function openLightbox(i) {
   overlay.addEventListener('click', function (e) { if (e.target === overlay || e.target.closest('.lightbox-close')) overlay.remove(); });
 }
 
+/** Turns a pasted YouTube/Vimeo/direct-file URL into something embeddable. */
+function videoEmbedInfo_(url) {
+  url = String(url || '');
+  var yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{6,})/);
+  if (yt) return { kind: 'iframe', src: 'https://www.youtube.com/embed/' + yt[1] };
+  var vimeo = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if (vimeo) return { kind: 'iframe', src: 'https://player.vimeo.com/video/' + vimeo[1] };
+  return { kind: 'video', src: url };
+}
+
+function renderVideos(videos) {
+  var section = document.getElementById('videos-section');
+  var host = document.getElementById('videoGrid');
+  if (!videos || !videos.length) { section.style.display = 'none'; return; }
+  section.style.display = '';
+  if (!document.getElementById('watchNavLink')) {
+    var link = document.createElement('a');
+    link.href = '#videos-section'; link.id = 'watchNavLink'; link.textContent = 'Watch';
+    var nav = document.getElementById('pubNav');
+    var adminLink = document.getElementById('adminLoginLink');
+    if (nav && adminLink) nav.insertBefore(link, adminLink);
+  }
+  host.innerHTML = videos.map(function (v) {
+    var info = videoEmbedInfo_(v.VideoURL);
+    var player = info.kind === 'iframe'
+      ? '<iframe src="' + esc(info.src) + '" title="' + esc(v.Title || 'Video') + '" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>'
+      : '<video src="' + esc(info.src) + '" controls preload="metadata"></video>';
+    return '<div class="video-card"><div class="video-frame">' + player + '</div>' +
+      (v.Title || v.Caption ? '<div class="video-card-body">' + (v.Title ? '<b>' + esc(v.Title) + '</b>' : '') + (v.Caption ? '<span class="muted">' + esc(v.Caption) + '</span>' : '') + '</div>' : '') +
+      '</div>';
+  }).join('');
+}
+
 function renderReviews(reviews) {
   var el = document.getElementById('reviewsList');
   if (!reviews.length) { el.innerHTML = '<p class="muted">No reviews yet — be the first!</p>'; return; }
@@ -1163,6 +1348,31 @@ function renderContact(s) {
   document.getElementById('contactMap').src = s.MapEmbedURL || '';
   var hoursHtml = STATE.branches.map(function (b) { return '<div><b>' + esc(b.Name) + ':</b> ' + esc(b.OpeningHours) + '</div>'; }).join('');
   document.getElementById('contactHours').innerHTML = hoursHtml || 'Mon-Sat 8am-7pm';
+}
+
+function bindContactForm() {
+  var form = document.getElementById('contactMsgForm');
+  if (!form) return;
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var btn = document.getElementById('cmSubmitBtn');
+    var result = document.getElementById('cmResult');
+    result.innerHTML = '';
+    btn.disabled = true; btn.textContent = 'Sending…';
+    api('sendContactMessage', {
+      name: document.getElementById('cmName').value.trim(),
+      email: document.getElementById('cmEmail').value.trim(),
+      phone: document.getElementById('cmPhone').value.trim(),
+      message: document.getElementById('cmMessage').value.trim()
+    }).then(function () {
+      result.innerHTML = '<div class="form-success">Message sent — we\'ll get back to you soon.</div>';
+      form.reset();
+    }).catch(function (err) {
+      result.innerHTML = '<div class="form-error">' + esc(err.message) + '</div>';
+    }).finally(function () {
+      btn.disabled = false; btn.textContent = 'Send Message';
+    });
+  });
 }
 
 function renderSocialRow(s) {
@@ -1395,7 +1605,7 @@ var WIZ_STEPS = [];
 var WIZ_INDEX = 0;
 
 function resetBooking() {
-  BOOKING = { branchId: '', serviceId: '', staffId: '', category: '', date: '', time: '', name: '', phone: '', email: '', notes: '' };
+  BOOKING = { branchId: '', serviceId: '', staffId: '', category: '', date: '', time: '', name: '', phone: '', email: '', notes: '', paymentMethod: 'Cash', paymentProofURL: '' };
 }
 
 function initBookingWizard(prefill, startStepKey) {
@@ -1409,7 +1619,7 @@ function initBookingWizard(prefill, startStepKey) {
   } else {
     BOOKING.branchId = (data.branches[0] && data.branches[0].BranchID) || '';
   }
-  WIZ_STEPS.push('service', 'stylist', 'datetime', 'details', 'confirm');
+  WIZ_STEPS.push('service', 'stylist', 'datetime', 'details', 'payment', 'confirm');
   WIZ_INDEX = startStepKey ? Math.max(0, WIZ_STEPS.indexOf(startStepKey)) : 0;
   renderWizard();
 }
@@ -1426,7 +1636,7 @@ function quickBook(serviceId, branchId) {
 function renderWizard() {
   var section = document.getElementById('bookingWizardHost');
   var stepKey = WIZ_STEPS[WIZ_INDEX];
-  var titleMap = { branch: 'Choose Branch', service: 'Choose Service', stylist: 'Pick Stylist', datetime: 'Select Date & Time', details: 'Add Details', confirm: 'Confirm & Book' };
+  var titleMap = { branch: 'Choose Branch', service: 'Choose Service', stylist: 'Pick Stylist', datetime: 'Select Date & Time', details: 'Add Details', payment: 'Payment Method', confirm: 'Confirm & Book' };
   var progressDots = WIZ_STEPS.map(function (s, i) { return '<span class="dot ' + (i < WIZ_INDEX ? 'done' : (i === WIZ_INDEX ? 'active' : '')) + '"></span>'; }).join('');
   var canBack = WIZ_INDEX > 0;
   var isLast = WIZ_INDEX === WIZ_STEPS.length - 1;
@@ -1510,17 +1720,55 @@ function renderWizardStep(stepKey) {
       '<div class="form-row"><label>Email (optional)</label><input type="email" id="wizEmail" value="' + esc(BOOKING.email) + '"></div>' +
       '<div class="form-row"><label>Notes (optional)</label><textarea id="wizNotes" rows="2">' + esc(BOOKING.notes) + '</textarea></div>';
   }
+  if (stepKey === 'payment') {
+    var settings = data.settings || {};
+    var service0 = data.services.find(function (s) { return s.ServiceID === BOOKING.serviceId; });
+    var payOpts = [
+      { key: 'Cash', label: 'Cash at Front Desk', desc: 'Pay when you arrive for your appointment — nothing to do now.' },
+      { key: 'MTN MoMo', label: 'MTN Mobile Money', desc: 'Pay now via MTN MoMo, then upload your payment screenshot.' },
+      { key: 'Vodafone Cash', label: 'Vodafone Cash', desc: 'Pay now via Vodafone Cash, then upload your payment screenshot.' },
+      { key: 'Telecel Cash', label: 'Telecel Cash', desc: 'Pay now via Telecel Cash, then upload your payment screenshot.' },
+      { key: 'AirtelTigo Money', label: 'AirtelTigo Money', desc: 'Pay now via AirtelTigo Money, then upload your payment screenshot.' },
+      { key: 'Bank Transfer', label: 'Bank Transfer', desc: 'Pay now via bank transfer, then upload your payment screenshot.' }
+    ];
+    var momoNetworks = ['MTN MoMo', 'Vodafone Cash', 'Telecel Cash', 'AirtelTigo Money'];
+    var isMomo = momoNetworks.indexOf(BOOKING.paymentMethod) > -1;
+    var isBank = BOOKING.paymentMethod === 'Bank Transfer';
+    var optionsHtml = '<div class="pay-options">' + payOpts.map(function (o) {
+      var sel = BOOKING.paymentMethod === o.key;
+      return '<div class="pay-option' + (sel ? ' selected' : '') + '" data-pay="' + o.key + '"><div class="pay-option-radio"></div>' +
+        '<div><h4>' + o.label + '</h4><p class="muted">' + o.desc + '</p></div></div>';
+    }).join('') + '</div>';
+    var instructionsHtml = '';
+    if (isMomo) {
+      instructionsHtml = '<div class="pay-instructions"><p class="pay-amt">Amount: ' + money(service0 ? service0.Price : 0) + '</p>' +
+        '<p><b>Send to:</b> ' + esc(settings.MomoNumber || 'Contact us for the MoMo number') + '</p>' +
+        (settings.MomoName ? '<p><b>Name on account:</b> ' + esc(settings.MomoName) + '</p>' : '') + '</div>';
+    } else if (isBank) {
+      instructionsHtml = '<div class="pay-instructions"><p class="pay-amt">Amount: ' + money(service0 ? service0.Price : 0) + '</p>' +
+        (settings.BankName ? '<p><b>Bank:</b> ' + esc(settings.BankName) + '</p>' : '') +
+        (settings.BankAccountName ? '<p><b>Account Name:</b> ' + esc(settings.BankAccountName) + '</p>' : '') +
+        (settings.BankAccountNumber ? '<p><b>Account Number:</b> ' + esc(settings.BankAccountNumber) + '</p>' : '') + '</div>';
+    }
+    var proofHtml = (isMomo || isBank)
+      ? '<div class="form-row"><label>Upload Payment Screenshot *</label>' + payProofPickerHtml() +
+        '<p class="form-hint">After sending payment, upload a screenshot as proof — our team will verify it and mark your booking Paid.</p></div>'
+      : '';
+    return optionsHtml + instructionsHtml + proofHtml;
+  }
   if (stepKey === 'confirm') {
     var branch = data.branches.find(function (b) { return b.BranchID === BOOKING.branchId; });
     var service = data.services.find(function (s) { return s.ServiceID === BOOKING.serviceId; });
     var staffMember = data.staff.find(function (s) { return s.StaffID === BOOKING.staffId; });
     function row(label, val) { return '<div class="confirm-row"><span class="lbl">' + label + '</span><span>' + val + '</span></div>'; }
+    var payLabel = BOOKING.paymentMethod === 'Cash' ? 'Cash at Front Desk' : BOOKING.paymentMethod + (BOOKING.paymentProofURL ? ' — proof uploaded ✓' : '');
     return '<div class="confirm-card">' +
       row('Branch', esc(branch ? branch.Name : '')) + row('Service', esc(service ? service.Name : '')) +
       row('Stylist', esc(staffMember ? staffMember.Name : 'Any available')) +
       row('Date & Time', esc(formatNiceDate(BOOKING.date)) + ' at ' + esc(formatTime12(BOOKING.time))) +
       row('Duration', service ? service.DurationMinutes + ' min' : '') +
       row('Name', esc(BOOKING.name)) + row('Phone', esc(BOOKING.phone)) + (BOOKING.email ? row('Email', esc(BOOKING.email)) : '') +
+      row('Payment', esc(payLabel)) +
       row('Total', '<b>' + money(service ? service.Price : 0) + '</b>') +
       '</div><p class="muted">By confirming, you agree to receive an SMS/Email booking confirmation.</p>';
   }
@@ -1555,6 +1803,15 @@ function bindWizardStepEvents(stepKey) {
       });
     });
     if (BOOKING.date) loadTimeSlots();
+  } else if (stepKey === 'payment') {
+    body.querySelectorAll('[data-pay]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        if (BOOKING.paymentMethod !== el.dataset.pay) BOOKING.paymentProofURL = '';
+        BOOKING.paymentMethod = el.dataset.pay;
+        refreshWizardBody();
+      });
+    });
+    bindPayProofPicker();
   }
 }
 
@@ -1639,6 +1896,11 @@ function wizNext() {
     if (!BOOKING.name) return wizErr('Please enter your name.');
     if (!isValidGhanaPhoneClient(BOOKING.phone)) return wizErr('Please enter a valid Ghana phone number, e.g. 024XXXXXXX or +233XXXXXXXXX.');
   }
+  if (stepKey === 'payment') {
+    if (!BOOKING.paymentMethod) return wizErr('Please select a payment method.');
+    var proofRequired = BOOKING.paymentMethod !== 'Cash';
+    if (proofRequired && !BOOKING.paymentProofURL) return wizErr('Please upload a screenshot of your payment before continuing.');
+  }
   if (stepKey === 'confirm') { submitBooking(); return; }
   WIZ_INDEX++;
   renderWizard();
@@ -1652,7 +1914,8 @@ function submitBooking() {
   api('createAppointment', {
     branchId: BOOKING.branchId, serviceId: BOOKING.serviceId, staffId: BOOKING.staffId,
     date: BOOKING.date, timeSlot: BOOKING.time, name: BOOKING.name, phone: BOOKING.phone,
-    email: BOOKING.email, notes: BOOKING.notes
+    email: BOOKING.email, notes: BOOKING.notes,
+    paymentMethod: BOOKING.paymentMethod, paymentProofURL: BOOKING.paymentProofURL
   }).then(function (res) {
     renderBookingSuccess(res);
   }).catch(function (err) {
@@ -1800,6 +2063,40 @@ function resolvePhotoPicker(idPrefix, callback) {
   if (file) { uploadFileThen(file, function (url) { callback(url); }); }
   else callback(urlInput.value);
 }
+/** Public (no-auth) picker for a customer's payment-proof screenshot at booking time. */
+function payProofPickerHtml() {
+  var current = BOOKING.paymentProofURL;
+  return '<div class="photo-picker" id="payProofPicker">' +
+    '<div class="photo-preview" id="payProofPreview" style="' + (current ? "background-image:url('" + esc(current) + "')" : '') + '">' + (current ? '' : icon('image', 26)) + '</div>' +
+    '<div class="photo-picker-controls">' +
+    '<label class="btn btn-sm btn-outline photo-upload-btn">' + icon('upload', 14) + ' Upload Screenshot<input type="file" accept="image/*" id="payProofFile" style="display:none"></label>' +
+    '<span class="muted" id="payProofStatus">' + (current ? 'Uploaded ✓' : 'No file selected') + '</span>' +
+    '</div></div>';
+}
+function bindPayProofPicker() {
+  var fileInput = document.getElementById('payProofFile');
+  if (!fileInput) return;
+  fileInput.addEventListener('change', function () {
+    var file = fileInput.files[0];
+    if (!file) return;
+    var status = document.getElementById('payProofStatus');
+    var preview = document.getElementById('payProofPreview');
+    status.textContent = 'Uploading…';
+    var reader = new FileReader();
+    reader.onload = function () {
+      api('uploadPaymentProof', reader.result, file.name, file.type).then(function (res) {
+        BOOKING.paymentProofURL = res.url;
+        status.textContent = 'Uploaded ✓';
+        preview.style.backgroundImage = "url('" + res.url + "')";
+        preview.innerHTML = '';
+      }).catch(function (err) {
+        status.textContent = 'Upload failed — please try again.';
+        showError(err);
+      });
+    };
+    reader.readAsDataURL(file);
+  });
+}
 function uploadFileThen(file, callback) {
   var reader = new FileReader();
   reader.onload = function () {
@@ -1828,6 +2125,7 @@ var NAV_CONFIG = [
   { key: 'reviews', icon: 'star', label: 'Reviews', roles: ['Owner', 'Manager'] },
   { key: 'gallery', icon: 'copy', label: 'Gallery', roles: ['Owner', 'Manager'] },
   { key: 'heroSlides', icon: 'image', label: 'Hero Carousel', roles: ['Owner', 'Manager'] },
+  { key: 'videos', icon: 'play', label: 'Videos', roles: ['Owner', 'Manager'] },
   { key: 'settings', icon: 'droplet', label: 'Branding & Theme', roles: ['Owner'] },
   { key: 'sms', icon: 'smartphone', label: 'SMS', roles: ['Owner', 'Manager'] },
   { key: 'users', icon: 'lock', label: 'Users', roles: ['Owner'] },
@@ -1886,7 +2184,10 @@ function renderSidebar() {
     var div = document.createElement('div');
     div.className = 'nav-item' + (STATE.adminPage === n.key ? ' active' : '');
     div.innerHTML = icon(n.icon, 18) + '<span>' + n.label + '</span>';
-    div.addEventListener('click', function () { STATE.adminPage = n.key; renderSidebar(); renderAdminPage(); });
+    div.addEventListener('click', function () {
+      STATE.adminPage = n.key; renderSidebar(); renderAdminPage();
+      if (window.closeMobileSidebar) window.closeMobileSidebar();
+    });
     host.appendChild(div);
   });
 }
@@ -1900,7 +2201,7 @@ function renderAdminPage() {
     overview: renderOverview, appointments: renderAppointments, slots: renderSlotsAdmin, pos: renderPOS, customers: renderCustomers,
     services: renderServicesAdmin, staff: renderStaffAdmin, inventory: renderInventory, branches: renderBranchesAdmin,
     expenses: renderExpenses, reports: renderReports, reviews: renderReviewsAdmin, gallery: renderGalleryAdmin,
-    heroSlides: renderHeroAdmin, settings: renderSettingsAdmin, sms: renderSmsAdmin, users: renderUsersAdmin,
+    heroSlides: renderHeroAdmin, videos: renderVideosAdmin, settings: renderSettingsAdmin, sms: renderSmsAdmin, users: renderUsersAdmin,
     account: renderAccount, about: renderAbout
   };
   (renderers[STATE.adminPage] || function () {})(content);
@@ -2031,9 +2332,9 @@ function loadAppointmentsTable() {
 }
 
 function renderAppointmentsTable(host, rows) {
-  host.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Ref</th><th>Date</th><th>Time</th><th>Customer</th><th>Phone</th><th>Service</th><th>Staff</th><th>Status</th><th>Actions</th></tr></thead><tbody>' +
+  host.innerHTML = '<div class="table-wrap"><table><thead><tr><th>Ref</th><th>Date</th><th>Time</th><th>Customer</th><th>Phone</th><th>Service</th><th>Staff</th><th>Status</th><th>Payment</th><th>Actions</th></tr></thead><tbody>' +
     rows.map(function (a) {
-      return '<tr><td>' + esc(a.Reference) + '</td><td>' + esc(a.Date) + '</td><td>' + esc(a.TimeSlot) + '</td><td>' + esc(a.CustomerName) + '</td><td>' + esc(a.CustomerPhone) + '</td><td>' + esc(a.ServiceName) + ' (' + money(a.ServicePrice) + ')</td><td>' + esc(a.StaffName) + '</td><td>' + statusBadge(a.Status) + '</td>' +
+      return '<tr><td>' + esc(a.Reference) + '</td><td>' + esc(a.Date) + '</td><td>' + esc(a.TimeSlot) + '</td><td>' + esc(a.CustomerName) + '</td><td>' + esc(a.CustomerPhone) + '</td><td>' + esc(a.ServiceName) + ' (' + money(a.ServicePrice) + ')</td><td>' + esc(a.StaffName) + '</td><td>' + statusBadge(a.Status) + '</td><td>' + paymentInfoHtml_(a) + '</td>' +
         '<td class="row-actions">' + apptActionButtons_(a) + '</td></tr>';
     }).join('') + '</tbody></table></div>';
 }
@@ -2042,7 +2343,24 @@ function apptActionButtons_(a) {
   return (a.Status !== 'Confirmed' && a.Status !== 'Completed' ? '<button class="btn btn-sm" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'Confirmed\')">Confirm</button>' : '') +
     (a.Status !== 'Completed' ? '<button class="btn btn-sm btn-accent" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'Completed\')">Complete</button>' : '') +
     (a.Status !== 'Cancelled' && a.Status !== 'Completed' ? '<button class="btn btn-sm btn-outline" onclick="openRescheduleModal(\'' + a.AppointmentID + '\',\'' + a.Date + '\',\'' + a.TimeSlot + '\')">Reschedule</button><button class="btn btn-sm btn-danger" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'Cancelled\')">Cancel</button>' : '') +
-    (a.Status !== 'Completed' && a.Status !== 'Cancelled' ? '<button class="btn btn-sm btn-outline" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'No-show\')">No-show</button>' : '');
+    (a.Status !== 'Completed' && a.Status !== 'Cancelled' ? '<button class="btn btn-sm btn-outline" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'No-show\')">No-show</button>' : '') +
+    (a.PaymentStatus === 'Pending Verification' ? '<button class="btn btn-sm btn-accent" onclick="verifyApptPayment(\'' + a.AppointmentID + '\')">' + icon('check', 13) + ' Verify Payment</button>' : '');
+}
+
+/** Payment method + status + (if uploaded) a link to the customer's proof screenshot, for the Appointments table/Kanban. */
+function paymentInfoHtml_(a) {
+  var status = a.PaymentStatus || 'Pay at Shop';
+  var cls = status === 'Paid' ? 'badge-completed' : status === 'Pending Verification' ? 'badge-pending' : status === 'Awaiting Payment' ? 'badge-cancelled' : 'badge-confirmed';
+  return '<div class="muted" style="font-size:.8rem;">' + esc(a.PaymentMethod || 'Cash') + '</div>' +
+    '<span class="badge ' + cls + '">' + esc(status) + '</span>' +
+    (a.PaymentProofURL ? '<br><a href="' + esc(a.PaymentProofURL) + '" target="_blank" rel="noopener" style="font-size:.78rem;">' + icon('image', 12) + ' View Proof</a>' : '');
+}
+
+function verifyApptPayment(id) {
+  api('verifyAppointmentPayment', STATE.token, id).then(function () {
+    toast('Payment marked as verified', 'success');
+    loadAppointmentsTable();
+  }).catch(showError);
 }
 
 /** Kanban board grouped by status, with native HTML5 drag-and-drop to change status. */
@@ -2055,6 +2373,7 @@ function renderAppointmentsKanban(host, rows) {
         return '<div class="kanban-card" draggable="true" data-id="' + a.AppointmentID + '">' +
           '<b>' + esc(a.CustomerName) + '</b><div class="muted">' + esc(a.ServiceName) + ' &middot; ' + esc(a.StaffName) + '</div>' +
           '<div class="muted">' + esc(a.Date) + ' ' + esc(a.TimeSlot) + '</div><div class="muted">' + esc(a.Reference) + '</div>' +
+          '<div style="margin-top:4px;">' + paymentInfoHtml_(a) + '</div>' +
           '<div class="row-actions">' + apptActionButtons_(a) + '</div>' +
           '</div>';
       }).join('') : '<div class="kanban-empty">None</div>') +
@@ -2826,6 +3145,42 @@ function deleteSlideRow(id) {
   api('deleteHeroSlide', STATE.token, id).then(function () { toast('Deleted', 'success'); loadSlidesTable(); }).catch(showError);
 }
 
+/* ---------- VIDEOS ---------- */
+function renderVideosAdmin(content) {
+  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Videos</h3><button class="btn btn-sm" onclick="openVideoModal()">' + icon('plus', 14) + ' Add Video</button></div>' +
+    '<p class="muted">Paste a YouTube, Vimeo, or direct video (.mp4) URL — it plays embedded on your website automatically. No large file upload needed.</p>' +
+    '<div id="videoTableHost"></div></div>';
+  loadVideosTable();
+}
+function loadVideosTable() {
+  api('getVideos', STATE.token).then(function (rows) {
+    document.getElementById('videoTableHost').innerHTML = renderTable(['Title', 'URL', 'Order', 'Active', 'Actions'], rows.map(function (v) {
+      return [esc(v.Title || '(untitled)'), '<a href="' + esc(v.VideoURL) + '" target="_blank" rel="noopener" style="word-break:break-all;">' + esc(v.VideoURL) + '</a>', v.SortOrder, v.Active,
+        '<div class="row-actions"><button class="btn btn-sm btn-outline" onclick=\'openVideoModal(' + JSON.stringify(v).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button> <button class="btn btn-sm btn-danger" onclick="deleteVideoRow(\'' + v.VideoID + '\')">' + icon('trash', 13) + '</button></div>'];
+    }));
+  }).catch(function (err) { document.getElementById('videoTableHost').innerHTML = errorPanel(err); });
+}
+function openVideoModal(v) {
+  v = v || {};
+  var html = '<div class="field-grid">' +
+    '<div style="grid-column:1/-1"><label>Video URL (YouTube, Vimeo, or direct .mp4 link)</label><input id="vidUrl" value="' + esc(v.VideoURL || '') + '" placeholder="https://youtube.com/watch?v=…"></div>' +
+    '<div><label>Title</label><input id="vidTitle" value="' + esc(v.Title || '') + '"></div>' +
+    '<div><label>Sort Order</label><input type="number" id="vidOrder" value="' + (v.SortOrder || 1) + '"></div>' +
+    '<div style="grid-column:1/-1"><label>Caption</label><input id="vidCaption" value="' + esc(v.Caption || '') + '"></div>' +
+    '<div><label>Active</label><select id="vidActive">' + ['Y', 'N'].map(function (a) { return '<option' + (v.Active === a ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select></div>' +
+    '</div>';
+  openModal(v.VideoID ? 'Edit Video' : 'Add Video', html, function () {
+    api('saveVideo', STATE.token, {
+      VideoID: v.VideoID || '', VideoURL: document.getElementById('vidUrl').value, Title: document.getElementById('vidTitle').value,
+      Caption: document.getElementById('vidCaption').value, SortOrder: document.getElementById('vidOrder').value, Active: document.getElementById('vidActive').value
+    }).then(function () { toast('Video saved', 'success'); closeModal(); loadVideosTable(); }).catch(showError);
+  }, 'Save');
+}
+function deleteVideoRow(id) {
+  if (!confirm('Delete this video?')) return;
+  api('deleteVideo', STATE.token, id).then(function () { toast('Deleted', 'success'); loadVideosTable(); }).catch(showError);
+}
+
 /* ---------- SETTINGS / BRANDING / THEME ---------- */
 var SETTINGS_TABS = [
   { key: 'branding', label: 'Branding', icon: 'droplet' },
@@ -2859,6 +3214,7 @@ function renderSettingsAdmin(content) {
       colorField('Accent Color', 'stAccentColor', s.AccentColor) +
       colorField('Background Color', 'stBackgroundColor', s.BackgroundColor) +
       colorField('Text Color', 'stTextColor', s.TextColor) +
+      fontField(s.FontFamily) +
       '</div><button type="button" class="btn btn-sm btn-outline" style="margin-top:10px" onclick="previewTheme()">Preview Theme</button></div></div>' +
 
       '<div class="settings-panel hidden" data-panel="social"><div class="panel"><div class="field-grid">' +
@@ -2883,6 +3239,12 @@ function renderSettingsAdmin(content) {
       field('Tax Rate (%)', 'stTaxRatePercent', s.TaxRatePercent) +
       field('Loyalty Points per GH₵1 spent', 'stLoyaltyPointsPerCedi', s.LoyaltyPointsPerCedi) +
       field('Points needed for GH₵1 discount', 'stLoyaltyRedeemRate', s.LoyaltyRedeemRate) +
+      '</div><h4 style="margin:20px 0 4px;">Pay-at-Booking Details</h4><p class="muted" style="margin-bottom:12px;">Shown to customers at checkout when they choose Mobile Money or Bank Transfer, so they know where to send payment before uploading their screenshot.</p><div class="field-grid">' +
+      field('MTN/Vodafone/Telecel/AirtelTigo Number', 'stMomoNumber', s.MomoNumber) +
+      field('Name on Mobile Money Account', 'stMomoName', s.MomoName) +
+      field('Bank Name', 'stBankName', s.BankName) +
+      field('Bank Account Name', 'stBankAccountName', s.BankAccountName) +
+      field('Bank Account Number', 'stBankAccountNumber', s.BankAccountNumber) +
       '</div></div></div>' +
 
       '<div class="settings-panel hidden" data-panel="sms"><div class="panel"><div class="field-grid">' +
@@ -2911,6 +3273,7 @@ function renderSettingsAdmin(content) {
       });
     });
     bindPhotoPicker('stLogo');
+    bindFontPresetField();
     renderQrCard(s);
   }).catch(function (err) { content.innerHTML = errorPanel(err); });
 }
@@ -2944,6 +3307,34 @@ function printQrCard() {
 function field(label, id, val) {
   return '<div><label>' + label + '</label><input id="' + id + '" value="' + esc(val || '') + '"></div>';
 }
+var FONT_PRESETS = {
+  'System Default': "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+  'Classic Serif': "Georgia, 'Times New Roman', serif",
+  'Modern Sans': "Verdana, Geneva, Tahoma, sans-serif",
+  'Elegant Serif': "Garamond, 'Palatino Linotype', 'Book Antiqua', Palatino, serif",
+  'Rounded Sans': "Avenir, 'Trebuchet MS', sans-serif",
+  'Technical Mono': "'Courier New', Courier, monospace"
+};
+function fontField(currentValue) {
+  var current = currentValue || FONT_PRESETS['System Default'];
+  var presetName = Object.keys(FONT_PRESETS).find(function (k) { return FONT_PRESETS[k] === current; });
+  var opts = Object.keys(FONT_PRESETS);
+  if (!presetName) { presetName = 'Custom (from theme)'; opts = opts.concat(presetName); }
+  return '<div style="grid-column:1/-1"><label>Site Font</label><select id="stFontPreset">' +
+    opts.map(function (o) { return '<option value="' + esc(o) + '"' + (o === presetName ? ' selected' : '') + '>' + o + '</option>'; }).join('') +
+    '</select><div id="stFontPreview" style="margin-top:8px;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:1rem;font-family:' + esc(current) + ';">The quick brown fox jumps over the lazy dog — 0123456789</div>' +
+    '<input type="hidden" id="stFontFamily" value="' + esc(current) + '"></div>';
+}
+function bindFontPresetField() {
+  var sel = document.getElementById('stFontPreset');
+  if (!sel) return;
+  sel.addEventListener('change', function () {
+    var stack = FONT_PRESETS[sel.value];
+    if (!stack) return; // "Custom (from theme)" — leave the stored value untouched
+    document.getElementById('stFontFamily').value = stack;
+    document.getElementById('stFontPreview').style.fontFamily = stack;
+  });
+}
 function colorField(label, id, val) {
   return '<div><label>' + label + '</label><div class="color-field"><input type="color" id="' + id + '" value="' + (val || '#000000') + '"><span>' + esc(val || '') + '</span></div></div>';
 }
@@ -2954,7 +3345,7 @@ function previewTheme() {
   applyTheme({
     PrimaryColor: document.getElementById('stPrimaryColor').value, SecondaryColor: document.getElementById('stSecondaryColor').value,
     AccentColor: document.getElementById('stAccentColor').value, BackgroundColor: document.getElementById('stBackgroundColor').value,
-    TextColor: document.getElementById('stTextColor').value, FontFamily: STATE.settings.FontFamily
+    TextColor: document.getElementById('stTextColor').value, FontFamily: document.getElementById('stFontFamily').value
   });
   toast('Preview applied — click "Save All Settings" to make it permanent', 'success');
 }
@@ -2970,11 +3361,14 @@ function saveAllSettings() {
       SocialYoutube: document.getElementById('stSocialYoutube').value,
       PrimaryColor: document.getElementById('stPrimaryColor').value, SecondaryColor: document.getElementById('stSecondaryColor').value,
       AccentColor: document.getElementById('stAccentColor').value, BackgroundColor: document.getElementById('stBackgroundColor').value,
-      TextColor: document.getElementById('stTextColor').value,
+      TextColor: document.getElementById('stTextColor').value, FontFamily: document.getElementById('stFontFamily').value,
       BookingStartHour: document.getElementById('stBookingStartHour').value, BookingEndHour: document.getElementById('stBookingEndHour').value,
       SlotIntervalMinutes: document.getElementById('stSlotIntervalMinutes').value,
       TaxRatePercent: document.getElementById('stTaxRatePercent').value, LoyaltyPointsPerCedi: document.getElementById('stLoyaltyPointsPerCedi').value,
       LoyaltyRedeemRate: document.getElementById('stLoyaltyRedeemRate').value,
+      MomoNumber: document.getElementById('stMomoNumber').value, MomoName: document.getElementById('stMomoName').value,
+      BankName: document.getElementById('stBankName').value, BankAccountName: document.getElementById('stBankAccountName').value,
+      BankAccountNumber: document.getElementById('stBankAccountNumber').value,
       SmsProvider: document.getElementById('stSmsProvider').value, SmsSenderId: document.getElementById('stSmsSenderId').value,
       SmsApiKey: document.getElementById('stSmsApiKey').value, HubtelClientId: document.getElementById('stHubtelClientId').value,
       HubtelClientSecret: document.getElementById('stHubtelClientSecret').value
