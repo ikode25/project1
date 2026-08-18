@@ -120,10 +120,82 @@ var DEFAULT_SETTINGS = {
   // switcher/step UI everywhere and treats the single existing Branches
   // row as just that shop's info (name/location/phone/hours), not a list
   // to manage. Not every barbershop has multiple locations.
-  HasBranches: 'Y'
+  HasBranches: 'Y',
+  // Per-weekday opening hours (JSON), the single source of truth for both
+  // what's shown to customers and which time slots the booking wizard
+  // offers on a given date. Keys are the 3-letter weekday abbreviations
+  // used everywhere else in this file (Staff.WorkDays, Utilities'
+  // 'EEE' format). Sunday defaults closed; every other day 9am-6pm.
+  WeeklyHours: JSON.stringify({
+    Sun: { open: false, is24: false, start: '09:00', end: '18:00' },
+    Mon: { open: true, is24: false, start: '09:00', end: '18:00' },
+    Tue: { open: true, is24: false, start: '09:00', end: '18:00' },
+    Wed: { open: true, is24: false, start: '09:00', end: '18:00' },
+    Thu: { open: true, is24: false, start: '09:00', end: '18:00' },
+    Fri: { open: true, is24: false, start: '09:00', end: '18:00' },
+    Sat: { open: true, is24: false, start: '09:00', end: '18:00' }
+  })
 };
 
 var PAYMENT_METHODS = ['Cash', 'MTN MoMo', 'Vodafone Cash', 'Telecel Cash', 'AirtelTigo Money', 'Bank Transfer'];
+var WEEKDAY_KEYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** Parses Settings.WeeklyHours, falling back to the legacy flat BookingStartHour/BookingEndHour (every day open) if it's missing or malformed. */
+function parseWeeklyHours_(settings) {
+  try {
+    var parsed = JSON.parse(settings.WeeklyHours);
+    if (parsed && typeof parsed === 'object') return parsed;
+  } catch (e) { /* fall through to legacy default below */ }
+  var startH = Number(settings.BookingStartHour) || 9;
+  var endH = Number(settings.BookingEndHour) || 18;
+  var start = (startH < 10 ? '0' : '') + startH + ':00';
+  var end = (endH < 10 ? '0' : '') + endH + ':00';
+  var fallback = {};
+  WEEKDAY_KEYS.forEach(function (d) { fallback[d] = { open: true, is24: false, start: start, end: end }; });
+  return fallback;
+}
+
+/** Converts a WeeklyHours day entry into { open, startMin, endMin } (minutes since midnight), for slot-generation math. */
+function dayWindowMinutes_(dayEntry) {
+  if (!dayEntry || !dayEntry.open) return { open: false, startMin: 0, endMin: 0 };
+  if (dayEntry.is24) return { open: true, startMin: 0, endMin: 24 * 60 };
+  var parts1 = String(dayEntry.start || '09:00').split(':');
+  var parts2 = String(dayEntry.end || '18:00').split(':');
+  var startMin = (parseInt(parts1[0], 10) || 0) * 60 + (parseInt(parts1[1], 10) || 0);
+  var endMin = (parseInt(parts2[0], 10) || 0) * 60 + (parseInt(parts2[1], 10) || 0);
+  if (endMin <= startMin) endMin = startMin; // malformed — treat as a zero-length window rather than wrapping past midnight
+  return { open: true, startMin: startMin, endMin: endMin };
+}
+
+/** Friendly one-line label for a single day's hours, e.g. "9:00 AM – 6:00 PM", "Open 24 hours", or "Closed". */
+function formatDayHoursLabel_(dayEntry) {
+  if (!dayEntry || !dayEntry.open) return 'Closed';
+  if (dayEntry.is24) return 'Open 24 hours';
+  return formatHourMinute12_(dayEntry.start) + ' – ' + formatHourMinute12_(dayEntry.end);
+}
+function formatHourMinute12_(hhmm) {
+  var parts = String(hhmm || '00:00').split(':');
+  var h = parseInt(parts[0], 10) || 0, m = parts[1] || '00';
+  var ampm = h >= 12 ? 'PM' : 'AM';
+  var h12 = h % 12; if (h12 === 0) h12 = 12;
+  return h12 + ':' + m + ' ' + ampm;
+}
+
+/** Whether the shop is open right now (Africa/Accra time) plus today's hours label, for the public site and every admin dashboard. */
+function computeShopStatus_(settings) {
+  var weeklyHours = parseWeeklyHours_(settings);
+  var now = new Date();
+  var weekday = Utilities.formatDate(now, TIMEZONE, 'EEE');
+  var nowMin = Number(Utilities.formatDate(now, TIMEZONE, 'H')) * 60 + Number(Utilities.formatDate(now, TIMEZONE, 'm'));
+  var today = weeklyHours[weekday];
+  var window = dayWindowMinutes_(today);
+  var open = window.open && nowMin >= window.startMin && nowMin < window.endMin;
+  return {
+    open: open,
+    todayLabel: formatDayHoursLabel_(today),
+    weekLabels: WEEKDAY_KEYS.map(function (d) { return { day: d, label: formatDayHoursLabel_(weeklyHours[d]) }; })
+  };
+}
 
 /* ============================================================================
  * 2. WEB APP ENTRY POINT
@@ -687,7 +759,8 @@ function getPublicData() {
     heroSlides: heroSlides.map(stripRow_),
     gallery: gallery.map(stripRow_),
     videos: videos.map(stripRow_),
-    reviews: reviews
+    reviews: reviews,
+    shopStatus: computeShopStatus_(settings)
   };
 }
 
@@ -810,24 +883,27 @@ function submitReview(data) {
 function getAvailableSlots(branchId, staffId, date) {
   if (!branchId || !date) return { slots: [], dayAvailable: true };
   var settings = getSettingsMap_();
-  var startHour = Number(settings.BookingStartHour) || 9;
-  var endHour = Number(settings.BookingEndHour) || 18;
   var interval = Number(settings.SlotIntervalMinutes) || 30;
+  var weekday = Utilities.formatDate(new Date(date + 'T00:00:00'), TIMEZONE, 'EEE');
+  var window = dayWindowMinutes_(parseWeeklyHours_(settings)[weekday]);
 
   var branchStaff = readAll_('Staff').filter(function (s) {
     return s.BranchID === branchId && String(s.Active).toUpperCase() === 'Y';
   });
-  var weekday = Utilities.formatDate(new Date(date + 'T00:00:00'), TIMEZONE, 'EEE');
 
-  var dayAvailable = true;
+  // The shop's own weekly hours gate the day first — no staff schedule can
+  // open a day the shop itself is closed on.
+  var dayAvailable = window.open;
   var candidateStaff = branchStaff;
-  if (staffId) {
-    var chosen = branchStaff.find(function (s) { return s.StaffID === staffId; });
-    if (!chosen) return { slots: [], dayAvailable: false };
-    dayAvailable = worksOnDay_(chosen, weekday);
-    candidateStaff = [chosen];
-  } else {
-    dayAvailable = branchStaff.some(function (s) { return worksOnDay_(s, weekday); });
+  if (dayAvailable) {
+    if (staffId) {
+      var chosen = branchStaff.find(function (s) { return s.StaffID === staffId; });
+      if (!chosen) return { slots: [], dayAvailable: false };
+      dayAvailable = worksOnDay_(chosen, weekday);
+      candidateStaff = [chosen];
+    } else {
+      dayAvailable = branchStaff.some(function (s) { return worksOnDay_(s, weekday); });
+    }
   }
 
   var existing = readAll_('Appointments').filter(function (a) {
@@ -838,14 +914,16 @@ function getAvailableSlots(branchId, staffId, date) {
   blocked.forEach(function (b) { blockedTimes[b.TimeSlot] = true; });
 
   var slots = [];
-  for (var mins = startHour * 60; mins < endHour * 60; mins += interval) {
-    var h = Math.floor(mins / 60), m = mins % 60;
-    var label = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
-    var available = dayAvailable && !blockedTimes[label] && candidateStaff.some(function (s) {
-      if (!worksOnDay_(s, weekday)) return false;
-      return !existing.some(function (a) { return a.StaffID === s.StaffID && a.TimeSlot === label; });
-    });
-    slots.push({ time: label, available: available, blocked: !!blockedTimes[label] });
+  if (window.open) {
+    for (var mins = window.startMin; mins < window.endMin; mins += interval) {
+      var h = Math.floor(mins / 60), m = mins % 60;
+      var label = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+      var available = dayAvailable && !blockedTimes[label] && candidateStaff.some(function (s) {
+        if (!worksOnDay_(s, weekday)) return false;
+        return !existing.some(function (a) { return a.StaffID === s.StaffID && a.TimeSlot === label; });
+      });
+      slots.push({ time: label, available: available, blocked: !!blockedTimes[label] });
+    }
   }
   return { slots: slots, dayAvailable: dayAvailable };
 }
@@ -856,9 +934,9 @@ function getAvailableSlots(branchId, staffId, date) {
 function getSlotsForAdmin(token, branchId, date) {
   requireAuth_(token);
   var settings = getSettingsMap_();
-  var startHour = Number(settings.BookingStartHour) || 9;
-  var endHour = Number(settings.BookingEndHour) || 18;
   var interval = Number(settings.SlotIntervalMinutes) || 30;
+  var weekday = Utilities.formatDate(new Date(date + 'T00:00:00'), TIMEZONE, 'EEE');
+  var window = dayWindowMinutes_(parseWeeklyHours_(settings)[weekday]);
   var blocked = readAll_('BlockedSlots').filter(function (b) { return b.BranchID === branchId && b.Date === date; });
   var blockedTimes = {};
   blocked.forEach(function (b) { blockedTimes[b.TimeSlot] = true; });
@@ -869,12 +947,14 @@ function getSlotsForAdmin(token, branchId, date) {
   existing.forEach(function (a) { bookedTimes[a.TimeSlot] = (bookedTimes[a.TimeSlot] || 0) + 1; });
 
   var slots = [];
-  for (var mins = startHour * 60; mins < endHour * 60; mins += interval) {
-    var h = Math.floor(mins / 60), m = mins % 60;
-    var label = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
-    slots.push({ time: label, blocked: !!blockedTimes[label], bookedCount: bookedTimes[label] || 0 });
+  if (window.open) {
+    for (var mins = window.startMin; mins < window.endMin; mins += interval) {
+      var h = Math.floor(mins / 60), m = mins % 60;
+      var label = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+      slots.push({ time: label, blocked: !!blockedTimes[label], bookedCount: bookedTimes[label] || 0 });
+    }
   }
-  return slots;
+  return { dayOpen: window.open, slots: slots };
 }
 
 /** Toggles a slot between blocked/open for every stylist at a branch on a given date. */
@@ -898,8 +978,9 @@ function worksOnDay_(staffMember, weekday) {
 
 function isSlotAvailable_(branchId, staffId, date, timeSlot) {
   var result = getAvailableSlots(branchId, staffId, date);
+  if (!result.dayAvailable) return false; // shop/staff closed that day — never valid, regardless of the specific time
   var slot = result.slots.find(function (s) { return s.time === timeSlot; });
-  return !slot || slot.available; // an off-grid custom time is not blocked
+  return !slot || slot.available; // an off-grid custom time within an open day is not blocked
 }
 
 /* ---------- Gallery (public showcase + admin management) ---------- */
