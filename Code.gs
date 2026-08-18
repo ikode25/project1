@@ -184,7 +184,6 @@ function addMonths_(date, months) {
 
 /** Whole-day difference between two dates (b - a), ignoring time of day. */
 function daysBetween_(a, b) {
-  var da = new Date(a.getFullYear ? a.getFullYear() : new Date(a).getFullYear(), 0, 0);
   var A = new Date(a); var B = new Date(b);
   var ms = Date.UTC(B.getFullYear(), B.getMonth(), B.getDate()) - Date.UTC(A.getFullYear(), A.getMonth(), A.getDate());
   return Math.round(ms / 86400000);

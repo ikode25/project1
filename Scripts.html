@@ -1085,14 +1085,52 @@ async function loadProperties() {
     });
   } catch (e) { toast(e.message, 'error'); }
 }
+// Shared multi-photo uploader for Property/Room modals: thumbnails, add, remove,
+// client-side downscale before upload (speed requirement — never full-res in transit).
+function photoUploaderHtml(existingCsv) {
+  return '<div class="field"><label>Photos</label>' +
+    '<div id="photo-thumbs" class="row" style="flex-wrap:wrap;gap:8px;"></div>' +
+    '<label class="btn btn-sm mt-2" style="cursor:pointer;display:inline-flex;">' + icon('camera', 16) + ' Add Photos' +
+    '<input type="file" accept="image/*" multiple id="photo-input" style="display:none;"></label>' +
+    '<input type="hidden" id="af-PhotoFileIds" value="' + esc(existingCsv || '') + '"></div>';
+}
+function wirePhotoUploader(existingCsv) {
+  var ids = (existingCsv || '').split(',').filter(Boolean);
+  function renderThumbs() {
+    qs('#photo-thumbs').innerHTML = ids.map(function (id) {
+      return '<div style="position:relative;"><img src="https://drive.google.com/thumbnail?id=' + id + '&sz=w150" style="width:64px;height:64px;object-fit:cover;border-radius:8px;">' +
+        '<button type="button" data-remove="' + id + '" class="icon-btn" style="position:absolute;top:-8px;right:-8px;width:20px;height:20px;background:var(--danger);color:#fff;">' + icon('close', 12) + '</button></div>';
+    }).join('');
+    qs('#af-PhotoFileIds').value = ids.join(',');
+    qsa('button[data-remove]', qs('#photo-thumbs')).forEach(function (b) {
+      b.addEventListener('click', function () { ids = ids.filter(function (x) { return x !== b.getAttribute('data-remove'); }); renderThumbs(); });
+    });
+  }
+  renderThumbs();
+  qs('#photo-input').addEventListener('change', async function (ev) {
+    var files = Array.prototype.slice.call(ev.target.files);
+    for (var i = 0; i < files.length; i++) {
+      try {
+        var dataUrl = await tfDownscaleImage(files[i], 1200, 0.8);
+        var res = await api('uploadFile', { kind: 'propertyPhoto', base64: dataUrl, mimeType: 'image/jpeg', filename: files[i].name });
+        ids.push(res.fileId);
+      } catch (e) { toast(e.message, 'error'); }
+    }
+    renderThumbs();
+  });
+}
+
 function openPropertyModal(property) {
   var body = '<form id="property-form">' + PROPERTY_FIELDS.map(function (f) { return adminFieldHtml(f, property ? property[f.key] : ''); }).join('') +
+    photoUploaderHtml(property ? property.PhotoFileIds : '') +
     '<button class="btn btn-primary btn-block" type="submit">Save Property</button></form>';
   openModal(property ? 'Edit Property' : 'Add Property', body);
+  wirePhotoUploader(property ? property.PhotoFileIds : '');
   qs('#property-form').addEventListener('submit', async function (ev) {
     ev.preventDefault();
     try {
       var data = adminCollect(PROPERTY_FIELDS);
+      data.PhotoFileIds = qs('#af-PhotoFileIds').value;
       if (property) data.ID = property.ID;
       await apiAuth('saveProperty', data);
       toast('Property saved.', 'success');
@@ -1158,13 +1196,16 @@ function openRoomModal(room, properties) {
   var propSelect = '<div class="field"><label>Property</label><select id="af-PropertyID">' +
     properties.map(function (p) { return '<option value="' + p.ID + '"' + (room && room.PropertyID === p.ID ? ' selected' : '') + '>' + esc(p.PropertyName) + '</option>'; }).join('') + '</select></div>';
   var body = '<form id="room-form">' + propSelect + ROOM_FIELDS.map(function (f) { return adminFieldHtml(f, room ? room[f.key] : ''); }).join('') +
+    photoUploaderHtml(room ? room.PhotoFileIds : '') +
     '<button class="btn btn-primary btn-block" type="submit">Save Room</button></form>';
   openModal(room ? 'Edit Room' : 'Add Room', body);
+  wirePhotoUploader(room ? room.PhotoFileIds : '');
   qs('#room-form').addEventListener('submit', async function (ev) {
     ev.preventDefault();
     try {
       var data = adminCollect(ROOM_FIELDS);
       data.PropertyID = qs('#af-PropertyID').value;
+      data.PhotoFileIds = qs('#af-PhotoFileIds').value;
       if (room) data.ID = room.ID;
       await apiAuth('saveRoom', data);
       toast('Room saved.', 'success');
