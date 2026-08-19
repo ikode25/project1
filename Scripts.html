@@ -2037,6 +2037,19 @@ async function loadHealth() {
 
 window.addEventListener('hashchange', onRouteChange);
 
+// index.html sets <base target="_top"> so full-page links can escape the iframe Apps
+// Script wraps this app in. That default also hijacks plain in-page <a href="#/...">
+// clicks — the browser sends them to the OUTER wrapper page instead of updating this
+// app's own hash, so the screen goes blank. Intercept every internal hash link here
+// and route it through navigate() ourselves instead of relying on default anchor
+// navigation, so it always affects THIS window regardless of the <base> target.
+document.addEventListener('click', function (ev) {
+  var a = ev.target.closest && ev.target.closest('a[href^="#/"]');
+  if (!a) return;
+  ev.preventDefault();
+  navigate(a.getAttribute('href'));
+});
+
 document.addEventListener('DOMContentLoaded', function () {
   applyTheme();
   if (!window.location.hash) window.location.hash = '#/';
