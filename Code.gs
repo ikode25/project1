@@ -2572,15 +2572,16 @@ function changeMyPassword(token, oldPassword, newPassword) {
  * username "admin" and that password. Change it again from Settings afterwards.
  */
 function resetDefaultAdminPassword() {
-  var RESET_PASSWORD = 'ChangeThisNow123'; // edit this line before running
+  var RESET_USERNAME = 'admin'; // edit if you want a different username
+  var RESET_PASSWORD = 'admin123'; // edit this line before running
   var users = readTable_(SHEETS.USERS, { skipCache: true });
   var admin = users.find(function (u) { return u.Role === 'SuperAdmin'; });
   if (!admin) throw new Error('No SuperAdmin account found — run setup() instead.');
   var salt = Utilities.getUuid();
-  updateById_(SHEETS.USERS, admin.ID, { PasswordHash: hashPassword_(RESET_PASSWORD, salt), Salt: salt, Active: 'Y' });
+  updateById_(SHEETS.USERS, admin.ID, { Email: RESET_USERNAME, PasswordHash: hashPassword_(RESET_PASSWORD, salt), Salt: salt, Active: 'Y' });
   logAudit_('SYSTEM', 'PASSWORD_RESET', 'User', admin.ID, 'Manual recovery via resetDefaultAdminPassword()');
-  Logger.log('Password reset for ' + admin.Email + '. Log in with that email and: ' + RESET_PASSWORD);
-  return 'Done. Email: ' + admin.Email;
+  Logger.log('Reset done. Log in with username: ' + RESET_USERNAME + '  password: ' + RESET_PASSWORD);
+  return 'Done. Username: ' + RESET_USERNAME;
 }
 
 function getSettingsAdmin(token) {
