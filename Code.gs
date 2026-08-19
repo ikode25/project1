@@ -45,7 +45,7 @@ var UPLOAD_FOLDER_NAME = 'SalonSystem_Uploads';
 // Bump this whenever a fix needs to force-run against an EXISTING spreadsheet
 // (e.g. a cell-formatting or data-repair migration) even though its sheet
 // headers already match SCHEMA and would otherwise skip setupSheets().
-var SETUP_VERSION = 3;
+var SETUP_VERSION = 4;
 
 // Column schema for every tab. Order matters — it defines the sheet column order.
 var SCHEMA = {
@@ -100,8 +100,6 @@ var DEFAULT_SETTINGS = {
   HubtelClientId: '',
   HubtelClientSecret: '',
   Currency: 'GH₵',
-  BookingStartHour: '9',
-  BookingEndHour: '18',
   SlotIntervalMinutes: '30',
   SocialFacebook: '',
   SocialInstagram: '',
@@ -130,32 +128,13 @@ var DEFAULT_SETTINGS = {
   // only actually shows if BOTH this list includes it AND its own
   // number/account details below are filled in — see paymentMethodDetailsFilled_().
   ActivePaymentMethods: 'Cash,MTN MoMo,Vodafone Cash,Telecel Cash,AirtelTigo Money,Bank Transfer',
-  // 'N' means "one shop, no separate branches" — hides the multi-branch
-  // switcher/step UI everywhere and treats the single existing Branches
-  // row as just that shop's info (name/location/phone/hours), not a list
-  // to manage. Not every barbershop has multiple locations.
-  HasBranches: 'Y',
   // Comma-separated list of service categories the Owner has defined — the
   // Services admin page picks from this instead of retyping a category
   // name (and risking "Haircut" vs "Haircuts" splitting the price list).
   ServiceCategories: 'Haircut,Shave,Braids,Manicure,Facial',
   // 'Y'/'N' toggles for optional public-site sections.
   ShowGreetingBanner: 'Y',
-  ShowTeamSection: 'Y',
-  // Per-weekday opening hours (JSON), the single source of truth for both
-  // what's shown to customers and which time slots the booking wizard
-  // offers on a given date. Keys are the 3-letter weekday abbreviations
-  // used everywhere else in this file (Staff.WorkDays, Utilities'
-  // 'EEE' format). Sunday defaults closed; every other day 9am-6pm.
-  WeeklyHours: JSON.stringify({
-    Sun: { open: false, is24: false, start: '09:00', end: '18:00' },
-    Mon: { open: true, is24: false, start: '09:00', end: '18:00' },
-    Tue: { open: true, is24: false, start: '09:00', end: '18:00' },
-    Wed: { open: true, is24: false, start: '09:00', end: '18:00' },
-    Thu: { open: true, is24: false, start: '09:00', end: '18:00' },
-    Fri: { open: true, is24: false, start: '09:00', end: '18:00' },
-    Sat: { open: true, is24: false, start: '09:00', end: '18:00' }
-  })
+  ShowTeamSection: 'Y'
 };
 
 var PAYMENT_METHODS = ['Cash', 'MTN MoMo', 'Vodafone Cash', 'Telecel Cash', 'AirtelTigo Money', 'Bank Transfer'];
@@ -179,15 +158,7 @@ function parseWeeklyHoursJson_(jsonStr, fallbackStart, fallbackEnd) {
   WEEKDAY_KEYS.forEach(function (d) { fallback[d] = { open: true, is24: false, start: fallbackStart || '09:00', end: fallbackEnd || '18:00' }; });
   return fallback;
 }
-/** Parses Settings.WeeklyHours — used in single-shop mode (HasBranches='N'), falling back to the legacy flat BookingStartHour/BookingEndHour if missing/malformed. */
-function parseWeeklyHours_(settings) {
-  var startH = Number(settings.BookingStartHour) || 9;
-  var endH = Number(settings.BookingEndHour) || 18;
-  var start = (startH < 10 ? '0' : '') + startH + ':00';
-  var end = (endH < 10 ? '0' : '') + endH + ':00';
-  return parseWeeklyHoursJson_(settings.WeeklyHours, start, end);
-}
-/** Parses one Branch row's own WeeklyHours — used in multi-branch mode, where each branch can run different hours. */
+/** Parses the shop's own WeeklyHours (the single Branches row) — the one source of truth for opening hours. */
 function parseBranchWeeklyHours_(branch) {
   return parseWeeklyHoursJson_(branch && branch.WeeklyHours, '09:00', '18:00');
 }
@@ -412,7 +383,53 @@ function setupSheets() {
   repairPhoneColumns_();
   repairTimeSlotColumns_();
   repairImageUrlColumns_();
+  mergeToSingleBranch_();
   return 'Setup complete';
+}
+
+/**
+ * One-time data repair: this app now runs for exactly one shop, so the
+ * Branches sheet should hold exactly one row — not a list an Owner adds
+ * to or deletes from. A spreadsheet from before this change (including
+ * the sample data, which used to seed two branches for demo purposes)
+ * can still have more than one. This collapses down to the first branch
+ * row, reassigning every other sheet's BranchID references that pointed
+ * at any of the removed branches over to the surviving one first — so no
+ * service, staff member, product, expense, appointment, sale, blocked
+ * slot, gallery photo, or user account is silently orphaned — and only
+ * then deletes the extra branch rows. Idempotent: a spreadsheet already
+ * down to one branch (or zero, before first seed) is left untouched.
+ */
+function mergeToSingleBranch_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var branchSheet = ss.getSheetByName('Branches');
+  if (!branchSheet) return;
+  var lastRow = branchSheet.getLastRow();
+  if (lastRow < 3) return; // 0 or 1 data row already — nothing to merge
+  var idCol = SCHEMA.Branches.indexOf('BranchID');
+  var rows = branchSheet.getRange(2, 1, lastRow - 1, SCHEMA.Branches.length).getValues();
+  var canonicalId = rows[0][idCol];
+  var extraIds = rows.slice(1).map(function (r) { return r[idCol]; });
+
+  ['Services', 'Staff', 'Products', 'Expenses', 'Appointments', 'Sales', 'BlockedSlots', 'Gallery', 'Users'].forEach(function (sheetName) {
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet) return;
+    var col = SCHEMA[sheetName].indexOf('BranchID') + 1;
+    if (!col) return;
+    var n = sheet.getLastRow();
+    if (n < 2) return;
+    var range = sheet.getRange(2, col, n - 1, 1);
+    var values = range.getValues();
+    var changed = false;
+    var fixed = values.map(function (row) {
+      if (extraIds.indexOf(row[0]) > -1) { changed = true; return [canonicalId]; }
+      return row;
+    });
+    if (changed) range.setValues(fixed);
+  });
+
+  // Bottom-up so deleting one row never shifts the index of the next one to delete.
+  for (var r = lastRow; r >= 3; r--) branchSheet.deleteRow(r);
 }
 
 /**
@@ -946,14 +963,11 @@ function getCurrentUser(token) {
 /** Single aggregated call the public site uses on load — keeps things light on mobile data. */
 function getPublicData() {
   var settings = getSettingsMap_();
-  var branches = readAll_('Branches');
-  // Single-shop mode: no matter how many branch rows still exist in the
-  // sheet (e.g. left over from before the Owner switched this off, or
-  // sample data), the public site and booking wizard only ever see the
-  // first one — never a branch picker. The Owner can still see/manage
-  // every row from the admin Branches/Shop Info page (getBranches is a
-  // separate, unfiltered call), so nothing is lost if they switch back.
-  if (settings.HasBranches === 'N' && branches.length > 1) branches = branches.slice(0, 1);
+  // This app runs for exactly one shop — the Branches sheet always holds
+  // exactly one row for it (mergeToSingleBranch_ guarantees that even for
+  // a spreadsheet that once had more). Defensive slice in case a row ever
+  // slips in some other way; there's never a branch picker to show either way.
+  var branches = readAll_('Branches').slice(0, 1);
   var services = readAll_('Services').filter(function (s) { return String(s.Active).toUpperCase() === 'Y'; });
   var staff = readAll_('Staff').filter(function (s) { return String(s.Active).toUpperCase() === 'Y'; });
   var heroSlides = readAll_('HeroSlides')
@@ -975,18 +989,7 @@ function getPublicData() {
     return o;
   });
 
-  // Single-shop mode has one global schedule (Settings → Booking). Multi-
-  // branch mode: each branch owns its hours, since a business with
-  // different locations can genuinely keep different hours at each one.
-  // The single top-level shopStatus badge only makes sense when there's
-  // exactly one branch to be unambiguous about; branchStatus always has
-  // one entry per branch for per-branch displays (branch cards, etc).
-  var branchStatus = branches.map(function (b) {
-    return { BranchID: b.BranchID, status: computeShopStatus_(parseBranchWeeklyHours_(b)) };
-  });
-  var shopStatus = settings.HasBranches === 'N'
-    ? computeShopStatus_(parseWeeklyHours_(settings))
-    : (branchStatus.length === 1 ? branchStatus[0].status : null);
+  var shopStatus = branches[0] ? computeShopStatus_(parseBranchWeeklyHours_(branches[0])) : null;
 
   if (settings.LogoURL) settings.LogoURL = imageUrlToDataUri_(settings.LogoURL);
 
@@ -999,8 +1002,7 @@ function getPublicData() {
     gallery: withImageDataUris_(gallery.map(stripRow_), 'ImageURL'),
     videos: videos.map(stripRow_),
     reviews: reviews,
-    shopStatus: shopStatus,
-    branchStatus: branchStatus
+    shopStatus: shopStatus
   };
 }
 
@@ -1115,14 +1117,8 @@ function submitReview(data) {
   return stripRow_(review);
 }
 
-/**
- * Single-shop mode (HasBranches='N') has one global weekly schedule set in
- * Settings → Booking. Multi-branch mode gives each branch its own —
- * different locations can genuinely keep different hours — so this picks
- * whichever is actually authoritative for a given branch right now.
- */
-function getEffectiveWeeklyHours_(settings, branchId) {
-  if (settings.HasBranches === 'N') return parseWeeklyHours_(settings);
+/** The shop's own weekly schedule (edited from the Shop Info page), for the one branch this app runs for. */
+function getEffectiveWeeklyHours_(branchId) {
   var branch = readAll_('Branches').find(function (b) { return b.BranchID === branchId; });
   return parseBranchWeeklyHours_(branch);
 }
@@ -1138,7 +1134,7 @@ function getAvailableSlots(branchId, staffId, date) {
   var settings = getSettingsMap_();
   var interval = Number(settings.SlotIntervalMinutes) || 30;
   var weekday = Utilities.formatDate(new Date(date + 'T00:00:00'), TIMEZONE, 'EEE');
-  var window = dayWindowMinutes_(getEffectiveWeeklyHours_(settings, branchId)[weekday]);
+  var window = dayWindowMinutes_(getEffectiveWeeklyHours_(branchId)[weekday]);
 
   var branchStaff = readAll_('Staff').filter(function (s) {
     return s.BranchID === branchId && String(s.Active).toUpperCase() === 'Y';
@@ -1196,7 +1192,7 @@ function getSlotsForAdmin(token, branchId, date) {
   var settings = getSettingsMap_();
   var interval = Number(settings.SlotIntervalMinutes) || 30;
   var weekday = Utilities.formatDate(new Date(date + 'T00:00:00'), TIMEZONE, 'EEE');
-  var window = dayWindowMinutes_(getEffectiveWeeklyHours_(settings, branchId)[weekday]);
+  var window = dayWindowMinutes_(getEffectiveWeeklyHours_(branchId)[weekday]);
   var blocked = readAll_('BlockedSlots').filter(function (b) { return b.BranchID === branchId && b.Date === date; });
   var blockedTimes = {};
   blocked.forEach(function (b) { blockedTimes[b.TimeSlot] = true; });
@@ -1298,29 +1294,31 @@ function deleteVideo(token, videoId) {
  * 7. BRANCHES / SERVICES / STAFF CRUD (admin)
  * ==========================================================================*/
 
-function getBranches(token) {
+/**
+ * This app runs for exactly one shop, so "Branches" is really just a single
+ * record — its name, location, phone, and working hours — not a list to
+ * add to or delete from. getShopInfo/saveShopInfo read and write that one
+ * row directly; there is no delete, because there must always be exactly
+ * one (mergeToSingleBranch_ guarantees that on setup, even for a
+ * spreadsheet that once had more than one branch).
+ */
+function getShopInfo(token) {
   requireAuth_(token);
-  return readAll_('Branches').map(stripRow_);
+  var branch = readAll_('Branches')[0];
+  return branch ? stripRow_(branch) : null;
 }
 
-function saveBranch(token, branch) {
+function saveShopInfo(token, info) {
   var user = requireAuth_(token);
   requireRole_(user, ['Owner']);
   // OpeningHours is never typed by hand — it's auto-derived from the
   // structured per-day WeeklyHours editor so there's only one place
   // (WeeklyHours) that can ever go out of sync with what's displayed.
-  if (branch.WeeklyHours) branch.OpeningHours = summarizeWeeklyHours_(parseBranchWeeklyHours_(branch));
-  if (branch.BranchID) {
-    return stripRow_(updateById_('Branches', 'BranchID', branch.BranchID, branch));
-  }
-  branch.BranchID = nextId_('Branches', 'BranchID');
-  return stripRow_(appendRow_('Branches', branch));
-}
-
-function deleteBranch(token, branchId) {
-  var user = requireAuth_(token);
-  requireRole_(user, ['Owner']);
-  return deleteById_('Branches', 'BranchID', branchId);
+  if (info.WeeklyHours) info.OpeningHours = summarizeWeeklyHours_(parseBranchWeeklyHours_(info));
+  var existing = readAll_('Branches')[0];
+  if (existing) return stripRow_(updateById_('Branches', 'BranchID', existing.BranchID, info));
+  info.BranchID = nextId_('Branches', 'BranchID');
+  return stripRow_(appendRow_('Branches', info));
 }
 
 function getServices(token, branchId) {

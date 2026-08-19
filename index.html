@@ -84,9 +84,6 @@
     50% { box-shadow: 0 0 0 5px rgba(28,124,60,0); }
   }
   .pub-greeting-strip { background: var(--clr-accent); color: #1a1a1a; padding: 8px 0; text-align: center; font-size: .85rem; font-weight: 600; }
-  .branch-status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
-  .branch-status-dot.open { background: #1c7c3c; }
-  .branch-status-dot.closed { background: #b32424; }
   .nav-right-group { display: flex; align-items: center; gap: 14px; }
   .pub-reload-btn {
     display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%;
@@ -426,7 +423,6 @@
   .admin-topbar { flex-shrink: 0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding: 20px 26px 16px; }
   .admin-topbar h2 { margin: 0; }
   .admin-topbar-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  select.branch-switch { padding: 8px 12px; border-radius: 8px; border: 1px solid #ccc; }
   #adminContent { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 0 26px 60px; }
 
   /* Icon-only topbar buttons (dark mode, refresh, notifications) — explicit
@@ -932,7 +928,6 @@
         </div>
         <div class="admin-topbar-actions">
           <span id="adminShopStatusBadge" class="shop-status-badge hidden"></span>
-          <select class="branch-switch hidden" id="ownerBranchSwitch"></select>
           <button class="icon-btn" id="reloadBtn" title="Refresh this page's data" aria-label="Refresh"></button>
           <div class="bell-wrap">
             <button class="icon-btn" id="bellBtn" title="New bookings" aria-label="Notifications"></button>
@@ -1033,7 +1028,6 @@ var STATE = {
   settings: null,
   branches: [],
   publicData: null,
-  currentBranchFilter: '',
   adminPage: 'overview',
   loadingCount: 0
 };
@@ -1564,17 +1558,8 @@ function renderContact(s, shopStatus) {
   document.getElementById('contactWaLink').href = 'https://wa.me/' + String(s.WhatsAppNumber).replace(/\D/g, '');
   document.getElementById('contactMap').src = s.MapEmbedURL || '';
 
-  var hasBranches = s.HasBranches !== 'N' && STATE.branches.length > 1;
   var hoursHtml;
-  if (hasBranches) {
-    var branchStatusMap = {};
-    (STATE.publicData && STATE.publicData.branchStatus || []).forEach(function (bs) { branchStatusMap[bs.BranchID] = bs.status; });
-    hoursHtml = STATE.branches.map(function (b) {
-      var bs = branchStatusMap[b.BranchID];
-      var dot = bs ? '<span class="branch-status-dot ' + (bs.open ? 'open' : 'closed') + '" title="' + (bs.open ? 'Open Now' : 'Closed Now') + '"></span>' : '';
-      return '<div>' + dot + '<b>' + esc(b.Name) + ':</b> ' + esc(b.OpeningHours) + '</div>';
-    }).join('');
-  } else if (shopStatus && shopStatus.weekLabels) {
+  if (shopStatus && shopStatus.weekLabels) {
     var todayDay = WEEKDAY_ORDER[new Date().getDay()];
     hoursHtml = shopStatus.weekLabels.map(function (w) {
       return '<div class="hours-row' + (w.day === todayDay ? ' today' : '') + '"><span>' + WEEKDAY_LABELS[w.day] + '</span><span>' + esc(w.label) + '</span></div>';
@@ -2416,7 +2401,7 @@ var NAV_CONFIG = [
   { key: 'services', icon: 'scissors', label: 'Services (POS Menu)', roles: ['Owner', 'Manager'], group: 'Catalog' },
   { key: 'staff', icon: 'user', label: 'Staff', roles: ['Owner', 'Manager'], group: 'Catalog' },
   { key: 'inventory', icon: 'box', label: 'Inventory', roles: ['Owner', 'Manager'], group: 'Catalog' },
-  { key: 'branches', icon: 'mapPin', label: 'Branches', roles: ['Owner'], group: 'Catalog' },
+  { key: 'branches', icon: 'mapPin', label: 'Shop Info', roles: ['Owner'], group: 'Catalog' },
   { key: 'expenses', icon: 'card', label: 'Income & Expenses', roles: ['Owner', 'Manager'], group: 'Finance' },
   { key: 'reports', icon: 'barChart', label: 'Reports', roles: ['Owner', 'Manager'], group: 'Finance' },
   { key: 'reviews', icon: 'star', label: 'Reviews', roles: ['Owner', 'Manager'], group: 'Marketing' },
@@ -2438,16 +2423,6 @@ function showAdminApp() {
   if (STATE.publicData) renderShopStatusBadge_('adminShopStatusBadge', STATE.publicData.shopStatus);
   renderAdminGreeting();
   if (!STATE.greetingInterval) STATE.greetingInterval = setInterval(renderAdminGreeting, 60000);
-
-  var branchSwitch = document.getElementById('ownerBranchSwitch');
-  var hasBranches = (STATE.settings && STATE.settings.HasBranches) !== 'N';
-  if (STATE.user.role === 'Owner' && hasBranches) {
-    branchSwitch.classList.remove('hidden');
-    branchSwitch.innerHTML = '<option value="">All Branches</option>' + STATE.branches.map(function (b) { return '<option value="' + b.BranchID + '">' + esc(b.Name) + '</option>'; }).join('');
-    branchSwitch.onchange = function () { STATE.currentBranchFilter = branchSwitch.value; renderAdminPage(); };
-  } else {
-    branchSwitch.classList.add('hidden');
-  }
 
   renderSidebar();
   renderAdminPage();
@@ -2495,11 +2470,9 @@ function renderSidebar() {
   var activeItem = items.find(function (n) { return n.key === STATE.adminPage; });
   if (activeItem && activeItem.group && !(activeItem.group in openState)) openState[activeItem.group] = true; // auto-open the group holding the current page
 
-  var hasBranches = !STATE.settings || STATE.settings.HasBranches !== 'N';
   function navItemHtml(n, sub) {
-    var label = (n.key === 'branches' && !hasBranches) ? 'Shop Info' : n.label;
     return '<div class="nav-item' + (sub ? ' nav-sub-item' : '') + (STATE.adminPage === n.key ? ' active' : '') + '" data-key="' + n.key + '">' +
-      icon(n.icon, 18) + '<span>' + esc(label) + '</span></div>';
+      icon(n.icon, 18) + '<span>' + esc(n.label) + '</span></div>';
   }
 
   var groups = {}; // name -> items, in first-seen order
@@ -2552,17 +2525,16 @@ function renderAdminPage() {
 }
 
 /**
- * The branch ID to scope the current admin page/action to. In single-shop
- * mode with exactly one branch on record, there is nothing to choose —
- * that one branch is always used, with no picker shown anywhere and no
- * "select a branch first" dead end (POS checkout, appointment creation,
- * etc. all go through this one function).
+ * The branch ID to scope the current admin page/action to. This app runs
+ * for exactly one shop, so there's never anything to choose — that one
+ * branch is always used, with no picker shown anywhere and no "select a
+ * branch first" dead end (POS checkout, appointment creation, etc. all go
+ * through this one function).
  */
 function branchArg() {
-  if (STATE.settings && STATE.settings.HasBranches === 'N' && STATE.branches.length === 1) return STATE.branches[0].BranchID;
-  return STATE.user.role === 'Owner' ? STATE.currentBranchFilter : STATE.user.branchId;
+  return STATE.branches[0] ? STATE.branches[0].BranchID : (STATE.user ? STATE.user.branchId : '');
 }
-/** Whether branch pickers should show at all — false once there's only one branch to pick from anyway (single-shop mode, or a business that just hasn't added a second branch yet). */
+/** Whether branch pickers should show at all — always false; this app runs for exactly one shop. */
 function showBranchPicker_() { return STATE.branches.length > 1; }
 /** A branch <select> field, or '' when there's only one branch (nothing to pick). */
 function branchSelectHtml(id, selectedId, label) {
@@ -3341,49 +3313,40 @@ function restockPrompt(id) {
 }
 
 /* ---------- BRANCHES ---------- */
+/**
+ * This app runs for exactly one shop, so "Shop Info" is a single direct
+ * edit form — name, location, phone, and working hours — not a list to
+ * add to or delete from.
+ */
 function renderBranchesAdmin(content) {
-  var hasBranches = !STATE.settings || STATE.settings.HasBranches !== 'N';
-  content.innerHTML = hasBranches
-    ? '<div class="panel"><div class="panel-head"><h3>Branches</h3><button class="btn btn-sm" onclick="openBranchModal()">' + icon('plus', 14) + ' Add Branch</button></div><div id="branchTableHost"></div></div>'
-    : '<div class="panel"><h3>Shop Info</h3><p class="muted">Your business is set to a single shop (change this in Settings → Booking if that ever changes). This is the name, location, phone, and hours shown to customers.</p><div id="branchTableHost"></div></div>';
-  loadBranchesTable();
+  content.innerHTML = '<div class="panel"><h3>Shop Info</h3><p class="muted">Your business name, location, phone, and working hours — shown to customers on the public site and used to generate the booking wizard\'s time slots.</p><div id="shopInfoHost"><p class="muted">Loading…</p></div></div>';
+  loadShopInfo();
 }
-function loadBranchesTable() {
-  var hasBranches = !STATE.settings || STATE.settings.HasBranches !== 'N';
-  api('getBranches', STATE.token).then(function (rows) {
-    STATE.branches = rows;
-    var host = document.getElementById('branchTableHost');
-    function draw() {
-      host.innerHTML = renderTable(['Name', 'Location', 'Phone', 'Hours', 'Actions'], rows.map(function (b) {
-        return [esc(b.Name), esc(b.Location), esc(b.Phone), esc(b.OpeningHours),
-          '<button class="btn btn-sm btn-outline" onclick=\'openBranchModal(' + JSON.stringify(b).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + ' Edit</button>' +
-          (hasBranches ? ' <button class="btn btn-sm btn-danger" onclick="deleteBranchRow(\'' + b.BranchID + '\')">' + icon('trash', 13) + '</button>' : '')];
-      }), 'branches');
-      bindTablePager(host, 'branches', draw);
-    }
-    draw();
-  }).catch(function (err) { document.getElementById('branchTableHost').innerHTML = errorPanel(err); });
-}
-function openBranchModal(b) {
-  b = b || {};
-  var html = '<div class="field-grid">' +
-    '<div><label>Name</label><input id="brName" value="' + esc(b.Name || '') + '"></div>' +
-    '<div><label>Location</label><input id="brLocation" value="' + esc(b.Location || '') + '"></div>' +
-    '<div><label>Phone</label><input id="brPhone" value="' + esc(b.Phone || '') + '"></div>' +
-    '</div>' +
-    '<h4 style="margin:18px 0 4px;">Working Hours</h4><p class="muted" style="margin-bottom:10px;">This branch\'s own hours — shown to customers and used to generate its booking time slots.</p>' +
-    weeklyHoursEditorHtml(parseWeeklyHoursClient_(b));
-  openModal(b.BranchID ? 'Edit Branch' : 'Add Branch', html, function () {
-    api('saveBranch', STATE.token, {
-      BranchID: b.BranchID || '', Name: document.getElementById('brName').value, Location: document.getElementById('brLocation').value,
-      Phone: document.getElementById('brPhone').value, WeeklyHours: collectWeeklyHours()
-    }).then(function () { toast('Branch saved', 'success'); closeModal(); loadBranchesTable(); }).catch(showError);
-  }, 'Save');
-  bindWeeklyHoursEditor();
-}
-function deleteBranchRow(id) {
-  if (!confirm('Delete this branch? This cannot be undone.')) return;
-  api('deleteBranch', STATE.token, id).then(function () { toast('Deleted', 'success'); loadBranchesTable(); }).catch(showError);
+function loadShopInfo() {
+  api('getShopInfo', STATE.token).then(function (b) {
+    b = b || {};
+    STATE.branches = b.BranchID ? [b] : [];
+    var host = document.getElementById('shopInfoHost');
+    host.innerHTML = '<div class="field-grid">' +
+      '<div><label>Name</label><input id="brName" value="' + esc(b.Name || '') + '"></div>' +
+      '<div><label>Location</label><input id="brLocation" value="' + esc(b.Location || '') + '"></div>' +
+      '<div><label>Phone</label><input id="brPhone" value="' + esc(b.Phone || '') + '"></div>' +
+      '</div>' +
+      '<h4 style="margin:20px 0 4px;">Working Hours</h4><p class="muted" style="margin-bottom:10px;">Controls the time slots offered in the booking wizard <b>and</b> what\'s shown to customers on the public site, including the live Open Now/Closed Now badge. Need to close one specific date (a holiday, a one-off closure)? Use <b>Manage Slots</b> in the sidebar instead.</p>' +
+      weeklyHoursEditorHtml(parseWeeklyHoursClient_(b)) +
+      '<button class="btn btn-accent" style="margin-top:16px;" id="shopInfoSaveBtn">' + icon('check', 14) + ' Save Shop Info</button>';
+    bindWeeklyHoursEditor();
+    document.getElementById('shopInfoSaveBtn').addEventListener('click', function () {
+      api('saveShopInfo', STATE.token, {
+        BranchID: b.BranchID || '', Name: document.getElementById('brName').value, Location: document.getElementById('brLocation').value,
+        Phone: document.getElementById('brPhone').value, WeeklyHours: collectWeeklyHours()
+      }).then(function (saved) {
+        STATE.branches = [saved];
+        if (STATE.publicData) STATE.publicData.branches = [saved];
+        toast('Shop info saved', 'success');
+      }).catch(showError);
+    });
+  }).catch(function (err) { document.getElementById('shopInfoHost').innerHTML = errorPanel(err); });
 }
 
 /* ---------- EXPENSES ---------- */
@@ -3817,19 +3780,8 @@ function renderSettingsAdmin(content) {
       '</div><p class="muted">Only the platforms you fill in appear as icons on your public site footer.</p></div></div>' +
 
       '<div class="settings-panel hidden" data-panel="booking"><div class="panel"><div class="field-grid">' +
-      '<div><label>Does your business have multiple branches/locations?</label><select id="stHasBranches">' +
-      '<option value="Y"' + (s.HasBranches !== 'N' ? ' selected' : '') + '>Yes — I manage multiple branches</option>' +
-      '<option value="N"' + (s.HasBranches === 'N' ? ' selected' : '') + '>No — just one shop</option>' +
-      '</select></div>' +
       field('Slot Interval (minutes)', 'stSlotIntervalMinutes', s.SlotIntervalMinutes) +
-      '</div>' +
-      '<h4 style="margin:20px 0 4px;">Working Hours' + (s.HasBranches === 'N' ? '' : ' (single-shop mode only)') + '</h4><p class="muted" style="margin-bottom:12px;">' +
-      (s.HasBranches === 'N'
-        ? 'Set when you\'re open each day. This controls the time slots offered in the booking wizard <b>and</b> what\'s shown to customers on the public site, including a live Open/Closed indicator.'
-        : 'You have multiple branches switched on, so <b>each branch sets its own hours instead</b> — edit them from the branch\'s own Edit button on the Branches page. This schedule here only takes effect if you switch back to "just one shop" above.') +
-      ' Need to close one specific date (a holiday, a one-off closure)? Use <b>Manage Slots</b> in the sidebar instead.</p>' +
-      weeklyHoursEditorHtml(parseWeeklyHoursClient_(s)) +
-      '</div></div>' +
+      '</div><p class="muted" style="margin-top:10px;">Working hours are set from <b>Shop Info</b> in the sidebar, along with your business name, location, and phone.</p></div></div>' +
 
       '<div class="settings-panel hidden" data-panel="payments"><div class="panel"><div class="field-grid">' +
       field('Tax Rate (%)', 'stTaxRatePercent', s.TaxRatePercent) +
@@ -4084,8 +4036,6 @@ function saveAllSettings() {
       PrimaryColor: document.getElementById('stPrimaryColor').value, SecondaryColor: document.getElementById('stSecondaryColor').value,
       AccentColor: document.getElementById('stAccentColor').value, BackgroundColor: document.getElementById('stBackgroundColor').value,
       TextColor: document.getElementById('stTextColor').value, FontFamily: document.getElementById('stFontFamily').value,
-      HasBranches: document.getElementById('stHasBranches').value,
-      WeeklyHours: collectWeeklyHours(),
       SlotIntervalMinutes: document.getElementById('stSlotIntervalMinutes').value,
       TaxRatePercent: document.getElementById('stTaxRatePercent').value, LoyaltyPointsPerCedi: document.getElementById('stLoyaltyPointsPerCedi').value,
       LoyaltyRedeemRate: document.getElementById('stLoyaltyRedeemRate').value,
@@ -4102,9 +4052,6 @@ function saveAllSettings() {
     };
     api('updateSettings', STATE.token, payload).then(function (s) {
       STATE.settings = s; applyTheme(s); toast('Settings saved', 'success');
-      renderSidebar(); // picks up the Branches → Shop Info rename immediately if HasBranches changed
-      var branchSwitch = document.getElementById('ownerBranchSwitch');
-      if (branchSwitch) branchSwitch.classList.toggle('hidden', STATE.user.role !== 'Owner' || s.HasBranches === 'N');
     }).catch(showError);
   });
 }
@@ -4120,8 +4067,8 @@ function loadUsersTable() {
     var hint = pending ? '<p class="muted warn-line">' + icon('alertTriangle', 14) + ' ' + pending + ' account(s) awaiting approval (shown as inactive below).</p>' : '';
     var host = document.getElementById('userTableHost');
     function draw() {
-      host.innerHTML = hint + renderTable(['Full Name', 'Username', 'Role', 'Branch', 'Status', 'Actions'], rows.map(function (u) {
-        return [esc(u.FullName || '—'), esc(u.Username), esc(u.Role), esc(u.BranchID || '—'),
+      host.innerHTML = hint + renderTable(['Full Name', 'Username', 'Role', 'Status', 'Actions'], rows.map(function (u) {
+        return [esc(u.FullName || '—'), esc(u.Username), esc(u.Role),
           u.Active === 'Y' ? statusBadge('Confirmed') : '<span class="badge badge-pending">Pending</span>',
           '<button class="btn btn-sm btn-outline" onclick=\'openUserModal(' + JSON.stringify(u).replace(/'/g, '&#39;') + ')\'>' + icon('edit', 13) + '</button> <button class="btn btn-sm btn-danger" onclick="deleteUserRow(\'' + u.Username + '\')">' + icon('trash', 13) + '</button>'];
       }), 'users');
@@ -4132,13 +4079,12 @@ function loadUsersTable() {
 }
 function openUserModal(u) {
   u = u || {};
-  var branchOpts = '<option value="ALL">All Branches</option>' + STATE.branches.map(function (b) { return '<option value="' + b.BranchID + '"' + (u.BranchID === b.BranchID ? ' selected' : '') + '>' + esc(b.Name) + '</option>'; }).join('');
   var html = '<div class="field-grid">' +
     '<div><label>Full Name</label><input id="usFullName" value="' + esc(u.FullName || '') + '"></div>' +
     '<div><label>Username</label><input id="usUsername" value="' + esc(u.Username || '') + '" ' + (u.Username ? 'readonly' : '') + '></div>' +
     '<div><label>Password ' + (u.Username ? '(leave blank to keep)' : '') + '</label><input type="password" id="usPassword"></div>' +
     '<div><label>Role</label><select id="usRole">' + ['Owner', 'Manager', 'Staff', 'Receptionist'].map(function (r) { return '<option' + (u.Role === r ? ' selected' : '') + '>' + r + '</option>'; }).join('') + '</select></div>' +
-    '<div><label>Branch</label><select id="usBranch">' + branchOpts + '</select></div>' +
+    branchSelectHtml('usBranch', u.BranchID || (STATE.branches[0] && STATE.branches[0].BranchID)) +
     '<div><label>Linked Staff ID (optional)</label><input id="usStaffID" value="' + esc(u.StaffID || '') + '"></div>' +
     '<div><label>Email</label><input id="usEmail" value="' + esc(u.Email || '') + '"></div>' +
     '<div><label>Phone</label><input id="usPhone" value="' + esc(u.Phone || '') + '"></div>' +
@@ -4148,7 +4094,7 @@ function openUserModal(u) {
     api('saveUser', STATE.token, {
       Username: document.getElementById('usUsername').value, Password: document.getElementById('usPassword').value,
       FullName: document.getElementById('usFullName').value,
-      Role: document.getElementById('usRole').value, BranchID: document.getElementById('usBranch').value,
+      Role: document.getElementById('usRole').value, BranchID: branchSelectValue('usBranch'),
       StaffID: document.getElementById('usStaffID').value, Email: document.getElementById('usEmail').value,
       Phone: document.getElementById('usPhone').value, Active: document.getElementById('usActive').value
     }).then(function () { toast('User saved', 'success'); closeModal(); loadUsersTable(); }).catch(showError);
