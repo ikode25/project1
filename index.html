@@ -129,9 +129,6 @@
   .section-sub { text-align: center; color: #777; margin-bottom: 44px; font-size: 1.05rem; }
   @media (max-width: 700px) { .section-title { font-size: 1.6rem; } }
 
-  .branch-select-bar { display: flex; justify-content: center; margin-bottom: 30px; }
-  .branch-select-bar select { padding: 10px 16px; border-radius: 8px; border: 1px solid #ddd; min-width: 260px; }
-
   .svc-category { margin-bottom: 34px; }
   .svc-category h3 { color: var(--clr-secondary); border-bottom: 2px solid var(--clr-secondary); padding-bottom: 6px; margin-bottom: 16px; display: inline-block; font-size: 1.1rem; letter-spacing: .3px; }
   .svc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 18px; }
@@ -274,7 +271,6 @@
      hours as elevated cards) above a map + message-form split — the same
      two-tone, card-driven treatment used by higher-end agency/business
      sites, instead of a plain stacked list. ---------- */
-  .section-subtitle { text-align: center; color: #888; max-width: 540px; margin: 0 auto 44px; font-size: 1.02rem; line-height: 1.6; }
   .contact-info-bar {
     display: grid; grid-template-columns: repeat(4, 1fr); background: var(--clr-primary);
     border-radius: 18px; overflow: hidden; box-shadow: var(--shadow-lift);
@@ -315,7 +311,21 @@
   #adminLoginLink:hover { opacity: .85; }
 
   /* ---------- LOADING / TOAST ---------- */
-  #loadingBar { position: fixed; top: 0; left: 0; height: 3px; background: var(--clr-accent); width: 0; z-index: 9999; transition: width .3s ease, opacity .3s ease; }
+  #loadingBar {
+    position: fixed; top: 0; left: 0; height: 3px; width: 0; z-index: 9999; opacity: 0;
+    background: linear-gradient(90deg, var(--clr-accent), #e8c65a, var(--clr-accent));
+    background-size: 200% 100%; box-shadow: 0 0 8px rgba(201,162,39,.7);
+    transition: width .25s ease, opacity .3s ease;
+  }
+  #loadingBar.active { animation: loadingBarShimmer 1.2s linear infinite; }
+  @keyframes loadingBarShimmer { to { background-position: -200% 0; } }
+  .spinner-loading { display: flex; align-items: center; gap: 10px; color: #888; padding: 22px 4px; font-size: .9rem; }
+  .spinner-ring {
+    width: 17px; height: 17px; border-radius: 50%; flex-shrink: 0;
+    border: 2.5px solid rgba(0,0,0,.1); border-top-color: var(--clr-accent); animation: spinnerRotate .7s linear infinite;
+  }
+  #adminApp.dark .spinner-ring { border-color: rgba(255,255,255,.14); border-top-color: var(--clr-accent); }
+  @keyframes spinnerRotate { to { transform: rotate(360deg); } }
   #toastHost { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; max-width: 340px; }
   .toast { padding: 12px 16px; border-radius: 8px; color: #fff; background: #1a1a1a; box-shadow: var(--shadow); font-size: .9rem; animation: slidein .2s ease; }
   .toast.error { background: #c0392b; }
@@ -550,12 +560,20 @@
   .pos-layout { display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px; }
   @media (max-width: 900px) { .pos-layout { grid-template-columns: 1fr; } }
   .pos-item-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(150px,1fr)); gap: 10px; max-height: 480px; overflow-y: auto; }
-  .pos-item-card { background: #f7f7f7; border-radius: 8px; padding: 10px; cursor: pointer; border: 1px solid #eee; }
+  .pos-item-card { background: #f7f7f7; border-radius: 8px; padding: 10px; cursor: pointer; border: 2px solid #eee; position: relative; transition: border-color .15s ease, background .15s ease; }
   #adminApp.dark .pos-item-card { background: #262a31; border-color: #333; }
   .pos-item-photo { width: 100%; aspect-ratio: 4/3; border-radius: 6px; background-size: cover; background-position: center; background-color: #eee; margin-bottom: 8px; }
   .pos-item-photo-empty { display: flex; align-items: center; justify-content: center; color: #aaa; }
   #adminApp.dark .pos-item-photo { background-color: #333; }
   .pos-item-card:hover { border-color: var(--clr-accent); }
+  .pos-item-card.selected { border-color: var(--clr-accent); background: rgba(201,162,39,.1); }
+  #adminApp.dark .pos-item-card.selected { background: rgba(201,162,39,.16); }
+  .pos-item-qty-badge {
+    position: absolute; top: -8px; right: -8px; background: var(--clr-accent); color: #1a1a1a; font-size: .72rem;
+    font-weight: 800; min-width: 22px; height: 22px; border-radius: 999px; display: flex; align-items: center;
+    justify-content: center; padding: 0 5px; box-shadow: 0 2px 6px rgba(0,0,0,.25); border: 2px solid #fff;
+  }
+  #adminApp.dark .pos-item-qty-badge { border-color: #14161a; }
   .pos-item-card .item-name { display: flex; align-items: center; gap: 6px; font-weight: 700; }
   .cart-line { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; font-size: .88rem; }
   .cart-tot-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: .92rem; }
@@ -761,12 +779,6 @@
   <div class="pub-greeting-strip"><div class="container"><span id="pubGreeting"></span></div></div>
   <div id="hero"></div>
 
-  <section class="pub" id="branchBar">
-    <div class="container branch-select-bar">
-      <select id="branchSelector"><option value="">All Branches</option></select>
-    </div>
-  </section>
-
   <section class="pub alt" id="services">
     <div class="container">
       <h2 class="section-title">Services & Price List</h2>
@@ -799,7 +811,7 @@
     </div>
   </section>
 
-  <section class="pub" id="booking">
+  <section class="pub alt" id="booking">
     <div class="container">
       <h2 class="section-title">Book an Appointment</h2>
       <p class="section-sub">Follow the steps below — we'll confirm by SMS/Email</p>
@@ -807,7 +819,7 @@
     </div>
   </section>
 
-  <section class="pub alt" id="mybookings">
+  <section class="pub" id="mybookings">
     <div class="container">
       <h2 class="section-title">Track Your Bookings</h2>
       <p class="section-sub">Look up by the phone number you booked with, or by your booking reference</p>
@@ -829,7 +841,7 @@
     </div>
   </section>
 
-  <section class="pub" id="reviews">
+  <section class="pub alt" id="reviews">
     <div class="container">
       <h2 class="section-title">What Our Customers Say</h2>
       <div class="reviews-grid" id="reviewsList">Loading reviews…</div>
@@ -851,7 +863,7 @@
   <section class="pub" id="contact">
     <div class="container">
       <h2 class="section-title">Visit / Contact Us</h2>
-      <p class="section-subtitle">We'd love to hear from you — reach out however suits you best.</p>
+      <p class="section-sub">We'd love to hear from you — reach out however suits you best.</p>
 
       <div class="contact-info-bar">
         <div class="contact-info-card">
@@ -1095,12 +1107,38 @@ function api(fnName) {
   });
 }
 
+var loadingBarResetTimer = null;
+/**
+ * A believable progress feel with no real progress to report: the bar
+ * eases toward 90% over a few seconds while a request is in flight (most
+ * requests finish well before it gets there), then snaps to 100% the
+ * instant the response actually lands and fades out — rather than the
+ * flat, static-width bar this used to be.
+ */
 function setLoading(on) {
   STATE.loadingCount += on ? 1 : -1;
   if (STATE.loadingCount < 0) STATE.loadingCount = 0;
   var bar = document.getElementById('loadingBar');
-  bar.style.opacity = STATE.loadingCount > 0 ? '1' : '0';
-  bar.style.width = STATE.loadingCount > 0 ? '70%' : '0%';
+  clearTimeout(loadingBarResetTimer);
+  if (STATE.loadingCount > 0) {
+    bar.classList.add('active');
+    bar.style.transition = 'width 4s cubic-bezier(.1,.6,.3,1), opacity .2s ease';
+    bar.style.opacity = '1';
+    bar.style.width = '90%';
+  } else {
+    bar.classList.remove('active');
+    bar.style.transition = 'width .2s ease, opacity .4s ease .15s';
+    bar.style.width = '100%';
+    loadingBarResetTimer = setTimeout(function () {
+      bar.style.opacity = '0';
+      loadingBarResetTimer = setTimeout(function () { bar.style.width = '0%'; }, 300);
+    }, 120);
+  }
+}
+
+/** A small spinner + label, used everywhere a panel/table is waiting on a fetch — replaces plain "Loading…" text. */
+function loadingHtml(label) {
+  return '<div class="spinner-loading"><span class="spinner-ring"></span>' + esc(label || 'Loading…') + '</div>';
 }
 
 function toast(msg, type) {
@@ -1358,9 +1396,8 @@ function loadPublicSite() {
     applyTheme(data.settings);
     renderBranding(data.settings);
     renderHero(data.heroSlides);
-    renderBranchSelector(data.branches);
-    renderServices(data.services, data.branches, '');
-    renderStaff(data.staff, '');
+    renderServices(data.services);
+    renderStaff(data.staff);
     renderGallery(data.gallery || []);
     renderVideos(data.videos || []);
     renderReviews(data.reviews);
@@ -1373,14 +1410,13 @@ function loadPublicSite() {
   }
 
   function revalidateInPlace(data) {
-    var branchFilter = document.getElementById('branchSelector') ? document.getElementById('branchSelector').value : '';
     STATE.publicData = data;
     STATE.settings = data.settings;
     STATE.branches = data.branches;
     applyTheme(data.settings);
     renderBranding(data.settings);
-    renderServices(data.services, data.branches, branchFilter);
-    renderStaff(data.staff, branchFilter);
+    renderServices(data.services);
+    renderStaff(data.staff);
     renderGallery(data.gallery || []);
     renderVideos(data.videos || []);
     renderReviews(data.reviews);
@@ -1463,32 +1499,18 @@ function renderHero(slides) {
   }
 }
 
-function renderBranchSelector(branches) {
-  var sel = document.getElementById('branchSelector');
-  branches.forEach(function (b) {
-    var o = document.createElement('option'); o.value = b.BranchID; o.textContent = b.Name; sel.appendChild(o);
-  });
-  if (branches.length <= 1) document.getElementById('branchBar').classList.add('hidden');
-  sel.addEventListener('change', function () {
-    renderServices(STATE.publicData.services, STATE.publicData.branches, sel.value);
-    renderStaff(STATE.publicData.staff, sel.value);
-  });
-}
-
-function renderServices(services, branches, branchFilter) {
-  var list = branchFilter ? services.filter(function (s) { return s.BranchID === branchFilter; }) : services;
+function renderServices(services) {
   var byCategory = {};
-  list.forEach(function (s) {
+  services.forEach(function (s) {
     if (!byCategory[s.Category]) byCategory[s.Category] = [];
     byCategory[s.Category].push(s);
   });
-  var branchMap = {}; branches.forEach(function (b) { branchMap[b.BranchID] = b.Name; });
   var html = Object.keys(byCategory).sort().map(function (cat) {
     return '<div class="svc-category"><h3>' + esc(cat) + '</h3><div class="svc-grid">' +
       byCategory[cat].map(function (s) {
         var photo = s.ImageURL ? '<div class="svc-photo" onclick="openImageLightbox(\'' + esc(s.ImageURL) + '\',\'' + esc(s.Name) + '\')" title="Click to see the full photo" style="background-image:url(\'' + esc(s.ImageURL) + '\')"></div>' : '<div class="svc-photo svc-photo-empty">' + icon('scissors', 26) + '</div>';
         return '<div class="svc-card">' + photo + '<div class="svc-card-body">' +
-          '<div class="svc-card-head"><b>' + esc(s.Name) + '</b>' + (branches.length > 1 ? '<span class="muted">' + esc(branchMap[s.BranchID] || '') + '</span>' : '') + '</div>' +
+          '<div class="svc-card-head"><b>' + esc(s.Name) + '</b></div>' +
           '<div class="muted">' + esc(s.Description || '') + '</div>' +
           '<div class="svc-card-foot"><div class="dur">' + icon('clock', 14) + ' ' + s.DurationMinutes + ' mins</div><div class="price">' + money(s.Price) + '</div></div>' +
           '<button class="btn btn-sm btn-outline btn-block" onclick="quickBook(\'' + s.ServiceID + '\',\'' + s.BranchID + '\')">Book Now</button>' +
@@ -1498,9 +1520,8 @@ function renderServices(services, branches, branchFilter) {
   document.getElementById('servicesList').innerHTML = html || '<p class="muted">No services available yet.</p>';
 }
 
-function renderStaff(staff, branchFilter) {
-  var list = branchFilter ? staff.filter(function (s) { return s.BranchID === branchFilter; }) : staff;
-  document.getElementById('staffList').innerHTML = list.map(function (s) {
+function renderStaff(staff) {
+  document.getElementById('staffList').innerHTML = staff.map(function (s) {
     var photo = s.PhotoURL ? 'style="background-image:url(\'' + esc(s.PhotoURL) + '\')"' : '';
     var days = String(s.WorkDays || '').split(',').map(function (d) { return d.trim(); }).filter(Boolean);
     var dayTags = days.length ? '<div class="tags" style="justify-content:center;margin-top:6px;">' + days.map(function (d) { return '<span class="tag">' + d + '</span>'; }).join('') + '</div>' : '';
@@ -2589,7 +2610,7 @@ function renderAdminPage() {
   var titleMap = {}; NAV_CONFIG.forEach(function (n) { titleMap[n.key] = n.label; });
   document.getElementById('pageTitle').textContent = titleMap[STATE.adminPage] || '';
   var content = document.getElementById('adminContent');
-  content.innerHTML = '<p class="muted">Loading…</p>';
+  content.innerHTML = loadingHtml();
   var renderers = {
     overview: renderOverview, appointments: renderAppointments, slots: renderSlotsAdmin, pos: renderPOS, customers: renderCustomers,
     services: renderServicesAdmin, staff: renderStaffAdmin, inventory: renderInventory,
@@ -2802,7 +2823,7 @@ function renderAppointments(content) {
     '<button class="btn btn-sm btn-outline" onclick="loadAppointmentsTable()">' + icon('search', 13) + ' Filter</button>' +
     '</div>' +
     (APPT_VIEW === 'kanban' ? '<p class="muted">Drag a card to a different column to change its status.</p>' : '') +
-    '<div id="apTableHost"><p class="muted">Loading…</p></div></div>';
+    '<div id="apTableHost">' + loadingHtml() + '</div></div>';
   content.querySelectorAll('.view-toggle button').forEach(function (btn) {
     btn.addEventListener('click', function () {
       APPT_VIEW = btn.dataset.view;
@@ -3005,13 +3026,34 @@ function renderPosItems() {
     return url ? '<div class="pos-item-photo" style="background-image:url(\'' + esc(url) + '\')"></div>' : '<div class="pos-item-photo pos-item-photo-empty">' + icon(fallbackIcon, 20) + '</div>';
   }
   var html = services.map(function (s) {
-    return '<div class="pos-item-card" onclick="addToCart(\'service\',\'' + s.ServiceID + '\',\'' + esc(s.Name).replace(/'/g, "\\'") + '\',' + s.Price + ')">' + thumb(s.ImageURL, 'scissors') +
+    return '<div class="pos-item-card" data-type="service" data-id="' + s.ServiceID + '" onclick="addToCart(\'service\',\'' + s.ServiceID + '\',\'' + esc(s.Name).replace(/'/g, "\\'") + '\',' + s.Price + ')">' + thumb(s.ImageURL, 'scissors') +
       '<div class="item-name">' + esc(s.Name) + '</div><span class="muted">' + money(s.Price) + '</span></div>';
   }).join('') + products.map(function (p) {
-    return '<div class="pos-item-card" onclick="addToCart(\'product\',\'' + p.ProductID + '\',\'' + esc(p.Name).replace(/'/g, "\\'") + '\',' + p.SellingPrice + ')">' + thumb(p.ImageURL, 'box') +
+    return '<div class="pos-item-card" data-type="product" data-id="' + p.ProductID + '" onclick="addToCart(\'product\',\'' + p.ProductID + '\',\'' + esc(p.Name).replace(/'/g, "\\'") + '\',' + p.SellingPrice + ')">' + thumb(p.ImageURL, 'box') +
       '<div class="item-name">' + esc(p.Name) + '</div><span class="muted">' + money(p.SellingPrice) + ' · Stock: ' + p.QuantityInStock + '</span></div>';
   }).join('');
   document.getElementById('posItemGrid').innerHTML = html || '<p class="muted">No items found.</p>';
+  updatePosItemSelection();
+}
+
+/**
+ * Marks each item card in the grid as selected (accent border + a quantity
+ * badge) when it's in the cart, without rebuilding the grid's HTML — the
+ * search box's filtered results and scroll position stay put on every
+ * add/remove, only the affected card's own state changes.
+ */
+function updatePosItemSelection() {
+  document.querySelectorAll('.pos-item-card').forEach(function (card) {
+    var line = POS_CART.find(function (c) { return c.type === card.dataset.type && c.id === card.dataset.id; });
+    card.classList.toggle('selected', !!line);
+    var badge = card.querySelector('.pos-item-qty-badge');
+    if (line) {
+      if (!badge) { badge = document.createElement('span'); badge.className = 'pos-item-qty-badge'; card.appendChild(badge); }
+      badge.textContent = line.qty;
+    } else if (badge) {
+      badge.remove();
+    }
+  });
 }
 
 function addToCart(type, id, name, price) {
@@ -3022,6 +3064,7 @@ function addToCart(type, id, name, price) {
 }
 function renderCart() {
   var host = document.getElementById('posCart');
+  updatePosItemSelection();
   if (!POS_CART.length) { host.innerHTML = '<p class="muted">Cart is empty.</p>'; document.getElementById('posTotals').innerHTML = ''; return; }
   host.innerHTML = POS_CART.map(function (c, i) {
     return '<div class="cart-line"><span>' + esc(c.name) + ' x' + c.qty + '</span><span>' + money(c.price * c.qty) +
@@ -3096,7 +3139,7 @@ function showReceipt(sale) {
 function renderCustomers(content) {
   content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Customers</h3>' + viewToggleHtml('customers') + '</div>' +
     '<div class="filters-bar"><input type="text" id="custSearch" placeholder="Search by name/phone" oninput="loadCustomers()"></div>' +
-    '<div id="custTableHost"><p class="muted">Loading…</p></div></div>';
+    '<div id="custTableHost">' + loadingHtml() + '</div></div>';
   bindViewToggle(content, 'customers', function () { loadCustomers(); });
   loadCustomers();
 }
@@ -3301,7 +3344,7 @@ function openStaffLeaveModal(staffId, staffName) {
     '<div class="form-row2"><div class="form-row"><label>Date</label><input type="date" id="leaveDate" value="' + isoToday() + '"></div>' +
     '<div class="form-row"><label>Reason (optional)</label><input type="text" id="leaveReason" placeholder="Sick, vacation…"></div></div>' +
     '<button type="button" class="btn btn-sm btn-accent" id="leaveAddBtn">' + icon('plus', 13) + ' Add Day Off</button>' +
-    '<h4 style="margin:18px 0 8px;">Upcoming Days Off</h4><div id="leaveListHost"><p class="muted">Loading…</p></div>';
+    '<h4 style="margin:18px 0 8px;">Upcoming Days Off</h4><div id="leaveListHost">' + loadingHtml() + '</div>';
   openModal('Time Off — ' + staffName, html, null, null);
   document.getElementById('leaveAddBtn').addEventListener('click', function () {
     var date = document.getElementById('leaveDate').value;
@@ -3398,7 +3441,7 @@ function restockPrompt(id) {
 /* ---------- EXPENSES ---------- */
 function renderExpenses(content) {
   content.innerHTML =
-    '<div id="incomeSummaryHost"><p class="muted">Loading…</p></div>' +
+    '<div id="incomeSummaryHost">' + loadingHtml() + '</div>' +
     '<div class="panel"><h3>Income (auto-recorded from Point of Sale)</h3><p class="muted">Every completed sale is already logged the moment it is rung up — nothing to enter here.</p><div id="incomeTableHost"></div></div>' +
     '<div class="panel"><div class="panel-head"><h3>Expenses</h3><button class="btn btn-sm" onclick="openExpenseModal()">' + icon('plus', 14) + ' Add Expense</button></div><div id="expTableHost"></div></div>';
   loadIncomeExpenseSummary();
@@ -4190,7 +4233,7 @@ function renderSlotsAdmin(content) {
     '<input type="date" id="slotDate" value="' + isoToday() + '">' +
     '<button class="btn btn-sm btn-outline" onclick="loadSlotsAdmin()">' + icon('refresh', 14) + ' Refresh</button>' +
     '</div>' +
-    '<div id="slotGridHost"><p class="muted">Loading…</p></div>' +
+    '<div id="slotGridHost">' + loadingHtml() + '</div>' +
     '</div>';
   var slotBranchEl = document.getElementById('slotBranch');
   if (slotBranchEl) {
@@ -4205,7 +4248,7 @@ function loadSlotsAdmin() {
   var date = document.getElementById('slotDate').value;
   var host = document.getElementById('slotGridHost');
   if (!branchId || !date) return;
-  host.innerHTML = '<p class="muted">Loading…</p>';
+  host.innerHTML = loadingHtml();
   api('getSlotsForAdmin', STATE.token, branchId, date).then(function (res) {
     if (!res.dayOpen) {
       host.innerHTML = '<p class="muted">' + icon('info', 15) + ' This branch is closed on this day per its Working Hours — no slots to manage.</p>';
@@ -4254,7 +4297,7 @@ function toggleSlotAdmin(timeSlot, el) {
 
 /* ---------- SMS MODULE ---------- */
 function renderSmsAdmin(content) {
-  content.innerHTML = '<p class="muted">Loading…</p>';
+  content.innerHTML = loadingHtml();
   Promise.all([api('getSmsStats', STATE.token), api('getStaff', STATE.token, branchArg())]).then(function (res) {
     var stats = res[0], staff = res[1];
     STATE.smsStaff = staff;
