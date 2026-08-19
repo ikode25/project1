@@ -270,14 +270,40 @@
   .star-pick.active { color: var(--clr-accent); }
   .star-pick.active svg { fill: currentColor; }
 
-  .contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 36px; }
-  @media (max-width: 800px) { .contact-grid { grid-template-columns: 1fr; } }
-  .contact-item { display: flex; gap: 14px; margin-bottom: 18px; align-items: flex-start; }
-  .contact-item .ic { color: var(--clr-secondary); background: rgba(201,162,39,.12); width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .hours-row { display: flex; justify-content: space-between; gap: 16px; max-width: 260px; padding: 2px 0; }
-  .hours-row.today { font-weight: 800; color: var(--clr-primary); }
-  .contact-grid iframe { width: 100%; height: 280px; border: 0; border-radius: 16px; box-shadow: 0 3px 16px rgba(0,0,0,.08); }
-  .contact-form-wrap { max-width: 560px; margin: 30px auto 0; background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 24px; }
+  /* ---------- Contact section: a dark info bar (name/phone/whatsapp/email/
+     hours as elevated cards) above a map + message-form split — the same
+     two-tone, card-driven treatment used by higher-end agency/business
+     sites, instead of a plain stacked list. ---------- */
+  .section-subtitle { text-align: center; color: #888; max-width: 540px; margin: 0 auto 44px; font-size: 1.02rem; line-height: 1.6; }
+  .contact-info-bar {
+    display: grid; grid-template-columns: repeat(4, 1fr); background: var(--clr-primary);
+    border-radius: 18px; overflow: hidden; box-shadow: var(--shadow-lift);
+  }
+  .contact-info-card {
+    padding: 34px 20px; text-align: center; color: #fff; display: flex; flex-direction: column;
+    align-items: center; gap: 8px; border-right: 1px solid rgba(255,255,255,.1); transition: background .2s ease;
+  }
+  .contact-info-card:last-child { border-right: 0; }
+  .contact-info-card:hover { background: rgba(255,255,255,.05); }
+  .contact-info-card .ic {
+    width: 54px; height: 54px; border-radius: 50%; background: rgba(201,162,39,.16); color: var(--clr-secondary);
+    display: flex; align-items: center; justify-content: center; margin-bottom: 6px;
+  }
+  .contact-info-label { font-weight: 800; font-size: .74rem; text-transform: uppercase; letter-spacing: .07em; color: var(--clr-secondary); }
+  .contact-info-card a { color: #fff; font-weight: 700; word-break: break-word; }
+  .contact-info-card a:hover { color: var(--clr-secondary); }
+  .contact-info-card .hours-row { color: #d8d8d8; max-width: none; justify-content: center; gap: 8px; font-size: .84rem; }
+  .contact-info-card .hours-row.today { color: var(--clr-secondary); font-weight: 800; }
+  @media (max-width: 860px) {
+    .contact-info-bar { grid-template-columns: repeat(2, 1fr); }
+    .contact-info-card:nth-child(2) { border-right: 0; }
+    .contact-info-card:nth-child(1), .contact-info-card:nth-child(2) { border-bottom: 1px solid rgba(255,255,255,.1); }
+  }
+  @media (max-width: 480px) { .contact-info-bar { grid-template-columns: 1fr; } .contact-info-card { border-right: 0 !important; border-bottom: 1px solid rgba(255,255,255,.1); } .contact-info-card:last-child { border-bottom: 0; } }
+  .contact-split { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 50px; align-items: stretch; }
+  @media (max-width: 800px) { .contact-split { grid-template-columns: 1fr; } }
+  .contact-split iframe { width: 100%; height: 100%; min-height: 340px; border: 0; border-radius: 16px; box-shadow: var(--shadow); }
+  .contact-form-wrap { margin: 0; background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 32px; }
 
   footer.pub-footer { background: var(--clr-primary); color: #eee; padding: 44px 0 30px; text-align: center; font-size: .85rem; border-top: 3px solid var(--clr-accent); }
   footer.pub-footer #footerBrand { font-size: 1.1rem; font-weight: 800; color: #fff; margin-bottom: 14px; }
@@ -625,7 +651,7 @@
   @keyframes toastIn { from { transform: translateY(14px) scale(.96); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
 
   /* ---------- Social icons, credit line ---------- */
-  .social-row { display: flex; gap: 10px; margin-top: 18px; }
+  .social-row { display: flex; gap: 10px; margin-top: 18px; justify-content: center; }
   .social-badge {
     width: 38px; height: 38px; border-radius: 50%; background: var(--clr-primary); color: #fff;
     display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: .85rem;
@@ -823,31 +849,50 @@
   </section>
 
   <section class="pub" id="contact">
-    <div class="container contact-grid">
-      <div>
-        <h2>Visit / Contact Us</h2>
-        <div class="contact-item"><span class="ic" id="icPhone"></span><div><b>Call Us</b><br><a id="contactPhoneLink" href="#"></a></div></div>
-        <div class="contact-item"><span class="ic" id="icChat"></span><div><b>WhatsApp</b><br><a id="contactWaLink" href="#" target="_blank">Chat with us</a></div></div>
-        <div class="contact-item"><span class="ic" id="icMail"></span><div><b>Email</b><br><a id="contactEmailLink" href="#"></a></div></div>
-        <div class="contact-item"><span class="ic" id="icClock"></span><div><b>Opening Hours</b><div id="contactHours"></div></div></div>
-        <div class="social-row" id="socialRow"></div>
-      </div>
-      <iframe id="contactMap" loading="lazy" src=""></iframe>
-    </div>
     <div class="container">
-      <div class="contact-form-wrap">
-        <h3>Send Us a Message</h3>
-        <p class="muted">Prefer email? Fill this in and it goes straight to our inbox.</p>
-        <form id="contactMsgForm">
-          <div class="form-row"><label>Your Name *</label><input type="text" id="cmName" required></div>
-          <div class="form-row2">
-            <div class="form-row"><label>Email</label><input type="email" id="cmEmail"></div>
-            <div class="form-row"><label>Phone</label><input type="tel" id="cmPhone"></div>
-          </div>
-          <div class="form-row"><label>Message *</label><textarea id="cmMessage" rows="4" required></textarea></div>
-          <button type="submit" class="btn btn-accent" id="cmSubmitBtn">Send Message</button>
-          <div id="cmResult"></div>
-        </form>
+      <h2 class="section-title">Visit / Contact Us</h2>
+      <p class="section-subtitle">We'd love to hear from you — reach out however suits you best.</p>
+
+      <div class="contact-info-bar">
+        <div class="contact-info-card">
+          <span class="ic" id="icPhone"></span>
+          <div class="contact-info-label">Call Us</div>
+          <a id="contactPhoneLink" href="#"></a>
+        </div>
+        <div class="contact-info-card">
+          <span class="ic" id="icChat"></span>
+          <div class="contact-info-label">WhatsApp</div>
+          <a id="contactWaLink" href="#" target="_blank">Chat with us</a>
+        </div>
+        <div class="contact-info-card">
+          <span class="ic" id="icMail"></span>
+          <div class="contact-info-label">Email</div>
+          <a id="contactEmailLink" href="#"></a>
+        </div>
+        <div class="contact-info-card">
+          <span class="ic" id="icClock"></span>
+          <div class="contact-info-label">Opening Hours</div>
+          <div id="contactHours"></div>
+        </div>
+      </div>
+      <div class="social-row" id="socialRow"></div>
+
+      <div class="contact-split">
+        <iframe id="contactMap" loading="lazy" src=""></iframe>
+        <div class="contact-form-wrap">
+          <h3>Send Us a Message</h3>
+          <p class="muted">Prefer email? Fill this in and it goes straight to our inbox.</p>
+          <form id="contactMsgForm">
+            <div class="form-row"><label>Your Name *</label><input type="text" id="cmName" required></div>
+            <div class="form-row2">
+              <div class="form-row"><label>Email</label><input type="email" id="cmEmail"></div>
+              <div class="form-row"><label>Phone</label><input type="tel" id="cmPhone"></div>
+            </div>
+            <div class="form-row"><label>Message *</label><textarea id="cmMessage" rows="4" required></textarea></div>
+            <button type="submit" class="btn btn-accent" id="cmSubmitBtn">Send Message</button>
+            <div id="cmResult"></div>
+          </form>
+        </div>
       </div>
     </div>
   </section>
@@ -1147,7 +1192,40 @@ window.addEventListener('DOMContentLoaded', function () {
     nav.classList.toggle('open');
     document.getElementById('navToggle').innerHTML = icon(nav.classList.contains('open') ? 'close' : 'menu', 22);
   });
-  loadPublicSite();
+
+  // Restored up front, before deciding what data to load — an existing
+  // admin session heading straight to #admin never needs the public
+  // site's own (image-heavy) data at all; see the branch below.
+  var savedToken = sessionStorage.getItem('salon_token');
+  var savedUser = sessionStorage.getItem('salon_user');
+  if (savedToken && savedUser) { STATE.token = savedToken; STATE.user = JSON.parse(savedUser); }
+
+  if (location.hash === '#admin' && STATE.token) {
+    // Skip loadPublicSite() entirely here — it fetches every service,
+    // staff, gallery, and hero-slide photo (each one a live Drive
+    // round-trip now that images are embedded as data: URIs), none of
+    // which the admin dashboard shell actually needs. This lightweight
+    // pair of calls is all showAdminApp() needs to render correctly;
+    // each admin page fetches its own data — with its own images — only
+    // once that specific page is actually opened.
+    Promise.all([api('getSettings', STATE.token), api('getShopInfo', STATE.token)]).then(function (results) {
+      STATE.settings = results[0];
+      applyTheme(results[0]);
+      var shop = results[1];
+      STATE.branches = shop && shop.BranchID ? [shop] : [];
+      STATE.publicData = { shopStatus: shop ? shop.status : null };
+      routeHash();
+    }).catch(function () {
+      // Settings/session failed to load — fall through to the normal
+      // route so the visitor at least sees a working login screen
+      // instead of a blank page.
+      routeHash();
+    });
+  } else {
+    loadPublicSite();
+    routeHash();
+  }
+
   bindReviewForm();
   bindLoginForm();
   bindPasswordToggles();
@@ -1157,7 +1235,6 @@ window.addEventListener('DOMContentLoaded', function () {
   bindContactForm();
   initChatWidget();
   window.addEventListener('hashchange', routeHash);
-  routeHash();
 
   var savedDark = localStorage.getItem('salon_dark_mode') === '1';
   if (savedDark) { document.getElementById('adminApp').classList.add('dark'); document.getElementById('darkModeToggle').innerHTML = icon('sun', 17); }
@@ -1806,7 +1883,7 @@ function answerPublicFaq(q) {
 function answerAdminFaq(q) {
   var lower = q.toLowerCase();
   if (/service/.test(lower) && /add|new|create|edit|photo/.test(lower)) return 'Go to "Services (POS Menu)" in the sidebar → "+ Add Service". This is exactly what shows on the website and in POS, photo included.';
-  if (/slot|block|close|lunch/.test(lower)) return 'Go to "Manage Slots" in the sidebar, pick a branch and date, then click any time to open/close it for booking.';
+  if (/slot|block|close|lunch/.test(lower)) return 'Go to "Manage Slots" in the sidebar, pick a date, then click any time to open/close it for booking.';
   if (/sms/.test(lower) && /staff|send|broadcast/.test(lower)) return 'Go to "SMS" in the sidebar → select staff members → type your message → Send SMS.';
   if (/theme|color|logo|brand/.test(lower)) return 'Go to "Branding & Theme" → the "Theme & Colors" tab to change colors, or "Branding" tab to change your logo/name.';
   if (/staff/.test(lower) && /add|new|day|schedule/.test(lower)) return 'Go to "Staff" in the sidebar → "+ Add Staff". You can set their working days there too, which controls availability in the booking wizard.';
@@ -2831,11 +2908,15 @@ function openRescheduleModal(id, date, time) {
 }
 
 function openAppointmentModal() {
-  var services = STATE.publicData.services, staff = STATE.publicData.staff;
+  // Fetched from the admin-authenticated endpoints (not STATE.publicData) so
+  // this modal doesn't depend on the public site's own data ever having
+  // loaded — the admin dashboard boot path skips that (image-heavy) fetch
+  // entirely now, since none of the admin pages actually need it.
+  var services = [], staff = [];
   var html =
     '<div class="field-grid">' +
     branchSelectHtml('naBranch', STATE.branches[0] && STATE.branches[0].BranchID) +
-    '<div><label>Service</label><select id="naService"></select></div>' +
+    '<div><label>Service</label><select id="naService"><option>Loading…</option></select></div>' +
     '<div><label>Staff</label><select id="naStaff"><option value="">Any</option></select></div>' +
     '<div><label>Status</label><select id="naStatus">' + ['Pending', 'Confirmed'].map(function (s) { return '<option value="' + s + '">' + s + '</option>'; }).join('') + '</select></div>' +
     '<div><label>Date</label><input type="date" id="naDate"></div>' +
@@ -2857,12 +2938,15 @@ function openAppointmentModal() {
 
   function refreshServiceOptions() {
     var bId = branchSelectValue('naBranch');
-    document.getElementById('naService').innerHTML = services.filter(function (s) { return s.BranchID === bId; }).map(function (s) { return '<option value="' + s.ServiceID + '">' + esc(s.Name) + '</option>'; }).join('');
-    document.getElementById('naStaff').innerHTML = '<option value="">Any</option>' + staff.filter(function (s) { return s.BranchID === bId; }).map(function (s) { return '<option value="' + s.StaffID + '">' + esc(s.Name) + '</option>'; }).join('');
+    document.getElementById('naService').innerHTML = services.filter(function (s) { return s.BranchID === bId && s.Active !== 'N'; }).map(function (s) { return '<option value="' + s.ServiceID + '">' + esc(s.Name) + '</option>'; }).join('');
+    document.getElementById('naStaff').innerHTML = '<option value="">Any</option>' + staff.filter(function (s) { return s.BranchID === bId && s.Active !== 'N'; }).map(function (s) { return '<option value="' + s.StaffID + '">' + esc(s.Name) + '</option>'; }).join('');
   }
   var naBranchEl = document.getElementById('naBranch');
   if (naBranchEl) naBranchEl.addEventListener('change', refreshServiceOptions);
-  refreshServiceOptions();
+  Promise.all([api('getServices', STATE.token), api('getStaff', STATE.token)]).then(function (results) {
+    services = results[0]; staff = results[1];
+    refreshServiceOptions();
+  }).catch(showError);
 }
 
 /* ---------- POINT OF SALE ---------- */
@@ -4142,7 +4226,7 @@ function loadSlotsAdmin() {
   }).catch(function (err) { host.innerHTML = errorPanel(err); });
 }
 function toggleSlotAdmin(timeSlot, el) {
-  var branchId = document.getElementById('slotBranch').value;
+  var branchId = branchSelectValue('slotBranch') || branchArg();
   var date = document.getElementById('slotDate').value;
   // Optimistic UI: flip the clicked slot immediately so the click always
   // feels instant.

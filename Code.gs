@@ -319,9 +319,26 @@ function extractDriveFileId_(url) {
 function imageUrlToDataUri_(url) {
   var fileId = extractDriveFileId_(url);
   if (!fileId) return url;
+  // Reading and base64-encoding a Drive file is the slowest step on any
+  // page that shows photos — a live Drive round trip per image, on every
+  // single load. CacheService turns a repeat load (the overwhelmingly
+  // common case — the same logo/staff photo/service photo shown again a
+  // minute later) into a cache hit instead, shared across every admin and
+  // visitor hitting this script, not just the current user.
+  var cache = CacheService.getScriptCache();
+  var cacheKey = 'img_' + fileId;
+  var cached = cache.get(cacheKey);
+  if (cached !== null) return cached;
   try {
     var blob = DriveApp.getFileById(fileId).getBlob();
-    return 'data:' + blob.getContentType() + ';base64,' + Utilities.base64Encode(blob.getBytes());
+    var dataUri = 'data:' + blob.getContentType() + ';base64,' + Utilities.base64Encode(blob.getBytes());
+    // CacheService rejects values over 100KB — a larger photo just isn't
+    // cached, which only means that one keeps paying the live-fetch cost;
+    // everything else still benefits.
+    if (dataUri.length < 100000) {
+      try { cache.put(cacheKey, dataUri, 21600); } catch (cacheErr) { /* fine uncached */ }
+    }
+    return dataUri;
   } catch (err) {
     return '';
   }
@@ -1305,7 +1322,14 @@ function deleteVideo(token, videoId) {
 function getShopInfo(token) {
   requireAuth_(token);
   var branch = readAll_('Branches')[0];
-  return branch ? stripRow_(branch) : null;
+  if (!branch) return null;
+  var info = stripRow_(branch);
+  // Included so the admin dashboard's boot sequence can show the live
+  // Open Now/Closed Now badge from this one lightweight call, instead of
+  // needing the full (image-heavy) getPublicData() bundle just to render
+  // the topbar.
+  info.status = computeShopStatus_(parseBranchWeeklyHours_(branch));
+  return info;
 }
 
 function saveShopInfo(token, info) {
