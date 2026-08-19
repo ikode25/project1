@@ -2555,6 +2555,29 @@ function changeMyPassword(token, oldPassword, newPassword) {
   });
 }
 
+/**
+ * RECOVERY TOOL — not called from the web app. Run this manually from the Apps Script
+ * editor's function dropdown if you're locked out (lost the temporary password from
+ * setup() and its execution log has expired). It force-resets the first SuperAdmin
+ * account's password. Only someone with edit access to this script project can run it,
+ * since it requires opening the editor directly — the web app never exposes it.
+ *
+ * Usage: change RESET_PASSWORD below to whatever you want to log in with, select
+ * resetDefaultAdminPassword from the function dropdown, click Run, then log in with
+ * admin@keydeed.local and that password. Change it again from Settings afterwards.
+ */
+function resetDefaultAdminPassword() {
+  var RESET_PASSWORD = 'ChangeThisNow123'; // edit this line before running
+  var users = readTable_(SHEETS.USERS, { skipCache: true });
+  var admin = users.find(function (u) { return u.Role === 'SuperAdmin'; });
+  if (!admin) throw new Error('No SuperAdmin account found — run setup() instead.');
+  var salt = Utilities.getUuid();
+  updateById_(SHEETS.USERS, admin.ID, { PasswordHash: hashPassword_(RESET_PASSWORD, salt), Salt: salt, Active: 'Y' });
+  logAudit_('SYSTEM', 'PASSWORD_RESET', 'User', admin.ID, 'Manual recovery via resetDefaultAdminPassword()');
+  Logger.log('Password reset for ' + admin.Email + '. Log in with that email and: ' + RESET_PASSWORD);
+  return 'Done. Email: ' + admin.Email;
+}
+
 function getSettingsAdmin(token) {
   return safeCall_('getSettingsAdmin', function () {
     requireRole_(token, ['SuperAdmin', 'Landlord']);
