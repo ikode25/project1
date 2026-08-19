@@ -2401,7 +2401,6 @@ var NAV_CONFIG = [
   { key: 'services', icon: 'scissors', label: 'Services (POS Menu)', roles: ['Owner', 'Manager'], group: 'Catalog' },
   { key: 'staff', icon: 'user', label: 'Staff', roles: ['Owner', 'Manager'], group: 'Catalog' },
   { key: 'inventory', icon: 'box', label: 'Inventory', roles: ['Owner', 'Manager'], group: 'Catalog' },
-  { key: 'branches', icon: 'mapPin', label: 'Shop Info', roles: ['Owner'], group: 'Catalog' },
   { key: 'expenses', icon: 'card', label: 'Income & Expenses', roles: ['Owner', 'Manager'], group: 'Finance' },
   { key: 'reports', icon: 'barChart', label: 'Reports', roles: ['Owner', 'Manager'], group: 'Finance' },
   { key: 'reviews', icon: 'star', label: 'Reviews', roles: ['Owner', 'Manager'], group: 'Marketing' },
@@ -2516,7 +2515,7 @@ function renderAdminPage() {
   content.innerHTML = '<p class="muted">Loading…</p>';
   var renderers = {
     overview: renderOverview, appointments: renderAppointments, slots: renderSlotsAdmin, pos: renderPOS, customers: renderCustomers,
-    services: renderServicesAdmin, staff: renderStaffAdmin, inventory: renderInventory, branches: renderBranchesAdmin,
+    services: renderServicesAdmin, staff: renderStaffAdmin, inventory: renderInventory,
     expenses: renderExpenses, reports: renderReports, reviews: renderReviewsAdmin, gallery: renderGalleryAdmin,
     heroSlides: renderHeroAdmin, videos: renderVideosAdmin, settings: renderSettingsAdmin, sms: renderSmsAdmin, users: renderUsersAdmin,
     account: renderAccount, about: renderAbout
@@ -3312,43 +3311,6 @@ function restockPrompt(id) {
   api('restockProduct', STATE.token, id, qty).then(function () { toast('Stock updated', 'success'); loadProductsTable(); }).catch(showError);
 }
 
-/* ---------- BRANCHES ---------- */
-/**
- * This app runs for exactly one shop, so "Shop Info" is a single direct
- * edit form — name, location, phone, and working hours — not a list to
- * add to or delete from.
- */
-function renderBranchesAdmin(content) {
-  content.innerHTML = '<div class="panel"><h3>Shop Info</h3><p class="muted">Your business name, location, phone, and working hours — shown to customers on the public site and used to generate the booking wizard\'s time slots.</p><div id="shopInfoHost"><p class="muted">Loading…</p></div></div>';
-  loadShopInfo();
-}
-function loadShopInfo() {
-  api('getShopInfo', STATE.token).then(function (b) {
-    b = b || {};
-    STATE.branches = b.BranchID ? [b] : [];
-    var host = document.getElementById('shopInfoHost');
-    host.innerHTML = '<div class="field-grid">' +
-      '<div><label>Name</label><input id="brName" value="' + esc(b.Name || '') + '"></div>' +
-      '<div><label>Location</label><input id="brLocation" value="' + esc(b.Location || '') + '"></div>' +
-      '<div><label>Phone</label><input id="brPhone" value="' + esc(b.Phone || '') + '"></div>' +
-      '</div>' +
-      '<h4 style="margin:20px 0 4px;">Working Hours</h4><p class="muted" style="margin-bottom:10px;">Controls the time slots offered in the booking wizard <b>and</b> what\'s shown to customers on the public site, including the live Open Now/Closed Now badge. Need to close one specific date (a holiday, a one-off closure)? Use <b>Manage Slots</b> in the sidebar instead.</p>' +
-      weeklyHoursEditorHtml(parseWeeklyHoursClient_(b)) +
-      '<button class="btn btn-accent" style="margin-top:16px;" id="shopInfoSaveBtn">' + icon('check', 14) + ' Save Shop Info</button>';
-    bindWeeklyHoursEditor();
-    document.getElementById('shopInfoSaveBtn').addEventListener('click', function () {
-      api('saveShopInfo', STATE.token, {
-        BranchID: b.BranchID || '', Name: document.getElementById('brName').value, Location: document.getElementById('brLocation').value,
-        Phone: document.getElementById('brPhone').value, WeeklyHours: collectWeeklyHours()
-      }).then(function (saved) {
-        STATE.branches = [saved];
-        if (STATE.publicData) STATE.publicData.branches = [saved];
-        toast('Shop info saved', 'success');
-      }).catch(showError);
-    });
-  }).catch(function (err) { document.getElementById('shopInfoHost').innerHTML = errorPanel(err); });
-}
-
 /* ---------- EXPENSES ---------- */
 function renderExpenses(content) {
   content.innerHTML =
@@ -3730,15 +3692,17 @@ var SETTINGS_TABS = [
   { key: 'branding', label: 'Branding', icon: 'droplet' },
   { key: 'theme', label: 'Theme & Colors', icon: 'droplet' },
   { key: 'social', label: 'Social & Contact', icon: 'globe' },
-  { key: 'booking', label: 'Booking', icon: 'calendar' },
   { key: 'payments', label: 'Payments & Loyalty', icon: 'card' },
   { key: 'sms', label: 'SMS Gateway', icon: 'smartphone' },
   { key: 'qr', label: 'QR Code', icon: 'image' }
 ];
 
 function renderSettingsAdmin(content) {
-  api('getSettings', STATE.token).then(function (s) {
+  Promise.all([api('getSettings', STATE.token), api('getShopInfo', STATE.token)]).then(function (results) {
+    var s = results[0];
+    var shop = results[1] || {};
     STATE.adminSettings = s;
+    STATE.branches = shop.BranchID ? [shop] : [];
     // All tab panels are rendered into the DOM at once (just hidden/shown) so
     // field values survive switching tabs and "Save All" can read every field.
     content.innerHTML =
@@ -3752,7 +3716,16 @@ function renderSettingsAdmin(content) {
       '<div style="grid-column:1/-1"><label>Logo</label>' + photoPickerHtml('stLogo', s.LogoURL) +
       '<button type="button" class="btn btn-sm btn-outline" id="viewUploadsFolderBtn" style="margin-top:8px;">' + icon('folder', 13) + ' View Uploads Folder in Drive</button>' +
       '<p class="muted" style="margin-top:4px;">Every photo uploaded anywhere in this app — logo, staff, services, products, gallery, hero slides — is stored in this one Drive folder.</p></div>' +
-      '</div><h4 style="margin:20px 0 4px;">Public Site Sections</h4><p class="muted" style="margin-bottom:10px;">Turn any of these off if you\'d rather not show them.</p>' +
+      '</div>' +
+      '<h4 style="margin:20px 0 4px;">Shop Info</h4><p class="muted" style="margin-bottom:10px;">Your shop\'s location and phone, shown to customers on the public site.</p>' +
+      '<div class="field-grid">' +
+      field('Location', 'brLocation', shop.Location) +
+      field('Phone', 'brPhone', shop.Phone) +
+      field('Slot Interval (minutes)', 'stSlotIntervalMinutes', s.SlotIntervalMinutes) +
+      '</div>' +
+      '<h4 style="margin:20px 0 4px;">Working Hours</h4><p class="muted" style="margin-bottom:10px;">Controls the time slots offered in the booking wizard <b>and</b> what\'s shown to customers on the public site, including the live Open Now/Closed Now badge. Need to close one specific date (a holiday, a one-off closure)? Use <b>Manage Slots</b> in the sidebar instead.</p>' +
+      weeklyHoursEditorHtml(parseWeeklyHoursClient_(shop)) +
+      '<h4 style="margin:20px 0 4px;">Public Site Sections</h4><p class="muted" style="margin-bottom:10px;">Turn any of these off if you\'d rather not show them.</p>' +
       '<div class="day-picker">' +
       '<label class="chip-toggle"><input type="checkbox" id="stShowGreeting"' + (s.ShowGreetingBanner !== 'N' ? ' checked' : '') + '> Greeting banner</label>' +
       '<label class="chip-toggle"><input type="checkbox" id="stShowTeam"' + (s.ShowTeamSection !== 'N' ? ' checked' : '') + '> Our Team section</label>' +
@@ -3778,10 +3751,6 @@ function renderSettingsAdmin(content) {
       field('TikTok URL', 'stSocialTiktok', s.SocialTiktok) +
       field('YouTube URL', 'stSocialYoutube', s.SocialYoutube) +
       '</div><p class="muted">Only the platforms you fill in appear as icons on your public site footer.</p></div></div>' +
-
-      '<div class="settings-panel hidden" data-panel="booking"><div class="panel"><div class="field-grid">' +
-      field('Slot Interval (minutes)', 'stSlotIntervalMinutes', s.SlotIntervalMinutes) +
-      '</div><p class="muted" style="margin-top:10px;">Working hours are set from <b>Shop Info</b> in the sidebar, along with your business name, location, and phone.</p></div></div>' +
 
       '<div class="settings-panel hidden" data-panel="payments"><div class="panel"><div class="field-grid">' +
       field('Tax Rate (%)', 'stTaxRatePercent', s.TaxRatePercent) +
@@ -4050,8 +4019,19 @@ function saveAllSettings() {
       SmsApiKey: document.getElementById('stSmsApiKey').value, HubtelClientId: document.getElementById('stHubtelClientId').value,
       HubtelClientSecret: document.getElementById('stHubtelClientSecret').value
     };
-    api('updateSettings', STATE.token, payload).then(function (s) {
-      STATE.settings = s; applyTheme(s); toast('Settings saved', 'success');
+    var shopInfo = {
+      BranchID: (STATE.branches[0] && STATE.branches[0].BranchID) || '',
+      Name: payload.BusinessName, Location: document.getElementById('brLocation').value,
+      Phone: document.getElementById('brPhone').value, WeeklyHours: collectWeeklyHours()
+    };
+    Promise.all([
+      api('updateSettings', STATE.token, payload),
+      api('saveShopInfo', STATE.token, shopInfo)
+    ]).then(function (results) {
+      STATE.settings = results[0]; applyTheme(results[0]);
+      STATE.branches = [results[1]];
+      if (STATE.publicData) STATE.publicData.branches = [results[1]];
+      toast('Settings saved', 'success');
     }).catch(showError);
   });
 }
