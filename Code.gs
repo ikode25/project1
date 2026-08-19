@@ -310,43 +310,91 @@ function extractDriveFileId_(url) {
 }
 
 /**
- * Turns a Drive-uploaded image reference into a `data:` URI holding the
- * actual image bytes. A non-Drive URL (external photo, or already blank)
- * passes through unchanged; a Drive file that's since been deleted or had
- * its sharing revoked degrades to '' rather than breaking the whole
- * response it's part of.
+ * Resolves a batch of possibly-Drive-backed image references into their
+ * `data:` URI form in as few round trips as possible.
+ *
+ * The very first version of this fetched and base64-encoded each image
+ * with its own `DriveApp.getFileById(id).getBlob()` call, one at a time —
+ * completely sequential, so a page with a dozen photos meant a dozen live
+ * Drive round trips back to back before that response could even start
+ * assembling. CacheService (added afterward) helps once an image has been
+ * seen before, but the very first load of any page — and every load right
+ * after a redeploy, when the cache is empty — still paid that full serial
+ * cost, which is what made every page feel slow, not just the ones with
+ * obviously many photos: `getPublicData()` alone touches the logo, every
+ * service, every staff photo, every gallery photo, and every hero slide
+ * in one response.
+ *
+ * `UrlFetchApp.fetchAll()` sends every still-uncached image's request in
+ * a single batched call instead, which Apps Script executes with real
+ * concurrency — so N images that were N sequential round trips become
+ * effectively one. This is the one function every image-resolving call
+ * in the file now goes through; a non-Drive URL (an external photo, or
+ * blank) passes straight through unchanged, and a Drive file that's since
+ * been deleted or had sharing revoked degrades to '' for just that one
+ * entry rather than breaking the whole response.
  */
-function imageUrlToDataUri_(url) {
-  var fileId = extractDriveFileId_(url);
-  if (!fileId) return url;
-  // Reading and base64-encoding a Drive file is the slowest step on any
-  // page that shows photos — a live Drive round trip per image, on every
-  // single load. CacheService turns a repeat load (the overwhelmingly
-  // common case — the same logo/staff photo/service photo shown again a
-  // minute later) into a cache hit instead, shared across every admin and
-  // visitor hitting this script, not just the current user.
+function batchResolveImageUrls_(urls) {
   var cache = CacheService.getScriptCache();
-  var cacheKey = 'img_' + fileId;
-  var cached = cache.get(cacheKey);
-  if (cached !== null) return cached;
-  try {
-    var blob = DriveApp.getFileById(fileId).getBlob();
-    var dataUri = 'data:' + blob.getContentType() + ';base64,' + Utilities.base64Encode(blob.getBytes());
-    // CacheService rejects values over 100KB — a larger photo just isn't
-    // cached, which only means that one keeps paying the live-fetch cost;
-    // everything else still benefits.
-    if (dataUri.length < 100000) {
-      try { cache.put(cacheKey, dataUri, 21600); } catch (cacheErr) { /* fine uncached */ }
+  var results = new Array(urls.length);
+  var fileIdByIndex = {};
+  var uncachedFileIds = [];
+
+  urls.forEach(function (url, i) {
+    var fileId = extractDriveFileId_(url);
+    if (!fileId) { results[i] = url; return; }
+    var cached = cache.get('img_' + fileId);
+    if (cached !== null) { results[i] = cached; return; }
+    fileIdByIndex[i] = fileId;
+    if (uncachedFileIds.indexOf(fileId) === -1) uncachedFileIds.push(fileId);
+  });
+
+  if (uncachedFileIds.length) {
+    var token = ScriptApp.getOAuthToken();
+    var requests = uncachedFileIds.map(function (fileId) {
+      return {
+        url: 'https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media',
+        headers: { Authorization: 'Bearer ' + token },
+        muteHttpExceptions: true
+      };
+    });
+    var responses;
+    try {
+      responses = UrlFetchApp.fetchAll(requests);
+    } catch (err) {
+      responses = []; // whole batch failed to even dispatch — every entry below degrades to ''
     }
-    return dataUri;
-  } catch (err) {
-    return '';
+    var dataUriByFileId = {};
+    uncachedFileIds.forEach(function (fileId, i) {
+      var res = responses[i];
+      if (!res || res.getResponseCode() !== 200) { dataUriByFileId[fileId] = ''; return; }
+      var blob = res.getBlob();
+      var dataUri = 'data:' + blob.getContentType() + ';base64,' + Utilities.base64Encode(blob.getBytes());
+      dataUriByFileId[fileId] = dataUri;
+      // CacheService rejects values over 100KB — a larger photo just isn't
+      // cached, which only means that one keeps paying the live-fetch cost
+      // on future loads; everything else still benefits.
+      if (dataUri.length < 100000) {
+        try { cache.put('img_' + fileId, dataUri, 21600); } catch (cacheErr) { /* fine uncached */ }
+      }
+    });
+    Object.keys(fileIdByIndex).forEach(function (i) {
+      results[i] = dataUriByFileId[fileIdByIndex[i]] || '';
+    });
   }
+
+  return results;
 }
 
-/** Converts one image field to a data: URI on every item of a list, in place. */
+/** Single-URL convenience wrapper around batchResolveImageUrls_ — for a lone field like Settings.LogoURL. */
+function imageUrlToDataUri_(url) {
+  return batchResolveImageUrls_([url])[0];
+}
+
+/** Converts one image field to a data: URI on every item of a list, in place, in one batched round trip. */
 function withImageDataUris_(list, field) {
-  list.forEach(function (item) { if (item[field]) item[field] = imageUrlToDataUri_(item[field]); });
+  var resolved = batchResolveImageUrls_(list.map(function (item) { return item[field]; }));
+  list.forEach(function (item, i) { if (item[field]) item[field] = resolved[i]; });
   return list;
 }
 
@@ -1008,15 +1056,36 @@ function getPublicData() {
 
   var shopStatus = branches[0] ? computeShopStatus_(parseBranchWeeklyHours_(branches[0])) : null;
 
-  if (settings.LogoURL) settings.LogoURL = imageUrlToDataUri_(settings.LogoURL);
+  var servicesRows = services.map(stripRow_);
+  var staffRows = staff.map(function (s) { return stripRow_(sanitizeStaff_(s)); });
+  var heroRows = heroSlides.map(stripRow_);
+  var galleryRows = gallery.map(stripRow_);
+
+  // This call touches more photos than any other in the app — logo,
+  // every active service, every active staff member, every hero slide,
+  // every gallery photo — so they're all resolved in one single batched
+  // round trip (see batchResolveImageUrls_) instead of five separate ones.
+  var imgUrls = [settings.LogoURL]
+    .concat(servicesRows.map(function (s) { return s.ImageURL; }))
+    .concat(staffRows.map(function (s) { return s.PhotoURL; }))
+    .concat(heroRows.map(function (h) { return h.ImageURL; }))
+    .concat(galleryRows.map(function (g) { return g.ImageURL; }));
+  var resolved = batchResolveImageUrls_(imgUrls);
+  var idx = 0;
+  if (settings.LogoURL) settings.LogoURL = resolved[idx];
+  idx++;
+  servicesRows.forEach(function (s) { if (s.ImageURL) s.ImageURL = resolved[idx]; idx++; });
+  staffRows.forEach(function (s) { if (s.PhotoURL) s.PhotoURL = resolved[idx]; idx++; });
+  heroRows.forEach(function (h) { if (h.ImageURL) h.ImageURL = resolved[idx]; idx++; });
+  galleryRows.forEach(function (g) { if (g.ImageURL) g.ImageURL = resolved[idx]; idx++; });
 
   return {
     settings: settings,
     branches: branches.map(stripRow_),
-    services: withImageDataUris_(services.map(stripRow_), 'ImageURL'),
-    staff: withImageDataUris_(staff.map(function (s) { return stripRow_(sanitizeStaff_(s)); }), 'PhotoURL'),
-    heroSlides: withImageDataUris_(heroSlides.map(stripRow_), 'ImageURL'),
-    gallery: withImageDataUris_(gallery.map(stripRow_), 'ImageURL'),
+    services: servicesRows,
+    staff: staffRows,
+    heroSlides: heroRows,
+    gallery: galleryRows,
     videos: videos.map(stripRow_),
     reviews: reviews,
     shopStatus: shopStatus
