@@ -2700,20 +2700,51 @@
         // for bulk sends to several candidates at once there's no single
         // href to point an anchor at, so that case falls back to a
         // best-effort window.open() loop instead.
+        // For WhatsApp, neither window.open() nor a real <a target="_blank">
+        // click reliably escapes the sandboxed iframe Apps Script serves this
+        // app through - both have been observed leaving the whole app blank.
+        // So instead of attempting any navigation from inside this app at
+        // all, WhatsApp "sending" copies the pre-filled wa.me link to the
+        // clipboard (navigator.clipboard.writeText - no navigation involved)
+        // and shows it as plain selectable text too, so the admin can paste
+        // it into a new tab themselves, or right-click it to open it - both
+        // native browser actions immune to whatever the iframe restricts.
         const SmsTemplateModal = ({ isOpen, onClose, template, onChange, onSend, title, channel = 'sms', whatsappCandidates, whatsappCountryCode }) => {
+            const [showLinks, setShowLinks] = useState(false);
+            const [copiedIndex, setCopiedIndex] = useState(null);
+
+            React.useEffect(() => {
+                if (isOpen) setShowLinks(false);
+            }, [isOpen]);
+
             if (!isOpen) return null;
 
             const isWhatsapp = channel === 'whatsapp';
             const charCount = (template || '').length;
-            const singleWhatsappLink = (isWhatsapp && whatsappCandidates && whatsappCandidates.length === 1)
-                ? buildWhatsappLink(
-                    whatsappCandidates[0].mobile,
-                    template
-                        .replace(/\[Candidate Name\]/g, `${whatsappCandidates[0].firstName} ${whatsappCandidates[0].lastName}`)
-                        .replace(/\[Position\]/g, whatsappCandidates[0].applyingFor || 'the position'),
-                    whatsappCountryCode
-                )
-                : null;
+
+            const personalize = (candidate) => (template || '')
+                .replace(/\[Candidate Name\]/g, `${candidate.firstName} ${candidate.lastName}`)
+                .replace(/\[Position\]/g, candidate.applyingFor || 'the position');
+
+            const whatsappLinks = (isWhatsapp ? (whatsappCandidates || []) : []).map(c => ({
+                name: `${c.firstName} ${c.lastName}`,
+                link: buildWhatsappLink(c.mobile, personalize(c), whatsappCountryCode)
+            }));
+
+            const handleCopyLink = async (link, index) => {
+                try {
+                    await navigator.clipboard.writeText(link);
+                } catch (e) {
+                    window.prompt('Copy this link:', link);
+                }
+                setCopiedIndex(index);
+                setTimeout(() => setCopiedIndex(prev => (prev === index ? null : prev)), 2000);
+            };
+
+            const handleDone = () => {
+                setShowLinks(false);
+                onSend();
+            };
 
             return (
                 <div className="modal-overlay">
@@ -2724,65 +2755,91 @@
                                 <i className="fas fa-times"></i>
                             </button>
                         </div>
-                        <div className="modal-body">
-                            <div>
-                                <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#333' }}>
-                                    {isWhatsapp ? 'WhatsApp Message' : 'SMS Message'}
-                                </label>
-                                <textarea
-                                    value={template}
-                                    onChange={(e) => onChange(e.target.value)}
-                                    placeholder={isWhatsapp ? 'Write your WhatsApp message here...' : 'Write your SMS here...'}
-                                    style={{
-                                        width: '100%',
-                                        minHeight: '160px',
-                                        padding: '12px',
-                                        border: '1px solid #ddd',
-                                        borderRadius: '4px',
-                                        fontFamily: 'monospace',
-                                        fontSize: '13px',
-                                        resize: 'vertical'
-                                    }}
-                                />
-                                <p style={{ fontSize: '12px', color: '#999', marginTop: '6px' }}>{charCount} characters</p>
-                            </div>
-                            <div style={{ marginTop: '12px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '4px', fontSize: '12px', color: '#666' }}>
-                                <strong>Available placeholders:</strong> [Candidate Name], [Position], [Date], [Time], [Location], [Interviewer Name]
-                                {isWhatsapp && ' - opens WhatsApp in a new tab pre-filled with this text; you press Send there yourself.'}
-                            </div>
-                        </div>
-                        <div className="modal-footer">
-                            <button className="action-btn" onClick={onClose} style={{ background: '#9e9e9e' }}>
-                                Cancel
-                            </button>
-                            {singleWhatsappLink ? (
-                                <a
-                                    href={singleWhatsappLink}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="action-btn btn-shortlist"
-                                    style={{ background: '#25D366', textDecoration: 'none' }}
-                                    onClick={() => {
-                                        // onSend closes this modal (unmounting
-                                        // this very <a>). Doing that in the
-                                        // same tick as the click races the
-                                        // browser's own handling of the
-                                        // anchor's default navigation - inside
-                                        // Apps Script's sandboxed iframe that
-                                        // race was leaving the whole app blank.
-                                        // Deferring one tick lets the browser
-                                        // finish opening the new tab first.
-                                        setTimeout(onSend, 0);
-                                    }}
-                                >
-                                    <i className="fab fa-whatsapp"></i> Send WhatsApp
-                                </a>
-                            ) : (
-                                <button className="action-btn btn-shortlist" onClick={onSend} style={isWhatsapp ? { background: '#25D366' } : {}}>
-                                    <i className={isWhatsapp ? 'fab fa-whatsapp' : 'fas fa-paper-plane'}></i> {isWhatsapp ? 'Send WhatsApp' : 'Send SMS'}
-                                </button>
-                            )}
-                        </div>
+                        {isWhatsapp && showLinks ? (
+                            <>
+                                <div className="modal-body">
+                                    <div style={{ marginBottom: '12px', padding: '10px', backgroundColor: '#e8f5e9', borderRadius: '4px', fontSize: '13px', color: '#2e7d32' }}>
+                                        <i className="fas fa-info-circle"></i> Copy the link below and open it in a new browser tab (or right-click it and choose "Open link in new tab") to start the WhatsApp chat.
+                                    </div>
+                                    <div style={{ display: 'grid', gap: '10px' }}>
+                                        {whatsappLinks.map((item, index) => (
+                                            <div key={index} style={{ border: '1px solid #ddd', borderRadius: '6px', padding: '10px 12px' }}>
+                                                <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '6px' }}>{item.name}</div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                    <a
+                                                        href={item.link}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        style={{ flex: '1 1 auto', minWidth: 0, fontSize: '12px', color: '#1976d2', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                                    >
+                                                        {item.link}
+                                                    </a>
+                                                    <button
+                                                        className="action-btn"
+                                                        onClick={() => handleCopyLink(item.link, index)}
+                                                        style={{ backgroundColor: copiedIndex === index ? '#2e7d32' : '#25D366', color: '#fff', padding: '6px 12px', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px', flexShrink: 0 }}
+                                                    >
+                                                        <i className={copiedIndex === index ? 'fas fa-check' : 'fas fa-copy'}></i> {copiedIndex === index ? 'Copied!' : 'Copy Link'}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="modal-footer">
+                                    <button className="action-btn" onClick={() => setShowLinks(false)} style={{ background: '#9e9e9e' }}>
+                                        <i className="fas fa-arrow-left"></i> Back
+                                    </button>
+                                    <button className="action-btn btn-shortlist" onClick={handleDone} style={{ background: '#25D366' }}>
+                                        <i className="fas fa-check"></i> Done
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div className="modal-body">
+                                    <div>
+                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', color: '#333' }}>
+                                            {isWhatsapp ? 'WhatsApp Message' : 'SMS Message'}
+                                        </label>
+                                        <textarea
+                                            value={template}
+                                            onChange={(e) => onChange(e.target.value)}
+                                            placeholder={isWhatsapp ? 'Write your WhatsApp message here...' : 'Write your SMS here...'}
+                                            style={{
+                                                width: '100%',
+                                                minHeight: '160px',
+                                                padding: '12px',
+                                                border: '1px solid #ddd',
+                                                borderRadius: '4px',
+                                                fontFamily: 'monospace',
+                                                fontSize: '13px',
+                                                resize: 'vertical'
+                                            }}
+                                        />
+                                        <p style={{ fontSize: '12px', color: '#999', marginTop: '6px' }}>{charCount} characters</p>
+                                    </div>
+                                    <div style={{ marginTop: '12px', padding: '10px', backgroundColor: '#f5f5f5', borderRadius: '4px', fontSize: '12px', color: '#666' }}>
+                                        <strong>Available placeholders:</strong> [Candidate Name], [Position], [Date], [Time], [Location], [Interviewer Name]
+                                        {isWhatsapp && ' - the next step gives you a link to copy and open in WhatsApp.'}
+                                    </div>
+                                </div>
+                                <div className="modal-footer">
+                                    <button className="action-btn" onClick={onClose} style={{ background: '#9e9e9e' }}>
+                                        Cancel
+                                    </button>
+                                    {isWhatsapp ? (
+                                        <button className="action-btn btn-shortlist" onClick={() => setShowLinks(true)} style={{ background: '#25D366' }}>
+                                            <i className="fab fa-whatsapp"></i> Get WhatsApp Link{whatsappLinks.length > 1 ? 's' : ''}
+                                        </button>
+                                    ) : (
+                                        <button className="action-btn btn-shortlist" onClick={onSend}>
+                                            <i className="fas fa-paper-plane"></i> Send SMS
+                                        </button>
+                                    )}
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             );
@@ -4909,13 +4966,18 @@ HR Team`
                 )
                 : null;
 
-            const handleSendTestWhatsapp = (e) => {
+            const handleSendTestWhatsapp = async (e) => {
+                e.preventDefault();
                 if (!testWhatsappPhone) {
-                    e.preventDefault();
                     showToast('Enter a phone number to test with.', 'warning');
                     return;
                 }
-                showToast('Opening WhatsApp - press Send there to complete the test.', 'success');
+                try {
+                    await navigator.clipboard.writeText(testWhatsappLink);
+                    showToast('Test link copied! Paste it into a new browser tab to open WhatsApp.', 'success');
+                } catch (err) {
+                    window.prompt('Copy this link:', testWhatsappLink);
+                }
             };
 
             const handleSaveWhatsappTemplates = () => {
@@ -6323,7 +6385,7 @@ HR Team`
                                         </h3>
                                         <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#e8f5e9', borderRadius: '8px', border: '1px solid #66bb6a' }}>
                                             <p style={{ margin: 0, color: '#2e7d32', fontSize: '14px' }}>
-                                                <i className="fas fa-info-circle"></i> No WhatsApp Business API or credentials needed. Clicking "WhatsApp" (bulk actions bar or a candidate's own button) opens a WhatsApp chat with that applicant's number in a new tab, with your message pre-filled - you press Send yourself inside WhatsApp. Admin-triggered only, never automatic.
+                                                <i className="fas fa-info-circle"></i> No WhatsApp Business API or credentials needed. Clicking "WhatsApp" (bulk actions bar or a candidate's own button) gives you a link, pre-filled with your message to that applicant's number - copy it and open it in a new browser tab to start the chat, then press Send yourself inside WhatsApp. Admin-triggered only, never automatic.
                                             </p>
                                         </div>
                                         <div className="template-card" style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
@@ -6346,16 +6408,13 @@ HR Team`
                                                 </button>
                                                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                                                     <input type="tel" value={testWhatsappPhone} onChange={(e) => setTestWhatsappPhone(e.target.value)} placeholder="+233 XX XXX XXXX" style={{ padding: '10px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }} />
-                                                    <a
-                                                        href={testWhatsappLink || '#'}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
+                                                    <button
                                                         className="action-btn"
                                                         onClick={handleSendTestWhatsapp}
-                                                        style={{ backgroundColor: '#1976d2', color: '#fff', padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '500', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                                                        style={{ backgroundColor: '#1976d2', color: '#fff', padding: '10px 20px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}
                                                     >
-                                                        <i className="fas fa-paper-plane"></i> Test with a Number
-                                                    </a>
+                                                        <i className="fas fa-copy"></i> Copy Test Link
+                                                    </button>
                                                 </div>
                                             </div>
                                         </div>
@@ -7327,34 +7386,13 @@ HR Team`
                         template={whatsappModal.template}
                         onChange={(template) => setWhatsappModal({ ...whatsappModal, template })}
                         onSend={() => {
-                            // No API involved - just opens a wa.me click-to-chat
-                            // link, pre-filled with the recipient's number and
-                            // the personalized message. When there's exactly
-                            // one candidate the Send button itself IS the
-                            // <a target="_blank"> that opens it (see
-                            // SmsTemplateModal) - real anchor clicks aren't
-                            // blocked the way window.open() calls sometimes
-                            // are inside this app's iframe. This handler just
-                            // does the bookkeeping for that case, and for
-                            // multiple candidates it also does the (best-
-                            // effort) opening itself, since one anchor can't
-                            // point at more than one link.
+                            // Actual link generation/copying happens inside
+                            // SmsTemplateModal itself (see its "Get WhatsApp
+                            // Link(s)" step) - no navigation is attempted from
+                            // here at all, since that's what was leaving the
+                            // app blank. This just closes out the flow once
+                            // the admin clicks "Done" there.
                             if (whatsappModal.candidates && whatsappModal.candidates.length > 0) {
-                                if (whatsappModal.candidates.length > 1) {
-                                    whatsappModal.candidates.forEach(candidate => {
-                                        const candidateName = `${candidate.firstName} ${candidate.lastName}`;
-                                        const personalizedMessage = whatsappModal.template
-                                            .replace(/\[Candidate Name\]/g, candidateName)
-                                            .replace(/\[Position\]/g, candidate.applyingFor || 'the position');
-
-                                        const link = buildWhatsappLink(candidate.mobile, personalizedMessage, whatsappConfig.defaultCountryCode);
-                                        window.open(link, '_blank');
-                                    });
-                                    showToast(`Opening WhatsApp for ${whatsappModal.candidates.length} candidates - allow pop-ups for this site if any tabs were blocked.`, 'success');
-                                } else {
-                                    showToast('Opening WhatsApp - press Send there to deliver the message.', 'success');
-                                }
-
                                 setSelectedCandidates([]);
                             }
                             setWhatsappModal({ isOpen: false, template: '', title: '', candidates: [] });
