@@ -978,6 +978,7 @@ var ICONS = {
   barChart: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
   star: '<path d="' + STAR_PATH_D + '"/>',
   image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
+  folder: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
   copy: '<rect x="3" y="7" width="14" height="14" rx="2"/><path d="M7 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-2"/>',
   droplet: '<path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>',
   lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
@@ -1840,7 +1841,7 @@ var WIZ_STEPS = [];
 var WIZ_INDEX = 0;
 
 function resetBooking() {
-  BOOKING = { branchId: '', serviceId: '', staffId: '', category: '', date: '', time: '', name: '', phone: '', email: '', notes: '', paymentMethod: 'Cash', paymentProofURL: '' };
+  BOOKING = { branchId: '', serviceId: '', staffId: '', category: '', date: '', time: '', name: '', phone: '', email: '', notes: '', paymentMethod: 'Cash', paymentProofURL: '', paymentProofPreview: '' };
 }
 
 function initBookingWizard(prefill, startStepKey) {
@@ -2068,7 +2069,7 @@ function bindWizardStepEvents(stepKey) {
   } else if (stepKey === 'payment') {
     body.querySelectorAll('[data-pay]').forEach(function (el) {
       el.addEventListener('click', function () {
-        if (BOOKING.paymentMethod !== el.dataset.pay) BOOKING.paymentProofURL = '';
+        if (BOOKING.paymentMethod !== el.dataset.pay) { BOOKING.paymentProofURL = ''; BOOKING.paymentProofPreview = ''; }
         BOOKING.paymentMethod = el.dataset.pay;
         refreshWizardBody();
       });
@@ -2348,8 +2349,12 @@ function resolvePhotoPicker(idPrefix, callback) {
 /** Public (no-auth) picker for a customer's payment-proof screenshot at booking time. */
 function payProofPickerHtml() {
   var current = BOOKING.paymentProofURL;
+  // Re-rendering (e.g. navigating back a step) previews from the local
+  // data URI captured at upload time, not the stored server URL — see the
+  // note in bindPayProofPicker() below.
+  var previewSrc = BOOKING.paymentProofPreview || current;
   return '<div class="photo-picker" id="payProofPicker">' +
-    '<div class="photo-preview" id="payProofPreview" style="' + (current ? "background-image:url('" + esc(current) + "')" : '') + '">' + (current ? '' : icon('image', 26)) + '</div>' +
+    '<div class="photo-preview" id="payProofPreview" style="' + (previewSrc ? "background-image:url('" + esc(previewSrc) + "')" : '') + '">' + (previewSrc ? '' : icon('image', 26)) + '</div>' +
     '<div class="photo-picker-controls">' +
     '<label class="btn btn-sm btn-outline photo-upload-btn">' + icon('upload', 14) + ' Upload Screenshot<input type="file" accept="image/*" id="payProofFile" style="display:none"></label>' +
     '<span class="muted" id="payProofStatus">' + (current ? 'Uploaded ✓' : 'No file selected') + '</span>' +
@@ -2366,11 +2371,17 @@ function bindPayProofPicker() {
     status.textContent = 'Uploading…';
     var reader = new FileReader();
     reader.onload = function () {
+      // Preview from the local FileReader result, not the server's returned
+      // URL — a freshly-uploaded Drive-backed link isn't reliable to hotlink
+      // as a CSS background-image from inside this app's own page (the same
+      // reason on-page photos are now delivered as data: URIs elsewhere);
+      // the browser already has the actual bytes right here.
+      preview.style.backgroundImage = "url('" + reader.result + "')";
+      preview.innerHTML = '';
+      BOOKING.paymentProofPreview = reader.result;
       api('uploadPaymentProof', reader.result, file.name, file.type).then(function (res) {
         BOOKING.paymentProofURL = res.url;
         status.textContent = 'Uploaded ✓';
-        preview.style.backgroundImage = "url('" + res.url + "')";
-        preview.innerHTML = '';
       }).catch(function (err) {
         status.textContent = 'Upload failed — please try again.';
         showError(err);
@@ -3775,7 +3786,9 @@ function renderSettingsAdmin(content) {
       '<div class="settings-panel' + '" data-panel="branding"><div class="panel"><div class="field-grid">' +
       field('Business Name', 'stBusinessName', s.BusinessName) +
       field('Tagline', 'stTagline', s.Tagline) +
-      '<div style="grid-column:1/-1"><label>Logo</label>' + photoPickerHtml('stLogo', s.LogoURL) + '</div>' +
+      '<div style="grid-column:1/-1"><label>Logo</label>' + photoPickerHtml('stLogo', s.LogoURL) +
+      '<button type="button" class="btn btn-sm btn-outline" id="viewUploadsFolderBtn" style="margin-top:8px;">' + icon('folder', 13) + ' View Uploads Folder in Drive</button>' +
+      '<p class="muted" style="margin-top:4px;">Every photo uploaded anywhere in this app — logo, staff, services, products, gallery, hero slides — is stored in this one Drive folder.</p></div>' +
       '</div><h4 style="margin:20px 0 4px;">Public Site Sections</h4><p class="muted" style="margin-bottom:10px;">Turn any of these off if you\'d rather not show them.</p>' +
       '<div class="day-picker">' +
       '<label class="chip-toggle"><input type="checkbox" id="stShowGreeting"' + (s.ShowGreetingBanner !== 'N' ? ' checked' : '') + '> Greeting banner</label>' +
@@ -3871,6 +3884,9 @@ function renderSettingsAdmin(content) {
     bindPaymentMethodsPicker();
     bindWeeklyHoursEditor();
     renderQrCard(s);
+    document.getElementById('viewUploadsFolderBtn').addEventListener('click', function () {
+      api('getUploadFolderUrl', STATE.token).then(function (url) { window.open(url, '_blank', 'noopener'); }).catch(showError);
+    });
   }).catch(function (err) { content.innerHTML = errorPanel(err); });
 }
 

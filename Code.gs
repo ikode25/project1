@@ -261,13 +261,12 @@ function summarizeWeeklyHours_(weeklyHours) {
 function doGet(e) {
   ensureSetup_();
 
-  // Serving an uploaded image by its Drive file ID (?img=<fileId>). Every
-  // browser fetches this from the exact same origin as the web app itself,
-  // so there's no cross-domain Drive hotlink, no session-cookie-gated
-  // redirect, and no undocumented CDN trick that can silently break on one
-  // browser and not another (the actual cause of images that showed fine
-  // in Chrome but never loaded in Safari) — this is the one image-serving
-  // approach that behaves identically everywhere.
+  // Direct link to an uploaded file's raw bytes (?img=<fileId>) — used for
+  // "open this in a new tab" links (e.g. viewing a payment-proof screenshot
+  // full-size). A plain top-level navigation to the web app's own /exec URL
+  // like this works fine; it's specifically loading it as an <img> inside
+  // the app's own already-open page that turned out to be unreliable (see
+  // imageUrlToDataUri_ below for how actual on-page images are handled).
   if (e && e.parameter && e.parameter.img) {
     return serveUploadedImage_(e.parameter.img);
   }
@@ -297,6 +296,70 @@ function getAppUrl_() {
 
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+/* ----------------------------------------------------------------------
+ * Uploaded-image delivery.
+ *
+ * Every attempt at hotlinking an uploaded photo — `uc?export=view`,
+ * `drive.google.com/thumbnail`, `lh3.googleusercontent.com/d/...`, and
+ * even this app's own doGet ?img= endpoint used directly as an <img src>
+ * — turned out unreliable for one browser or another, or (in the ?img=
+ * case) for ALL browsers at once. The common thread: all of those load
+ * the image as a separate resource fetched by the browser, and an <img>
+ * tag inside this app's own HtmlService-sandboxed page fetching from the
+ * app's own script.google.com address hits Google's redirect/consent
+ * handling for that flow inconsistently — it is not just a Safari quirk.
+ *
+ * The fix is to stop asking the browser to fetch the image as a separate
+ * resource at all. Every endpoint that hands image data to the browser
+ * (getPublicData, getServices, getStaff, getProducts, getGallery,
+ * getHeroSlides, getSettings, updateSettings) now converts a Drive-backed
+ * image reference into a `data:` URI — the actual image bytes, read
+ * server-side and embedded straight into the same google.script.run
+ * response already carrying everything else that page needs. That's the
+ * one delivery path already proven to work identically in every browser,
+ * because the rest of the app's data already relies on it.
+ * ------------------------------------------------------------------- */
+
+/**
+ * Recognizes a Drive-uploaded image reference in any format this app has
+ * ever generated — the current same-origin `?img=` link, or either of the
+ * two external Drive-hotlink formats used before it — and pulls out the
+ * file ID. Returns null for anything else (an external URL, e.g. a seeded
+ * Unsplash sample photo, or an empty value), which callers treat as
+ * "nothing to convert, use it as-is."
+ */
+function extractDriveFileId_(url) {
+  var s = String(url || '');
+  var m = s.match(/[?&]img=([a-zA-Z0-9_-]{15,})/) ||
+    s.match(/drive\.google\.com\/thumbnail\?id=([a-zA-Z0-9_-]{15,})/) ||
+    s.match(/lh3\.googleusercontent\.com\/d\/([a-zA-Z0-9_-]{15,})/);
+  return m ? m[1] : null;
+}
+
+/**
+ * Turns a Drive-uploaded image reference into a `data:` URI holding the
+ * actual image bytes. A non-Drive URL (external photo, or already blank)
+ * passes through unchanged; a Drive file that's since been deleted or had
+ * its sharing revoked degrades to '' rather than breaking the whole
+ * response it's part of.
+ */
+function imageUrlToDataUri_(url) {
+  var fileId = extractDriveFileId_(url);
+  if (!fileId) return url;
+  try {
+    var blob = DriveApp.getFileById(fileId).getBlob();
+    return 'data:' + blob.getContentType() + ';base64,' + Utilities.base64Encode(blob.getBytes());
+  } catch (err) {
+    return '';
+  }
+}
+
+/** Converts one image field to a data: URI on every item of a list, in place. */
+function withImageDataUris_(list, field) {
+  list.forEach(function (item) { if (item[field]) item[field] = imageUrlToDataUri_(item[field]); });
+  return list;
 }
 
 /* ============================================================================
@@ -338,6 +401,12 @@ function setupSheets() {
   if (def && def.getLastRow() === 0 && ss.getSheets().length > 1) {
     ss.deleteSheet(def);
   }
+
+  // Created up front rather than lazily on first upload, so the folder
+  // that will hold every uploaded photo (logo, staff, services, products,
+  // gallery, hero slides, payment proofs) exists from the very first run,
+  // not just after someone happens to upload something.
+  getOrCreateUploadFolder_();
 
   seedIfEmpty_();
   repairPhoneColumns_();
@@ -919,13 +988,15 @@ function getPublicData() {
     ? computeShopStatus_(parseWeeklyHours_(settings))
     : (branchStatus.length === 1 ? branchStatus[0].status : null);
 
+  if (settings.LogoURL) settings.LogoURL = imageUrlToDataUri_(settings.LogoURL);
+
   return {
     settings: settings,
     branches: branches.map(stripRow_),
-    services: services.map(stripRow_),
-    staff: staff.map(function (s) { return stripRow_(sanitizeStaff_(s)); }),
-    heroSlides: heroSlides.map(stripRow_),
-    gallery: gallery.map(stripRow_),
+    services: withImageDataUris_(services.map(stripRow_), 'ImageURL'),
+    staff: withImageDataUris_(staff.map(function (s) { return stripRow_(sanitizeStaff_(s)); }), 'PhotoURL'),
+    heroSlides: withImageDataUris_(heroSlides.map(stripRow_), 'ImageURL'),
+    gallery: withImageDataUris_(gallery.map(stripRow_), 'ImageURL'),
     videos: videos.map(stripRow_),
     reviews: reviews,
     shopStatus: shopStatus,
@@ -1176,7 +1247,8 @@ function isSlotAvailable_(branchId, staffId, date, timeSlot) {
 
 function getGallery(token) {
   requireAuth_(token);
-  return readAll_('Gallery').sort(function (a, b) { return Number(a.SortOrder) - Number(b.SortOrder); }).map(stripRow_);
+  var rows = readAll_('Gallery').sort(function (a, b) { return Number(a.SortOrder) - Number(b.SortOrder); }).map(stripRow_);
+  return withImageDataUris_(rows, 'ImageURL');
 }
 
 function saveGalleryItem(token, item) {
@@ -1256,7 +1328,7 @@ function getServices(token, branchId) {
   var scoped = scopeBranch_(user, branchId);
   var rows = readAll_('Services');
   if (scoped) rows = rows.filter(function (s) { return s.BranchID === scoped; });
-  return rows.map(stripRow_);
+  return withImageDataUris_(rows.map(stripRow_), 'ImageURL');
 }
 
 function saveService(token, service) {
@@ -1283,7 +1355,7 @@ function getStaff(token, branchId) {
   var scoped = scopeBranch_(user, branchId);
   var rows = readAll_('Staff');
   if (scoped) rows = rows.filter(function (s) { return s.BranchID === scoped; });
-  return rows.map(stripRow_);
+  return withImageDataUris_(rows.map(stripRow_), 'PhotoURL');
 }
 
 function saveStaff(token, staff) {
@@ -1619,7 +1691,7 @@ function getProducts(token, branchId) {
   var scoped = scopeBranch_(user, branchId);
   var rows = readAll_('Products');
   if (scoped) rows = rows.filter(function (p) { return p.BranchID === scoped; });
-  return rows.map(stripRow_);
+  return withImageDataUris_(rows.map(stripRow_), 'ImageURL');
 }
 
 function saveProduct(token, product) {
@@ -1828,7 +1900,9 @@ function getSettingsMap_() {
 
 function getSettings(token) {
   requireAuth_(token);
-  return getSettingsMap_();
+  var settings = getSettingsMap_();
+  if (settings.LogoURL) settings.LogoURL = imageUrlToDataUri_(settings.LogoURL);
+  return settings;
 }
 
 /**
@@ -1862,7 +1936,9 @@ function updateSettings(token, settingsObj) {
   if (existing.length) sheet.getRange(2, 1, existing.length, 2).setValues(existing);
   if (newRows.length) sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, 2).setValues(newRows);
 
-  return getSettingsMap_();
+  var settings = getSettingsMap_();
+  if (settings.LogoURL) settings.LogoURL = imageUrlToDataUri_(settings.LogoURL);
+  return settings;
 }
 
 /* ============================================================================
@@ -1871,7 +1947,8 @@ function updateSettings(token, settingsObj) {
 
 function getHeroSlides(token) {
   requireAuth_(token);
-  return readAll_('HeroSlides').sort(function (a, b) { return Number(a.SortOrder) - Number(b.SortOrder); }).map(stripRow_);
+  var rows = readAll_('HeroSlides').sort(function (a, b) { return Number(a.SortOrder) - Number(b.SortOrder); }).map(stripRow_);
+  return withImageDataUris_(rows, 'ImageURL');
 }
 
 function saveHeroSlide(token, slide) {
@@ -1942,6 +2019,12 @@ function getOrCreateUploadFolder_() {
   var it = DriveApp.getFoldersByName(UPLOAD_FOLDER_NAME);
   if (it.hasNext()) return it.next();
   return DriveApp.createFolder(UPLOAD_FOLDER_NAME);
+}
+
+/** Lets the Owner open the one Drive folder every uploaded photo lands in, straight from Branding & Theme settings. */
+function getUploadFolderUrl(token) {
+  requireAuth_(token);
+  return getOrCreateUploadFolder_().getUrl();
 }
 
 /* ============================================================================
