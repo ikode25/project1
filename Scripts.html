@@ -469,10 +469,7 @@ function afterTenantAuth() {
 }
 
 function renderTenantSignup() {
-  root().innerHTML =
-    '<div class="card" style="max-width:420px;margin:40px auto;">' +
-    '<h2 style="text-align:center;">Create Your Account</h2>' +
-    '<p class="muted" style="text-align:center;">Sign up to apply for a room, pay, and manage your tenancy.</p>' +
+  root().innerHTML = authShell('users', 'Create Your Account', 'Sign up to apply for a room, pay, and manage your tenancy.',
     '<form id="signup-form">' +
     '<div class="field"><label>Full Name</label><input id="su-name" required></div>' +
     '<div class="field"><label>Phone Number</label><input id="su-phone" type="tel" placeholder="024 XXX XXXX" required></div>' +
@@ -480,10 +477,10 @@ function renderTenantSignup() {
     '<div class="field"><label>Password</label><input id="su-password" type="password" required></div>' +
     '<div class="field"><label>Confirm Password</label><input id="su-password2" type="password" required></div>' +
     '<button class="btn btn-primary btn-block" type="submit">Sign Up</button>' +
-    '</form>' +
-    '<p class="mt-4" style="text-align:center;">Already have an account? <a href="#/tenant-login">Log in</a></p>' +
-    '<p style="text-align:center;"><a href="#/" class="muted">Back to listings</a></p>' +
-    '</div>';
+    '</form>',
+    '<span class="auth-link-muted">Already have an account? <a href="#/tenant-login">Log in</a></span>' +
+    '<span class="auth-link-back">' + icon('arrow-left', 14) + ' <a href="#/">Back to listings</a></span>'
+  );
   qs('#signup-form').addEventListener('submit', async function (ev) {
     ev.preventDefault();
     if (qs('#su-password').value !== qs('#su-password2').value) { toast('Passwords do not match.', 'error'); return; }
@@ -500,18 +497,16 @@ function renderTenantSignup() {
 }
 
 function renderTenantLogin() {
-  root().innerHTML =
-    '<div class="card" style="max-width:380px;margin:60px auto;">' +
-    '<h2 style="text-align:center;">Tenant Login</h2>' +
+  root().innerHTML = authShell('door', 'Tenant Login', 'Log in to view your tenancy, pay, and message your landlord.',
     '<form id="login-form">' +
     '<div class="field"><label>Phone or Email</label><input id="tl-id" required></div>' +
     '<div class="field"><label>Password</label><input id="tl-password" type="password" required></div>' +
     '<button class="btn btn-primary btn-block" type="submit">Log In</button>' +
-    '</form>' +
-    '<p class="mt-4" style="text-align:center;"><a href="#/tenant-forgot">Forgot password?</a></p>' +
-    '<p style="text-align:center;">New here? <a href="#/signup">Create an account</a></p>' +
-    '<p style="text-align:center;"><a href="#/" class="muted">Back to listings</a></p>' +
-    '</div>';
+    '</form>',
+    '<a href="#/tenant-forgot">Forgot password?</a>' +
+    '<span class="auth-link-muted">New here? <a href="#/signup">Create an account</a></span>' +
+    '<span class="auth-link-back">' + icon('arrow-left', 14) + ' <a href="#/">Back to listings</a></span>'
+  );
   qs('#login-form').addEventListener('submit', async function (ev) {
     ev.preventDefault();
     try {
@@ -523,9 +518,7 @@ function renderTenantLogin() {
 }
 
 function renderTenantForgot() {
-  root().innerHTML =
-    '<div class="card" style="max-width:380px;margin:60px auto;">' +
-    '<h2 style="text-align:center;">Reset Password</h2>' +
+  root().innerHTML = authShell('shield', 'Reset Password', 'Enter your phone number to receive a one-time code.',
     '<div id="forgot-step-phone">' +
     '<div class="field"><label>Phone Number</label><input id="fg-phone" type="tel" placeholder="024 XXX XXXX"></div>' +
     '<button class="btn btn-primary btn-block" id="fg-request-btn">Send Reset Code</button>' +
@@ -534,9 +527,9 @@ function renderTenantForgot() {
     '<div class="field"><label>6-digit code</label><input type="text" inputmode="numeric" maxlength="6" id="fg-code"></div>' +
     '<div class="field"><label>New Password</label><input type="password" id="fg-newpass"></div>' +
     '<button class="btn btn-primary btn-block" id="fg-reset-btn">Reset Password</button>' +
-    '</div>' +
-    '<p class="mt-4" style="text-align:center;"><a href="#/tenant-login">Back to login</a></p>' +
-    '</div>';
+    '</div>',
+    '<span class="auth-link-back">' + icon('arrow-left', 14) + ' <a href="#/tenant-login">Back to login</a></span>'
+  );
   var phoneVal = '';
   qs('#fg-request-btn').addEventListener('click', async function () {
     try {
@@ -1096,18 +1089,29 @@ async function pmSend() {
 
 // ---- Admin Login ------------------------------------------------------------------------
 
+// ---- Shared auth-card shell (tenant login/signup/forgot, admin login) ------------------
+// One consistent, deliberately-designed card instead of ad-hoc styling per screen: an
+// accent icon badge, title, optional subtitle, the caller's form, then a divider and a
+// footer of secondary links so primary vs. secondary actions read differently at a glance.
+function authShell(iconName, title, subtitle, formHtml, linksHtml) {
+  return '<div class="auth-page"><div class="auth-card">' +
+    '<div class="auth-badge">' + icon(iconName, 26) + '</div>' +
+    '<h2 class="auth-title">' + esc(title) + '</h2>' +
+    (subtitle ? '<p class="auth-subtitle">' + esc(subtitle) + '</p>' : '') +
+    formHtml +
+    (linksHtml ? '<hr class="auth-divider"><div class="auth-links">' + linksHtml + '</div>' : '') +
+    '</div></div>';
+}
+
 function renderAdminLogin() {
-  root().innerHTML =
-    '<div class="card" style="max-width:380px;margin:60px auto;">' +
-    '<h2 style="text-align:center;">' + icon('shield', 28) + '</h2>' +
-    '<h2 style="text-align:center;">Landlord / Admin Login</h2>' +
+  root().innerHTML = authShell('shield', 'Landlord / Admin Login', 'Manage your properties, tenants and bookings.',
     '<form id="login-form">' +
-    '<div class="field"><label>Email</label><input type="email" id="login-email" required></div>' +
+    '<div class="field"><label>Username</label><input type="text" id="login-email" placeholder="admin" autocapitalize="off" required></div>' +
     '<div class="field"><label>Password</label><input type="password" id="login-password" required></div>' +
     '<button class="btn btn-primary btn-block" type="submit">Log In</button>' +
-    '</form>' +
-    '<p class="mt-4" style="text-align:center;"><a href="#/">Back to public portal</a></p>' +
-    '</div>';
+    '</form>',
+    '<span class="auth-link-back">' + icon('arrow-left', 14) + ' <a href="#/">Back to public portal</a></span>'
+  );
   qs('#login-form').addEventListener('submit', async function (ev) {
     ev.preventDefault();
     try {
@@ -1922,7 +1926,14 @@ async function renderSettings() {
     var s = res.settings;
     root().innerHTML =
       '<h1>Settings</h1>' +
-      '<div class="card"><h3>Branding &amp; Contact</h3><form id="settings-form">' +
+      '<div class="card"><h3>My Account</h3><p class="muted" style="font-size:13px;">Signed in as ' + esc(STATE.user ? STATE.user.name : '') + ' (' + esc(STATE.user ? STATE.user.email : '') + ').</p>' +
+      '<form id="password-form">' +
+      '<div class="field"><label>Current Password</label><input type="password" id="pw-current" required></div>' +
+      '<div class="field"><label>New Password</label><input type="password" id="pw-new" required minlength="6"></div>' +
+      '<div class="field"><label>Confirm New Password</label><input type="password" id="pw-confirm" required minlength="6"></div>' +
+      '<button class="btn btn-primary" type="submit">Change Password</button>' +
+      '</form></div>' +
+      '<div class="card mt-4"><h3>Branding &amp; Contact</h3><form id="settings-form">' +
       SETTINGS_TEXT_FIELDS.map(function (f) { return '<div class="field"><label>' + f[1] + '</label><input id="s-' + f[0] + '" value="' + esc(s[f[0]]) + '"></div>'; }).join('') +
       '<div class="checkbox-row"><input type="checkbox" id="s-SmsEnabled" ' + (s.SmsEnabled === 'Y' ? 'checked' : '') + '><label for="s-SmsEnabled">Enable SMS sending</label></div>' +
       '<div class="checkbox-row mt-2"><input type="checkbox" id="s-EmailEnabled" ' + (s.EmailEnabled === 'Y' ? 'checked' : '') + '><label for="s-EmailEnabled">Enable Email sending</label></div>' +
@@ -1937,6 +1948,15 @@ async function renderSettings() {
       '<button class="btn" id="btn-triggers">Install Reminder Trigger</button>' +
       '<button class="btn" id="btn-export">Export Tenants CSV</button>' +
       '</div></div>';
+    qs('#password-form').addEventListener('submit', async function (ev) {
+      ev.preventDefault();
+      if (qs('#pw-new').value !== qs('#pw-confirm').value) { toast('New passwords do not match.', 'error'); return; }
+      try {
+        await apiAuth('changeMyPassword', qs('#pw-current').value, qs('#pw-new').value);
+        toast('Password changed.', 'success');
+        qs('#password-form').reset();
+      } catch (e) { toast(e.message, 'error'); }
+    });
     qs('#settings-form').addEventListener('submit', async function (ev) {
       ev.preventDefault();
       try {

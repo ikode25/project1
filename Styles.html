@@ -249,4 +249,27 @@ table.data-table { width: 100%; border-collapse: collapse; }
 
 /* ---- Payment proof thumbnail (Bookings inbox) ---------------------------------------- */
 .proof-thumb { width: 100%; max-width: 160px; border-radius: var(--radius); border: 1px solid var(--border); object-fit: cover; display: block; }
+
+/* ---- Auth screens (tenant/admin login, signup, forgot password) ---------------------- */
+.auth-page {
+  min-height: 80vh; display: flex; align-items: center; justify-content: center;
+  padding: var(--space-5) var(--space-4);
+}
+.auth-card {
+  width: 100%; max-width: 400px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 16px; box-shadow: var(--shadow); padding: var(--space-6) var(--space-5);
+}
+.auth-badge {
+  width: 56px; height: 56px; border-radius: 50%; background: var(--accent-soft); color: var(--accent);
+  display: flex; align-items: center; justify-content: center; margin: 0 auto var(--space-4);
+}
+.auth-title { text-align: center; margin-bottom: 4px; }
+.auth-subtitle { text-align: center; color: var(--muted); font-size: 13px; margin: 0 0 var(--space-5); line-height: 1.5; }
+.auth-card form .field:last-of-type { margin-bottom: var(--space-5); }
+.auth-divider { border: none; border-top: 1px solid var(--border); margin: var(--space-5) 0 var(--space-4); }
+.auth-links { display: flex; flex-direction: column; gap: var(--space-2); align-items: center; font-size: 13px; }
+.auth-links a { color: var(--accent); font-weight: 600; }
+.auth-links .auth-link-muted { color: var(--muted); }
+.auth-links .auth-link-muted a { color: var(--muted); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.auth-links .auth-link-back { color: var(--muted); display: inline-flex; align-items: center; gap: 4px; margin-top: var(--space-2); }
 </style>

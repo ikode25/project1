@@ -71,17 +71,18 @@ Apps Script adds that automatically). Save the project (Ctrl/Cmd+S).
    permissions**, choose your Google account, click **Advanced** → **Go to KEY & DEED
    (unsafe)** → **Allow**. This warning appears because the script isn't published on
    the Google marketplace — it's normal for a private script you wrote/pasted yourself.
-4. Once it finishes, open **View → Logs** (or press Ctrl+Enter). You'll see a message
-   like:
+4. Once it finishes, open **View → Logs** (or press Ctrl+Enter) to confirm it succeeded.
 
-   ```
-   Setup complete. Spreadsheet: https://docs.google.com/spreadsheets/d/xxxxx
-   Default admin login -> Email: admin@keydeed.local  Password: Change-Me-4821
-   Change this password immediately after first login (Settings > My Account).
-   ```
+5. The default admin account is created automatically with fixed credentials:
 
-5. **Write down that email and password.** You'll use it to log in as an admin in Step
-   5, and you should change it immediately afterwards.
+   - **Username:** `admin`
+   - **Password:** `admin123`
+
+   Use these to log in as an admin in Step 5. **Change this password immediately after
+   your first login** from **Settings → My Account**. Because this default is fixed and
+   publicly documented here, anyone who knows it could log in before you change it —
+   don't leave it as `admin` / `admin123` on a live deployment for longer than it takes
+   you to log in and change it.
 
 `setup()` is safe to run again at any time — it repairs missing tabs/columns/Drive
 folders instead of duplicating your data. You can also trigger it again later from
@@ -115,9 +116,8 @@ does not update the live URL.
 
 ## Step 6 — Change your password
 
-Log in, go to **Settings**, and change your password from the temporary one immediately.
-(If you don't see a "My Account" section, use **Users** as a SuperAdmin to reset the
-default admin's password from there.)
+Go to **Settings → My Account**, enter `admin123` as your current password, and set a
+new one. Do this before sharing the app's URL with anyone.
 
 ## Step 7 — Register an Arkesel Sender ID and add your API key
 

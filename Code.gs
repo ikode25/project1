@@ -558,7 +558,7 @@ function setup() {
   logAudit_('SYSTEM', 'SETUP', 'System', '', 'setup() completed');
   var msg = 'Setup complete. Spreadsheet: ' + ss.getUrl();
   if (admin && admin.tempPassword) {
-    msg += '\nDefault admin login -> Email: ' + admin.email + '  Password: ' + admin.tempPassword +
+    msg += '\nDefault admin login -> Username: ' + admin.email + '  Password: ' + admin.tempPassword +
       '\nChange this password immediately after first login (Settings > My Account).';
   }
   Logger.log(msg);
@@ -751,24 +751,29 @@ function ensureDefaultSettings_() {
 }
 
 /** Seeds a default SuperAdmin user (idempotent) and returns credentials only when newly created. */
+// Fixed, memorable default admin credentials, per explicit landlord request (this is a
+// single-landlord deployment they control end to end). This is weaker than a random
+// temp password — change it immediately after first login from Settings, or run
+// resetDefaultAdminPassword() below for a different fixed value.
+var DEFAULT_ADMIN_USERNAME = 'admin';
+var DEFAULT_ADMIN_PASSWORD = 'admin123';
+
 function ensureDefaultAdmin_() {
   var users = readTable_(SHEETS.USERS, { skipCache: true });
   var hasSuperAdmin = users.some(function (u) { return u.Role === 'SuperAdmin'; });
   if (hasSuperAdmin) return null;
-  var email = 'admin@keydeed.local';
-  var tempPassword = 'Change-Me-' + Math.floor(1000 + Math.random() * 9000);
   var salt = Utilities.getUuid();
   appendRow_(SHEETS.USERS, {
     Name: 'Default Admin',
-    Email: email,
+    Email: DEFAULT_ADMIN_USERNAME,
     Phone: '',
     Role: 'SuperAdmin',
-    PasswordHash: hashPassword_(tempPassword, salt),
+    PasswordHash: hashPassword_(DEFAULT_ADMIN_PASSWORD, salt),
     Salt: salt,
     Active: 'Y',
     LastLoginAt: ''
   }, 'USR');
-  return { email: email, tempPassword: tempPassword };
+  return { email: DEFAULT_ADMIN_USERNAME, tempPassword: DEFAULT_ADMIN_PASSWORD };
 }
 
 /**
@@ -2564,7 +2569,7 @@ function changeMyPassword(token, oldPassword, newPassword) {
  *
  * Usage: change RESET_PASSWORD below to whatever you want to log in with, select
  * resetDefaultAdminPassword from the function dropdown, click Run, then log in with
- * admin@keydeed.local and that password. Change it again from Settings afterwards.
+ * username "admin" and that password. Change it again from Settings afterwards.
  */
 function resetDefaultAdminPassword() {
   var RESET_PASSWORD = 'ChangeThisNow123'; // edit this line before running
