@@ -2,6 +2,21 @@
  * KEY & DEED — Ghana Tenancy Management System
  * Single Google Apps Script Web App backend.
  *
+ * The real-world flow this system encodes:
+ *   1. Public site lists every property/room (available AND rented, clearly badged).
+ *   2. A prospective tenant clicks "Rent this room" -> signs up / logs in (real account).
+ *   3. On signup the tenant automatically gets a welcome SMS + email telling them to
+ *      inspect the room and submit payment.
+ *   4. Tenant fills a Booking & Payment form: pays by bank/cash/mobile money and
+ *      uploads a screenshot as proof (or a note, for cash).
+ *   5. Landlord (admin) reviews the proof in the Bookings inbox and approves/rejects.
+ *   6. Only once approved does the Tenancy Agreement Form unlock for that tenant —
+ *      they fill in duration/payment/personal/guarantor details, sign, submit -> a
+ *      PDF is generated, the tenancy goes Active, and the room flips to Occupied.
+ *   7. The tenant portal lets them download the agreement, see their ledger, file
+ *      complaints (maintenance tickets), and message the landlord in-app or via
+ *      WhatsApp. The landlord's admin console manages/monitors every tenant.
+ *
  * File layout:
  *   Code.gs      - this file (server logic, organised in //region blocks below)
  *   index.html   - SPA shell, includes Styles.html + Scripts.html
@@ -22,7 +37,7 @@
 var APP_DEFAULT_NAME = 'KEY & DEED';
 var DB_FILE_NAME = 'KEY & DEED — Database';
 var ROOT_FOLDER_NAME = 'KEY & DEED';
-var SUBFOLDERS = ['Signatures', 'Agreements', 'Property Photos', 'Tenant Documents', 'Receipts', 'Notices'];
+var SUBFOLDERS = ['Signatures', 'Agreements', 'Property Photos', 'Tenant Documents', 'Receipts', 'Notices', 'Payment Proofs'];
 
 var PROP_KEY = {
   SS_ID: 'SS_ID',
@@ -41,12 +56,13 @@ var SHEETS = {
   ROOMS: 'Rooms',
   TENANTS: 'Tenants',
   TENANCIES: 'Tenancies',
-  APPLICATIONS: 'Applications',
+  BOOKINGS: 'Bookings',
   FORM_SCHEMA: 'FormSchema',
   PAYMENTS: 'Payments',
   REMINDERS: 'Reminders',
   NOTICES: 'Notices',
   MAINTENANCE: 'Maintenance',
+  MESSAGES: 'Messages',
   USERS: 'Users',
   AUDIT: 'AuditLog'
 };
@@ -63,13 +79,13 @@ SCHEMA[SHEETS.ROOMS] = ['ID', 'PropertyID', 'RoomLabel', 'RoomType', 'SizeSqM', 
   'PhotoFileIds', 'Status', 'AvailableFrom', 'ListedPublicly', 'CreatedAt', 'UpdatedAt'];
 SCHEMA[SHEETS.TENANTS] = ['ID', 'FullName', 'Phone', 'AltPhone', 'Email', 'GhanaCardNumber', 'DateOfBirth',
   'Gender', 'MaritalStatus', 'Occupation', 'Employer', 'EmployerPhone', 'NextOfKinName', 'NextOfKinPhone',
-  'GuarantorName', 'GuarantorPhone', 'GuarantorGhanaCard', 'PhotoFileId', 'IdDocFileId', 'PortalCode',
-  'Status', 'CreatedAt', 'UpdatedAt'];
-SCHEMA[SHEETS.TENANCIES] = ['ID', 'TenantID', 'PropertyID', 'RoomID', 'StartDate', 'AdvanceMonths',
+  'GuarantorName', 'GuarantorPhone', 'GuarantorGhanaCard', 'PhotoFileId', 'IdDocFileId',
+  'PasswordHash', 'Salt', 'Status', 'CreatedAt', 'UpdatedAt'];
+SCHEMA[SHEETS.TENANCIES] = ['ID', 'TenantID', 'PropertyID', 'RoomID', 'BookingID', 'StartDate', 'AdvanceMonths',
   'AdvanceAmount', 'MonthlyRent', 'Deposit', 'EndDate', 'PaymentMode', 'Status', 'AgreementPdfFileId',
   'SignatureFileId', 'SignedAt', 'RenewalCount', 'CreatedAt', 'UpdatedAt'];
-SCHEMA[SHEETS.APPLICATIONS] = ['ID', 'SubmittedAt', 'RoomID', 'FormVersion', 'PayloadJSON', 'TenantID',
-  'SignatureFileId', 'PdfFileId', 'Status', 'ReviewedBy', 'ReviewNotes', 'CreatedAt', 'UpdatedAt'];
+SCHEMA[SHEETS.BOOKINGS] = ['ID', 'TenantID', 'PropertyID', 'RoomID', 'RequestedAt', 'PaymentMethod', 'AmountGHS',
+  'ProofFileId', 'ProofNotes', 'Status', 'ReviewedBy', 'ReviewNotes', 'ReviewedAt', 'CreatedAt', 'UpdatedAt'];
 SCHEMA[SHEETS.FORM_SCHEMA] = ['ID', 'Section', 'Label', 'FieldKey', 'Type', 'Options', 'Required',
   'Placeholder', 'HelpText', 'Validation', 'SortOrder', 'Visible', 'Version', 'CreatedAt', 'UpdatedAt'];
 SCHEMA[SHEETS.PAYMENTS] = ['ID', 'TenancyID', 'TenantID', 'AmountGHS', 'PaymentDate', 'Channel',
@@ -82,6 +98,8 @@ SCHEMA[SHEETS.NOTICES] = ['ID', 'TenancyID', 'Type', 'IssuedOn', 'EffectiveDate'
 SCHEMA[SHEETS.MAINTENANCE] = ['ID', 'PropertyID', 'RoomID', 'TenantID', 'ReportedAt', 'Category',
   'Description', 'PhotoFileIds', 'Priority', 'Status', 'AssignedTo', 'CostGHS', 'ResolvedAt',
   'CreatedAt', 'UpdatedAt'];
+SCHEMA[SHEETS.MESSAGES] = ['ID', 'TenantID', 'SenderRole', 'SenderName', 'Body', 'SentAt',
+  'ReadByAdmin', 'ReadByTenant', 'CreatedAt', 'UpdatedAt'];
 SCHEMA[SHEETS.USERS] = ['ID', 'Name', 'Email', 'Phone', 'Role', 'PasswordHash', 'Salt', 'Active',
   'LastLoginAt', 'CreatedAt', 'UpdatedAt'];
 SCHEMA[SHEETS.AUDIT] = ['ID', 'Timestamp', 'Actor', 'Action', 'Entity', 'EntityID', 'Details', 'IpHint'];
@@ -122,6 +140,11 @@ var DEFAULT_SETTINGS = {
   OnboardingDone: 'N',
   ReceiptPrefix: 'KD',
   SmsRatePerSegment: '0.03',
+  WelcomeSmsTemplate: 'Welcome to {{AppName}}, {{TenantName}}! Please inspect {{RoomLabel}} at {{PropertyName}} and submit your payment on the portal to secure it. - {{LandlordName}} ({{LandlordPhone}})',
+  WelcomeEmailTemplate: 'Dear {{TenantName}}, thank you for signing up. Please arrange to inspect {{RoomLabel}} at {{PropertyName}}, then submit your payment (bank transfer, mobile money, or cash) with proof through the portal so {{LandlordName}} can confirm and unlock your Tenancy Agreement Form.',
+  BookingApprovedTemplate: 'Good news {{TenantName}}! Your payment for {{RoomLabel}} at {{PropertyName}} has been confirmed. Please log in to the portal to complete your Tenancy Agreement Form. - {{LandlordName}} ({{LandlordPhone}})',
+  BookingRejectedTemplate: 'Dear {{TenantName}}, we could not confirm your payment for {{RoomLabel}}: {{Reason}}. Please contact {{LandlordName}} on {{LandlordPhone}}.',
+  AgreementPendingTemplate: 'Dear {{TenantName}}, your payment for {{RoomLabel}} was confirmed but your Tenancy Agreement Form is still incomplete. Please log in to the portal to finish it and secure your room.',
   MessageTemplateRent1Month: 'Dear {{TenantName}}, your rent advance for {{RoomLabel}} at {{PropertyName}} expires on {{DueDate}} ({{DaysLeft}} days left). Please contact {{LandlordName}} on {{LandlordPhone}} to renew. - KEY & DEED',
   MessageTemplateRent1Week: 'Dear {{TenantName}}, reminder: your rent advance for {{RoomLabel}} expires on {{DueDate}}, just {{DaysLeft}} days away. Kindly arrange renewal with {{LandlordName}} ({{LandlordPhone}}).',
   MessageTemplateRent1Day: 'Dear {{TenantName}}, your rent advance for {{RoomLabel}} expires TOMORROW ({{DueDate}}). Please contact {{LandlordName}} ({{LandlordPhone}}) urgently.',
@@ -263,6 +286,9 @@ function safeCall_(actionName, fn) {
   }
 }
 
+// =====================================================================================
+// endregion
+// =====================================================================================
 
 // =====================================================================================
 // region: Sheet Data Access Layer
@@ -504,6 +530,9 @@ function logAudit_(actor, action, entity, entityId, details) {
   }
 }
 
+// =====================================================================================
+// endregion
+// =====================================================================================
 
 // =====================================================================================
 // region: Setup / Auto-Provisioning
@@ -610,7 +639,7 @@ function applyColumnFormats_(sh, sheetName, headers) {
     setValidation('Status', ['Active', 'Inactive']);
   }
   if (sheetName === SHEETS.ROOMS) {
-    setValidation('Status', ['Vacant', 'Occupied', 'Reserved', 'Maintenance']);
+    setValidation('Status', ['Vacant', 'Reserved', 'Occupied', 'Maintenance']);
     setValidation('Furnished', ['Y', 'N']);
     setValidation('ListedPublicly', ['Y', 'N']);
     setMoneyFmt('MonthlyRent');
@@ -618,19 +647,21 @@ function applyColumnFormats_(sh, sheetName, headers) {
     setDateFmt('AvailableFrom');
   }
   if (sheetName === SHEETS.TENANTS) {
-    setValidation('Status', ['Applicant', 'Active', 'Notice', 'Vacated', 'Rejected']);
+    setValidation('Status', ['New', 'AwaitingPayment', 'AwaitingApproval', 'AwaitingAgreement', 'Active', 'Notice', 'Vacated', 'Rejected']);
     setValidation('Gender', ['Male', 'Female']);
     setDateFmt('DateOfBirth');
   }
   if (sheetName === SHEETS.TENANCIES) {
     setValidation('PaymentMode', ['Advance', 'Monthly']);
-    setValidation('Status', ['Pending', 'Active', 'ExpiringSoon', 'Expired', 'Terminated']);
+    setValidation('Status', ['AwaitingAgreement', 'Active', 'ExpiringSoon', 'Expired', 'Notice', 'Terminated']);
     setDateFmt('StartDate'); setDateFmt('EndDate'); setDateFmt('SignedAt');
     setMoneyFmt('AdvanceAmount'); setMoneyFmt('MonthlyRent'); setMoneyFmt('Deposit');
   }
-  if (sheetName === SHEETS.APPLICATIONS) {
-    setValidation('Status', ['New', 'Reviewed', 'Approved', 'Rejected']);
-    setDateFmt('SubmittedAt');
+  if (sheetName === SHEETS.BOOKINGS) {
+    setValidation('PaymentMethod', ['Bank Transfer', 'Mobile Money', 'Cash']);
+    setValidation('Status', ['Submitted', 'Approved', 'Rejected']);
+    setDateFmt('RequestedAt'); setDateFmt('ReviewedAt');
+    setMoneyFmt('AmountGHS');
   }
   if (sheetName === SHEETS.FORM_SCHEMA) {
     setValidation('Type', ['text', 'tel', 'email', 'number', 'date', 'select', 'radio', 'checkbox',
@@ -645,7 +676,7 @@ function applyColumnFormats_(sh, sheetName, headers) {
   }
   if (sheetName === SHEETS.REMINDERS) {
     setValidation('Type', ['Rent-1Month', 'Rent-1Week', 'Rent-1Day', 'Rent-Overdue', 'Notice-3Month',
-      'Notice-2Month', 'Notice-1Month', 'Notice-1Week', 'Notice-1Day', 'Custom']);
+      'Notice-2Month', 'Notice-1Month', 'Notice-1Week', 'Notice-1Day', 'AgreementPending', 'Custom']);
     setDateFmt('ScheduledFor'); setDateFmt('SentAt');
   }
   if (sheetName === SHEETS.NOTICES) {
@@ -656,6 +687,12 @@ function applyColumnFormats_(sh, sheetName, headers) {
     setValidation('Priority', ['Low', 'Medium', 'High', 'Urgent']);
     setValidation('Status', ['Open', 'In Progress', 'Resolved']);
     setMoneyFmt('CostGHS');
+  }
+  if (sheetName === SHEETS.MESSAGES) {
+    setValidation('SenderRole', ['Tenant', 'Admin']);
+    setValidation('ReadByAdmin', ['Y', 'N']);
+    setValidation('ReadByTenant', ['Y', 'N']);
+    setDateFmt('SentAt');
   }
   if (sheetName === SHEETS.USERS) {
     setValidation('Role', ['SuperAdmin', 'Landlord', 'Caretaker', 'Viewer']);
@@ -734,31 +771,33 @@ function ensureDefaultAdmin_() {
   return { email: email, tempPassword: tempPassword };
 }
 
-/** Seeds the default Tenancy Agreement form schema so the form is never empty on first run. */
+/**
+ * Seeds the default Tenancy Agreement Form schema so the form is never empty on first
+ * run. This is the form a tenant fills AFTER their booking payment is approved — it
+ * captures personal/guarantor details and the signature; term/payment figures are
+ * shown read-only (pulled from the Room and the approved Booking), not re-typed.
+ */
 function ensureDefaultFormSchema_() {
   var existing = readTable_(SHEETS.FORM_SCHEMA, { skipCache: true });
   if (existing.length) return;
   var defs = [
     ['Personal Details', 'Full Name', 'FullName', 'text', '', 'Y', 'e.g. Kwame Mensah', '', '', 1],
-    ['Personal Details', 'Phone Number', 'Phone', 'tel', '', 'Y', '024 XXX XXXX', 'We will send your login code here', '', 2],
-    ['Personal Details', 'Alternative Phone', 'AltPhone', 'tel', '', 'N', '054 XXX XXXX', '', '', 3],
-    ['Personal Details', 'Email Address', 'Email', 'email', '', 'N', 'name@example.com', '', '', 4],
-    ['Personal Details', 'Ghana Card Number', 'GhanaCardNumber', 'text', '', 'Y', 'GHA-XXXXXXXXX-X', '', '^GHA-\\d{9}-\\d$', 5],
-    ['Personal Details', 'Date of Birth', 'DateOfBirth', 'date', '', 'Y', '', '', '', 6],
-    ['Personal Details', 'Gender', 'Gender', 'select', 'Male,Female', 'Y', '', '', '', 7],
-    ['Personal Details', 'Marital Status', 'MaritalStatus', 'select', 'Single,Married,Divorced,Widowed', 'N', '', '', '', 8],
-    ['Employment & Guarantor', 'Occupation', 'Occupation', 'text', '', 'Y', 'e.g. Trader, Teacher', '', '', 9],
-    ['Employment & Guarantor', 'Employer', 'Employer', 'text', '', 'N', '', '', '', 10],
-    ['Employment & Guarantor', 'Employer Phone', 'EmployerPhone', 'tel', '', 'N', '', '', '', 11],
-    ['Employment & Guarantor', 'Next of Kin Name', 'NextOfKinName', 'text', '', 'Y', '', '', '', 12],
-    ['Employment & Guarantor', 'Next of Kin Phone', 'NextOfKinPhone', 'tel', '', 'Y', '', '', '', 13],
-    ['Employment & Guarantor', 'Guarantor Name', 'GuarantorName', 'text', '', 'Y', '', '', '', 14],
-    ['Employment & Guarantor', 'Guarantor Phone', 'GuarantorPhone', 'tel', '', 'Y', '', '', '', 15],
-    ['Employment & Guarantor', 'Guarantor Ghana Card', 'GuarantorGhanaCard', 'text', '', 'N', 'GHA-XXXXXXXXX-X', '', '', 16],
-    ['Documents', 'Passport Photo', 'PhotoFile', 'file', '', 'N', '', 'Max 5MB', '', 17],
-    ['Documents', 'Ghana Card Scan', 'IdDocFile', 'file', '', 'Y', '', 'Front and back, max 5MB', '', 18],
-    ['Declaration & Signature', 'I confirm the information above is accurate', 'Declaration', 'checkbox', '', 'Y', '', '', '', 19],
-    ['Declaration & Signature', 'Signature', 'Signature', 'signature', '', 'Y', '', 'Draw or upload your signature', '', 20]
+    ['Personal Details', 'Ghana Card Number', 'GhanaCardNumber', 'text', '', 'Y', 'GHA-XXXXXXXXX-X', '', '^GHA-\\d{9}-\\d$', 2],
+    ['Personal Details', 'Date of Birth', 'DateOfBirth', 'date', '', 'Y', '', '', '', 3],
+    ['Personal Details', 'Gender', 'Gender', 'select', 'Male,Female', 'Y', '', '', '', 4],
+    ['Personal Details', 'Marital Status', 'MaritalStatus', 'select', 'Single,Married,Divorced,Widowed', 'N', '', '', '', 5],
+    ['Employment & Guarantor', 'Occupation', 'Occupation', 'text', '', 'Y', 'e.g. Trader, Teacher', '', '', 6],
+    ['Employment & Guarantor', 'Employer', 'Employer', 'text', '', 'N', '', '', '', 7],
+    ['Employment & Guarantor', 'Employer Phone', 'EmployerPhone', 'tel', '', 'N', '', '', '', 8],
+    ['Employment & Guarantor', 'Next of Kin Name', 'NextOfKinName', 'text', '', 'Y', '', '', '', 9],
+    ['Employment & Guarantor', 'Next of Kin Phone', 'NextOfKinPhone', 'tel', '', 'Y', '', '', '', 10],
+    ['Employment & Guarantor', 'Guarantor Name', 'GuarantorName', 'text', '', 'Y', '', '', '', 11],
+    ['Employment & Guarantor', 'Guarantor Phone', 'GuarantorPhone', 'tel', '', 'Y', '', '', '', 12],
+    ['Employment & Guarantor', 'Guarantor Ghana Card', 'GuarantorGhanaCard', 'text', '', 'N', 'GHA-XXXXXXXXX-X', '', '', 13],
+    ['Documents', 'Passport Photo', 'PhotoFile', 'file', '', 'N', '', 'Max 5MB', '', 14],
+    ['Documents', 'Ghana Card Scan', 'IdDocFile', 'file', '', 'Y', '', 'Front and back, max 5MB', '', 15],
+    ['Declaration & Signature', 'I confirm the information above is accurate', 'Declaration', 'checkbox', '', 'Y', '', '', '', 16],
+    ['Declaration & Signature', 'Signature', 'Signature', 'signature', '', 'Y', '', 'Draw or upload your signature', '', 17]
   ];
   defs.forEach(function (d) {
     appendRow_(SHEETS.FORM_SCHEMA, {
@@ -901,44 +940,10 @@ function whoAmI(token) {
   });
 }
 
-// ---- Tenant self-service login (phone + SMS code) ------------------------------------
-
-function tenantRequestCode(phoneRaw) {
-  return safeCall_('tenantRequestCode', function () {
-    var phone = normalizePhoneGh_(phoneRaw);
-    if (!phone) throw new Error('Enter a valid Ghanaian mobile number.');
-    checkRateLimit_('tenant_code', phone);
-    var tenant = findOneBy_(SHEETS.TENANTS, 'Phone', phone);
-    if (!tenant) throw new Error('No tenant record found for that phone number.');
-    var code = String(Math.floor(100000 + Math.random() * 900000));
-    var salt = Utilities.getUuid();
-    CacheService.getScriptCache().put(CACHE_PREFIX + 'tcode_' + phone, JSON.stringify({
-      hash: hashPassword_(code, salt), salt: salt, tenantId: tenant.ID
-    }), 600); // 10-minute expiry
-    var settings = getSettings_();
-    var message = 'Your KEY & DEED portal login code is ' + code + '. Valid for 10 minutes.';
-    SmsService.send([phone], message);
-    return { sent: true, maskedPhone: phone.substring(0, 7) + 'XXXX' };
-  });
-}
-
-function tenantVerifyCode(phoneRaw, code) {
-  return safeCall_('tenantVerifyCode', function () {
-    var phone = normalizePhoneGh_(phoneRaw);
-    if (!phone) throw new Error('Invalid phone number.');
-    var raw = CacheService.getScriptCache().get(CACHE_PREFIX + 'tcode_' + phone);
-    if (!raw) throw new Error('Code expired. Please request a new one.');
-    var record = JSON.parse(raw);
-    if (hashPassword_(code, record.salt) !== record.hash) throw new Error('Incorrect code.');
-    CacheService.getScriptCache().remove(CACHE_PREFIX + 'tcode_' + phone);
-    var token = makeSessionToken_();
-    var tenant = getById_(SHEETS.TENANTS, record.tenantId);
-    var session = { tenantId: tenant.ID, name: tenant.FullName, role: 'Tenant', phone: tenant.Phone };
-    CacheService.getScriptCache().put(CACHE_PREFIX + 'sess_' + token, JSON.stringify(session), SESSION_TTL_SEC);
-    logAudit_(tenant.FullName, 'LOGIN', 'Tenant', tenant.ID, 'Portal login');
-    return { token: token, tenant: session };
-  });
-}
+// ---- Tenant self-service: real signup/login accounts ---------------------------------
+// The tenant portal uses a real account (name/phone/email/password), not a one-time
+// code — matching "tenant will have a portal to sign up and login". A 6-digit SMS code
+// is still used, but only as the "forgot password" recovery path (see below).
 
 function requireTenant_(token) {
   var session = getSession_(token);
@@ -946,12 +951,134 @@ function requireTenant_(token) {
   return session;
 }
 
+function tenantSessionFor_(tenant) {
+  return { tenantId: tenant.ID, name: tenant.FullName, role: 'Tenant', phone: tenant.Phone, email: tenant.Email };
+}
+
+function issueTenantSession_(tenant) {
+  var token = makeSessionToken_();
+  var session = tenantSessionFor_(tenant);
+  CacheService.getScriptCache().put(CACHE_PREFIX + 'sess_' + token, JSON.stringify(session), SESSION_TTL_SEC);
+  return { token: token, tenant: session };
+}
+
+/**
+ * Tenant self-signup. Creates the tenant account, then automatically sends the
+ * welcome SMS + email telling them to inspect the room and submit payment. If
+ * `roomId` is supplied (tenant arrived via "Rent this room"), the welcome message
+ * names that specific room/property.
+ */
+function tenantSignup(data) {
+  return safeCall_('tenantSignup', function () {
+    var lock = LockService.getScriptLock();
+    lock.waitLock(30000);
+    try {
+      if (!data.fullName || !data.password) throw new Error('Name and password are required.');
+      if (String(data.password).length < 6) throw new Error('Password must be at least 6 characters.');
+      var phone = normalizePhoneGh_(data.phone);
+      if (!phone) throw new Error('Enter a valid Ghanaian mobile number.');
+      if (findOneBy_(SHEETS.TENANTS, 'Phone', phone)) throw new Error('An account with this phone number already exists. Please log in instead.');
+      if (data.email) {
+        var existingEmail = findOneBy_(SHEETS.TENANTS, 'Email', data.email.toLowerCase().trim());
+        if (existingEmail) throw new Error('An account with this email already exists. Please log in instead.');
+      }
+      var salt = Utilities.getUuid();
+      var tenant = appendRow_(SHEETS.TENANTS, {
+        FullName: data.fullName, Phone: phone, Email: (data.email || '').toLowerCase().trim(),
+        PasswordHash: hashPassword_(data.password, salt), Salt: salt, Status: 'New'
+      }, 'TNT');
+
+      var settings = getSettings_();
+      var room = data.roomId ? getById_(SHEETS.ROOMS, data.roomId) : null;
+      var property = room ? getById_(SHEETS.PROPERTIES, room.PropertyID) : null;
+      var tokens = {
+        AppName: settings.AppName, TenantName: tenant.FullName,
+        RoomLabel: room ? room.RoomLabel : 'your chosen room', PropertyName: property ? property.PropertyName : 'the property',
+        LandlordName: settings.LandlordName, LandlordPhone: settings.LandlordPhone
+      };
+      if (settings.SmsEnabled === 'Y') SmsService.send([phone], mergeTokens_(settings.WelcomeSmsTemplate, tokens));
+      if (settings.EmailEnabled === 'Y' && tenant.Email) {
+        EmailService.send(tenant.Email, 'Welcome to ' + settings.AppName,
+          '<p>' + escapeHtml_(mergeTokens_(settings.WelcomeEmailTemplate, tokens)) + '</p>', []);
+      }
+      logAudit_(tenant.FullName, 'SIGNUP', 'Tenant', tenant.ID, 'Self-signup');
+      return issueTenantSession_(tenant);
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+/** Tenant login with phone or email + password. */
+function tenantLogin(identifier, password) {
+  return safeCall_('tenantLogin', function () {
+    if (!identifier || !password) throw new Error('Enter your phone/email and password.');
+    checkRateLimit_('tenant_login', String(identifier).toLowerCase());
+    var phone = normalizePhoneGh_(identifier);
+    var tenant = phone ? findOneBy_(SHEETS.TENANTS, 'Phone', phone) : findOneBy_(SHEETS.TENANTS, 'Email', String(identifier).toLowerCase().trim());
+    if (!tenant || !tenant.PasswordHash) throw new Error('Invalid login details.');
+    if (hashPassword_(password, tenant.Salt) !== tenant.PasswordHash) throw new Error('Invalid login details.');
+    clearRateLimit_('tenant_login', String(identifier).toLowerCase());
+    logAudit_(tenant.FullName, 'LOGIN', 'Tenant', tenant.ID, 'Portal login');
+    return issueTenantSession_(tenant);
+  });
+}
+
+/** Forgot-password recovery: sends a 6-digit SMS code, 10-minute expiry, rate-limited. */
+function tenantRequestPasswordReset(phoneRaw) {
+  return safeCall_('tenantRequestPasswordReset', function () {
+    var phone = normalizePhoneGh_(phoneRaw);
+    if (!phone) throw new Error('Enter a valid Ghanaian mobile number.');
+    checkRateLimit_('tenant_reset', phone);
+    var tenant = findOneBy_(SHEETS.TENANTS, 'Phone', phone);
+    if (!tenant) throw new Error('No account found for that phone number.');
+    var code = String(Math.floor(100000 + Math.random() * 900000));
+    var salt = Utilities.getUuid();
+    CacheService.getScriptCache().put(CACHE_PREFIX + 'reset_' + phone, JSON.stringify({
+      hash: hashPassword_(code, salt), salt: salt, tenantId: tenant.ID
+    }), 600);
+    SmsService.send([phone], 'Your KEY & DEED password reset code is ' + code + '. Valid for 10 minutes.');
+    return { sent: true };
+  });
+}
+
+function tenantResetPassword(phoneRaw, code, newPassword) {
+  return safeCall_('tenantResetPassword', function () {
+    var phone = normalizePhoneGh_(phoneRaw);
+    var raw = CacheService.getScriptCache().get(CACHE_PREFIX + 'reset_' + phone);
+    if (!raw) throw new Error('Code expired. Please request a new one.');
+    var record = JSON.parse(raw);
+    if (hashPassword_(code, record.salt) !== record.hash) throw new Error('Incorrect code.');
+    if (String(newPassword).length < 6) throw new Error('Password must be at least 6 characters.');
+    CacheService.getScriptCache().remove(CACHE_PREFIX + 'reset_' + phone);
+    var newSalt = Utilities.getUuid();
+    updateById_(SHEETS.TENANTS, record.tenantId, { PasswordHash: hashPassword_(newPassword, newSalt), Salt: newSalt });
+    logAudit_('SYSTEM', 'PASSWORD_RESET', 'Tenant', record.tenantId, '');
+    return { reset: true };
+  });
+}
+
+// =====================================================================================
+// endregion
+// =====================================================================================
 
 // =====================================================================================
 // region: Public Portal API
 // =====================================================================================
 // One consolidated payload per screen — the public portal loads its entire catalogue
-// in a single call and filters client-side, per the speed requirements.
+// in a single call and filters client-side, per the speed requirements. Every room is
+// shown — vacant ("Available") and occupied ("Rented") alike — so a prospective tenant
+// can see the full picture of a landlord's portfolio, not just the vacancies.
+
+/** Builds a no-API-key Google Maps embed URL from a property's address fields. */
+function mapEmbedUrl_(property) {
+  var query = property.GhanaPostGPS || (property.StreetAddress + ', ' + property.Town + ', ' + property.Region + ', Ghana');
+  return 'https://maps.google.com/maps?q=' + encodeURIComponent(query) + '&output=embed';
+}
+function mapDirectionsUrl_(property) {
+  var query = property.GhanaPostGPS || (property.Town + ' ' + property.Region + ', Ghana');
+  return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(query);
+}
 
 function getPublicListings() {
   return safeCall_('getPublicListings', function () {
@@ -959,11 +1086,10 @@ function getPublicListings() {
     if (settings.PublicPortalEnabled !== 'Y') return { enabled: false, rooms: [], properties: [] };
     var properties = readTable_(SHEETS.PROPERTIES).filter(function (p) { return p.Status === 'Active'; });
     var propMap = indexById_(properties);
-    var rooms = readTable_(SHEETS.ROOMS).filter(function (r) {
-      return r.Status === 'Vacant' && r.ListedPublicly === 'Y' && propMap[r.PropertyID];
-    });
+    var rooms = readTable_(SHEETS.ROOMS).filter(function (r) { return r.ListedPublicly === 'Y' && propMap[r.PropertyID]; });
     var listings = rooms.map(function (r) {
       var p = propMap[r.PropertyID];
+      var availability = r.Status === 'Vacant' ? 'Available' : (r.Status === 'Maintenance' ? 'Unavailable' : 'Rented');
       return {
         roomId: r.ID, propertyId: p.ID, propertyName: p.PropertyName, propertyType: p.PropertyType,
         region: p.Region, town: p.Town, ghanaPostGPS: p.GhanaPostGPS,
@@ -972,7 +1098,8 @@ function getPublicListings() {
         deposit: r.Deposit, amenities: (r.Amenities || '').split(',').filter(Boolean),
         photoFileIds: (r.PhotoFileIds || '').split(',').filter(Boolean),
         propertyPhotoFileIds: (p.PhotoFileIds || '').split(',').filter(Boolean),
-        availableFrom: formatDate_(r.AvailableFrom), rentFormatted: formatGHS_(r.MonthlyRent)
+        availableFrom: formatDate_(r.AvailableFrom), rentFormatted: formatGHS_(r.MonthlyRent),
+        availability: availability, status: r.Status
       };
     });
     return {
@@ -988,13 +1115,15 @@ function getRoomDetail(roomId) {
     if (!room) throw new Error('Room not found.');
     var property = getById_(SHEETS.PROPERTIES, room.PropertyID);
     var settings = getSettings_();
+    var availability = room.Status === 'Vacant' ? 'Available' : (room.Status === 'Maintenance' ? 'Unavailable' : 'Rented');
     return {
-      room: room, property: property,
+      room: room, property: property, availability: availability,
       photoFileIds: (room.PhotoFileIds || '').split(',').filter(Boolean),
       propertyPhotoFileIds: (property.PhotoFileIds || '').split(',').filter(Boolean),
       amenities: (room.Amenities || '').split(',').filter(Boolean),
       rentFormatted: formatGHS_(room.MonthlyRent),
       depositFormatted: formatGHS_(room.Deposit),
+      mapEmbedUrl: mapEmbedUrl_(property), mapDirectionsUrl: mapDirectionsUrl_(property),
       landlordPhone: settings.LandlordPhone, appName: settings.AppName
     };
   });
@@ -1007,6 +1136,8 @@ function getRoomDetail(roomId) {
 // =====================================================================================
 // region: Form Schema API
 // =====================================================================================
+// Drives the Tenancy Agreement Form (the form a tenant fills after their booking
+// payment is approved) — never hard-coded, always rendered from this table.
 
 function getFormSchema() {
   return safeCall_('getFormSchema', function () {
@@ -1025,7 +1156,7 @@ function getFormSchemaAdmin(token) {
   });
 }
 
-var CORE_FIELD_KEYS = ['FullName', 'Phone', 'GhanaCardNumber', 'Signature'];
+var CORE_FIELD_KEYS = ['FullName', 'GhanaCardNumber', 'Signature'];
 
 function saveFormField(token, field) {
   return safeCall_('saveFormField', function () {
@@ -1091,7 +1222,8 @@ var MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // 5MB client-side guard mirrored server
 
 /**
  * Saves a base64 data-URI (or raw base64) payload to the given Drive subfolder.
- * Returns the Drive file ID. Used for signatures, ID scans, photos and generated PDFs.
+ * Returns the Drive file ID. Used for signatures, ID scans, photos, payment proofs
+ * and generated PDFs.
  */
 function saveBase64File_(base64Data, mimeType, folderName, filenameHint) {
   var cleaned = base64Data.indexOf(',') !== -1 ? base64Data.split(',')[1] : base64Data;
@@ -1103,13 +1235,13 @@ function saveBase64File_(base64Data, mimeType, folderName, filenameHint) {
   return file.getId();
 }
 
-/** Public-facing wrapper for tenant/applicant signature + document uploads. */
+/** Public-facing wrapper for tenant signature/document/payment-proof uploads. */
 function uploadFile(payload) {
   return safeCall_('uploadFile', function () {
-    var kind = payload.kind; // 'signature' | 'idDoc' | 'photo' | 'ticketPhoto'
+    var kind = payload.kind; // 'signature' | 'idDoc' | 'photo' | 'ticketPhoto' | 'proof' | 'propertyPhoto'
     var folderMap = {
       signature: 'Signatures', idDoc: 'Tenant Documents', photo: 'Tenant Documents',
-      ticketPhoto: 'Tenant Documents', propertyPhoto: 'Property Photos'
+      ticketPhoto: 'Tenant Documents', propertyPhoto: 'Property Photos', proof: 'Payment Proofs'
     };
     var folder = folderMap[kind] || 'Tenant Documents';
     var fileId = saveBase64File_(payload.base64, payload.mimeType, folder, payload.filename);
@@ -1131,125 +1263,6 @@ function getThumbUrl(fileId, size) {
     if (!fileId) return { url: '' };
     return { url: 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w' + (size || 400) };
   });
-}
-
-// =====================================================================================
-// endregion
-// =====================================================================================
-
-// =====================================================================================
-// region: Application Submission
-// =====================================================================================
-
-/**
- * Handles the tenant-facing multi-step form submission. Server-side re-validates
- * required fields and Ghana Card format even though the client already checked.
- * Creates/merges the Tenant record, writes the Application, generates a draft
- * tenancy agreement PDF, and emails copies to the tenant + admins.
- */
-function submitApplication(payload) {
-  return safeCall_('submitApplication', function () {
-    var lock = LockService.getScriptLock();
-    lock.waitLock(30000);
-    try {
-      var schema = readTable_(SHEETS.FORM_SCHEMA).filter(function (f) { return f.Visible === 'Y'; });
-      var answers = payload.answers || {};
-
-      // Server-side re-validation
-      schema.forEach(function (f) {
-        if (f.Type === 'heading' || f.Type === 'divider') return;
-        var val = answers[f.FieldKey];
-        if (f.Required === 'Y' && (val === undefined || val === null || val === '')) {
-          throw new Error('Missing required field: ' + f.Label);
-        }
-        if (f.Validation && val) {
-          var re = new RegExp(f.Validation);
-          if (!re.test(val)) throw new Error(f.Label + ' is not in the expected format.');
-        }
-      });
-
-      var phone = normalizePhoneGh_(answers.Phone);
-      if (!phone) throw new Error('Phone number is not a valid Ghanaian mobile number.');
-
-      var room = getById_(SHEETS.ROOMS, payload.roomId);
-      if (!room) throw new Error('Selected room could not be found.');
-      var property = getById_(SHEETS.PROPERTIES, room.PropertyID);
-
-      // Merge into Tenants: reuse an existing record for this phone if present.
-      var existingTenant = findOneBy_(SHEETS.TENANTS, 'Phone', phone);
-      var portalCodeSalt = Utilities.getUuid();
-      var tenantFields = {
-        FullName: answers.FullName, Phone: phone, AltPhone: normalizePhoneGh_(answers.AltPhone) || answers.AltPhone || '',
-        Email: answers.Email || '', GhanaCardNumber: answers.GhanaCardNumber || '',
-        DateOfBirth: answers.DateOfBirth || '', Gender: answers.Gender || '', MaritalStatus: answers.MaritalStatus || '',
-        Occupation: answers.Occupation || '', Employer: answers.Employer || '', EmployerPhone: answers.EmployerPhone || '',
-        NextOfKinName: answers.NextOfKinName || '', NextOfKinPhone: answers.NextOfKinPhone || '',
-        GuarantorName: answers.GuarantorName || '', GuarantorPhone: answers.GuarantorPhone || '',
-        GuarantorGhanaCard: answers.GuarantorGhanaCard || '',
-        PhotoFileId: answers.PhotoFile || (existingTenant ? existingTenant.PhotoFileId : ''),
-        IdDocFileId: answers.IdDocFile || (existingTenant ? existingTenant.IdDocFileId : ''),
-        Status: 'Applicant'
-      };
-      var tenant;
-      if (existingTenant) {
-        tenant = updateById_(SHEETS.TENANTS, existingTenant.ID, tenantFields);
-      } else {
-        tenantFields.PortalCode = '';
-        tenant = appendRow_(SHEETS.TENANTS, tenantFields, 'TNT');
-      }
-
-      var signatureFileId = answers.Signature || '';
-
-      var application = appendRow_(SHEETS.APPLICATIONS, {
-        SubmittedAt: new Date(), RoomID: room.ID, FormVersion: (schema[0] && schema[0].Version) || 1,
-        PayloadJSON: JSON.stringify(answers), TenantID: tenant.ID, SignatureFileId: signatureFileId,
-        Status: 'New'
-      }, 'APP');
-
-      // Draft agreement PDF for the applicant's own records (terms confirmed on approval).
-      var pdfFileId = generateAgreementPdf_({
-        tenant: tenant, property: property, room: room,
-        advanceMonths: room.MinAdvanceMonths || 12, advanceAmount: (room.MonthlyRent || 0) * (room.MinAdvanceMonths || 12),
-        startDate: new Date(), signatureFileId: signatureFileId, draft: true
-      });
-      updateById_(SHEETS.APPLICATIONS, application.ID, { PdfFileId: pdfFileId });
-
-      var settings = getSettings_();
-      var pdfBlob = DriveApp.getFileById(pdfFileId).getBlob();
-      if (tenant.Email && settings.EmailEnabled === 'Y') {
-        EmailService.send(tenant.Email, 'Your Tenancy Application — ' + settings.AppName,
-          buildApplicantEmailHtml_(tenant, property, room, settings), [pdfBlob]);
-      }
-      var adminEmails = (settings.AdminEmails || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
-      adminEmails.forEach(function (addr) {
-        EmailService.send(addr, 'New Tenancy Application — ' + tenant.FullName,
-          buildAdminNotifyEmailHtml_(tenant, property, room, settings), [pdfBlob]);
-      });
-
-      logAudit_(tenant.FullName, 'SUBMIT', 'Application', application.ID, 'Room ' + room.RoomLabel);
-      return { applicationId: application.ID, tenantId: tenant.ID, pdfFileId: pdfFileId, downloadUrl: 'https://drive.google.com/uc?export=download&id=' + pdfFileId };
-    } finally {
-      lock.releaseLock();
-    }
-  });
-}
-
-function buildApplicantEmailHtml_(tenant, property, room, settings) {
-  return '<table style="font-family:Arial,sans-serif;color:#111827;max-width:560px;">' +
-    '<tr><td><h2 style="margin:0 0 12px;">Application received</h2>' +
-    '<p>Dear ' + escapeHtml_(tenant.FullName) + ',</p>' +
-    '<p>Thank you for applying for <strong>' + escapeHtml_(room.RoomLabel) + '</strong> at ' +
-    escapeHtml_(property.PropertyName) + '. Your draft tenancy agreement is attached as a PDF.</p>' +
-    '<p>' + escapeHtml_(settings.LandlordName) + ' will be in touch on ' + escapeHtml_(settings.LandlordPhone) + '.</p>' +
-    '<p style="color:#6B7280;font-size:12px;">' + escapeHtml_(settings.PdfFooterText) + '</p></td></tr></table>';
-}
-
-function buildAdminNotifyEmailHtml_(tenant, property, room, settings) {
-  return '<table style="font-family:Arial,sans-serif;color:#111827;max-width:560px;">' +
-    '<tr><td><h2 style="margin:0 0 12px;">New application</h2>' +
-    '<p><strong>' + escapeHtml_(tenant.FullName) + '</strong> (' + escapeHtml_(tenant.Phone) + ') applied for ' +
-    escapeHtml_(room.RoomLabel) + ' at ' + escapeHtml_(property.PropertyName) + '.</p>' +
-    '<p>Review it in the Applications inbox.</p></td></tr></table>';
 }
 
 // =====================================================================================
@@ -1299,13 +1312,14 @@ function htmlToPdfBlob_(html, filename) {
 }
 
 /**
- * Builds and saves the full Ghanaian tenancy agreement PDF. Accepts either a live
- * Tenancy record's data, or (for applications) a "draft" set of terms before approval.
- * Returns the Drive file ID.
+ * Builds and saves the full Ghanaian tenancy agreement PDF, once a booking payment has
+ * been approved and the tenant has filled and signed the form. `ctx.booking` (optional)
+ * carries the confirmed payment method/amount/date so the agreement documents exactly
+ * what was paid, not just what's owed. Returns the Drive file ID.
  */
 function generateAgreementPdf_(ctx) {
   var settings = getSettings_();
-  var tenant = ctx.tenant, property = ctx.property, room = ctx.room;
+  var tenant = ctx.tenant, property = ctx.property, room = ctx.room, booking = ctx.booking;
   var startDate = ctx.startDate instanceof Date ? ctx.startDate : new Date(ctx.startDate);
   var advanceMonths = Number(ctx.advanceMonths) || 12;
   var endDate = addMonths_(startDate, advanceMonths);
@@ -1314,6 +1328,12 @@ function generateAgreementPdf_(ctx) {
   var advisory = advanceMonths > 6 ?
     '<p style="color:#B45309;"><em>Advisory: Act 220 (Rent Act, 1963) caps residential rent advance at 6 months. This agreement records ' +
     advanceMonths + ' months as actually agreed by both parties.</em></p>' : '';
+  var paymentConfirmation = booking ?
+    '<h2>5. Payment Confirmation</h2><table>' +
+    '<tr><td class="label">Amount Paid</td><td>' + formatGHS_(booking.AmountGHS) + '</td></tr>' +
+    '<tr><td class="label">Payment Method</td><td>' + escapeHtml_(booking.PaymentMethod) + '</td></tr>' +
+    '<tr><td class="label">Date Confirmed</td><td>' + formatDate_(booking.ReviewedAt) + '</td></tr>' +
+    '<tr><td class="label">Confirmed By</td><td>' + escapeHtml_(booking.ReviewedBy) + '</td></tr></table>' : '';
 
   var html = '<html><head>' + pdfDocStyles_() + '</head><body>' +
     pdfHeader_((ctx.draft ? 'DRAFT — ' : '') + 'Tenancy Agreement', settings) +
@@ -1328,7 +1348,7 @@ function generateAgreementPdf_(ctx) {
     '<tr><td class="label">Room</td><td>' + escapeHtml_(room.RoomLabel) + ' (' + escapeHtml_(room.RoomType) + ')</td></tr>' +
     '<tr><td class="label">Address</td><td>' + escapeHtml_(property.StreetAddress) + ', ' + escapeHtml_(property.Town) + ', ' + escapeHtml_(property.Region) + '</td></tr>' +
     '<tr><td class="label">Ghana Post GPS</td><td>' + escapeHtml_(property.GhanaPostGPS) + '</td></tr></table>' +
-    '<h2>3. Term</h2>' +
+    '<h2>3. Term (Duration)</h2>' +
     '<table><tr><td class="label">Start Date</td><td>' + formatDate_(startDate) + '</td></tr>' +
     '<tr><td class="label">End Date</td><td>' + formatDate_(endDate) + '</td></tr>' +
     '<tr><td class="label">Duration</td><td>' + advanceMonths + ' months</td></tr></table>' +
@@ -1336,17 +1356,18 @@ function generateAgreementPdf_(ctx) {
     '<table><tr><td class="label">Monthly Rent</td><td>' + formatGHS_(room.MonthlyRent) + '</td></tr>' +
     '<tr><td class="label">Advance Paid</td><td>' + formatGHS_(advanceAmount) + ' (' + advanceMonths + ' months)</td></tr>' +
     '<tr><td class="label">Deposit</td><td>' + formatGHS_(room.Deposit) + '</td></tr></table>' +
-    '<h2>5. Utilities & Levies</h2>' +
+    paymentConfirmation +
+    '<h2>6. Utilities & Levies</h2>' +
     '<p>' + escapeHtml_(room.UtilitiesIncluded || 'As agreed between the parties: electricity, water, waste collection, security levy and caretaker fee responsibilities to be confirmed in writing.') + '</p>' +
-    '<h2>6. Tenant Covenants</h2>' +
+    '<h2>7. Tenant Covenants</h2>' +
     '<p>The Tenant shall pay rent as agreed, use the premises for residential purposes only, keep the premises in good repair (fair wear and tear excepted), not sublet without written consent, and give the required notice before vacating.</p>' +
-    '<h2>7. Landlord Covenants</h2>' +
+    '<h2>8. Landlord Covenants</h2>' +
     '<p>The Landlord/Landlady shall ensure quiet enjoyment of the premises, keep the structure in good repair, and give the required notice before requiring the Tenant to vacate.</p>' +
-    '<h2>8. Repairs</h2><p>Structural repairs are the Landlord\'s responsibility; minor/day-to-day repairs arising from tenant use are the Tenant\'s responsibility, unless otherwise agreed.</p>' +
-    '<h2>9. Assignment & Subletting</h2><p>The Tenant shall not assign or sublet the premises without the Landlord\'s prior written consent.</p>' +
-    '<h2>10. Termination & Notice</h2><p>Either party may terminate this tenancy by giving the other not less than three (3) months\' written notice, or as otherwise required by the Rent Act, 1963 (Act 220).</p>' +
-    '<h2>11. Dispute Resolution</h2><p>Disputes arising from this agreement should first be referred to the Rent Control Division, Ministry of Works and Housing, before recourse to the courts.</p>' +
-    '<h2>12. Signatures & Witnesses</h2>' +
+    '<h2>9. Repairs</h2><p>Structural repairs are the Landlord\'s responsibility; minor/day-to-day repairs arising from tenant use are the Tenant\'s responsibility, unless otherwise agreed.</p>' +
+    '<h2>10. Assignment & Subletting</h2><p>The Tenant shall not assign or sublet the premises without the Landlord\'s prior written consent.</p>' +
+    '<h2>11. Termination & Notice</h2><p>Either party may terminate this tenancy by giving the other not less than three (3) months\' written notice, or as otherwise required by the Rent Act, 1963 (Act 220).</p>' +
+    '<h2>12. Dispute Resolution</h2><p>Disputes arising from this agreement should first be referred to the Rent Control Division, Ministry of Works and Housing, before recourse to the courts.</p>' +
+    '<h2>13. Signatures & Witnesses</h2>' +
     '<table><tr><td style="width:50%;">Tenant Signature:<br/>' +
     (sigDataUri ? '<img class="sig" src="' + sigDataUri + '"/>' : '<div style="height:60px;border-bottom:1px solid #111827;"></div>') +
     '<br/>' + escapeHtml_(tenant.FullName) + ' &middot; ' + formatDate_(new Date()) + '</td>' +
@@ -1430,7 +1451,269 @@ function generateStatementPdf_(tenancy, tenant, property, room, payments) {
 // =====================================================================================
 
 // =====================================================================================
-// region: Payments & Receipts
+// region: Bookings (Room Booking & Payment) — Stage 1 of the tenancy pipeline
+// =====================================================================================
+// A logged-in tenant chooses a room, pays by bank/mobile money/cash outside the system,
+// then submits this form with proof (a screenshot for bank/MoMo, a note for cash). The
+// room is held as "Reserved" while the landlord reviews. Only once the landlord
+// approves does the Tenancy Agreement Form unlock (see next region).
+
+/** Tenant submits a booking + payment proof for a room. */
+function submitBooking(token, data) {
+  return safeCall_('submitBooking', function () {
+    var lock = LockService.getScriptLock();
+    lock.waitLock(30000);
+    try {
+      var session = requireTenant_(token);
+      var room = getById_(SHEETS.ROOMS, data.roomId);
+      if (!room) throw new Error('Room not found.');
+      if (room.Status !== 'Vacant') throw new Error('Sorry, this room is no longer available.');
+      if (!data.paymentMethod) throw new Error('Select how you paid.');
+      if (!data.amountGHS || Number(data.amountGHS) <= 0) throw new Error('Enter the amount you paid.');
+      if (data.paymentMethod !== 'Cash' && !data.proofFileId) throw new Error('Please upload a screenshot of your payment as proof.');
+
+      // Prevent duplicate live bookings by the same tenant for the same room.
+      var already = findBy_(SHEETS.BOOKINGS, 'TenantID', session.tenantId)
+        .filter(function (b) { return b.RoomID === data.roomId && b.Status === 'Submitted'; });
+      if (already.length) throw new Error('You already have a booking submitted for this room, awaiting review.');
+
+      var property = getById_(SHEETS.PROPERTIES, room.PropertyID);
+      var booking = appendRow_(SHEETS.BOOKINGS, {
+        TenantID: session.tenantId, PropertyID: property.ID, RoomID: room.ID, RequestedAt: new Date(),
+        PaymentMethod: data.paymentMethod, AmountGHS: Number(data.amountGHS), ProofFileId: data.proofFileId || '',
+        ProofNotes: data.proofNotes || '', Status: 'Submitted'
+      }, 'BKG');
+
+      updateById_(SHEETS.ROOMS, room.ID, { Status: 'Reserved' });
+      updateById_(SHEETS.TENANTS, session.tenantId, { Status: 'AwaitingApproval' });
+
+      var settings = getSettings_();
+      var tenant = getById_(SHEETS.TENANTS, session.tenantId);
+      var adminEmails = (settings.AdminEmails || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+      adminEmails.forEach(function (addr) {
+        EmailService.send(addr, 'New Booking Payment Submitted — ' + tenant.FullName,
+          '<p><strong>' + escapeHtml_(tenant.FullName) + '</strong> (' + escapeHtml_(tenant.Phone) + ') submitted ' +
+          formatGHS_(booking.AmountGHS) + ' via ' + escapeHtml_(booking.PaymentMethod) + ' for ' + escapeHtml_(room.RoomLabel) +
+          ' at ' + escapeHtml_(property.PropertyName) + '. Please review in the Bookings inbox.</p>', []);
+      });
+      logAudit_(tenant.FullName, 'BOOKING_SUBMITTED', 'Booking', booking.ID, formatGHS_(booking.AmountGHS));
+      return { booking: booking };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+/** Tenant-side: my current/past bookings, so the portal can show status. */
+function getMyBookings(token) {
+  return safeCall_('getMyBookings', function () {
+    var session = requireTenant_(token);
+    var bookings = findBy_(SHEETS.BOOKINGS, 'TenantID', session.tenantId)
+      .sort(function (a, b) { return new Date(b.RequestedAt) - new Date(a.RequestedAt); });
+    var rooms = indexById_(readTable_(SHEETS.ROOMS));
+    var properties = indexById_(readTable_(SHEETS.PROPERTIES));
+    return { bookings: bookings.map(function (b) {
+      return Object.assign({}, b, {
+        roomLabel: (rooms[b.RoomID] || {}).RoomLabel || '', propertyName: (properties[b.PropertyID] || {}).PropertyName || ''
+      });
+    }) };
+  });
+}
+
+function listBookingsAdmin(token) {
+  return safeCall_('listBookingsAdmin', function () {
+    requireRole_(token, ['SuperAdmin', 'Landlord']);
+    var bookings = readTable_(SHEETS.BOOKINGS).sort(function (a, b) { return new Date(b.RequestedAt) - new Date(a.RequestedAt); });
+    var tenants = indexById_(readTable_(SHEETS.TENANTS));
+    var rooms = indexById_(readTable_(SHEETS.ROOMS));
+    var properties = indexById_(readTable_(SHEETS.PROPERTIES));
+    return { bookings: bookings.map(function (b) {
+      return Object.assign({}, b, {
+        tenantName: (tenants[b.TenantID] || {}).FullName || '', tenantPhone: (tenants[b.TenantID] || {}).Phone || '',
+        roomLabel: (rooms[b.RoomID] || {}).RoomLabel || '', propertyName: (properties[b.PropertyID] || {}).PropertyName || ''
+      });
+    }) };
+  });
+}
+
+/**
+ * Landlord confirms the payment proof is genuine. This unlocks the Tenancy Agreement
+ * Form for the tenant (creates a Tenancy stub in AwaitingAgreement status) and records
+ * the payment already made as the first ledger entry + receipt.
+ */
+function approveBooking(token, bookingId) {
+  return safeCall_('approveBooking', function () {
+    var session = requireRole_(token, ['SuperAdmin', 'Landlord']);
+    var booking = getById_(SHEETS.BOOKINGS, bookingId);
+    if (!booking) throw new Error('Booking not found.');
+    if (booking.Status !== 'Submitted') throw new Error('This booking has already been reviewed.');
+    var tenant = getById_(SHEETS.TENANTS, booking.TenantID);
+    var room = getById_(SHEETS.ROOMS, booking.RoomID);
+    var property = getById_(SHEETS.PROPERTIES, booking.PropertyID);
+
+    updateById_(SHEETS.BOOKINGS, bookingId, { Status: 'Approved', ReviewedBy: session.name, ReviewedAt: new Date() });
+    updateById_(SHEETS.TENANTS, tenant.ID, { Status: 'AwaitingAgreement' });
+
+    var tenancy = appendRow_(SHEETS.TENANCIES, {
+      TenantID: tenant.ID, PropertyID: property.ID, RoomID: room.ID, BookingID: booking.ID,
+      MonthlyRent: room.MonthlyRent, Deposit: room.Deposit, PaymentMode: 'Advance', Status: 'AwaitingAgreement'
+    }, 'TCY');
+
+    // The payment already made is real money in hand — log it to the ledger immediately.
+    var receiptNumber = nextReceiptNumber_();
+    var payment = appendRow_(SHEETS.PAYMENTS, {
+      TenancyID: tenancy.ID, TenantID: tenant.ID, AmountGHS: booking.AmountGHS, PaymentDate: booking.RequestedAt,
+      Channel: booking.PaymentMethod, Reference: 'Booking ' + booking.ID, RecordedBy: session.name,
+      Notes: 'Initial payment confirmed at booking approval.', ReceiptNumber: receiptNumber
+    }, 'PMT');
+    var receiptPdfId = generateReceiptPdf_(payment, tenant, property, room);
+    updateById_(SHEETS.PAYMENTS, payment.ID, { ReceiptPdfFileId: receiptPdfId });
+
+    var settings = getSettings_();
+    var tokens = { TenantName: tenant.FullName, RoomLabel: room.RoomLabel, PropertyName: property.PropertyName,
+      LandlordName: settings.LandlordName, LandlordPhone: settings.LandlordPhone };
+    if (settings.SmsEnabled === 'Y') SmsService.send([tenant.Phone], mergeTokens_(settings.BookingApprovedTemplate, tokens));
+    if (settings.EmailEnabled === 'Y' && tenant.Email) {
+      EmailService.send(tenant.Email, 'Payment Confirmed — Complete Your Tenancy Agreement',
+        '<p>' + escapeHtml_(mergeTokens_(settings.BookingApprovedTemplate, tokens)) + '</p>', []);
+    }
+    logAudit_(session.name, 'BOOKING_APPROVED', 'Booking', bookingId, 'Tenancy ' + tenancy.ID);
+    return { tenancy: tenancy, payment: payment };
+  });
+}
+
+function rejectBooking(token, bookingId, reason) {
+  return safeCall_('rejectBooking', function () {
+    var session = requireRole_(token, ['SuperAdmin', 'Landlord']);
+    var booking = getById_(SHEETS.BOOKINGS, bookingId);
+    if (!booking) throw new Error('Booking not found.');
+    if (booking.Status !== 'Submitted') throw new Error('This booking has already been reviewed.');
+    var tenant = getById_(SHEETS.TENANTS, booking.TenantID);
+    var room = getById_(SHEETS.ROOMS, booking.RoomID);
+    var property = getById_(SHEETS.PROPERTIES, booking.PropertyID);
+
+    updateById_(SHEETS.BOOKINGS, bookingId, { Status: 'Rejected', ReviewedBy: session.name, ReviewedAt: new Date(), ReviewNotes: reason });
+    updateById_(SHEETS.ROOMS, room.ID, { Status: 'Vacant' }); // release the room back to the market
+    updateById_(SHEETS.TENANTS, tenant.ID, { Status: 'Rejected' });
+
+    var settings = getSettings_();
+    var tokens = { TenantName: tenant.FullName, RoomLabel: room.RoomLabel, PropertyName: property.PropertyName,
+      Reason: reason, LandlordName: settings.LandlordName, LandlordPhone: settings.LandlordPhone };
+    if (settings.SmsEnabled === 'Y') SmsService.send([tenant.Phone], mergeTokens_(settings.BookingRejectedTemplate, tokens));
+    if (settings.EmailEnabled === 'Y' && tenant.Email) {
+      EmailService.send(tenant.Email, 'Booking Payment Not Confirmed',
+        '<p>' + escapeHtml_(mergeTokens_(settings.BookingRejectedTemplate, tokens)) + '</p>', []);
+    }
+    logAudit_(session.name, 'BOOKING_REJECTED', 'Booking', bookingId, reason);
+    return true;
+  });
+}
+
+// =====================================================================================
+// endregion
+// =====================================================================================
+
+// =====================================================================================
+// region: Tenancy Agreement — Stage 2 of the tenancy pipeline
+// =====================================================================================
+// Unlocked only once a Booking has been approved (a Tenancy row exists in
+// AwaitingAgreement status for the logged-in tenant). Rendered from FormSchema.
+
+/** Returns the tenant's pending agreement task (room/property/booking context) or null. */
+function getMyAgreementTask(token) {
+  return safeCall_('getMyAgreementTask', function () {
+    var session = requireTenant_(token);
+    var pending = findBy_(SHEETS.TENANCIES, 'TenantID', session.tenantId).find(function (t) { return t.Status === 'AwaitingAgreement'; });
+    if (!pending) return { pending: false };
+    var room = getById_(SHEETS.ROOMS, pending.RoomID);
+    var property = getById_(SHEETS.PROPERTIES, pending.PropertyID);
+    var booking = getById_(SHEETS.BOOKINGS, pending.BookingID);
+    return { pending: true, tenancy: pending, room: room, property: property, booking: booking };
+  });
+}
+
+/** Tenant submits the completed, signed Tenancy Agreement Form. Generates the PDF and activates the tenancy. */
+function submitTenancyAgreement(token, answers) {
+  return safeCall_('submitTenancyAgreement', function () {
+    var lock = LockService.getScriptLock();
+    lock.waitLock(30000);
+    try {
+      var session = requireTenant_(token);
+      var pending = findBy_(SHEETS.TENANCIES, 'TenantID', session.tenantId).find(function (t) { return t.Status === 'AwaitingAgreement'; });
+      if (!pending) throw new Error('No tenancy agreement is currently awaiting your signature.');
+
+      var schema = readTable_(SHEETS.FORM_SCHEMA).filter(function (f) { return f.Visible === 'Y'; });
+      schema.forEach(function (f) {
+        if (f.Type === 'heading' || f.Type === 'divider') return;
+        var val = answers[f.FieldKey];
+        if (f.Required === 'Y' && (val === undefined || val === null || val === '')) {
+          throw new Error('Missing required field: ' + f.Label);
+        }
+        if (f.Validation && val) {
+          var re = new RegExp(f.Validation);
+          if (!re.test(val)) throw new Error(f.Label + ' is not in the expected format.');
+        }
+      });
+
+      var tenant = getById_(SHEETS.TENANTS, session.tenantId);
+      var room = getById_(SHEETS.ROOMS, pending.RoomID);
+      var property = getById_(SHEETS.PROPERTIES, pending.PropertyID);
+      var booking = getById_(SHEETS.BOOKINGS, pending.BookingID);
+
+      var tenantPatch = {
+        FullName: answers.FullName || tenant.FullName, GhanaCardNumber: answers.GhanaCardNumber || '',
+        DateOfBirth: answers.DateOfBirth || '', Gender: answers.Gender || '', MaritalStatus: answers.MaritalStatus || '',
+        Occupation: answers.Occupation || '', Employer: answers.Employer || '', EmployerPhone: answers.EmployerPhone || '',
+        NextOfKinName: answers.NextOfKinName || '', NextOfKinPhone: answers.NextOfKinPhone || '',
+        GuarantorName: answers.GuarantorName || '', GuarantorPhone: answers.GuarantorPhone || '',
+        GuarantorGhanaCard: answers.GuarantorGhanaCard || '', PhotoFileId: answers.PhotoFile || tenant.PhotoFileId,
+        IdDocFileId: answers.IdDocFile || tenant.IdDocFileId
+      };
+      tenant = updateById_(SHEETS.TENANTS, tenant.ID, tenantPatch);
+
+      var advanceMonths = Number(room.MinAdvanceMonths) || 12;
+      var startDate = new Date();
+      var endDate = addMonths_(startDate, advanceMonths);
+      var signatureFileId = answers.Signature || '';
+
+      var pdfId = generateAgreementPdf_({
+        tenant: tenant, property: property, room: room, booking: booking, advanceMonths: advanceMonths,
+        advanceAmount: booking.AmountGHS, startDate: startDate, signatureFileId: signatureFileId, draft: false
+      });
+
+      var tenancy = updateById_(SHEETS.TENANCIES, pending.ID, {
+        StartDate: startDate, EndDate: endDate, AdvanceMonths: advanceMonths, AdvanceAmount: booking.AmountGHS,
+        Status: 'Active', AgreementPdfFileId: pdfId, SignatureFileId: signatureFileId, SignedAt: new Date()
+      });
+      updateById_(SHEETS.ROOMS, room.ID, { Status: 'Occupied' });
+      updateById_(SHEETS.TENANTS, tenant.ID, { Status: 'Active' });
+
+      var settings = getSettings_();
+      var pdfBlob = DriveApp.getFileById(pdfId).getBlob();
+      if (tenant.Email && settings.EmailEnabled === 'Y') {
+        EmailService.send(tenant.Email, 'Your Signed Tenancy Agreement — ' + settings.AppName,
+          '<p>Dear ' + escapeHtml_(tenant.FullName) + ', congratulations — your tenancy for ' + escapeHtml_(room.RoomLabel) +
+          ' at ' + escapeHtml_(property.PropertyName) + ' is now active. Your signed agreement is attached.</p>', [pdfBlob]);
+      }
+      var adminEmails = (settings.AdminEmails || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+      adminEmails.forEach(function (addr) {
+        EmailService.send(addr, 'Tenancy Agreement Signed — ' + tenant.FullName,
+          '<p>' + escapeHtml_(tenant.FullName) + ' signed the tenancy agreement for ' + escapeHtml_(room.RoomLabel) + '.</p>', [pdfBlob]);
+      });
+      logAudit_(tenant.FullName, 'AGREEMENT_SIGNED', 'Tenancy', tenancy.ID, room.RoomLabel);
+      return { tenancy: tenancy, pdfFileId: pdfId, downloadUrl: 'https://drive.google.com/uc?export=download&id=' + pdfId };
+    } finally {
+      lock.releaseLock();
+    }
+  });
+}
+
+// =====================================================================================
+// endregion
+// =====================================================================================
+
+// =====================================================================================
+// region: Payments & Receipts (ongoing payments recorded by admin after the tenancy is active)
 // =====================================================================================
 
 function nextReceiptNumber_() {
@@ -1649,19 +1932,44 @@ function sendReminder_(tenancy, tenant, property, room, type, templateKey, daysL
 }
 
 /**
- * Scans all Active/ExpiringSoon tenancies each morning and fires the countdown
- * reminders (1 month / 1 week / 1 day before advance expiry) plus overdue
- * escalations at +1/+7/+30 days past expiry. Time-driven, Africa/Accra.
+ * Scans all tenancies each morning and fires:
+ *  - a nudge for tenancies stuck in AwaitingAgreement for 3+ days (payment confirmed
+ *    but the tenant hasn't come back to sign the agreement yet);
+ *  - the rent-advance countdown reminders (1 month / 1 week / 1 day before expiry);
+ *  - overdue escalations at +1/+7/+30 days past expiry;
+ *  - notice-to-quit follow-ups.
  */
 function runDailyReminders() {
-  var tenancies = readTable_(SHEETS.TENANCIES, { skipCache: true })
-    .filter(function (t) { return t.Status === 'Active' || t.Status === 'ExpiringSoon' || t.Status === 'Expired'; });
+  var allTenancies = readTable_(SHEETS.TENANCIES, { skipCache: true });
   var tenants = indexById_(readTable_(SHEETS.TENANTS));
   var properties = indexById_(readTable_(SHEETS.PROPERTIES));
   var rooms = indexById_(readTable_(SHEETS.ROOMS));
   var today = new Date();
+  var settings = getSettings_();
 
-  tenancies.forEach(function (t) {
+  // Agreement-pending nudge (one-time, at 3+ days waiting).
+  allTenancies.filter(function (t) { return t.Status === 'AwaitingAgreement'; }).forEach(function (t) {
+    var tenant = tenants[t.TenantID], property = properties[t.PropertyID], room = rooms[t.RoomID];
+    if (!tenant || !property || !room) return;
+    var waitingDays = daysBetween_(t.CreatedAt, today);
+    if (waitingDays < 3 || reminderAlreadySent_(t.ID, 'AgreementPending')) return;
+    try {
+      var message = mergeTokens_(settings.AgreementPendingTemplate, {
+        TenantName: tenant.FullName, RoomLabel: room.RoomLabel, PropertyName: property.PropertyName
+      });
+      var reminder = appendRow_(SHEETS.REMINDERS, {
+        TenancyID: t.ID, TenantID: tenant.ID, Type: 'AgreementPending', ScheduledFor: today, MessageBody: message, Attempts: 1
+      }, 'RMD');
+      var channels = [];
+      if (settings.SmsEnabled === 'Y' && tenant.Phone && SmsService.send([tenant.Phone], message).success) channels.push('SMS');
+      if (settings.EmailEnabled === 'Y' && tenant.Email && EmailService.send(tenant.Email, 'Complete Your Tenancy Agreement', '<p>' + escapeHtml_(message) + '</p>', [])) channels.push('Email');
+      updateById_(SHEETS.REMINDERS, reminder.ID, { SentAt: today, ChannelsUsed: channels.join('/') || 'None' });
+    } catch (e) { logAudit_('SYSTEM', 'REMINDER_ERROR', 'Tenancy', t.ID, String(e)); }
+  });
+
+  // Rent-advance countdown + overdue escalation for active tenancies.
+  var activeTenancies = allTenancies.filter(function (t) { return t.Status === 'Active' || t.Status === 'ExpiringSoon' || t.Status === 'Expired'; });
+  activeTenancies.forEach(function (t) {
     var tenant = tenants[t.TenantID], property = properties[t.PropertyID], room = rooms[t.RoomID];
     if (!tenant || !property || !room || !t.EndDate) return;
     var daysLeft = daysBetween_(today, t.EndDate); // positive = future expiry, negative = overdue
@@ -1700,7 +2008,7 @@ function runDailyReminders() {
       logAudit_('SYSTEM', 'REMINDER_ERROR', 'Notice', n.ID, String(e));
     }
   });
-  logAudit_('SYSTEM', 'DAILY_REMINDERS', 'System', '', tenancies.length + ' tenancies scanned');
+  logAudit_('SYSTEM', 'DAILY_REMINDERS', 'System', '', allTenancies.length + ' tenancies scanned');
 }
 
 /** Manual "Send now / Test" trigger from the admin UI, and ad-hoc bulk messaging. */
@@ -1803,6 +2111,101 @@ function getNotices(token, tenancyId) {
 // =====================================================================================
 
 // =====================================================================================
+// region: Messaging (in-app tenant <-> landlord chat, plus WhatsApp deep links client-side)
+// =====================================================================================
+// One thread per tenant (tenant <-> the landlord/admin team). Simple and sufficient for
+// a single-landlord portfolio: no polling/websockets, the client re-fetches on open and
+// after sending. WhatsApp is offered client-side as a one-tap alternative — Apps Script
+// cannot receive inbound WhatsApp messages without a paid Business API integration, so
+// in-app messaging is the system of record and WhatsApp is a convenience link.
+
+function sendMessageAsTenant(token, body) {
+  return safeCall_('sendMessageAsTenant', function () {
+    var session = requireTenant_(token);
+    if (!body || !body.trim()) throw new Error('Message cannot be empty.');
+    var tenant = getById_(SHEETS.TENANTS, session.tenantId);
+    var msg = appendRow_(SHEETS.MESSAGES, {
+      TenantID: session.tenantId, SenderRole: 'Tenant', SenderName: tenant.FullName, Body: body.trim(),
+      SentAt: new Date(), ReadByAdmin: 'N', ReadByTenant: 'Y'
+    }, 'MSG');
+    var settings = getSettings_();
+    var adminEmails = (settings.AdminEmails || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    adminEmails.forEach(function (addr) {
+      EmailService.send(addr, 'New message from ' + tenant.FullName,
+        '<p>' + escapeHtml_(body) + '</p><p class="muted">Reply from the Messages screen in your admin console.</p>', []);
+    });
+    return { message: msg };
+  });
+}
+
+function sendMessageAsAdmin(token, tenantId, body) {
+  return safeCall_('sendMessageAsAdmin', function () {
+    var session = requireRole_(token, ['SuperAdmin', 'Landlord', 'Caretaker']);
+    if (!body || !body.trim()) throw new Error('Message cannot be empty.');
+    var tenant = getById_(SHEETS.TENANTS, tenantId);
+    if (!tenant) throw new Error('Tenant not found.');
+    var msg = appendRow_(SHEETS.MESSAGES, {
+      TenantID: tenantId, SenderRole: 'Admin', SenderName: session.name, Body: body.trim(),
+      SentAt: new Date(), ReadByAdmin: 'Y', ReadByTenant: 'N'
+    }, 'MSG');
+    var settings = getSettings_();
+    if (settings.EmailEnabled === 'Y' && tenant.Email) {
+      EmailService.send(tenant.Email, 'New message from ' + settings.LandlordName,
+        '<p>' + escapeHtml_(body) + '</p><p class="muted">Reply from your tenant portal.</p>', []);
+    }
+    return { message: msg };
+  });
+}
+
+/** Tenant view of their own thread; marks admin messages as read by the tenant. */
+function getMyMessageThread(token) {
+  return safeCall_('getMyMessageThread', function () {
+    var session = requireTenant_(token);
+    var thread = findBy_(SHEETS.MESSAGES, 'TenantID', session.tenantId).sort(function (a, b) { return new Date(a.SentAt) - new Date(b.SentAt); });
+    thread.filter(function (m) { return m.SenderRole === 'Admin' && m.ReadByTenant !== 'Y'; })
+      .forEach(function (m) { updateById_(SHEETS.MESSAGES, m.ID, { ReadByTenant: 'Y' }); });
+    return { thread: thread };
+  });
+}
+
+/** Admin view of one tenant's thread; marks tenant messages as read by admin. */
+function getMessageThreadAdmin(token, tenantId) {
+  return safeCall_('getMessageThreadAdmin', function () {
+    requireRole_(token, ['SuperAdmin', 'Landlord', 'Caretaker']);
+    var thread = findBy_(SHEETS.MESSAGES, 'TenantID', tenantId).sort(function (a, b) { return new Date(a.SentAt) - new Date(b.SentAt); });
+    thread.filter(function (m) { return m.SenderRole === 'Tenant' && m.ReadByAdmin !== 'Y'; })
+      .forEach(function (m) { updateById_(SHEETS.MESSAGES, m.ID, { ReadByAdmin: 'Y' }); });
+    return { thread: thread };
+  });
+}
+
+/** Admin inbox: one row per tenant who has ever messaged, with last message + unread count. */
+function listMessageThreadsAdmin(token) {
+  return safeCall_('listMessageThreadsAdmin', function () {
+    requireRole_(token, ['SuperAdmin', 'Landlord', 'Caretaker']);
+    var messages = readTable_(SHEETS.MESSAGES);
+    var tenants = indexById_(readTable_(SHEETS.TENANTS));
+    var byTenant = {};
+    messages.forEach(function (m) {
+      if (!byTenant[m.TenantID]) byTenant[m.TenantID] = [];
+      byTenant[m.TenantID].push(m);
+    });
+    var threads = Object.keys(byTenant).map(function (tenantId) {
+      var msgs = byTenant[tenantId].sort(function (a, b) { return new Date(b.SentAt) - new Date(a.SentAt); });
+      var unread = msgs.filter(function (m) { return m.SenderRole === 'Tenant' && m.ReadByAdmin !== 'Y'; }).length;
+      var tenant = tenants[tenantId] || {};
+      return { tenantId: tenantId, tenantName: tenant.FullName || 'Unknown', tenantPhone: tenant.Phone || '',
+        lastMessage: msgs[0].Body, lastAt: msgs[0].SentAt, unread: unread };
+    }).sort(function (a, b) { return new Date(b.lastAt) - new Date(a.lastAt); });
+    return { threads: threads };
+  });
+}
+
+// =====================================================================================
+// endregion
+// =====================================================================================
+
+// =====================================================================================
 // region: Admin APIs
 // =====================================================================================
 
@@ -1816,6 +2219,7 @@ function getDashboard(token) {
     var tenancies = readTable_(SHEETS.TENANCIES);
     var payments = readTable_(SHEETS.PAYMENTS);
     var maintenance = readTable_(SHEETS.MAINTENANCE);
+    var bookings = readTable_(SHEETS.BOOKINGS);
     var totalRooms = rooms.length;
     var occupied = rooms.filter(function (r) { return r.Status === 'Occupied'; }).length;
     var vacant = rooms.filter(function (r) { return r.Status === 'Vacant'; }).length;
@@ -1830,6 +2234,8 @@ function getDashboard(token) {
     var ageing = getArrearsAgeing_();
     var outstanding = ageing['0-30'] + ageing['31-60'] + ageing['61-90'] + ageing['90+'];
     var openTickets = maintenance.filter(function (m) { return m.Status !== 'Resolved'; }).length;
+    var pendingBookings = bookings.filter(function (b) { return b.Status === 'Submitted'; }).length;
+    var awaitingAgreement = tenancies.filter(function (t) { return t.Status === 'AwaitingAgreement'; }).length;
 
     // Monthly collections for the last 12 months (bar chart data).
     var monthly = [];
@@ -1862,7 +2268,8 @@ function getDashboard(token) {
         occupancyPct: totalRooms ? Math.round((occupied / totalRooms) * 100) : 0,
         activeTenancies: activeTenancies, expiring30: expiring30,
         collectedThisYear: collectedThisYear, collectedThisYearFormatted: formatGHS_(collectedThisYear),
-        outstanding: outstanding, outstandingFormatted: formatGHS_(outstanding), openTickets: openTickets
+        outstanding: outstanding, outstandingFormatted: formatGHS_(outstanding), openTickets: openTickets,
+        pendingBookings: pendingBookings, awaitingAgreement: awaitingAgreement
       },
       charts: { monthlyCollections: monthly, expiryTimeline: expiryTimeline, ageing: ageing },
       rentCountdown: getRentCountdown_(tenancies, properties, rooms)
@@ -1973,10 +2380,11 @@ function getTenantProfile(token, tenantId) {
     if (!tenant) throw new Error('Tenant not found.');
     var tenancies = findBy_(SHEETS.TENANCIES, 'TenantID', tenantId);
     var payments = findBy_(SHEETS.PAYMENTS, 'TenantID', tenantId);
+    var bookings = findBy_(SHEETS.BOOKINGS, 'TenantID', tenantId);
     var notices = [];
     tenancies.forEach(function (t) { notices = notices.concat(findBy_(SHEETS.NOTICES, 'TenancyID', t.ID)); });
     var tickets = findBy_(SHEETS.MAINTENANCE, 'TenantID', tenantId);
-    return { tenant: tenant, tenancies: tenancies, payments: payments, notices: notices, tickets: tickets };
+    return { tenant: tenant, tenancies: tenancies, payments: payments, notices: notices, tickets: tickets, bookings: bookings };
   });
 }
 
@@ -1994,94 +2402,12 @@ function saveTenant(token, tenant) {
   });
 }
 
-// ---- Applications inbox ------------------------------------------------------------------
-
-function listApplications(token) {
-  return safeCall_('listApplications', function () {
-    requireRole_(token, ['SuperAdmin', 'Landlord']);
-    var apps = readTable_(SHEETS.APPLICATIONS).sort(function (a, b) { return new Date(b.SubmittedAt) - new Date(a.SubmittedAt); });
-    var tenants = indexById_(readTable_(SHEETS.TENANTS));
-    var rooms = indexById_(readTable_(SHEETS.ROOMS));
-    return { applications: apps.map(function (a) {
-      return Object.assign({}, a, {
-        tenantName: (tenants[a.TenantID] || {}).FullName || '',
-        roomLabel: (rooms[a.RoomID] || {}).RoomLabel || ''
-      });
-    }) };
-  });
-}
-
-/** Approving an application converts the applicant into an Active Tenancy and marks the room Occupied. */
-function approveApplication(token, applicationId, terms) {
-  return safeCall_('approveApplication', function () {
-    var session = requireRole_(token, ['SuperAdmin', 'Landlord']);
-    var app = getById_(SHEETS.APPLICATIONS, applicationId);
-    if (!app) throw new Error('Application not found.');
-    var tenant = getById_(SHEETS.TENANTS, app.TenantID);
-    var room = getById_(SHEETS.ROOMS, app.RoomID);
-    var property = getById_(SHEETS.PROPERTIES, room.PropertyID);
-
-    var startDate = terms.startDate ? new Date(terms.startDate) : new Date();
-    var advanceMonths = Number(terms.advanceMonths) || Number(room.MinAdvanceMonths) || 12;
-    var paymentMode = terms.paymentMode || 'Advance';
-    var advanceAmount = paymentMode === 'Advance' ? (Number(room.MonthlyRent) * advanceMonths) : 0;
-    var endDate = addMonths_(startDate, advanceMonths);
-
-    var pdfId = generateAgreementPdf_({
-      tenant: tenant, property: property, room: room, advanceMonths: advanceMonths, advanceAmount: advanceAmount,
-      startDate: startDate, signatureFileId: app.SignatureFileId, draft: false
-    });
-
-    var tenancy = appendRow_(SHEETS.TENANCIES, {
-      TenantID: tenant.ID, PropertyID: property.ID, RoomID: room.ID, StartDate: startDate,
-      AdvanceMonths: advanceMonths, AdvanceAmount: advanceAmount, MonthlyRent: room.MonthlyRent,
-      Deposit: room.Deposit, EndDate: endDate, PaymentMode: paymentMode, Status: 'Active',
-      AgreementPdfFileId: pdfId, SignatureFileId: app.SignatureFileId, SignedAt: new Date(), RenewalCount: 0
-    }, 'TCY');
-
-    updateById_(SHEETS.TENANTS, tenant.ID, { Status: 'Active' });
-    updateById_(SHEETS.ROOMS, room.ID, { Status: 'Occupied' });
-    updateById_(SHEETS.APPLICATIONS, applicationId, { Status: 'Approved', ReviewedBy: session.name });
-
-    var settings = getSettings_();
-    if (settings.EmailEnabled === 'Y' && tenant.Email) {
-      var blob = DriveApp.getFileById(pdfId).getBlob();
-      EmailService.send(tenant.Email, 'Tenancy Approved — ' + property.PropertyName,
-        '<p>Dear ' + escapeHtml_(tenant.FullName) + ', your tenancy for ' + escapeHtml_(room.RoomLabel) +
-        ' has been approved. Signed agreement attached.</p>', [blob]);
-    }
-    if (settings.SmsEnabled === 'Y' && tenant.Phone) {
-      SmsService.send([tenant.Phone], 'Congratulations ' + tenant.FullName + ', your tenancy for ' + room.RoomLabel + ' is approved. Move-in: ' + formatDate_(startDate) + '. - ' + settings.LandlordName);
-    }
-    logAudit_(session.name, 'APPROVE', 'Application', applicationId, 'Tenancy ' + tenancy.ID);
-    return { tenancy: tenancy, pdfFileId: pdfId };
-  });
-}
-
-function rejectApplication(token, applicationId, reason) {
-  return safeCall_('rejectApplication', function () {
-    var session = requireRole_(token, ['SuperAdmin', 'Landlord']);
-    var app = getById_(SHEETS.APPLICATIONS, applicationId);
-    if (!app) throw new Error('Application not found.');
-    updateById_(SHEETS.APPLICATIONS, applicationId, { Status: 'Rejected', ReviewedBy: session.name, ReviewNotes: reason });
-    var tenant = getById_(SHEETS.TENANTS, app.TenantID);
-    if (tenant) updateById_(SHEETS.TENANTS, tenant.ID, { Status: 'Rejected' });
-    var settings = getSettings_();
-    if (tenant && settings.EmailEnabled === 'Y' && tenant.Email) {
-      EmailService.send(tenant.Email, 'Application Update — ' + settings.AppName,
-        '<p>Dear ' + escapeHtml_(tenant.FullName) + ', your application was not successful. Reason: ' + escapeHtml_(reason) + '</p>', []);
-    }
-    logAudit_(session.name, 'REJECT', 'Application', applicationId, reason);
-    return true;
-  });
-}
-
 // ---- Tenancies: expiry board & renewal pipeline ------------------------------------------
 
 function getExpiryBoard(token) {
   return safeCall_('getExpiryBoard', function () {
     requireRole_(token, ['SuperAdmin', 'Landlord', 'Caretaker', 'Viewer']);
-    var tenancies = readTable_(SHEETS.TENANCIES).filter(function (t) { return t.Status !== 'Terminated'; });
+    var tenancies = readTable_(SHEETS.TENANCIES).filter(function (t) { return t.Status !== 'Terminated' && t.Status !== 'AwaitingAgreement'; });
     var tenants = indexById_(readTable_(SHEETS.TENANTS));
     var properties = indexById_(readTable_(SHEETS.PROPERTIES));
     var rooms = indexById_(readTable_(SHEETS.ROOMS));
@@ -2154,7 +2480,7 @@ function getYearlyStatement(token, tenancyId) {
   });
 }
 
-// ---- Maintenance tickets -------------------------------------------------------------
+// ---- Maintenance tickets (complaints) -------------------------------------------------
 
 function listMaintenance(token) {
   return safeCall_('listMaintenance', function () {
@@ -2173,7 +2499,7 @@ function saveMaintenanceTicket(token, ticket) {
   });
 }
 
-/** Tenant-portal version: a logged-in tenant can raise their own ticket. */
+/** Tenant-portal version: a logged-in tenant files their own complaint/maintenance ticket. */
 function tenantSaveMaintenanceTicket(token, ticket) {
   return safeCall_('tenantSaveMaintenanceTicket', function () {
     var session = requireTenant_(token);
@@ -2181,6 +2507,12 @@ function tenantSaveMaintenanceTicket(token, ticket) {
     ticket.ReportedAt = new Date();
     ticket.Status = 'Open';
     var result = appendRow_(SHEETS.MAINTENANCE, ticket, 'TKT');
+    var settings = getSettings_();
+    var adminEmails = (settings.AdminEmails || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    adminEmails.forEach(function (addr) {
+      EmailService.send(addr, 'New Complaint — ' + session.name,
+        '<p>' + escapeHtml_(session.name) + ' filed a ' + escapeHtml_(ticket.Category) + ' complaint: ' + escapeHtml_(ticket.Description) + '</p>', []);
+    });
     logAudit_(session.name, 'CREATE', 'Maintenance', result.ID, 'Self-reported');
     return result;
   });
