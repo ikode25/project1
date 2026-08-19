@@ -6,6 +6,28 @@ steps in order. It takes about 15–20 minutes the first time.
 You do **not** need to create a Google Sheet, a Drive folder, or any spreadsheet tabs
 yourself — the system builds all of that automatically the first time it runs.
 
+## How the system works, in plain terms
+
+1. Your public site lists every property and room you own — both **Available** and
+   already **Rented** — each with photos and a map.
+2. A prospective tenant clicks **"Rent this room"**. They're asked to **sign up** (name,
+   phone, email, password) or log in if they already have an account.
+3. The moment they sign up, they automatically get a **welcome SMS and email** telling
+   them to inspect the room and submit payment.
+4. The tenant pays you directly (bank transfer, mobile money, or cash), then fills a
+   **Booking & Payment form** on the portal and uploads a **screenshot as proof** (or a
+   note, for cash).
+5. You review the proof in your **Bookings inbox** and click **Approve** (or **Reject**
+   with a reason).
+6. Approving unlocks the **Tenancy Agreement Form** for that tenant — they fill in their
+   personal/guarantor details, sign on-screen, and submit. A signed **PDF agreement** is
+   generated automatically, their room is marked **Occupied**, and the payment they
+   already made is logged as the first receipt in their ledger.
+7. From then on, the tenant can log in any time to download their agreement, view their
+   payment history, **message you directly** (in-app or via WhatsApp), and file
+   complaints/maintenance requests. You manage and monitor every tenant from your admin
+   console.
+
 ---
 
 ## What you need before you start
@@ -61,9 +83,9 @@ Apps Script adds that automatically). Save the project (Ctrl/Cmd+S).
 5. **Write down that email and password.** You'll use it to log in as an admin in Step
    5, and you should change it immediately afterwards.
 
-`setup()` is safe to run again at any time — it repairs missing sheet tabs or Drive
+`setup()` is safe to run again at any time — it repairs missing tabs/columns/Drive
 folders instead of duplicating your data. You can also trigger it again later from
-**Settings → Rebuild Database** inside the app, or from **Health Check → Fix it**.
+**Settings → Rebuild Database**, or from **Health Check → Fix it**.
 
 ## Step 4 — Deploy as a Web App
 
@@ -74,8 +96,8 @@ folders instead of duplicating your data. You can also trigger it again later fr
    - **Execute as**: **Me** (your account)
    - **Who has access**: **Anyone**
 4. Click **Deploy**.
-5. Copy the **Web app URL** shown — this is the link you will share publicly (for the
-   tenant portal and property listings) and use yourself to log in as admin.
+5. Copy the **Web app URL** shown — this is the link you will share publicly (tenants
+   browse and sign up here) and use yourself to log in as admin.
 
 Every time you change the code and want the live app to reflect it, use **Deploy →
 Manage deployments → Edit (pencil) → New version → Deploy**. Simply saving the files
@@ -105,30 +127,46 @@ default admin's password from there.)
 3. Copy your **API key** from the Arkesel dashboard.
 4. In the app, go to **Settings**, paste the API key and Sender ID, and tick **Enable
    SMS sending**. Save.
-5. From **Messaging**, select a test tenant and use **Send Now** to confirm delivery
-   before relying on it for real reminders.
+5. From **Bulk Messaging**, select a test tenant and use **Send Now** to confirm
+   delivery before relying on it for real reminders.
 
-## Step 8 — Add your first property and rooms
+## Step 8 — Add your properties and rooms
 
-1. Go to **Properties → Add Property**. Fill in the region, town, Ghana Post GPS
-   address, and upload a few photos.
-2. Go to **Rooms → Add Room**, attach it to the property, set the monthly rent and
-   minimum advance months, add photos, and tick **Listed Publicly** if you want it to
-   appear on the public portal.
+1. Go to **Properties → Add Property**. If you have two or more houses/compounds, add
+   each one separately, with its region, town, Ghana Post GPS address (used to draw the
+   map on the public listing), and a few photos.
+2. Go to **Rooms → Add Room**, attach it to the right property, and **name the room or
+   balcony clearly** (e.g. "Room 3", "Balcony A", "Self-Contained Annex") — this is how
+   you'll know which tenant is in which space once they're occupied. Set the monthly
+   rent and minimum advance months, add photos, and tick **Listed Publicly** so it
+   appears on the public site.
 
 ## Step 9 — Install the daily reminders trigger
 
 Go to **Settings → Install Reminder Trigger** (or **Health Check → Fix it** next to
 "Daily Reminders Trigger"). This installs a trigger that runs every morning at 08:00
-Africa/Accra time to send rent-advance and notice-to-quit reminders automatically.
+Africa/Accra time to send rent-advance countdown reminders, agreement-pending nudges,
+and notice-to-quit follow-ups automatically.
 
 ## Step 10 — Share the public URL
 
-Share the Web App URL from Step 4 with prospective tenants. They can browse vacant
-rooms and apply without logging in. Existing tenants use the same URL and click
-**Tenant portal login** to view their tenancy with their phone number.
+Share the Web App URL from Step 4 with prospective tenants. They browse your rooms,
+sign up, pay, and apply — end to end — without you lifting a finger until it's time to
+**approve their payment** in your **Bookings** inbox.
 
 ---
+
+## Day-to-day: approving a new tenant
+
+1. A tenant signs up, submits a **Booking & Payment** with a screenshot.
+2. You get an email notification. Open **Bookings** in your admin console.
+3. Check the payment screenshot/reference against your bank/MoMo statement.
+4. Click **Approve Payment** — this unlocks their Tenancy Agreement Form and
+   automatically logs their payment as the first ledger entry + receipt.
+   Click **Reject** with a reason if the payment can't be confirmed — the room is
+   released back to "Available" automatically.
+5. The tenant fills and signs the Tenancy Agreement Form on their own. Once submitted,
+   their room flips to **Occupied** and you'll see them as an **Active** tenancy.
 
 ## Health Check
 
@@ -149,8 +187,7 @@ Go to KEY & DEED (unsafe) → Allow flow each time a *new* permission is request
 Time-driven triggers only run on deployed/authorised projects, not simply by having the
 code present. Confirm via **Health Check** that the trigger shows "Installed". If not,
 click its **Fix it** button, or run `installTriggers` manually once from the Apps
-Script editor's function dropdown. Also check **Triggers** (clock icon) in the left
-sidebar of the Apps Script editor for any error notifications Google emailed you.
+Script editor's function dropdown.
 
 **SMS says "rejected" or never arrives.**
 A brand-new Arkesel Sender ID needs approval from the network operators (can take a
@@ -165,13 +202,20 @@ Google Workspace accounts get **1,500/day**. The **Health Check** screen shows y
 remaining quota. If you hit the limit, sending resumes automatically after the daily
 quota resets (roughly 24 hours after your first send that day).
 
-**I ran `setup()` again and I'm worried it duplicated my data.**
-It doesn't. `setup()` only creates a tab, folder, or default row if one doesn't already
-exist — existing property, tenant, and payment data is left untouched.
+**A tenant says they can't sign up — "account already exists".**
+Each phone number and email can only be tied to one tenant account. If someone lost
+access, use **Tenant Portal → Forgot password** (they need their registered phone
+number) rather than creating a second account for them.
 
 **The public portal shows "Portal not available".**
 Go to **Settings** and make sure **Public portal enabled** is ticked, and confirm at
-least one Room has **Status: Vacant** and **Listed Publicly: Y**.
+least one Room has **Listed Publicly: Y**.
+
+**I approved a booking by mistake.**
+There's no automatic "un-approve." Use **Bookings** and, once the tenant hasn't yet
+signed the agreement, you can still message them via **Messages** to explain; if the
+agreement has already been signed, terminate the tenancy from their profile and issue a
+refund manually outside the system.
 
 **I forgot the default admin password and never changed it.**
 Open the Apps Script editor, run `setup()` again — since a SuperAdmin already exists it
@@ -186,14 +230,18 @@ reset (advanced — back up the sheet first).
 Where the brief left a detail unspecified, the simplest option for a landlord was
 chosen automatically rather than stopping to ask:
 
-- The "Property & Terms" wizard step is presented as a read-only summary of the chosen
-  room plus a single "desired advance months" field, since detailed term negotiation
-  happens between landlord and tenant, not purely through form fields.
-- Tenant self-service login uses a 6-digit SMS code with a 10-minute expiry and a
-  6-attempt rate limit per phone number.
+- In-app messaging is a simple per-tenant thread (tenant ↔ landlord team), refreshed on
+  open/send — not a live/real-time chat. WhatsApp is offered alongside it as a one-tap
+  convenience link; Apps Script can't receive inbound WhatsApp messages without a paid
+  Business API, so in-app messaging is the system of record.
+- The property map is a no-API-key Google Maps embed built from the Ghana Post GPS
+  address (or street/town/region if GPS isn't set) — no Google Maps API key needed or
+  billed.
+- Tenant self-service uses a real account (phone/email + password). The 6-digit SMS
+  code is only used for the "forgot password" recovery path, not day-to-day login.
 - The admin session token is a random 6-hour-lived token cached server-side via
   `CacheService` (Apps Script has no built-in server session store for anonymous web
   apps).
 - Caretaker and Viewer roles have a reduced navigation menu client-side matching their
-  server-side permissions (money, notices, messaging, settings and user management are
-  hidden from Caretaker/Viewer, not just blocked).
+  server-side permissions (money, bookings approval, bulk messaging, settings and user
+  management are hidden from Caretaker/Viewer, not just blocked).

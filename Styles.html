@@ -236,4 +236,17 @@ table.data-table { width: 100%; border-collapse: collapse; }
 .mt-2 { margin-top: var(--space-2); } .mt-4 { margin-top: var(--space-4); } .mb-0 { margin-bottom: 0; }
 .text-right { text-align: right; }
 .wa-link { color: #1F9C55; display: inline-flex; align-items: center; gap: 6px; }
+
+/* ---- Map embed (property location) -------------------------------------------------- */
+.map-embed { width: 100%; aspect-ratio: 16/9; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
+.map-embed iframe { width: 100%; height: 100%; border: none; }
+
+/* ---- In-app messaging (tenant <-> landlord thread) ----------------------------------- */
+.msg-bubble { max-width: 80%; padding: var(--space-2) var(--space-3); border-radius: var(--radius); margin-bottom: var(--space-2); }
+.msg-bubble.msg-mine { background: var(--accent-soft); margin-left: auto; }
+.msg-bubble.msg-theirs { background: var(--surface-2); margin-right: auto; }
+.msg-bubble .msg-meta { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+
+/* ---- Payment proof thumbnail (Bookings inbox) ---------------------------------------- */
+.proof-thumb { width: 100%; max-width: 160px; border-radius: var(--radius); border: 1px solid var(--border); object-fit: cover; display: block; }
 </style>
