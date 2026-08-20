@@ -1146,19 +1146,26 @@ var STATE = {
 /**
  * Admin navigation used to mean re-fetching a page's data from scratch
  * every single time it was opened — switch from POS to Reviews and back,
- * and POS paid a full Apps Script round trip again for data that hadn't
- * actually changed. Every read (any function named getX) is now cached
- * client-side for a few minutes; revisiting a page within that window
- * resolves from memory instantly instead of going back to the server,
- * while any write (save/delete/checkout/toggle/…) clears the whole cache
- * the moment it succeeds — so the very next read anywhere is guaranteed
- * fresh rather than risking stale data after a change. A couple of
- * functions are deliberately never cached: getNotificationBell (its
- * whole purpose is near-real-time polling) and getPublicData (which
- * already has its own, more deliberate stale-while-revalidate cache).
+ * and POS paid a full Apps Script round trip again (loading bar and all)
+ * for data that hadn't actually changed. Every read (any function named
+ * getX) now goes through real **stale-while-revalidate**: once a page has
+ * been fetched, revisiting it ALWAYS resolves instantly from memory — no
+ * loading spinner, not even after the "fresh" window passes. Once a cache
+ * entry is more than API_CACHE_TTL_MS old, that instant resolve is paired
+ * with a silent background refetch (revalidateInBackground_()) that never
+ * touches the loading bar; if the result actually differs and the admin
+ * is still on the page that asked for it, the page is quietly repainted
+ * with the fresh data. Any write (save/delete/checkout/toggle/…) still
+ * clears the whole cache the moment it succeeds, so the very next read
+ * anywhere is a genuinely cold, guaranteed-fresh fetch rather than ever
+ * risking stale data right after a change. Two functions are deliberately
+ * excluded and always fetch live: getNotificationBell (its whole purpose
+ * is near-real-time polling) and getPublicData (which already has its
+ * own, more deliberate stale-while-revalidate localStorage cache for the
+ * public site — layering this one on top would fight it).
  */
 var API_CACHE = {};
-var API_CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes
+var API_CACHE_TTL_MS = 3 * 60 * 1000; // below this age a cache hit is "fresh enough" — no background revalidation triggered
 var API_CACHE_NEVER = { getNotificationBell: true, getPublicData: true };
 function clearApiCache_() { API_CACHE = {}; }
 
@@ -1167,24 +1174,59 @@ function api(fnName) {
   var cacheKey = (fnName.indexOf('get') === 0 && !API_CACHE_NEVER[fnName]) ? fnName + '|' + JSON.stringify(args) : null;
   if (cacheKey) {
     var hit = API_CACHE[cacheKey];
-    if (hit && (Date.now() - hit.time) < API_CACHE_TTL_MS) return Promise.resolve(hit.data);
+    if (hit) {
+      if ((Date.now() - hit.time) >= API_CACHE_TTL_MS) revalidateInBackground_(fnName, args, cacheKey);
+      return Promise.resolve(hit.data); // stale or fresh, always instant — this is the "no more loading every time" part
+    }
   }
+  return liveApiCall_(fnName, args, cacheKey, true);
+}
+
+/** The actual google.script.run round trip. `showLoading` drives the topbar progress bar — off for a silent SWR background revalidation, on for every real foreground fetch. */
+function liveApiCall_(fnName, args, cacheKey, showLoading) {
   return new Promise(function (resolve, reject) {
-    setLoading(true);
+    if (showLoading) setLoading(true);
     if (typeof google === 'undefined' || !google.script || !google.script.run) {
-      setLoading(false);
+      if (showLoading) setLoading(false);
       reject(new Error('This app must be opened as a deployed Google Apps Script Web App.'));
       return;
     }
     google.script.run
       .withSuccessHandler(function (res) {
-        setLoading(false);
+        if (showLoading) setLoading(false);
         if (cacheKey) API_CACHE[cacheKey] = { data: res, time: Date.now() };
         else clearApiCache_(); // a write just happened — every cached read is a candidate to now be stale
         resolve(res);
       })
-      .withFailureHandler(function (err) { setLoading(false); reject(err); })[fnName].apply(null, args);
+      .withFailureHandler(function (err) { if (showLoading) setLoading(false); reject(err); })[fnName].apply(null, args);
   });
+}
+
+/**
+ * Refetches one already-cached read in the background — no loading bar,
+ * and a failure (e.g. a dropped connection) is swallowed rather than
+ * shown as an error, since the admin still has valid stale data on screen
+ * and will simply get another chance to revalidate next visit. If the
+ * result actually differs from what was cached AND the admin hasn't since
+ * navigated to a different page, the current page is silently repainted
+ * (via renderAdminPage(), coalesced through a single scheduled microtask
+ * so several stale reads on the same page only trigger one repaint).
+ */
+var SWR_REVALIDATING = {};
+var SWR_REPAINT_PENDING = false;
+function revalidateInBackground_(fnName, args, cacheKey) {
+  if (SWR_REVALIDATING[cacheKey]) return; // already in flight — don't pile up duplicate requests
+  SWR_REVALIDATING[cacheKey] = true;
+  var pageAtRequestTime = STATE.adminPage;
+  var before = JSON.stringify(API_CACHE[cacheKey].data);
+  liveApiCall_(fnName, args, cacheKey, false).then(function (res) {
+    delete SWR_REVALIDATING[cacheKey];
+    if (JSON.stringify(res) === before) return; // nothing actually changed — no need to touch the DOM
+    if (STATE.adminPage !== pageAtRequestTime) return; // admin has since moved on — let the next visit pick up the fresh cache instead
+    if (SWR_REPAINT_PENDING) return;
+    SWR_REPAINT_PENDING = true;
+    setTimeout(function () { SWR_REPAINT_PENDING = false; renderAdminPage(); }, 0);
+  }).catch(function () { delete SWR_REVALIDATING[cacheKey]; });
 }
 
 var loadingBarResetTimer = null;
