@@ -1106,8 +1106,32 @@ var STATE = {
 /* =====================================================================
  * API WRAPPER — google.script.run with loading + error handling
  * ===================================================================*/
+/**
+ * Admin navigation used to mean re-fetching a page's data from scratch
+ * every single time it was opened — switch from POS to Reviews and back,
+ * and POS paid a full Apps Script round trip again for data that hadn't
+ * actually changed. Every read (any function named getX) is now cached
+ * client-side for a few minutes; revisiting a page within that window
+ * resolves from memory instantly instead of going back to the server,
+ * while any write (save/delete/checkout/toggle/…) clears the whole cache
+ * the moment it succeeds — so the very next read anywhere is guaranteed
+ * fresh rather than risking stale data after a change. A couple of
+ * functions are deliberately never cached: getNotificationBell (its
+ * whole purpose is near-real-time polling) and getPublicData (which
+ * already has its own, more deliberate stale-while-revalidate cache).
+ */
+var API_CACHE = {};
+var API_CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes
+var API_CACHE_NEVER = { getNotificationBell: true, getPublicData: true };
+function clearApiCache_() { API_CACHE = {}; }
+
 function api(fnName) {
   var args = Array.prototype.slice.call(arguments, 1);
+  var cacheKey = (fnName.indexOf('get') === 0 && !API_CACHE_NEVER[fnName]) ? fnName + '|' + JSON.stringify(args) : null;
+  if (cacheKey) {
+    var hit = API_CACHE[cacheKey];
+    if (hit && (Date.now() - hit.time) < API_CACHE_TTL_MS) return Promise.resolve(hit.data);
+  }
   return new Promise(function (resolve, reject) {
     setLoading(true);
     if (typeof google === 'undefined' || !google.script || !google.script.run) {
@@ -1116,7 +1140,12 @@ function api(fnName) {
       return;
     }
     google.script.run
-      .withSuccessHandler(function (res) { setLoading(false); resolve(res); })
+      .withSuccessHandler(function (res) {
+        setLoading(false);
+        if (cacheKey) API_CACHE[cacheKey] = { data: res, time: Date.now() };
+        else clearApiCache_(); // a write just happened — every cached read is a candidate to now be stale
+        resolve(res);
+      })
       .withFailureHandler(function (err) { setLoading(false); reject(err); })[fnName].apply(null, args);
   });
 }
@@ -1349,6 +1378,7 @@ window.addEventListener('DOMContentLoaded', function () {
     var btn = this;
     btn.classList.add('spinning');
     var done = function () { btn.classList.remove('spinning'); };
+    clearApiCache_(); // the whole point of this button is a genuinely fresh fetch, not the cache that speeds up ordinary navigation
     if (STATE.token) { renderAdminPage(); refreshBell(); setTimeout(done, 500); }
     else { loadPublicSite(); setTimeout(done, 500); }
   });
@@ -2434,6 +2464,7 @@ function doLogout() {
     STATE.token = null; STATE.user = null;
     if (STATE.bellInterval) { clearInterval(STATE.bellInterval); STATE.bellInterval = null; }
     sessionStorage.removeItem('salon_token'); sessionStorage.removeItem('salon_user');
+    clearApiCache_();
     location.hash = '';
     routeHash();
   });
