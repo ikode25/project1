@@ -2217,6 +2217,33 @@
 <body>
     <div id="root"></div>
 
+    <!-- Independent of React entirely, so it still shows up even if the
+         React tree itself is what goes down (React's own error boundaries
+         only catch errors thrown during rendering, not inside plain event
+         handlers). Renders a plain-DOM banner with the real error text on
+         any uncaught exception or unhandled promise rejection, so a blank
+         page turns into an actionable screenshot instead of a dead end. -->
+    <script>
+        function showCrashBanner(message) {
+            if (document.getElementById('crash-banner')) return;
+            const banner = document.createElement('div');
+            banner.id = 'crash-banner';
+            banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:999999;' +
+                'background:#fff3f3;border-bottom:3px solid #c62828;padding:14px 18px;' +
+                'font-family:monospace;font-size:12px;color:#c62828;white-space:pre-wrap;' +
+                'word-break:break-word;max-height:40vh;overflow:auto;box-shadow:0 2px 8px rgba(0,0,0,0.15);';
+            banner.textContent = 'A script error happened (please screenshot this):\n\n' + message;
+            document.body.appendChild(banner);
+        }
+        window.addEventListener('error', function (event) {
+            showCrashBanner((event.error && event.error.stack) || event.message);
+        });
+        window.addEventListener('unhandledrejection', function (event) {
+            const reason = event.reason;
+            showCrashBanner((reason && reason.stack) || (reason && reason.message) || String(reason));
+        });
+    </script>
+
     <script type="text/babel">
         const { useState } = React;
 
@@ -9046,9 +9073,72 @@ HR Team`
             );
         };
 
+        // Catches any render-time crash and shows the real error instead of
+        // leaving the page blank with no clue what happened. React error
+        // boundaries must be class components - hooks/functional components
+        // can't implement componentDidCatch/getDerivedStateFromError.
+        class ErrorBoundary extends React.Component {
+            constructor(props) {
+                super(props);
+                this.state = { error: null };
+            }
+
+            static getDerivedStateFromError(error) {
+                return { error };
+            }
+
+            componentDidCatch(error, info) {
+                console.error('App crashed:', error, info);
+            }
+
+            render() {
+                if (this.state.error) {
+                    return (
+                        <div style={{
+                            maxWidth: '700px', margin: '40px auto', padding: '30px',
+                            fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif",
+                            background: '#fff3f3', border: '2px solid #c62828', borderRadius: '12px'
+                        }}>
+                            <h2 style={{ color: '#c62828', marginTop: 0 }}>
+                                <i className="fas fa-triangle-exclamation"></i> Something went wrong
+                            </h2>
+                            <p style={{ color: '#555' }}>
+                                Please take a screenshot of the message below and share it - it
+                                shows exactly what broke, which makes this fixable instead of a
+                                guessing game.
+                            </p>
+                            <pre style={{
+                                whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: '12px',
+                                background: '#fff', padding: '14px', borderRadius: '6px',
+                                border: '1px solid #eee', maxHeight: '300px', overflow: 'auto'
+                            }}>
+                                {this.state.error && this.state.error.toString()}
+                                {this.state.error && this.state.error.stack ? '\n\n' + this.state.error.stack : ''}
+                            </pre>
+                            <button
+                                onClick={() => this.setState({ error: null })}
+                                style={{
+                                    marginTop: '16px', padding: '10px 20px', background: '#c62828',
+                                    color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer',
+                                    fontSize: '14px', fontWeight: 600
+                                }}
+                            >
+                                Try to Recover
+                            </button>
+                        </div>
+                    );
+                }
+                return this.props.children;
+            }
+        }
+
         // Render the app
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<JobApplicationForm />);
+        root.render(
+            <ErrorBoundary>
+                <JobApplicationForm />
+            </ErrorBoundary>
+        );
     </script>
 </body>
 </html>
