@@ -2604,7 +2604,19 @@ function buildEmailHtml_(headline, bodyHtml, ctaText, ctaLink) {
   var s = getSettingsMap_();
   var primary = s.PrimaryColor || '#1a1a1a';
   var accent = s.AccentColor || '#c9a227';
-  var logoImg = s.LogoURL ? '<img src="' + esc_(s.LogoURL) + '" alt="' + esc_(s.BusinessName) + '" style="height:46px;border-radius:8px;margin-bottom:12px;display:inline-block;">' : '';
+  // Embedded as the actual image bytes (a data: URI), not linked to this
+  // app's own URL — a remote-hosted <img src> in an email depends on the
+  // recipient's mail client choosing to fetch it, which most (Gmail,
+  // Outlook, etc.) don't do automatically for images from an unfamiliar
+  // sender; the customer would only ever see the logo after manually
+  // clicking "Display images below". An inline data: URI has no fetch to
+  // block — the bytes are already part of the email. Skipped (not
+  // embedded, not linked) if it comes out unusually large, since Gmail
+  // clips a whole message over ~102KB and the email's actual content
+  // matters more than its logo.
+  var logoDataUri = s.LogoURL ? imageUrlToDataUri_(s.LogoURL) : '';
+  var logoImg = (logoDataUri && logoDataUri.length < 60000)
+    ? '<img src="' + logoDataUri + '" alt="' + esc_(s.BusinessName) + '" style="height:46px;border-radius:8px;margin-bottom:12px;display:inline-block;">' : '';
   return '<div style="font-family:Arial,Helvetica,sans-serif;background:#f4f3f1;padding:24px 12px;">' +
     '<div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.08);">' +
     '<div style="background:' + primary + ';padding:28px 30px;text-align:center;color:#ffffff;">' + logoImg +

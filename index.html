@@ -112,9 +112,13 @@
   #hero .slide.active { opacity: 1; }
   #hero .slide::after { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, rgba(0,0,0,.78) 10%, rgba(0,0,0,.4) 55%, rgba(0,0,0,.15)); }
   #hero .slide-content { position: relative; z-index: 2; color: #fff; max-width: 680px; padding: 0 24px; }
-  #hero .slide-content h1 { font-size: 3rem; margin-bottom: .3em; text-shadow: 0 2px 20px rgba(0,0,0,.35); }
-  #hero .slide-content p { font-size: 1.18rem; opacity: .94; max-width: 520px; }
-  #hero .slide-content .btn { margin-top: 8px; }
+  #hero .slide-content h1 { font-size: 3rem; margin-bottom: .3em; text-shadow: 0 2px 20px rgba(0,0,0,.35); animation: heroFadeUp .8s .1s cubic-bezier(.2,.7,.3,1) both; }
+  #hero .slide-content p { font-size: 1.18rem; opacity: .94; max-width: 520px; animation: heroFadeUp .8s .25s cubic-bezier(.2,.7,.3,1) both; }
+  #hero .slide-content .btn { margin-top: 8px; animation: heroFadeUp .8s .4s cubic-bezier(.2,.7,.3,1) both; }
+  @keyframes heroFadeUp { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    #hero .slide-content h1, #hero .slide-content p, #hero .slide-content .btn { animation: none; }
+  }
   #hero .dots { position: absolute; bottom: 22px; left: 0; right: 0; display: flex; justify-content: center; gap: 8px; z-index: 3; }
   #hero .dots span { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,.45); cursor: pointer; transition: background .15s, transform .15s; }
   #hero .dots span.active { background: var(--clr-accent); transform: scale(1.2); }
@@ -128,6 +132,15 @@
   .section-title::after { content: ''; display: block; width: 52px; height: 4px; border-radius: 4px; background: var(--clr-accent); margin: 16px auto 0; }
   .section-sub { text-align: center; color: #777; margin-bottom: 44px; font-size: 1.05rem; }
   @media (max-width: 700px) { .section-title { font-size: 1.6rem; } }
+
+  /* ---------- Scroll-reveal: each section fades/slides up into place the
+     first time it enters the viewport, instead of just appearing — see
+     initScrollReveal_(). Respects prefers-reduced-motion. ---------- */
+  [data-reveal] { opacity: 0; transform: translateY(32px); transition: opacity .7s cubic-bezier(.2,.7,.3,1), transform .7s cubic-bezier(.2,.7,.3,1); }
+  [data-reveal].revealed { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    [data-reveal] { opacity: 1; transform: none; transition: none; }
+  }
 
   .svc-category { margin-bottom: 34px; }
   .svc-category h3 { color: var(--clr-secondary); border-bottom: 2px solid var(--clr-secondary); padding-bottom: 6px; margin-bottom: 16px; display: inline-block; font-size: 1.1rem; letter-spacing: .3px; }
@@ -157,7 +170,8 @@
   /* ---------- GALLERY ---------- */
   .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
   .video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
-  .video-card { background: #fff; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+  .video-card { background: #fff; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); transition: transform .2s ease, box-shadow .2s ease; }
+  .video-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lift); }
   .video-frame { position: relative; width: 100%; aspect-ratio: 16/9; background: #111; }
   .video-frame iframe, .video-frame video { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
   .video-card-body { padding: 12px 16px; }
@@ -766,9 +780,9 @@
           <a href="#services">Services</a>
           <a href="#team" id="teamNavLink">Our Team</a>
           <a href="#gallery">Gallery</a>
+          <a href="#reviews">Reviews</a>
           <a href="#booking">Book Now</a>
           <a href="#mybookings">My Bookings</a>
-          <a href="#reviews">Reviews</a>
           <a href="#contact">Contact</a>
           <a href="#admin" id="adminLoginLink" title="Staff Login" aria-label="Staff Login"></a>
         </nav>
@@ -779,31 +793,31 @@
   <div class="pub-greeting-strip"><div class="container"><span id="pubGreeting"></span></div></div>
   <div id="hero"></div>
 
-  <section class="pub alt" id="services">
+  <section class="pub alt" id="services" data-reveal>
     <div class="container">
       <h2 class="section-title">Services & Price List</h2>
       <p class="section-sub">All prices in Ghana Cedis (GH₵)</p>
-      <div id="servicesList">Loading services…</div>
+      <div id="servicesList"><div class="spinner-loading" style="justify-content:center;"><span class="spinner-ring"></span>Loading services…</div></div>
     </div>
   </section>
 
-  <section class="pub" id="team">
+  <section class="pub" id="team" data-reveal>
     <div class="container">
       <h2 class="section-title">Meet Our Team</h2>
       <p class="section-sub">Experienced barbers &amp; stylists ready to serve you</p>
-      <div class="staff-grid" id="staffList">Loading team…</div>
+      <div class="staff-grid" id="staffList"><div class="spinner-loading" style="justify-content:center;grid-column:1/-1;"><span class="spinner-ring"></span>Loading team…</div></div>
     </div>
   </section>
 
-  <section class="pub alt" id="gallery">
+  <section class="pub alt" id="gallery" data-reveal>
     <div class="container">
       <h2 class="section-title">Our Work</h2>
       <p class="section-sub">A glimpse into the salon experience</p>
-      <div class="gallery-grid" id="galleryGrid">Loading gallery…</div>
+      <div class="gallery-grid" id="galleryGrid"><div class="spinner-loading" style="justify-content:center;grid-column:1/-1;"><span class="spinner-ring"></span>Loading gallery…</div></div>
     </div>
   </section>
 
-  <section class="pub" id="videos-section" style="display:none;">
+  <section class="pub" id="videos-section" style="display:none;" data-reveal>
     <div class="container">
       <h2 class="section-title">Watch</h2>
       <p class="section-sub">See our work in action</p>
@@ -811,15 +825,34 @@
     </div>
   </section>
 
-  <section class="pub alt" id="booking">
+  <section class="pub alt" id="reviews" data-reveal>
     <div class="container">
-      <h2 class="section-title">Book an Appointment</h2>
-      <p class="section-sub">Follow the steps below — we'll confirm by SMS/Email</p>
-      <div id="bookingWizardHost" class="book-wrap"><p class="muted" style="text-align:center;">Loading booking form…</p></div>
+      <h2 class="section-title">What Our Customers Say</h2>
+      <div class="reviews-grid" id="reviewsList"><div class="spinner-loading" style="justify-content:center;grid-column:1/-1;"><span class="spinner-ring"></span>Loading reviews…</div></div>
+      <div class="review-form-wrap">
+        <h3>Leave a Review</h3>
+        <form id="reviewForm">
+          <div class="form-row"><label>Your Rating</label><div class="star-picker" id="starPicker"></div></div>
+          <div class="form-row2">
+            <div class="form-row"><label>Your Name</label><input type="text" id="rvName" required></div>
+            <div class="form-row"><label>Phone (optional)</label><input type="text" id="rvPhone" placeholder="024XXXXXXX"></div>
+          </div>
+          <div class="form-row"><label>Comment</label><textarea id="rvComment" rows="3" required></textarea></div>
+          <button type="submit" class="btn btn-accent">Submit Review</button>
+        </form>
+      </div>
     </div>
   </section>
 
-  <section class="pub" id="mybookings">
+  <section class="pub" id="booking" data-reveal>
+    <div class="container">
+      <h2 class="section-title">Book an Appointment</h2>
+      <p class="section-sub">Follow the steps below — we'll confirm by SMS/Email</p>
+      <div id="bookingWizardHost"><div class="spinner-loading" style="justify-content:center;"><span class="spinner-ring"></span>Loading booking form…</div></div>
+    </div>
+  </section>
+
+  <section class="pub alt" id="mybookings" data-reveal>
     <div class="container">
       <h2 class="section-title">Track Your Bookings</h2>
       <p class="section-sub">Look up by the phone number you booked with, or by your booking reference</p>
@@ -841,26 +874,7 @@
     </div>
   </section>
 
-  <section class="pub alt" id="reviews">
-    <div class="container">
-      <h2 class="section-title">What Our Customers Say</h2>
-      <div class="reviews-grid" id="reviewsList">Loading reviews…</div>
-      <div class="review-form-wrap">
-        <h3>Leave a Review</h3>
-        <form id="reviewForm">
-          <div class="form-row"><label>Your Rating</label><div class="star-picker" id="starPicker"></div></div>
-          <div class="form-row2">
-            <div class="form-row"><label>Your Name</label><input type="text" id="rvName" required></div>
-            <div class="form-row"><label>Phone (optional)</label><input type="text" id="rvPhone" placeholder="024XXXXXXX"></div>
-          </div>
-          <div class="form-row"><label>Comment</label><textarea id="rvComment" rows="3" required></textarea></div>
-          <button type="submit" class="btn btn-accent">Submit Review</button>
-        </form>
-      </div>
-    </div>
-  </section>
-
-  <section class="pub" id="contact">
+  <section class="pub" id="contact" data-reveal>
     <div class="container">
       <h2 class="section-title">Visit / Contact Us</h2>
       <p class="section-sub">We'd love to hear from you — reach out however suits you best.</p>
@@ -1203,6 +1217,30 @@ function applyTheme(settings) {
   r.style.setProperty('--font', settings.FontFamily || '-apple-system, sans-serif');
 }
 
+/**
+ * Fades/slides each `[data-reveal]` public-site section up into place the
+ * first time it scrolls into view, instead of it just being there on
+ * paint — a one-time reveal per section (it doesn't re-trigger scrolling
+ * back up past it). Falls back to showing everything immediately in a
+ * browser without IntersectionObserver, rather than leaving it invisible.
+ */
+function initScrollReveal_() {
+  var targets = document.querySelectorAll('[data-reveal]');
+  if (!('IntersectionObserver' in window) || !targets.length) {
+    targets.forEach(function (el) { el.classList.add('revealed'); });
+    return;
+  }
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('revealed');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12, rootMargin: '0px 0px -60px 0px' });
+  targets.forEach(function (el) { observer.observe(el); });
+}
+
 /* =====================================================================
  * BOOT
  * ===================================================================*/
@@ -1272,6 +1310,7 @@ window.addEventListener('DOMContentLoaded', function () {
   bindMyBookingsForm();
   bindContactForm();
   initChatWidget();
+  initScrollReveal_();
   window.addEventListener('hashchange', routeHash);
 
   var savedDark = localStorage.getItem('salon_dark_mode') === '1';
@@ -1553,13 +1592,23 @@ function openImageLightbox(url, caption) {
   overlay.addEventListener('click', function (e) { if (e.target === overlay || e.target.closest('.lightbox-close')) overlay.remove(); });
 }
 
-/** Turns a pasted YouTube/Vimeo/direct-file URL into something embeddable. */
+/** Turns a pasted YouTube/Vimeo/TikTok/direct-file URL into something embeddable. */
 function videoEmbedInfo_(url) {
   url = String(url || '');
   var yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{6,})/);
   if (yt) return { kind: 'iframe', src: 'https://www.youtube.com/embed/' + yt[1] };
   var vimeo = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
   if (vimeo) return { kind: 'iframe', src: 'https://player.vimeo.com/video/' + vimeo[1] };
+  // A TikTok video page URL (https://www.tiktok.com/@user/video/123...) is
+  // not itself a video file — pasted as a plain <video src>, it silently
+  // shows nothing, since the browser can't play an HTML page as a video
+  // stream. TikTok's own embed player takes the video ID as a plain
+  // iframe src, the same shape as the YouTube/Vimeo embeds above. This
+  // only recognizes the full tiktok.com/@user/video/... link (what
+  // "Copy link" on a TikTok video page gives you) — a shortened
+  // vm.tiktok.com/... share link isn't resolved client-side.
+  var tiktok = url.match(/tiktok\.com\/@[\w.-]+\/video\/(\d+)/);
+  if (tiktok) return { kind: 'iframe', src: 'https://www.tiktok.com/embed/v2/' + tiktok[1] };
   return { kind: 'video', src: url };
 }
 
@@ -3776,7 +3825,7 @@ function deleteSlideRow(id) {
 /* ---------- VIDEOS ---------- */
 function renderVideosAdmin(content) {
   content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Videos</h3><button class="btn btn-sm" onclick="openVideoModal()">' + icon('plus', 14) + ' Add Video</button></div>' +
-    '<p class="muted">Paste a YouTube, Vimeo, or direct video (.mp4) URL — it plays embedded on your website automatically. No large file upload needed.</p>' +
+    '<p class="muted">Paste a YouTube, Vimeo, TikTok, or direct video (.mp4) URL — it plays embedded on your website automatically. No large file upload needed. For TikTok, use the full link from that video\'s own "Copy link" (not a shortened vm.tiktok.com one).</p>' +
     '<div id="videoTableHost"></div></div>';
   loadVideosTable();
 }
@@ -3796,7 +3845,7 @@ function loadVideosTable() {
 function openVideoModal(v) {
   v = v || {};
   var html = '<div class="field-grid">' +
-    '<div style="grid-column:1/-1"><label>Video URL (YouTube, Vimeo, or direct .mp4 link)</label><input id="vidUrl" value="' + esc(v.VideoURL || '') + '" placeholder="https://youtube.com/watch?v=…"></div>' +
+    '<div style="grid-column:1/-1"><label>Video URL (YouTube, Vimeo, TikTok, or direct .mp4 link)</label><input id="vidUrl" value="' + esc(v.VideoURL || '') + '" placeholder="https://youtube.com/watch?v=…"></div>' +
     '<div><label>Title</label><input id="vidTitle" value="' + esc(v.Title || '') + '"></div>' +
     '<div><label>Sort Order</label><input type="number" id="vidOrder" value="' + (v.SortOrder || 1) + '"></div>' +
     '<div style="grid-column:1/-1"><label>Caption</label><input id="vidCaption" value="' + esc(v.Caption || '') + '"></div>' +
