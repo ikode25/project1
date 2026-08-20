@@ -134,7 +134,15 @@ var DEFAULT_SETTINGS = {
   ServiceCategories: 'Haircut,Shave,Braids,Manicure,Facial',
   // 'Y'/'N' toggles for optional public-site sections.
   ShowGreetingBanner: 'Y',
-  ShowTeamSection: 'Y'
+  ShowTeamSection: 'Y',
+  // 'Y'/'N' toggles for the automatic SMS/Email a customer gets the moment
+  // they book an appointment (the "Booking Received — pending confirmation"
+  // message). Default 'Y' preserves the app's existing always-on behavior.
+  // WhatsApp is deliberately not included here — there's no WhatsApp
+  // Business API integration in this app, only the existing click-to-chat
+  // link, so there's nothing to automate/toggle.
+  NotifyBookingSms: 'Y',
+  NotifyBookingEmail: 'Y'
 };
 
 var PAYMENT_METHODS = ['Cash', 'MTN MoMo', 'Vodafone Cash', 'Telecel Cash', 'AirtelTigo Money', 'Bank Transfer'];
@@ -2166,6 +2174,18 @@ function getDashboardOverview(token, branchId) {
     // revenue visible to them, so it's withheld here (not just hidden in
     // the UI) rather than trusting the client to hide a number it already has.
     todayRevenue: user.role === 'Staff' ? null : round2_(todayRevenue),
+    // Per-sale payment detail for today, so the admin can see (and drill into)
+    // exactly who paid via Cash/Mobile Money/Card today — withheld from Staff
+    // for the same reason todayRevenue is (Staff don't handle the money side).
+    todaySalesDetail: user.role === 'Staff' ? null : todaySales.map(function (s) {
+      return {
+        SaleID: s.SaleID,
+        Time: String(s.Date).slice(11, 16),
+        PaymentMethod: s.PaymentMethod,
+        CustomerName: s.CustomerID && customers[s.CustomerID] ? customers[s.CustomerID].Name : 'Walk-in',
+        Total: round2_(Number(s.Total))
+      };
+    }).sort(function (a, b) { return a.Time.localeCompare(b.Time); }),
     todaySalesCount: todaySales.length,
     upcomingCount: upcoming.length,
     lowStock: lowStock.map(stripRow_),
@@ -2675,8 +2695,11 @@ function sendAppointmentConfirmation_(appt, customer, service, branch) {
   var msg = 'Hi ' + customer.Name + ', your booking (' + appt.Reference + ') for ' + service.Name +
     ' at ' + branch.Name + ' on ' + appt.Date + ' ' + appt.TimeSlot + ' is received and PENDING confirmation. ' +
     '- ' + settings.BusinessName;
-  sendSms_(customer.Phone, msg);
-  if (customer.Email) {
+  // Booking notifications are the one message type the Owner can switch off
+  // per-channel (Settings → Notifications) — every other automatic message
+  // (status updates, receipts, reminders) still always sends.
+  if (settings.NotifyBookingSms !== 'N') sendSms_(customer.Phone, msg);
+  if (settings.NotifyBookingEmail !== 'N' && customer.Email) {
     var bodyHtml = '<p>Hi ' + esc_(customer.Name) + ',</p>' +
       '<p>Thank you for booking with us! Your appointment request has been received and is <b>pending confirmation</b>. Here are the details:</p>' +
       emailDetailTable_([

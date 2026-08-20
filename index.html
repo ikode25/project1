@@ -606,9 +606,6 @@
   .settings-tab.active { background: var(--clr-accent); border-color: var(--clr-accent); color: #1a1a1a; }
   .settings-tab:hover:not(.active) { border-color: var(--clr-accent); }
 
-  .receipt-box { font-family: monospace; font-size: .85rem; background: #fafafa; border: 1px dashed #999; padding: 16px; }
-  .receipt-box hr { border: none; border-top: 1px dashed #999; }
-
   .receipt-modern { border-radius: 14px; overflow: hidden; box-shadow: 0 6px 20px rgba(0,0,0,.12); }
   .receipt-modern .rh { background: linear-gradient(135deg, var(--clr-primary), var(--clr-accent)); color: #fff; padding: 24px 22px 18px; text-align: center; }
   .receipt-modern .rh img { height: 38px; border-radius: 8px; margin: 0 auto 8px; }
@@ -620,6 +617,40 @@
   .receipt-total-row.grand { font-size: 1.2rem; font-weight: 800; color: var(--clr-primary); border-top: 2px solid #eee; margin-top: 8px; padding-top: 12px; }
   .receipt-pay-badge { display: inline-flex; align-items: center; gap: 6px; background: #f0eee8; padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: .8rem; margin-top: 10px; }
   .receipt-footer { text-align: center; padding: 14px; color: #888; font-size: .78rem; background: #fafaf8; }
+
+  /* Receipt print-format toggle (A4 vs Thermal), shown above the receipt in
+     the modal — never printed, see the print-isolation rules below. */
+  .receipt-format-toggle { display: flex; gap: 8px; margin-bottom: 14px; }
+  .receipt-format-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 10px; border-radius: 8px; border: 1.5px solid #e5e2da; background: #fff; color: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; }
+  #adminApp.dark .receipt-format-btn { background: #1e2127; border-color: #2a2e37; }
+  .receipt-format-btn.active { background: var(--clr-accent); border-color: var(--clr-accent); color: #1a1a1a; }
+  .receipt-format-btn:hover:not(.active) { border-color: var(--clr-accent); }
+
+  /* Thermal format: a narrow, monochrome roll-style layout — thermal
+     printers are line printers with no real color support, so the gradient
+     header and soft badges of the on-screen/A4 look are swapped for plain
+     dashed rules, repurposing the look the old unused .receipt-box class
+     used to have. */
+  #receiptPrint.format-thermal { width: 288px; max-width: 100%; margin: 0 auto; font-family: 'Courier New', Courier, monospace; border-radius: 0; box-shadow: none; border: 1px dashed #999; }
+  #receiptPrint.format-thermal .rh { background: #fff !important; color: #1a1a1a; padding: 14px 10px 10px; border-bottom: 1px dashed #999; }
+  #receiptPrint.format-thermal .rh .check { color: #1a1a1a; }
+  #receiptPrint.format-thermal .rh img { filter: grayscale(1); }
+  #receiptPrint.format-thermal .rbody { padding: 10px; }
+  #receiptPrint.format-thermal .receipt-line { font-size: .76rem; padding: 5px 0; border-bottom: 1px dashed #ccc; }
+  #receiptPrint.format-thermal .receipt-total-row { font-size: .76rem; }
+  #receiptPrint.format-thermal .receipt-total-row.grand { font-size: .98rem; border-top: 1px dashed #999; }
+  #receiptPrint.format-thermal .receipt-pay-badge { background: none; border: 1px dashed #999; border-radius: 0; }
+  #receiptPrint.format-thermal .receipt-footer { background: #fff; font-size: .68rem; }
+
+  /* Print isolation: while body.printing-receipt is set (toggled right
+     around window.print(), see printReceiptNow_()), everything on the page
+     — admin chrome, the modal's title/close/format-toggle/action buttons —
+     is hidden except #receiptPrint itself, so only the receipt prints
+     regardless of what's open behind it. @page sizing (A4 vs an 80mm
+     thermal roll) is injected dynamically alongside this, per chosen format. */
+  body.printing-receipt * { visibility: hidden !important; }
+  body.printing-receipt #receiptPrint, body.printing-receipt #receiptPrint * { visibility: visible !important; }
+  body.printing-receipt #receiptPrint { position: absolute !important; left: 0; top: 0; width: 100%; margin: 0 !important; box-shadow: none !important; }
 
   /* Charts */
   .hbar-chart { display: flex; flex-direction: column; gap: 10px; }
@@ -1074,7 +1105,9 @@ var ICONS = {
   info: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>',
   globe: '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 0 20 15.3 15.3 0 0 1 0-20z"/>',
   play: '<polygon points="5 3 19 12 5 21 5 3"/>',
-  landmark: '<line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7 12 2"/>'
+  landmark: '<line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7 12 2"/>',
+  printer: '<polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>',
+  fileText: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>'
 };
 function icon(name, size, cls) {
   size = size || 20;
@@ -1854,12 +1887,16 @@ function renderBookingsKanban(host, rows) {
         return '<div class="kanban-card"><b>' + esc(a.ServiceName) + '</b>' +
           '<div class="muted">' + esc(a.BranchName) + ' &middot; ' + esc(a.StaffName) + '</div>' +
           '<div class="muted">' + esc(formatNiceDate(a.Date)) + '</div>' +
-          '<div class="muted">' + esc(formatTime12(a.TimeSlot)) + ' &middot; Ref: ' + esc(a.Reference) + '</div>' +
+          '<div class="muted" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">' + esc(formatTime12(a.TimeSlot)) + ' &middot; Ref: ' + esc(a.Reference) +
+          '<button type="button" class="btn btn-sm btn-outline copy-btn" data-copy="' + esc(a.Reference) + '" title="Copy reference">' + icon('copy', 11) + '</button></div>' +
           (canCancel ? '<div class="row-actions"><button class="btn btn-sm btn-outline" onclick="cancelMyBookingRow(\'' + a.AppointmentID + '\')">Cancel</button></div>' : '') +
           '</div>';
       }).join('') : '<div class="kanban-empty">None</div>') +
       '</div>';
   }).join('') + '</div>';
+  host.querySelectorAll('.copy-btn').forEach(function (el) {
+    el.addEventListener('click', function () { copyToClipboard(el.dataset.copy); });
+  });
 }
 
 function cancelMyBookingRow(appointmentId) {
@@ -2374,10 +2411,16 @@ function renderBookingSuccess(res) {
   section.innerHTML = '<div class="wizard-box booking-success">' +
     '<div class="check-icon">' + icon('checkCircle', 64) + '</div>' +
     '<h2>Booking Requested!</h2><p class="muted">' + esc(res.message) + '</p>' +
-    '<div class="ref-badge">' + esc(res.reference) + '</div>' +
+    '<div style="display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin:14px 0;">' +
+    '<div class="ref-badge" style="margin:0;">' + esc(res.reference) + '</div>' +
+    '<button type="button" class="btn btn-sm btn-outline copy-btn" data-copy="' + esc(res.reference) + '">' + icon('copy', 13) + ' Copy</button>' +
+    '</div>' +
     '<p class="muted">Save this reference. We\'ve sent a confirmation to your phone' + (BOOKING.email ? ' and email' : '') + '.</p>' +
     '<button class="btn btn-accent" onclick="initBookingWizard()">Book Another Appointment</button>' +
     '</div>';
+  section.querySelectorAll('.copy-btn').forEach(function (el) {
+    el.addEventListener('click', function () { copyToClipboard(el.dataset.copy); });
+  });
 }
 
 /* =====================================================================
@@ -2878,13 +2921,89 @@ function renderOverview(content) {
       (isStaff ? '' : '<div class="panel"><h3>7-Day Revenue Trend</h3>' + renderLineChart(rpt.revenueByDay.map(function (r) { return { label: r.date, value: r.revenue }; }), { height: 180 }) + '</div>') +
       '<div class="panel"><h3>Website Visitors (7 days)</h3><p class="muted">Roughly-unique visitors per day, counted once per browser per day — not tied to any personal info.</p>' +
       renderLineChart(visits.trend.map(function (t) { return { label: t.date, value: t.visitors }; }), { height: 140 }) + '</div>' +
+      renderApptsByTimeHtml_(d.todayAppointments) +
       '<div class="panel"><div class="panel-head"><h3>Today\'s Appointments</h3></div>' +
       renderTable(['Time', 'Customer', 'Service', 'Staff', 'Status'], d.todayAppointments.map(function (a) {
         return [a.TimeSlot, a.CustomerName, a.ServiceName, a.StaffName, statusBadge(a.Status)];
       })) + '</div>' +
+      (d.todaySalesDetail ? renderPaymentsByMethodHtml_(d.todaySalesDetail) : '') +
       (d.lowStock.length ? '<div class="panel"><div class="panel-head"><h3 class="warn-line">' + icon('alertTriangle', 17) + ' Low Stock Alerts</h3></div>' +
         renderTable(['Product', 'In Stock', 'Reorder Level'], d.lowStock.map(function (p) { return [p.Name, p.QuantityInStock, p.ReorderLevel]; })) + '</div>' : '');
   }).catch(function (err) { content.innerHTML = errorPanel(err); });
+}
+
+/**
+ * "Today's Appointments by Time" — how busy each booked time slot is today,
+ * as a bar per time (reusing the existing hbar-chart look). Clicking a row
+ * opens a modal listing exactly who's booked at that time, so the admin can
+ * both see the shape of the day at a glance and drill into any one slot.
+ * Built entirely from the same d.todayAppointments already fetched for the
+ * table below it — no extra request.
+ */
+var OVERVIEW_APPTS_BY_TIME = {};
+function renderApptsByTimeHtml_(todayAppointments) {
+  OVERVIEW_APPTS_BY_TIME = {};
+  todayAppointments.forEach(function (a) {
+    var t = a.TimeSlot || 'Unspecified';
+    (OVERVIEW_APPTS_BY_TIME[t] = OVERVIEW_APPTS_BY_TIME[t] || []).push(a);
+  });
+  var times = Object.keys(OVERVIEW_APPTS_BY_TIME).sort();
+  if (!times.length) return '';
+  var maxCount = Math.max.apply(null, times.map(function (t) { return OVERVIEW_APPTS_BY_TIME[t].length; }));
+  return '<div class="panel"><div class="panel-head"><h3>Today\'s Appointments by Time</h3></div>' +
+    '<p class="muted" style="margin-bottom:10px;">How busy each time slot is today — click a time to see who\'s booked then.</p>' +
+    '<div class="hbar-chart">' + times.map(function (t) {
+      var n = OVERVIEW_APPTS_BY_TIME[t].length;
+      var pct = Math.max(6, Math.round((n / maxCount) * 100));
+      return '<div class="hbar-row" style="cursor:pointer;" onclick="showApptsAtTime_(\'' + esc(t).replace(/'/g, "\\'") + '\')" title="Click to see who\'s booked">' +
+        '<div class="hbar-label">' + esc(formatTime12(t)) + '</div>' +
+        '<div class="hbar-track"><div class="hbar-fill" style="width:' + pct + '%;background:var(--clr-accent);"></div></div>' +
+        '<div class="hbar-value">' + n + '</div></div>';
+    }).join('') + '</div></div>';
+}
+function showApptsAtTime_(timeSlot) {
+  var rows = OVERVIEW_APPTS_BY_TIME[timeSlot] || [];
+  var html = renderTable(['Customer', 'Service', 'Staff', 'Status'], rows.map(function (a) {
+    return [esc(a.CustomerName), esc(a.ServiceName), esc(a.StaffName), statusBadge(a.Status)];
+  }));
+  openModal(rows.length + ' Booked at ' + formatTime12(timeSlot), html);
+}
+
+/**
+ * "Today's Payments by Method" — Cash / Mobile Money / Card counts and
+ * totals for today (Mobile Money groups every network — MTN MoMo, Vodafone
+ * Cash, Telecel Cash, AirtelTigo Money — since that's how the Owner thinks
+ * about it day-to-day; the exact network is still shown in the drill-down
+ * table). Withheld entirely when d.todaySalesDetail is null (Staff role —
+ * mirrors todayRevenue's existing privacy handling). Clicking a tile opens
+ * a modal listing exactly which customers/walk-ins paid that way today.
+ */
+var OVERVIEW_PAYMENTS_BY_METHOD = {};
+function paymentMethodBucket_(method) {
+  if (method === 'Cash') return 'Cash';
+  if (method === 'Card') return 'Card';
+  return 'Mobile Money';
+}
+function renderPaymentsByMethodHtml_(todaySalesDetail) {
+  var order = ['Cash', 'Mobile Money', 'Card'];
+  var buckets = { Cash: [], 'Mobile Money': [], Card: [] };
+  todaySalesDetail.forEach(function (s) { buckets[paymentMethodBucket_(s.PaymentMethod)].push(s); });
+  OVERVIEW_PAYMENTS_BY_METHOD = buckets;
+  return '<div class="panel"><div class="panel-head"><h3>Today\'s Payments by Method</h3></div>' +
+    '<p class="muted" style="margin-bottom:10px;">Who paid how today — click a method to see the individual customers.</p>' +
+    '<div class="stat-grid">' + order.map(function (b) {
+      var list = buckets[b];
+      var total = list.reduce(function (sum, s) { return sum + Number(s.Total); }, 0);
+      return '<div class="stat-card" style="cursor:pointer;" onclick="showPaymentsForMethod_(\'' + b + '\')" title="Click to see who paid via ' + b + '">' +
+        '<div class="val">' + list.length + '</div><div class="lbl">' + esc(b) + ' &middot; ' + money(total) + '</div></div>';
+    }).join('') + '</div></div>';
+}
+function showPaymentsForMethod_(bucket) {
+  var rows = OVERVIEW_PAYMENTS_BY_METHOD[bucket] || [];
+  var html = renderTable(['Time', 'Customer', 'Payment Method', 'Amount'], rows.map(function (s) {
+    return [esc(s.Time), esc(s.CustomerName), esc(s.PaymentMethod), money(s.Total)];
+  }));
+  openModal(rows.length + ' ' + bucket + ' Payments Today', html);
 }
 
 /* ---------- APPOINTMENTS ---------- */
@@ -3192,9 +3311,16 @@ function checkoutSale() {
   }).catch(showError);
 }
 
+/** Persisted A4/Thermal choice for the checkout receipt, so it's remembered between sales. */
+var RECEIPT_FORMAT_KEY = 'salon_receipt_format';
+function getReceiptFormat_() {
+  try { var v = localStorage.getItem(RECEIPT_FORMAT_KEY); return v === 'thermal' ? 'thermal' : 'a4'; } catch (e) { return 'a4'; }
+}
+
 function showReceipt(sale) {
   var s = STATE.settings;
-  var html = '<div class="receipt-modern" id="receiptPrint">' +
+  var fmt = getReceiptFormat_();
+  var receiptHtml = '<div class="receipt-modern format-' + fmt + '" id="receiptPrint">' +
     '<div class="rh">' + (s.LogoURL ? '<img src="' + esc(s.LogoURL) + '">' : '') +
     '<div class="check">' + icon('checkCircle', 34) + '</div>' +
     '<div style="font-weight:800;font-size:1.1rem;">' + esc(s.BusinessName) + '</div>' +
@@ -3212,8 +3338,42 @@ function showReceipt(sale) {
     '</div>' +
     '<div class="receipt-footer">Thank you for visiting ' + esc(s.BusinessName) + '! ' + (s.ContactPhone ? esc(s.ContactPhone) : '') + '</div>' +
     '</div>';
-  openModal('Receipt — ' + sale.SaleID, html, function () { window.print(); }, 'Print Receipt');
+  var toggleHtml = '<div class="receipt-format-toggle" id="receiptFmtToggle">' +
+    '<button type="button" class="receipt-format-btn' + (fmt === 'a4' ? ' active' : '') + '" data-fmt="a4">' + icon('fileText', 14) + ' A4 Format</button>' +
+    '<button type="button" class="receipt-format-btn' + (fmt === 'thermal' ? ' active' : '') + '" data-fmt="thermal">' + icon('printer', 14) + ' Thermal Receipt</button>' +
+    '</div>';
+  openModal('Receipt — ' + sale.SaleID, toggleHtml + receiptHtml, function () { printReceiptNow_(); }, 'Print Receipt');
+  document.querySelectorAll('#receiptFmtToggle .receipt-format-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () { setReceiptFormat_(btn.dataset.fmt); });
+  });
 }
+
+function setReceiptFormat_(fmt) {
+  try { localStorage.setItem(RECEIPT_FORMAT_KEY, fmt); } catch (e) {}
+  var el = document.getElementById('receiptPrint');
+  if (el) { el.classList.remove('format-a4', 'format-thermal'); el.classList.add('format-' + fmt); }
+  document.querySelectorAll('#receiptFmtToggle .receipt-format-btn').forEach(function (btn) {
+    btn.classList.toggle('active', btn.dataset.fmt === fmt);
+  });
+}
+
+/**
+ * Prints only #receiptPrint, at the right page size for the chosen format —
+ * A4 for a standard printer, or an 80mm-wide roll for a thermal printer.
+ * The rest of the page (admin chrome, modal title/toggle/buttons) is hidden
+ * for the duration via the printing-receipt CSS rules, then restored on
+ * "afterprint" (with a timeout fallback for browsers that never fire it).
+ */
+function printReceiptNow_() {
+  var fmt = getReceiptFormat_();
+  var pageStyle = document.getElementById('receiptPageStyle');
+  if (!pageStyle) { pageStyle = document.createElement('style'); pageStyle.id = 'receiptPageStyle'; document.head.appendChild(pageStyle); }
+  pageStyle.textContent = fmt === 'thermal' ? '@page { size: 80mm auto; margin: 3mm; }' : '@page { size: A4; margin: 16mm; }';
+  document.body.classList.add('printing-receipt');
+  window.print();
+  setTimeout(function () { document.body.classList.remove('printing-receipt'); }, 1000);
+}
+window.addEventListener('afterprint', function () { document.body.classList.remove('printing-receipt'); });
 
 /* ---------- CUSTOMERS ---------- */
 function renderCustomers(content) {
@@ -3901,6 +4061,7 @@ var SETTINGS_TABS = [
   { key: 'social', label: 'Social & Contact', icon: 'globe' },
   { key: 'payments', label: 'Payments & Loyalty', icon: 'card' },
   { key: 'sms', label: 'SMS Gateway', icon: 'smartphone' },
+  { key: 'notifications', label: 'Notifications', icon: 'bell' },
   { key: 'qr', label: 'QR Code', icon: 'image' }
 ];
 
@@ -3988,6 +4149,13 @@ function renderSettingsAdmin(content) {
       field('Hubtel Client ID', 'stHubtelClientId', s.HubtelClientId) +
       field('Hubtel Client Secret', 'stHubtelClientSecret', s.HubtelClientSecret) +
       '</div><p class="muted">"Simulate" logs messages without sending — useful for testing before you have gateway credentials. See <b>SMS</b> in the sidebar for delivery stats, balance, and history.</p></div></div>' +
+
+      '<div class="settings-panel hidden" data-panel="notifications"><div class="panel"><h4 style="margin:0 0 4px;">Booking Confirmation</h4>' +
+      '<p class="muted" style="margin-bottom:10px;">The moment a customer books an appointment, they automatically get a "Booking Received — pending confirmation" message. Switch either channel off here if you\'d rather they not receive it that way — every other automatic message (status updates, receipts, reminders) is unaffected.</p>' +
+      '<div class="day-picker">' +
+      '<label class="chip-toggle"><input type="checkbox" id="stNotifyBookingSms"' + (s.NotifyBookingSms !== 'N' ? ' checked' : '') + '> ' + icon('smartphone', 14) + ' Automatic SMS</label>' +
+      '<label class="chip-toggle"><input type="checkbox" id="stNotifyBookingEmail"' + (s.NotifyBookingEmail !== 'N' ? ' checked' : '') + '> ' + icon('mail', 14) + ' Automatic Email</label>' +
+      '</div><p class="muted" style="margin-top:12px;">WhatsApp stays as the click-to-chat button on your site — there\'s no WhatsApp Business API connected here to send it automatically.</p></div></div>' +
 
       '<div class="settings-panel hidden" data-panel="qr"><div class="panel"><p class="muted">Print this and display it at your shop — customers scan it to jump straight to the booking form. Or paste any other URL below (a promo page, WhatsApp link, social profile…) to generate a QR code for that instead.</p>' +
       '<div class="form-row" style="max-width:480px;margin:0 auto 16px;"><label>URL to Encode</label><div style="display:flex;gap:8px;"><input type="text" id="qrCustomUrl" placeholder="Defaults to your booking page"><button type="button" class="btn btn-sm btn-outline" onclick="regenerateQrCard()">' + icon('refresh', 13) + ' Generate</button></div></div>' +
@@ -4224,7 +4392,9 @@ function saveAllSettings() {
       ActivePaymentMethods: Array.prototype.slice.call(document.querySelectorAll('#stPaymentMethodsPicker .day-chip.active')).map(function (el) { return el.dataset.method; }).join(','),
       SmsProvider: document.getElementById('stSmsProvider').value, SmsSenderId: document.getElementById('stSmsSenderId').value,
       SmsApiKey: document.getElementById('stSmsApiKey').value, HubtelClientId: document.getElementById('stHubtelClientId').value,
-      HubtelClientSecret: document.getElementById('stHubtelClientSecret').value
+      HubtelClientSecret: document.getElementById('stHubtelClientSecret').value,
+      NotifyBookingSms: document.getElementById('stNotifyBookingSms').checked ? 'Y' : 'N',
+      NotifyBookingEmail: document.getElementById('stNotifyBookingEmail').checked ? 'Y' : 'N'
     };
     var shopInfo = {
       BranchID: (STATE.branches[0] && STATE.branches[0].BranchID) || '',
