@@ -121,38 +121,36 @@ survives the cleanup.
 Both keep showing the product's price and full description, so nothing is
 hidden behind "Contact for price" unless you actually leave the price at 0.
 
-## WhatsApp order alerts (to you, automatically)
+## Admin order alerts (to you, automatically)
 
-Get a WhatsApp message on your own phone the instant a customer checks out —
-customer name, phone, items, total, and payment reference, no need to keep
-the admin portal open. **Settings → Notifications & Sign-in → WhatsApp Order
-Alerts.**
+Get notified the moment a customer checks out — separately from the
+customer's own receipt/confirmation. **Settings → Notifications & Sign-in →
+Admin Order Alerts.**
 
-Real WhatsApp Business messaging (Meta's Cloud API) needs a verified business
-account, a phone number registered with Meta, and pre-approved message
-templates before it can send anything — out of reach for most small shops to
-set up alone. So the default provider here is **CallMeBot**, a free
-personal-WhatsApp relay that needs none of that:
+- Tick **Email me on new orders**, enter **Your alert email**, and every
+  checkout emails you the customer's name/phone, items, total, and payment
+  reference.
+- Tick **SMS me on new orders**, enter **Your alert phone**, and every
+  checkout also texts you a short summary — this uses your configured SMS
+  provider (Admin → SMS) and spends SMS credits like any other message, so
+  make sure a provider is active there first.
 
-1. On the phone whose WhatsApp you want alerts sent to, add this contact:
-   **+34 644 59 71 67** (the official CallMeBot number).
-2. Send it this exact message (case matters): `I allow callmebot to send me messages`
-3. Within a minute or two it replies with your **API key**.
-4. In the admin portal, tick **Enable WhatsApp order alerts**, enter your
-   WhatsApp number with country code and no `+` (e.g. `233547359015`), paste
-   the API key, and **Save**. Use **Send Test Alert** to confirm it works.
+Both are independent — enable one, the other, or both. **Save All Settings**
+applies them. This used to be a WhatsApp-based alert; that's been removed in
+favor of email/SMS, which don't depend on a third-party relay service.
 
-CallMeBot is a free community service intended for personal/low-volume
-notifications (roughly one message per second, which a small shop's order
-volume is nowhere near) — it is not affiliated with WhatsApp/Meta and could
-change or go down without notice. If that ever matters to you, the **Custom
-webhook** provider option lets you point this at a Meta Cloud API-compatible
-gateway (or your own relay) instead, using `{phone}` `{message}` `{apikey}`
-placeholders in a URL template sent as a GET request.
+## Daily financial report (to you, automatically)
 
-This alert goes **to you** — it's separate from (and doesn't affect) the
-customer-facing WhatsApp enquiry number under Contact & Social, and separate
-from the customer's own order-confirmation email/SMS.
+**Settings → Notifications & Sign-in → Daily Financial Report.** Tick
+**Enable daily report email**, enter the address to receive it, pick a
+**Send at** time, and click **Save & Activate** — this creates a real
+scheduled job (an Apps Script time-based trigger), not just a setting, so the
+report actually goes out on its own every day at that time, with no
+admin portal session needed. It covers that day's confirmed income,
+expenses, net profit, order counts and visitors. Use **Send Test Report Now**
+to see one immediately without waiting for the scheduled time.
+
+Unticking **Enable** and saving removes the scheduled job entirely.
 
 ## Visitor tracking
 
@@ -316,3 +314,10 @@ Apps Script sheet reads are slow, so the catalog is cached in two places:
 There is no blocking spinner anywhere — a thin progress bar at the top of the
 page shows work in flight, so the interface stays usable while it loads. Hit
 **Refresh** any time to force live data.
+
+**Admin portal:** each module (Orders, Products, Settings, …) only loads its
+data the first time you visit it in a session. Switching away and back later
+shows what's already on screen instantly, with no re-fetch — so if you've had
+a tab open a while and want to see anything new (e.g. orders placed since you
+last checked), tap the **Refresh** icon (top right) to pull live data for the
+module you're on.

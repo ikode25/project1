@@ -12,11 +12,11 @@
 
 // Bump when SHEETS changes so ensureSetup_ re-runs and adds new columns to
 // spreadsheets created by an older version of this script.
-var SCHEMA_VERSION = '9';
+var SCHEMA_VERSION = '10';
 
 // Shown in the storefront footer and admin sidebar. If this doesn't match the
 // file you pasted, the deployment is still serving an older version.
-var BUILD_VERSION = '2026.08.17-18';
+var BUILD_VERSION = '2026.08.17-19';
 
 // ---------------------------------------------------------------------------
 // Sheet schema — single source of truth for headers used by the generic
@@ -42,8 +42,7 @@ var SHEETS = {
   // One row per calendar day, not per visit — recordVisit() increments the
   // count for today rather than appending a row per page load, so this stays
   // small forever regardless of traffic.
-  VisitorStats:   ['Date', 'Count'],
-  WhatsAppAlertLog: ['AlertID', 'CreatedAt', 'Phone', 'Message', 'OrderID', 'Status', 'Response']
+  VisitorStats:   ['Date', 'Count']
 };
 
 var LOW_STOCK_THRESHOLD = 5;
@@ -360,13 +359,20 @@ function seedDefaultSettings_() {
     VideoAdvertURL: '',
     VideoAdvertTitle: '',
     VideoAdvertEnabled: 'FALSE',
-    // WhatsApp order alerts go to the admin, not the customer — a separate
-    // concern from the WhatsAppNumber above, which is the storefront's
-    // customer-facing enquiry number.
-    WhatsAppAlertsEnabled: 'FALSE',
-    WhatsAppAlertsProvider: 'callmebot',
-    WhatsAppAlertsPhone: '',
-    WhatsAppAlertsCustomUrl: ''
+    // Admin-facing order alerts (email/SMS to you, not the customer) — a
+    // separate concern from the WhatsAppNumber above, which is the
+    // storefront's customer-facing enquiry number, and from OrderEmailEnabled
+    // /OrderSmsEnabled above, which notify the customer.
+    AdminOrderEmailEnabled: 'FALSE',
+    AdminOrderSmsEnabled: 'FALSE',
+    AdminAlertEmail: '',
+    AdminAlertPhone: '',
+    // End-of-day financial report email. Enabling this also (de)activates a
+    // real time-based trigger — see adminSetupDailyReportTrigger — so it's
+    // not just a flag like the toggles above.
+    DailyReportEnabled: 'FALSE',
+    DailyReportEmail: '',
+    DailyReportHour: '23'
   };
 
   var existing = {};
@@ -1298,6 +1304,126 @@ function recordVisit() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Daily financial report — a real time-based trigger (not just a flag) mails
+// the admin income/expenses/net-profit/orders for the day it fires on. The
+// trigger itself does the once-a-day scheduling; sendDailyFinancialReport_
+// just needs to run correctly whenever Apps Script calls it.
+// ---------------------------------------------------------------------------
+var DAILY_REPORT_HANDLER = 'sendDailyFinancialReport_';
+
+function computeDailyFinancials_(dateKey) {
+  var tz = Session.getScriptTimeZone() || 'Africa/Accra';
+  var key = dateKey || Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+
+  var orders = sheetToObjects_('Orders').filter(function (o) {
+    if (!o.CreatedAt) return false;
+    try { return Utilities.formatDate(new Date(o.CreatedAt), tz, 'yyyy-MM-dd') === key; } catch (err) { return false; }
+  });
+  var expenses = sheetToObjects_('Expenses').filter(function (e) {
+    if (!e.Date) return false;
+    try { return Utilities.formatDate(new Date(e.Date), tz, 'yyyy-MM-dd') === key; } catch (err) { return false; }
+  });
+  var confirmed = orders.filter(function (o) { return o.PaymentStatus === 'Confirmed'; });
+  var income = confirmed.reduce(function (s, o) { return s + toNum_(o.Total); }, 0);
+  var expenseTotal = expenses.reduce(function (s, e) { return s + toNum_(e.Amount); }, 0);
+  var visitorRow = sheetToObjects_('VisitorStats').filter(function (v) { return String(v.Date) === 'D-' + key; })[0];
+
+  return {
+    dateKey: key,
+    totalOrders: orders.length,
+    confirmedOrders: confirmed.length,
+    pendingPayments: orders.filter(function (o) { return o.PaymentStatus === 'Pending Verification'; }).length,
+    income: round2_(income),
+    expenses: round2_(expenseTotal),
+    netProfit: round2_(income - expenseTotal),
+    visitors: visitorRow ? toNum_(visitorRow.Count, 0) : 0
+  };
+}
+
+function dailyFinancialReportHtml_(r) {
+  var sym = getSettingValue_('CurrencySymbol', 'GHS ');
+  var row = function (label, value) {
+    return '<tr><td style="padding:8px;border-bottom:1px solid #e2e8f0;">' + escapeHtml_(label) + '</td>' +
+      '<td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;font-weight:600;">' + value + '</td></tr>';
+  };
+  return '<p>Here is your financial summary for <strong>' + escapeHtml_(r.dateKey) + '</strong>.</p>' +
+    '<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:16px 0;">' +
+      row('Confirmed income', sym + r.income.toFixed(2)) +
+      row('Expenses', sym + r.expenses.toFixed(2)) +
+      row('Net profit', sym + r.netProfit.toFixed(2)) +
+      row('Total orders', r.totalOrders) +
+      row('Confirmed orders', r.confirmedOrders) +
+      row('Pending payment verification', r.pendingPayments) +
+      row('Visitors today', r.visitors) +
+    '</table>' +
+    '<p>Open the admin portal for the full breakdown by business and product.</p>';
+}
+
+// The trigger's target function — no arguments, since Apps Script calls
+// time-based triggers with an event object it never needs here. Wrapped so a
+// mail problem never leaves the trigger itself failing/retrying oddly.
+function sendDailyFinancialReport_() {
+  try {
+    var email = getSettingValue_('DailyReportEmail', '');
+    if (!email) return;
+    var report = computeDailyFinancials_();
+    sendEmail_(email, 'Daily Financial Report — ' + report.dateKey,
+      dailyFinancialReportHtml_(report), 'Daily Financial Report', 'daily-report', 'system');
+  } catch (err) {
+    Logger.log('sendDailyFinancialReport_ failed: ' + err);
+  }
+}
+
+// Creates (or replaces) the one time-based trigger that fires this report
+// daily at the chosen hour. Removes any existing trigger for the same
+// handler first, so re-saving a new hour never leaves two triggers running.
+function adminSetupDailyReportTrigger(token) {
+  requireAdmin_(token);
+  var hour = Math.max(0, Math.min(23, toNum_(getSettingValue_('DailyReportHour', '23'), 23)));
+  try {
+    ScriptApp.getProjectTriggers().forEach(function (t) {
+      if (t.getHandlerFunction() === DAILY_REPORT_HANDLER) ScriptApp.deleteTrigger(t);
+    });
+    ScriptApp.newTrigger(DAILY_REPORT_HANDLER).timeBased().everyDays(1).atHour(hour).nearMinute(0).create();
+    return { success: true };
+  } catch (err) {
+    return { success: false, message: String(err && err.message ? err.message : err) };
+  }
+}
+
+function adminDisableDailyReportTrigger(token) {
+  requireAdmin_(token);
+  try {
+    ScriptApp.getProjectTriggers().forEach(function (t) {
+      if (t.getHandlerFunction() === DAILY_REPORT_HANDLER) ScriptApp.deleteTrigger(t);
+    });
+    return { success: true };
+  } catch (err) {
+    return { success: false, message: String(err && err.message ? err.message : err) };
+  }
+}
+
+function adminGetDailyReportStatus(token) {
+  requireAdmin_(token);
+  try {
+    var active = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === DAILY_REPORT_HANDLER; });
+    return { active: active };
+  } catch (err) {
+    return { active: false, message: String(err && err.message ? err.message : err) };
+  }
+}
+
+function adminSendTestDailyReport(token) {
+  requireAdmin_(token);
+  var email = getSettingValue_('DailyReportEmail', '');
+  if (!email) return { success: false, message: 'Enter and save a report email address first.' };
+  var report = computeDailyFinancials_();
+  var result = sendEmail_(email, 'Daily Financial Report — ' + report.dateKey,
+    dailyFinancialReportHtml_(report), 'Daily Financial Report', 'daily-report-test', 'system');
+  return result.ok ? { success: true, message: 'Sent! Check ' + email + '.' } : { success: false, message: 'Could not send: ' + result.response };
+}
+
 // --- Dashboard -------------------------------------------------------------
 function adminGetDashboard(token) {
   requireAdmin_(token);
@@ -2057,84 +2183,6 @@ function adminGetSmsLog(token, limit) {
 }
 
 // ============================================================================
-// WHATSAPP ORDER ALERTS — pings the admin's own WhatsApp when a customer
-// checks out. Real WhatsApp Business messaging (Meta's Cloud API) needs a
-// verified business account and pre-approved message templates, which is
-// out of reach for a small shop owner setting this up alone — so the
-// default provider is CallMeBot, a free personal-WhatsApp relay: the admin
-// adds CallMeBot as a contact, sends it one activation message, gets an API
-// key back, and pastes that key here. See SETUP.md for the exact steps.
-// A "custom" provider is offered as an escape hatch for anyone who does
-// have a Cloud API-compatible webhook to point this at instead.
-// ============================================================================
-function sendOneWhatsAppAlert_(phone, message) {
-  var to = String(phone || '').replace(/\D/g, '');
-  if (!to) return { ok: false, response: 'No WhatsApp alert number configured.' };
-
-  var provider = String(getSettingValue_('WhatsAppAlertsProvider', 'callmebot')).toLowerCase();
-  var apiKey = PropertiesService.getScriptProperties().getProperty('WHATSAPP_ALERT_KEY') || '';
-  var url;
-
-  try {
-    if (provider === 'custom') {
-      var template = String(getSettingValue_('WhatsAppAlertsCustomUrl', ''));
-      if (!template) return { ok: false, response: 'No custom WhatsApp webhook URL configured.' };
-      url = template
-        .replace(/\{phone\}/g, encodeURIComponent(to))
-        .replace(/\{message\}/g, encodeURIComponent(message))
-        .replace(/\{apikey\}/g, encodeURIComponent(apiKey));
-    } else {
-      if (!apiKey) return { ok: false, response: 'No CallMeBot API key saved yet. See Settings -> Notifications & Sign-in.' };
-      url = 'https://api.callmebot.com/whatsapp.php?phone=' + encodeURIComponent(to) +
-        '&text=' + encodeURIComponent(message) + '&apikey=' + encodeURIComponent(apiKey);
-    }
-    var res = UrlFetchApp.fetch(url, { method: 'get', muteHttpExceptions: true });
-    var code = res.getResponseCode();
-    var body = res.getContentText();
-    // CallMeBot answers 200 even on some failures (e.g. not yet activated),
-    // signalling the real outcome in the body text instead.
-    var looksFailed = /error|not.*(activated|allowed)|invalid/i.test(body || '');
-    return { ok: code >= 200 && code < 300 && !looksFailed, response: (body || '').slice(0, 400) };
-  } catch (err) {
-    return { ok: false, response: String(err && err.message ? err.message : err) };
-  }
-}
-
-function logWhatsAppAlert_(orderId, phone, message, result) {
-  appendRowObject_('WhatsAppAlertLog', {
-    AlertID: genId_('WA'), CreatedAt: new Date(), Phone: phone, Message: message, OrderID: orderId || '',
-    Status: result.ok ? 'Sent' : 'Failed', Response: result.response
-  });
-}
-
-// The CallMeBot API key is a credential (if leaked, someone could relay
-// messages through it), so like SMS provider secrets it lives only in
-// Script Properties, never in the spreadsheet. Blank means "leave the
-// saved key alone", so re-saving the rest of the form doesn't wipe it.
-function adminSaveWhatsAppAlertKey(token, apiKey) {
-  requireAdmin_(token);
-  if (apiKey) PropertiesService.getScriptProperties().setProperty('WHATSAPP_ALERT_KEY', String(apiKey));
-  return { success: true };
-}
-
-function adminGetWhatsAppAlertStatus(token) {
-  requireAdmin_(token);
-  return { hasApiKey: !!PropertiesService.getScriptProperties().getProperty('WHATSAPP_ALERT_KEY') };
-}
-
-function adminSendTestWhatsAppAlert(token) {
-  requireAdmin_(token);
-  var phone = getSettingValue_('WhatsAppAlertsPhone', '');
-  if (!phone) return { success: false, message: 'Enter and save your WhatsApp number first.' };
-  var siteName = getSettingValue_('SiteName', 'Your Store');
-  var result = sendOneWhatsAppAlert_(phone, 'Test alert from ' + siteName + ' — WhatsApp order alerts are working!');
-  logWhatsAppAlert_('', phone, 'Test alert', result);
-  return result.ok
-    ? { success: true, message: 'Sent! Check your WhatsApp.' }
-    : { success: false, message: 'Could not send: ' + result.response };
-}
-
-// ============================================================================
 // EMAIL — branded HTML built from the store's own colors, logo and details
 // ============================================================================
 function buildEmailHtml_(title, bodyHtml, opts) {
@@ -2235,6 +2283,40 @@ function orderConfirmationHtml_(order, items) {
     '<p>We appreciate your business!</p>';
 }
 
+// The admin-facing counterpart to orderConfirmationHtml_ — same branded
+// shell, but framed as "you have a new order" with the customer's own
+// contact details front and center, since that's what the admin needs to
+// act on it (verify payment, arrange delivery, etc.).
+function adminOrderAlertHtml_(order, items) {
+  var s = getPublicSettings_();
+  var sym = s.CurrencySymbol || 'GHS ';
+  var rows = items.map(function (i) {
+    return '<tr>' +
+      '<td style="padding:8px;border-bottom:1px solid #e2e8f0;">' + escapeHtml_(i.ProductName) +
+        (i.RecipientNumber ? '<br><span style="color:#64748b;font-size:12px;">For: ' + escapeHtml_(i.RecipientNumber) + '</span>' : '') +
+      '</td>' +
+      '<td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:center;">' + i.Qty + '</td>' +
+      '<td style="padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;">' + sym + Number(i.Subtotal).toFixed(2) + '</td>' +
+    '</tr>';
+  }).join('');
+
+  return '<p>You have a new order.</p>' +
+    '<p style="background:#f1f5f9;padding:12px;border-radius:8px;">' +
+      '<strong>Order ID:</strong> ' + escapeHtml_(order.OrderID) + '<br>' +
+      '<strong>Customer:</strong> ' + escapeHtml_(order.CustomerName) + ' — ' + escapeHtml_(order.Phone) + '<br>' +
+      (order.Address ? '<strong>Delivery address:</strong> ' + escapeHtml_(order.Address) + '<br>' : '') +
+      '<strong>Paid via:</strong> ' + escapeHtml_(order.PaymentMethodLabel) + ' from ' + escapeHtml_(order.PayerNumber) + '<br>' +
+      '<strong>Transaction ID:</strong> ' + escapeHtml_(order.TransactionID) +
+    '</p>' +
+    '<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:16px 0;">' +
+      '<tr style="background:#f8fafc;"><th align="left" style="padding:8px;">Item</th><th style="padding:8px;">Qty</th><th align="right" style="padding:8px;">Amount</th></tr>' +
+      rows +
+      '<tr><td colspan="2" style="padding:10px;text-align:right;font-weight:700;">Total</td>' +
+      '<td style="padding:10px;text-align:right;font-weight:700;">' + sym + Number(order.Total).toFixed(2) + '</td></tr>' +
+    '</table>' +
+    '<p>Open the admin portal to verify payment and update its status.</p>';
+}
+
 // Fired after checkout. Wrapped so a mail/SMS problem can never fail an order
 // that has already been recorded.
 function notifyOrderPlaced_(orderId) {
@@ -2254,19 +2336,17 @@ function notifyOrderPlaced_(orderId) {
         ' for ' + sym + Number(order.Total).toFixed(2) + ' received. We are verifying your payment.';
       sendSmsBatch_([order.Phone], msg, 'order-confirmation', 'system');
     }
-    // Pings the admin, not the customer — a separate opt-in from the two
-    // notifications above.
-    if (String(s.WhatsAppAlertsEnabled).toUpperCase() === 'TRUE' && s.WhatsAppAlertsPhone) {
-      var currSym = s.CurrencySymbol || 'GHS ';
-      var itemsLine = items.map(function (it) {
-        return it.Qty + '× ' + it.ProductName + (it.RecipientNumber ? ' (' + it.RecipientNumber + ')' : '');
-      }).join(', ');
-      var waMsg = 'New order ' + order.OrderID + ' — ' + currSym + Number(order.Total).toFixed(2) +
-        '\nFrom: ' + order.CustomerName + ' (' + order.Phone + ')' +
-        '\nItems: ' + itemsLine +
-        '\nPaid via: ' + order.PaymentMethodLabel + ' · Txn ID: ' + order.TransactionID;
-      var waResult = sendOneWhatsAppAlert_(s.WhatsAppAlertsPhone, waMsg);
-      logWhatsAppAlert_(order.OrderID, s.WhatsAppAlertsPhone, waMsg, waResult);
+    // Pings the admin, not the customer — separate opt-ins from the two
+    // customer-facing notifications above, and from each other.
+    if (String(s.AdminOrderEmailEnabled).toUpperCase() === 'TRUE' && s.AdminAlertEmail) {
+      sendEmail_(s.AdminAlertEmail, 'New order ' + order.OrderID + ' — ' + (s.CurrencySymbol || 'GHS ') + Number(order.Total).toFixed(2),
+        adminOrderAlertHtml_(order, items), 'New Order Received', 'admin-order-alert', 'system');
+    }
+    if (String(s.AdminOrderSmsEnabled).toUpperCase() === 'TRUE' && s.AdminAlertPhone) {
+      var adminSym = s.CurrencySymbol || 'GHS ';
+      var adminMsg = 'New order ' + order.OrderID + ' — ' + adminSym + Number(order.Total).toFixed(2) +
+        ' from ' + order.CustomerName + ' (' + order.Phone + '). ' + items.length + ' item(s). Txn: ' + order.TransactionID;
+      sendSmsBatch_([s.AdminAlertPhone], adminMsg, 'admin-order-alert', 'system');
     }
   } catch (err) {
     Logger.log('notifyOrderPlaced_ failed: ' + err);

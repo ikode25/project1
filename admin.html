@@ -1,5 +1,5 @@
 <!-- admin.html — Multi-Business Admin Portal -->
-<!-- MB_BUILD:2026.08.17-18 -->
+<!-- MB_BUILD:2026.08.17-19 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -67,7 +67,7 @@
     }
   </style>
 </head>
-<body class="min-h-screen" data-mb-build="2026.08.17-18">
+<body class="min-h-screen" data-mb-build="2026.08.17-19">
 
   <div id="progressBar"></div>
 
@@ -700,27 +700,26 @@
           </div>
 
           <div class="surface p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-3">
-            <h2 class="font-bold md:col-span-2">WhatsApp Order Alerts <span class="muted font-normal">(sent to you, not the customer)</span></h2>
-            <p class="text-sm muted md:col-span-2">Get an automatic WhatsApp message on your own phone the moment a customer checks out. The default option, CallMeBot, is free and needs no WhatsApp Business account — just a 2-minute one-time setup. See SETUP.md.</p>
-            <label class="flex items-center gap-2 text-sm md:col-span-2"><input type="checkbox" id="waEnabled"> Enable WhatsApp order alerts</label>
-            <label class="text-sm">Provider
-              <select id="waProvider" class="p-2 rounded-lg w-full mt-1" onchange="onWaProviderChange()">
-                <option value="callmebot">CallMeBot (free, personal WhatsApp)</option>
-                <option value="custom">Custom webhook</option>
-              </select>
+            <h2 class="font-bold md:col-span-2">Admin Order Alerts <span class="muted font-normal">(sent to you, not the customer)</span></h2>
+            <p class="text-sm muted md:col-span-2">Get notified the moment a customer checks out — separately from the customer's own receipt above.</p>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="setAdminOrderEmailEnabled"> Email me on new orders</label>
+            <label class="flex items-center gap-2 text-sm"><input type="checkbox" id="setAdminOrderSmsEnabled"> SMS me on new orders <span class="muted">(uses SMS credits)</span></label>
+            <label class="text-sm">Your alert email<input id="setAdminAlertEmail" type="email" class="p-2 rounded-lg w-full mt-1" placeholder="you@example.com"></label>
+            <label class="text-sm">Your alert phone<input id="setAdminAlertPhone" class="p-2 rounded-lg w-full mt-1" placeholder="e.g. 0547359015"></label>
+          </div>
+
+          <div class="surface p-4 rounded-lg shadow grid grid-cols-1 md:grid-cols-2 gap-3">
+            <h2 class="font-bold md:col-span-2">Daily Financial Report</h2>
+            <p class="text-sm muted md:col-span-2">Get an automatic email each day with income, expenses, net profit and order counts for that day.</p>
+            <label class="flex items-center gap-2 text-sm md:col-span-2"><input type="checkbox" id="drEnabled"> Enable daily report email</label>
+            <label class="text-sm">Report email<input id="drEmail" type="email" class="p-2 rounded-lg w-full mt-1" placeholder="you@example.com"></label>
+            <label class="text-sm">Send at
+              <select id="drHour" class="p-2 rounded-lg w-full mt-1"></select>
             </label>
-            <label class="text-sm">Your WhatsApp number <span class="muted">(with country code, no +)</span><input id="waPhone" placeholder="e.g. 233547359015" class="p-2 rounded-lg w-full mt-1"></label>
-            <label class="text-sm md:col-span-2" id="waApiKeyWrap">CallMeBot API Key
-              <input id="waApiKey" type="password" placeholder="Leave blank to keep the saved key" class="p-2 rounded-lg w-full mt-1">
-              <span class="text-xs muted" id="waApiKeyStatus"></span>
-            </label>
-            <label class="text-sm md:col-span-2 hidden" id="waCustomUrlWrap">Custom Webhook URL Template
-              <input id="waCustomUrl" placeholder="https://your-gateway.example.com/send?to={phone}&amp;text={message}&amp;key={apikey}" class="p-2 rounded-lg w-full mt-1">
-              <span class="text-xs muted">Placeholders: {phone} {message} {apikey} — requested as a GET.</span>
-            </label>
+            <p class="md:col-span-2 text-sm" id="drStatus"></p>
             <div class="md:col-span-2 flex flex-wrap gap-2">
-              <button type="button" onclick="saveWhatsAppAlertConfig()" class="bg-primary px-4 py-2 rounded-lg text-sm">Save WhatsApp Alert Settings</button>
-              <button type="button" onclick="sendTestWhatsAppAlert()" class="surface-2 bordered px-4 py-2 rounded-lg text-sm">Send Test Alert</button>
+              <button type="button" onclick="saveDailyReportConfig()" class="bg-primary px-4 py-2 rounded-lg text-sm">Save &amp; Activate</button>
+              <button type="button" onclick="sendTestDailyReport()" class="surface-2 bordered px-4 py-2 rounded-lg text-sm">Send Test Report Now</button>
             </div>
           </div>
 
@@ -1177,7 +1176,7 @@
           html: '<table style="margin:0 auto;font-size:13px">' + rows + '</table>' +
             '<hr style="margin:12px 0">' +
             '<div style="font-size:12px;text-align:left">' +
-              '<b>admin page build:</b> 2026.08.17-18<br>' +
+              '<b>admin page build:</b> 2026.08.17-19<br>' +
               '<b>Code.gs build:</b> ' + ((info && info.build) || 'could not read') + '<br>' +
               '<b>schema:</b> ' + ((info && info.setupVersion) || '?') +
             '</div>' +
@@ -1330,12 +1329,12 @@
     // Switching tabs is pure DOM show/hide and is always instant. Fetching
     // that tab's data from Apps Script is what's slow (each round trip costs
     // 1-3s of Google's own function-start overhead, independent of anything
-    // in this code). Re-fetching on every single click made every click feel
-    // slow even when nothing had changed, so a tab already loaded recently
-    // just stays on screen as-is instead of re-fetching. The section is never
-    // cleared on hide, so the previous render is still sitting there ready.
-    var TAB_FRESH_MS = 45000;
-    var tabLoadedAt = {};
+    // in this code). A tab already loaded this session just stays on screen
+    // as-is on every later visit — no re-fetch, no time limit — since the
+    // section is never cleared on hide, so the previous render is still
+    // sitting there ready. Tap the Refresh button (or the module's own
+    // in-tab Refresh action) any time you actually want live data.
+    var tabLoaded = {};
     function showTab(name, force) {
       activeTab = name;
       document.querySelectorAll('.tab-section').forEach(function (s) { s.classList.add('hidden'); });
@@ -1351,10 +1350,9 @@
       };
       if (!loaders[name]) return;
 
-      var fresh = !force && tabLoadedAt[name] !== undefined && (Date.now() - tabLoadedAt[name] < TAB_FRESH_MS);
-      if (fresh) return; // already showing an up-to-date render, nothing to fetch
+      if (!force && tabLoaded[name]) return; // already showing this tab's data, nothing to fetch
 
-      tabLoadedAt[name] = Date.now();
+      tabLoaded[name] = true;
       loaders[name]();
     }
 
@@ -2272,13 +2270,15 @@
       ['ChatbotGreeting', 'setChatbotGreeting'], ['BundleDisclaimer', 'setBundleDisclaimer'],
       ['SiteLogoURL', 'setLogoUrl'], ['GoogleClientId', 'setGoogleClientId'],
       ['SmsCountryCode', 'setSmsCountryCode'],
-      ['VideoAdvertURL', 'setVideoAdvertURL'], ['VideoAdvertTitle', 'setVideoAdvertTitle']
+      ['VideoAdvertURL', 'setVideoAdvertURL'], ['VideoAdvertTitle', 'setVideoAdvertTitle'],
+      ['AdminAlertEmail', 'setAdminAlertEmail'], ['AdminAlertPhone', 'setAdminAlertPhone']
     ];
     // Checkbox settings stored as TRUE/FALSE strings.
     var SETTING_TOGGLES = [
       ['ChatbotEnabled', 'setChatbotEnabled', true], ['NewsTickerEnabled', 'setNewsTickerEnabled', true],
       ['OrderEmailEnabled', 'setOrderEmailEnabled', true], ['OrderSmsEnabled', 'setOrderSmsEnabled', false],
-      ['ContactFormEnabled', 'setContactFormEnabled', true], ['VideoAdvertEnabled', 'setVideoAdvertEnabled', false]
+      ['ContactFormEnabled', 'setContactFormEnabled', true], ['VideoAdvertEnabled', 'setVideoAdvertEnabled', false],
+      ['AdminOrderEmailEnabled', 'setAdminOrderEmailEnabled', false], ['AdminOrderSmsEnabled', 'setAdminOrderSmsEnabled', false]
     ];
 
     function showSettingsPane(name) {
@@ -2313,61 +2313,67 @@
         syncColorInputs();
         renderFeatureStatus();
         applyTheme(cache.settings);
-        loadWhatsAppAlertConfig();
+        loadDailyReportConfig();
       }).withFailureHandler(runFail).adminGetSettings(adminToken);
     }
 
-    // WhatsApp Order Alerts kept out of SETTING_FIELDS/SETTING_TOGGLES and
-    // saved via its own button — the API key needs the same "blank means
-    // leave it alone" secret handling the SMS providers use, which the bulk
-    // Save All Settings button doesn't do.
-    function loadWhatsAppAlertConfig() {
-      document.getElementById('waEnabled').checked = String(cache.settings.WhatsAppAlertsEnabled).toUpperCase() === 'TRUE';
-      document.getElementById('waProvider').value = cache.settings.WhatsAppAlertsProvider || 'callmebot';
-      document.getElementById('waPhone').value = cache.settings.WhatsAppAlertsPhone || '';
-      document.getElementById('waCustomUrl').value = cache.settings.WhatsAppAlertsCustomUrl || '';
-      onWaProviderChange();
+    // Daily Financial Report kept out of SETTING_FIELDS/SETTING_TOGGLES and
+    // saved via its own button — enabling/disabling it also has to
+    // create/remove a real time-based trigger, which the bulk Save All
+    // Settings button has no business doing as a side effect.
+    function loadDailyReportConfig() {
+      var hourSel = document.getElementById('drHour');
+      if (!hourSel.options.length) {
+        for (var h = 0; h < 24; h++) {
+          var label = h === 0 ? '12:00 AM (midnight)' : h === 12 ? '12:00 PM (noon)' : h < 12 ? h + ':00 AM' : (h - 12) + ':00 PM';
+          var opt = document.createElement('option');
+          opt.value = String(h); opt.textContent = label;
+          hourSel.appendChild(opt);
+        }
+      }
+      document.getElementById('drEnabled').checked = String(cache.settings.DailyReportEnabled).toUpperCase() === 'TRUE';
+      document.getElementById('drEmail').value = cache.settings.DailyReportEmail || '';
+      hourSel.value = cache.settings.DailyReportHour || '23';
       google.script.run.withSuccessHandler(function (s) {
-        document.getElementById('waApiKeyStatus').textContent = (s && s.hasApiKey)
-          ? 'A key is already saved — leave blank to keep it.' : 'No key saved yet.';
-      }).withFailureHandler(function () {}).adminGetWhatsAppAlertStatus(adminToken);
+        document.getElementById('drStatus').innerHTML = (s && s.active)
+          ? '<span style="color:#15803d">&#10004; Active — the report will send automatically at the chosen time.</span>'
+          : '<span class="muted">Not active yet. Enable and Save &amp; Activate to turn it on.</span>';
+      }).withFailureHandler(function () {}).adminGetDailyReportStatus(adminToken);
     }
-    function onWaProviderChange() {
-      var custom = document.getElementById('waProvider').value === 'custom';
-      document.getElementById('waApiKeyWrap').classList.toggle('hidden', custom);
-      document.getElementById('waCustomUrlWrap').classList.toggle('hidden', !custom);
-    }
-    function saveWhatsAppAlertConfig() {
+    function saveDailyReportConfig() {
+      var enabled = document.getElementById('drEnabled').checked;
+      var email = document.getElementById('drEmail').value.trim();
+      if (enabled && !email) { toast('error', 'Enter a report email address first', ''); return; }
       var cfg = {
-        WhatsAppAlertsEnabled: document.getElementById('waEnabled').checked ? 'TRUE' : 'FALSE',
-        WhatsAppAlertsProvider: document.getElementById('waProvider').value,
-        WhatsAppAlertsPhone: document.getElementById('waPhone').value.trim(),
-        WhatsAppAlertsCustomUrl: document.getElementById('waCustomUrl').value.trim()
+        DailyReportEnabled: enabled ? 'TRUE' : 'FALSE',
+        DailyReportEmail: email,
+        DailyReportHour: document.getElementById('drHour').value
       };
-      var apiKey = document.getElementById('waApiKey').value.trim();
       showLoadingSpinner();
       google.script.run.withSuccessHandler(function () {
         Object.keys(cfg).forEach(function (k) { cache.settings[k] = cfg[k]; });
-        if (!apiKey) {
+        var finish = function () {
           hideLoadingSpinner();
-          toast('success', 'WhatsApp alert settings saved', '');
-          return;
+          toast('success', enabled ? 'Daily report activated' : 'Daily report disabled', '');
+          loadDailyReportConfig();
+        };
+        if (enabled) {
+          google.script.run.withSuccessHandler(function (res) {
+            if (res && res.success) finish();
+            else { hideLoadingSpinner(); toast('error', 'Could not activate', (res && res.message) || ''); }
+          }).withFailureHandler(runFail).adminSetupDailyReportTrigger(adminToken);
+        } else {
+          google.script.run.withSuccessHandler(finish).withFailureHandler(runFail).adminDisableDailyReportTrigger(adminToken);
         }
-        google.script.run.withSuccessHandler(function () {
-          hideLoadingSpinner();
-          document.getElementById('waApiKey').value = '';
-          toast('success', 'WhatsApp alert settings saved', '');
-          loadWhatsAppAlertConfig();
-        }).withFailureHandler(runFail).adminSaveWhatsAppAlertKey(adminToken, apiKey);
       }).withFailureHandler(runFail).adminSaveSettings(adminToken, cfg);
     }
-    function sendTestWhatsAppAlert() {
+    function sendTestDailyReport() {
       showLoadingSpinner();
       google.script.run.withSuccessHandler(function (res) {
         hideLoadingSpinner();
         if (res.success) toast('success', res.message, '');
         else toast('error', 'Test failed', res.message || '');
-      }).withFailureHandler(runFail).adminSendTestWhatsAppAlert(adminToken);
+      }).withFailureHandler(runFail).adminSendTestDailyReport(adminToken);
     }
     // These two features stay invisible on the storefront until they are
     // configured, so spell out their current state rather than leaving the
