@@ -131,9 +131,17 @@ email can.
   System" if left blank).
 - **WhatsApp**: a no-API fallback channel to SMS (Admin > Settings >
   WhatsApp) - see details above. Clicking "WhatsApp" from the bulk actions
-  bar or a candidate's own button opens a pre-filled WhatsApp chat with
-  that applicant in a new tab (same four template types as SMS); the admin
-  presses Send themselves. Admin-triggered only, no automatic sending.
+  bar or a candidate's own button generates a pre-filled WhatsApp link
+  (same four template types as SMS) and lets the admin copy it to open in
+  a new tab themselves. Admin-triggered only, no automatic sending.
+- **Documents folder**: every applicant upload (CV, cover letter,
+  certificates, passport photo, custom files) is saved to a Google Drive
+  folder created automatically the first time it's needed - no setup
+  required. Each applicant gets their own subfolder inside it (named with
+  their name and email) so all of one person's documents stay together
+  instead of everyone's files being mixed in one flat folder. Admin >
+  Settings > General has an "Open Documents Folder in Drive" link to
+  browse it directly.
 
 All of the above is additive and stored in the same spreadsheet used today
 (new rows in `Settings`, and new `SmsTemplates`/`SmsLog`/`WhatsappTemplates`

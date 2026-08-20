@@ -4416,6 +4416,10 @@ HR Team`
             const [bannerFileName, setBannerFileName] = useState('');
             const [socialLinks, setSocialLinks] = useState({ facebook: '', twitter: '', instagram: '', linkedin: '' });
 
+            // Drive folder holding every applicant's documents (each in
+            // their own subfolder)
+            const [assetsFolderUrl, setAssetsFolderUrl] = useState('');
+
             // SMS settings state
             const [smsConfig, setSmsConfig] = useState({
                 enabled: false,
@@ -4463,6 +4467,7 @@ HR Team`
                 loadJobDescription();
                 loadThemeConfig();
                 loadBanner();
+                loadAssetsFolderUrl();
                 loadSocialLinks();
                 loadSmsConfig();
                 loadSmsTemplates();
@@ -4525,6 +4530,16 @@ HR Team`
                         .withSuccessHandler((url) => setBannerUrl(url || ''))
                         .withFailureHandler((error) => console.error('Failed to load banner:', error))
                         .getBannerUrl();
+                }
+            };
+
+            // Load the URL of the Drive folder holding every applicant's documents
+            const loadAssetsFolderUrl = () => {
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run
+                        .withSuccessHandler((url) => setAssetsFolderUrl(url || ''))
+                        .withFailureHandler((error) => console.error('Failed to load documents folder URL:', error))
+                        .getAssetsFolderUrl();
                 }
             };
 
@@ -5829,6 +5844,35 @@ HR Team`
                                             <button className="action-btn" onClick={handleSaveCompanyInfo} style={{ backgroundColor: '#455a64', color: '#fff', padding: '10px 25px', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', fontWeight: '500' }}>
                                                 <i className="fas fa-save"></i> Save
                                             </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Documents Folder */}
+                                    <div style={{ marginTop: '40px', paddingTop: '30px', borderTop: '2px solid #e0e0e0' }}>
+                                        <h3 style={{ color: '#00695c', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <i className="fas fa-folder-open"></i> Documents Folder
+                                        </h3>
+                                        <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#e0f2f1', borderRadius: '8px', border: '1px solid #4db6ac' }}>
+                                            <p style={{ margin: 0, color: '#00695c', fontSize: '14px' }}>
+                                                <i className="fas fa-info-circle"></i> Every document applicants upload (CV, cover letter, certificates, passport photo, custom files) is saved automatically to a Google Drive folder - no setup needed. Each applicant gets their own subfolder inside it, named with their name and email, so all of one person's documents stay together.
+                                            </p>
+                                        </div>
+                                        <div className="template-card" style={{ backgroundColor: '#fff', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                                            {assetsFolderUrl ? (
+                                                <a
+                                                    href={assetsFolderUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="action-btn"
+                                                    style={{ backgroundColor: '#00695c', color: '#fff', padding: '10px 25px', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: '500', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                                                >
+                                                    <i className="fas fa-folder-open"></i> Open Documents Folder in Drive
+                                                </a>
+                                            ) : (
+                                                <p style={{ margin: 0, color: '#999', fontSize: '13px' }}>
+                                                    <i className="fas fa-spinner fa-spin"></i> Loading folder link...
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                     </>

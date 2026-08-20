@@ -29,10 +29,18 @@ function submitJobApplication(formData, fileName, fileData, coverLetterFileName,
         };
       }
     }
+    // Every document this applicant uploads (CV, cover letter, photo,
+    // certificates, custom files) goes into ONE subfolder for them inside
+    // the main ASSETS NAME folder, instead of a flat pile mixed with every
+    // other applicant's files - computed once and reused below rather than
+    // re-resolved per file.
+    const applicantName = `${formData.firstName || ''} ${formData.lastName || ''}`.trim();
+    const applicantFolder = getApplicantFolder(formData.email, applicantName);
+
     let cvUrl = '';
     if (fileData && fileName) {
       try {
-        cvUrl = uploadCVToDrive(fileData, fileName, formData.email);
+        cvUrl = uploadCVToDrive(fileData, fileName, applicantFolder, formData.email, 'CV');
         Logger.log(`CV uploaded successfully: ${cvUrl}`);
       } catch (uploadError) {
         Logger.log(`Error uploading CV: ${uploadError.toString()}`);
@@ -43,7 +51,7 @@ function submitJobApplication(formData, fileName, fileData, coverLetterFileName,
     let coverLetterUrl = '';
     if (coverLetterFileData && coverLetterFileName) {
       try {
-        coverLetterUrl = uploadCVToDrive(coverLetterFileData, coverLetterFileName, formData.email + '_coverletter');
+        coverLetterUrl = uploadCVToDrive(coverLetterFileData, coverLetterFileName, applicantFolder, formData.email, 'CoverLetter');
         Logger.log(`Cover letter uploaded successfully: ${coverLetterUrl}`);
       } catch (uploadError) {
         Logger.log(`Error uploading cover letter: ${uploadError.toString()}`);
@@ -54,7 +62,7 @@ function submitJobApplication(formData, fileName, fileData, coverLetterFileName,
     let passportPhotoUrl = '';
     if (passportPhotoFileData && passportPhotoFileName) {
       try {
-        passportPhotoUrl = uploadPassportPhoto(passportPhotoFileData, passportPhotoFileName, formData.email);
+        passportPhotoUrl = uploadPassportPhoto(passportPhotoFileData, passportPhotoFileName, applicantFolder, formData.email, 'PassportPhoto');
         Logger.log(`Passport photo uploaded successfully: ${passportPhotoUrl}`);
       } catch (uploadError) {
         Logger.log(`Error uploading passport photo: ${uploadError.toString()}`);
@@ -73,7 +81,7 @@ function submitJobApplication(formData, fileName, fileData, coverLetterFileName,
         const cert = certificateData[level];
         if (cert && cert.data && cert.fileName) {
           try {
-            certificateUrls[level] = uploadCVToDrive(cert.data, cert.fileName, formData.email + '_' + level + '_certificate');
+            certificateUrls[level] = uploadCVToDrive(cert.data, cert.fileName, applicantFolder, formData.email, `${level}Certificate`);
             Logger.log(`${level} certificate uploaded successfully: ${certificateUrls[level]}`);
           } catch (uploadError) {
             Logger.log(`Error uploading ${level} certificate: ${uploadError.toString()}`);
@@ -104,8 +112,8 @@ function submitJobApplication(formData, fileName, fileData, coverLetterFileName,
         if (file && file.data && file.fileName) {
           try {
             formData.customFieldValues[fieldId] = customFieldTypes[fieldId] === 'image'
-              ? uploadPassportPhoto(file.data, file.fileName, formData.email + '_' + fieldId)
-              : uploadCVToDrive(file.data, file.fileName, formData.email + '_' + fieldId);
+              ? uploadPassportPhoto(file.data, file.fileName, applicantFolder, formData.email, fieldId)
+              : uploadCVToDrive(file.data, file.fileName, applicantFolder, formData.email, fieldId);
             Logger.log(`Custom field "${fieldId}" file uploaded successfully: ${formData.customFieldValues[fieldId]}`);
           } catch (uploadError) {
             Logger.log(`Error uploading custom field "${fieldId}" file: ${uploadError.toString()}`);
@@ -466,80 +474,126 @@ HR Team
 }
 
 /**
- * Uploads CV file to Google Drive ASSETS folder
- * @param {Object} fileData - The file data in base64 format
- * @param {string} fileName - The name of the file
- * @param {string} applicantEmail - Email of the applicant
+ * Uploads a file into an applicant's Drive subfolder.
+ * @param {string} fileData - base64 data URL
+ * @param {string} fileName - the applicant's original file name
+ * @param {GoogleAppsScript.Drive.Folder} applicantFolder - from getApplicantFolder()
+ * @param {string} applicantEmail - for the file's description metadata only
+ * @param {string} tag - short label (e.g. "CV", "CoverLetter", "sscCertificate")
+ *   distinguishing this file from the applicant's other uploads, now that
+ *   they all land in the same per-applicant folder
  * @returns {string} File URL
  */
-function uploadCVToDrive(fileData, fileName, applicantEmail) {
+function uploadCVToDrive(fileData, fileName, applicantFolder, applicantEmail, tag) {
   try {
-    // Get or create ASSETS folder
-    const folder = getCVFolder();
-
-    // Decode base64 and create file
     const blob = Utilities.newBlob(
       Utilities.base64Decode(fileData.split(',')[1]),
       fileData.split(';')[0].split(':')[1],
       fileName
     );
 
-    // Create file with ISO timestamp and applicant email in name
-    const sanitizedEmail = applicantEmail.replace(/[^a-zA-Z0-9]/g, '_');
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const newFileName = `${timestamp}_${sanitizedEmail}_${fileName}`;
-    const file = folder.createFile(blob.setName(newFileName));
+    const newFileName = tag ? `${timestamp}_${tag}_${fileName}` : `${timestamp}_${fileName}`;
+    const file = applicantFolder.createFile(blob.setName(newFileName));
 
-    // Set file description
-    file.setDescription(`CV uploaded by ${applicantEmail} on ${new Date().toISOString()}`);
+    file.setDescription(`${tag || 'File'} uploaded by ${applicantEmail} on ${new Date().toISOString()}`);
 
-    Logger.log(`CV uploaded to ASSETS folder: ${newFileName}`);
+    Logger.log(`File uploaded to applicant folder: ${newFileName}`);
 
     return file.getUrl();
 
   } catch (error) {
-    Logger.log('Error uploading CV: ' + error.toString());
+    Logger.log('Error uploading file: ' + error.toString());
     throw error;
   }
 }
 
 /**
- * Uploads a passport-size photo to Drive. Unlike CVs/cover letters
- * (viewed one-off in a modal), photos need to render inline as
- * thumbnails wherever an applicant's info shows - so this explicitly
- * makes the file link-viewable and returns a direct thumbnail URL
- * (usable straight as an <img src>) instead of Drive's generic file
- * view page.
+ * Uploads a passport-size photo (or other image field) into an applicant's
+ * Drive subfolder. Unlike CVs/cover letters (viewed one-off in a modal),
+ * images need to render inline as thumbnails wherever an applicant's info
+ * shows - so this explicitly makes the file link-viewable and returns a
+ * direct thumbnail URL (usable straight as an <img src>) instead of
+ * Drive's generic file view page.
  * @param {string} fileData - base64 data URL
  * @param {string} fileName
- * @param {string} applicantEmail
+ * @param {GoogleAppsScript.Drive.Folder} applicantFolder - from getApplicantFolder()
+ * @param {string} applicantEmail - for the file's description metadata only
+ * @param {string} tag - short label (e.g. "PassportPhoto", or a custom field id)
  * @returns {string} Thumbnail URL
  */
-function uploadPassportPhoto(fileData, fileName, applicantEmail) {
+function uploadPassportPhoto(fileData, fileName, applicantFolder, applicantEmail, tag) {
   try {
-    const folder = getCVFolder();
-
     const blob = Utilities.newBlob(
       Utilities.base64Decode(fileData.split(',')[1]),
       fileData.split(';')[0].split(':')[1],
       fileName
     );
 
-    const sanitizedEmail = applicantEmail.replace(/[^a-zA-Z0-9]/g, '_');
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const newFileName = `${timestamp}_${sanitizedEmail}_${fileName}`;
-    const file = folder.createFile(blob.setName(newFileName));
+    const newFileName = tag ? `${timestamp}_${tag}_${fileName}` : `${timestamp}_${fileName}`;
+    const file = applicantFolder.createFile(blob.setName(newFileName));
 
-    file.setDescription(`Passport photo uploaded by ${applicantEmail} on ${new Date().toISOString()}`);
+    file.setDescription(`${tag || 'Photo'} uploaded by ${applicantEmail} on ${new Date().toISOString()}`);
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
-    Logger.log(`Passport photo uploaded to ASSETS folder: ${newFileName}`);
+    Logger.log(`Photo uploaded to applicant folder: ${newFileName}`);
 
     return `https://drive.google.com/thumbnail?id=${file.getId()}&sz=w800`;
 
   } catch (error) {
-    Logger.log('Error uploading passport photo: ' + error.toString());
+    Logger.log('Error uploading photo: ' + error.toString());
     throw error;
+  }
+}
+
+/**
+ * Gets (or creates) the Drive subfolder holding everything ONE applicant
+ * uploaded - CV, cover letter, certificates, passport photo, custom files -
+ * all together instead of mixed flat with every other applicant's files.
+ * Looked up by email (stable, unique, matches the one-application-per-
+ * email rule) even though the folder is *named* with the applicant's name
+ * too for readability when browsing Drive directly.
+ * @param {string} applicantEmail
+ * @param {string} applicantName
+ * @returns {GoogleAppsScript.Drive.Folder}
+ */
+function getApplicantFolder(applicantEmail, applicantName) {
+  const rootFolder = getCVFolder();
+  const existingFolders = rootFolder.getFolders();
+  while (existingFolders.hasNext()) {
+    const existing = existingFolders.next();
+    if (existing.getName().indexOf(applicantEmail) !== -1) {
+      return existing;
+    }
+  }
+  const label = applicantName ? `${applicantName} (${applicantEmail})` : applicantEmail;
+  const folder = rootFolder.createFolder(sanitizeDriveFolderName(label));
+  folder.setDescription(`Documents submitted by ${applicantEmail}`);
+  return folder;
+}
+
+/**
+ * Strips characters Drive folder names can't (or shouldn't) contain.
+ * @param {string} str
+ * @returns {string}
+ */
+function sanitizeDriveFolderName(str) {
+  return (str || 'Unknown Applicant').replace(/[\\/:*?"<>|]/g, '_').trim() || 'Unknown Applicant';
+}
+
+/**
+ * Returns the URL of the main Drive folder holding every applicant's
+ * documents (each in their own subfolder), so the admin can open it
+ * directly in Drive and browse everything at once.
+ * @returns {string} Folder URL, or empty string on failure
+ */
+function getAssetsFolderUrl() {
+  try {
+    return getCVFolder().getUrl();
+  } catch (error) {
+    Logger.log('Error getting assets folder URL: ' + error.toString());
+    return '';
   }
 }
 
@@ -559,7 +613,7 @@ function getCVFolder() {
     const folder = DriveApp.createFolder(folderName);
 
     // Set folder description
-    folder.setDescription('Job Application Assets - CVs and Documents uploaded by applicants');
+    folder.setDescription('Job Application Assets - each applicant has their own subfolder here with their CV, cover letter, certificates, photo and any custom document uploads.');
 
     return folder;
   }
