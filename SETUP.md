@@ -28,7 +28,7 @@ are seeded:
 
 - **Settings** — site name, currency, chatbot text and theme (all editable in Admin → Settings)
 - **Payment Method** — an empty Mobile Money entry, filled in by the first-run wizard in step 4
-- A demo catalog: **Data Bundles**, **Electronics & Gadgets**, **Picture Frames & Gifts**, **Security & Alarm Systems**, **Scripts & Source Code** — edit them, or delete them all from Settings once you've added your own.
+- A demo catalog: **Electronics & Gadgets**, **Picture Frames & Gifts**, **Security & Alarm Systems**, **Scripts & Source Code** — edit them, or delete them all from Settings once you've added your own. (Data bundles aren't seeded as a demo business — see **Data Bundles** below for that dedicated module.)
 
 No personal details are baked into the code, so a fresh copy of this project
 starts clean for whoever sets it up.
@@ -97,7 +97,7 @@ Log in to the admin portal, then:
   - Pick a **Business**, then a **Network** (or add a new one by name — spelling must match exactly across bundles for the same network, since it also drives the customer-facing network toggle).
   - Add a bundle **Size** (e.g. "1GB"), your **Base Price** (what it costs you) and **Your Selling Price** — the **Profit** is calculated for you live, and again per row in the table below.
   - Edit **Your Selling Price** directly in the table any time to reprice instantly; **Available/Unavailable** flips storefront visibility without deleting the bundle.
-  - Every bundle created here automatically asks the customer for the receiving phone number before checkout, skips the delivery-address step (it's digital), and groups by network into the storefront's toggle row — you don't need to configure any of that separately.
+  - Every bundle created here automatically asks the customer for the receiving phone number before checkout, skips the delivery-address step (it's digital), and appears in the storefront's own dedicated **Data Bundles** section — a reseller-style network tab row above a compact pricing grid, kept completely separate from the regular product grid/search/categories rather than mixed in among physical-product cards. You don't need to configure any of that separately.
 - **Banners** — upload images for the homepage carousel.
 - **Discounts** — run a sale storewide, for one business, or for a single product, percent or fixed amount, with an optional date range.
 
@@ -339,14 +339,19 @@ key in Script Properties (never in the HTML/JS).
 
 ## Speed
 
-Apps Script sheet reads are slow, so the catalog is cached in two places:
+Apps Script sheet reads are slow — a cold function call typically costs 1-3
+seconds no matter what the code does, which is Google's own platform
+overhead, not something client code can eliminate. The catalog is cached in
+two places to make that as invisible as possible:
 
 - **Server:** the whole storefront payload is cached for 5 minutes. Any admin save clears it immediately, so edits are never stale. Within a single request, each sheet is read at most once (this alone cut a page load from 6 sheet reads to 0 on a warm cache).
-- **Browser:** the last payload is kept in `sessionStorage` and painted instantly on a repeat visit while fresh data loads in the background.
+- **Browser (stale-while-revalidate):** the last payload is kept in `localStorage` — not `sessionStorage`, so it survives closing the tab — and painted immediately on load while a fresh copy is fetched in the background and swapped in the moment it arrives. A returning shopper sees the store instantly instead of a blank page. The tab also silently revalidates whenever it regains focus after being hidden for more than a minute (switching apps and coming back, a tab left open overnight), so long-lived tabs don't go stale.
 
-There is no blocking spinner anywhere — a thin progress bar at the top of the
-page shows work in flight, so the interface stays usable while it loads. Hit
-**Refresh** any time to force live data.
+There is no blocking spinner anywhere — a thin, continuously animated
+progress bar at the top of the page (not a fake width-jump; a genuine
+indeterminate sliding indicator, since there's no real "% complete" for an
+Apps Script round trip) shows work in flight, so the interface stays usable
+while it loads. Hit **Refresh** any time to force live data.
 
 **Admin portal:** each module (Orders, Products, Settings, …) only loads its
 data the first time you visit it in a session. Switching away and back later

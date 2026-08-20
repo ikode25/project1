@@ -1,5 +1,5 @@
 <!-- admin.html — Multi-Business Admin Portal -->
-<!-- MB_BUILD:2026.08.20-1 -->
+<!-- MB_BUILD:2026.08.20-2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -44,6 +44,13 @@
     table.admin-table th { background: var(--surface-2); white-space: nowrap; }
     .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
+    /* Own spin keyframe (not just Font Awesome's fa-spin) — guarantees the
+       motion and runs faster than FA6's default ~2s/turn. */
+    @keyframes iconSpin { to { transform: rotate(360deg); } }
+    .icon-spin { animation: iconSpin .6s linear infinite; }
+    #adminRefreshIcon { transition: transform .25s ease; }
+    #adminRefreshIcon:hover { transform: rotate(35deg); }
+
     /* Thin top progress bar replaces the old full-screen blocking spinner. */
     #progressBar {
       position: fixed; top: 0; left: 0; height: 3px; width: 0;
@@ -67,7 +74,7 @@
     }
   </style>
 </head>
-<body class="min-h-screen" data-mb-build="2026.08.20-1">
+<body class="min-h-screen" data-mb-build="2026.08.20-2">
 
   <div id="progressBar"></div>
 
@@ -1026,8 +1033,8 @@
     var activeTab = 'dashboard';
     function refreshCurrentTab() {
       var icon = document.getElementById('adminRefreshIcon');
-      icon.classList.add('fa-spin');
-      setTimeout(function () { icon.classList.remove('fa-spin'); }, 800);
+      icon.classList.add('icon-spin');
+      setTimeout(function () { icon.classList.remove('icon-spin'); }, 800);
       loadReferenceData();
       showTab(activeTab, true); // force: ignore the freshness cache
     }
@@ -1193,7 +1200,7 @@
           html: '<table style="margin:0 auto;font-size:13px">' + rows + '</table>' +
             '<hr style="margin:12px 0">' +
             '<div style="font-size:12px;text-align:left">' +
-              '<b>admin page build:</b> 2026.08.20-1<br>' +
+              '<b>admin page build:</b> 2026.08.20-2<br>' +
               '<b>Code.gs build:</b> ' + ((info && info.build) || 'could not read') + '<br>' +
               '<b>schema:</b> ' + ((info && info.setupVersion) || '?') +
             '</div>' +

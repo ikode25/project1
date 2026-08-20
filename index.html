@@ -1,5 +1,5 @@
 <!-- index.html — Multi-Business Storefront -->
-<!-- MB_BUILD:2026.08.20-1 -->
+<!-- MB_BUILD:2026.08.20-2 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -39,12 +39,23 @@
     input, textarea, select { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
     input::placeholder, textarea::placeholder { color: var(--muted); }
 
-    /* Thin top progress bar replaces the old full-screen blocking spinner. */
+    /* Thin top progress bar. #progressBar is just a track; the visible
+       moving piece is the inner bar, which slides side to side on a short
+       loop for as long as any request is in flight — an indeterminate
+       indicator (we don't know real % complete for an Apps Script round
+       trip) rather than the old fake width-jump. */
     #progressBar {
-      position: fixed; top: 0; left: 0; height: 3px; width: 0;
-      background: var(--accent); z-index: 70; transition: width .25s ease, opacity .3s ease;
-box-shadow: 0 0 8px var(--accent);
+      position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 70;
+      overflow: hidden; opacity: 0; transition: opacity .2s ease;
     }
+    #progressBar.active { opacity: 1; }
+    #progressBar .bar {
+      position: absolute; top: 0; left: 0; height: 100%; width: 40%;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      box-shadow: 0 0 8px var(--accent);
+      animation: progressSlide .8s ease-in-out infinite;
+    }
+    @keyframes progressSlide { 0% { left: -40%; } 100% { left: 100%; } }
 
     .ticker-wrap { overflow: hidden; white-space: nowrap; }
     .ticker-move { display: inline-block; padding-left: 100%; animation: ticker 22s linear infinite; }
@@ -71,11 +82,32 @@ box-shadow: 0 0 8px var(--accent);
            justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
     #fabMenu { transition: opacity .2s ease, transform .2s ease; }
     #fabMenu.closed { opacity: 0; transform: translateY(8px); pointer-events: none; }
+
+    /* Entrance + hover motion for cards and sections — used throughout the
+       storefront so it reads as a live, designed page rather than a static
+       data dump. Respects reduced-motion preferences. */
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-in-up { animation: fadeInUp .5s ease both; }
+    .card-anim { animation: fadeInUp .45s ease both; }
+    .card-hover { transition: transform .2s ease, box-shadow .2s ease; }
+    .card-hover:hover { transform: translateY(-4px); box-shadow: 0 14px 28px rgba(0,0,0,.14); }
+    @media (prefers-reduced-motion: reduce) {
+      .fade-in-up, .card-anim { animation: none; }
+      .card-hover:hover { transform: none; }
+    }
+
+    /* Own spin keyframe rather than relying solely on Font Awesome's
+       fa-spin (which also works, but this guarantees the motion and lets
+       us run it faster than FA6's default ~2s/turn). */
+    @keyframes iconSpin { to { transform: rotate(360deg); } }
+    .icon-spin { animation: iconSpin .6s linear infinite; }
+    #refreshIcon, #adminRefreshIcon { transition: transform .25s ease; }
+    #refreshIcon:hover, #adminRefreshIcon:hover { transform: rotate(35deg); }
   </style>
 </head>
-<body class="flex flex-col min-h-screen" data-mb-build="2026.08.20-1">
+<body class="flex flex-col min-h-screen" data-mb-build="2026.08.20-2">
 
-  <div id="progressBar"></div>
+  <div id="progressBar"><div class="bar"></div></div>
 
   <!-- Header -->
   <header class="app-header fixed top-0 left-0 right-0 z-40 shadow">
@@ -123,7 +155,7 @@ box-shadow: 0 0 8px var(--accent);
        width (no max-w-6xl cap), with just enough side padding to keep edges
        readable. Only the footer keeps a centered column, since its 3-column
        layout gets awkwardly sparse at full width. -->
-  <div id="bannerWrap" class="relative overflow-hidden hidden w-full px-3 md:px-4 mt-2">
+  <div id="bannerWrap" class="relative overflow-hidden hidden w-full px-3 md:px-4 mt-2 fade-in-up">
     <div class="rounded-lg overflow-hidden shadow relative">
       <div id="carouselTrack" class="carousel-track"></div>
       <div id="carouselDots" class="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-2"></div>
@@ -132,10 +164,23 @@ box-shadow: 0 0 8px var(--accent);
 
   <div id="videoAdvert" class="hidden w-full px-3 md:px-4 mt-4"></div>
 
-  <div class="w-full px-3 md:px-4 mt-4">
+  <div class="w-full px-3 md:px-4 mt-4 fade-in-up" style="animation-delay:80ms">
     <h2 class="text-xs font-semibold muted uppercase mb-2">Shop by Business</h2>
     <div id="businessNav" class="flex gap-2 mb-2 scroll-x pb-1"></div>
   </div>
+
+  <!-- Data bundles get their own dedicated section — separate from the
+       regular product grid entirely — so they render as a clean, uniform
+       pricing table (network tabs + compact cards) instead of getting
+       shuffled in next to tall photo-and-description product cards.
+       Hidden whenever the current business/pool has no bundle products. -->
+  <div id="bundleSection" class="hidden w-full px-3 md:px-4 mt-6 fade-in-up" style="animation-delay:140ms">
+    <h2 class="text-xl sm:text-2xl font-bold mb-3 flex items-center gap-2"><i class="fas fa-sim-card text-primary"></i>Data Bundles</h2>
+    <div id="bundleNetworkToggle" class="flex flex-wrap gap-2 mb-4"></div>
+    <div id="bundleContainer" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3 md:gap-4"></div>
+  </div>
+
+  <div class="w-full px-3 md:px-4 mt-6"><h2 id="regularSectionHeading" class="hidden text-xl sm:text-2xl font-bold flex items-center gap-2"><i class="fas fa-store text-primary"></i>All Products</h2></div>
 
   <div class="md:hidden w-full px-3 mt-2">
     <select id="mobileCategory" onchange="selectedCategory = this.value || null; renderProducts();" class="w-full p-3 rounded-lg bordered"></select>
@@ -413,7 +458,7 @@ box-shadow: 0 0 8px var(--accent);
     var cart = [];
     try { cart = JSON.parse(localStorage.getItem('mb_cart') || '[]'); } catch (e) { cart = []; }
     var isLoggedIn = false, currentUser = null;
-    var selectedBusinessId = null, selectedCategory = null;
+    var selectedBusinessId = null, selectedCategory = null, selectedNetwork = null;
     var carouselIndex = 0, carouselTimer = null;
     var selectedPaymentMethodId = null;
     var pendingRecipientProduct = null;
@@ -428,19 +473,12 @@ box-shadow: 0 0 8px var(--accent);
     var pending = 0;
     function startProgress() {
       pending++;
-      var bar = document.getElementById('progressBar');
-      bar.style.opacity = '1';
-      bar.style.width = '35%';
+      document.getElementById('progressBar').classList.add('active');
     }
     function stopProgress() {
       pending = Math.max(0, pending - 1);
       if (pending > 0) return;
-      var bar = document.getElementById('progressBar');
-      bar.style.width = '100%';
-      setTimeout(function () {
-        bar.style.opacity = '0';
-        setTimeout(function () { if (pending === 0) bar.style.width = '0'; }, 300);
-      }, 200);
+      document.getElementById('progressBar').classList.remove('active');
     }
 
     function currency(n) {
@@ -504,9 +542,17 @@ box-shadow: 0 0 8px var(--accent);
     window.addEventListener('resize', syncHeaderSpacer);
 
     // ---------------------------------------------------------------------
-    // Bootstrapping — render any cached copy immediately, then revalidate.
-    // A repeat visit paints instantly instead of waiting on a round trip.
+    // Bootstrapping — stale-while-revalidate. The last-known catalog is
+    // painted instantly from localStorage (persists across visits, not just
+    // within one tab session, unlike the sessionStorage this used to use),
+    // then a fresh copy is fetched in the background and swapped in the
+    // moment it arrives. A returning shopper never stares at a blank page
+    // waiting on an Apps Script round trip — they see the store immediately
+    // and it quietly updates under them if anything changed.
     // ---------------------------------------------------------------------
+    var lastFetchedAt = 0;
+    var REVALIDATE_INTERVAL_MS = 60000; // don't re-fetch on focus more than once a minute
+
     window.onload = function () {
       document.getElementById('footerYear').textContent = new Date().getFullYear();
       restoreSession();
@@ -515,17 +561,30 @@ box-shadow: 0 0 8px var(--accent);
 
       var cached = null;
       try {
-        sessionStorage.removeItem('mb_store'); // key used by older builds
-        cached = JSON.parse(sessionStorage.getItem(STORE_CACHE_KEY) || 'null');
+        sessionStorage.removeItem('mb_store'); // key used by an older build generation
+        cached = JSON.parse(localStorage.getItem(STORE_CACHE_KEY) || 'null');
       } catch (e) { cached = null; }
       if (cached && cached.products) {
         onStoreLoaded(cached, true);
       }
 
+      fetchStoreData();
+
+      // SWR "revalidate on focus": catches a tab left open for a while (or
+      // switched away and back) without re-fetching on every single alt-tab.
+      document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible' && Date.now() - lastFetchedAt > REVALIDATE_INTERVAL_MS) {
+          fetchStoreData();
+        }
+      });
+    };
+
+    function fetchStoreData() {
+      lastFetchedAt = Date.now();
       startProgress();
       google.script.run.withSuccessHandler(function (data) { onStoreLoaded(data, false); })
         .withFailureHandler(onStoreLoadFailed).getStorefrontData(false);
-    };
+    }
 
     // Counts a daily unique visit — throttled to once per calendar day per
     // browser via localStorage, so refreshes/repeat visits the same day
@@ -564,7 +623,7 @@ box-shadow: 0 0 8px var(--accent);
       store.settings = store.settings || {};
       storeLoaded = true;
       if (!fromCache) {
-        try { sessionStorage.setItem(STORE_CACHE_KEY, JSON.stringify(data)); } catch (e) { /* quota */ }
+        try { localStorage.setItem(STORE_CACHE_KEY, JSON.stringify(data)); } catch (e) { /* quota or unavailable */ }
       }
       setupAdminLinks(store.adminUrl);
       if (store.build) document.getElementById('buildTag').textContent = store.build;
@@ -576,6 +635,7 @@ box-shadow: 0 0 8px var(--accent);
       renderVideoAdvert();
       renderBusinessNav();
       renderCategories();
+      renderBundleSection();
       renderProducts();
       renderFooter();
       updateCartCount();
@@ -591,15 +651,15 @@ box-shadow: 0 0 8px var(--accent);
 
     function refreshStore() {
       var icon = document.getElementById('refreshIcon');
-      icon.classList.add('fa-spin');
+      icon.classList.add('icon-spin');
       startProgress();
       // force=true skips the server-side cache so the shopper gets live data.
       google.script.run.withSuccessHandler(function (data) {
-        icon.classList.remove('fa-spin');
+        icon.classList.remove('icon-spin');
         onStoreLoaded(data, false);
         toast('success', 'Updated', '');
       }).withFailureHandler(function (err) {
-        icon.classList.remove('fa-spin');
+        icon.classList.remove('icon-spin');
         onStoreLoadFailed(err);
       }).getStorefrontData(true);
     }
@@ -712,9 +772,9 @@ box-shadow: 0 0 8px var(--accent);
     }
 
     function goHome() {
-      selectedBusinessId = null; selectedCategory = null;
+      selectedBusinessId = null; selectedCategory = null; selectedNetwork = null;
       document.getElementById('searchInput').value = '';
-      renderCategories(); renderProducts(); renderBusinessNav();
+      renderCategories(); renderBundleSection(); renderProducts(); renderBusinessNav();
       document.getElementById('activeBusinessBanner').classList.add('hidden');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -820,8 +880,8 @@ box-shadow: 0 0 8px var(--accent);
     }
 
     function afterBusinessChange() {
-      selectedCategory = null;
-      renderBusinessNav(); renderCategories(); renderProducts();
+      selectedCategory = null; selectedNetwork = null;
+      renderBusinessNav(); renderCategories(); renderBundleSection(); renderProducts();
       var banner = document.getElementById('activeBusinessBanner');
       var biz = store.businesses.filter(function (b) { return b.id === selectedBusinessId; })[0];
       if (biz) {
@@ -837,6 +897,16 @@ box-shadow: 0 0 8px var(--accent);
     function currentProductPool() {
       return store.products.filter(function (p) { return selectedBusinessId === null || p.businessId === selectedBusinessId; });
     }
+    // Data bundles (requiresRecipient) are split out of the regular catalog
+    // entirely — they get their own section (see renderBundleSection) with
+    // its own network-tab filtering, rather than sitting in the searchable/
+    // category-filterable product grid alongside physical goods.
+    function regularPool() {
+      return currentProductPool().filter(function (p) { return !p.requiresRecipient; });
+    }
+    function bundlePool() {
+      return currentProductPool().filter(function (p) { return p.requiresRecipient; });
+    }
 
     function renderCategories() {
       var list = document.getElementById('categoryList');
@@ -844,7 +914,7 @@ box-shadow: 0 0 8px var(--accent);
       var toggleRow = document.getElementById('categoryToggleRow');
       list.innerHTML = '';
       var cats = [];
-      currentProductPool().forEach(function (p) { if (p.category && cats.indexOf(p.category) === -1) cats.push(p.category); });
+      regularPool().forEach(function (p) { if (p.category && cats.indexOf(p.category) === -1) cats.push(p.category); });
 
       var mk = function (label, value) {
         var btn = document.createElement('button');
@@ -879,6 +949,45 @@ box-shadow: 0 0 8px var(--accent);
       } else {
         toggleRow.classList.add('hidden');
       }
+    }
+
+    // Dedicated "Data Bundles" section: a network tab row (always exactly
+    // one network active, like a reseller's pricing table) plus a compact
+    // grid of just that network's bundles — entirely separate from the
+    // regular product grid/search/category filters above.
+    function renderBundleSection() {
+      var section = document.getElementById('bundleSection');
+      var heading = document.getElementById('regularSectionHeading');
+      var bundles = bundlePool();
+      var networks = [];
+      bundles.forEach(function (p) { if (p.category && networks.indexOf(p.category) === -1) networks.push(p.category); });
+
+      if (!networks.length) {
+        section.classList.add('hidden');
+        if (heading) heading.classList.add('hidden');
+        return;
+      }
+      section.classList.remove('hidden');
+      if (heading) heading.classList.remove('hidden');
+      if (!selectedNetwork || networks.indexOf(selectedNetwork) === -1) selectedNetwork = networks[0];
+
+      var toggleRow = document.getElementById('bundleNetworkToggle');
+      toggleRow.innerHTML = '';
+      networks.forEach(function (n) {
+        var c = networkColorFor(n);
+        var active = selectedNetwork === n;
+        var btn = document.createElement('button');
+        btn.className = 'px-5 py-2.5 rounded-full font-semibold text-sm transition-transform hover:scale-105';
+        btn.style.background = active ? c.bg : 'var(--surface-2)';
+        btn.style.color = active ? c.fg : 'var(--text)';
+        btn.style.border = active ? '2px solid ' + c.bg : '1px solid var(--border)';
+        btn.textContent = n;
+        btn.onclick = function () { selectedNetwork = n; renderBundleSection(); };
+        toggleRow.appendChild(btn);
+      });
+
+      var list = bundles.filter(function (p) { return p.category === selectedNetwork; });
+      document.getElementById('bundleContainer').innerHTML = list.map(function (p, i) { return bundleCardHtml(p, i); }).join('');
     }
 
     // ---------------------------------------------------------------------
@@ -918,8 +1027,9 @@ box-shadow: 0 0 8px var(--accent);
     // a network-colored badge, the size in large type, and the price — no
     // image slot at all, matching how resellers present bundle pricing and
     // meaning an admin never has to source or upload bundle artwork.
-    function bundleCardHtml(p) {
+    function bundleCardHtml(p, i) {
       var c = networkColorFor(p.category);
+      var delay = Math.min(i || 0, 12) * 35;
       // self-start: the product grid is a CSS Grid, which stretches every
       // card to match the tallest one in its row by default. A bundle card
       // sitting next to a tall photo+description product card would
@@ -927,7 +1037,7 @@ box-shadow: 0 0 8px var(--accent);
       // padding div below would stretch right along with it — exactly the
       // huge gap between price and button reported. self-start makes this
       // card size to its own (short) content regardless of its row-mates.
-      return '<div class="self-start rounded-lg shadow-md flex flex-col overflow-hidden cursor-pointer relative transition-shadow hover:shadow-lg" style="border:2px solid ' + c.bg + '" onclick="openProductModal(\'' + p.id + '\')">' +
+      return '<div class="self-start rounded-lg shadow-md flex flex-col overflow-hidden cursor-pointer relative card-anim card-hover" style="border:2px solid ' + c.bg + ';animation-delay:' + delay + 'ms" onclick="openProductModal(\'' + p.id + '\')">' +
         (p.onSale ? '<span class="absolute top-2 right-2 z-10 text-white text-xs px-2 py-1 rounded" style="background:var(--accent)">' + esc(p.discountLabel || 'Sale') + '</span>' : '') +
         '<div class="p-4" style="background:var(--surface)">' +
           '<span class="inline-block text-xs font-bold uppercase tracking-wide px-3 py-1 rounded-full mb-3" style="background:' + c.bg + ';color:' + c.fg + '">' + esc(p.category) + '</span>' +
@@ -974,7 +1084,7 @@ box-shadow: 0 0 8px var(--accent);
 
     function renderProducts() {
       var search = document.getElementById('searchInput').value.toLowerCase();
-      var list = currentProductPool().filter(function (p) {
+      var list = regularPool().filter(function (p) {
         var matchesCategory = selectedCategory === null || p.category === selectedCategory;
         var matchesSearch = (p.name + ' ' + (p.description || '')).toLowerCase().indexOf(search) !== -1;
         return matchesCategory && matchesSearch;
@@ -983,9 +1093,12 @@ box-shadow: 0 0 8px var(--accent);
       document.getElementById('emptyState').classList.toggle('hidden', list.length > 0);
 
       // Build once and swap in, rather than reflowing on every appendChild.
-      var html = list.map(function (p) {
-        if (p.requiresRecipient) return bundleCardHtml(p);
-        return '<div class="surface p-4 rounded-lg shadow-md flex flex-col relative cursor-pointer" onclick="openProductModal(\'' + p.id + '\')">' +
+      // Each card fades/slides in with a small staggered delay (capped so a
+      // long list doesn't leave the last cards waiting a full second) —
+      // the same entrance treatment as the bundle cards below.
+      var html = list.map(function (p, i) {
+        var delay = Math.min(i, 12) * 40;
+        return '<div class="surface p-4 rounded-lg shadow-md flex flex-col relative cursor-pointer card-anim card-hover" style="animation-delay:' + delay + 'ms" onclick="openProductModal(\'' + p.id + '\')">' +
           (!p.inStock && !p.enquireOnWhatsApp ? '<span class="absolute top-2 left-2 z-10 bg-gray-800 text-white text-xs px-2 py-1 rounded">Out of Stock</span>' : '') +
           (p.onSale ? '<span class="absolute top-2 right-2 z-10 text-white text-xs px-2 py-1 rounded" style="background:var(--accent)">' + esc(p.discountLabel || 'Sale') + '</span>' : '') +
           '<img src="' + esc(p.image || 'https://placehold.co/400x300?text=' + encodeURIComponent(p.name)) + '" alt="' + esc(p.name) + '" loading="lazy" class="w-full h-40 sm:h-44 object-cover mb-3 rounded' + (p.inStock ? '' : ' opacity-50') + '">' +

@@ -16,7 +16,7 @@ var SCHEMA_VERSION = '11';
 
 // Shown in the storefront footer and admin sidebar. If this doesn't match the
 // file you pasted, the deployment is still serving an older version.
-var BUILD_VERSION = '2026.08.20-1';
+var BUILD_VERSION = '2026.08.20-2';
 
 // ---------------------------------------------------------------------------
 // Sheet schema — single source of truth for headers used by the generic
