@@ -2402,13 +2402,16 @@
         // wa.me expects digits only (no "+", spaces, or dashes), with the
         // country code included.
         function normalizeWhatsappNumber(phone, defaultCountryCode) {
-            let digits = (phone || '').replace(/[^\d+]/g, '');
+            // Google Sheets hands back a long all-digit Mobile cell as a JS
+            // number, not a string (no quotes needed to look numeric) -
+            // String(...) first so .replace() below never blows up on it.
+            let digits = String(phone || '').replace(/[^\d+]/g, '');
             if (digits.startsWith('+')) {
                 digits = digits.substring(1);
             } else if (digits.startsWith('00')) {
                 digits = digits.substring(2);
             } else if (digits.startsWith('0') && defaultCountryCode) {
-                digits = defaultCountryCode.replace(/\D/g, '') + digits.substring(1);
+                digits = String(defaultCountryCode).replace(/\D/g, '') + digits.substring(1);
             }
             return digits;
         }
