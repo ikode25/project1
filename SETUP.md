@@ -121,23 +121,26 @@ survives the cleanup.
 Both keep showing the product's price and full description, so nothing is
 hidden behind "Contact for price" unless you actually leave the price at 0.
 
-## Admin order alerts (to you, automatically)
+## Admin alerts (to you, automatically)
 
-Get notified the moment a customer checks out — separately from the
-customer's own receipt/confirmation. **Settings → Notifications & Sign-in →
-Admin Order Alerts.**
+Get notified the moment a customer checks out or messages you — separately
+from the customer's own receipt/confirmation. **Settings → Notifications &
+Sign-in → Admin Alerts.**
 
-- Tick **Email me on new orders**, enter **Your alert email**, and every
-  checkout emails you the customer's name/phone, items, total, and payment
-  reference.
-- Tick **SMS me on new orders**, enter **Your alert phone**, and every
-  checkout also texts you a short summary — this uses your configured SMS
-  provider (Admin → SMS) and spends SMS credits like any other message, so
-  make sure a provider is active there first.
+Enter **your alert email** and/or **your alert phone**, then tick whichever
+of these you want:
 
-Both are independent — enable one, the other, or both. **Save All Settings**
-applies them. This used to be a WhatsApp-based alert; that's been removed in
-favor of email/SMS, which don't depend on a third-party relay service.
+- **On a new order** — Email me / SMS me: every checkout sends you the
+  customer's name/phone, items, total, and payment reference.
+- **On a new customer message** — Email me / SMS me: every message sent
+  through the store's contact form pings you immediately.
+
+All four are independent toggles sharing the same alert email/phone. SMS
+options use your configured SMS provider (Settings → SMS Providers) and spend
+SMS credits like any other message, so make sure a provider is active there
+first. **Save All Settings** applies changes. (This used to be a
+WhatsApp-based alert; that's been removed in favor of email/SMS, which don't
+depend on a third-party relay service.)
 
 ## Daily financial report (to you, automatically)
 
@@ -159,6 +162,28 @@ The Dashboard shows **Today's Visitors**, **All-Time Visitors**, and a
 counted once per browser per calendar day (a repeat page load or refresh the
 same day doesn't inflate it), recorded automatically — nothing to configure.
 It only counts the customer storefront, not the admin portal itself.
+
+## Sidebar navigation
+
+The sidebar is grouped into sections — Overview, Catalog, Sales, People,
+Communications, System — instead of one long flat list. You can also hide
+whichever modules you don't use: **Settings → Sidebar Navigation**, untick
+anything you want out of the way, **Save Sidebar Settings**. Dashboard and
+Settings can't be hidden, so there's no combination of choices that locks you
+out of your own portal. Hiding a module only removes it from the sidebar —
+any in-app link that points at it directly (e.g. the "Selling data bundles?"
+note on the Products page) still works.
+
+**Backup & Recovery** and **SMS Providers** now live inside Settings as their
+own tabs, rather than separate sidebar entries — they're setup/maintenance
+tasks you visit occasionally, not day-to-day modules.
+
+## Uploaded images folder
+
+Every photo you upload through the admin portal (products, banners, logo) is
+saved to one Google Drive folder, created automatically the first time you
+upload something. **Settings → Branding & Video → Open Uploads Folder in
+Google Drive** opens it directly.
 
 ## Admin login security
 
@@ -202,8 +227,11 @@ that route.
 
 ## SMS
 
-**Admin → SMS.** Add a provider (Arkesel, Hubtel, or any custom HTTP API), save
-your API key, and send.
+**Admin → SMS** is where you send messages and see history/balance. The
+provider itself (which gateway is used to actually send) is configured under
+**Settings → SMS Providers** — add a provider (Arkesel, Hubtel, or any custom
+HTTP API), save your API key, and it's used for every SMS the system sends,
+including admin/order alerts and the daily report.
 
 - **Arkesel** — paste your API key. Sender ID max 11 characters, and must be registered with Arkesel.
 - **Hubtel** — API Key field takes your *Client ID*, and the Client Secret field takes your *Client Secret*.
@@ -258,6 +286,11 @@ Customers can message you from the store (envelope button, or the footer link).
 Messages arrive in **Admin → Messages** with an unread badge, and you can reply
 by **email or SMS** right from there, or jump to WhatsApp. Turn the form off in
 Settings if you'd rather not receive messages.
+
+Want a heads-up the moment one arrives, instead of checking the Messages tab?
+**Settings → Notifications & Sign-in → Admin Alerts** has an "On a new
+customer message" section — tick Email and/or SMS and it uses the same alert
+email/phone as order alerts.
 
 ## How it works (data model)
 

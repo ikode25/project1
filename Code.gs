@@ -12,11 +12,11 @@
 
 // Bump when SHEETS changes so ensureSetup_ re-runs and adds new columns to
 // spreadsheets created by an older version of this script.
-var SCHEMA_VERSION = '10';
+var SCHEMA_VERSION = '11';
 
 // Shown in the storefront footer and admin sidebar. If this doesn't match the
 // file you pasted, the deployment is still serving an older version.
-var BUILD_VERSION = '2026.08.17-19';
+var BUILD_VERSION = '2026.08.20-1';
 
 // ---------------------------------------------------------------------------
 // Sheet schema — single source of truth for headers used by the generic
@@ -365,6 +365,8 @@ function seedDefaultSettings_() {
     // /OrderSmsEnabled above, which notify the customer.
     AdminOrderEmailEnabled: 'FALSE',
     AdminOrderSmsEnabled: 'FALSE',
+    AdminMessageEmailEnabled: 'FALSE',
+    AdminMessageSmsEnabled: 'FALSE',
     AdminAlertEmail: '',
     AdminAlertPhone: '',
     // End-of-day financial report email. Enabling this also (de)activates a
@@ -372,7 +374,12 @@ function seedDefaultSettings_() {
     // not just a flag like the toggles above.
     DailyReportEnabled: 'FALSE',
     DailyReportEmail: '',
-    DailyReportHour: '23'
+    DailyReportHour: '23',
+    // Comma-separated tab keys hidden from the admin sidebar. Dashboard and
+    // Settings ignore this entirely (see NAV_ITEMS' "locked" items in
+    // admin.html) so an admin can never lock themselves out by hiding
+    // everything.
+    HiddenNavTabs: ''
   };
 
   var existing = {};
@@ -1913,6 +1920,25 @@ function getOrCreateUploadFolder_() {
   return folder;
 }
 
+// Lets an admin open the same Drive folder adminUploadImage() writes into,
+// straight from Settings, without hunting for it in their own Drive.
+function adminGetUploadFolderUrl(token) {
+  requireAdmin_(token);
+  try {
+    var folder = getOrCreateUploadFolder_();
+    return { success: true, url: folder.getUrl(), name: folder.getName() };
+  } catch (err) {
+    var msg = String(err && err.message ? err.message : err);
+    if (msg.indexOf('permission') !== -1 || msg.indexOf('Drive') !== -1 || msg.indexOf('authoriz') !== -1) {
+      return {
+        success: false,
+        message: 'This deployment has not been granted Google Drive access yet. Open the Apps Script editor, run the function "authorizeDrive" once, accept the permission prompt, then redeploy.'
+      };
+    }
+    return { success: false, message: 'Could not open the folder: ' + msg };
+  }
+}
+
 // ============================================================================
 // SMS — pluggable providers (Arkesel, Hubtel, or any custom HTTP endpoint)
 //
@@ -2434,12 +2460,38 @@ function submitCustomerMessage(payload) {
   if (!name || !body) return { success: false, message: 'Please enter your name and a message.' };
   if (!payload.phone && !payload.email) return { success: false, message: 'Please leave a phone number or email so we can reply.' };
 
+  var subject = String(payload.subject || 'General enquiry').trim();
   appendRowObject_('Messages', {
     MessageID: genId_('MSG'), CreatedAt: new Date(), Name: name,
     Phone: String(payload.phone || '').trim(), Email: String(payload.email || '').trim().toLowerCase(),
-    Subject: String(payload.subject || 'General enquiry').trim(), Body: body,
+    Subject: subject, Body: body,
     Status: 'New', Reply: '', RepliedAt: '', RepliedBy: ''
   });
+
+  // Best-effort admin ping, same opt-in pattern as the order alerts — a
+  // notification failure here must never turn a saved message into an
+  // error for the customer who sent it.
+  try {
+    var s = getPublicSettings_();
+    if (String(s.AdminMessageEmailEnabled).toUpperCase() === 'TRUE' && s.AdminAlertEmail) {
+      var html = '<p>You have a new message from <strong>' + escapeHtml_(name) + '</strong>.</p>' +
+        '<p style="background:#f1f5f9;padding:12px;border-radius:8px;">' +
+          '<strong>Subject:</strong> ' + escapeHtml_(subject) + '<br>' +
+          (payload.phone ? '<strong>Phone:</strong> ' + escapeHtml_(String(payload.phone)) + '<br>' : '') +
+          (payload.email ? '<strong>Email:</strong> ' + escapeHtml_(String(payload.email)) + '<br>' : '') +
+        '</p>' +
+        '<p style="white-space:pre-line;">' + escapeHtml_(body) + '</p>' +
+        '<p>Open the admin portal to reply.</p>';
+      sendEmail_(s.AdminAlertEmail, 'New message from ' + name, html, 'New Customer Message', 'admin-message-alert', 'system');
+    }
+    if (String(s.AdminMessageSmsEnabled).toUpperCase() === 'TRUE' && s.AdminAlertPhone) {
+      var smsMsg = 'New message from ' + name + ' (' + (payload.phone || payload.email || 'no contact given') + '): ' + body.slice(0, 100);
+      sendSmsBatch_([s.AdminAlertPhone], smsMsg, 'admin-message-alert', 'system');
+    }
+  } catch (err) {
+    Logger.log('submitCustomerMessage admin alert failed: ' + err);
+  }
+
   return { success: true };
 }
 
