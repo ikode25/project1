@@ -361,6 +361,10 @@
   #adminApp.dark .chip-toggle { background: #2a2e37; }
   .chip-toggle input { accent-color: var(--clr-accent); cursor: pointer; }
 
+  /* A regular/frequent customer, auto-flagged from their recent visit count (see computeCustomerVisitCounts_ / IsFavourite). */
+  .fav-star { display: inline-flex; align-items: center; gap: 3px; color: var(--clr-accent); font-weight: 700; font-size: .78rem; }
+  .fav-star svg { fill: var(--clr-accent); stroke: var(--clr-accent); }
+
   /* ---------- WEEKLY WORKING HOURS EDITOR ---------- */
   .wh-editor { display: flex; flex-direction: column; gap: 4px; }
   .wh-row { display: flex; align-items: center; gap: 18px; padding: 10px 4px; border-bottom: 1px solid #eee; flex-wrap: wrap; }
@@ -2631,6 +2635,7 @@ var NAV_CONFIG = [
   { key: 'settings', icon: 'droplet', label: 'Branding & Theme', roles: ['Owner'], group: 'Settings' },
   { key: 'sms', icon: 'smartphone', label: 'SMS', roles: ['Owner', 'Manager'], group: 'Settings' },
   { key: 'users', icon: 'lock', label: 'Users', roles: ['Owner'], group: 'Settings' },
+  { key: 'trash', icon: 'trash', label: 'Trash', roles: ['Owner', 'Manager'], group: 'Settings' },
   { key: 'account', icon: 'sliders', label: 'My Account', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] },
   { key: 'about', icon: 'info', label: 'About', roles: ['Owner', 'Manager', 'Staff', 'Receptionist'] }
 ];
@@ -2739,7 +2744,7 @@ function renderAdminPage() {
     services: renderServicesAdmin, staff: renderStaffAdmin, inventory: renderInventory,
     expenses: renderExpenses, reports: renderReports, reviews: renderReviewsAdmin, gallery: renderGalleryAdmin,
     heroSlides: renderHeroAdmin, videos: renderVideosAdmin, settings: renderSettingsAdmin, sms: renderSmsAdmin, users: renderUsersAdmin,
-    account: renderAccount, about: renderAbout
+    trash: renderTrashAdmin, account: renderAccount, about: renderAbout
   };
   (renderers[STATE.adminPage] || function () {})(content);
 }
@@ -2846,6 +2851,93 @@ function bindTablePager(container, pageKey, onChange) {
       onChange();
     });
   });
+}
+
+/**
+ * A checkbox-selectable, paginated table — the shared building block behind
+ * Customers/Appointments' individual/multi-select/bulk "Clear" and the
+ * Trash module's Restore/Delete Forever. Deliberately separate from
+ * renderTable()/bindTablePager() above (no column sorting, no shared state)
+ * rather than bolting selection onto that already-widely-used pair, so
+ * every existing table on every other page is completely unaffected.
+ * `rows` are pre-rendered cell-HTML arrays like renderTable() takes; `ids`
+ * is a parallel array of each row's identifying id. Selection persists in
+ * TABLE_SELECT_STATE[pageKey] across page changes so a bulk action can span
+ * more than one page — call clearSelection_(pageKey) whenever the
+ * underlying list is freshly re-fetched, so stale ids don't linger.
+ */
+var TABLE_SELECT_STATE = {};
+function renderSelectableTable(headers, rows, ids, pageKey, pageSize) {
+  if (!rows.length) return '<p class="muted">No records found.</p>';
+  pageSize = pageSize || 15;
+  var totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  var page = Math.min(Math.max(1, TABLE_PAGE_STATE[pageKey] || 1), totalPages);
+  TABLE_PAGE_STATE[pageKey] = page;
+  var start = (page - 1) * pageSize;
+  var pageRows = rows.slice(start, start + pageSize);
+  var pageIds = ids.slice(start, start + pageSize);
+  var selected = TABLE_SELECT_STATE[pageKey] || (TABLE_SELECT_STATE[pageKey] = {});
+  var pagerHtml = '';
+  if (totalPages > 1) {
+    pagerHtml = '<div class="pager" data-pager="' + esc(pageKey) + '">' +
+      '<button type="button" class="btn btn-sm btn-outline" data-pg="prev"' + (page <= 1 ? ' disabled' : '') + '>' + icon('chevronLeft', 14) + ' Prev</button>' +
+      '<span class="muted">Page ' + page + ' of ' + totalPages + ' &middot; ' + rows.length + ' total</span>' +
+      '<button type="button" class="btn btn-sm btn-outline" data-pg="next"' + (page >= totalPages ? ' disabled' : '') + '>Next ' + icon('chevronRight', 14) + '</button>' +
+      '</div>';
+  }
+  var allOnPageSelected = pageIds.length > 0 && pageIds.every(function (id) { return selected[id]; });
+  var headHtml = '<th style="width:34px;"><input type="checkbox" class="select-all-cb"' + (allOnPageSelected ? ' checked' : '') + '></th>' +
+    headers.map(function (h) { return '<th>' + h + '</th>'; }).join('');
+  var bodyHtml = pageRows.map(function (r, i) {
+    var id = pageIds[i];
+    return '<tr><td><input type="checkbox" class="row-select-cb" data-id="' + esc(id) + '"' + (selected[id] ? ' checked' : '') + '></td>' +
+      r.map(function (c) { return '<td>' + c + '</td>'; }).join('') + '</tr>';
+  }).join('');
+  return '<div class="table-wrap"><table><thead><tr>' + headHtml + '</tr></thead><tbody>' + bodyHtml + '</tbody></table></div>' + pagerHtml;
+}
+/** Wires up a renderSelectableTable(): the pager, every row checkbox, and the header "select all (this page)" checkbox. `onSelectionChange()` runs after any checkbox click (to refresh a bulk-action bar's count/enabled state); `onChange()` (a full re-render) runs after a page button click. */
+function bindSelectableTable(container, pageKey, onChange, onSelectionChange) {
+  var pagerEl = container.querySelector('.pager[data-pager="' + pageKey + '"]');
+  if (pagerEl) {
+    pagerEl.querySelectorAll('button[data-pg]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (btn.disabled) return;
+        TABLE_PAGE_STATE[pageKey] = (TABLE_PAGE_STATE[pageKey] || 1) + (btn.dataset.pg === 'prev' ? -1 : 1);
+        onChange();
+      });
+    });
+  }
+  var selected = TABLE_SELECT_STATE[pageKey] || (TABLE_SELECT_STATE[pageKey] = {});
+  container.querySelectorAll('.row-select-cb').forEach(function (cb) {
+    cb.addEventListener('change', function () {
+      if (cb.checked) selected[cb.dataset.id] = true; else delete selected[cb.dataset.id];
+      onSelectionChange();
+    });
+  });
+  var selectAll = container.querySelector('.select-all-cb');
+  if (selectAll) {
+    selectAll.addEventListener('change', function () {
+      container.querySelectorAll('.row-select-cb').forEach(function (cb) {
+        cb.checked = selectAll.checked;
+        if (selectAll.checked) selected[cb.dataset.id] = true; else delete selected[cb.dataset.id];
+      });
+      onSelectionChange();
+    });
+  }
+}
+function selectedIdsFor_(pageKey) {
+  var selected = TABLE_SELECT_STATE[pageKey] || {};
+  return Object.keys(selected).filter(function (id) { return selected[id]; });
+}
+function clearSelection_(pageKey) { TABLE_SELECT_STATE[pageKey] = {}; }
+/** A small bar showing "N selected" plus whatever action buttons the caller passes — hidden entirely (returns '') when nothing is selected. */
+function bulkActionBarHtml_(pageKey, actionsHtml) {
+  var n = selectedIdsFor_(pageKey).length;
+  if (!n) return '';
+  return '<div class="filters-bar" style="align-items:center;">' +
+    '<b>' + n + ' selected</b>' + actionsHtml +
+    '<button type="button" class="btn btn-sm btn-outline" onclick="clearSelection_(\'' + pageKey + '\');renderAdminPage();">Cancel</button>' +
+    '</div>';
 }
 
 /* =====================================================================
@@ -3009,20 +3101,31 @@ function showPaymentsForMethod_(bucket) {
 /* ---------- APPOINTMENTS ---------- */
 var APPT_VIEW = localStorage.getItem('salon_appt_view') || 'table';
 
+/** Only Owner/Manager/Receptionist can clear appointments to Trash — mirrors clearAppointments()'s own server-side role check, so Staff (hairstylists) never see a Clear control that would just fail. */
+function canClearAppointments_() { return STATE.user.role !== 'Staff'; }
 function renderAppointments(content) {
+  var s = STATE.settings || {};
+  var canClear = canClearAppointments_();
   content.innerHTML =
     '<div class="panel">' +
     '<div class="panel-head"><h3>Appointments</h3><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">' +
     '<div class="view-toggle"><button type="button" data-view="table" class="' + (APPT_VIEW === 'table' ? 'active' : '') + '">' + icon('grid', 14) + ' Table</button><button type="button" data-view="kanban" class="' + (APPT_VIEW === 'kanban' ? 'active' : '') + '">' + icon('copy', 14) + ' Kanban</button></div>' +
     '<button class="btn btn-sm" onclick="openAppointmentModal()">' + icon('plus', 14) + ' New Appointment</button>' +
+    (canClear ? '<button class="btn btn-sm btn-danger" onclick="clearAllAppointments()">' + icon('trash', 14) + ' Clear All</button>' : '') +
     '</div></div>' +
     '<div class="filters-bar">' +
     '<input type="date" id="apFilterDate">' +
-    '<select id="apFilterStatus"><option value="">All Statuses</option>' + ['Pending', 'Confirmed', 'Completed', 'No-show', 'Cancelled'].map(function (s) { return '<option value="' + s + '">' + s + '</option>'; }).join('') + '</select>' +
+    '<select id="apFilterStatus"><option value="">All Statuses</option>' + ['Pending', 'Confirmed', 'Completed', 'No-show', 'Cancelled'].map(function (s2) { return '<option value="' + s2 + '">' + s2 + '</option>'; }).join('') + '</select>' +
     '<button class="btn btn-sm btn-outline" onclick="loadAppointmentsTable()">' + icon('search', 13) + ' Filter</button>' +
     '</div>' +
     (APPT_VIEW === 'kanban' ? '<p class="muted">Drag a card to a different column to change its status.</p>' : '') +
-    '<div id="apTableHost">' + loadingHtml() + '</div></div>';
+    '<div id="apTableHost">' + loadingHtml() + '</div></div>' +
+    (canClear ? '<div class="panel"><h3>Housekeeping</h3>' +
+    '<p class="muted" style="margin-bottom:10px;">Finished appointments (Completed/Cancelled/No-show, plus anything left Pending/Confirmed past its own date) pile up over time. Clear them out — either right now, or automatically every day — so the list stays focused on what\'s actually still coming up. Nothing here is destroyed; cleared appointments go to <b>Trash</b> and can be restored.</p>' +
+    '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">' +
+    '<label class="chip-toggle"><input type="checkbox" id="apAutoClearToggle"' + (s.AutoClearAppointmentsDaily === 'Y' ? ' checked' : '') + '> Auto-clear finished appointments daily</label>' +
+    '<button type="button" class="btn btn-sm btn-outline" onclick="clearOldAppointmentsNowBtn()">' + icon('trash', 13) + ' Clear Old Appointments Now</button>' +
+    '</div></div>' : '');
   content.querySelectorAll('.view-toggle button').forEach(function (btn) {
     btn.addEventListener('click', function () {
       APPT_VIEW = btn.dataset.view;
@@ -3030,6 +3133,15 @@ function renderAppointments(content) {
       renderAppointments(content);
     });
   });
+  if (canClear) {
+    document.getElementById('apAutoClearToggle').addEventListener('change', function (e) {
+      api('updateSettings', STATE.token, { AutoClearAppointmentsDaily: e.target.checked ? 'Y' : 'N' }).then(function (settings) {
+        STATE.settings = settings;
+        toast('Auto-clear ' + (e.target.checked ? 'enabled' : 'disabled'), 'success');
+      }).catch(showError);
+    });
+  }
+  clearSelection_('appointments');
   loadAppointmentsTable();
 }
 
@@ -3044,11 +3156,22 @@ function loadAppointmentsTable() {
 }
 
 function renderAppointmentsTable(host, rows) {
+  if (!canClearAppointments_()) {
+    var drawPlain = function () {
+      host.innerHTML = renderTable(['Ref', 'Date', 'Time', 'Customer', 'Phone', 'Service', 'Staff', 'Status', 'Payment', 'Actions'], rows.map(function (a) {
+        return [esc(a.Reference), esc(a.Date), esc(a.TimeSlot), esc(a.CustomerName), esc(a.CustomerPhone), esc(a.ServiceName) + ' (' + money(a.ServicePrice) + ')', esc(a.StaffName), statusBadge(a.Status), paymentInfoHtml_(a), apptActionButtons_(a)];
+      }), 'appointments');
+      bindTablePager(host, 'appointments', drawPlain);
+    };
+    drawPlain();
+    return;
+  }
   function draw() {
-    host.innerHTML = renderTable(['Ref', 'Date', 'Time', 'Customer', 'Phone', 'Service', 'Staff', 'Status', 'Payment', 'Actions'], rows.map(function (a) {
+    var bar = bulkActionBarHtml_('appointments', '<button type="button" class="btn btn-sm btn-danger" onclick="clearSelectedAppointments()">' + icon('trash', 13) + ' Clear Selected</button>');
+    host.innerHTML = bar + renderSelectableTable(['Ref', 'Date', 'Time', 'Customer', 'Phone', 'Service', 'Staff', 'Status', 'Payment', 'Actions'], rows.map(function (a) {
       return [esc(a.Reference), esc(a.Date), esc(a.TimeSlot), esc(a.CustomerName), esc(a.CustomerPhone), esc(a.ServiceName) + ' (' + money(a.ServicePrice) + ')', esc(a.StaffName), statusBadge(a.Status), paymentInfoHtml_(a), apptActionButtons_(a)];
-    }), 'appointments');
-    bindTablePager(host, 'appointments', draw);
+    }), rows.map(function (a) { return a.AppointmentID; }), 'appointments');
+    bindSelectableTable(host, 'appointments', draw, draw);
   }
   draw();
 }
@@ -3058,7 +3181,44 @@ function apptActionButtons_(a) {
     (a.Status !== 'Completed' ? '<button class="btn btn-sm btn-accent" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'Completed\')">' + icon('check', 13) + ' Complete</button>' : '') +
     (a.Status !== 'Cancelled' && a.Status !== 'Completed' ? '<button class="btn btn-sm btn-outline" onclick="openRescheduleModal(\'' + a.AppointmentID + '\',\'' + a.Date + '\',\'' + a.TimeSlot + '\')">' + icon('calendar', 13) + ' Reschedule</button><button class="btn btn-sm btn-danger" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'Cancelled\')">' + icon('close', 13) + ' Cancel</button>' : '') +
     (a.Status !== 'Completed' && a.Status !== 'Cancelled' ? '<button class="btn btn-sm btn-outline" onclick="setApptStatus(\'' + a.AppointmentID + '\',\'No-show\')">' + icon('alertTriangle', 13) + ' No-show</button>' : '') +
-    (a.PaymentStatus === 'Pending Verification' ? '<button class="btn btn-sm btn-accent" onclick="verifyApptPayment(\'' + a.AppointmentID + '\')">' + icon('check', 13) + ' Verify Payment</button>' : '');
+    (a.PaymentStatus === 'Pending Verification' ? '<button class="btn btn-sm btn-accent" onclick="verifyApptPayment(\'' + a.AppointmentID + '\')">' + icon('check', 13) + ' Verify Payment</button>' : '') +
+    (canClearAppointments_() ? '<button class="btn btn-sm btn-danger" onclick="clearAppointmentRow(\'' + a.AppointmentID + '\')">' + icon('trash', 13) + ' Clear</button>' : '');
+}
+function clearAppointmentRow(id) {
+  if (!confirm('Move this appointment to Trash? You can restore it from the Trash page any time.')) return;
+  api('clearAppointments', STATE.token, [id]).then(function () {
+    toast('Appointment moved to Trash', 'success');
+    loadAppointmentsTable();
+  }).catch(showError);
+}
+function clearSelectedAppointments() {
+  var ids = selectedIdsFor_('appointments');
+  if (!ids.length) return;
+  if (!confirm('Move ' + ids.length + ' selected appointment(s) to Trash? You can restore them from the Trash page any time.')) return;
+  api('clearAppointments', STATE.token, ids).then(function (res) {
+    toast(res.cleared + ' appointment(s) moved to Trash', 'success');
+    clearSelection_('appointments');
+    loadAppointmentsTable();
+  }).catch(showError);
+}
+function clearAllAppointments() {
+  var filters = { branchId: branchArg(), date: document.getElementById('apFilterDate').value, status: document.getElementById('apFilterStatus').value };
+  api('getAppointments', STATE.token, filters).then(function (rows) {
+    if (!rows.length) { toast('No appointments to clear', 'error'); return; }
+    if (!confirm('Move ALL ' + rows.length + ' appointment(s) currently listed to Trash? You can restore them from the Trash page any time.')) return;
+    api('clearAppointments', STATE.token, rows.map(function (a) { return a.AppointmentID; })).then(function (res) {
+      toast(res.cleared + ' appointment(s) moved to Trash', 'success');
+      clearSelection_('appointments');
+      loadAppointmentsTable();
+    }).catch(showError);
+  }).catch(showError);
+}
+function clearOldAppointmentsNowBtn() {
+  if (!confirm('Clear every finished appointment (Completed/Cancelled/No-show, or past its own date) to Trash now? Upcoming and today\'s still-pending bookings are never touched.')) return;
+  api('clearOldAppointmentsNow', STATE.token).then(function (res) {
+    toast(res.cleared + ' old appointment(s) moved to Trash', 'success');
+    loadAppointmentsTable();
+  }).catch(showError);
 }
 
 /** Payment method + status + (if uploaded) a link to the customer's proof screenshot, for the Appointments table/Kanban. */
@@ -3376,35 +3536,91 @@ function printReceiptNow_() {
 window.addEventListener('afterprint', function () { document.body.classList.remove('printing-receipt'); });
 
 /* ---------- CUSTOMERS ---------- */
+var CUST_FAV_ONLY = false;
+/** Only Owner/Manager can clear customers to Trash — mirrors clearCustomers()'s own server-side role check, so Receptionist never sees a Clear control that would just fail. */
+function canClearCustomers_() { return STATE.user.role === 'Owner' || STATE.user.role === 'Manager'; }
 function renderCustomers(content) {
   content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Customers</h3>' + viewToggleHtml('customers') + '</div>' +
-    '<div class="filters-bar"><input type="text" id="custSearch" placeholder="Search by name/phone" oninput="loadCustomers()"></div>' +
+    '<div class="filters-bar">' +
+    '<input type="text" id="custSearch" placeholder="Search by name/phone" oninput="loadCustomers()">' +
+    '<label class="chip-toggle"><input type="checkbox" id="custFavOnly"' + (CUST_FAV_ONLY ? ' checked' : '') + '> ' + icon('star', 13) + ' Favourites only</label>' +
+    (canClearCustomers_() ? '<button type="button" class="btn btn-sm btn-danger" onclick="clearAllCustomers()" style="margin-left:auto;">' + icon('trash', 13) + ' Clear All</button>' : '') +
+    '</div>' +
     '<div id="custTableHost">' + loadingHtml() + '</div></div>';
   bindViewToggle(content, 'customers', function () { loadCustomers(); });
+  document.getElementById('custFavOnly').addEventListener('change', function (e) { CUST_FAV_ONLY = e.target.checked; loadCustomers(); });
+  clearSelection_('customers');
   loadCustomers();
 }
 function loadCustomers() {
   api('getCustomers', STATE.token, document.getElementById('custSearch').value).then(function (rows) {
+    if (CUST_FAV_ONLY) rows = rows.filter(function (c) { return c.IsFavourite; });
     var host = document.getElementById('custTableHost');
     if (getViewMode('customers') === 'grid') {
+      var canClear = canClearCustomers_();
       host.innerHTML = renderRecordGrid(rows, function (c) {
         return {
           fallbackIcon: 'users', title: c.Name,
-          lines: [esc(c.Phone), esc(c.Email || '—'), '<b>' + c.LoyaltyPoints + '</b> loyalty pts', 'Joined ' + String(c.DateJoined).slice(0, 10)],
-          actions: '<button class="btn btn-sm btn-outline" onclick="viewCustomerProfile(\'' + c.CustomerID + '\')">' + icon('eye', 13) + ' View</button>'
+          lines: [
+            (c.IsFavourite ? '<span class="fav-star">' + icon('star', 13) + ' Favourite (' + c.RecentVisits + ' visits)</span>' : ''),
+            esc(c.Phone), esc(c.Email || '—'), '<b>' + c.LoyaltyPoints + '</b> loyalty pts', 'Joined ' + String(c.DateJoined).slice(0, 10)
+          ].filter(Boolean),
+          actions: '<button class="btn btn-sm btn-outline" onclick="viewCustomerProfile(\'' + c.CustomerID + '\')">' + icon('eye', 13) + ' View</button>' +
+            (canClear ? '<button class="btn btn-sm btn-danger" onclick="clearCustomerRow(\'' + c.CustomerID + '\')">' + icon('trash', 13) + '</button>' : '')
         };
       });
-    } else {
+    } else if (canClearCustomers_()) {
       var draw = function () {
-        host.innerHTML = renderTable(['Name', 'Phone', 'Email', 'Loyalty Pts', 'Joined', 'Actions'], rows.map(function (c) {
-          return [esc(c.Name), esc(c.Phone), esc(c.Email), c.LoyaltyPoints, String(c.DateJoined).slice(0, 10),
-            '<button class="btn btn-sm btn-outline" onclick="viewCustomerProfile(\'' + c.CustomerID + '\')">' + icon('eye', 13) + ' View</button>'];
-        }), 'customers');
-        bindTablePager(host, 'customers', draw);
+        var bar = bulkActionBarHtml_('customers', '<button type="button" class="btn btn-sm btn-danger" onclick="clearSelectedCustomers()">' + icon('trash', 13) + ' Clear Selected</button>');
+        host.innerHTML = bar + renderSelectableTable(['Name', 'Phone', 'Email', 'Loyalty Pts', 'Joined', 'Actions'], rows.map(function (c) {
+          return [(c.IsFavourite ? '<span class="fav-star" title="Favourite — ' + c.RecentVisits + ' visits recently">' + icon('star', 14) + '</span> ' : '') + esc(c.Name), esc(c.Phone), esc(c.Email), c.LoyaltyPoints, String(c.DateJoined).slice(0, 10),
+            '<button class="btn btn-sm btn-outline" onclick="viewCustomerProfile(\'' + c.CustomerID + '\')">' + icon('eye', 13) + ' View</button>' +
+            '<button class="btn btn-sm btn-danger" onclick="clearCustomerRow(\'' + c.CustomerID + '\')">' + icon('trash', 13) + ' Clear</button>'];
+        }), rows.map(function (c) { return c.CustomerID; }), 'customers');
+        bindSelectableTable(host, 'customers', draw, draw);
       };
       draw();
+    } else {
+      var draw2 = function () {
+        host.innerHTML = renderTable(['Name', 'Phone', 'Email', 'Loyalty Pts', 'Joined', 'Actions'], rows.map(function (c) {
+          return [(c.IsFavourite ? '<span class="fav-star" title="Favourite — ' + c.RecentVisits + ' visits recently">' + icon('star', 14) + '</span> ' : '') + esc(c.Name), esc(c.Phone), esc(c.Email), c.LoyaltyPoints, String(c.DateJoined).slice(0, 10),
+            '<button class="btn btn-sm btn-outline" onclick="viewCustomerProfile(\'' + c.CustomerID + '\')">' + icon('eye', 13) + ' View</button>'];
+        }), 'customers');
+        bindTablePager(host, 'customers', draw2);
+      };
+      draw2();
     }
   }).catch(function (err) { document.getElementById('custTableHost').innerHTML = errorPanel(err); });
+}
+function clearCustomerRow(id) {
+  if (!confirm('Move this customer to Trash? You can restore them from the Trash page any time.')) return;
+  api('clearCustomers', STATE.token, [id]).then(function () {
+    toast('Customer moved to Trash', 'success');
+    loadCustomers();
+  }).catch(showError);
+}
+function clearSelectedCustomers() {
+  var ids = selectedIdsFor_('customers');
+  if (!ids.length) return;
+  if (!confirm('Move ' + ids.length + ' selected customer(s) to Trash? You can restore them from the Trash page any time.')) return;
+  api('clearCustomers', STATE.token, ids).then(function (res) {
+    toast(res.cleared + ' customer(s) moved to Trash', 'success');
+    clearSelection_('customers');
+    loadCustomers();
+  }).catch(showError);
+}
+function clearAllCustomers() {
+  var q = document.getElementById('custSearch') ? document.getElementById('custSearch').value : '';
+  api('getCustomers', STATE.token, q).then(function (rows) {
+    if (CUST_FAV_ONLY) rows = rows.filter(function (c) { return c.IsFavourite; });
+    if (!rows.length) { toast('No customers to clear', 'error'); return; }
+    if (!confirm('Move ALL ' + rows.length + ' customer(s) currently listed to Trash? You can restore them from the Trash page any time.')) return;
+    api('clearCustomers', STATE.token, rows.map(function (c) { return c.CustomerID; })).then(function (res) {
+      toast(res.cleared + ' customer(s) moved to Trash', 'success');
+      clearSelection_('customers');
+      loadCustomers();
+    }).catch(showError);
+  }).catch(showError);
 }
 function viewCustomerProfile(id) {
   api('getCustomerProfile', STATE.token, id).then(function (d) {
@@ -3412,6 +3628,94 @@ function viewCustomerProfile(id) {
       '<h4>Appointment History</h4>' + renderTable(['Date', 'Time', 'Status'], d.appointments.map(function (a) { return [a.Date, a.TimeSlot, a.Status]; })) +
       '<h4>Purchase History</h4>' + renderTable(['Date', 'Total', 'Payment'], d.sales.map(function (s) { return [String(s.Date).slice(0, 10), money(s.Total), s.PaymentMethod]; }));
     openModal('Customer Profile', html, null, null);
+  }).catch(showError);
+}
+
+/* ---------- TRASH (cleared Customers + Appointments, recoverable) ---------- */
+var TRASH_TYPE_FILTER = '';
+function renderTrashAdmin(content) {
+  content.innerHTML = '<div class="panel"><div class="panel-head"><h3>Trash</h3>' +
+    '<button type="button" class="btn btn-sm btn-danger" onclick="emptyTrashBtn()">' + icon('trash', 14) + ' Empty Trash</button>' +
+    '</div>' +
+    '<p class="muted">Records cleared from Customers or Appointments land here instead of being deleted outright — restore one any time, or delete it for good once you\'re sure.</p>' +
+    '<div class="filters-bar">' +
+    '<select id="trashTypeFilter"><option value="">All Types</option><option value="Customers">Customers</option><option value="Appointments">Appointments</option></select>' +
+    '</div>' +
+    '<div id="trashTableHost">' + loadingHtml() + '</div></div>';
+  document.getElementById('trashTypeFilter').value = TRASH_TYPE_FILTER;
+  document.getElementById('trashTypeFilter').addEventListener('change', function (e) { TRASH_TYPE_FILTER = e.target.value; clearSelection_('trash'); loadTrash(); });
+  clearSelection_('trash');
+  loadTrash();
+}
+function loadTrash() {
+  api('getTrash', STATE.token, TRASH_TYPE_FILTER).then(function (rows) {
+    var host = document.getElementById('trashTableHost');
+    if (!rows.length) { host.innerHTML = '<p class="muted">Trash is empty.</p>'; return; }
+    function draw() {
+      var bar = bulkActionBarHtml_('trash',
+        '<button type="button" class="btn btn-sm btn-accent" onclick="restoreSelectedTrash()">' + icon('refresh', 13) + ' Restore Selected</button>' +
+        '<button type="button" class="btn btn-sm btn-danger" onclick="deleteSelectedTrashForever()">' + icon('trash', 13) + ' Delete Selected Forever</button>');
+      host.innerHTML = bar + renderSelectableTable(['Type', 'Details', 'Cleared At', 'Cleared By', 'Actions'], rows.map(function (t) {
+        return [esc(t.RecordType), trashDetailsHtml_(t), String(t.DeletedAt).replace('T', ' ').slice(0, 16), esc(t.DeletedBy || '—'),
+          '<button class="btn btn-sm btn-accent" onclick="restoreTrashRow(\'' + t.TrashID + '\')">' + icon('refresh', 13) + ' Restore</button>' +
+          '<button class="btn btn-sm btn-danger" onclick="deleteTrashRowForever(\'' + t.TrashID + '\')">' + icon('trash', 13) + ' Delete Forever</button>'];
+      }), rows.map(function (t) { return t.TrashID; }), 'trash');
+      bindSelectableTable(host, 'trash', draw, draw);
+    }
+    draw();
+  }).catch(function (err) { document.getElementById('trashTableHost').innerHTML = errorPanel(err); });
+}
+/** A one-line summary of what's actually in a trashed record, since Customers and Appointments carry very different fields. */
+function trashDetailsHtml_(t) {
+  var s = t.Summary || {};
+  if (t.RecordType === 'Customers') {
+    return '<b>' + esc(s.Name || t.RecordID) + '</b> &middot; ' + esc(s.Phone || '') + (s.Email ? ' &middot; ' + esc(s.Email) : '');
+  }
+  if (t.RecordType === 'Appointments') {
+    return '<b>' + esc(s.Reference || t.RecordID) + '</b> &middot; ' + esc(s.CustomerName || '') + ' &middot; ' + esc(s.ServiceName || '') +
+      '<div class="muted">' + esc(s.Date || '') + ' ' + esc(s.TimeSlot || '') + ' &middot; ' + esc(s.Status || '') + '</div>';
+  }
+  return esc(t.RecordID);
+}
+function restoreTrashRow(trashId) {
+  api('restoreTrashItems', STATE.token, [trashId]).then(function () {
+    toast('Record restored', 'success');
+    loadTrash();
+  }).catch(showError);
+}
+function restoreSelectedTrash() {
+  var ids = selectedIdsFor_('trash');
+  if (!ids.length) return;
+  api('restoreTrashItems', STATE.token, ids).then(function (res) {
+    toast(res.restored + ' record(s) restored', 'success');
+    clearSelection_('trash');
+    loadTrash();
+  }).catch(showError);
+}
+function deleteTrashRowForever(trashId) {
+  if (!confirm('Permanently delete this record? This cannot be undone.')) return;
+  api('permanentlyDeleteTrash', STATE.token, [trashId]).then(function () {
+    toast('Deleted permanently', 'success');
+    loadTrash();
+  }).catch(showError);
+}
+function deleteSelectedTrashForever() {
+  var ids = selectedIdsFor_('trash');
+  if (!ids.length) return;
+  if (!confirm('Permanently delete ' + ids.length + ' selected record(s)? This cannot be undone.')) return;
+  api('permanentlyDeleteTrash', STATE.token, ids).then(function (res) {
+    toast(res.deleted + ' record(s) permanently deleted', 'success');
+    clearSelection_('trash');
+    loadTrash();
+  }).catch(showError);
+}
+function emptyTrashBtn() {
+  var label = TRASH_TYPE_FILTER || 'all';
+  if (!confirm('Permanently delete everything in Trash (' + label + ')? This cannot be undone.')) return;
+  api('emptyTrash', STATE.token, TRASH_TYPE_FILTER).then(function (res) {
+    toast(res.deleted + ' record(s) permanently deleted', 'success');
+    clearSelection_('trash');
+    loadTrash();
   }).catch(showError);
 }
 
@@ -4124,6 +4428,8 @@ function renderSettingsAdmin(content) {
       field('Tax Rate (%)', 'stTaxRatePercent', s.TaxRatePercent) +
       field('Loyalty Points per GH₵1 spent', 'stLoyaltyPointsPerCedi', s.LoyaltyPointsPerCedi) +
       field('Points needed for GH₵1 discount', 'stLoyaltyRedeemRate', s.LoyaltyRedeemRate) +
+      field('Favourite: visits needed', 'stFavouriteVisitThreshold', s.FavouriteVisitThreshold) +
+      field('Favourite: within last (days)', 'stFavouriteWindowDays', s.FavouriteWindowDays) +
       '</div><h4 style="margin:20px 0 4px;">Accepted Payment Methods</h4><p class="muted" style="margin-bottom:10px;">Tap to switch which options customers see at checkout. A mobile money network or Bank Transfer only actually shows to customers once you\'ve also filled in its number/account details below — an empty one is hidden automatically even if switched on here. Keep at least one on.</p>' +
       '<div class="day-picker" id="stPaymentMethodsPicker">' + PAYMENT_METHOD_OPTIONS.map(function (m) {
         return '<span class="day-chip' + (activePaymentMethodsFrom_(s).indexOf(m) > -1 ? ' active' : '') + '" data-method="' + esc(m) + '">' + esc(m) + '</span>';
@@ -4383,6 +4689,7 @@ function saveAllSettings() {
       SlotIntervalMinutes: document.getElementById('stSlotIntervalMinutes').value,
       TaxRatePercent: document.getElementById('stTaxRatePercent').value, LoyaltyPointsPerCedi: document.getElementById('stLoyaltyPointsPerCedi').value,
       LoyaltyRedeemRate: document.getElementById('stLoyaltyRedeemRate').value,
+      FavouriteVisitThreshold: document.getElementById('stFavouriteVisitThreshold').value, FavouriteWindowDays: document.getElementById('stFavouriteWindowDays').value,
       MomoNumber: document.getElementById('stMomoNumber').value, MomoName: document.getElementById('stMomoName').value,
       VodafoneCashNumber: document.getElementById('stVodafoneCashNumber').value, VodafoneCashName: document.getElementById('stVodafoneCashName').value,
       TelecelCashNumber: document.getElementById('stTelecelCashNumber').value, TelecelCashName: document.getElementById('stTelecelCashName').value,

@@ -30,7 +30,8 @@
  *   16. Hero carousel & image uploads
  *   17. Reports & exports
  *   18. Notifications (SMS + Email)
- *   19. Utilities (currency, phone, dates, ids)
+ *   19. Trash / recovery (Customers + Appointments)
+ *   20. Utilities (currency, phone, dates, ids)
  * ============================================================================
  */
 
@@ -66,14 +67,20 @@ var SCHEMA = {
   BlockedSlots:  ['BlockedSlotID', 'BranchID', 'Date', 'TimeSlot'],
   Videos:        ['VideoID', 'VideoURL', 'Title', 'Caption', 'SortOrder', 'Active'],
   Visits:        ['VisitID', 'Date', 'Timestamp', 'VisitorKey'],
-  StaffLeave:    ['LeaveID', 'StaffID', 'Date', 'Reason']
+  StaffLeave:    ['LeaveID', 'StaffID', 'Date', 'Reason'],
+  // A "cleared" Customer/Appointment record's entire original row, kept as
+  // JSON so it can be restored exactly as it was — see section 19, TRASH.
+  Trash:         ['TrashID', 'RecordType', 'RecordID', 'Data', 'DeletedAt', 'DeletedBy']
 };
 
 var ID_PREFIX = {
   Branches: 'BR', Services: 'SV', Staff: 'ST', Customers: 'CU', Appointments: 'AP',
   Sales: 'SL', Products: 'PR', Expenses: 'EX', Reviews: 'RV', HeroSlides: 'HS', Gallery: 'GL',
-  Notifications: 'NT', BlockedSlots: 'BL', Videos: 'VD', Visits: 'VS', StaffLeave: 'LV'
+  Notifications: 'NT', BlockedSlots: 'BL', Videos: 'VD', Visits: 'VS', StaffLeave: 'LV', Trash: 'TR'
 };
+
+/** Which sheets support "Clear" (soft-delete to Trash, recoverable) instead of/alongside a permanent Delete. Also used by nextId_() below to keep a cleared record's ID reserved while it sits in Trash. */
+var TRASH_RECORD_TYPES = { Customers: true, Appointments: true };
 
 var ROLES = ['Owner', 'Manager', 'Staff', 'Receptionist'];
 
@@ -142,7 +149,15 @@ var DEFAULT_SETTINGS = {
   // Business API integration in this app, only the existing click-to-chat
   // link, so there's nothing to automate/toggle.
   NotifyBookingSms: 'Y',
-  NotifyBookingEmail: 'Y'
+  NotifyBookingEmail: 'Y',
+  // Appointments module housekeeping — see clearFinishedAppointments_().
+  // 'N' by default: nothing auto-clears until the Owner turns it on.
+  AutoClearAppointmentsDaily: 'N',
+  // A customer is auto-flagged as a "Favourite" once they've visited (a
+  // completed appointment or a POS sale) at least this many times within
+  // the trailing FavouriteWindowDays days — see computeCustomerVisitCounts_().
+  FavouriteVisitThreshold: '3',
+  FavouriteWindowDays: '90'
 };
 
 var PAYMENT_METHODS = ['Cash', 'MTN MoMo', 'Vodafone Cash', 'Telecel Cash', 'AirtelTigo Money', 'Bank Transfer'];
@@ -925,6 +940,18 @@ function nextId_(sheetName, idField) {
     var num = parseInt(raw.split('-').pop(), 10);
     if (!isNaN(num) && num > max) max = num;
   });
+  // A cleared Customer/Appointment still "owns" its ID while it sits in
+  // Trash — without this, a brand-new record created while the old one is
+  // trashed could be handed that exact same ID, and restoring the trashed
+  // record afterward would silently collide with (and corrupt) the new one.
+  if (TRASH_RECORD_TYPES[sheetName]) {
+    readAll_('Trash').forEach(function (t) {
+      if (t.RecordType !== sheetName) return;
+      var raw = String(t.RecordID || '');
+      var num = parseInt(raw.split('-').pop(), 10);
+      if (!isNaN(num) && num > max) max = num;
+    });
+  }
   return prefix + '-' + String(max + 1).padStart(4, '0');
 }
 
@@ -1532,7 +1559,37 @@ function getCustomers(token, search) {
       return String(c.Name).toLowerCase().indexOf(q) > -1 || String(c.Phone).indexOf(q) > -1;
     });
   }
-  return rows.map(stripRow_);
+  var settings = getSettingsMap_();
+  var threshold = Number(settings.FavouriteVisitThreshold) || 3;
+  var counts = computeCustomerVisitCounts_(Number(settings.FavouriteWindowDays) || 90);
+  return rows.map(function (c) {
+    var o = stripRow_(c);
+    o.RecentVisits = counts[c.CustomerID] || 0;
+    o.IsFavourite = o.RecentVisits >= threshold;
+    return o;
+  });
+}
+
+/**
+ * How many times each customer has visited (a completed appointment, or a
+ * POS sale) in the trailing `windowDays` days — the basis for auto-flagging
+ * "Favourite" regulars in the Customers list, so the Owner can spot who's
+ * worth a discount/promo without having to dig through each profile by hand.
+ */
+function computeCustomerVisitCounts_(windowDays) {
+  var cutoff = windowDays ? addDays_(Utilities.formatDate(new Date(), TIMEZONE, 'yyyy-MM-dd'), -windowDays) : null;
+  var counts = {};
+  readAll_('Appointments').forEach(function (a) {
+    if (a.Status !== 'Completed' || !a.CustomerID) return;
+    if (cutoff && a.Date < cutoff) return;
+    counts[a.CustomerID] = (counts[a.CustomerID] || 0) + 1;
+  });
+  readAll_('Sales').forEach(function (s) {
+    if (!s.CustomerID) return;
+    if (cutoff && String(s.Date).slice(0, 10) < cutoff) return;
+    counts[s.CustomerID] = (counts[s.CustomerID] || 0) + 1;
+  });
+  return counts;
 }
 
 function getCustomerProfile(token, customerId) {
@@ -1564,12 +1621,6 @@ function saveCustomer(token, customer) {
   customer.DateJoined = customer.DateJoined || nowIso_();
   customer.LoyaltyPoints = customer.LoyaltyPoints || 0;
   return stripRow_(appendRow_('Customers', customer));
-}
-
-function deleteCustomer(token, customerId) {
-  var user = requireAuth_(token);
-  requireRole_(user, ['Owner', 'Manager']);
-  return deleteById_('Customers', 'CustomerID', customerId);
 }
 
 /* ============================================================================
@@ -2797,7 +2848,172 @@ function sendUpcomingAppointmentReminders() {
 }
 
 /* ============================================================================
- * 19. UTILITIES
+ * 19. TRASH / RECOVERY (Customers + Appointments)
+ *
+ * "Clear" is a soft delete: the record's full row is copied into the Trash
+ * sheet as JSON, then removed from its own sheet. Nothing here permanently
+ * destroys data — a cleared record just moves out of the main list and into
+ * Trash, where it can be restored (back to its own sheet, same ID) or, if
+ * the Owner/Manager is sure, permanently deleted from there. Only Customers
+ * and Appointments go through this path (TRASH_RECORD_TYPES); every other
+ * record type keeps its existing plain Delete button, unchanged.
+ * ==========================================================================*/
+
+/**
+ * Moves one record out of `sheetName` and into Trash. `preloadedRecord`
+ * lets a bulk caller that already has the full row (from its own single
+ * readAll_() pass) skip re-reading the sheet for every single record.
+ */
+function moveToTrash_(sheetName, idField, id, deletedBy, preloadedRecord) {
+  var record = preloadedRecord || readAll_(sheetName).find(function (r) { return r[idField] === id; });
+  if (!record) return false;
+  appendRow_('Trash', {
+    TrashID: nextId_('Trash', 'TrashID'),
+    RecordType: sheetName,
+    RecordID: id,
+    Data: JSON.stringify(stripRow_(record)),
+    DeletedAt: nowIso_(),
+    DeletedBy: deletedBy || ''
+  });
+  deleteById_(sheetName, idField, id);
+  return true;
+}
+
+function clearCustomers(token, customerIds) {
+  var user = requireAuth_(token);
+  requireRole_(user, ['Owner', 'Manager']);
+  var ids = Array.isArray(customerIds) ? customerIds : [customerIds];
+  var idSet = {}; ids.forEach(function (id) { idSet[id] = true; });
+  var rows = readAll_('Customers').filter(function (r) { return idSet[r.CustomerID]; });
+  var deletedBy = user.fullName || user.username || user.role;
+  var n = 0;
+  rows.forEach(function (r) { if (moveToTrash_('Customers', 'CustomerID', r.CustomerID, deletedBy, r)) n++; });
+  return { cleared: n };
+}
+
+function clearAppointments(token, appointmentIds) {
+  var user = requireAuth_(token);
+  requireRole_(user, ['Owner', 'Manager', 'Receptionist']);
+  var ids = Array.isArray(appointmentIds) ? appointmentIds : [appointmentIds];
+  var idSet = {}; ids.forEach(function (id) { idSet[id] = true; });
+  var rows = readAll_('Appointments').filter(function (r) { return idSet[r.AppointmentID]; });
+  var deletedBy = user.fullName || user.username || user.role;
+  var n = 0;
+  rows.forEach(function (r) { if (moveToTrash_('Appointments', 'AppointmentID', r.AppointmentID, deletedBy, r)) n++; });
+  return { cleared: n };
+}
+
+/**
+ * The actual "clear finished appointments" sweep — shared by the manual
+ * "Clear Old Appointments Now" button and the daily auto-clear trigger.
+ * Clears anything already Completed/Cancelled/No-show (regardless of
+ * date), plus any Pending/Confirmed appointment whose date has already
+ * passed. Today's and every future still-pending/confirmed booking is
+ * never touched, so nothing is ever wiped out from under a customer.
+ */
+function clearFinishedAppointments_() {
+  var today = Utilities.formatDate(new Date(), TIMEZONE, 'yyyy-MM-dd');
+  var finishedStatuses = { Completed: true, Cancelled: true, 'No-show': true };
+  var rows = readAll_('Appointments');
+  var toClear = rows.filter(function (a) { return finishedStatuses[a.Status] || a.Date < today; });
+  toClear.forEach(function (a) { moveToTrash_('Appointments', 'AppointmentID', a.AppointmentID, 'Auto-clear', a); });
+  return toClear.length;
+}
+
+/**
+ * Wire this up as a daily time-driven trigger in the Apps Script editor
+ * (Triggers → Add Trigger → this function → Time-driven → Day timer),
+ * exactly like sendUpcomingAppointmentReminders — see the README. It only
+ * actually clears anything once the Owner has switched "Auto-clear
+ * finished appointments daily" on (Appointments page or Settings), so the
+ * trigger is safe to leave installed even while the setting is off.
+ */
+function autoClearOldAppointments_() {
+  var settings = getSettingsMap_();
+  if (settings.AutoClearAppointmentsDaily !== 'Y') return 0;
+  return clearFinishedAppointments_();
+}
+
+/** The Appointments page's "Clear Old Appointments Now" button — runs the same sweep on demand, regardless of the daily-auto-clear setting. */
+function clearOldAppointmentsNow(token) {
+  var user = requireAuth_(token);
+  requireRole_(user, ['Owner', 'Manager', 'Receptionist']);
+  return { cleared: clearFinishedAppointments_() };
+}
+
+/** The Trash list itself, optionally filtered to one RecordType, newest-cleared first — each row's stored Data is parsed and, where possible, enriched with the same friendly names (customer/service/staff) the live admin tables show. */
+function getTrash(token, recordType) {
+  var user = requireAuth_(token);
+  requireRole_(user, ['Owner', 'Manager']);
+  var rows = readAll_('Trash');
+  if (recordType) rows = rows.filter(function (t) { return t.RecordType === recordType; });
+  rows.sort(function (a, b) { return String(b.DeletedAt).localeCompare(String(a.DeletedAt)); });
+  var customers = keyBy_(readAll_('Customers'), 'CustomerID');
+  var services = keyBy_(readAll_('Services'), 'ServiceID');
+  var staffMap = keyBy_(readAll_('Staff'), 'StaffID');
+  return rows.map(function (t) {
+    var o = stripRow_(t);
+    var rec = {};
+    try { rec = JSON.parse(o.Data || '{}'); } catch (e) {}
+    delete o.Data; // already parsed into Summary/rec below — no need to send the raw JSON string too
+    if (o.RecordType === 'Customers') {
+      o.Summary = { Name: rec.Name, Phone: rec.Phone, Email: rec.Email, LoyaltyPoints: rec.LoyaltyPoints };
+    } else if (o.RecordType === 'Appointments') {
+      o.Summary = {
+        Reference: rec.Reference,
+        CustomerName: customers[rec.CustomerID] ? customers[rec.CustomerID].Name : (rec.CustomerID ? 'Cleared customer' : 'Walk-in'),
+        ServiceName: services[rec.ServiceID] ? services[rec.ServiceID].Name : '',
+        StaffName: staffMap[rec.StaffID] ? staffMap[rec.StaffID].Name : 'Any available',
+        Date: rec.Date, TimeSlot: rec.TimeSlot, Status: rec.Status
+      };
+    }
+    return o;
+  });
+}
+
+function restoreTrashItems(token, trashIds) {
+  var user = requireAuth_(token);
+  requireRole_(user, ['Owner', 'Manager']);
+  var ids = Array.isArray(trashIds) ? trashIds : [trashIds];
+  var trashRows = readAll_('Trash');
+  var n = 0;
+  ids.forEach(function (trashId) {
+    var t = trashRows.find(function (r) { return r.TrashID === trashId; });
+    if (!t) return;
+    var rec;
+    try { rec = JSON.parse(t.Data || '{}'); } catch (e) { rec = null; }
+    if (!rec) return;
+    appendRow_(t.RecordType, rec);
+    deleteById_('Trash', 'TrashID', trashId);
+    n++;
+  });
+  return { restored: n };
+}
+
+function permanentlyDeleteTrash(token, trashIds) {
+  var user = requireAuth_(token);
+  requireRole_(user, ['Owner', 'Manager']);
+  var ids = Array.isArray(trashIds) ? trashIds : [trashIds];
+  var n = 0;
+  ids.forEach(function (trashId) {
+    try { deleteById_('Trash', 'TrashID', trashId); n++; } catch (e) { /* already gone — ignore */ }
+  });
+  return { deleted: n };
+}
+
+/** "Empty Trash" — permanently deletes every trashed record, or just one RecordType's if given. */
+function emptyTrash(token, recordType) {
+  var user = requireAuth_(token);
+  requireRole_(user, ['Owner', 'Manager']);
+  var rows = readAll_('Trash');
+  if (recordType) rows = rows.filter(function (t) { return t.RecordType === recordType; });
+  var n = 0;
+  rows.forEach(function (t) { try { deleteById_('Trash', 'TrashID', t.TrashID); n++; } catch (e) { /* already gone — ignore */ } });
+  return { deleted: n };
+}
+
+/* ============================================================================
+ * 20. UTILITIES
  * ==========================================================================*/
 
 function nowIso_() {
