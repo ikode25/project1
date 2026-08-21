@@ -4476,6 +4476,7 @@
       substitutes:  { icon: 'user-times',       label: 'Substitutes',        group: 'daily' },
       assets:       { icon: 'desktop',          label: 'Assets',             group: 'records' },
       inventory:    { icon: 'boxes',            label: 'Stock / Inventory',  group: 'records' },
+      trash:        { icon: 'trash-restore',    label: 'Trash',              group: 'account' },
       account:      { icon: 'user-circle',      label: 'My Account',         group: 'account' },
       settings:     { icon: 'cog',              label: 'Settings',           group: 'account' },
       about:        { icon: 'info-circle',      label: 'About App',          group: 'account' }
@@ -4490,14 +4491,14 @@
     //  - student: timetable + attendance + marks + notices first
     //  - parent: notices + child's attendance/marks/fees first
     const MENU_PRIORITY = {
-      admin: ['dashboard','ownerPortal','reports','admissions','admissionReqs','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','questionBank','onlineLinks','hallTickets','feePayments','accounts','feeStructure','payroll','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','recruitment','account','settings','about'],
+      admin: ['dashboard','ownerPortal','reports','admissions','admissionReqs','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','questionBank','onlineLinks','hallTickets','feePayments','accounts','feeStructure','payroll','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','recruitment','trash','account','settings','about'],
       // headteacher (internal role id stays 'supervisor' — see ROLE_DISPLAY_LABEL) — system-wide
       // oversight: academic operations plus Owner Portal's financial/activity monitoring
       supervisor: ['dashboard','ownerPortal','reports','attendance','substitutes','marks','hallTickets','exams','notices','ptm','calendar','discipline','conduct','helpdesk','complaints','lessonPlans','logbook','activities','students','parents','classes','subjects','assignments','documents','timetable','account','about'],
-      clerk: ['admissions','admissionReqs','students','parents','feePayments','accounts','feeStructure','sms','reports','attendance','helpdesk','complaints','documents','assets','inventory','timetable','classes','notices','calendar','account','about'],
+      clerk: ['admissions','admissionReqs','students','parents','feePayments','accounts','feeStructure','sms','reports','attendance','helpdesk','complaints','documents','assets','inventory','timetable','classes','notices','calendar','trash','account','about'],
       // bursar/accountant — finance + asset/stock inventory only, nothing else (per-role scoped portal)
-      bursar: ['dashboard','feePayments','feeStructure','accounts','payroll','assets','inventory','account','about'],
-      teacher: ['timetable','attendance','substitutes','marks','questionBank','onlineLinks','payroll','hallTickets','exams','lessonPlans','ptm','logbook','students','discipline','conduct','activities','notices','reports','calendar','documents','complaints','classes','subjects','account','about'],
+      bursar: ['dashboard','feePayments','feeStructure','accounts','payroll','assets','inventory','trash','account','about'],
+      teacher: ['timetable','attendance','substitutes','marks','questionBank','onlineLinks','payroll','hallTickets','exams','lessonPlans','ptm','logbook','students','discipline','conduct','activities','notices','reports','calendar','documents','complaints','classes','subjects','trash','account','about'],
       // student: dashboard → own-class academics → own records → support → profile. Read-only everywhere except helpdesk/complaints/account.
       student: ['dashboard','timetable','attendance','marks','hallTickets','exams','onlineLinks','notices','calendar','feePayments','feeStructure','activities','conduct','discipline','documents','helpdesk','complaints','account','about'],
       // parent: like student + PTM booking with teachers
@@ -28917,10 +28918,31 @@
       const [year, setYear] = useState(schoolSettings?.AcademicYear || defaultYear);
       const [term, setTerm] = useState(schoolSettings?.ActiveTerm || 'term1');
       const [saving, setSaving] = useState(false);
+      const blankTermDates = { term1: { vacation: '', reopening: '' }, term2: { vacation: '', reopening: '' }, term3: { vacation: '', reopening: '' } };
+      const [termDates, setTermDates] = useState({ ...blankTermDates, ...(schoolSettings?.TermDates || {}) });
+      const [savingDates, setSavingDates] = useState(false);
 
       useEffect(() => {
-        if (schoolSettings) { setYear(schoolSettings.AcademicYear || defaultYear); setTerm(schoolSettings.ActiveTerm || 'term1'); }
+        if (schoolSettings) {
+          setYear(schoolSettings.AcademicYear || defaultYear);
+          setTerm(schoolSettings.ActiveTerm || 'term1');
+          setTermDates({ ...blankTermDates, ...(schoolSettings.TermDates || {}) });
+        }
       }, [schoolSettings]);
+
+      const setTermDateField = (t, field, val) => setTermDates(prev => ({ ...prev, [t]: { ...prev[t], [field]: val } }));
+
+      const handleSaveTermDates = () => {
+        setSavingDates(true);
+        google.script.run
+          .withSuccessHandler((res) => {
+            setSavingDates(false);
+            if (res.success) { Swal.fire({ icon: 'success', text: res.message, timer: 2200, showConfirmButton: false }); if (onSaved) onSaved(); }
+            else Swal.fire({ icon: 'error', text: res.message });
+          })
+          .withFailureHandler((err) => { setSavingDates(false); Swal.fire({ icon: 'error', text: err.message }); })
+          .updateTermDates(termDates, currentUser, role);
+      };
 
       const { data: history, isLoading: histLoading, mutate: loadHistory } =
         useSWR('getAcademicHistory', () => swrFetcher('getAcademicHistory', currentUser, role));
@@ -28960,6 +28982,36 @@
               <button type="submit" className="btn btn-primary" disabled={saving}><i className="fas fa-save"></i> {saving ? 'Saving…' : 'Set Active Session'}</button>
             </div>
           </form>
+
+          <h3 style={{marginBottom:'6px',color:'var(--navy-primary)',fontSize:'15px',textTransform:'uppercase',letterSpacing:'0.5px'}}>
+            <i className="fas fa-plane-departure"></i> Term Vacation &amp; Reopening Dates
+          </h3>
+          <div className="settings-info-message" style={{marginBottom:'14px'}}>
+            <i className="fas fa-info-circle"></i> Set every term's dates once, at the start of the year — the moment today's date reaches a term's Reopening Date, the system automatically switches the whole school into that term. Nobody has to remember to flip it above, so records can't accidentally get entered against the wrong term.
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:'14px',marginBottom:'14px'}}>
+            {['term1', 'term2', 'term3'].map((t) => (
+              <div key={t} style={{border:'1px solid #e2e2e2',borderRadius:'6px',padding:'12px 14px',background: term === t ? '#f4f8fc' : '#fff'}}>
+                <div style={{fontWeight:700,color:'var(--navy-primary)',fontSize:'13px',marginBottom:'8px'}}>
+                  {TERM_LABELS_CLIENT[t]}{term === t && <span className="role-badge status-active" style={{marginLeft:'8px',fontSize:'10px'}}>Active</span>}
+                </div>
+                <div className="form-group" style={{marginBottom:'8px'}}>
+                  <label style={{fontSize:'12px'}}>Vacation Date (ends)</label>
+                  <input type="date" value={termDates[t]?.vacation || ''} onChange={(e) => setTermDateField(t, 'vacation', e.target.value)} />
+                </div>
+                <div className="form-group" style={{marginBottom:0}}>
+                  <label style={{fontSize:'12px'}}>Reopening Date (begins)</label>
+                  <input type="date" value={termDates[t]?.reopening || ''} onChange={(e) => setTermDateField(t, 'reopening', e.target.value)}
+                    disabled={t === 'term1'} placeholder={t === 'term1' ? 'Set via a new academic year' : ''}
+                    style={t === 'term1' ? {background:'#f8f9fa',cursor:'not-allowed'} : {}} />
+                  {t === 'term1' && <div style={{fontSize:'10px',color:'#888',marginTop:'3px'}}>Term 1 starts a new academic year — set above, not auto-advanced.</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+          <button type="button" className="btn btn-primary" disabled={savingDates} onClick={handleSaveTermDates} style={{marginBottom:'22px'}}>
+            <i className="fas fa-save"></i> {savingDates ? 'Saving…' : 'Save Term Dates'}
+          </button>
 
           <h3 style={{marginBottom:'14px',color:'var(--navy-primary)',fontSize:'15px',textTransform:'uppercase',letterSpacing:'0.5px'}}>
             <i className="fas fa-history"></i> Records by Academic Year
@@ -31431,6 +31483,137 @@
       );
     }
 
+    // ============== Trash / Recycle Bin ==============
+    function TrashView({ currentUser, role }) {
+      const { data: itemsData, error: loadError, isLoading: loading, isValidating: syncing, mutate: refresh } =
+        useSWR('getTrash', () => swrFetcher('getTrash', currentUser, role));
+      const items = itemsData || [];
+      const [filterType, setFilterType] = useState('');
+      const [search, setSearch] = useState('');
+      const [busyId, setBusyId] = useState(''); // EntityType+ID currently mid-request
+
+      const typeOpts = [...new Map(items.map(i => [i.EntityType, i.EntityLabel])).entries()]
+        .map(([value, label]) => ({ value, label }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+
+      const visible = items.filter(i => {
+        if (filterType && i.EntityType !== filterType) return false;
+        if (search && !(i.Label || '').toLowerCase().includes(search.toLowerCase())) return false;
+        return true;
+      });
+
+      const fmtDate = (v) => {
+        if (!v) return '—';
+        try { const d = new Date(v); return isNaN(d.getTime()) ? '—' : `${d.toLocaleString('en-US',{month:'short'})} ${String(d.getDate()).padStart(2,'0')}, ${d.getFullYear()}`; } catch { return '—'; }
+      };
+
+      const handleRestore = (item) => {
+        Swal.fire({ icon: 'question', title: 'Restore this record?', text: item.Label, showCancelButton: true, confirmButtonColor: '#34a853', confirmButtonText: 'Restore' })
+          .then((r) => {
+            if (!r.isConfirmed) return;
+            const key = item.EntityType + ':' + item.ID;
+            setBusyId(key);
+            google.script.run
+              .withSuccessHandler((res) => {
+                setBusyId('');
+                if (res.success) { Swal.fire({ icon: 'success', text: res.message, timer: 1600, showConfirmButton: false }); refresh(); }
+                else Swal.fire({ icon: 'error', text: res.message });
+              })
+              .withFailureHandler((err) => { setBusyId(''); Swal.fire({ icon: 'error', text: err.message }); })
+              .restoreTrashItem(item.EntityType, item.ID, currentUser, role);
+          });
+      };
+
+      const handlePurge = (item) => {
+        Swal.fire({
+          icon: 'warning', title: 'Delete permanently?',
+          html: `<strong>${item.Label}</strong> will be gone for good — this cannot be undone.`,
+          showCancelButton: true, confirmButtonColor: '#ea4335', confirmButtonText: 'Delete Forever'
+        }).then((r) => {
+          if (!r.isConfirmed) return;
+          const key = item.EntityType + ':' + item.ID;
+          setBusyId(key);
+          google.script.run
+            .withSuccessHandler((res) => {
+              setBusyId('');
+              if (res.success) { Swal.fire({ icon: 'success', text: res.message, timer: 1600, showConfirmButton: false }); refresh(); }
+              else Swal.fire({ icon: 'error', text: res.message });
+            })
+            .withFailureHandler((err) => { setBusyId(''); Swal.fire({ icon: 'error', text: err.message }); })
+            .purgeTrashItem(item.EntityType, item.ID, currentUser, role);
+        });
+      };
+
+      return (
+        <div className="data-section">
+          <div className="section-header">
+            <h2><i className="fas fa-trash-restore"></i> Trash{syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}</h2>
+          </div>
+          <div className="settings-info-message" style={{marginBottom:'15px'}}>
+            <i className="fas fa-info-circle"></i> Deleted records land here first — restore one if it was a mistake, or delete it permanently once you're sure. Only shows record types you're allowed to manage.
+          </div>
+
+          {loadError && !loading && items.length === 0 && (
+            <div className="settings-info-message" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>
+              <i className="fas fa-triangle-exclamation" style={{marginRight:'6px',color:'#ea4335'}}></i>
+              Couldn't load Trash — {String((loadError && loadError.message) || loadError)}.
+            </div>
+          )}
+
+          {!loading && items.length > 0 && (
+            <div className="filters-section" style={{marginBottom:'15px'}}>
+              <div className="filters-grid">
+                <div className="filter-group">
+                  <label><i className="fas fa-search"></i> Search</label>
+                  <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search deleted records..." className="filter-input" />
+                </div>
+                <div className="filter-group">
+                  <label><i className="fas fa-filter"></i> Type</label>
+                  <SearchableDropdown options={typeOpts} value={filterType} onChange={setFilterType} placeholder="All Types" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {loading ? <TableSkeleton rows={6} columns={4} /> : items.length === 0 ? (
+            <div style={{textAlign:'center',padding:'40px',color:'#888',background:'#f8f9fa'}}>
+              <i className="fas fa-trash-restore" style={{fontSize:'42px',color:'#ccc',marginBottom:'10px',display:'block'}}></i>
+              Trash is empty — nothing you've deleted is waiting here.
+            </div>
+          ) : visible.length === 0 ? (
+            <div style={{textAlign:'center',padding:'30px',color:'#888',background:'#f8f9fa'}}>No deleted records match this filter.</div>
+          ) : (
+            <div style={{overflowX:'auto'}}>
+              <table className="simple-table" style={{width:'100%'}}>
+                <thead><tr><th>Record</th><th>Type</th><th>Deleted</th><th style={{width:'190px'}}>Actions</th></tr></thead>
+                <tbody>
+                  {visible.map((item) => {
+                    const key = item.EntityType + ':' + item.ID;
+                    const isBusy = busyId === key;
+                    return (
+                      <tr key={key}>
+                        <td style={{fontWeight:600,color:'var(--navy-primary)'}}>{item.Label}</td>
+                        <td><span className="role-badge role-clerk">{item.EntityLabel}</span></td>
+                        <td style={{fontSize:'12px',color:'#666'}}>{fmtDate(item.DeletedAt)}</td>
+                        <td>
+                          <button className="action-icon edit-icon" title="Restore" disabled={isBusy} onClick={() => handleRestore(item)}>
+                            <i className="fas fa-undo"></i>
+                          </button>
+                          <button className="action-icon delete-icon" title="Delete Permanently" disabled={isBusy} onClick={() => handlePurge(item)}>
+                            <i className="fas fa-trash"></i>
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      );
+    }
+
     // ============== About App ==============
     function AboutView({ role, schoolSettings }) {
       const ss = schoolSettings || {};
@@ -31633,6 +31816,7 @@
       const canSeeAssets = r === 'admin' || r === 'clerk' || r === 'teacher' || r === 'supervisor' || isBursar;
       const canSeeInventory = r === 'admin' || r === 'clerk' || r === 'teacher' || isBursar;
       const canSeeReports = r === 'admin' || r === 'clerk' || r === 'supervisor' || r === 'teacher';
+      const canSeeTrash = r === 'admin' || r === 'clerk' || r === 'teacher' || isBursar;
 
       const denied = (label) => (
         <div className="data-section">
@@ -31734,6 +31918,8 @@
           return canSeeAssets ? <AssetsView currentUser={user} role={role} /> : denied('Asset Inventory');
         case 'inventory':
           return canSeeInventory ? <InventoryView currentUser={user} role={role} /> : denied('Stock / Inventory');
+        case 'trash':
+          return canSeeTrash ? <TrashView currentUser={user} role={role} /> : denied('Trash');
         case 'settings':
           return <SettingsView currentUser={user} role={role} onSettingsUpdate={onSettingsUpdate} schoolSettings={schoolSettings} refreshSchoolSettings={refreshSchoolSettings} />;
         case 'account':

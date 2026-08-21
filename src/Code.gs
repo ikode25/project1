@@ -365,7 +365,7 @@ var PERIOD_HEADERS = ['ID','PeriodNumber','StartTime','EndTime','IsBreak','Label
 // matters (Exams, Fee_Structure, Admissions, LessonPlans, etc.) already carries its own
 // AcademicYear/Term columns, so old sessions stay fully queryable forever; this pair only drives
 // which session NEW records default into and what the dashboard banner shows.)
-var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt','ShowOverallPositionOnReportCard','ShowSubjectAverageOnReportCard','SchoolStampURL','HeadteacherSignatureURL','AdminSignatureURL','PublicAppBaseURL','ActiveTerm','DietaryOptions','BursarEmail','BursarPhone','HeadteacherEmail','HeadteacherPhone','UngradedStages','ShowInterestTalentOnReportCard','ShowConductOnReportCard','ShowAttitudeOnReportCard','ShowClassTeacherRemarkOnReportCard','ShowHeadteacherRemarkOnReportCard','SessionTimeoutMinutes','UseUnifiedGrading','ReportCardTemplate'];
+var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt','ShowOverallPositionOnReportCard','ShowSubjectAverageOnReportCard','SchoolStampURL','HeadteacherSignatureURL','AdminSignatureURL','PublicAppBaseURL','ActiveTerm','DietaryOptions','BursarEmail','BursarPhone','HeadteacherEmail','HeadteacherPhone','UngradedStages','ShowInterestTalentOnReportCard','ShowConductOnReportCard','ShowAttitudeOnReportCard','ShowClassTeacherRemarkOnReportCard','ShowHeadteacherRemarkOnReportCard','SessionTimeoutMinutes','UseUnifiedGrading','ReportCardTemplate','TermDatesJSON'];
 // col 40 = DietaryOptions — admin-editable CSV of "value|label" pairs shown as checkboxes on the
 // student form (Ghana-appropriate defaults; the old hardcoded Halal/Kosher/Pescatarian/etc. list
 // is now just the fallback seed, not a fixed enum — see defaultDietaryOptions()).
@@ -663,17 +663,17 @@ function nextClassId(sh) {
   return max + 1;
 }
 
-// Short-lived cache for the "roster" lookup maps (users/classes/students/fee structures) that
-// dozens of list-view functions rebuild from a full sheet read on every single call — including
+// Cache for the "roster" lookup maps (users/classes/students/fee structures) that dozens of
+// list-view functions rebuild from a full sheet read on every single call — including
 // getAllPayments, which does FOUR such full-sheet reads back to back. Under the burst of parallel
 // calls a dashboard/list view fires on load, that made Fee Payments (the heaviest of these
 // call sites) the one most likely to lose the race against Apps Script's client-bridge fragility,
-// surfacing as the recurring "Couldn't load payments — No response from server" report. A short
-// TTL (90s) turns 3 of those 4 full-sheet reads into a cache hit on any request that isn't the
-// very first in that window, without meaningfully risking stale names (a student's name or a fee
-// item's amount essentially never changes second-to-second).
+// surfacing as the recurring "Couldn't load payments — No response from server" report. Every write
+// that changes one of these rosters now calls _invalidateRosterCache() itself (see call sites of
+// that function), so a longer TTL here is safe — edits are never masked by a stale cache entry,
+// they're gone from cache the instant they're written, not up to TTL_SECONDS later.
 function _cachedRosterMap(key, builder) {
-  var CACHE_TTL_SECONDS = 90;
+  var CACHE_TTL_SECONDS = 300;
   try {
     var cache = CacheService.getScriptCache();
     var raw = cache.get(key);
@@ -691,6 +691,7 @@ function _cachedRosterMap(key, builder) {
 function _invalidateRosterCache(key) {
   try { CacheService.getScriptCache().remove(key); } catch (e) {}
 }
+
 
 // id -> {fullName, role} map for join lookups
 function getUsersMap() {
@@ -2234,6 +2235,7 @@ function addUser(userData, currentUser, currentRole) {
       String(userData.SSNITNumber || '').trim()
     ]);
 
+    _invalidateRosterCache('roster_users_v1');
     addLog(currentUser, 'User Added', 'Added: ' + username + ' (' + (userData.Role || 'teacher') + ')');
     var msg = 'User added successfully' + (username !== String(userData.Username || '').trim() ? ' — username: ' + username : '');
     if (generatedPassword) msg += ' — generated password: ' + generatedPassword;
@@ -2286,6 +2288,7 @@ function updateUser(username, userData, currentUser, currentRole) {
       sh.getRange(row, 26).setValue(String(userData.EmergencyContactPhone || '').trim());
       if (userData.SSNITNumber !== undefined) sh.getRange(row, 27).setValue(String(userData.SSNITNumber || '').trim());
 
+      _invalidateRosterCache('roster_users_v1');
       addLog(currentUser, 'User Updated', 'Updated: ' + username);
       return { success: true, message: 'User updated successfully' };
     }
@@ -2312,6 +2315,7 @@ function deleteUser(username, currentUser, currentRole) {
       sh.getRange(row, 15).setValue('inactive');  // status
       sh.getRange(row, 22).setValue(ts);
       sh.getRange(row, 23).setValue(currentUser);
+      _invalidateRosterCache('roster_users_v1');
       addLog(currentUser, 'User Deleted', 'Soft-deleted: ' + username);
       return { success: true, message: 'User deleted successfully' };
     }
@@ -3063,6 +3067,7 @@ function addClass(classData, currentUser, currentRole) {
       n.shift
     ]);
 
+    _invalidateRosterCache('roster_classes_v1');
     addLog(currentUser, 'Class Added', 'Added: ' + classData.ClassName + ' ' + classData.Section + ' (' + classData.AcademicYear + ')');
     return { success: true, message: 'Class added successfully', id: id };
   } catch (err) {
@@ -3143,6 +3148,7 @@ function updateClass(id, classData, currentUser, currentRole) {
       sh.getRange(row, 19).setValue(n.isActive);
       sh.getRange(row, 20).setValue(n.shift);
 
+      _invalidateRosterCache('roster_classes_v1');
       addLog(currentUser, 'Class Updated', 'Updated id ' + idn + ': ' + classData.ClassName + ' ' + classData.Section);
       return { success: true, message: 'Class updated successfully' };
     }
@@ -3243,6 +3249,7 @@ function deleteClass(id, currentUser, currentRole) {
       var row = i + 1, ts = nowIso();
       sh.getRange(row, 7).setValue('1');
       sh.getRange(row, 9).setValue(ts);
+      _invalidateRosterCache('roster_classes_v1');
       addLog(currentUser, 'Class Deleted', 'Soft-deleted class id ' + idn);
       return { success: true, message: 'Class deleted successfully' };
     }
@@ -4475,6 +4482,7 @@ function addStudent(s, currentUser, currentRole) {
       loginPassword, s.Gender || '', s.DateOfBirth ? toIso(s.DateOfBirth) : '', s.PhotoURL || '', currentUser);
     // auto-generate monthly dues from admission month → current month
     if (cid !== null) { try { generateStudentDues(id, currentUser); } catch (e) { Logger.log('generateStudentDues hook failed: ' + e.toString()); } }
+    _invalidateRosterCache('roster_students_lite_v1');
     addLog(currentUser, 'Student Added', 'Added: ' + admissionNumber + ' / ' + s.FirstName + ' ' + s.LastName + (cmap[cid] ? ' -> ' + cmap[cid].label : ''));
     return { success: true, message: 'Student added successfully' + (String(s.LoginPassword || '').trim() ? '' : ' — generated password: ' + loginPassword), id: id, admissionNumber: admissionNumber };
   } catch (err) {
@@ -4607,6 +4615,7 @@ function updateStudent(id, s, currentUser, currentRole) {
       _mirrorStudentToUsers(idn, admissionNumber, _fullName, s.Email || '', s.Mobile || '',
         s.LoginPassword || '', s.Gender || '', s.DateOfBirth ? toIso(s.DateOfBirth) : '', s.PhotoURL || '', currentUser);
 
+      _invalidateRosterCache('roster_students_lite_v1');
       addLog(currentUser, 'Student Updated', 'Updated id ' + idn + ': ' + admissionNumber);
       return { success: true, message: 'Student updated successfully' };
     }
@@ -4751,6 +4760,7 @@ function promoteStudents(payload, currentUser, currentRole) {
 
     recomputeClassStrength(fromClassId);
     recomputeClassStrength(toClassId);
+    _invalidateRosterCache('roster_students_lite_v1');
 
     addLog(currentUser, 'Students Promoted', promoted + ' student(s) moved from ' + fromLabel + ' to ' + toLabel +
       (withArrears ? ', ' + withArrears + ' with arrears totalling ' + totalArrears.toFixed(2) : ''));
@@ -4787,6 +4797,7 @@ function deleteStudent(id, currentUser, currentRole) {
       sh.getRange(row, 39).setValue(ts);
       recomputeClassStrength(classId);
       _unmirrorByEmployeeCode('STU-' + idn);  // soft-delete the Users mirror too
+      _invalidateRosterCache('roster_students_lite_v1');
       addLog(currentUser, 'Student Deleted', 'Soft-deleted student id ' + idn);
       return { success: true, message: 'Student deleted successfully' };
     }
@@ -8666,6 +8677,7 @@ function addFeeStructure(data, currentUser, currentRole) {
       instAllowed, instCount, taxPct, desc
     ]);
 
+    _invalidateRosterCache('roster_fee_structures_lite_v1');
     addLog(currentUser, 'Fee Added', 'Added: ' + cat + ' (' + fr + ') ' + amt + ' for ' + cmap[cid].label);
     return { success: true, message: 'Fee structure added successfully', id: id };
   } catch (err) {
@@ -8722,6 +8734,7 @@ function addFeeTypeBulk(d, currentUser, currentRole) {
     }
 
     if (!added) return { success: false, message: skipped.length ? 'All selected classes already have this fee item (' + skipped.join(', ') + ')' : 'Nothing to add' };
+    _invalidateRosterCache('roster_fee_structures_lite_v1');
     addLog(currentUser, 'Fee Type Bulk-Added', cat + ' (' + fr + ') for ' + added + ' class(es)');
     var msg = 'Added ' + cat + ' fee to ' + added + ' class(es)';
     if (skipped.length) msg += ' — skipped ' + skipped.length + ' that already had it (' + skipped.join(', ') + ')';
@@ -8795,6 +8808,7 @@ function updateFeeStructure(id, data, currentUser, currentRole) {
       sh.getRange(row, 15).setValue(taxPct);
       sh.getRange(row, 16).setValue(desc);
 
+      _invalidateRosterCache('roster_fee_structures_lite_v1');
       addLog(currentUser, 'Fee Updated', 'Updated id ' + idn);
       return { success: true, message: 'Fee structure updated successfully' };
     }
@@ -8817,6 +8831,7 @@ function deleteFeeStructure(id, currentUser, currentRole) {
       var row = i + 1, ts = nowIso();
       sh.getRange(row, 10).setValue('1');
       sh.getRange(row, 12).setValue(ts);
+      _invalidateRosterCache('roster_fee_structures_lite_v1');
       addLog(currentUser, 'Fee Deleted', 'Soft-deleted fee structure id ' + idn);
       return { success: true, message: 'Fee structure deleted successfully' };
     }
@@ -12723,6 +12738,77 @@ function setup() { return initializeSheets(); }
 
 // ============== School Settings (system-wide config) ==============
 // returns the single settings row (or null sentinel object). Public — login page calls this without auth.
+// Auto-advances Settings.ActiveTerm the moment today's date reaches the NEXT term's reopening
+// date, so a school running term1→term2→term3 doesn't depend on admin remembering to flip it —
+// forgetting that is exactly what causes records to get entered against the wrong term. Checked on
+// every getSchoolSettings() read (cheap: two string date comparisons when nothing needs to change),
+// and only writes on the rare day a term boundary is actually crossed. term3 → a new academic year
+// stays a deliberate admin action (see the Academic Session module) rather than automatic, since
+// starting a new year also needs a new AcademicYear value the system can't invent on its own.
+function _autoAdvanceTerm(sh, row, sheetRow) {
+  try {
+    var termDatesRaw = row[53] || ''; // col 54 = TermDatesJSON
+    if (!termDatesRaw) return null;
+    var termDates;
+    try { termDates = JSON.parse(termDatesRaw); } catch (e) { return null; }
+    var activeTerm = String(row[38] || 'term1').toLowerCase();
+    var nextTerm = activeTerm === 'term1' ? 'term2' : activeTerm === 'term2' ? 'term3' : null;
+    if (!nextTerm) return null;
+    var reopening = termDates[nextTerm] && String(termDates[nextTerm].reopening || '').trim();
+    if (!reopening) return null;
+    if (todayStr() < reopening) return null;
+    sh.getRange(sheetRow, 39).setValue(nextTerm); // col 39 = ActiveTerm
+    sh.getRange(sheetRow, 16).setValue(nowIso());  // col 16 = UpdatedAt
+    addLog('System', 'Active Term Auto-Advanced', activeTerm + ' → ' + nextTerm + ' (reopening date ' + reopening + ' reached)');
+    return nextTerm;
+  } catch (e) {
+    Logger.log('_autoAdvanceTerm failed: ' + e.toString());
+    return null;
+  }
+}
+
+// admin only — saves each term's Vacation Date (when it ends) and Reopening Date (when it begins).
+// The Reopening Date on term2/term3 is what _autoAdvanceTerm() watches for — set it once at the
+// start of the year for all three terms and the school never has to remember to flip ActiveTerm by
+// hand again. term1 doesn't need a ReopeningDate (nothing auto-advances INTO term1 — that's a new
+// academic year, a deliberate admin action) but is still accepted here for symmetry/display.
+function updateTermDates(termDates, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var clean = {};
+    var dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    var terms = ['term1', 'term2', 'term3'];
+    for (var t = 0; t < terms.length; t++) {
+      var term = terms[t];
+      var src = (termDates && termDates[term]) || {};
+      var vac = String(src.vacation || '').trim();
+      var reo = String(src.reopening || '').trim();
+      if (vac && !dateRe.test(vac)) return { success: false, message: TERM_LABELS[term] + ' vacation date must be YYYY-MM-DD' };
+      if (reo && !dateRe.test(reo)) return { success: false, message: TERM_LABELS[term] + ' reopening date must be YYYY-MM-DD' };
+      clean[term] = { vacation: vac, reopening: reo };
+    }
+
+    var sh = getSheet(SETTINGS_SHEET);
+    if (!sh) return { success: false, message: 'Settings sheet not found. Run setup() first.' };
+    var data = sh.getDataRange().getValues();
+    var foundRow = -1;
+    for (var i = 1; i < data.length; i++) { if (parseInt(data[i][0], 10) === 1) { foundRow = i + 1; break; } }
+    var ts = nowIso();
+    if (foundRow === -1) {
+      var blank = new Array(SETTINGS_HEADERS.length).fill('');
+      blank[0] = 1; blank[14] = ts; blank[15] = ts;
+      sh.appendRow(blank);
+      foundRow = sh.getLastRow();
+    }
+    sh.getRange(foundRow, 54).setValue(JSON.stringify(clean)); // col 54 = TermDatesJSON
+    sh.getRange(foundRow, 16).setValue(ts);
+    addLog(currentUser, 'Term Dates Updated', 'Vacation/reopening dates saved for all 3 terms');
+    return { success: true, message: 'Term dates saved — the system will auto-advance the active term on each reopening date', data: clean };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
 function getSchoolSettings() {
   try {
     var sh = getSheet(SETTINGS_SHEET);
@@ -12730,6 +12816,7 @@ function getSchoolSettings() {
     var data = sh.getDataRange().getValues();
     for (var i = 1; i < data.length; i++) {
       if (parseInt(data[i][0], 10) === 1) {
+        var advancedTerm = _autoAdvanceTerm(sh, data[i], i + 1);
         return {
           success: true,
           data: {
@@ -12760,7 +12847,7 @@ function getSchoolSettings() {
             HeadteacherSignatureURL: data[i][35] || '',
             AdminSignatureURL: data[i][36] || '',
             PublicAppBaseURL: _resolvePublicBaseUrl(data[i][37]),
-            ActiveTerm: data[i][38] || 'term1',
+            ActiveTerm: advancedTerm || data[i][38] || 'term1',
             DietaryOptions: parseDietaryOptionsCsv(data[i][39]),
             UngradedStages: String(data[i][44] || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean),
             ShowInterestTalentOnReportCard: data[i][45] === '' || data[i][45] == null ? true : String(data[i][45]) === '1',
@@ -12770,7 +12857,8 @@ function getSchoolSettings() {
             ShowHeadteacherRemarkOnReportCard: data[i][49] === '' || data[i][49] == null ? true : String(data[i][49]) === '1',
             SessionTimeoutMinutes: parseInt(data[i][50], 10) || 60,
             UseUnifiedGrading: String(data[i][51]) === '1',
-            ReportCardTemplate: data[i][52] || 'classic'
+            ReportCardTemplate: data[i][52] || 'classic',
+            TermDates: (function () { try { return JSON.parse(data[i][53] || '{}'); } catch (e) { return {}; } })()
           }
         };
       }
@@ -12819,7 +12907,8 @@ function defaultSchoolSettings() {
     ShowHeadteacherRemarkOnReportCard: true,
     SessionTimeoutMinutes: 60,
     UseUnifiedGrading: false,
-    ReportCardTemplate: 'classic'
+    ReportCardTemplate: 'classic',
+    TermDates: {}
   };
 }
 
@@ -20462,6 +20551,10 @@ function _resolveSelfStudentId(currentUser) {
 //     treated as this parent's wards without any manual linking step.
 function _resolveParentChildrenIds(currentUser) {
   var key = String(currentUser || '').trim().toLowerCase();
+  var keyPhoneNorm = _normalizePhone(currentUser); // parents often log in with a phone typed in a
+  // slightly different format than what's on file (e.g. 0244000001 vs +233244000001) — matching the
+  // formal Parent_Students link on a raw string-equal mobile silently misses those parents entirely,
+  // which is exactly the "not linked to their ward" symptom, so this match is phone-normalized too.
   var ids = {};
   var parentMobile = '';
 
@@ -20473,7 +20566,8 @@ function _resolveParentChildrenIds(currentUser) {
       if (String(pdata[i][10]) === '1') continue;
       var mob = String(pdata[i][3] || '').toLowerCase();
       var email = String(pdata[i][2] || '').toLowerCase();
-      if (mob === key || email === key) { pid = pdata[i][0]; parentMobile = pdata[i][3]; break; }
+      var mobNorm = _normalizePhone(pdata[i][3]);
+      if (mob === key || email === key || (keyPhoneNorm && mobNorm && mobNorm === keyPhoneNorm)) { pid = pdata[i][0]; parentMobile = pdata[i][3]; break; }
     }
     if (pid) {
       var lsh = getSheet(PARENT_STUDENTS_SHEET);
@@ -20743,4 +20837,146 @@ function payMonthlyDues(payload, currentUser, currentRole) {
       monthsPaid: allMonths
     };
   } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
+}
+
+// ============== Trash / Recycle Bin ==============
+// Registry-driven, so adding a new entity is one line, not a new set of endpoints. Restore/purge
+// reuse the SAME permission check the entity's own delete action already requires — whoever could
+// delete a record can see it in Trash, restore it, or purge it for good; nobody gets a bigger
+// blast radius through Trash than they already had through normal delete. Column indices are looked
+// up from each entity's real *_HEADERS array (not hardcoded), so this stays correct if a sheet's
+// columns are ever reordered elsewhere. "Deleted around" is UpdatedAt — every delete() already
+// bumps it, so no new column is needed anywhere just to support this.
+var TRASH_REGISTRY = {
+  students:     { label: 'Student',              sheet: STUDENTS_SHEET,      headers: STUDENT_HEADERS,      desc: function (r) { return [r[2], r[3], r[4]].filter(Boolean).join(' ') + (r[1] ? ' (' + r[1] + ')' : ''); }, canManage: isAdmin },
+  parents:      { label: 'Parent',               sheet: PARENTS_SHEET,       headers: PARENT_HEADERS,       desc: function (r) { return r[1] + (r[3] ? ' — ' + r[3] : ''); }, canManage: isAdmin },
+  staff:        { label: 'Staff / User',         sheet: USERS_SHEET,         headers: USER_HEADERS,         desc: function (r) { return r[2] + (r[6] ? ' (' + r[6] + ')' : ''); }, canManage: isAdmin },
+  classes:      { label: 'Class',                sheet: CLASSES_SHEET,       headers: CLASS_HEADERS,        desc: function (r) { return r[1] + ' ' + (r[2] || ''); }, canManage: isAdmin },
+  subjects:     { label: 'Subject',              sheet: SUBJECTS_SHEET,      headers: SUBJECT_HEADERS,      desc: function (r) { return r[1] + (r[2] ? ' (' + r[2] + ')' : ''); }, canManage: isAdmin },
+  exams:        { label: 'Exam',                 sheet: EXAMS_SHEET,         headers: EXAM_HEADERS,         desc: function (r) { return r[1]; }, canManage: isAdmin },
+  feeStructure: { label: 'Fee Structure Item',   sheet: FEE_STRUCTURE_SHEET, headers: FEE_STRUCTURE_HEADERS, desc: function (r) { return String(r[2] || '').toUpperCase() + ' — GH₵' + r[3]; }, canManage: isFinanceStaff },
+  payments:     { label: 'Fee Payment',          sheet: FEE_PAYMENTS_SHEET,  headers: FEE_PAYMENT_HEADERS,  desc: function (r) { return 'Receipt ' + r[11] + ' — GH₵' + r[3]; }, canManage: isAdminOrBursar },
+  discipline:   { label: 'Discipline Record',    sheet: DISCIPLINE_SHEET,    headers: DISCIPLINE_HEADERS,   desc: function (r) { return (r[3] || 'Incident') + ' — ' + String(r[2]).split('T')[0]; }, canManage: isAdmin },
+  conduct:      { label: 'Conduct Record',       sheet: CONDUCT_SHEET,       headers: CONDUCT_HEADERS,      desc: function (r) { return 'Conduct — ' + (r[3] || r[2] || ''); }, canManage: isAdmin },
+  notices:      { label: 'Notice',               sheet: NOTICES_SHEET,       headers: NOTICE_HEADERS,       desc: function (r) { return r[1]; }, canManage: function (role) { var rl = String(role || '').toLowerCase(); return isAdmin(role) || rl === 'teacher'; } },
+  documents:    { label: 'Document',             sheet: DOCUMENTS_SHEET,     headers: DOCUMENT_HEADERS,     desc: function (r) { return r[1]; }, canManage: isAdmin },
+  admissionReqs:{ label: 'Admission Requirement',sheet: ADMISSION_REQUIREMENTS_SHEET, headers: ADMISSION_REQUIREMENTS_HEADERS, desc: function (r) { return r[1]; }, canManage: isAdmin },
+  assets:       { label: 'Asset',                sheet: ASSETS_SHEET,        headers: ASSET_HEADERS,        desc: function (r) { return r[2] + (r[1] ? ' (' + r[1] + ')' : ''); }, canManage: canWriteAssets },
+  stockItems:   { label: 'Stock Item',           sheet: STOCK_ITEMS_SHEET,   headers: STOCK_ITEM_HEADERS,   desc: function (r) { return r[2] + (r[1] ? ' (' + r[1] + ')' : ''); }, canManage: canWriteStock },
+  activities:   { label: 'Activity',             sheet: ACTIVITIES_SHEET,    headers: ACTIVITY_HEADERS,     desc: function (r) { return r[2]; }, canManage: isAdmin }
+};
+
+// current role's own soft-deleted records across every entity they're allowed to manage
+function getTrash(currentUser, currentRole) {
+  try {
+    var out = [];
+    Object.keys(TRASH_REGISTRY).forEach(function (key) {
+      var reg = TRASH_REGISTRY[key];
+      if (!reg.canManage(currentRole)) return;
+      var sh = getSheet(reg.sheet);
+      if (!sh) return;
+      var delCol = reg.headers.indexOf('IsDeleted');
+      var updCol = reg.headers.indexOf('UpdatedAt');
+      if (delCol === -1) return;
+      var data = sh.getDataRange().getValues();
+      for (var i = 1; i < data.length; i++) {
+        if (String(data[i][delCol]) !== '1') continue;
+        var label = '';
+        try { label = String(reg.desc(data[i]) || '').trim(); } catch (e) { label = ''; }
+        out.push({
+          EntityType: key,
+          EntityLabel: reg.label,
+          ID: data[i][0],
+          Label: label || ('#' + data[i][0]),
+          DeletedAt: updCol !== -1 ? toIso(data[i][updCol]) : ''
+        });
+      }
+    });
+    out.sort(function (a, b) { return String(b.DeletedAt).localeCompare(String(a.DeletedAt)); });
+    return { success: true, data: out };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function _findTrashRow(reg, id) {
+  var sh = getSheet(reg.sheet);
+  if (!sh) return null;
+  var delCol = reg.headers.indexOf('IsDeleted');
+  var idn = parseInt(id, 10);
+  var data = sh.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][0] !== idn) continue;
+    if (String(data[i][delCol]) !== '1') return { sh: sh, rowIdx: i, delCol: delCol, notInTrash: true };
+    return { sh: sh, rowIdx: i, delCol: delCol };
+  }
+  return null;
+}
+
+// puts a record back — same permission as deleting it. Students get one extra step: their Users
+// login mirror (soft-deleted alongside them) is restored too, and their class strength count is
+// refreshed, so a restored student is immediately usable again, not half-undone.
+// only entities backed by a _cachedRosterMap() need this — everything else is read uncached
+var TRASH_CACHE_KEYS = {
+  students: 'roster_students_lite_v1', classes: 'roster_classes_v1',
+  staff: 'roster_users_v1', feeStructure: 'roster_fee_structures_lite_v1'
+};
+
+function restoreTrashItem(entityType, id, currentUser, currentRole) {
+  try {
+    var reg = TRASH_REGISTRY[entityType];
+    if (!reg) return { success: false, message: 'Unknown record type' };
+    if (!reg.canManage(currentRole)) return { success: false, message: 'Forbidden' };
+    var found = _findTrashRow(reg, id);
+    if (!found) return { success: false, message: 'Record not found' };
+    if (found.notInTrash) return { success: false, message: 'Record is not in Trash' };
+
+    var updCol = reg.headers.indexOf('UpdatedAt');
+    var ts = nowIso();
+    found.sh.getRange(found.rowIdx + 1, found.delCol + 1).setValue('0');
+    if (updCol !== -1) found.sh.getRange(found.rowIdx + 1, updCol + 1).setValue(ts);
+
+    if (entityType === 'students') {
+      try {
+        var ush = getSheet(USERS_SHEET);
+        if (ush) {
+          var udata = ush.getDataRange().getValues();
+          for (var u = 1; u < udata.length; u++) {
+            if (String(udata[u][23] || '') === 'STU-' + parseInt(id, 10)) {
+              ush.getRange(u + 1, 17).setValue('0');
+              ush.getRange(u + 1, 22).setValue(ts);
+              break;
+            }
+          }
+        }
+        var classId = parseInt(found.sh.getRange(found.rowIdx + 1, 26).getValue(), 10);
+        if (classId) recomputeClassStrength(classId);
+      } catch (e) { Logger.log('restoreTrashItem student side-effects failed: ' + e.toString()); }
+      _invalidateRosterCache('roster_users_v1');
+    }
+    if (TRASH_CACHE_KEYS[entityType]) _invalidateRosterCache(TRASH_CACHE_KEYS[entityType]);
+
+    addLog(currentUser, 'Record Restored', reg.label + ' #' + id);
+    return { success: true, message: reg.label + ' restored' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// removes the row for good — cannot be undone. Same permission as deleting it in the first place.
+function purgeTrashItem(entityType, id, currentUser, currentRole) {
+  try {
+    var reg = TRASH_REGISTRY[entityType];
+    if (!reg) return { success: false, message: 'Unknown record type' };
+    if (!reg.canManage(currentRole)) return { success: false, message: 'Forbidden' };
+    var found = _findTrashRow(reg, id);
+    if (!found) return { success: false, message: 'Record not found' };
+    if (found.notInTrash) return { success: false, message: 'Record is not in Trash' };
+    found.sh.deleteRow(found.rowIdx + 1);
+    if (TRASH_CACHE_KEYS[entityType]) _invalidateRosterCache(TRASH_CACHE_KEYS[entityType]);
+    addLog(currentUser, 'Record Permanently Deleted', reg.label + ' #' + id);
+    return { success: true, message: reg.label + ' permanently deleted' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
 }
