@@ -17608,6 +17608,89 @@ function getAllStockTransactions(filters, currentUser, currentRole) {
   } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
 }
 
+// Corrects an already-recorded transaction (wrong quantity/price/date typed at POS, etc). ItemID and
+// Type (stock direction) are intentionally NOT editable here — reassigning a transaction to a
+// different item/direction after the fact is what delete-and-re-record is for; this only fixes the
+// transaction's own details.
+// For 'in'/'out' Kind rows, a Quantity change re-derives CurrentStock by undoing the old
+// quantity's effect and re-applying the new one (so the item's stock stays correct without needing
+// to replay every later transaction). 'adjustment' rows record an ABSOLUTE stock value at the time
+// they were made, not a delta — replaying that retroactively could clobber every transaction since,
+// so their Quantity is locked; only the descriptive fields (party/date/reason/etc) can be corrected.
+// d: { quantity?, unitPrice?, party?, paymentMode?, transactionDate?, reason?, notes?, reference? }
+function updateStockTransaction(id, d, currentUser, currentRole) {
+  try {
+    if (!canIssueStock(currentRole)) return { success: false, message: 'Forbidden — admin/clerk/bursar only' };
+    var tid = parseInt(id, 10);
+    if (isNaN(tid)) return { success: false, message: 'Invalid id' };
+    if (!d || typeof d !== 'object') return { success: false, message: 'Invalid payload' };
+
+    var tsh = _ensureStockTransactionsSheet();
+    var tdata = tsh.getDataRange().getValues();
+    var row = -1;
+    for (var i = 1; i < tdata.length; i++) {
+      if (parseInt(tdata[i][0], 10) === tid) { row = i; break; }
+    }
+    if (row === -1) return { success: false, message: 'Transaction not found' };
+
+    var oldType = String(tdata[row][2] || '').toLowerCase();
+    var oldQty = parseFloat(tdata[row][3]) || 0;
+    var kind = String(tdata[row][12] || '').toLowerCase();
+    var iid = parseInt(tdata[row][1], 10);
+
+    var newQty = oldQty;
+    if (d.quantity != null && d.quantity !== '') {
+      if (kind === 'adjustment') return { success: false, message: 'Quantity can\'t be edited on an adjustment record — delete and re-record instead' };
+      newQty = parseFloat(d.quantity);
+      if (isNaN(newQty) || newQty <= 0) return { success: false, message: 'quantity must be a positive number' };
+    }
+
+    var ish = getSheet(STOCK_ITEMS_SHEET);
+    if (!ish) return { success: false, message: 'Stock_Items sheet not found' };
+    var idata = ish.getDataRange().getValues(), itemRow = -1;
+    for (var k = 1; k < idata.length; k++) {
+      if (idata[k][0] === iid) { itemRow = k; break; }
+    }
+
+    if (itemRow !== -1 && newQty !== oldQty && oldType !== 'adjustment') {
+      var cur = parseFloat(idata[itemRow][5]) || 0;
+      // undo the old effect, then apply the new one
+      var restored = oldType === 'out' ? cur + oldQty : oldType === 'in' ? cur - oldQty : cur;
+      var newStock = oldType === 'out' ? restored - newQty : oldType === 'in' ? restored + newQty : restored;
+      if (oldType === 'out' && newStock < 0) {
+        return { success: false, message: 'Insufficient stock to raise this sale\'s quantity — only ' + restored + ' available' };
+      }
+      ish.getRange(itemRow + 1, 6).setValue(newStock);
+      ish.getRange(itemRow + 1, 14).setValue(nowIso());
+    }
+
+    var unitPrice = tdata[row][13];
+    if (d.unitPrice != null && d.unitPrice !== '') {
+      var up = parseFloat(d.unitPrice);
+      if (!isNaN(up) && up >= 0) unitPrice = up;
+    }
+    var totalAmount = Math.round(newQty * (parseFloat(unitPrice) || 0) * 100) / 100;
+
+    var sheetRow = row + 1;
+    tsh.getRange(sheetRow, 4).setValue(newQty);
+    if (d.reason != null) tsh.getRange(sheetRow, 5).setValue(String(d.reason));
+    if (d.reference != null) tsh.getRange(sheetRow, 7).setValue(String(d.reference));
+    if (d.notes != null) tsh.getRange(sheetRow, 8).setValue(String(d.notes));
+    if (d.transactionDate) tsh.getRange(sheetRow, 10).setNumberFormat('@').setValue(toIso(d.transactionDate));
+    tsh.getRange(sheetRow, 14).setValue(unitPrice);
+    tsh.getRange(sheetRow, 15).setValue(totalAmount);
+    if (d.paymentMode != null) {
+      var pm = String(d.paymentMode).toLowerCase();
+      if (pm && POS_PAYMENT_MODES.indexOf(pm) === -1) return { success: false, message: 'Invalid paymentMode' };
+      tsh.getRange(sheetRow, 17).setValue(pm);
+    }
+    if (d.party != null) tsh.getRange(sheetRow, 18).setValue(String(d.party));
+
+    addLog(currentUser, 'Stock Transaction Edited', '#' + tid);
+    return { success: true, message: 'Transaction updated' };
+  } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
+}
+
 // ============== Vendors ==============
 
 function rowToVendor(row) {

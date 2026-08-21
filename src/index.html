@@ -31707,12 +31707,15 @@
 
     // ============== Stock Transactions (dedicated ledger page) ==============
     function StockTransactionsView({ currentUser, role }) {
+      const r = String(role).toLowerCase();
+      const canManage = r === 'admin' || r === 'clerk' || r === 'bursar';
       const [filters, setFilters] = useState({ kind: '' });
       const { data: txnData, error: loadError, isLoading: loading, isValidating: syncing, mutate: refresh } =
         useSWR('getAllStockTransactions', () => swrFetcher('getAllStockTransactions', {}, currentUser, role));
       const allTxns = txnData || [];
       const txns = filters.kind ? allTxns.filter(t => t.Kind === filters.kind) : allTxns;
       const tableRef = useRef(null);
+      const [editingTxn, setEditingTxn] = useState(null);
 
       useEffect(() => {
         return () => { try { if (tableRef.current) { tableRef.current.destroy(); tableRef.current = null; } } catch(e) {} };
@@ -31747,17 +31750,31 @@
           { data: 'PerformedByName', title: 'By', render: (d, t, row) => esc(d || row.PerformedBy || '—') }
         ];
 
+        if (canManage) {
+          cols.push({
+            data: null, title: 'Actions', orderable: false,
+            render: () => `<button class="action-icon edit-icon" data-action="edit" title="Edit"><i class="fas fa-edit"></i></button>`
+          });
+        }
+
+        const exportCols = canManage ? ':not(:last-child)' : ':visible';
         const t = $(id).DataTable({
           data: data, destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams, columns: cols, pageLength: 15,
           lengthMenu: [[15,25,50,-1],[15,25,50,'All']],
           responsive: true, dom: 'Blfrtip',
           buttons: [
             { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
-            { extend:'csv', text:'<i class="fas fa-file-csv"></i> CSV' },
+            { extend:'csv', text:'<i class="fas fa-file-csv"></i> CSV', exportOptions:{ columns: exportCols } },
             dtPdfButton('Stock Transactions'),
-            { extend:'print', text:'<i class="fas fa-print"></i> Print' }
+            { extend:'print', text:'<i class="fas fa-print"></i> Print', exportOptions:{ columns: exportCols } }
           ],
           order: [[0,'desc']]
+        });
+        $(id).off('click', '.action-icon');
+        $(id).on('click', '.action-icon', function () {
+          const action = $(this).data('action');
+          const row = t.row($(this).parents('tr')).data(); if (!row) return;
+          if (action === 'edit') setEditingTxn(row);
         });
         tableRef.current = t;
       };
@@ -31810,26 +31827,174 @@
           <div style={{display: loading || txns.length === 0 ? 'none' : 'block'}}>
             <table id="stockTxnTable" className="display responsive nowrap" style={{width:'100%'}}></table>
           </div>
+
+          {editingTxn && (
+            <StockTransactionEditModal txn={editingTxn} currentUser={currentUser} role={role}
+              onClose={() => setEditingTxn(null)}
+              onSaved={() => { setEditingTxn(null); refresh(); }} />
+          )}
+        </div>
+      );
+    }
+
+    function StockTransactionEditModal({ txn, currentUser, role, onClose, onSaved }) {
+      const [data, setData] = useState({
+        Quantity: txn.Quantity,
+        UnitPrice: txn.UnitPrice || 0,
+        Party: txn.Party || '',
+        PaymentMode: txn.PaymentMode || '',
+        TransactionDate: String(txn.TransactionDate || '').slice(0, 10),
+        Reason: txn.Reason || '',
+        Reference: txn.Reference || '',
+        Notes: txn.Notes || ''
+      });
+      const [saving, setSaving] = useState(false);
+      const set = (k, v) => setData(d => ({...d, [k]: v}));
+      const isAdjustment = txn.Kind === 'adjustment';
+
+      const submit = (e) => {
+        e.preventDefault();
+        const qty = parseFloat(data.Quantity);
+        if (!isAdjustment && (!qty || qty <= 0)) { Swal.fire({ icon:'warning', text:'Quantity must be > 0.' }); return; }
+        setSaving(true);
+        google.script.run.withSuccessHandler(res => {
+          setSaving(false);
+          if (!res) { Swal.fire({ icon:'error', text:'No response' }); return; }
+          if (res.success) { Swal.fire({ icon:'success', text:res.message, timer:1500, showConfirmButton:false }); onSaved(); }
+          else Swal.fire({ icon:'error', text:res.message });
+        }).withFailureHandler(err => { setSaving(false); Swal.fire({ icon:'error', text:(err&&err.message)||'Failed' }); })
+          .updateStockTransaction(txn.ID, {
+            quantity: isAdjustment ? undefined : qty,
+            unitPrice: parseFloat(data.UnitPrice) || 0,
+            party: data.Party,
+            paymentMode: data.PaymentMode,
+            transactionDate: data.TransactionDate,
+            reason: data.Reason,
+            reference: data.Reference,
+            notes: data.Notes
+          }, currentUser, role);
+      };
+
+      const kindLabel = (txn.Kind || '').charAt(0).toUpperCase() + (txn.Kind || '').slice(1);
+      const typeLabel = txn.Type === 'out' ? 'Stock Out' : txn.Type === 'in' ? 'Stock In' : 'Adjustment';
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{maxWidth:'640px'}}>
+            <div className="modal-header">
+              <h3><i className="fas fa-edit"></i> Edit Transaction — {txn.ItemName}</h3>
+              <button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button>
+            </div>
+            <div className="modal-body">
+              <div style={{background:'#f8f9fa',padding:'10px',borderRadius:'6px',marginBottom:'12px',fontSize:'13px',display:'flex',gap:'16px',flexWrap:'wrap'}}>
+                <span><strong>Item:</strong> {txn.ItemName} ({txn.ItemCode})</span>
+                <span><strong>Kind:</strong> {kindLabel}</span>
+                <span><strong>Direction:</strong> {typeLabel}</span>
+              </div>
+              {isAdjustment && (
+                <div className="settings-info-message" style={{marginBottom:'12px'}}>
+                  <i className="fas fa-info-circle" style={{marginRight:'6px'}}></i>
+                  Adjustment records set an absolute stock count — Quantity can't be edited here. Record a new adjustment instead if the count was wrong.
+                </div>
+              )}
+              <form onSubmit={submit}>
+                <div className="form-grid">
+                  <div className="form-group"><label>Quantity{!isAdjustment && ' *'}</label>
+                    <input type="number" min="0.01" step="0.01" value={data.Quantity} disabled={isAdjustment}
+                      onChange={e => set('Quantity', e.target.value)} required={!isAdjustment} />
+                  </div>
+                  <div className="form-group"><label>Unit Price</label>
+                    <input type="number" min="0" step="0.01" value={data.UnitPrice} onChange={e => set('UnitPrice', e.target.value)} />
+                  </div>
+                  <div className="form-group"><label>Party / Buyer / Vendor</label>
+                    <input type="text" value={data.Party} onChange={e => set('Party', e.target.value)} maxLength="200" />
+                  </div>
+                  <div className="form-group"><label>Date</label>
+                    <input type="date" value={data.TransactionDate} onChange={e => set('TransactionDate', e.target.value)} />
+                  </div>
+                  <div className="form-group"><label>Payment Mode</label>
+                    <select value={data.PaymentMode} onChange={e => set('PaymentMode', e.target.value)}>
+                      <option value="">—</option>
+                      <option value="cash">Cash</option>
+                      <option value="mobile_money">Mobile Money</option>
+                      <option value="card">Card</option>
+                      <option value="bank_transfer">Bank Transfer</option>
+                    </select>
+                  </div>
+                  <div className="form-group"><label>Reference</label>
+                    <input type="text" value={data.Reference} onChange={e => set('Reference', e.target.value)} maxLength="100" />
+                  </div>
+                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Reason</label>
+                    <input type="text" value={data.Reason} onChange={e => set('Reason', e.target.value)} maxLength="200" />
+                  </div>
+                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Notes</label>
+                    <textarea value={data.Notes} onChange={e => set('Notes', e.target.value)} rows="2" maxLength="500" />
+                  </div>
+                </div>
+                <div className="form-actions">
+                  <button type="submit" className="btn btn-primary" disabled={saving}>
+                    {saving ? <><i className="fas fa-spinner fa-spin"></i> Saving…</> : <><i className="fas fa-save"></i> Save</>}
+                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={onClose}><i className="fas fa-times"></i> Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
         </div>
       );
     }
 
     // ============== POS / Sell ==============
+    // keyword-first, category-fallback icon for a stock item's POS tile — most items in a Ghanaian
+    // school shop fall into a handful of recognizable shapes (uniform, book, stationery, water...)
+    // regardless of which of our broader STOCK_CATEGORIES bucket they were filed under.
+    function getPOSItemIcon(item) {
+      const name = String(item.ItemName || '').toLowerCase();
+      const rules = [
+        [/shirt|trouser|uniform|blazer|\btie\b|skirt|tunic|smock/, 'fa-shirt'],
+        [/notebook|exercise book|jotter/, 'fa-book-open'],
+        [/book|textbook|novel|dictionary/, 'fa-book'],
+        [/pencil|\bpen\b|ruler|crayon|marker|eraser|geometry set/, 'fa-pencil-ruler'],
+        [/bag|backpack|satchel/, 'fa-bag-shopping'],
+        [/bottle|water|flask(?!.*lab)/, 'fa-bottle-water'],
+        [/broom|mop|detergent|soap|bleach|disinfect/, 'fa-broom'],
+        [/plate|cup|spoon|pot|tray|kitchen/, 'fa-utensils'],
+        [/chemical|beaker|lab coat|glove|goggle/, 'fa-flask'],
+        [/first.?aid|medic|bandage|drug|tablet|thermometer/, 'fa-briefcase-medical'],
+        [/\bball\b|jersey|\bsport|net\b|whistle|cone/, 'fa-futbol']
+      ];
+      const hit = rules.find(([re]) => re.test(name));
+      if (hit) return hit[1];
+      const catIcon = { stationery:'fa-pencil-ruler', cleaning:'fa-broom', kitchen:'fa-utensils', lab:'fa-flask', medical:'fa-briefcase-medical', sports:'fa-futbol', other:'fa-box' };
+      return catIcon[String(item.Category || '').toLowerCase()] || 'fa-box';
+    }
+
     function POSView({ currentUser, role }) {
       const { data: itemsData, error: loadError, isLoading: loading, mutate: refreshItems } =
         useSWR('getAllStockItems', () => swrFetcher('getAllStockItems', {}, currentUser, role));
       const items = itemsData || [];
+      const { data: studentsData } = useSWR('getAllStudents', () => swrFetcher('getAllStudents', currentUser, role));
+      const students = studentsData || [];
       const [mode, setMode] = useState('sale'); // 'sale' | 'return'
       const [cart, setCart] = useState([]); // [{ ItemID, ItemName, Unit, UnitPrice, Quantity, maxStock }]
-      const [party, setParty] = useState('');
+      const [buyerId, setBuyerId] = useState('');
+      const [walkInName, setWalkInName] = useState('');
       const [paymentMode, setPaymentMode] = useState('cash');
       const [search, setSearch] = useState('');
       const [submitting, setSubmitting] = useState(false);
 
+      const buyerOptions = [
+        { value: '', label: 'Walk-in customer' },
+        ...students.map(s => ({ value: String(s.ID), label: `${s.FullName} (${s.AdmissionNumber})` }))
+      ];
+      const selectedBuyer = buyerId ? buyerOptions.find(o => o.value === buyerId) : null;
+      const party = selectedBuyer ? selectedBuyer.label : (walkInName.trim() || 'Walk-in');
+
       const filteredItems = items.filter(i =>
         !search.trim() ||
         String(i.ItemName || '').toLowerCase().includes(search.toLowerCase()) ||
-        String(i.ItemCode || '').toLowerCase().includes(search.toLowerCase())
+        String(i.ItemCode || '').toLowerCase().includes(search.toLowerCase()) ||
+        String(i.Category || '').toLowerCase().includes(search.toLowerCase())
       );
 
       const addToCart = (item) => {
@@ -31889,19 +32054,32 @@
           refreshItems();
           if (failed.length === 0) {
             Swal.fire({ icon:'success', title: mode === 'sale' ? 'Sale completed' : 'Return recorded', text: 'Total GH₵' + cartTotal.toFixed(2), timer:2000, showConfirmButton:false });
-            setCart([]); setParty('');
+            setCart([]); setBuyerId(''); setWalkInName('');
           } else {
             Swal.fire({ icon:'warning', title:'Completed with issues', html: failed.map(f => esc_(f)).join('<br/>') });
           }
         };
       };
 
-      const categoryColor = { stationery:'#0074D9', cleaning:'#28a745', kitchen:'#fbbc04', lab:'#ea4335', medical:'#9b59b6', sports:'#17a2b8', other:'#6c757d' };
-
       return (
         <div className="data-section">
           <div className="section-header">
-            <h2><i className="fas fa-cash-register"></i> POS / Sell</h2>
+            <div>
+              <h2><i className="fas fa-cash-register"></i> POS / Sell</h2>
+              <div style={{fontSize:'12px',color:'#888',marginTop:'2px'}}>
+                Select items to create one {mode === 'sale' ? 'sale' : 'return'} record.
+              </div>
+            </div>
+            <div style={{display:'flex', gap:'8px'}}>
+              <button onClick={() => { setMode('sale'); setCart([]); }}
+                style={{background: mode === 'sale' ? '#001f3f' : '#fff', color: mode === 'sale' ? '#fff' : '#001f3f', border:'1.5px solid #001f3f', borderRadius:'22px', padding:'9px 18px', fontSize:'13px', fontWeight:600, cursor:'pointer'}}>
+                <i className="fas fa-cart-shopping"></i> Sale
+              </button>
+              <button onClick={() => { setMode('return'); setCart([]); }}
+                style={{background: mode === 'return' ? '#001f3f' : '#fff', color: mode === 'return' ? '#fff' : '#001f3f', border:'1.5px solid #001f3f', borderRadius:'22px', padding:'9px 18px', fontSize:'13px', fontWeight:600, cursor:'pointer'}}>
+                <i className="fas fa-rotate-left"></i> Return / Restock
+              </button>
+            </div>
           </div>
 
           {loadError && !loading && items.length === 0 && (
@@ -31911,45 +32089,50 @@
             </div>
           )}
 
-          <div className="pipeline-stages" style={{marginBottom:'15px'}}>
-            <div className={'pipeline-stage' + (mode === 'sale' ? ' active' : '')}
-                 style={{background: mode === 'sale' ? '#001f3f' : '#28a745'}}
-                 onClick={() => { setMode('sale'); setCart([]); }}>
-              <span className="pipeline-stage-name"><i className="fas fa-shopping-cart"></i> Sell</span>
-            </div>
-            <div className={'pipeline-stage' + (mode === 'return' ? ' active' : '')}
-                 style={{background: mode === 'return' ? '#001f3f' : '#fbbc04'}}
-                 onClick={() => { setMode('return'); setCart([]); }}>
-              <span className="pipeline-stage-name"><i className="fas fa-undo"></i> Return / Restock</span>
-            </div>
-          </div>
-
           <div style={{display:'grid', gridTemplateColumns:'1fr 360px', gap:'16px', alignItems:'start'}}>
             <div>
-              <div className="form-group" style={{marginBottom:'12px'}}>
-                <input type="text" placeholder="Search item name or code…" value={search} onChange={e => setSearch(e.target.value)}
-                  style={{width:'100%',padding:'10px 12px',border:'1px solid #ddd',borderRadius:'6px'}} />
+              <div className="form-group" style={{marginBottom:'14px'}}>
+                <div style={{position:'relative'}}>
+                  <i className="fas fa-search" style={{position:'absolute', left:'14px', top:'50%', transform:'translateY(-50%)', color:'#aaa', fontSize:'13px'}}></i>
+                  <input type="text" placeholder="Search item, category, or code…" value={search} onChange={e => setSearch(e.target.value)}
+                    style={{width:'100%', padding:'11px 12px 11px 36px', border:'1px solid #ddd', borderRadius:'8px', fontSize:'14px'}} />
+                </div>
               </div>
               {loading && <TableSkeleton rows={4} columns={4} />}
               {!loading && (
-                <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:'10px'}}>
+                <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(150px, 1fr))', gap:'12px'}}>
                   {filteredItems.map(item => {
-                    const out = mode === 'sale' && Number(item.CurrentStock || 0) <= 0;
+                    const stock = Number(item.CurrentStock || 0);
+                    const out = mode === 'sale' && stock <= 0;
+                    const low = !out && stock <= Number(item.ReorderLevel || 0);
+                    const icon = getPOSItemIcon(item);
+                    const badgeStyle = out
+                      ? { background: '#fdecea', color: '#c0392b' }
+                      : low
+                        ? { background: '#fff3cd', color: '#8a6100' }
+                        : { background: '#e3f6e8', color: '#1b8a3d' };
                     return (
                       <div key={item.ID} onClick={() => !out && addToCart(item)}
                         style={{
-                          border: '1px solid #e0e0e0', borderRadius:'8px', padding:'12px', cursor: out ? 'not-allowed' : 'pointer',
-                          background: out ? '#f5f5f5' : '#fff', opacity: out ? 0.55 : 1, borderTop: '3px solid ' + (categoryColor[item.Category] || '#6c757d'),
-                          transition:'box-shadow .15s'
+                          border: '1px solid #e5e7eb', borderRadius:'10px', overflow:'hidden', cursor: out ? 'not-allowed' : 'pointer',
+                          background: '#fff', opacity: out ? 0.6 : 1, transition:'box-shadow .15s'
                         }}
-                        onMouseEnter={e => { if (!out) e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.12)'; }}
+                        onMouseEnter={e => { if (!out) e.currentTarget.style.boxShadow = '0 4px 10px rgba(0,0,0,0.10)'; }}
                         onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; }}>
-                        <div style={{fontWeight:600, fontSize:'13px', color:'var(--navy-primary)', marginBottom:'4px'}}>{item.ItemName}</div>
-                        <div style={{fontSize:'11px', color:'#888', marginBottom:'6px'}}>{item.ItemCode}</div>
-                        <div style={{fontSize:'12px', color: out ? '#ea4335' : '#28a745', fontWeight:600}}>
-                          {out ? 'Out of stock' : `${item.CurrentStock} ${item.Unit || ''} left`}
+                        <div style={{position:'relative', background:'#eef7f5', padding:'22px 0', textAlign:'center'}}>
+                          <i className={`fas ${icon}`} style={{fontSize:'28px', color:'#0d9488'}}></i>
+                          <span style={{position:'absolute', top:'8px', right:'8px', fontSize:'10px', fontWeight:700, padding:'3px 8px', borderRadius:'20px', whiteSpace:'nowrap', ...badgeStyle}}>
+                            {out ? 'Out of stock' : `${stock} in stock`}
+                          </span>
                         </div>
-                        <div style={{fontSize:'13px', fontWeight:700, marginTop:'4px'}}>GH₵{Number(item.UnitCost || 0).toFixed(2)}</div>
+                        <div style={{padding:'10px 12px'}}>
+                          <div style={{fontWeight:600, fontSize:'13px', color:'var(--navy-primary)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{item.ItemName}</div>
+                          <div style={{fontSize:'11px', color:'#888', textTransform:'capitalize'}}>{item.Category}</div>
+                          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:'6px'}}>
+                            <span style={{fontWeight:700, fontSize:'14px'}}>GH₵{Number(item.UnitCost || 0).toFixed(2)}</span>
+                            {!out && <span style={{fontSize:'10px', color:'#aaa'}}>Tap to add</span>}
+                          </div>
+                        </div>
                       </div>
                     );
                   })}
@@ -31978,13 +32161,17 @@
               <div style={{display:'flex', justifyContent:'space-between', fontWeight:700, fontSize:'16px', margin:'12px 0'}}>
                 <span>Total</span><span>GH₵{cartTotal.toFixed(2)}</span>
               </div>
+              <SearchableDropdown label="Buyer / Customer" icon="fas fa-user"
+                options={buyerOptions} value={buyerId} onChange={setBuyerId} placeholder="Walk-in customer" />
+              {!buyerId && (
+                <div className="form-group">
+                  <label style={{fontSize:'12px'}}>Walk-in name</label>
+                  <input type="text" value={walkInName} onChange={e => setWalkInName(e.target.value)} placeholder="Optional customer name"
+                    style={{width:'100%', padding:'8px', border:'1px solid #ddd', borderRadius:'6px'}} />
+                </div>
+              )}
               <div className="form-group">
-                <label style={{fontSize:'12px'}}>Buyer / Customer</label>
-                <input type="text" value={party} onChange={e => setParty(e.target.value)} placeholder="Walk-in"
-                  style={{width:'100%', padding:'8px', border:'1px solid #ddd', borderRadius:'6px'}} />
-              </div>
-              <div className="form-group">
-                <label style={{fontSize:'12px'}}>Payment Mode</label>
+                <label style={{fontSize:'12px'}}>Payment</label>
                 <select value={paymentMode} onChange={e => setPaymentMode(e.target.value)}
                   style={{width:'100%', padding:'8px', border:'1px solid #ddd', borderRadius:'6px'}}>
                   <option value="cash">Cash</option>
@@ -31994,7 +32181,7 @@
                 </select>
               </div>
               <button className="btn btn-primary" disabled={submitting || cart.length === 0} onClick={completeTransaction} style={{width:'100%', marginTop:'8px'}}>
-                {submitting ? <><i className="fas fa-spinner fa-spin"></i> Processing…</> : <><i className="fas fa-check"></i> {mode === 'sale' ? 'Complete Sale' : 'Complete Return'}</>}
+                {submitting ? <><i className="fas fa-spinner fa-spin"></i> Processing…</> : <><i className="fas fa-check"></i> {mode === 'sale' ? `Complete Sale · GH₵${cartTotal.toFixed(2)}` : `Complete Return · GH₵${cartTotal.toFixed(2)}`}</>}
               </button>
             </div>
           </div>
