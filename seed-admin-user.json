@@ -1,0 +1,11 @@
+{
+  "users": {
+    "admin1": {
+      "email": "admin@yourschool.com",
+      "name": "Admin",
+      "password": "Admin@2026",
+      "role": "admin",
+      "lastLogin": ""
+    }
+  }
+}
