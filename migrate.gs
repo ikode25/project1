@@ -21,6 +21,21 @@
 // ============================================================
 
 const MIGRATE_DB_URL = "https://fees-1f58a-default-rtdb.firebaseio.com";
+const MIGRATE_FIREBASE_API_KEY = "AIzaSyC_W__0g7E0Lg1qDKM9CNHn_dS6_K7l26A"; // public web API key
+
+// Database writes require "auth != null" (see firebase-rules.json), so this
+// signs in anonymously first and attaches the token to the import request.
+// Make sure Anonymous sign-in is enabled: Firebase console -> Authentication
+// -> Sign-in method -> Anonymous -> Enable.
+function migrateGetFirebaseIdToken() {
+  const resp = UrlFetchApp.fetch(
+    'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + MIGRATE_FIREBASE_API_KEY,
+    { method: 'post', contentType: 'application/json', payload: JSON.stringify({ returnSecureToken: true }), muteHttpExceptions: true }
+  );
+  const data = JSON.parse(resp.getContentText());
+  if (!data.idToken) throw new Error('Could not sign in to Firebase — is Anonymous sign-in enabled? Response: ' + resp.getContentText());
+  return data.idToken;
+}
 
 function migrateToFirebase() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -126,7 +141,8 @@ function migrateToFirebase() {
 
   // Push the whole tree in one shot. PUT at root REPLACES everything —
   // only run this once, against an empty/fresh database.
-  const resp = UrlFetchApp.fetch(MIGRATE_DB_URL + '/.json', {
+  const idToken = migrateGetFirebaseIdToken();
+  const resp = UrlFetchApp.fetch(MIGRATE_DB_URL + '/.json?auth=' + encodeURIComponent(idToken), {
     method: 'put', contentType: 'application/json', payload: JSON.stringify(out), muteHttpExceptions: true
   });
 

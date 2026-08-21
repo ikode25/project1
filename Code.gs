@@ -13,23 +13,47 @@
 // ============================================================
 
 const DB_URL = "https://fees-1f58a-default-rtdb.firebaseio.com";
+const FIREBASE_API_KEY = "AIzaSyC_W__0g7E0Lg1qDKM9CNHn_dS6_K7l26A"; // public web API key — safe to embed, identifies the project only
+
+// Database writes require "auth != null" (see firebase-rules.json), so this
+// script signs itself in anonymously too — same as the browser app does —
+// and attaches the resulting token to write requests. Reads stay open and
+// need no token.
+function getFirebaseIdToken() {
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get('fb_id_token');
+  if (cached) return cached;
+  const resp = UrlFetchApp.fetch(
+    'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + FIREBASE_API_KEY,
+    { method: 'post', contentType: 'application/json', payload: JSON.stringify({ returnSecureToken: true }), muteHttpExceptions: true }
+  );
+  try {
+    const data = JSON.parse(resp.getContentText());
+    if (data.idToken) { cache.put('fb_id_token', data.idToken, 3000); return data.idToken; }
+  } catch (e) { Logger.log('getFirebaseIdToken error: ' + e.message); }
+  return null;
+}
 
 function dbGet(path) {
   const resp = UrlFetchApp.fetch(DB_URL + path + '.json', { muteHttpExceptions: true });
   try { return JSON.parse(resp.getContentText()); } catch (e) { return null; }
 }
+function authedUrl(path) {
+  const token = getFirebaseIdToken();
+  return DB_URL + path + '.json' + (token ? '?auth=' + encodeURIComponent(token) : '');
+}
 function dbPatch(path, data) {
-  return UrlFetchApp.fetch(DB_URL + path + '.json', {
+  return UrlFetchApp.fetch(authedUrl(path), {
     method: 'patch', contentType: 'application/json', payload: JSON.stringify(data), muteHttpExceptions: true
   });
 }
 function dbPut(path, data) {
-  return UrlFetchApp.fetch(DB_URL + path + '.json', {
+  return UrlFetchApp.fetch(authedUrl(path), {
     method: 'put', contentType: 'application/json', payload: JSON.stringify(data), muteHttpExceptions: true
   });
 }
 function dbPush(path, data) {
-  return UrlFetchApp.fetch(DB_URL + path + '.json', {
+  return UrlFetchApp.fetch(authedUrl(path), {
     method: 'post', contentType: 'application/json', payload: JSON.stringify(data), muteHttpExceptions: true
   });
 }

@@ -32,7 +32,7 @@
             if (failureHandler) failureHandler({ message: msg });
             return undefined;
           }
-          Promise.resolve()
+          (global.__AUTH_READY__ || Promise.resolve())
             .then(function () { return fn.apply(null, args); })
             .then(function (result) { if (successHandler) successHandler(result); })
             .catch(function (e) {

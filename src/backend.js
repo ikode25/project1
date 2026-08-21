@@ -35,6 +35,14 @@
   }
   var db = global.firebase.database();
 
+  // Silently identify this app to Firebase (no password prompt, invisible to
+  // the user) so the database rules can require "auth != null" on writes —
+  // that blocks anyone hitting the database directly with a script, while
+  // every real use of this app keeps working exactly as before.
+  var authReady = global.firebase.auth().signInAnonymously()
+    .catch(function (e) { console.error('Anonymous sign-in failed — writes will be rejected by Firebase rules:', e); });
+  global.__AUTH_READY__ = authReady;
+
   var TERMS = ["First Term", "Second Term", "Third Term"];
   var DEFAULT_COMPONENTS = [
     { id: "arrears", name: "Arrears", defaultAmount: 0, isActive: true, isForNewStudentsOnly: false, order: 1 },

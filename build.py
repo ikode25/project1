@@ -19,7 +19,8 @@ ROOT = Path(__file__).parent
 SRC = ROOT / "src"
 
 FIREBASE_SDK = """<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>"""
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>"""
 
 
 def build_injected_block():

@@ -28,30 +28,37 @@ history, etc.) reads and writes Firebase directly from the browser.
 
 ## One-time setup
 
-1. **Realtime Database rules.** In the Firebase console → Realtime Database →
+1. **Enable Anonymous sign-in.** Firebase console → Authentication →
+   Sign-in method → enable **Anonymous**. The app silently identifies itself
+   this way on load (no password prompt, invisible to users) so the database
+   rules below can require a real Firebase identity on writes.
+
+2. **Realtime Database rules.** Firebase console → Realtime Database →
    Rules, paste in `firebase-rules.json` and publish. It's currently
    locked (`.read`/`.write: false`), so nothing works until you do this.
 
-   ⚠️ These rules are intentionally open (`.read`/`.write: true`). The app
-   keeps your original custom email/password login (not Firebase
-   Authentication), so there's no real per-user identity for the database to
-   check — anyone with the database URL can read/write. This matches the
-   original Apps Script app's actual security level (any function was
-   already callable by anyone who could reach the web app URL); it's just
-   more honest about it now. If you want real access control later, that
-   needs Firebase Authentication wired into the login flow.
+   Reads stay open (`.read: true`) — that matches how the parent portal
+   already worked, looking up fee balances without logging in. Writes
+   require `auth != null`, i.e. only the app itself (and `Code.gs`, which
+   signs itself in the same way) can write — a script or stranger hitting the
+   database URL directly gets rejected. The app still keeps your original
+   custom email/password login for its own UI, not Firebase Authentication,
+   so this doesn't check *who* is writing — just that it's coming through the
+   real app rather than a random request. For real per-user access control
+   later, that needs Firebase Authentication wired into the login flow
+   itself.
 
-2. **Redeploy Code.gs.** In your Apps Script project, replace the contents
+3. **Redeploy Code.gs.** In your Apps Script project, replace the contents
    with the new `Code.gs` in this repo, then Deploy → Manage deployments →
    edit the existing deployment → New version → Deploy. Keep the same Web
    App URL (`index.html`'s `APPS_SCRIPT_URL` already points at it).
 
-3. **Migrate existing data.** Follow the instructions at the top of
-   `migrate.gs` to copy your current students/fees/settings/etc. from the
-   old spreadsheet into Firebase. Run it once, before you stop using the old
-   sheet-based system.
+4. **Migrate existing data (only if you have an old spreadsheet).** Follow
+   the instructions at the top of `migrate.gs` to copy your current
+   students/fees/settings/etc. into Firebase. Run it once. Skip this
+   entirely if you're starting fresh.
 
-4. **Host `index.html`.** Your Firebase project already has a Hosting site
+5. **Host `index.html`.** Your Firebase project already has a Hosting site
    linked (`skul-fees`). From this repo:
    ```
    npm install -g firebase-tools   # if not already installed
