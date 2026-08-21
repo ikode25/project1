@@ -39,6 +39,7 @@ var ASSETS_SHEET = 'Assets';
 var ASSET_MAINTENANCE_SHEET = 'Asset_Maintenance';
 var STOCK_ITEMS_SHEET = 'Stock_Items';
 var STOCK_TRANSACTIONS_SHEET = 'Stock_Transactions';
+var VENDORS_SHEET = 'Vendors';
 var LOGS_SHEET = 'Logs';
 var ADMISSIONS_SHEET = 'Admissions';
 var ACCOUNT_TXN_SHEET = 'Account_Transactions';
@@ -605,11 +606,24 @@ var ASSET_MAINTENANCE_HEADERS = ['ID','AssetID','MaintenanceDate','Type','Descri
 // 16=MinimumStock (hard floor below which alert fires regardless of reorder level)
 var STOCK_ITEM_HEADERS = ['ID','ItemCode','ItemName','Category','Unit','CurrentStock','ReorderLevel','ReorderQuantity','Vendor','UnitCost','Location','Notes','CreatedAt','UpdatedAt','IsDeleted','ExpiryDate','MinimumStock'];
 
-// stock_transactions cols (12):
-// 0=ID, 1=ItemID(FK), 2=Type(in|out|adjustment), 3=Quantity(+ve), 4=Reason,
+// stock_transactions cols (18):
+// 0=ID, 1=ItemID(FK), 2=Type(in|out|adjustment — stock DIRECTION), 3=Quantity(+ve), 4=Reason,
 // 5=IssuedTo, 6=Reference, 7=Notes, 8=PerformedBy, 9=TransactionDate, 10=CreatedAt,
-// 11=ApprovedBy (FK→Users — second-signature for high-value issues, '' if not required)
-var STOCK_TRANSACTION_HEADERS = ['ID','ItemID','Type','Quantity','Reason','IssuedTo','Reference','Notes','PerformedBy','TransactionDate','CreatedAt','ApprovedBy'];
+// 11=ApprovedBy (FK→Users — second-signature for high-value issues, '' if not required),
+// 12=Kind (sale|purchase|return|issue|adjustment — the human-facing CATEGORY shown on the Stock
+//    Transactions page/POS; independent of Type since e.g. both a plain "Stock In" and a vendor
+//    "Purchase" restock share Type='in' but are different Kinds), 13=UnitPrice, 14=TotalAmount
+//    (Quantity*UnitPrice, computed server-side), 15=VendorID (FK→Vendors, purchases only),
+// 16=PaymentMode (POS sales: cash/mobile_money/card/bank_transfer), 17=Party (free-text
+//    buyer/customer name for a POS sale/return — no formal Student/Vendor record needed)
+var STOCK_TRANSACTION_HEADERS = ['ID','ItemID','Type','Quantity','Reason','IssuedTo','Reference','Notes','PerformedBy','TransactionDate','CreatedAt','ApprovedBy','Kind','UnitPrice','TotalAmount','VendorID','PaymentMode','Party'];
+
+// vendors cols (14): suppliers the school buys stock from — feeds the Vendor picker in POS
+// "Purchase"/restock and the Stock Transactions "Party" column.
+// 0=ID, 1=VendorName, 2=ContactPerson, 3=Phone, 4=Email, 5=TIN (Ghana Taxpayer ID, optional),
+// 6=PaymentTerms (free text, e.g. "Net 30", "Cash on delivery"), 7=OpeningBalance,
+// 8=Address, 9=Status(active|inactive), 10=Notes, 11=CreatedAt, 12=UpdatedAt, 13=IsDeleted
+var VENDOR_HEADERS = ['ID','VendorName','ContactPerson','Phone','Email','TIN','PaymentTerms','OpeningBalance','Address','Status','Notes','CreatedAt','UpdatedAt','IsDeleted'];
 
 // ============== Web App Entry ==============
 function doGet(e) {
@@ -1848,6 +1862,7 @@ function initializeSheets() {
     [ASSET_MAINTENANCE_SHEET, ASSET_MAINTENANCE_HEADERS],
     [STOCK_ITEMS_SHEET, STOCK_ITEM_HEADERS],
     [STOCK_TRANSACTIONS_SHEET, STOCK_TRANSACTION_HEADERS],
+    [VENDORS_SHEET, VENDOR_HEADERS],
     [ADMISSIONS_SHEET, ADMISSION_HEADERS],
     [ACCOUNT_TXN_SHEET, ACCOUNT_TXN_HEADERS]
   ];
@@ -17215,6 +17230,41 @@ function deleteMaintenanceRecord(id, currentUser, currentRole) {
 
 // ============== Stock / Inventory ==============
 // RBAC
+// mirrors _ensureFeePaymentsSheet's upgrade-in-place pattern: creates Stock_Transactions fresh with
+// the full current header set, or — for a sheet that already existed before Kind/UnitPrice/
+// TotalAmount/VendorID/PaymentMode/Party were added — appends just the missing trailing columns
+// without touching any existing data.
+function _ensureStockTransactionsSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(STOCK_TRANSACTIONS_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(STOCK_TRANSACTIONS_SHEET);
+    sh.appendRow(STOCK_TRANSACTION_HEADERS);
+    sh.getRange(1, 1, 1, STOCK_TRANSACTION_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+    sh.setFrozenRows(1);
+  } else if (sh.getLastColumn() < STOCK_TRANSACTION_HEADERS.length) {
+    var addFrom = sh.getLastColumn() + 1;
+    sh.getRange(1, addFrom, 1, STOCK_TRANSACTION_HEADERS.length - sh.getLastColumn()).setValues([STOCK_TRANSACTION_HEADERS.slice(addFrom - 1)])
+      .setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+  }
+  return sh;
+}
+
+function _ensureVendorsSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(VENDORS_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(VENDORS_SHEET);
+    sh.appendRow(VENDOR_HEADERS);
+    sh.getRange(1, 1, 1, VENDOR_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function canReadVendors(role) { return canReadStock(role); }
+function canWriteVendors(role) { return canWriteStock(role); }
+
 function canReadStock(role) {
   var r = String(role || '').toLowerCase();
   // supervisor = read-only (ops oversight); write/issue stays admin/clerk/bursar
@@ -17232,6 +17282,12 @@ function canIssueStock(role) {
 var STOCK_CATEGORIES = ['stationery','cleaning','kitchen','lab','medical','sports','other'];
 var STOCK_UNITS = ['pcs','box','pack','liter','kg','meter','dozen'];
 var STOCK_TXN_TYPES = ['in','out','adjustment'];
+// Kind is the human-facing category (independent of Type/stock-direction above): a POS sale is
+// Type='out'+Kind='sale', a POS return/restock is Type='in'+Kind='return', a vendor restock is
+// Type='in'+Kind='purchase', and the plain Inventory-page Stock In/Issue/Adjust actions default to
+// Kind='issue'/'adjustment' unless told otherwise.
+var STOCK_TXN_KINDS = ['sale','purchase','return','issue','adjustment'];
+var POS_PAYMENT_MODES = ['cash','mobile_money','card','bank_transfer'];
 
 function rowToStockItem(row) {
   return {
@@ -17254,10 +17310,11 @@ function rowToStockItem(row) {
   };
 }
 
-function rowToStockTxn(row, itemsMap, umap) {
+function rowToStockTxn(row, itemsMap, umap, vmap) {
   var iid = parseInt(row[1], 10);
   var perfId = parseInt(row[8], 10);
   var apprId = row[11] === '' || row[11] == null ? null : (parseInt(row[11], 10) || null);
+  var vid = row[15] === '' || row[15] == null ? null : (parseInt(row[15], 10) || null);
   return {
     ID: row[0],
     ItemID: iid,
@@ -17274,7 +17331,14 @@ function rowToStockTxn(row, itemsMap, umap) {
     TransactionDate: toIso(row[9]),
     CreatedAt: toIso(row[10]),
     ApprovedBy: apprId,
-    ApprovedByName: apprId && umap && umap[apprId] ? umap[apprId].fullName : ''
+    ApprovedByName: apprId && umap && umap[apprId] ? umap[apprId].fullName : '',
+    Kind: String(row[12] || (String(row[2]||'').toLowerCase() === 'out' ? 'issue' : 'adjustment')).toLowerCase(),
+    UnitPrice: parseFloat(row[13]) || 0,
+    TotalAmount: parseFloat(row[14]) || 0,
+    VendorID: vid,
+    VendorName: vid && vmap && vmap[vid] ? vmap[vid].VendorName : '',
+    PaymentMode: String(row[16] || '').toLowerCase(),
+    Party: row[17] || ''
   };
 }
 
@@ -17400,6 +17464,40 @@ function deleteStockItem(id, currentUser, currentRole) {
   } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
 }
 
+// shared by getStockTransactionHistory/getAllStockTransactions — active (non-deleted) Stock_Items,
+// keyed by ID, just the fields the transaction views need
+function _buildStockItemsMap() {
+  var ish = getSheet(STOCK_ITEMS_SHEET);
+  var itemsMap = {};
+  if (ish) {
+    var idata = ish.getDataRange().getValues();
+    for (var k = 1; k < idata.length; k++) {
+      if (String(idata[k][14]) === '1') continue;
+      itemsMap[idata[k][0]] = { ItemName: idata[k][2], ItemCode: idata[k][1] };
+    }
+  }
+  return itemsMap;
+}
+
+// shared by rowToStockTxn callers — active (non-deleted) Vendors, keyed by ID
+function _buildVendorsMap() {
+  var vsh = getSheet(VENDORS_SHEET);
+  var vmap = {};
+  if (vsh) {
+    var vdata = vsh.getDataRange().getValues();
+    for (var k = 1; k < vdata.length; k++) {
+      if (String(vdata[k][13]) === '1') continue;
+      vmap[vdata[k][0]] = { VendorName: vdata[k][1] };
+    }
+  }
+  return vmap;
+}
+
+// itemId, d: { type, quantity, reason?, issuedTo?, reference?, notes?, approvedBy?,
+//   kind? (sale|purchase|return|issue|adjustment), unitPrice? (POS/purchase line price),
+//   vendorId? (purchases), paymentMode? (POS sales/returns), party? (POS buyer/customer name) } —
+// the single place any module (Inventory page, POS/Sell) ever mutates Stock_Items.CurrentStock, so
+// every stock movement — however it was triggered — shows up in one consistent Stock_Transactions ledger.
 function recordStockTransaction(itemId, d, currentUser, currentRole) {
   try {
     if (!canIssueStock(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
@@ -17410,6 +17508,22 @@ function recordStockTransaction(itemId, d, currentUser, currentRole) {
     if (STOCK_TXN_TYPES.indexOf(type) === -1) return { success: false, message: 'Invalid type — must be in/out/adjustment' };
     var qty = parseFloat(d.quantity);
     if (isNaN(qty) || qty < 0) return { success: false, message: 'quantity must be a positive number' };
+    var kind = String(d.kind || (type === 'out' ? 'issue' : 'adjustment')).toLowerCase();
+    if (STOCK_TXN_KINDS.indexOf(kind) === -1) return { success: false, message: 'Invalid kind' };
+    var unitPrice = d.unitPrice != null && d.unitPrice !== '' ? parseFloat(d.unitPrice) : 0;
+    if (isNaN(unitPrice) || unitPrice < 0) unitPrice = 0;
+    var totalAmount = Math.round(qty * unitPrice * 100) / 100;
+    var vendorId = '';
+    if (d.vendorId != null && d.vendorId !== '') {
+      var vidn = parseInt(d.vendorId, 10);
+      if (!isNaN(vidn)) vendorId = vidn;
+    }
+    var paymentMode = '';
+    if (d.paymentMode) {
+      var pm = String(d.paymentMode).toLowerCase();
+      if (POS_PAYMENT_MODES.indexOf(pm) === -1) return { success: false, message: 'Invalid paymentMode' };
+      paymentMode = pm;
+    }
     var ish = getSheet(STOCK_ITEMS_SHEET);
     if (!ish) return { success: false, message: 'Stock_Items sheet not found' };
     var idata = ish.getDataRange().getValues(), itemRow = -1;
@@ -17421,11 +17535,10 @@ function recordStockTransaction(itemId, d, currentUser, currentRole) {
     var newStock;
     if (type === 'in') newStock = cur + qty;
     else if (type === 'out') {
-      if (qty > cur) return { success: false, message: 'Insufficient stock — current ' + cur + ', requested ' + qty };
+      if (qty > cur) return { success: false, message: 'Insufficient stock — current ' + cur + ', requested ' + qty + ' of ' + (idata[itemRow][2] || 'item') };
       newStock = cur - qty;
     } else newStock = qty; // adjustment = absolute set
-    var tsh = getSheet(STOCK_TRANSACTIONS_SHEET);
-    if (!tsh) return { success: false, message: 'Stock_Transactions sheet not found' };
+    var tsh = _ensureStockTransactionsSheet();
     var ts = nowIso(), tid = nextRowId(tsh);
     var uid = getCurrentUserId(currentUser) || '';
     var apprBy = '';
@@ -17435,41 +17548,159 @@ function recordStockTransaction(itemId, d, currentUser, currentRole) {
     }
     var newTxnRow = tsh.getLastRow() + 1;
     tsh.getRange(newTxnRow, 10).setNumberFormat('@');
-    tsh.appendRow([tid, iid, type, qty, String(d.reason || ''), String(d.issuedTo || ''), String(d.reference || ''), String(d.notes || ''), uid, ts, ts, apprBy]);
+    tsh.appendRow([tid, iid, type, qty, String(d.reason || ''), String(d.issuedTo || ''), String(d.reference || ''), String(d.notes || ''), uid, ts, ts, apprBy, kind, unitPrice, totalAmount, vendorId, paymentMode, String(d.party || '')]);
     tsh.getRange(newTxnRow, 10).setNumberFormat('@').setValue(ts);
     // update CurrentStock
     ish.getRange(itemRow + 1, 6).setValue(newStock);
     ish.getRange(itemRow + 1, 14).setValue(ts);
     addLog(currentUser, 'Stock ' + type.charAt(0).toUpperCase() + type.slice(1), 'Item #' + iid + ' qty ' + qty + ' → stock ' + newStock);
-    return { success: true, message: 'Transaction recorded', id: tid, newStock: newStock };
+    return { success: true, message: 'Transaction recorded', id: tid, newStock: newStock, totalAmount: totalAmount };
   } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
 }
 
 function getStockTransactionHistory(itemId, currentUser, currentRole) {
   try {
     if (!canReadStock(currentRole)) return { success: false, message: 'Forbidden' };
-    var sh = getSheet(STOCK_TRANSACTIONS_SHEET);
-    if (!sh) return { success: true, data: [] };
+    var sh = _ensureStockTransactionsSheet();
     var iid = parseInt(itemId, 10);
     if (isNaN(iid)) return { success: false, message: 'Invalid itemId' };
     var data = sh.getDataRange().getValues();
-    // build itemsMap
-    var ish = getSheet(STOCK_ITEMS_SHEET);
-    var itemsMap = {};
-    if (ish) {
-      var idata = ish.getDataRange().getValues();
-      for (var k = 1; k < idata.length; k++) {
-        if (String(idata[k][14]) === '1') continue;
-        itemsMap[idata[k][0]] = { ItemName: idata[k][2], ItemCode: idata[k][1] };
-      }
-    }
+    var itemsMap = _buildStockItemsMap();
+    var vmap = _buildVendorsMap();
     var umap = getUsersMap(), out = [];
     for (var i = 1; i < data.length; i++) {
       if (parseInt(data[i][1], 10) !== iid) continue;
-      out.push(rowToStockTxn(data[i], itemsMap, umap));
+      out.push(rowToStockTxn(data[i], itemsMap, umap, vmap));
     }
     out.sort(function(a, b) { return String(b.TransactionDate).localeCompare(String(a.TransactionDate)); });
     return { success: true, data: out };
+  } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
+}
+
+// dedicated feed for the top-level Stock Transactions page — every item's movements together
+// (getStockTransactionHistory above stays scoped to one item, for the Inventory drill-down modal).
+// filters: { kind?, itemId?, dateFrom?, dateTo? } (YYYY-MM-DD for the date bounds)
+function getAllStockTransactions(filters, currentUser, currentRole) {
+  try {
+    if (!canReadStock(currentRole)) return { success: false, message: 'Forbidden' };
+    var sh = _ensureStockTransactionsSheet();
+    var data = sh.getDataRange().getValues();
+    var itemsMap = _buildStockItemsMap();
+    var vmap = _buildVendorsMap();
+    var umap = getUsersMap();
+    var f = filters || {};
+    var kind = f.kind ? String(f.kind).toLowerCase() : '';
+    var itemId = f.itemId ? parseInt(f.itemId, 10) : null;
+    var dateFrom = String(f.dateFrom || '').trim();
+    var dateTo = String(f.dateTo || '').trim();
+    var out = [];
+    for (var i = 1; i < data.length; i++) {
+      if (itemId && parseInt(data[i][1], 10) !== itemId) continue;
+      var row = rowToStockTxn(data[i], itemsMap, umap, vmap);
+      if (kind && row.Kind !== kind) continue;
+      var d = String(row.TransactionDate || '').slice(0, 10);
+      if (dateFrom && d < dateFrom) continue;
+      if (dateTo && d > dateTo) continue;
+      out.push(row);
+    }
+    out.sort(function(a, b) { return String(b.TransactionDate).localeCompare(String(a.TransactionDate)); });
+    return { success: true, data: out };
+  } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
+}
+
+// ============== Vendors ==============
+
+function rowToVendor(row) {
+  return {
+    ID: row[0],
+    VendorName: row[1] || '',
+    ContactPerson: row[2] || '',
+    Phone: row[3] || '',
+    Email: row[4] || '',
+    TIN: row[5] || '',
+    PaymentTerms: row[6] || '',
+    OpeningBalance: parseFloat(row[7]) || 0,
+    Address: row[8] || '',
+    Status: String(row[9] || 'active').toLowerCase(),
+    Notes: row[10] || '',
+    CreatedAt: toIso(row[11]),
+    UpdatedAt: toIso(row[12])
+  };
+}
+
+function getAllVendors(currentUser, currentRole) {
+  try {
+    if (!canReadVendors(currentRole)) return { success: false, message: 'Forbidden' };
+    var sh = _ensureVendorsSheet();
+    var data = sh.getDataRange().getValues(), out = [];
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][13]) === '1') continue;
+      out.push(rowToVendor(data[i]));
+    }
+    out.sort(function(a, b) { return String(a.VendorName).localeCompare(String(b.VendorName)); });
+    return { success: true, data: out };
+  } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
+}
+
+function addVendor(d, currentUser, currentRole) {
+  try {
+    if (!canWriteVendors(currentRole)) return { success: false, message: 'Forbidden — admin/clerk/bursar only' };
+    if (!d || typeof d !== 'object') return { success: false, message: 'Invalid payload' };
+    var name = String(d.VendorName || '').trim();
+    if (!name) return { success: false, message: 'VendorName required' };
+    var status = String(d.Status || 'active').toLowerCase();
+    if (['active', 'inactive'].indexOf(status) === -1) status = 'active';
+    var opening = parseFloat(d.OpeningBalance) || 0;
+    var sh = _ensureVendorsSheet();
+    var ts = nowIso(), id = nextRowId(sh);
+    sh.appendRow([id, name, String(d.ContactPerson || ''), String(d.Phone || ''), String(d.Email || ''), String(d.TIN || ''), String(d.PaymentTerms || ''), opening, String(d.Address || ''), status, String(d.Notes || ''), ts, ts, '0']);
+    addLog(currentUser, 'Vendor Added', '#' + id + ' ' + name);
+    return { success: true, message: 'Vendor added', id: id };
+  } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
+}
+
+function updateVendor(id, d, currentUser, currentRole) {
+  try {
+    if (!canWriteVendors(currentRole)) return { success: false, message: 'Forbidden — admin/clerk/bursar only' };
+    if (!d || typeof d !== 'object') return { success: false, message: 'Invalid payload' };
+    var name = String(d.VendorName || '').trim();
+    if (!name) return { success: false, message: 'VendorName required' };
+    var idn = parseInt(id, 10);
+    if (isNaN(idn)) return { success: false, message: 'Invalid id' };
+    var sh = _ensureVendorsSheet();
+    var data = sh.getDataRange().getValues(), idx = -1;
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] === idn && String(data[i][13]) === '0') { idx = i; break; }
+    }
+    if (idx === -1) return { success: false, message: 'Vendor not found' };
+    var status = String(d.Status || 'active').toLowerCase();
+    if (['active', 'inactive'].indexOf(status) === -1) status = 'active';
+    var opening = parseFloat(d.OpeningBalance) || 0;
+    var r = idx + 1;
+    sh.getRange(r, 2, 1, 9).setValues([[name, String(d.ContactPerson || ''), String(d.Phone || ''), String(d.Email || ''), String(d.TIN || ''), String(d.PaymentTerms || ''), opening, String(d.Address || ''), status]]);
+    sh.getRange(r, 11).setValue(String(d.Notes || ''));
+    sh.getRange(r, 13).setValue(nowIso());
+    addLog(currentUser, 'Vendor Updated', '#' + idn);
+    return { success: true, message: 'Vendor updated' };
+  } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
+}
+
+function deleteVendor(id, currentUser, currentRole) {
+  try {
+    if (!canWriteVendors(currentRole)) return { success: false, message: 'Forbidden — admin/clerk/bursar only' };
+    var idn = parseInt(id, 10);
+    if (isNaN(idn)) return { success: false, message: 'Invalid id' };
+    var sh = _ensureVendorsSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] === idn && String(data[i][13]) === '0') {
+        sh.getRange(i + 1, 14).setValue('1');
+        sh.getRange(i + 1, 13).setValue(nowIso());
+        addLog(currentUser, 'Vendor Deleted', '#' + idn);
+        return { success: true, message: 'Vendor deleted' };
+      }
+    }
+    return { success: false, message: 'Vendor not found' };
   } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
 }
 
@@ -20528,6 +20759,53 @@ function backfillAllDues() {
 // Time-trigger entry point — generates dues for the current month for all active students
 function generateDuesForCurrentMonth() { return backfillAllDues(); }
 
+// Admin-triggered "start Fees Collection over" — the in-app equivalent of "delete the sheets and
+// regenerate", since Claude cannot reach into a school's live Google Sheet directly. Nothing is
+// destroyed: every existing Fee_Payments/Fee_Dues row is copied to a timestamped archive sheet
+// FIRST, then the live sheets are cleared down to just their header row, then a completely fresh
+// set of dues is generated from the current Fee_Structure for every active student (billed per the
+// school's terms, ready for daily/partial collection against — same due-based ledger as before,
+// just with a clean slate instead of whatever old/legacy rows had accumulated).
+function resetFeesCollection(currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'GMT', 'yyyyMMdd_HHmmss');
+
+    function archiveAndClear(sheetName, headers) {
+      var sh = ss.getSheetByName(sheetName);
+      if (!sh) return 0;
+      var lastRow = sh.getLastRow();
+      var rowCount = Math.max(0, lastRow - 1);
+      if (rowCount > 0) {
+        var data = sh.getDataRange().getValues();
+        var archiveName = (sheetName + '_Archive_' + stamp).substring(0, 100);
+        // extremely unlikely (same-second double-click), but never silently overwrite a prior archive
+        if (ss.getSheetByName(archiveName)) archiveName = (archiveName + '_2').substring(0, 100);
+        var arc = ss.insertSheet(archiveName);
+        arc.getRange(1, 1, data.length, data[0].length).setValues(data);
+        arc.setFrozenRows(1);
+        sh.getRange(2, 1, rowCount, sh.getLastColumn()).clearContent();
+      }
+      return rowCount;
+    }
+
+    var paymentsArchived = archiveAndClear(FEE_PAYMENTS_SHEET, FEE_PAYMENT_HEADERS);
+    var duesArchived = archiveAndClear(FEE_DUES_SHEET, FEE_DUE_HEADERS);
+
+    var backfillMsg = backfillAllDues();
+    addLog(currentUser, 'Fees Collection Reset', paymentsArchived + ' payment(s) and ' + duesArchived + ' due(s) archived; ' + backfillMsg);
+
+    return {
+      success: true,
+      message: 'Fees Collection reset — ' + paymentsArchived + ' old payment record(s) and ' + duesArchived + ' old due(s) were archived (not deleted, see the new "..._Archive_' + stamp + '" sheet(s)) and fresh dues were generated for every active student.',
+      paymentsArchived: paymentsArchived,
+      duesArchived: duesArchived,
+      backfill: backfillMsg
+    };
+  } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
+}
+
 function _resolveSelfStudentId(currentUser) {
   var key = String(currentUser || '').trim().toLowerCase();
   var ssh = getSheet(STUDENTS_SHEET);
@@ -20863,6 +21141,7 @@ var TRASH_REGISTRY = {
   admissionReqs:{ label: 'Admission Requirement',sheet: ADMISSION_REQUIREMENTS_SHEET, headers: ADMISSION_REQUIREMENTS_HEADERS, desc: function (r) { return r[1]; }, canManage: isAdmin },
   assets:       { label: 'Asset',                sheet: ASSETS_SHEET,        headers: ASSET_HEADERS,        desc: function (r) { return r[2] + (r[1] ? ' (' + r[1] + ')' : ''); }, canManage: canWriteAssets },
   stockItems:   { label: 'Stock Item',           sheet: STOCK_ITEMS_SHEET,   headers: STOCK_ITEM_HEADERS,   desc: function (r) { return r[2] + (r[1] ? ' (' + r[1] + ')' : ''); }, canManage: canWriteStock },
+  vendors:      { label: 'Vendor',               sheet: VENDORS_SHEET,       headers: VENDOR_HEADERS,       desc: function (r) { return r[1] + (r[3] ? ' — ' + r[3] : ''); }, canManage: canWriteVendors },
   activities:   { label: 'Activity',             sheet: ACTIVITIES_SHEET,    headers: ACTIVITY_HEADERS,     desc: function (r) { return r[2]; }, canManage: isAdmin }
 };
 

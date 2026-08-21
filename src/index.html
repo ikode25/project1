@@ -4476,6 +4476,9 @@
       substitutes:  { icon: 'user-times',       label: 'Substitutes',        group: 'daily' },
       assets:       { icon: 'desktop',          label: 'Assets',             group: 'records' },
       inventory:    { icon: 'boxes',            label: 'Stock / Inventory',  group: 'records' },
+      pos:          { icon: 'cash-register',    label: 'POS / Sell',         group: 'finance' },
+      stockTransactions: { icon: 'exchange-alt', label: 'Stock Transactions', group: 'finance' },
+      vendors:      { icon: 'truck',            label: 'Vendors',            group: 'finance' },
       trash:        { icon: 'trash-restore',    label: 'Trash',              group: 'account' },
       account:      { icon: 'user-circle',      label: 'My Account',         group: 'account' },
       settings:     { icon: 'cog',              label: 'Settings',           group: 'account' },
@@ -4491,13 +4494,13 @@
     //  - student: timetable + attendance + marks + notices first
     //  - parent: notices + child's attendance/marks/fees first
     const MENU_PRIORITY = {
-      admin: ['dashboard','ownerPortal','reports','admissions','admissionReqs','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','questionBank','onlineLinks','hallTickets','feePayments','accounts','feeStructure','payroll','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','recruitment','trash','account','settings','about'],
+      admin: ['dashboard','ownerPortal','reports','admissions','admissionReqs','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','questionBank','onlineLinks','hallTickets','feePayments','accounts','feeStructure','pos','stockTransactions','vendors','payroll','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','recruitment','trash','account','settings','about'],
       // headteacher (internal role id stays 'supervisor' — see ROLE_DISPLAY_LABEL) — system-wide
       // oversight: academic operations plus Owner Portal's financial/activity monitoring
       supervisor: ['dashboard','ownerPortal','reports','attendance','substitutes','marks','hallTickets','exams','notices','ptm','calendar','discipline','conduct','helpdesk','complaints','lessonPlans','logbook','activities','students','parents','classes','subjects','assignments','documents','timetable','account','about'],
       clerk: ['admissions','admissionReqs','students','parents','feePayments','accounts','feeStructure','sms','reports','attendance','helpdesk','complaints','documents','assets','inventory','timetable','classes','notices','calendar','trash','account','about'],
       // bursar/accountant — finance + asset/stock inventory only, nothing else (per-role scoped portal)
-      bursar: ['dashboard','feePayments','feeStructure','accounts','payroll','assets','inventory','trash','account','about'],
+      bursar: ['dashboard','feePayments','feeStructure','pos','stockTransactions','vendors','accounts','payroll','assets','inventory','trash','account','about'],
       teacher: ['timetable','attendance','substitutes','marks','questionBank','onlineLinks','payroll','hallTickets','exams','lessonPlans','ptm','logbook','students','discipline','conduct','activities','notices','reports','calendar','documents','complaints','classes','subjects','trash','account','about'],
       // student: dashboard → own-class academics → own records → support → profile. Read-only everywhere except helpdesk/complaints/account.
       student: ['dashboard','timetable','attendance','marks','hallTickets','exams','onlineLinks','notices','calendar','feePayments','feeStructure','activities','conduct','discipline','documents','helpdesk','complaints','account','about'],
@@ -19685,6 +19688,33 @@
                   <i className="fas fa-plus"></i> Record Payment
                 </button>
               )}
+              {r === 'admin' && (
+                <button className="btn btn-danger" title="Archives every payment/due record and regenerates fresh dues from Fee Structure"
+                  onClick={() => {
+                    Swal.fire({
+                      icon: 'warning',
+                      title: 'Reset Fees Collection?',
+                      html: 'This archives <strong>every</strong> Fee Payment and Fee Due record to a backup sheet (nothing is deleted), clears Fees Collection, then regenerates fresh dues for every active student from the current Fee Structure.<br/><br/>Type <strong>RESET</strong> to confirm.',
+                      input: 'text',
+                      inputPlaceholder: 'RESET',
+                      showCancelButton: true,
+                      confirmButtonText: 'Reset Fees Collection',
+                      confirmButtonColor: '#ea4335',
+                      inputValidator: (v) => v !== 'RESET' && 'Type RESET (all caps) to confirm'
+                    }).then(rr => {
+                      if (!rr.isConfirmed) return;
+                      Swal.fire({ title: 'Resetting…', text: 'Archiving old records and regenerating dues — this can take a moment.', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                      google.script.run.withSuccessHandler(res => {
+                        if (!res) { Swal.fire({ icon:'error', text:'No response — please try again.' }); return; }
+                        Swal.fire({ icon: res.success ? 'success' : 'error', title: res.success ? 'Fees Collection Reset' : 'Reset Failed', text: res.message });
+                        if (res.success) { refreshPayments(); refreshArrears(); }
+                      }).withFailureHandler(err => Swal.fire({ icon:'error', text:(err&&err.message)||'Failed' }))
+                        .resetFeesCollection(currentUser, role);
+                    });
+                  }}>
+                  <i className="fas fa-trash-restore-alt"></i> Reset Fees Collection
+                </button>
+              )}
             </div>
           </div>
 
@@ -31483,6 +31513,495 @@
       );
     }
 
+    // ============== Vendors ==============
+    function VendorsView({ currentUser, role }) {
+      const r = String(role).toLowerCase();
+      const canManage = r === 'admin' || r === 'clerk' || r === 'bursar';
+      const { data: vendorsData, error: loadError, isLoading: loading, isValidating: syncing, mutate: refresh } =
+        useSWR('getAllVendors', () => swrFetcher('getAllVendors', currentUser, role));
+      const vendors = vendorsData || [];
+      const [showModal, setShowModal] = useState(false);
+      const [editing, setEditing] = useState(null);
+      const tableRef = useRef(null);
+
+      useEffect(() => {
+        return () => { try { if (tableRef.current) { tableRef.current.destroy(); tableRef.current = null; } } catch(e) {} };
+      }, []);
+
+      useEffect(() => { if (!loading) setTimeout(() => initTable(vendors), 80); }, [vendorsData, loading]);
+
+      const initTable = (data) => {
+        const id = '#vendorsTable';
+        if (tableRef.current) { try { tableRef.current.destroy(); $(id).empty(); } catch(e){} tableRef.current = null; }
+        if (!$(id).length) return;
+        const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (m)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+        const cols = [
+          { data: 'VendorName', title: 'Vendor', render: (d) => `<div style="font-weight:600;color:var(--navy-primary)">${esc(d || '—')}</div>` },
+          { data: 'ContactPerson', title: 'Contact Person', render: (d) => d ? esc(d) : '<span style="color:#bbb">—</span>' },
+          { data: 'Phone', title: 'Phone', render: (d) => d ? esc(d) : '<span style="color:#bbb">—</span>' },
+          { data: 'Email', title: 'Email', render: (d) => d ? esc(d) : '<span style="color:#bbb">—</span>' },
+          { data: 'PaymentTerms', title: 'Payment Terms', render: (d) => d ? esc(d) : '<span style="color:#bbb">—</span>' },
+          { data: 'OpeningBalance', title: 'Opening Bal.', render: (d) => 'GH₵' + Number(d || 0).toFixed(2) },
+          { data: 'Status', title: 'Status', render: (d) => `<span class="status-badge ${d === 'active' ? 'status-active' : 'status-inactive'}">${esc(d)}</span>` }
+        ];
+
+        if (canManage) {
+          cols.push({
+            data: null, title: 'Actions', orderable: false,
+            render: () => `<button class="action-icon edit-icon" data-action="edit" title="Edit"><i class="fas fa-edit"></i></button>` +
+                           `<button class="action-icon delete-icon" data-action="delete" title="Delete"><i class="fas fa-trash"></i></button>`
+          });
+        }
+
+        const exportCols = canManage ? ':not(:last-child)' : ':visible';
+        setTimeout(() => {
+          try {
+            const t = $(id).DataTable({
+              data: data, destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams, columns: cols, pageLength: 10,
+              lengthMenu: [[10,25,50,-1],[10,25,50,'All']],
+              responsive: true, dom: 'Blfrtip',
+              buttons: [
+                { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
+                { extend:'csv', text:'<i class="fas fa-file-csv"></i> CSV', exportOptions:{ columns: exportCols } },
+                dtPdfButton('Vendors'),
+                { extend:'print', text:'<i class="fas fa-print"></i> Print', exportOptions:{ columns: exportCols } }
+              ],
+              order: [[0,'asc']]
+            });
+            $(id).off('click', '.action-icon');
+            $(id).on('click', '.action-icon', function(){
+              const action = $(this).data('action');
+              const row = t.row($(this).parents('tr')).data(); if (!row) return;
+              if (action === 'edit') { setEditing(row); setShowModal(true); }
+              else if (action === 'delete') {
+                Swal.fire({ icon:'warning', title:'Delete vendor?', text: row.VendorName, showCancelButton:true, confirmButtonColor:'#ea4335' })
+                  .then(rr => {
+                    if (!rr.isConfirmed) return;
+                    google.script.run.withSuccessHandler(res => {
+                      Swal.fire({ icon: res && res.success ? 'success':'error', text:(res&&res.message)||'Done', timer:1500, showConfirmButton:false });
+                      refresh();
+                    }).withFailureHandler(err => Swal.fire({ icon:'error', text:(err&&err.message)||'Failed' }))
+                      .deleteVendor(row.ID, currentUser, role);
+                  });
+              }
+            });
+            tableRef.current = t;
+          } catch(e) {}
+        }, 80);
+      };
+
+      const handleSave = (data) => {
+        const action = editing ? 'updateVendor' : 'addVendor';
+        const params = editing ? [editing.ID, data, currentUser, role] : [data, currentUser, role];
+        google.script.run.withSuccessHandler(res => {
+          if (!res) { Swal.fire({ icon:'error', text:'No response' }); return; }
+          if (res.success) { setShowModal(false); setEditing(null); Swal.fire({ icon:'success', text:res.message, timer:1500, showConfirmButton:false }); refresh(); }
+          else Swal.fire({ icon:'error', text:res.message });
+        }).withFailureHandler(err => Swal.fire({ icon:'error', text:(err&&err.message)||'Failed' }))[action](...params);
+      };
+
+      return (
+        <div className="data-section">
+          <div className="section-header">
+            <h2><i className="fas fa-truck"></i> Vendors{syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}</h2>
+            {canManage && (
+              <button className="btn btn-success" onClick={() => { setEditing(null); setShowModal(true); }}>
+                <i className="fas fa-plus"></i> Add Vendor
+              </button>
+            )}
+          </div>
+
+          {loadError && !loading && vendors.length === 0 && (
+            <div className="settings-info-message" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>
+              <i className="fas fa-triangle-exclamation" style={{marginRight:'6px',color:'#ea4335'}}></i>
+              Couldn't load vendors — {String((loadError && loadError.message) || loadError)}. Use the <i className="fas fa-arrows-rotate"></i> refresh button to retry.
+            </div>
+          )}
+
+          {loading && <TableSkeleton rows={5} columns={canManage ? 8 : 7} />}
+          {!loading && vendors.length === 0 && (
+            <div style={{textAlign:'center',padding:'40px',color:'#888',background:'#f8f9fa'}}>No vendors yet.</div>
+          )}
+          <div style={{display: loading || vendors.length === 0 ? 'none' : 'block'}}>
+            <table id="vendorsTable" className="display responsive nowrap" style={{width:'100%'}}></table>
+          </div>
+
+          {showModal && (
+            <VendorModal vendor={editing} onClose={() => { setShowModal(false); setEditing(null); }} onSave={handleSave} />
+          )}
+        </div>
+      );
+    }
+
+    function VendorModal({ vendor, onClose, onSave }) {
+      const [data, setData] = useState({
+        VendorName: vendor?.VendorName || '',
+        ContactPerson: vendor?.ContactPerson || '',
+        Phone: vendor?.Phone || '',
+        Email: vendor?.Email || '',
+        TIN: vendor?.TIN || '',
+        PaymentTerms: vendor?.PaymentTerms || '',
+        OpeningBalance: vendor?.OpeningBalance != null ? vendor.OpeningBalance : 0,
+        Address: vendor?.Address || '',
+        Status: vendor?.Status || 'active',
+        Notes: vendor?.Notes || ''
+      });
+      const set = (k, v) => setData(d => ({...d, [k]: v}));
+      const submit = (e) => {
+        e.preventDefault();
+        if (!data.VendorName.trim()) { Swal.fire({ icon:'warning', text:'Vendor name required.' }); return; }
+        onSave({ ...data, OpeningBalance: parseFloat(data.OpeningBalance) || 0 });
+      };
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{maxWidth:'700px'}}>
+            <div className="modal-header">
+              <h3><i className="fas fa-truck"></i> {vendor ? 'Edit' : 'Add'} Vendor</h3>
+              <button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button>
+            </div>
+            <div className="modal-body">
+              <form onSubmit={submit}>
+                <div className="form-grid">
+                  <div className="form-group"><label>Vendor Name *</label>
+                    <input type="text" value={data.VendorName} onChange={e => set('VendorName', e.target.value)} required maxLength="200" />
+                  </div>
+                  <div className="form-group"><label>Contact Person</label>
+                    <input type="text" value={data.ContactPerson} onChange={e => set('ContactPerson', e.target.value)} maxLength="200" />
+                  </div>
+                  <div className="form-group"><label>Phone</label>
+                    <input type="text" value={data.Phone} onChange={e => set('Phone', e.target.value)} maxLength="30" />
+                  </div>
+                  <div className="form-group"><label>Email</label>
+                    <input type="email" value={data.Email} onChange={e => set('Email', e.target.value)} maxLength="200" />
+                  </div>
+                  <div className="form-group"><label>TIN</label>
+                    <input type="text" value={data.TIN} onChange={e => set('TIN', e.target.value)} maxLength="50" placeholder="Ghana Taxpayer ID" />
+                  </div>
+                  <div className="form-group"><label>Payment Terms</label>
+                    <input type="text" value={data.PaymentTerms} onChange={e => set('PaymentTerms', e.target.value)} maxLength="100" placeholder="e.g. Net 30, Cash on delivery" />
+                  </div>
+                  <div className="form-group"><label>Opening Balance</label>
+                    <input type="number" step="0.01" value={data.OpeningBalance} onChange={e => set('OpeningBalance', e.target.value)} />
+                  </div>
+                  <SearchableDropdown label="Status" icon="fas fa-toggle-on"
+                    options={[{value:'active',label:'Active'},{value:'inactive',label:'Inactive'}]}
+                    value={data.Status} onChange={(v) => set('Status', v)} placeholder="Select..." />
+                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Address</label>
+                    <input type="text" value={data.Address} onChange={e => set('Address', e.target.value)} maxLength="300" />
+                  </div>
+                  <div className="form-group" style={{gridColumn:'1 / -1'}}><label>Notes</label>
+                    <textarea value={data.Notes} onChange={e => set('Notes', e.target.value)} rows="2" maxLength="500" />
+                  </div>
+                </div>
+                <div className="form-actions">
+                  <button type="submit" className="btn btn-primary"><i className="fas fa-save"></i> Save</button>
+                  <button type="button" className="btn btn-secondary" onClick={onClose}><i className="fas fa-times"></i> Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // ============== Stock Transactions (dedicated ledger page) ==============
+    function StockTransactionsView({ currentUser, role }) {
+      const [filters, setFilters] = useState({ kind: '' });
+      const { data: txnData, error: loadError, isLoading: loading, isValidating: syncing, mutate: refresh } =
+        useSWR('getAllStockTransactions', () => swrFetcher('getAllStockTransactions', {}, currentUser, role));
+      const allTxns = txnData || [];
+      const txns = filters.kind ? allTxns.filter(t => t.Kind === filters.kind) : allTxns;
+      const tableRef = useRef(null);
+
+      useEffect(() => {
+        return () => { try { if (tableRef.current) { tableRef.current.destroy(); tableRef.current = null; } } catch(e) {} };
+      }, []);
+
+      useEffect(() => { if (!loading) setTimeout(() => initTable(txns), 80); }, [txnData, loading, filters.kind]);
+
+      const kindOpts = [
+        { value:'sale', label:'Sale', color:'#28a745' },
+        { value:'purchase', label:'Purchase', color:'#0074D9' },
+        { value:'return', label:'Return', color:'#fbbc04' },
+        { value:'issue', label:'Issue', color:'#ea4335' },
+        { value:'adjustment', label:'Adjustment', color:'#6c757d' }
+      ];
+      const kindBadgeClass = (k) => k === 'sale' ? 'status-active' : k === 'return' ? 'status-suspended' : k === 'purchase' ? 'role-clerk' : k === 'issue' ? 'status-inactive' : 'role-supervisor';
+
+      const initTable = (data) => {
+        const id = '#stockTxnTable';
+        if (tableRef.current) { try { tableRef.current.destroy(); $(id).empty(); } catch(e){} tableRef.current = null; }
+        if (!$(id).length) return;
+        const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (m)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+        const fmtDate = (d) => { if (!d) return '—'; const dt = new Date(d); return isNaN(dt) ? String(d) : dt.toLocaleString(); };
+
+        const cols = [
+          { data: 'TransactionDate', title: 'Date', render: (d) => esc(fmtDate(d)) },
+          { data: 'ItemName', title: 'Item', render: (d, t, row) => `<div style="font-weight:600">${esc(d || '—')}</div><div style="font-size:11px;color:#888">${esc(row.ItemCode||'')}</div>` },
+          { data: 'Kind', title: 'Kind', render: (d) => `<span class="status-badge ${kindBadgeClass(d)}">${esc((d||'').charAt(0).toUpperCase()+(d||'').slice(1))}</span>` },
+          { data: 'Quantity', title: 'Qty', render: (d) => esc(String(d)) },
+          { data: 'UnitPrice', title: 'Unit Price', render: (d) => d ? 'GH₵' + Number(d).toFixed(2) : '<span style="color:#bbb">—</span>' },
+          { data: 'TotalAmount', title: 'Total', render: (d) => d ? 'GH₵' + Number(d).toFixed(2) : '<span style="color:#bbb">—</span>' },
+          { data: 'Party', title: 'Party', render: (d, t, row) => esc(d || row.VendorName || row.IssuedTo || '—') },
+          { data: 'PerformedByName', title: 'By', render: (d, t, row) => esc(d || row.PerformedBy || '—') }
+        ];
+
+        const t = $(id).DataTable({
+          data: data, destroy: true, stateSave: true, stateSaveParams: dtStateSaveParams, columns: cols, pageLength: 15,
+          lengthMenu: [[15,25,50,-1],[15,25,50,'All']],
+          responsive: true, dom: 'Blfrtip',
+          buttons: [
+            { extend: 'colvis', text: '<i class="fas fa-columns"></i> Columns', className: 'dt-colvis-btn' },
+            { extend:'csv', text:'<i class="fas fa-file-csv"></i> CSV' },
+            dtPdfButton('Stock Transactions'),
+            { extend:'print', text:'<i class="fas fa-print"></i> Print' }
+          ],
+          order: [[0,'desc']]
+        });
+        tableRef.current = t;
+      };
+
+      const totalIn = txns.filter(t => t.Type === 'in').reduce((s, t) => s + (Number(t.TotalAmount) || 0), 0);
+      const totalOut = txns.filter(t => t.Type === 'out').reduce((s, t) => s + (Number(t.TotalAmount) || 0), 0);
+
+      return (
+        <div className="data-section">
+          <div className="section-header">
+            <h2><i className="fas fa-exchange-alt"></i> Stock Transactions{syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}</h2>
+          </div>
+
+          {loadError && !loading && txns.length === 0 && (
+            <div className="settings-info-message" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>
+              <i className="fas fa-triangle-exclamation" style={{marginRight:'6px',color:'#ea4335'}}></i>
+              Couldn't load transactions — {String((loadError && loadError.message) || loadError)}. Use the <i className="fas fa-arrows-rotate"></i> refresh button to retry.
+            </div>
+          )}
+
+          {!loading && (
+            <div className="form-grid" style={{marginBottom:'15px'}}>
+              <div className="stat-card" style={{padding:'14px',background:'#fff',border:'1px solid #e0e0e0',borderRadius:'6px',borderLeft:'4px solid #28a745'}}>
+                <div style={{fontSize:'12px',color:'#888',textTransform:'uppercase'}}><i className="fas fa-arrow-down"></i> Total Sales / Out</div>
+                <div style={{fontSize:'22px',fontWeight:700,color:'#28a745'}}>GH₵{totalOut.toFixed(2)}</div>
+              </div>
+              <div className="stat-card" style={{padding:'14px',background:'#fff',border:'1px solid #e0e0e0',borderRadius:'6px',borderLeft:'4px solid #0074D9'}}>
+                <div style={{fontSize:'12px',color:'#888',textTransform:'uppercase'}}><i className="fas fa-arrow-up"></i> Total Purchases / In</div>
+                <div style={{fontSize:'22px',fontWeight:700,color:'#0074D9'}}>GH₵{totalIn.toFixed(2)}</div>
+              </div>
+              <div className="stat-card" style={{padding:'14px',background:'#fff',border:'1px solid #e0e0e0',borderRadius:'6px',borderLeft:'4px solid #001f3f'}}>
+                <div style={{fontSize:'12px',color:'#888',textTransform:'uppercase'}}><i className="fas fa-list"></i> Transactions</div>
+                <div style={{fontSize:'22px',fontWeight:700,color:'var(--navy-primary)'}}>{txns.length}</div>
+              </div>
+            </div>
+          )}
+
+          <StatusPipeline
+            items={allTxns}
+            field="Kind"
+            options={kindOpts}
+            value={filters.kind}
+            onChange={(v) => setFilters({...filters, kind: v})}
+          />
+
+          {loading && <TableSkeleton rows={6} columns={8} />}
+          {!loading && txns.length === 0 && (
+            <div style={{textAlign:'center',padding:'40px',color:'#888',background:'#f8f9fa'}}>No stock transactions{filters.kind ? ' of this kind' : ''} yet.</div>
+          )}
+          <div style={{display: loading || txns.length === 0 ? 'none' : 'block'}}>
+            <table id="stockTxnTable" className="display responsive nowrap" style={{width:'100%'}}></table>
+          </div>
+        </div>
+      );
+    }
+
+    // ============== POS / Sell ==============
+    function POSView({ currentUser, role }) {
+      const { data: itemsData, error: loadError, isLoading: loading, mutate: refreshItems } =
+        useSWR('getAllStockItems', () => swrFetcher('getAllStockItems', {}, currentUser, role));
+      const items = itemsData || [];
+      const [mode, setMode] = useState('sale'); // 'sale' | 'return'
+      const [cart, setCart] = useState([]); // [{ ItemID, ItemName, Unit, UnitPrice, Quantity, maxStock }]
+      const [party, setParty] = useState('');
+      const [paymentMode, setPaymentMode] = useState('cash');
+      const [search, setSearch] = useState('');
+      const [submitting, setSubmitting] = useState(false);
+
+      const filteredItems = items.filter(i =>
+        !search.trim() ||
+        String(i.ItemName || '').toLowerCase().includes(search.toLowerCase()) ||
+        String(i.ItemCode || '').toLowerCase().includes(search.toLowerCase())
+      );
+
+      const addToCart = (item) => {
+        if (mode === 'sale' && Number(item.CurrentStock || 0) <= 0) {
+          Swal.fire({ icon:'warning', text: 'Out of stock.', timer:1200, showConfirmButton:false }); return;
+        }
+        setCart(c => {
+          const idx = c.findIndex(x => x.ItemID === item.ID);
+          if (idx > -1) {
+            const next = c.slice();
+            next[idx] = { ...next[idx], Quantity: next[idx].Quantity + 1 };
+            return next;
+          }
+          return [...c, { ItemID: item.ID, ItemName: item.ItemName, Unit: item.Unit, UnitPrice: item.UnitCost || 0, Quantity: 1, maxStock: item.CurrentStock || 0 }];
+        });
+      };
+
+      const updateCartQty = (itemId, qty) => {
+        setCart(c => c.map(x => x.ItemID === itemId ? { ...x, Quantity: Math.max(1, qty) } : x));
+      };
+      const updateCartPrice = (itemId, price) => {
+        setCart(c => c.map(x => x.ItemID === itemId ? { ...x, UnitPrice: Math.max(0, price) } : x));
+      };
+      const removeFromCart = (itemId) => setCart(c => c.filter(x => x.ItemID !== itemId));
+
+      const cartTotal = cart.reduce((s, x) => s + (Number(x.Quantity) * Number(x.UnitPrice)), 0);
+
+      const completeTransaction = () => {
+        if (cart.length === 0) { Swal.fire({ icon:'warning', text:'Cart is empty.' }); return; }
+        if (mode === 'sale') {
+          const over = cart.find(x => x.Quantity > x.maxStock);
+          if (over) { Swal.fire({ icon:'error', text: `Only ${over.maxStock} ${over.Unit||''} of ${over.ItemName} in stock.` }); return; }
+        }
+        setSubmitting(true);
+        const saleRef = (mode === 'sale' ? 'SALE-' : 'RTN-') + Date.now();
+        const kind = mode === 'sale' ? 'sale' : 'return';
+        const type = mode === 'sale' ? 'out' : 'in';
+        let done = 0, failed = [];
+        cart.forEach((line) => {
+          google.script.run.withSuccessHandler(res => {
+            done++;
+            if (!res || !res.success) failed.push(line.ItemName + ': ' + ((res && res.message) || 'no response'));
+            if (done === cart.length) finish();
+          }).withFailureHandler(err => {
+            done++;
+            failed.push(line.ItemName + ': ' + ((err && err.message) || 'failed'));
+            if (done === cart.length) finish();
+          }).recordStockTransaction(line.ItemID, {
+            type: type, kind: kind, quantity: line.Quantity, unitPrice: line.UnitPrice,
+            party: party || 'Walk-in', paymentMode: paymentMode, reference: saleRef,
+            reason: mode === 'sale' ? 'POS Sale' : 'POS Return/Restock'
+          }, currentUser, role);
+        });
+        const esc_ = (s) => String(s || '').replace(/[&<>"']/g, (m)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+        const finish = () => {
+          setSubmitting(false);
+          refreshItems();
+          if (failed.length === 0) {
+            Swal.fire({ icon:'success', title: mode === 'sale' ? 'Sale completed' : 'Return recorded', text: 'Total GH₵' + cartTotal.toFixed(2), timer:2000, showConfirmButton:false });
+            setCart([]); setParty('');
+          } else {
+            Swal.fire({ icon:'warning', title:'Completed with issues', html: failed.map(f => esc_(f)).join('<br/>') });
+          }
+        };
+      };
+
+      const categoryColor = { stationery:'#0074D9', cleaning:'#28a745', kitchen:'#fbbc04', lab:'#ea4335', medical:'#9b59b6', sports:'#17a2b8', other:'#6c757d' };
+
+      return (
+        <div className="data-section">
+          <div className="section-header">
+            <h2><i className="fas fa-cash-register"></i> POS / Sell</h2>
+          </div>
+
+          {loadError && !loading && items.length === 0 && (
+            <div className="settings-info-message" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>
+              <i className="fas fa-triangle-exclamation" style={{marginRight:'6px',color:'#ea4335'}}></i>
+              Couldn't load stock items — {String((loadError && loadError.message) || loadError)}.
+            </div>
+          )}
+
+          <div className="pipeline-stages" style={{marginBottom:'15px'}}>
+            <div className={'pipeline-stage' + (mode === 'sale' ? ' active' : '')}
+                 style={{background: mode === 'sale' ? '#001f3f' : '#28a745'}}
+                 onClick={() => { setMode('sale'); setCart([]); }}>
+              <span className="pipeline-stage-name"><i className="fas fa-shopping-cart"></i> Sell</span>
+            </div>
+            <div className={'pipeline-stage' + (mode === 'return' ? ' active' : '')}
+                 style={{background: mode === 'return' ? '#001f3f' : '#fbbc04'}}
+                 onClick={() => { setMode('return'); setCart([]); }}>
+              <span className="pipeline-stage-name"><i className="fas fa-undo"></i> Return / Restock</span>
+            </div>
+          </div>
+
+          <div style={{display:'grid', gridTemplateColumns:'1fr 360px', gap:'16px', alignItems:'start'}}>
+            <div>
+              <div className="form-group" style={{marginBottom:'12px'}}>
+                <input type="text" placeholder="Search item name or code…" value={search} onChange={e => setSearch(e.target.value)}
+                  style={{width:'100%',padding:'10px 12px',border:'1px solid #ddd',borderRadius:'6px'}} />
+              </div>
+              {loading && <TableSkeleton rows={4} columns={4} />}
+              {!loading && (
+                <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(140px, 1fr))', gap:'10px'}}>
+                  {filteredItems.map(item => {
+                    const out = mode === 'sale' && Number(item.CurrentStock || 0) <= 0;
+                    return (
+                      <div key={item.ID} onClick={() => !out && addToCart(item)}
+                        style={{
+                          border: '1px solid #e0e0e0', borderRadius:'8px', padding:'12px', cursor: out ? 'not-allowed' : 'pointer',
+                          background: out ? '#f5f5f5' : '#fff', opacity: out ? 0.55 : 1, borderTop: '3px solid ' + (categoryColor[item.Category] || '#6c757d'),
+                          transition:'box-shadow .15s'
+                        }}
+                        onMouseEnter={e => { if (!out) e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.12)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; }}>
+                        <div style={{fontWeight:600, fontSize:'13px', color:'var(--navy-primary)', marginBottom:'4px'}}>{item.ItemName}</div>
+                        <div style={{fontSize:'11px', color:'#888', marginBottom:'6px'}}>{item.ItemCode}</div>
+                        <div style={{fontSize:'12px', color: out ? '#ea4335' : '#28a745', fontWeight:600}}>
+                          {out ? 'Out of stock' : `${item.CurrentStock} ${item.Unit || ''} left`}
+                        </div>
+                        <div style={{fontSize:'13px', fontWeight:700, marginTop:'4px'}}>GH₵{Number(item.UnitCost || 0).toFixed(2)}</div>
+                      </div>
+                    );
+                  })}
+                  {filteredItems.length === 0 && (
+                    <div style={{gridColumn:'1/-1', textAlign:'center', padding:'30px', color:'#888'}}>No items found.</div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div style={{border:'1px solid #e0e0e0', borderRadius:'8px', padding:'14px', background:'#fff', position:'sticky', top:'10px'}}>
+              <h3 style={{marginTop:0, fontSize:'15px'}}><i className="fas fa-receipt"></i> {mode === 'sale' ? 'Sale Cart' : 'Return Cart'}</h3>
+              {cart.length === 0 && <div style={{color:'#888', fontSize:'13px', padding:'10px 0'}}>Click an item to add it.</div>}
+              {cart.map(line => (
+                <div key={line.ItemID} style={{display:'flex', alignItems:'center', gap:'6px', padding:'8px 0', borderBottom:'1px solid #f0f0f0'}}>
+                  <div style={{flex:1, fontSize:'12px'}}>{line.ItemName}</div>
+                  <input type="number" min="1" value={line.Quantity} onChange={e => updateCartQty(line.ItemID, parseInt(e.target.value,10) || 1)}
+                    style={{width:'48px', padding:'4px', fontSize:'12px', border:'1px solid #ddd', borderRadius:'4px'}} />
+                  <input type="number" min="0" step="0.01" value={line.UnitPrice} onChange={e => updateCartPrice(line.ItemID, parseFloat(e.target.value) || 0)}
+                    style={{width:'64px', padding:'4px', fontSize:'12px', border:'1px solid #ddd', borderRadius:'4px'}} title="Unit price" />
+                  <button onClick={() => removeFromCart(line.ItemID)} style={{background:'none', border:'none', color:'#ea4335', cursor:'pointer'}}>
+                    <i className="fas fa-times"></i>
+                  </button>
+                </div>
+              ))}
+              <div style={{display:'flex', justifyContent:'space-between', fontWeight:700, fontSize:'16px', margin:'12px 0'}}>
+                <span>Total</span><span>GH₵{cartTotal.toFixed(2)}</span>
+              </div>
+              <div className="form-group">
+                <label style={{fontSize:'12px'}}>Buyer / Customer</label>
+                <input type="text" value={party} onChange={e => setParty(e.target.value)} placeholder="Walk-in"
+                  style={{width:'100%', padding:'8px', border:'1px solid #ddd', borderRadius:'6px'}} />
+              </div>
+              <div className="form-group">
+                <label style={{fontSize:'12px'}}>Payment Mode</label>
+                <select value={paymentMode} onChange={e => setPaymentMode(e.target.value)}
+                  style={{width:'100%', padding:'8px', border:'1px solid #ddd', borderRadius:'6px'}}>
+                  <option value="cash">Cash</option>
+                  <option value="mobile_money">Mobile Money</option>
+                  <option value="card">Card</option>
+                  <option value="bank_transfer">Bank Transfer</option>
+                </select>
+              </div>
+              <button className="btn btn-primary" disabled={submitting || cart.length === 0} onClick={completeTransaction} style={{width:'100%', marginTop:'8px'}}>
+                {submitting ? <><i className="fas fa-spinner fa-spin"></i> Processing…</> : <><i className="fas fa-check"></i> {mode === 'sale' ? 'Complete Sale' : 'Complete Return'}</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     // ============== Trash / Recycle Bin ==============
     function TrashView({ currentUser, role }) {
       const { data: itemsData, error: loadError, isLoading: loading, isValidating: syncing, mutate: refresh } =
@@ -31815,6 +32334,9 @@
       const canSeeSubstitutes = r === 'admin' || r === 'clerk' || r === 'teacher' || r === 'supervisor';
       const canSeeAssets = r === 'admin' || r === 'clerk' || r === 'teacher' || r === 'supervisor' || isBursar;
       const canSeeInventory = r === 'admin' || r === 'clerk' || r === 'teacher' || isBursar;
+      const canSeePos = r === 'admin' || isBursar;
+      const canSeeStockTransactions = r === 'admin' || isBursar;
+      const canSeeVendors = r === 'admin' || isBursar;
       const canSeeReports = r === 'admin' || r === 'clerk' || r === 'supervisor' || r === 'teacher';
       const canSeeTrash = r === 'admin' || r === 'clerk' || r === 'teacher' || isBursar;
 
@@ -31918,6 +32440,12 @@
           return canSeeAssets ? <AssetsView currentUser={user} role={role} /> : denied('Asset Inventory');
         case 'inventory':
           return canSeeInventory ? <InventoryView currentUser={user} role={role} /> : denied('Stock / Inventory');
+        case 'pos':
+          return canSeePos ? <POSView currentUser={user} role={role} /> : denied('POS / Sell');
+        case 'stockTransactions':
+          return canSeeStockTransactions ? <StockTransactionsView currentUser={user} role={role} /> : denied('Stock Transactions');
+        case 'vendors':
+          return canSeeVendors ? <VendorsView currentUser={user} role={role} /> : denied('Vendors');
         case 'trash':
           return canSeeTrash ? <TrashView currentUser={user} role={role} /> : denied('Trash');
         case 'settings':
