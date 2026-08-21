@@ -12755,8 +12755,9 @@
       }, [student.ID]);
 
       const pendingDues = dues.filter(d => d.Status !== 'paid');
+      const remainingOf = (d) => Math.max(0, (parseFloat(d.Amount) || 0) - (parseFloat(d.PaidAmount) || 0));
       const selectedIds = Object.keys(selectedDues).filter(k => selectedDues[k]).map(k => parseInt(k, 10));
-      const selectedTotal = pendingDues.filter(d => selectedDues[d.ID]).reduce((s, d) => s + (parseFloat(d.Amount) || 0), 0);
+      const selectedTotal = pendingDues.filter(d => selectedDues[d.ID]).reduce((s, d) => s + remainingOf(d), 0);
 
       const toggleDue = (id) => setSelectedDues(prev => ({ ...prev, [id]: !prev[id] }));
       const selectAllPending = () => {
@@ -12765,6 +12766,38 @@
         setSelectedDues(next);
       };
       const clearSelection = () => setSelectedDues({});
+
+      // quick single-due partial payment — the "collect a little today, more tomorrow" flow, right
+      // from the due card, without leaving this modal or opening the full Record Payment form
+      const [partialPaying, setPartialPaying] = useState(null); // dueId currently mid-request, or null
+      const handlePayPartial = (due) => {
+        const remaining = remainingOf(due);
+        Swal.fire({
+          icon: 'question', title: 'Collect payment', text: due.BillingMonthLabel + ' — remaining GH₵' + remaining.toFixed(2),
+          html: `<input id="pp-amount" class="swal2-input" type="number" min="0.01" max="${remaining}" step="0.01" placeholder="Amount collected today" value="${remaining.toFixed(2)}" />`,
+          showCancelButton: true, confirmButtonText: 'Record Payment', confirmButtonColor: '#34a853',
+          preConfirm: () => {
+            const amt = parseFloat(document.getElementById('pp-amount').value);
+            if (!amt || amt <= 0) { Swal.showValidationMessage('Enter a valid amount'); return false; }
+            if (amt > remaining + 0.01) { Swal.showValidationMessage('Amount exceeds the remaining balance of GH₵' + remaining.toFixed(2)); return false; }
+            return amt;
+          }
+        }).then((r) => {
+          if (!r.isConfirmed) return;
+          setPartialPaying(due.ID);
+          google.script.run
+            .withSuccessHandler((res) => {
+              setPartialPaying(null);
+              if (res.success) {
+                Swal.fire({ icon: 'success', title: res.message, timer: 2200, showConfirmButton: false });
+                loadDues();
+                google.script.run.withSuccessHandler((rs) => { if (rs.success) setData(rs.data); }).getStudentFeeSummary(student.ID, currentUser, role);
+              } else Swal.fire({ icon: 'error', title: 'Error', text: res.message });
+            })
+            .withFailureHandler((err) => { setPartialPaying(null); Swal.fire({ icon: 'error', title: 'Error', text: err.message }); })
+            .addPayment({ StudentID: student.ID, DueID: due.ID, AmountPaid: r.value, PaymentMode: 'cash', PaymentDate: new Date().toISOString().split('T')[0] }, currentUser, role);
+        });
+      };
 
       const handlePay = () => {
         if (selectedIds.length === 0) { Swal.fire({ icon: 'warning', text: 'Select at least one month' }); return; }
@@ -12968,6 +13001,8 @@
                       const isPaid = d.Status === 'paid';
                       const isSelected = !!selectedDues[d.ID];
                       const isArrears = !isPaid && d.IsArrears;
+                      const isPartial = !isPaid && (parseFloat(d.PaidAmount) || 0) > 0;
+                      const remaining = remainingOf(d);
                       return (
                         <div key={d.ID}
                           onClick={() => canPay && !isPaid && toggleDue(d.ID)}
@@ -12990,15 +13025,25 @@
                           </div>
                           <div style={{fontSize:'11px',color:'#888',textTransform:'capitalize',marginBottom:'4px'}}>{d.FeeCategory}</div>
                           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                            <span style={{fontWeight:700,fontSize:'14px',color:isPaid ? '#34a853' : '#ea4335'}}>GH₵{fmt(d.Amount)}</span>
+                            <span style={{fontWeight:700,fontSize:'14px',color:isPaid ? '#34a853' : '#ea4335'}}>GH₵{fmt(isPaid ? d.Amount : remaining)}</span>
                             <span style={{fontSize:'10px',padding:'2px 7px',borderRadius:'10px',background: isPaid ? '#34a853' : '#ea4335',color:'#fff',fontWeight:700,textTransform:'uppercase'}}>
-                              {isPaid ? 'Paid' : isArrears ? 'Arrears' : 'Pending'}
+                              {isPaid ? 'Paid' : isArrears ? 'Arrears' : isPartial ? 'Partial' : 'Pending'}
                             </span>
                           </div>
+                          {isPartial && (
+                            <div style={{fontSize:'10px',color:'#888',marginTop:'2px'}}>GH₵{fmt(d.PaidAmount)} of {fmt(d.Amount)} paid so far</div>
+                          )}
                           {isPaid && d.PaidDate && (
                             <div style={{fontSize:'10px',color:'#888',marginTop:'4px',fontFamily:'monospace'}}>
                               <i className="fas fa-receipt"></i> {String(d.PaidDate).split('T')[0]}
                             </div>
+                          )}
+                          {canPay && !isPaid && (
+                            <button type="button" className="btn btn-secondary btn-sm" style={{marginTop:'8px',width:'100%',fontSize:'11px',padding:'4px 6px'}}
+                              disabled={partialPaying === d.ID}
+                              onClick={(e) => { e.stopPropagation(); handlePayPartial(d); }}>
+                              {partialPaying === d.ID ? <><i className="fas fa-spinner fa-spin"></i> Recording…</> : <><i className="fas fa-hand-holding-usd"></i> Collect Payment</>}
+                            </button>
                           )}
                         </div>
                       );
@@ -19990,20 +20035,21 @@
 
       // ============ STUDENT MODE STATE ============
       const [students, setStudents] = useState([]);
-      const [feeStructures, setFeeStructures] = useState([]);
+      // outstanding dues for the picked student — this IS the "which term/month am I paying" picker
+      // now (replaces the old raw Fee Structure + free-text Billing Period fields). Arrears sort first.
+      const [dues, setDues] = useState([]);
+      const [duesLoading, setDuesLoading] = useState(false);
       const [formData, setFormData] = useState({
         StudentID: payment?.StudentID ? String(payment.StudentID) : '',
-        FeeStructureID: payment?.FeeStructureID ? String(payment.FeeStructureID) : '',
+        DueID: payment?.DueID ? String(payment.DueID) : '',
         AmountPaid: payment?.AmountPaid != null ? payment.AmountPaid : '',
         LateFee: payment?.LateFee != null ? payment.LateFee : 0,
         Discount: payment?.Discount != null ? payment.Discount : 0,
         PaymentDate: dStr(payment?.PaymentDate) || new Date().toISOString().split('T')[0],
-        BillingPeriod: payment?.BillingPeriod || '',
         PaymentMode: payment?.PaymentMode || 'cash',
         MobileMoneyProvider: payment?.MobileMoneyProvider || '',
         TransactionReference: payment?.TransactionReference || '',
         ReceiptNumber: payment?.ReceiptNumber || '',
-        PaymentStatus: payment?.PaymentStatus || 'paid',
         Remarks: payment?.Remarks || ''
       });
       const set = (k, v) => setFormData({ ...formData, [k]: v });
@@ -20014,8 +20060,8 @@
       const [selectedParentId, setSelectedParentId] = useState('');
       const [children, setChildren] = useState([]);
       const [childrenLoading, setChildrenLoading] = useState(false);
-      const [feeByClass, setFeeByClass] = useState({}); // classId → fee[]
-      const [childRows, setChildRows] = useState({});   // studentId → row data
+      const [duesByChild, setDuesByChild] = useState({}); // studentId → due[]
+      const [childRows, setChildRows] = useState({});     // studentId → row data
 
       // load students (student mode default load)
       useEffect(() => {
@@ -20028,15 +20074,20 @@
           .getAllStudents(currentUser, role);
       }, []);
 
-      // load fee structures for selected student's class (student mode)
-      const selectedStudent = students.find(s => String(s.ID) === String(formData.StudentID));
-      const classId = selectedStudent ? selectedStudent.ClassID : null;
+      // load the selected student's outstanding dues (student mode, ADD only — editing keeps its
+      // original due, no need to re-fetch the whole list)
       useEffect(() => {
-        if (mode !== 'student' || !classId) { if (mode === 'student') setFeeStructures([]); return; }
+        if (mode !== 'student' || !isAddNew || !formData.StudentID) { setDues([]); return; }
+        setDuesLoading(true);
         google.script.run
-          .withSuccessHandler((res) => { if (res.success) setFeeStructures(res.data || []); })
-          .getFeeStructuresForClass(classId, currentUser, role);
-      }, [classId, mode]);
+          .withSuccessHandler((res) => {
+            setDuesLoading(false);
+            if (res.success) setDues((res.data || []).filter(d => d.Status !== 'paid'));
+            else { setDues([]); Swal.fire({ icon: 'error', title: 'Could not load dues', text: res.message }); }
+          })
+          .withFailureHandler((err) => { setDuesLoading(false); Swal.fire({ icon: 'error', title: 'Could not load dues', text: err.message }); })
+          .getStudentMonthlyDues(formData.StudentID, currentUser, role);
+      }, [formData.StudentID, mode]);
 
       // load parents on first switch to parent-mode
       useEffect(() => {
@@ -20052,7 +20103,7 @@
           .getAllParents(currentUser, role);
       }, [mode]);
 
-      // when parent changes → load that parent's kids + their class fee structures
+      // when parent changes → load that parent's kids + each kid's outstanding dues
       useEffect(() => {
         if (mode !== 'parent' || !selectedParentId) { setChildren([]); setChildRows({}); return; }
         setChildrenLoading(true);
@@ -20068,51 +20119,51 @@
             // init per-child rows
             const rows = {};
             kids.forEach(k => {
-              rows[k.StudentID] = { FeeStructureID: '', AmountPaid: '', LateFee: 0, Discount: 0, BillingPeriod: '' };
+              rows[k.StudentID] = { DueID: '', AmountPaid: '', LateFee: 0, Discount: 0 };
             });
             setChildRows(rows);
-            // fetch fee structures for unique classes (skip already cached)
-            const uniqClassIds = Array.from(new Set(kids.map(k => k.ClassID).filter(Boolean)));
-            uniqClassIds.forEach(cid => {
-              if (feeByClass[cid]) return;
+            // fetch each child's outstanding dues (skip already cached)
+            kids.forEach(k => {
+              if (duesByChild[k.StudentID]) return;
               google.script.run
                 .withSuccessHandler((r) => {
-                  if (r.success) setFeeByClass(prev => ({ ...prev, [cid]: r.data || [] }));
+                  if (r.success) setDuesByChild(prev => ({ ...prev, [k.StudentID]: (r.data || []).filter(d => d.Status !== 'paid') }));
                 })
-                .getFeeStructuresForClass(cid, currentUser, role);
+                .getStudentMonthlyDues(k.StudentID, currentUser, role);
             });
           })
           .withFailureHandler((err) => { setChildrenLoading(false); Swal.fire({ icon: 'error', title: 'Error', text: err.message }); })
           .getParentStudentLinks(selectedParentId, currentUser, role);
       }, [selectedParentId, mode]);
 
-      // student-mode live calc
-      const selectedFee = feeStructures.find(f => String(f.ID) === String(formData.FeeStructureID));
-      const feeBaseAmount = selectedFee ? selectedFee.Amount : (payment?.FeeAmount || 0);
-      const expected = feeBaseAmount + (parseFloat(formData.LateFee) || 0) - (parseFloat(formData.Discount) || 0);
-      const expectedClamped = expected < 0 ? 0 : expected;
+      // student-mode live calc — remaining balance on the selected due, adjusted by any late
+      // fee/discount entered, minus what's being collected right now
+      const selectedDue = dues.find(d => String(d.ID) === String(formData.DueID));
+      const dueBaseRemaining = selectedDue ? Math.max(0, (selectedDue.Amount || 0) - (selectedDue.PaidAmount || 0)) : 0;
+      const adjustedRemaining = Math.max(0, dueBaseRemaining + (parseFloat(formData.LateFee) || 0) - (parseFloat(formData.Discount) || 0));
       const paidNow = parseFloat(formData.AmountPaid) || 0;
-      const dueNow = Math.max(0, expectedClamped - paidNow);
-      const computedStatus = paidNow <= 0 ? 'pending' : paidNow >= expectedClamped ? 'paid' : 'partial';
+      const dueNow = Math.max(0, adjustedRemaining - paidNow);
+      const computedStatus = paidNow <= 0 ? 'pending' : dueNow <= 0.01 ? 'paid' : 'partial';
+      const overpaying = paidNow > adjustedRemaining + 0.01;
 
       // parent-mode totals + per-child calc
       const childCalc = (k) => {
         const r = childRows[k.StudentID] || {};
-        const fees = feeByClass[k.ClassID] || [];
-        const f = fees.find(x => String(x.ID) === String(r.FeeStructureID));
-        const base = f ? f.Amount : 0;
+        const childDues = duesByChild[k.StudentID] || [];
+        const d = childDues.find(x => String(x.ID) === String(r.DueID));
+        const baseRemaining = d ? Math.max(0, (d.Amount || 0) - (d.PaidAmount || 0)) : 0;
         const lt = parseFloat(r.LateFee) || 0;
         const dc = parseFloat(r.Discount) || 0;
-        const ex = Math.max(0, base + lt - dc);
+        const ex = Math.max(0, baseRemaining + lt - dc);
         const pd = parseFloat(r.AmountPaid) || 0;
         const due = Math.max(0, ex - pd);
-        const stat = pd <= 0 ? 'pending' : pd >= ex ? 'paid' : 'partial';
-        return { base, expected: ex, paid: pd, due, status: stat, hasFee: !!f };
+        const stat = pd <= 0 ? 'pending' : due <= 0.01 ? 'paid' : 'partial';
+        return { base: baseRemaining, expected: ex, paid: pd, due, status: stat, hasDue: !!d, overpaying: pd > ex + 0.01 };
       };
       const bulkTotals = children.reduce((acc, k) => {
         const c = childCalc(k);
         const r = childRows[k.StudentID] || {};
-        if (r.FeeStructureID) {
+        if (r.DueID) {
           acc.included += 1;
           acc.expected += c.expected;
           acc.paid += c.paid;
@@ -20130,11 +20181,18 @@
         if (isView) return;
 
         if (mode === 'student') {
-          if (!formData.StudentID || !formData.FeeStructureID) {
-            Swal.fire({ icon: 'error', title: 'Missing fields', text: 'Pick a student and fee item.' }); return;
-          }
-          if (!formData.BillingPeriod) {
-            Swal.fire({ icon: 'error', title: 'Billing period required', text: 'e.g. "Sept 2024" or "Q1 2024-2025"' }); return;
+          if (isAddNew) {
+            if (!formData.StudentID || !formData.DueID) {
+              Swal.fire({ icon: 'error', title: 'Missing fields', text: 'Pick a student and which due to pay.' }); return;
+            }
+            if (!paidNow || paidNow <= 0) {
+              Swal.fire({ icon: 'error', title: 'Amount required', text: 'Enter the amount being collected today.' }); return;
+            }
+            if (overpaying) {
+              Swal.fire({ icon: 'error', title: 'Amount too high', text: 'That\'s more than the GH₵' + adjustedRemaining.toFixed(2) + ' remaining on this due.' }); return;
+            }
+          } else if (!paidNow || paidNow <= 0) {
+            Swal.fire({ icon: 'error', title: 'Amount required' }); return;
           }
           setSaving(true);
           onSave(formData);
@@ -20148,20 +20206,20 @@
         const rows = [];
         for (const k of children) {
           const r = childRows[k.StudentID] || {};
-          if (!r.FeeStructureID) continue;  // skip kids without a fee item picked
-          if (!r.BillingPeriod || !String(r.BillingPeriod).trim()) {
-            Swal.fire({ icon: 'error', title: 'Billing period missing', text: `Enter billing period for ${k.StudentFullName}.` }); return;
+          if (!r.DueID) continue;  // skip kids without a due picked
+          if (r.AmountPaid === '' || r.AmountPaid == null || parseFloat(r.AmountPaid) <= 0) {
+            Swal.fire({ icon: 'error', title: 'Amount missing', text: `Enter the amount being collected for ${k.StudentFullName}.` }); return;
           }
-          if (r.AmountPaid === '' || r.AmountPaid == null) {
-            Swal.fire({ icon: 'error', title: 'Amount missing', text: `Enter amount paid for ${k.StudentFullName} (use 0 for pending).` }); return;
+          const c = childCalc(k);
+          if (c.overpaying) {
+            Swal.fire({ icon: 'error', title: 'Amount too high', text: `${k.StudentFullName}: that's more than the GH₵${c.expected.toFixed(2)} remaining on this due.` }); return;
           }
           rows.push({
             StudentID: parseInt(k.StudentID, 10),
-            FeeStructureID: parseInt(r.FeeStructureID, 10),
+            DueID: parseInt(r.DueID, 10),
             AmountPaid: parseFloat(r.AmountPaid) || 0,
             LateFee: parseFloat(r.LateFee) || 0,
             Discount: parseFloat(r.Discount) || 0,
-            BillingPeriod: String(r.BillingPeriod).trim(),
             PaymentDate: formData.PaymentDate,
             PaymentMode: formData.PaymentMode,
             MobileMoneyProvider: formData.MobileMoneyProvider || '',
@@ -20170,7 +20228,7 @@
           });
         }
         if (rows.length === 0) {
-          Swal.fire({ icon: 'error', title: 'Nothing to record', text: 'Pick a fee item for at least one child.' }); return;
+          Swal.fire({ icon: 'error', title: 'Nothing to record', text: 'Pick a due to pay for at least one child.' }); return;
         }
         setSaving(true);
         onSave({ __bulk: true, payments: rows });
@@ -20210,70 +20268,82 @@
                 {mode === 'student' && (
                   <>
                     <h4 style={{margin:'0 0 12px',color:'var(--navy-primary)',fontSize:'15px',borderBottom:'2px solid var(--navy-primary)',paddingBottom:'6px'}}>
-                      <i className="fas fa-user"></i> Student & Fee
+                      <i className="fas fa-user"></i> Student & Due
                     </h4>
-                    <div className="form-grid">
-                      <SearchableDropdown
-                        label="Student" icon="fas fa-user-graduate"
-                        options={students
-                          .filter(s => s.Status === 'active' || s.Status === 'inactive' || s.Status === 'suspended')
-                          .map(s => ({
-                            value: String(s.ID),
-                            label: s.FullName + ' — ' + s.AdmissionNumber + ' (' + s.ClassLabel + ')'
+                    {isAddNew ? (
+                      <div className="form-grid">
+                        <SearchableDropdown
+                          label="Student" icon="fas fa-user-graduate"
+                          options={students
+                            .filter(s => s.Status === 'active' || s.Status === 'inactive' || s.Status === 'suspended')
+                            .map(s => ({
+                              value: String(s.ID),
+                              label: s.FullName + ' — ' + s.AdmissionNumber + ' (' + s.ClassLabel + ')'
+                            }))}
+                          value={formData.StudentID}
+                          onChange={(v) => setFormData({...formData, StudentID: v, DueID: ''})}
+                          placeholder="Pick a student..."
+                          required
+                        />
+                        <SearchableDropdown
+                          label="Due to Pay (term/month)" icon="fas fa-calendar-alt"
+                          options={dues.map(d => ({
+                            value: String(d.ID),
+                            label: (d.IsArrears ? '⚠ ARREARS — ' : '') + d.BillingMonthLabel + ' · ' + d.FeeCategory + ' — GH₵' + Math.max(0, d.Amount - d.PaidAmount).toFixed(2) + ' remaining'
                           }))}
-                        value={formData.StudentID}
-                        onChange={(v) => { if (!isView) setFormData({...formData, StudentID: v, FeeStructureID: ''}); }}
-                        placeholder="Pick a student..."
-                        required={!isView}
-                      />
-                      <SearchableDropdown
-                        label="Fee Item" icon="fas fa-tag"
-                        options={feeStructures.map(f => ({
-                          value: String(f.ID),
-                          label: f.FeeCategory + ' (' + f.Frequency + ', GH₵' + f.Amount + ')'
-                        }))}
-                        value={formData.FeeStructureID}
-                        onChange={(v) => !isView && set('FeeStructureID', v)}
-                        placeholder={formData.StudentID ? (feeStructures.length === 0 ? 'No active fee items for this class' : 'Pick fee item...') : 'Pick a student first'}
-                        required={!isView}
-                      />
-                      <div className="form-group">
-                        <label><i className="fas fa-calendar-week"></i> Billing Period <span style={{fontWeight:400,color:'#888',fontSize:'11px'}}>(blank = current month)</span></label>
-                        <input type="text" value={formData.BillingPeriod}
-                          onChange={(e) => set('BillingPeriod', e.target.value)}
-                          maxLength="20" disabled={isView}
-                          placeholder="e.g. Sept 2024 or Q1 2024-2025"
-                          style={isView ? {background:'#f8f9fa',cursor:'not-allowed'} : {}} />
+                          value={formData.DueID}
+                          onChange={(v) => set('DueID', v)}
+                          placeholder={!formData.StudentID ? 'Pick a student first' : duesLoading ? 'Loading dues...' : dues.length === 0 ? 'No outstanding dues for this student' : 'Pick a due to pay...'}
+                          required
+                        />
+                        <div className="form-group">
+                          <label><i className="fas fa-calendar-day"></i> Payment Date <span style={{fontWeight:400,color:'#888',fontSize:'11px'}}>(blank = today)</span></label>
+                          <input type="date" value={formData.PaymentDate}
+                            onChange={(e) => set('PaymentDate', e.target.value)} />
+                        </div>
                       </div>
-                      <div className="form-group">
-                        <label><i className="fas fa-calendar-day"></i> Payment Date <span style={{fontWeight:400,color:'#888',fontSize:'11px'}}>(blank = today)</span></label>
-                        <input type="date" value={formData.PaymentDate}
-                          onChange={(e) => set('PaymentDate', e.target.value)}
-                          disabled={isView}
-                          style={isView ? {background:'#f8f9fa',cursor:'not-allowed'} : {}} />
+                    ) : (
+                      <div style={{padding:'10px 14px',background:'#f8f9fa',border:'1px solid #dee2e6',marginBottom:'14px',fontSize:'13px'}}>
+                        <div><b>Student:</b> {payment?.StudentName} <span style={{fontFamily:'monospace',color:'#888'}}>({payment?.AdmissionNumber})</span></div>
+                        <div><b>Paying towards:</b> {payment?.FeeCategory} — {payment?.BillingPeriod}</div>
+                        {!payment?.DueID && (
+                          <div style={{color:'#888',fontSize:'11px',marginTop:'4px'}}><i className="fas fa-info-circle"></i> Legacy payment — not linked to a due, so the balance ledger below isn't shown.</div>
+                        )}
+                        <div style={{marginTop:'8px'}}>
+                          <label style={{fontSize:'12px',fontWeight:600,color:'var(--navy-primary)'}}><i className="fas fa-calendar-day"></i> Payment Date</label>
+                          <input type="date" value={formData.PaymentDate}
+                            onChange={(e) => !isView && set('PaymentDate', e.target.value)} disabled={isView}
+                            style={{display:'block',marginTop:'4px',...(isView ? {background:'#f8f9fa',cursor:'not-allowed'} : {})}} />
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     <h4 style={{margin:'18px 0 12px',color:'var(--navy-primary)',fontSize:'15px',borderBottom:'2px solid var(--navy-primary)',paddingBottom:'6px'}}>
-                      <i className="fas fa-money-bill-wave"></i> Amounts
+                      <i className="fas fa-money-bill-wave"></i> Amount Collected {isAddNew ? '(Today)' : ''}
                     </h4>
                     <div className="form-grid">
                       <div className="form-group">
                         <label><i className="fas fa-money-bill-wave"></i> Amount Paid *</label>
                         <input type="number" value={formData.AmountPaid}
                           onChange={(e) => set('AmountPaid', e.target.value)}
-                          required min="0" step="0.01" disabled={isView}
+                          required min="0.01" step="0.01" disabled={isView}
                           style={isView ? {background:'#f8f9fa',cursor:'not-allowed'} : {}} />
+                        {isAddNew && formData.DueID && (
+                          <button type="button" className="btn btn-secondary btn-sm" style={{marginTop:'6px'}}
+                            onClick={() => set('AmountPaid', adjustedRemaining.toFixed(2))}>
+                            <i className="fas fa-check-double"></i> Pay in full (GH₵{adjustedRemaining.toFixed(2)})
+                          </button>
+                        )}
                       </div>
                       <div className="form-group">
-                        <label><i className="fas fa-exclamation-triangle"></i> Late Fee</label>
+                        <label><i className="fas fa-exclamation-triangle"></i> Late Fee <span style={{fontWeight:400,color:'#888',fontSize:'11px'}}>(adds to the bill)</span></label>
                         <input type="number" value={formData.LateFee}
                           onChange={(e) => set('LateFee', e.target.value)}
                           min="0" step="0.01" disabled={isView}
                           style={isView ? {background:'#f8f9fa',cursor:'not-allowed'} : {}} />
                       </div>
                       <div className="form-group">
-                        <label><i className="fas fa-tag"></i> Discount</label>
+                        <label><i className="fas fa-tag"></i> Discount <span style={{fontWeight:400,color:'#888',fontSize:'11px'}}>(reduces the bill)</span></label>
                         <input type="number" value={formData.Discount}
                           onChange={(e) => set('Discount', e.target.value)}
                           min="0" step="0.01" disabled={isView}
@@ -20281,29 +20351,41 @@
                       </div>
                     </div>
 
-                    {/* live calc summary */}
-                    <div style={{margin:'14px 0',padding:'12px 15px',background:'linear-gradient(135deg,#f8f9fa,#e9ecef)',border:'1px solid #dee2e6',display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:'10px',fontSize:'13px'}}>
-                      <div>
-                        <div style={{fontSize:'11px',color:'#888',textTransform:'uppercase'}}>Fee Amount</div>
-                        <div style={{fontWeight:600,color:'var(--navy-primary)'}}>GH₵{feeBaseAmount.toFixed(2)}</div>
-                      </div>
-                      <div>
-                        <div style={{fontSize:'11px',color:'#888',textTransform:'uppercase'}}>Total Expected</div>
-                        <div style={{fontWeight:600}}>GH₵{expectedClamped.toFixed(2)}</div>
-                      </div>
-                      <div>
-                        <div style={{fontSize:'11px',color:'#888',textTransform:'uppercase'}}>Amount Due</div>
-                        <div style={{fontWeight:600,color: dueNow > 0 ? '#ea4335' : '#34a853'}}>GH₵{dueNow.toFixed(2)}</div>
-                      </div>
-                      <div>
-                        <div style={{fontSize:'11px',color:'#888',textTransform:'uppercase'}}>Auto Status</div>
+                    {/* live calc summary — this is the actual daily/partial collection math: whatever
+                        is already paid on the due stays paid, this transaction just tops it up */}
+                    {(isAddNew ? !!selectedDue : true) && (
+                      <div style={{margin:'14px 0',padding:'12px 15px',background: overpaying ? '#fdecea' : 'linear-gradient(135deg,#f8f9fa,#e9ecef)',border:'1px solid ' + (overpaying ? '#ea4335' : '#dee2e6'),display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:'10px',fontSize:'13px'}}>
+                        {isAddNew && (
+                          <>
+                            <div>
+                              <div style={{fontSize:'11px',color:'#888',textTransform:'uppercase'}}>Already Paid</div>
+                              <div style={{fontWeight:600,color:'var(--navy-primary)'}}>GH₵{(selectedDue?.PaidAmount || 0).toFixed(2)}</div>
+                            </div>
+                            <div>
+                              <div style={{fontSize:'11px',color:'#888',textTransform:'uppercase'}}>Balance Before Today</div>
+                              <div style={{fontWeight:600}}>GH₵{adjustedRemaining.toFixed(2)}</div>
+                            </div>
+                          </>
+                        )}
                         <div>
-                          <span className={`status-badge ${computedStatus === 'paid' ? 'status-active' : computedStatus === 'partial' ? 'status-suspended' : 'status-inactive'}`} style={{padding:'3px 10px'}}>
-                            {computedStatus}
-                          </span>
+                          <div style={{fontSize:'11px',color:'#888',textTransform:'uppercase'}}>Remaining After This</div>
+                          <div style={{fontWeight:600,color: dueNow > 0 ? '#ea4335' : '#34a853'}}>GH₵{dueNow.toFixed(2)}</div>
                         </div>
+                        <div>
+                          <div style={{fontSize:'11px',color:'#888',textTransform:'uppercase'}}>Status</div>
+                          <div>
+                            <span className={`status-badge ${computedStatus === 'paid' ? 'status-active' : computedStatus === 'partial' ? 'status-suspended' : 'status-inactive'}`} style={{padding:'3px 10px'}}>
+                              {computedStatus}
+                            </span>
+                          </div>
+                        </div>
+                        {overpaying && (
+                          <div style={{gridColumn:'1 / -1',color:'#7a1f1f',fontWeight:600}}>
+                            <i className="fas fa-triangle-exclamation"></i> This exceeds the remaining balance — reduce the amount.
+                          </div>
+                        )}
                       </div>
-                    </div>
+                    )}
                   </>
                 )}
 
@@ -20358,9 +20440,10 @@
 
                         {children.map(k => {
                           const r = childRows[k.StudentID] || {};
-                          const fees = feeByClass[k.ClassID] || [];
+                          const childDues = duesByChild[k.StudentID] || [];
+                          const duesLoadingChild = duesByChild[k.StudentID] === undefined;
                           const c = childCalc(k);
-                          const isIncluded = !!r.FeeStructureID;
+                          const isIncluded = !!r.DueID;
                           return (
                             <div key={k.StudentID}
                               style={{
@@ -20395,50 +20478,45 @@
                                 )}
                               </div>
 
-                              {/* per-child fee row */}
-                              <div style={{display:'grid',gridTemplateColumns:'2fr 1.2fr 0.9fr 0.7fr 0.7fr',gap:'8px',alignItems:'end'}}>
+                              {/* per-child due row */}
+                              <div style={{display:'grid',gridTemplateColumns:'2fr 0.9fr 0.7fr 0.7fr',gap:'8px',alignItems:'end'}}>
                                 <SearchableDropdown
-                                  label="Fee Item" icon="fas fa-tag"
-                                  options={fees.map(f => ({
-                                    value: String(f.ID),
-                                    label: f.FeeCategory + ' — GH₵' + f.Amount + ' (' + f.Frequency + ')'
+                                  label="Due to Pay" icon="fas fa-calendar-alt"
+                                  options={childDues.map(d => ({
+                                    value: String(d.ID),
+                                    label: (d.IsArrears ? '⚠ ARREARS — ' : '') + d.BillingMonthLabel + ' · ' + d.FeeCategory + ' — GH₵' + Math.max(0, d.Amount - d.PaidAmount).toFixed(2) + ' remaining'
                                   }))}
-                                  value={r.FeeStructureID || ''}
-                                  onChange={(v) => setChildField(k.StudentID, 'FeeStructureID', v)}
-                                  placeholder={fees.length === 0 ? 'No fee items for this class' : 'Pick / skip...'}
+                                  value={r.DueID || ''}
+                                  onChange={(v) => setChildField(k.StudentID, 'DueID', v)}
+                                  placeholder={duesLoadingChild ? 'Loading dues...' : childDues.length === 0 ? 'No outstanding dues' : 'Pick / skip...'}
                                 />
-                                <div className="form-group">
-                                  <label><i className="fas fa-calendar-week"></i> Billing</label>
-                                  <input type="text" value={r.BillingPeriod || ''}
-                                    onChange={(e) => setChildField(k.StudentID, 'BillingPeriod', e.target.value)}
-                                    maxLength="20" placeholder="e.g. May 2026" disabled={!r.FeeStructureID} />
-                                </div>
                                 <div className="form-group">
                                   <label><i className="fas fa-money-bill-wave"></i> Paid</label>
                                   <input type="number" value={r.AmountPaid}
                                     onChange={(e) => setChildField(k.StudentID, 'AmountPaid', e.target.value)}
-                                    min="0" step="0.01" disabled={!r.FeeStructureID} />
+                                    min="0" step="0.01" disabled={!r.DueID} />
                                 </div>
                                 <div className="form-group">
                                   <label>Late</label>
                                   <input type="number" value={r.LateFee || 0}
                                     onChange={(e) => setChildField(k.StudentID, 'LateFee', e.target.value)}
-                                    min="0" step="0.01" disabled={!r.FeeStructureID} />
+                                    min="0" step="0.01" disabled={!r.DueID} />
                                 </div>
                                 <div className="form-group">
                                   <label>Disc</label>
                                   <input type="number" value={r.Discount || 0}
                                     onChange={(e) => setChildField(k.StudentID, 'Discount', e.target.value)}
-                                    min="0" step="0.01" disabled={!r.FeeStructureID} />
+                                    min="0" step="0.01" disabled={!r.DueID} />
                                 </div>
                               </div>
 
                               {/* per-child summary */}
                               {isIncluded && (
                                 <div style={{display:'flex',gap:'14px',marginTop:'8px',padding:'6px 0 0',fontSize:'12px',color:'#555',flexWrap:'wrap'}}>
-                                  <span><strong>Fee:</strong> GH₵{c.base.toFixed(2)}</span>
-                                  <span><strong>Expected:</strong> GH₵{c.expected.toFixed(2)}</span>
-                                  <span style={{color: c.due > 0 ? '#ea4335' : '#34a853'}}><strong>Due:</strong> GH₵{c.due.toFixed(2)}</span>
+                                  <span><strong>Balance:</strong> GH₵{c.base.toFixed(2)}</span>
+                                  <span><strong>Adjusted:</strong> GH₵{c.expected.toFixed(2)}</span>
+                                  <span style={{color: c.due > 0 ? '#ea4335' : '#34a853'}}><strong>Remaining After:</strong> GH₵{c.due.toFixed(2)}</span>
+                                  {c.overpaying && <span style={{color:'#ea4335',fontWeight:700}}><i className="fas fa-triangle-exclamation"></i> Too much</span>}
                                 </div>
                               )}
                             </div>
@@ -20537,21 +20615,6 @@
                             style={isView ? {background:'#f8f9fa',cursor:'not-allowed'} : {}} />
                         </div>
                       )}
-                      {mode === 'student' && isAdmin && (
-                        <SearchableDropdown
-                          label="Status (admin override)" icon="fas fa-toggle-on"
-                          options={[
-                            { value: 'paid', label: 'Paid' },
-                            { value: 'partial', label: 'Partial' },
-                            { value: 'pending', label: 'Pending' },
-                            { value: 'failed', label: 'Failed' },
-                            { value: 'refunded', label: 'Refunded' }
-                          ]}
-                          value={formData.PaymentStatus}
-                          onChange={(v) => !isView && set('PaymentStatus', v)}
-                          placeholder="Auto..."
-                        />
-                      )}
                       <div className="form-group" style={{gridColumn:'1 / -1'}}>
                         <label><i className="fas fa-comment"></i> Remarks</label>
                         <textarea value={formData.Remarks}
@@ -20568,8 +20631,8 @@
                     <i className="fas fa-info-circle" style={{marginRight:'6px'}}></i>
                     <strong>Auto-compute:</strong>
                     {mode === 'parent'
-                      ? ' Each child gets a separate receipt number (RCP-YYYY-XXXXXXXX). AmountDue and PaymentStatus are calculated server-side per child.'
-                      : ' AmountDue and PaymentStatus are calculated server-side from (fee + late_fee - discount) vs amount_paid.' + (isAdmin ? ' You can override the status above.' : '')}
+                      ? ' Each child gets a separate receipt number (RCP-YYYY-XXXXXXXX). Status is calculated server-side per child from the due\'s remaining balance.'
+                      : ' Status (paid/partial) is calculated server-side from the due\'s remaining balance after this payment.'}
                   </div>
                 )}
 

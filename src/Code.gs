@@ -198,12 +198,39 @@ var FEE_STRUCTURE_HEADERS = ['ID','ClassID','FeeCategory','Amount','Frequency','
 // 18=AcademicYear (denorm for fast year-wise reports),
 // 19=RefundAmount (numeric >=0), 20=RefundDate (ISO opt), 21=RefundReason (text opt),
 // 22=MobileMoneyProvider (mtn_momo|telecel_cash|airteltigo_money — '' unless PaymentMode=mobile_money)
-var FEE_PAYMENT_HEADERS = ['ID','StudentID','FeeStructureID','AmountPaid','AmountDue','LateFee','Discount','PaymentDate','BillingPeriod','PaymentMode','TransactionReference','ReceiptNumber','PaymentStatus','CollectedBy','Remarks','IsDeleted','CreatedAt','UpdatedAt','AcademicYear','RefundAmount','RefundDate','RefundReason','MobileMoneyProvider'];
+// 23=DueID (FK→Fee_Dues — which term's/month's bill this transaction was collected against; blank on
+//    legacy rows recorded before dues-based collection existed). This is THE fix for "fee collection
+//    doesn't sync": every payment now updates ONE shared ledger (Fee_Dues.PaidAmount/Status) instead
+//    of each payment independently recomputing "amount due" against the full original fee — which is
+//    also what makes daily/partial collection correct (pay GH₵50 today, GH₵100 tomorrow, and the
+//    running balance on the due is accurate both times instead of resetting).
+var FEE_PAYMENT_HEADERS = ['ID','StudentID','FeeStructureID','AmountPaid','AmountDue','LateFee','Discount','PaymentDate','BillingPeriod','PaymentMode','TransactionReference','ReceiptNumber','PaymentStatus','CollectedBy','Remarks','IsDeleted','CreatedAt','UpdatedAt','AcademicYear','RefundAmount','RefundDate','RefundReason','MobileMoneyProvider','DueID'];
+
+function _ensureFeePaymentsSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(FEE_PAYMENTS_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(FEE_PAYMENTS_SHEET);
+    sh.appendRow(FEE_PAYMENT_HEADERS);
+    sh.getRange(1, 1, 1, FEE_PAYMENT_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+    sh.setFrozenRows(1);
+  } else if (sh.getLastColumn() < FEE_PAYMENT_HEADERS.length) {
+    // upgrade an existing sheet created before DueID existed
+    var addFrom = sh.getLastColumn() + 1;
+    sh.getRange(1, addFrom, 1, FEE_PAYMENT_HEADERS.length - sh.getLastColumn()).setValues([FEE_PAYMENT_HEADERS.slice(addFrom - 1)])
+      .setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+  }
+  return sh;
+}
 
 // fee_dues cols (12): one row per (student, fee_structure, billing_month) — auto-generated from admission month forward
 // 0=ID, 1=StudentID, 2=FeeStructureID, 3=BillingMonth (YYYY-MM), 4=BillingMonthLabel ('August 2026'), 5=Amount,
-// 6=Status (pending|paid|partial|waived), 7=PaymentID (FK→Fee_Payments when paid), 8=PaidAmount,
-// 9=PaidDate, 10=CreatedAt, 11=UpdatedAt
+// 6=Status (pending|paid|partial|waived|carried_forward — the last one set only by promoteStudents when
+//    a balance is rolled into the new class's arrears item instead of being paid off directly),
+// 7=PaymentID (FK→Fee_Payments — the MOST RECENT transaction applied to this due; a due can have many
+//    payments over time as it's paid down, this just points at the latest one for quick reference),
+// 8=PaidAmount (running total collected against this due so far — the real "how much is left" ledger),
+// 9=PaidDate (date of the most recent transaction), 10=CreatedAt, 11=UpdatedAt
 var FEE_DUE_HEADERS = ['ID','StudentID','FeeStructureID','BillingMonth','BillingMonthLabel','Amount','Status','PaymentID','PaidAmount','PaidDate','CreatedAt','UpdatedAt'];
 
 // sms_log cols (10): one row per SMS attempt
@@ -2520,7 +2547,7 @@ function getDashboardStats(currentUser, currentRole) {
       }
     }
 
-    var totalPayments = 0, totalCollected = 0, totalPending = 0;
+    var totalPayments = 0, totalCollected = 0;
     var fpy = getSheet(FEE_PAYMENTS_SHEET);
     if (fpy) {
       var fpd = fpy.getDataRange().getValues();
@@ -2528,7 +2555,21 @@ function getDashboardStats(currentUser, currentRole) {
         if (String(fpd[pi][15]) === '1') continue;
         totalPayments++;
         totalCollected += parseFloat(fpd[pi][3]) || 0;
-        totalPending += parseFloat(fpd[pi][4]) || 0;
+      }
+    }
+    // outstanding balance — the true "what's still owed right now" figure lives on Fee_Dues
+    // (Amount - PaidAmount per due), not summed from Fee_Payments.AmountDue: that column is one
+    // payment ROW's snapshot at the time it was recorded, and under daily/partial collection a due
+    // can have several payment rows against it, so summing them over-counts. Fee_Dues.PaidAmount is
+    // the one running total per due, so this is the only place the real outstanding figure lives.
+    var totalPending = 0;
+    var fdu = getSheet(FEE_DUES_SHEET);
+    if (fdu) {
+      var fdd = fdu.getDataRange().getValues();
+      for (var fd = 1; fd < fdd.length; fd++) {
+        var fdStatus = String(fdd[fd][6] || '').toLowerCase();
+        if (fdStatus === 'paid' || fdStatus === 'carried_forward' || fdStatus === 'waived') continue;
+        totalPending += Math.max(0, (parseFloat(fdd[fd][5]) || 0) - (parseFloat(fdd[fd][8]) || 0));
       }
     }
 
@@ -4610,9 +4651,10 @@ function promoteStudents(payload, currentUser, currentRole) {
     }
     if (!targetRows.length) return { success: false, message: 'No students found to promote in the source class' };
 
-    // pull all non-deleted fee payments once, grouped by student, to compute + close out outstanding balances
-    var fpsh = getSheet(FEE_PAYMENTS_SHEET);
-    if (!fpsh) return { success: false, message: 'Fee_Payments sheet not found' };
+    // pull all non-deleted fee payments once, grouped by student, to compute + close out outstanding
+    // balances — legacy safety net for any payment row that still carries a stale non-zero AmountDue
+    // from before the Fee_Dues ledger existed. New arrears mostly come from the Fee_Dues scan below.
+    var fpsh = _ensureFeePaymentsSheet();
     var fpdata = fpsh.getDataRange().getValues();
     var duesByStudent = {}; // sid -> [{ rowIdx, amountDue }]
     for (var f = 1; f < fpdata.length; f++) {
@@ -4622,6 +4664,22 @@ function promoteStudents(payload, currentUser, currentRole) {
       var fsid = parseInt(fpdata[f][1], 10);
       if (!duesByStudent[fsid]) duesByStudent[fsid] = [];
       duesByStudent[fsid].push({ rowIdx: f, amountDue: due });
+    }
+
+    // the REAL source of outstanding balances: any Fee_Dues row for this student not yet fully paid.
+    // These get closed out (status -> 'carried_forward', so they stop showing as owed under the OLD
+    // class) and their remaining balance folds into the single new arrears due created below.
+    var dsh = _ensureFeeDuesSheet();
+    var dueData = dsh.getDataRange().getValues();
+    var openDuesByStudent = {}; // sid -> [{ rowIdx, remaining }]
+    for (var od = 1; od < dueData.length; od++) {
+      var st = String(dueData[od][6] || '').toLowerCase();
+      if (st === 'paid' || st === 'carried_forward' || st === 'waived') continue;
+      var osid = parseInt(dueData[od][1], 10);
+      var remaining = Math.max(0, (parseFloat(dueData[od][5]) || 0) - (parseFloat(dueData[od][8]) || 0));
+      if (remaining <= 0) continue;
+      if (!openDuesByStudent[osid]) openDuesByStudent[osid] = [];
+      openDuesByStudent[osid].push({ rowIdx: od, remaining: remaining });
     }
 
     // find (or create) the "Arrears" fee structure item for the target class + year
@@ -4648,8 +4706,8 @@ function promoteStudents(payload, currentUser, currentRole) {
     }
 
     var promoted = 0, withArrears = 0, totalArrears = 0;
-    var fpNextId = nextPaymentId(fpsh);
-    var newPaymentRows = [];
+    var dueNextId = nextRowId(dsh);
+    var newDueRows = [];
     var ts = nowIso();
     var fromLabel = cmap[fromClassId].label, toLabel = cmap[toClassId].label;
 
@@ -4659,30 +4717,36 @@ function promoteStudents(payload, currentUser, currentRole) {
       ssh.getRange(t.row, 39).setValue(ts);
       promoted++;
 
-      // 2) close out old outstanding balance(s) and roll the total into one new arrears payment row
-      var dues = duesByStudent[t.sid] || [];
+      // 2) close out old outstanding balance(s) — both legacy Fee_Payments.AmountDue leftovers and
+      // (the normal case now) open Fee_Dues rows — and roll the total into ONE new Fee_Dues row
+      // under the arrears item, so it's payable through the exact same due-based flow as any other bill
       var balance = 0;
-      dues.forEach(function (d) {
+      (duesByStudent[t.sid] || []).forEach(function (d) {
         balance += d.amountDue;
         var r = d.rowIdx + 1;
-        fpsh.getRange(r, 5).setValue(0); // AmountDue -> 0, balance now lives on the new arrears row
+        fpsh.getRange(r, 5).setValue(0); // AmountDue -> 0, balance now lives on the new arrears due
         fpsh.getRange(r, 13).setValue('transferred'); // PaymentStatus
         var oldRemarks = String(fpdata[d.rowIdx][14] || '');
         fpsh.getRange(r, 15).setValue((oldRemarks ? oldRemarks + ' — ' : '') + 'Balance carried forward to ' + toLabel);
       });
+      (openDuesByStudent[t.sid] || []).forEach(function (d) {
+        balance += d.remaining;
+        var dr = d.rowIdx + 1;
+        dsh.getRange(dr, 7).setValue('carried_forward'); // Status
+        dsh.getRange(dr, 12).setValue(ts); // UpdatedAt
+      });
       if (balance > 0) {
-        newPaymentRows.push([
-          fpNextId++, t.sid, arrearsFeeStructureId, 0, balance, 0, 0,
-          todayStr(), 'Arrears Carried Forward', 'cash', '', '', 'pending', '',
-          'Carried forward from ' + fromLabel, '0', ts, ts, newAcademicYear, 0, '', '', ''
+        newDueRows.push([
+          dueNextId++, t.sid, arrearsFeeStructureId, 'arrears-' + newAcademicYear, 'Arrears from ' + fromLabel,
+          balance, 'pending', '', 0, '', ts, ts
         ]);
         withArrears++;
         totalArrears += balance;
       }
     });
 
-    if (newPaymentRows.length) {
-      fpsh.getRange(fpsh.getLastRow() + 1, 1, newPaymentRows.length, FEE_PAYMENT_HEADERS.length).setValues(newPaymentRows);
+    if (newDueRows.length) {
+      dsh.getRange(dsh.getLastRow() + 1, 1, newDueRows.length, FEE_DUE_HEADERS.length).setValues(newDueRows);
     }
 
     recomputeClassStrength(fromClassId);
@@ -5378,7 +5442,13 @@ function enrollAdmission(id, d, currentUser, currentRole) {
             if (fres && fres.success) fsId = fres.id;
           }
           if (fsId) {
-            var pres = addPayment({ StudentID: newStudentId, FeeStructureID: fsId, AmountPaid: admFee, PaymentDate: todayStr(), BillingPeriod: 'Admission Fee ' + year, PaymentMode: (ad.AdmissionFeeMode || 'cash'), Remarks: 'Auto from admission ' + ad.RegistrationNumber }, currentUser, currentRole);
+            // addPayment is due-based now — create the one-time due for this admission fee first,
+            // then pay it off in full immediately (an admission fee is collected up front, not daily)
+            var admDueSh = _ensureFeeDuesSheet();
+            var admDueId = nextRowId(admDueSh);
+            var admTs = nowIso();
+            admDueSh.appendRow([admDueId, newStudentId, fsId, 'admission-' + year, 'Admission Fee ' + year, admFee, 'pending', '', 0, '', admTs, admTs]);
+            var pres = addPayment({ StudentID: newStudentId, DueID: admDueId, AmountPaid: admFee, PaymentDate: todayStr(), PaymentMode: (ad.AdmissionFeeMode || 'cash'), Remarks: 'Auto from admission ' + ad.RegistrationNumber }, currentUser, currentRole);
             if (pres && pres.success) {
               feePaymentId = pres.id;
               sh.getRange(row, 49).setValue(feePaymentId); // 48 FeePaymentID
@@ -6060,16 +6130,7 @@ function getOwnerFinancialSummary(p, currentUser, currentRole) {
     var base = getIncomeExpenseReport(p, currentUser, currentRole);
     if (!base.success) return base;
 
-    var fsh = getSheet(FEE_PAYMENTS_SHEET);
-    var totalOutstanding = 0;
-    if (fsh) {
-      var fd = fsh.getDataRange().getValues();
-      for (var i = 1; i < fd.length; i++) {
-        if (String(fd[i][15]) === '1') continue;
-        totalOutstanding += parseFloat(fd[i][4]) || 0;
-      }
-    }
-    base.summary['Total Outstanding Fees'] = totalOutstanding;
+    base.summary['Total Outstanding Fees'] = _feeDuesOutstandingMaps().total;
     return base;
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
@@ -6086,20 +6147,27 @@ function getOwnerClassSummaries(currentUser, currentRole) {
     var cdata = csh.getDataRange().getValues();
     var cmap = getClassesMap();
 
-    var fmap = getFeeStructuresLite();
     var fsh = getSheet(FEE_PAYMENTS_SHEET);
     var fpdata = fsh ? fsh.getDataRange().getValues() : [];
-    // classId -> { paid, due }
+    var students = getStudentsLite();
+    // classId -> { paid, due } — paid still sums actual collections from Fee_Payments (that part was
+    // always correct); due comes from the Fee_Dues ledger, keyed by each student's CURRENT class
     var feesByClass = {};
     for (var f = 1; f < fpdata.length; f++) {
       if (String(fpdata[f][15]) === '1') continue;
-      var fs = fmap[fpdata[f][2]];
-      if (!fs) continue;
-      var cid = fs.classId;
+      var payStudent = students[parseInt(fpdata[f][1], 10)];
+      if (!payStudent) continue;
+      var cid = payStudent.classId;
       if (!feesByClass[cid]) feesByClass[cid] = { paid: 0, due: 0 };
       feesByClass[cid].paid += parseFloat(fpdata[f][3]) || 0;
-      feesByClass[cid].due += parseFloat(fpdata[f][4]) || 0;
     }
+    var outstandingByStudent = _feeDuesOutstandingMaps().byStudent;
+    Object.keys(outstandingByStudent).forEach(function(sidKey) {
+      var st = students[parseInt(sidKey, 10)];
+      if (!st) return;
+      if (!feesByClass[st.classId]) feesByClass[st.classId] = { paid: 0, due: 0 };
+      feesByClass[st.classId].due += outstandingByStudent[sidKey];
+    });
 
     var out = [];
     for (var i = 1; i < cdata.length; i++) {
@@ -6138,15 +6206,7 @@ function getOwnerStudentSummaries(currentUser, currentRole) {
     var sdata = ssh.getDataRange().getValues();
     var cmap = getClassesMap();
 
-    var fmap = getFeeStructuresLite();
-    var fsh = getSheet(FEE_PAYMENTS_SHEET);
-    var fpdata = fsh ? fsh.getDataRange().getValues() : [];
-    var dueByStudent = {};
-    for (var f = 1; f < fpdata.length; f++) {
-      if (String(fpdata[f][15]) === '1') continue;
-      var sid = parseInt(fpdata[f][1], 10);
-      dueByStudent[sid] = (dueByStudent[sid] || 0) + (parseFloat(fpdata[f][4]) || 0);
-    }
+    var dueByStudent = _feeDuesOutstandingMaps().byStudent;
 
     var out = [];
     for (var i = 1; i < sdata.length; i++) {
@@ -8827,7 +8887,8 @@ function rowToPayment(row, students, fmap, umap) {
     RefundAmount: parseFloat(row[19]) || 0,
     RefundDate: toIso(row[20]),
     RefundReason: row[21] || '',
-    MobileMoneyProvider: String(row[22] || '').toLowerCase()
+    MobileMoneyProvider: String(row[22] || '').toLowerCase(),
+    DueID: row[23] || ''
   };
 }
 
@@ -8944,91 +9005,76 @@ function receiptNumberExists(sh, receiptNo, excludeId) {
   return false;
 }
 
+// Records ONE fee collection transaction against ONE due (a specific term's/month's bill) — this is
+// the "daily collection" entry point: a parent can hand over any amount on any day and this just
+// reduces what's still owed on that due, however many times it's called before the due is settled.
+// p: { StudentID, DueID, AmountPaid, LateFee?, Discount?, PaymentDate?, PaymentMode?,
+//      TransactionReference?, ReceiptNumber?, Remarks?, MobileMoneyProvider? }
 function addPayment(p, currentUser, currentRole) {
   try {
     var role = String(currentRole).toLowerCase();
     if (role !== 'admin' && role !== 'clerk' && role !== 'bursar') return { success: false, message: 'Forbidden — admin, clerk or bursar only' };
 
-    var sh = getSheet(FEE_PAYMENTS_SHEET);
-    if (!sh) return { success: false, message: 'Fee_Payments sheet not found' };
-
-    if (!p.StudentID || !p.FeeStructureID || p.AmountPaid == null) {
-      return { success: false, message: 'Student, Fee Item, and Amount Paid are required' };
+    if (!p.StudentID || !p.DueID || p.AmountPaid == null) {
+      return { success: false, message: 'Student, Due (term/month to pay), and Amount are required' };
     }
     if (!String(p.PaymentDate || '').trim()) p.PaymentDate = todayStr();
-    if (!String(p.BillingPeriod || '').trim()) p.BillingPeriod = _MONTH_LABELS[new Date().getMonth()] + ' ' + new Date().getFullYear();
     var allowedModes = ['cash','cheque','online','mobile_money','card','bank_transfer'];
     var mode = String(p.PaymentMode || 'cash').toLowerCase();
     if (allowedModes.indexOf(mode) === -1) return { success: false, message: 'Invalid payment mode' };
 
-    // FK validations
     var sid = parseInt(p.StudentID, 10);
-    var fsid = parseInt(p.FeeStructureID, 10);
-    if (isNaN(sid) || isNaN(fsid)) return { success: false, message: 'Invalid student/fee_structure id' };
+    var dueId = parseInt(p.DueID, 10);
+    if (isNaN(sid) || isNaN(dueId)) return { success: false, message: 'Invalid student/due id' };
 
     var students = getStudentsLite();
     if (!students[sid]) return { success: false, message: 'Student not found or deleted' };
 
-    var fmap = getFeeStructuresLite();
-    if (!fmap[fsid]) return { success: false, message: 'Fee structure not found or deleted' };
-    if (fmap[fsid].classId !== students[sid].classId) {
-      return { success: false, message: 'Selected fee does not belong to the student\'s class' };
+    var dsh = _ensureFeeDuesSheet();
+    var dueData = dsh.getDataRange().getValues();
+    var dueRowIdx = -1;
+    for (var i = 1; i < dueData.length; i++) {
+      if (dueData[i][0] === dueId && parseInt(dueData[i][1], 10) === sid) { dueRowIdx = i; break; }
     }
+    if (dueRowIdx === -1) return { success: false, message: 'Due not found for this student' };
+    if (String(dueData[dueRowIdx][6]) === 'paid') return { success: false, message: 'This due is already fully paid' };
 
-    // amounts
-    var amountPaid = parseFloat(p.AmountPaid);
-    if (isNaN(amountPaid) || amountPaid < 0) return { success: false, message: 'AmountPaid must be non-negative' };
+    var fmap = getFeeStructuresLite();
+    var fsid = parseInt(dueData[dueRowIdx][2], 10);
+
     var lateFee = parseFloat(p.LateFee) || 0;
     var discount = parseFloat(p.Discount) || 0;
-    var feeAmt = fmap[fsid].amount;
-    var expected = feeAmt + lateFee - discount;
-    if (expected < 0) expected = 0;
-    var amountDue = Math.max(0, expected - amountPaid);
 
-    // status auto-compute (admin can override)
-    var status = computePaymentStatus(amountPaid, expected);
-    if (role === 'admin' && p.PaymentStatus) {
-      var allowedStatuses = ['paid','partial','pending','failed','refunded'];
-      if (allowedStatuses.indexOf(String(p.PaymentStatus).toLowerCase()) !== -1) {
-        status = String(p.PaymentStatus).toLowerCase();
-      }
-    }
+    var receiptNo = String(p.ReceiptNumber || '').trim();
+    var fpsh = _ensureFeePaymentsSheet();
+    if (receiptNo && receiptNumberExists(fpsh, receiptNo)) return { success: false, message: 'Receipt number already in use' };
 
-    // receipt number — auto-gen if blank, else validate uniqueness
-    var receiptNo = (p.ReceiptNumber && String(p.ReceiptNumber).trim() !== '')
-      ? String(p.ReceiptNumber).trim()
-      : generateReceiptNumber(sh);
-    if (receiptNumberExists(sh, receiptNo)) return { success: false, message: 'Receipt number already in use' };
-
-    var collectedBy = getCurrentUserId(currentUser);
-    if (!collectedBy) return { success: false, message: 'Could not resolve current user' };
-
-    // academic year — denorm from fee_structure if not provided
-    var ay = String(p.AcademicYear || fmap[fsid].year || '').trim();
     var refAmt = parseFloat(p.RefundAmount);
     if (isNaN(refAmt) || refAmt < 0) refAmt = 0;
-    var refDate = String(p.RefundDate || '').trim();
-    if (refDate && !/^\d{4}-\d{2}-\d{2}$/.test(refDate)) return { success: false, message: 'RefundDate must be YYYY-MM-DD' };
-    var refReason = String(p.RefundReason || '').trim();
-    if (refReason.length > 300) return { success: false, message: 'RefundReason max 300 chars' };
-
     var momoProviders = ['mtn_momo', 'telecel_cash', 'airteltigo_money'];
     var momoProvider = mode === 'mobile_money' ? String(p.MobileMoneyProvider || '').toLowerCase() : '';
     if (mode === 'mobile_money' && momoProvider && momoProviders.indexOf(momoProvider) === -1) {
       return { success: false, message: 'Invalid MobileMoneyProvider' };
     }
 
-    var ts = nowIso(), id = nextPaymentId(sh);
-    sh.appendRow([
-      id, sid, fsid, amountPaid, amountDue, lateFee, discount,
-      toIso(p.PaymentDate), String(p.BillingPeriod).trim(), mode,
-      p.TransactionReference || '', receiptNo, status, collectedBy,
-      p.Remarks || '', '0', ts, ts,
-      ay, refAmt, toIso(refDate), refReason, momoProvider
-    ]);
+    var collectedBy = getCurrentUserId(currentUser);
+    if (!collectedBy) return { success: false, message: 'Could not resolve current user' };
 
-    addLog(currentUser, 'Payment Added', 'Receipt ' + receiptNo + ' (' + status + '): GH₵' + amountPaid + ' from student ' + sid);
-    return { success: true, message: 'Payment recorded — receipt ' + receiptNo, id: id, receiptNumber: receiptNo, status: status };
+    var ay = String(p.AcademicYear || (fmap[fsid] && fmap[fsid].year) || '').trim();
+
+    var result = _applyPaymentToDue(dsh, dueData, dueRowIdx, p.AmountPaid, lateFee, discount, {
+      fpsh: fpsh, studentId: sid, paymentDate: p.PaymentDate, mode: mode,
+      txnRef: p.TransactionReference || '', receiptNo: receiptNo, remarks: p.Remarks || '',
+      momoProvider: momoProvider, collectedBy: collectedBy, academicYear: ay
+    });
+    if (!result.ok) return { success: false, message: result.message };
+
+    addLog(currentUser, 'Payment Added', 'Receipt ' + result.receiptNo + ' (' + result.dueStatus + '): GH₵' + result.amountPaid + ' from student ' + sid);
+    return {
+      success: true,
+      message: 'Payment recorded — receipt ' + result.receiptNo + (result.dueStatus === 'paid' ? ' — due settled in full' : ' — GH₵' + result.remainingAfter.toFixed(2) + ' still remaining on this due'),
+      id: result.paymentId, receiptNumber: result.receiptNo, status: result.dueStatus, remainingBalance: result.remainingAfter
+    };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
@@ -9037,6 +9083,10 @@ function addPayment(p, currentUser, currentRole) {
 // bulk-record payments — used by parent-mode (one parent → many kids in one shot)
 // payments: array of { StudentID, FeeStructureID, AmountPaid, LateFee, Discount, PaymentDate, BillingPeriod, PaymentMode, TransactionReference, Remarks }
 // validates ALL rows first; if any fail → no writes. otherwise bulk-appends + sequential receipts.
+// one parent paying for several of their children's dues in one sitting — each row is { StudentID,
+// DueID, AmountPaid, LateFee?, Discount?, PaymentDate, PaymentMode, TransactionReference?, Remarks? }.
+// Validates ALL rows first (same student/due/amount rules as addPayment); if any fail, nothing is
+// written. Otherwise applies each to its due via the same shared ledger as a single addPayment call.
 function addPaymentsBulk(payments, currentUser, currentRole) {
   try {
     var role = String(currentRole).toLowerCase();
@@ -9044,90 +9094,73 @@ function addPaymentsBulk(payments, currentUser, currentRole) {
     if (!Array.isArray(payments) || payments.length === 0) return { success: false, message: 'No payments provided' };
     if (payments.length > 50) return { success: false, message: 'Bulk limit is 50 rows per call' };
 
-    var sh = getSheet(FEE_PAYMENTS_SHEET);
-    if (!sh) return { success: false, message: 'Fee_Payments sheet not found' };
-
     var students = getStudentsLite();
     var fmap = getFeeStructuresLite();
     var allowedModes = ['cash','cheque','online','mobile_money','card','bank_transfer'];
 
-    // pre-validate everything first
+    var dsh = _ensureFeeDuesSheet();
+    var dueData = dsh.getDataRange().getValues();
+
+    // pre-validate everything first — no writes until every row checks out
     var prepared = [];
     for (var i = 0; i < payments.length; i++) {
       var p = payments[i];
       var rowLabel = 'Row ' + (i + 1);
-      if (!p.StudentID || !p.FeeStructureID || p.AmountPaid == null || !p.PaymentDate || !p.BillingPeriod || !p.PaymentMode) {
+      if (!p.StudentID || !p.DueID || p.AmountPaid == null || !p.PaymentDate || !p.PaymentMode) {
         return { success: false, message: rowLabel + ': required fields missing' };
       }
       var mode = String(p.PaymentMode).toLowerCase();
       if (allowedModes.indexOf(mode) === -1) return { success: false, message: rowLabel + ': invalid payment mode' };
 
-      var sid = parseInt(p.StudentID, 10), fsid = parseInt(p.FeeStructureID, 10);
-      if (isNaN(sid) || isNaN(fsid)) return { success: false, message: rowLabel + ': invalid id' };
+      var sid = parseInt(p.StudentID, 10), dueId = parseInt(p.DueID, 10);
+      if (isNaN(sid) || isNaN(dueId)) return { success: false, message: rowLabel + ': invalid id' };
       if (!students[sid]) return { success: false, message: rowLabel + ': student not found / deleted' };
-      if (!fmap[fsid]) return { success: false, message: rowLabel + ': fee item not found / deleted' };
-      if (fmap[fsid].classId !== students[sid].classId) {
-        return { success: false, message: rowLabel + ' (' + students[sid].fullName + '): fee does not belong to student\'s class' };
+
+      var dueRowIdx = -1;
+      for (var d = 1; d < dueData.length; d++) {
+        if (dueData[d][0] === dueId && parseInt(dueData[d][1], 10) === sid) { dueRowIdx = d; break; }
       }
+      if (dueRowIdx === -1) return { success: false, message: rowLabel + ' (' + students[sid].fullName + '): due not found' };
+      if (String(dueData[dueRowIdx][6]) === 'paid') return { success: false, message: rowLabel + ' (' + students[sid].fullName + '): due already fully paid' };
 
       var amountPaid = parseFloat(p.AmountPaid);
-      if (isNaN(amountPaid) || amountPaid < 0) return { success: false, message: rowLabel + ': amount must be ≥ 0' };
+      if (isNaN(amountPaid) || amountPaid <= 0) return { success: false, message: rowLabel + ': amount must be > 0' };
       var lateFee = parseFloat(p.LateFee) || 0, discount = parseFloat(p.Discount) || 0;
-      var feeAmt = fmap[fsid].amount;
-      var expected = Math.max(0, feeAmt + lateFee - discount);
-      var amountDue = Math.max(0, expected - amountPaid);
-      var status = computePaymentStatus(amountPaid, expected);
+      var curAmount = parseFloat(dueData[dueRowIdx][5]) || 0, curPaid = parseFloat(dueData[dueRowIdx][8]) || 0;
+      var newAmount = Math.max(curPaid, curAmount + lateFee - discount);
+      var remaining = Math.max(0, newAmount - curPaid);
+      if (amountPaid > remaining + 0.01) {
+        return { success: false, message: rowLabel + ' (' + students[sid].fullName + '): amount exceeds the remaining balance of GH₵' + remaining.toFixed(2) };
+      }
 
-      var ay = String(p.AcademicYear || fmap[fsid].year || '').trim();
+      var fsid = parseInt(dueData[dueRowIdx][2], 10);
+      var ay = String(p.AcademicYear || (fmap[fsid] && fmap[fsid].year) || '').trim();
       var momoProvider = mode === 'mobile_money' ? String(p.MobileMoneyProvider || '').toLowerCase() : '';
 
       prepared.push({
-        sid: sid, fsid: fsid, amountPaid: amountPaid, amountDue: amountDue,
-        lateFee: lateFee, discount: discount, paymentDate: toIso(p.PaymentDate),
-        billingPeriod: String(p.BillingPeriod).trim(), mode: mode,
-        txnRef: p.TransactionReference || '', remarks: p.Remarks || '',
-        status: status, studentName: students[sid].fullName, admNo: students[sid].admNo,
-        academicYear: ay, momoProvider: momoProvider
+        sid: sid, dueRowIdx: dueRowIdx, amountPaid: amountPaid, lateFee: lateFee, discount: discount,
+        paymentDate: p.PaymentDate, mode: mode, txnRef: p.TransactionReference || '', remarks: p.Remarks || '',
+        studentName: students[sid].fullName, admNo: students[sid].admNo, academicYear: ay, momoProvider: momoProvider
       });
     }
 
     var collectedBy = getCurrentUserId(currentUser);
     if (!collectedBy) return { success: false, message: 'Could not resolve current user' };
 
-    // sequential receipts — read once, increment locally
-    var year = new Date().getFullYear();
-    var prefix = 'RCP-' + year + '-';
-    var allData = sh.getDataRange().getValues(), maxSeq = 0, maxId = 0;
-    for (var k = 1; k < allData.length; k++) {
-      var rcp = String(allData[k][11] || '');
-      if (rcp.indexOf(prefix) === 0) {
-        var seq = parseInt(rcp.substring(prefix.length), 10);
-        if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
-      }
-      var nId = parseInt(allData[k][0], 10);
-      if (!isNaN(nId) && nId > maxId) maxId = nId;
-    }
-
-    var ts = nowIso(), rowsToWrite = [], receipts = [];
+    var fpsh = _ensureFeePaymentsSheet();
+    var ts = nowIso(), receipts = [];
     for (var j = 0; j < prepared.length; j++) {
       var pr = prepared[j];
-      maxSeq++;
-      maxId++;
-      var rcpNo = prefix + String(maxSeq).padStart(8, '0');
+      var result = _applyPaymentToDue(dsh, dueData, pr.dueRowIdx, pr.amountPaid, pr.lateFee, pr.discount, {
+        fpsh: fpsh, studentId: pr.sid, paymentDate: pr.paymentDate, mode: pr.mode,
+        txnRef: pr.txnRef, remarks: pr.remarks, momoProvider: pr.momoProvider,
+        collectedBy: collectedBy, academicYear: pr.academicYear, ts: ts
+      });
+      if (!result.ok) return { success: false, message: pr.studentName + ': ' + result.message + ' (a prior row in this batch may already be written — check Fees Collection before retrying)' };
       receipts.push({
         studentId: pr.sid, studentName: pr.studentName, admissionNumber: pr.admNo,
-        receiptNumber: rcpNo, amountPaid: pr.amountPaid, amountDue: pr.amountDue, status: pr.status
+        receiptNumber: result.receiptNo, amountPaid: result.amountPaid, amountDue: result.remainingAfter, status: result.dueStatus
       });
-      rowsToWrite.push([
-        maxId, pr.sid, pr.fsid, pr.amountPaid, pr.amountDue, pr.lateFee, pr.discount,
-        pr.paymentDate, pr.billingPeriod, pr.mode, pr.txnRef, rcpNo, pr.status,
-        collectedBy, pr.remarks, '0', ts, ts,
-        pr.academicYear, 0, '', '', pr.momoProvider
-      ]);
-    }
-
-    if (rowsToWrite.length > 0) {
-      sh.getRange(sh.getLastRow() + 1, 1, rowsToWrite.length, FEE_PAYMENT_HEADERS.length).setValues(rowsToWrite);
     }
 
     addLog(currentUser, 'Bulk Payment', 'Recorded ' + receipts.length + ' payment(s) — ' + receipts.map(function(r){ return r.receiptNumber; }).join(', '));
@@ -9137,24 +9170,23 @@ function addPaymentsBulk(payments, currentUser, currentRole) {
   }
 }
 
+// Edits an existing transaction's amount/lateFee/discount/date/mode/etc — the due it was applied to
+// is fixed (can't be reassigned to a different due here; delete + re-add for that). Correctly rolls
+// this payment's OLD contribution off the linked due first, then re-applies the NEW amount, so the
+// due's running balance stays accurate through a correction — not just the payment row's own fields.
 function updatePayment(id, p, currentUser, currentRole) {
   try {
     var role = String(currentRole).toLowerCase();
     if (role !== 'admin' && role !== 'clerk' && role !== 'bursar') return { success: false, message: 'Forbidden — admin, clerk or bursar only' };
 
-    var sh = getSheet(FEE_PAYMENTS_SHEET);
-    if (!sh) return { success: false, message: 'Fee_Payments sheet not found' };
+    var sh = _ensureFeePaymentsSheet();
     var idn = parseInt(id, 10);
     if (isNaN(idn)) return { success: false, message: 'Invalid id' };
 
-    if (!p.StudentID || !p.FeeStructureID || p.AmountPaid == null) {
-      return { success: false, message: 'Student, Fee Item, and Amount Paid are required' };
-    }
+    if (p.AmountPaid == null) return { success: false, message: 'Amount is required' };
     if (!String(p.PaymentDate || '').trim()) p.PaymentDate = todayStr();
-    if (!String(p.BillingPeriod || '').trim()) p.BillingPeriod = _MONTH_LABELS[new Date().getMonth()] + ' ' + new Date().getFullYear();
     if (!String(p.PaymentMode || '').trim()) p.PaymentMode = 'cash';
 
-    // find row first to check the existing payment_date for clerk same-day gate
     var rows = sh.getDataRange().getValues();
     var foundIdx = -1;
     for (var i = 1; i < rows.length; i++) {
@@ -9173,64 +9205,68 @@ function updatePayment(id, p, currentUser, currentRole) {
     var mode = String(p.PaymentMode).toLowerCase();
     if (allowedModes.indexOf(mode) === -1) return { success: false, message: 'Invalid payment mode' };
 
-    var sid = parseInt(p.StudentID, 10);
-    var fsid = parseInt(p.FeeStructureID, 10);
-    if (isNaN(sid) || isNaN(fsid)) return { success: false, message: 'Invalid id' };
+    var sid = parseInt(rows[foundIdx][1], 10);
+    var newAmountPaid = parseFloat(p.AmountPaid);
+    if (isNaN(newAmountPaid) || newAmountPaid <= 0) return { success: false, message: 'AmountPaid must be greater than 0' };
+    var newLateFee = parseFloat(p.LateFee) || 0;
+    var newDiscount = parseFloat(p.Discount) || 0;
 
-    var students = getStudentsLite();
-    if (!students[sid]) return { success: false, message: 'Student not found' };
-    var fmap = getFeeStructuresLite();
-    if (!fmap[fsid]) return { success: false, message: 'Fee structure not found' };
-    if (fmap[fsid].classId !== students[sid].classId) {
-      return { success: false, message: 'Fee does not belong to student\'s class' };
-    }
+    var oldAmountPaid = parseFloat(rows[foundIdx][3]) || 0;
+    var oldLateFee = parseFloat(rows[foundIdx][5]) || 0;
+    var oldDiscount = parseFloat(rows[foundIdx][6]) || 0;
+    var dueId = rows[foundIdx][23] ? parseInt(rows[foundIdx][23], 10) : null;
 
-    var amountPaid = parseFloat(p.AmountPaid);
-    if (isNaN(amountPaid) || amountPaid < 0) return { success: false, message: 'AmountPaid must be non-negative' };
-    var lateFee = parseFloat(p.LateFee) || 0;
-    var discount = parseFloat(p.Discount) || 0;
-    var expected = fmap[fsid].amount + lateFee - discount;
-    if (expected < 0) expected = 0;
-    var amountDue = Math.max(0, expected - amountPaid);
+    var newAmountDue = 0, dueStatus = null;
+    if (dueId) {
+      var dsh = _ensureFeeDuesSheet();
+      var dueData = dsh.getDataRange().getValues();
+      var dueRowIdx = -1;
+      for (var d = 1; d < dueData.length; d++) { if (dueData[d][0] === dueId) { dueRowIdx = d; break; } }
+      if (dueRowIdx === -1) return { success: false, message: 'The due this payment was applied to no longer exists' };
 
-    var status = computePaymentStatus(amountPaid, expected);
-    if (role === 'admin' && p.PaymentStatus) {
-      var allowedStatuses = ['paid','partial','pending','failed','refunded'];
-      if (allowedStatuses.indexOf(String(p.PaymentStatus).toLowerCase()) !== -1) {
-        status = String(p.PaymentStatus).toLowerCase();
+      // roll this payment's old contribution off the due, then re-validate + re-apply the new one
+      var rolledAmount = (parseFloat(dueData[dueRowIdx][5]) || 0) - oldLateFee + oldDiscount;
+      var rolledPaid = (parseFloat(dueData[dueRowIdx][8]) || 0) - oldAmountPaid;
+      var reAmount = Math.max(rolledPaid, rolledAmount + newLateFee - newDiscount);
+      var reRemaining = Math.max(0, reAmount - rolledPaid);
+      if (newAmountPaid > reRemaining + 0.01) {
+        return { success: false, message: 'Amount exceeds the remaining balance of GH₵' + reRemaining.toFixed(2) + ' for this due (after undoing the original payment)' };
       }
+      var rePaid = rolledPaid + newAmountPaid;
+      var reRemainingAfter = Math.max(0, reAmount - rePaid);
+      dueStatus = reRemainingAfter <= 0.01 ? 'paid' : 'partial';
+      newAmountDue = reRemainingAfter;
+
+      var dueSheetRow = dueRowIdx + 1, dts = nowIso();
+      dsh.getRange(dueSheetRow, 6).setValue(reAmount);
+      dsh.getRange(dueSheetRow, 7).setValue(dueStatus);
+      dsh.getRange(dueSheetRow, 8).setValue(idn);
+      dsh.getRange(dueSheetRow, 9).setValue(rePaid);
+      dsh.getRange(dueSheetRow, 10).setValue(toIso(p.PaymentDate));
+      dsh.getRange(dueSheetRow, 12).setValue(dts);
+    } else {
+      // legacy payment row with no linked due (recorded before this restructure) — just update the
+      // row itself, nothing to reconcile against
+      newAmountDue = 0;
+      dueStatus = computePaymentStatus(newAmountPaid, newAmountPaid);
     }
 
     var receiptNo = String(p.ReceiptNumber || '').trim() || rows[foundIdx][11];
     if (receiptNumberExists(sh, receiptNo, idn)) return { success: false, message: 'Receipt number already in use' };
 
     var row = foundIdx + 1, ts = nowIso();
-    sh.getRange(row, 2).setValue(sid);
-    sh.getRange(row, 3).setValue(fsid);
-    sh.getRange(row, 4).setValue(amountPaid);
-    sh.getRange(row, 5).setValue(amountDue);
-    sh.getRange(row, 6).setValue(lateFee);
-    sh.getRange(row, 7).setValue(discount);
+    sh.getRange(row, 4).setValue(newAmountPaid);
+    sh.getRange(row, 5).setValue(newAmountDue);
+    sh.getRange(row, 6).setValue(newLateFee);
+    sh.getRange(row, 7).setValue(newDiscount);
     sh.getRange(row, 8).setValue(toIso(p.PaymentDate));
-    sh.getRange(row, 9).setValue(String(p.BillingPeriod).trim());
     sh.getRange(row, 10).setValue(mode);
     sh.getRange(row, 11).setValue(p.TransactionReference || '');
     sh.getRange(row, 12).setValue(receiptNo);
-    sh.getRange(row, 13).setValue(status);
+    sh.getRange(row, 13).setValue(dueStatus);
     sh.getRange(row, 15).setValue(p.Remarks || '');
     sh.getRange(row, 18).setValue(ts);
 
-    var ay2 = String(p.AcademicYear || fmap[fsid].year || '').trim();
-    var refAmt2 = parseFloat(p.RefundAmount);
-    if (isNaN(refAmt2) || refAmt2 < 0) refAmt2 = 0;
-    var refDate2 = String(p.RefundDate || '').trim();
-    if (refDate2 && !/^\d{4}-\d{2}-\d{2}$/.test(refDate2)) return { success: false, message: 'RefundDate must be YYYY-MM-DD' };
-    var refReason2 = String(p.RefundReason || '').trim();
-    if (refReason2.length > 300) return { success: false, message: 'RefundReason max 300 chars' };
-    sh.getRange(row, 19).setValue(ay2);
-    sh.getRange(row, 20).setValue(refAmt2);
-    sh.getRange(row, 21).setValue(toIso(refDate2));
-    sh.getRange(row, 22).setValue(refReason2);
     var momoProviders2 = ['mtn_momo', 'telecel_cash', 'airteltigo_money'];
     var momoProvider2 = mode === 'mobile_money' ? String(p.MobileMoneyProvider || '').toLowerCase() : '';
     if (mode === 'mobile_money' && momoProvider2 && momoProviders2.indexOf(momoProvider2) === -1) {
@@ -9248,8 +9284,7 @@ function updatePayment(id, p, currentUser, currentRole) {
 function deletePayment(id, currentUser, currentRole) {
   try {
     if (!isAdminOrBursar(currentRole)) return { success: false, message: 'Forbidden — admin or bursar only' };
-    var sh = getSheet(FEE_PAYMENTS_SHEET);
-    if (!sh) return { success: false, message: 'Fee_Payments sheet not found' };
+    var sh = _ensureFeePaymentsSheet();
     var idn = parseInt(id, 10);
     if (isNaN(idn)) return { success: false, message: 'Invalid id' };
     var data = sh.getDataRange().getValues();
@@ -9258,6 +9293,30 @@ function deletePayment(id, currentUser, currentRole) {
       var row = i + 1, ts = nowIso();
       sh.getRange(row, 16).setValue('1');
       sh.getRange(row, 18).setValue(ts);
+
+      // a deleted payment is money that was never really counted — roll its contribution back off
+      // the due it was applied to, so the balance owed is accurate again
+      var dueId = data[i][23] ? parseInt(data[i][23], 10) : null;
+      if (dueId) {
+        var amountPaid = parseFloat(data[i][3]) || 0;
+        var lateFee = parseFloat(data[i][5]) || 0;
+        var discount = parseFloat(data[i][6]) || 0;
+        var dsh = _ensureFeeDuesSheet();
+        var dueData = dsh.getDataRange().getValues();
+        for (var d = 1; d < dueData.length; d++) {
+          if (dueData[d][0] !== dueId) continue;
+          var rolledAmount = Math.max(0, (parseFloat(dueData[d][5]) || 0) - lateFee + discount);
+          var rolledPaid = Math.max(0, (parseFloat(dueData[d][8]) || 0) - amountPaid);
+          var rolledStatus = rolledPaid <= 0.01 ? 'pending' : (rolledAmount - rolledPaid > 0.01 ? 'partial' : 'paid');
+          var dr = d + 1;
+          dsh.getRange(dr, 6).setValue(rolledAmount);
+          dsh.getRange(dr, 7).setValue(rolledStatus);
+          dsh.getRange(dr, 9).setValue(rolledPaid);
+          dsh.getRange(dr, 12).setValue(ts);
+          break;
+        }
+      }
+
       addLog(currentUser, 'Payment Deleted', 'Soft-deleted payment id ' + idn);
       return { success: true, message: 'Payment deleted successfully' };
     }
@@ -17379,7 +17438,7 @@ function getStudentFeeSummary(studentId, currentUser, currentRole) {
 
     // payments for this student
     var psh = getSheet(FEE_PAYMENTS_SHEET);
-    var payments = [], totalPaid = 0, totalDue = 0, totalLate = 0, totalDiscount = 0;
+    var payments = [], totalPaid = 0, totalLate = 0, totalDiscount = 0;
     if (psh) {
       var fmap = getFeeStructuresLite();
       var umap = getUsersMap();
@@ -17390,11 +17449,24 @@ function getStudentFeeSummary(studentId, currentUser, currentRole) {
         var p = rowToPayment(pdata[j], students, fmap, umap);
         payments.push(p);
         totalPaid += p.AmountPaid;
-        totalDue += p.AmountDue;
         totalLate += p.LateFee;
         totalDiscount += p.Discount;
       }
       payments.sort(function(a, b) { return String(b.PaymentDate).localeCompare(String(a.PaymentDate)); });
+    }
+
+    // outstanding balance — from Fee_Dues (the running ledger), not summed Fee_Payments.AmountDue
+    // snapshots, so this matches the Fee Dues panel above it instead of showing a different number
+    var totalDue = 0;
+    var dsh2 = getSheet(FEE_DUES_SHEET);
+    if (dsh2) {
+      var ddata2 = dsh2.getDataRange().getValues();
+      for (var k = 1; k < ddata2.length; k++) {
+        if (parseInt(ddata2[k][1], 10) !== sid) continue;
+        var dstatus = String(ddata2[k][6] || '').toLowerCase();
+        if (dstatus === 'paid' || dstatus === 'carried_forward' || dstatus === 'waived') continue;
+        totalDue += Math.max(0, (parseFloat(ddata2[k][5]) || 0) - (parseFloat(ddata2[k][8]) || 0));
+      }
     }
 
     return {
@@ -17737,17 +17809,8 @@ function getStudentDashboardData(currentUser, currentRole) {
       subjectPerf.sort(function(a, b) { return b.percent - a.percent; });
     }
 
-    // fees due (sum of AmountDue for this student)
-    var feesDue = 0;
-    var fpsh = getSheet(FEE_PAYMENTS_SHEET);
-    if (fpsh) {
-      var fd = fpsh.getDataRange().getValues();
-      for (var fp = 1; fp < fd.length; fp++) {
-        if (String(fd[fp][15]) === '1') continue;
-        if (parseInt(fd[fp][1], 10) !== sid) continue;
-        feesDue += parseFloat(fd[fp][4]) || 0;
-      }
-    }
+    // fees still outstanding for this student — from the Fee_Dues ledger
+    var feesDue = _feeDuesOutstandingMaps().byStudent[sid] || 0;
 
     // latest conduct grade
     var conductGrade = '—';
@@ -17880,6 +17943,7 @@ function getParentDashboardData(currentUser, currentRole) {
 
     var students = getStudentsLite();
     var cmap = getClassesMap();
+    var outstandingByStudent = _feeDuesOutstandingMaps().byStudent;
 
     // per-child stats
     var childStats = [];
@@ -17894,21 +17958,10 @@ function getParentDashboardData(currentUser, currentRole) {
         FullName: s.fullName,
         AdmissionNumber: s.admNo,
         ClassLabel: s.classLabel,
-        FeesDue: 0,
+        FeesDue: outstandingByStudent[sid] || 0,
         AttendancePct: 0,
         LatestResultPct: 0
       };
-
-      // fees due
-      var fpsh = getSheet(FEE_PAYMENTS_SHEET);
-      if (fpsh) {
-        var fd = fpsh.getDataRange().getValues();
-        for (var fp = 1; fp < fd.length; fp++) {
-          if (String(fd[fp][15]) === '1') continue;
-          if (parseInt(fd[fp][1], 10) !== sid) continue;
-          stat.FeesDue += parseFloat(fd[fp][4]) || 0;
-        }
-      }
       totalDue += stat.FeesDue;
 
       // attendance
@@ -18200,7 +18253,8 @@ function getClerkDashboardData(currentUser, currentRole) {
     var monthStartStr = monthStart.toISOString().split('T')[0];
 
     // payments scan
-    var todayCollection = 0, todayReceipts = 0, totalOutstanding = 0;
+    var todayCollection = 0, todayReceipts = 0;
+    var totalOutstanding = _feeDuesOutstandingMaps().total; // from the Fee_Dues ledger, not summed payment-row snapshots
     var refundsToday = 0, refundsTodayCount = 0;
     var collectionTrend = [];
     for (var i = 6; i >= 0; i--) {
@@ -18227,7 +18281,6 @@ function getClerkDashboardData(currentUser, currentRole) {
         var mode = String(fpd[fi][9] || '').toLowerCase();
         var refundAmt = parseFloat(fpd[fi][19]) || 0;
         var refundDate = toIso(fpd[fi][20]).split('T')[0];
-        totalOutstanding += due;
         if (pdate === todayStr_) { todayCollection += amt; todayReceipts++; }
         if (refundAmt > 0 && refundDate === todayStr_) { refundsToday += refundAmt; refundsTodayCount++; }
         if (collIdx[pdate] != null) collectionTrend[collIdx[pdate]].amount += amt;
@@ -19061,8 +19114,7 @@ function refundPayment(paymentId, refundAmount, refundReason, currentUser, curre
     var reason = String(refundReason || '').trim();
     if (reason.length < 3) return { success: false, message: 'Refund reason required (min 3 chars)' };
 
-    var sh = getSheet(FEE_PAYMENTS_SHEET);
-    if (!sh) return { success: false, message: 'Fee_Payments sheet not found' };
+    var sh = _ensureFeePaymentsSheet();
     var data = sh.getDataRange().getValues();
     for (var i = 1; i < data.length; i++) {
       if (data[i][0] !== pid) continue;
@@ -19075,6 +19127,25 @@ function refundPayment(paymentId, refundAmount, refundReason, currentUser, curre
       sh.getRange(row, 22).setValue(reason);         // col 22 = RefundReason
       sh.getRange(row, 13).setValue('refunded');     // col 13 = PaymentStatus
       sh.getRange(row, 18).setValue(ts);             // col 18 = UpdatedAt
+
+      // refunded money is money the school no longer holds — put it back on the balance owed
+      var dueId = data[i][23] ? parseInt(data[i][23], 10) : null;
+      if (dueId) {
+        var dsh = _ensureFeeDuesSheet();
+        var dueData = dsh.getDataRange().getValues();
+        for (var d = 1; d < dueData.length; d++) {
+          if (dueData[d][0] !== dueId) continue;
+          var dueAmount = parseFloat(dueData[d][5]) || 0;
+          var rolledPaid = Math.max(0, (parseFloat(dueData[d][8]) || 0) - amt);
+          var rolledStatus = rolledPaid <= 0.01 ? 'pending' : (dueAmount - rolledPaid > 0.01 ? 'partial' : 'paid');
+          var dr = d + 1;
+          dsh.getRange(dr, 7).setValue(rolledStatus);
+          dsh.getRange(dr, 9).setValue(rolledPaid);
+          dsh.getRange(dr, 12).setValue(ts);
+          break;
+        }
+      }
+
       addLog(currentUser, 'Fee Refunded', 'Refund ' + amt + ' for payment #' + pid + ' — ' + reason);
       return { success: true, message: 'Refund of ' + amt + ' recorded' };
     }
@@ -20036,9 +20107,9 @@ function getParentFeesSummary(parentId, currentUser, currentRole) {
       };
     });
 
-    // walk payments
+    // walk payments (paid/late/discount totals — Due is filled in separately below from Fee_Dues)
     var allPayments = [];
-    var totalPaid = 0, totalDue = 0, totalLate = 0, totalDiscount = 0;
+    var totalPaid = 0, totalLate = 0, totalDiscount = 0;
     var fpsh = getSheet(FEE_PAYMENTS_SHEET);
     if (fpsh) {
       var fpdata = fpsh.getDataRange().getValues();
@@ -20050,7 +20121,6 @@ function getParentFeesSummary(parentId, currentUser, currentRole) {
         allPayments.push(p);
         var c = byChild[psid];
         c.Paid += p.AmountPaid;
-        c.Due += p.AmountDue;
         c.LateFee += p.LateFee;
         c.Discount += p.Discount;
         c.PaymentCount++;
@@ -20058,11 +20128,18 @@ function getParentFeesSummary(parentId, currentUser, currentRole) {
           c.LastPaymentDate = p.PaymentDate;
         }
         totalPaid += p.AmountPaid;
-        totalDue += p.AmountDue;
         totalLate += p.LateFee;
         totalDiscount += p.Discount;
       }
     }
+    // outstanding balance per child — from the Fee_Dues ledger, not summed Fee_Payments.AmountDue
+    var totalDue = 0;
+    var outstandingByChild = _feeDuesOutstandingMaps().byStudent;
+    Object.keys(byChild).forEach(function(sidKey) {
+      var owed = outstandingByChild[sidKey] || 0;
+      byChild[sidKey].Due = owed;
+      totalDue += owed;
+    });
     allPayments.sort(function(a, b) { return String(b.PaymentDate).localeCompare(String(a.PaymentDate)); });
 
     // children list — primary first, then by name
@@ -20159,6 +20236,96 @@ function _ensureFeeDuesSheet() {
     sh.setFrozenRows(1);
   }
   return sh;
+}
+
+// Single pass over Fee_Dues for "what does everyone actually still owe right now" — used by every
+// dashboard/report/portal that shows an outstanding-fees figure, so they all agree with each other
+// and with the Fee Dues panel itself (summing Fee_Payments.AmountDue instead, which is what the
+// dashboards did before this restructure, over-counts once a due has more than one payment against
+// it from daily/partial collection).
+function _feeDuesOutstandingMaps() {
+  var byStudent = {}, total = 0;
+  try {
+    var dsh = getSheet(FEE_DUES_SHEET);
+    if (dsh) {
+      var data = dsh.getDataRange().getValues();
+      for (var i = 1; i < data.length; i++) {
+        var status = String(data[i][6] || '').toLowerCase();
+        if (status === 'paid' || status === 'carried_forward' || status === 'waived') continue;
+        var remaining = Math.max(0, (parseFloat(data[i][5]) || 0) - (parseFloat(data[i][8]) || 0));
+        if (remaining <= 0) continue;
+        var sid = parseInt(data[i][1], 10);
+        byStudent[sid] = (byStudent[sid] || 0) + remaining;
+        total += remaining;
+      }
+    }
+  } catch (e) { Logger.log('_feeDuesOutstandingMaps failed: ' + e.toString()); }
+  return { byStudent: byStudent, total: total };
+}
+
+// The ONE place a payment ever gets applied to a due — used by addPayment, addPaymentsBulk and
+// payMonthlyDues so there is exactly one ledger (Fee_Dues.PaidAmount/Status), not several
+// independently-computed "amount owed" snapshots. This is what makes daily/partial collection work:
+// each call reads whatever is ALREADY paid on the due and adds to it, instead of recomputing against
+// the full original fee amount from scratch (which is what silently broke syncing before).
+//
+// dsh/dueData/dueRowIdx: the Fee_Dues sheet, its full getDataRange().values, and the 0-based index
+//   of the due row within dueData (so the actual sheet row is dueRowIdx+1).
+// amountPaid: what's being collected THIS transaction (can be less than the full remaining balance).
+// lateFeeDelta/discountDelta: one-time adjustments to the due's total bill, applied before checking
+//   the remaining balance (a discount lowers what's owed, a late fee raises it) — 0/0 for a plain
+//   collection with no adjustment.
+// meta: { fpsh, studentId, paymentDate, mode, txnRef, receiptNo, remarks, momoProvider, collectedBy,
+//   academicYear, ts, statusOverride (admin only, optional) }
+// Returns { ok:false, message } on a bad amount, or { ok:true, paymentId, receiptNo, remainingAfter,
+//   dueStatus, amountPaid } on success. Caller is responsible for calling this inside a context where
+//   dsh already reflects the sheet (values are re-read fresh by index — safe to call in a loop over
+//   multiple dues in the SAME sheet, since each due is a different row).
+function _applyPaymentToDue(dsh, dueData, dueRowIdx, amountPaid, lateFeeDelta, discountDelta, meta) {
+  var dueRow = dueData[dueRowIdx];
+  var sheetRow = dueRowIdx + 1;
+  var curAmount = parseFloat(dueRow[5]) || 0;
+  var curPaid = parseFloat(dueRow[8]) || 0;
+
+  var newAmount = curAmount + (parseFloat(lateFeeDelta) || 0) - (parseFloat(discountDelta) || 0);
+  if (newAmount < curPaid) newAmount = curPaid; // a discount can't erase money already collected
+  var remainingBefore = Math.max(0, newAmount - curPaid);
+
+  var paid = parseFloat(amountPaid) || 0;
+  if (paid <= 0) return { ok: false, message: 'Amount must be greater than 0' };
+  if (paid > remainingBefore + 0.01) {
+    return { ok: false, message: 'Amount exceeds the remaining balance of GH₵' + remainingBefore.toFixed(2) + ' for this due' };
+  }
+
+  var newPaid = curPaid + paid;
+  var remainingAfter = Math.max(0, newAmount - newPaid);
+  var dueStatus = remainingAfter <= 0.01 ? 'paid' : 'partial';
+  if (meta.statusOverride) dueStatus = meta.statusOverride;
+
+  var fpsh = meta.fpsh;
+  var paymentId = nextPaymentId(fpsh);
+  var receiptNo = meta.receiptNo || generateReceiptNumber(fpsh);
+  var ts = meta.ts || nowIso();
+  var txnStatus = remainingAfter <= 0.01 ? 'paid' : 'partial';
+  fpsh.appendRow([
+    paymentId, meta.studentId, parseInt(dueRow[2], 10), paid, remainingAfter,
+    parseFloat(lateFeeDelta) || 0, parseFloat(discountDelta) || 0,
+    toIso(meta.paymentDate), dueRow[4], meta.mode,
+    meta.txnRef || '', receiptNo, txnStatus, meta.collectedBy,
+    meta.remarks || '', '0', ts, ts,
+    meta.academicYear || '', 0, '', '', meta.momoProvider || '', dueRow[0]
+  ]);
+
+  dsh.getRange(sheetRow, 6).setValue(newAmount);
+  dsh.getRange(sheetRow, 7).setValue(dueStatus);
+  dsh.getRange(sheetRow, 8).setValue(paymentId);
+  dsh.getRange(sheetRow, 9).setValue(newPaid);
+  dsh.getRange(sheetRow, 10).setValue(toIso(meta.paymentDate));
+  dsh.getRange(sheetRow, 12).setValue(ts);
+  // keep the in-memory copy consistent too, in case the SAME dueData array is reused later in the caller
+  dueRow[5] = newAmount; dueRow[6] = dueStatus; dueRow[7] = paymentId; dueRow[8] = newPaid;
+
+  return { ok: true, paymentId: paymentId, receiptNo: receiptNo, remainingAfter: remainingAfter, dueStatus: dueStatus, amountPaid: paid };
 }
 
 // Generate monthly due slots for one student from admission month → current month.
@@ -20378,6 +20545,7 @@ function getViewerScope(currentUser, currentRole) {
 var _TERM_ORDER = { term1: 1, term2: 2, term3: 3 };
 function _isPastBillingPeriod(billingMonth, activeTerm, academicYear) {
   var key = String(billingMonth || '');
+  if (key.indexOf('arrears-') === 0) return true; // a carried-forward balance from promoteStudents is always already overdue
   var termMatch = key.match(/^(term[123])-(.+)$/);
   if (termMatch) {
     var term = termMatch[1], year = termMatch[2];
@@ -20426,8 +20594,9 @@ function getStudentMonthlyDues(studentId, currentUser, currentRole) {
 
     for (var i = 1; i < data.length; i++) {
       if (parseInt(data[i][1], 10) !== sid) continue;
-      var amt = parseFloat(data[i][5]) || 0;
       var status = String(data[i][6] || 'pending').toLowerCase();
+      if (status === 'carried_forward') continue; // closed out at promotion — the new arrears due replaces it
+      var amt = parseFloat(data[i][5]) || 0;
       var paidAmt = parseFloat(data[i][8]) || 0;
       var fsid = data[i][2];
       var fs = fmap[fsid];
@@ -20479,7 +20648,7 @@ function getArrearsOverview(currentUser, currentRole) {
     var byStudent = {};
     for (var i = 1; i < data.length; i++) {
       var status = String(data[i][6] || 'pending').toLowerCase();
-      if (status === 'paid') continue;
+      if (status === 'paid' || status === 'carried_forward' || status === 'waived') continue;
       if (!_isPastBillingPeriod(data[i][3], activeTerm, academicYear)) continue;
       var sid = parseInt(data[i][1], 10);
       var s = students[sid];
@@ -20501,6 +20670,10 @@ function getArrearsOverview(currentUser, currentRole) {
 
 // Pay multiple month dues at once — creates Fee_Payments row(s), marks dues paid, returns receipts.
 // Groups by FeeStructureID — one Fee_Payments row per fee structure since amount maps to it.
+// bulk "settle these dues in full right now" — e.g. clearing every arrear at once. Pays each
+// selected due's REMAINING balance (via the same shared ledger as a normal addPayment call, so a
+// due that's already partially paid down from earlier daily collections is topped up correctly
+// rather than double-counted) and writes one payment row per due for a clean per-term audit trail.
 function payMonthlyDues(payload, currentUser, currentRole) {
   try {
     var role = String(currentRole || '').toLowerCase();
@@ -20524,57 +20697,42 @@ function payMonthlyDues(payload, currentUser, currentRole) {
     var s = students[sid];
     if (!s) return { success: false, message: 'Student not found or deleted' };
 
+    var fmap = getFeeStructuresLite();
     var dsh = _ensureFeeDuesSheet();
-    var ddata = dsh.getDataRange().getValues();
+    var dueData = dsh.getDataRange().getValues();
     var dueIdSet = {};
     dueIds.forEach(function(d) { dueIdSet[String(d)] = true; });
 
-    var groups = {};
-    for (var i = 1; i < ddata.length; i++) {
-      if (parseInt(ddata[i][1], 10) !== sid) continue;
-      var dueId = ddata[i][0];
-      if (!dueIdSet[String(dueId)]) continue;
-      var status = String(ddata[i][6] || '').toLowerCase();
-      if (status === 'paid') continue;
-      var fsid = parseInt(ddata[i][2], 10);
-      var amt = parseFloat(ddata[i][5]) || 0;
-      if (!groups[fsid]) groups[fsid] = { totalAmount: 0, monthLabels: [], rows: [] };
-      groups[fsid].totalAmount += amt;
-      groups[fsid].monthLabels.push(ddata[i][4]);
-      groups[fsid].rows.push({ rowIdx: i + 1, dueId: dueId, amount: amt });
+    var targets = [];
+    for (var i = 1; i < dueData.length; i++) {
+      if (parseInt(dueData[i][1], 10) !== sid) continue;
+      if (!dueIdSet[String(dueData[i][0])]) continue;
+      if (String(dueData[i][6]) === 'paid') continue;
+      var remaining = Math.max(0, (parseFloat(dueData[i][5]) || 0) - (parseFloat(dueData[i][8]) || 0));
+      if (remaining <= 0) continue;
+      targets.push({ dueRowIdx: i, remaining: remaining, monthLabel: dueData[i][4] });
     }
-    var keys = Object.keys(groups);
-    if (keys.length === 0) return { success: false, message: 'No pending dues found in selection' };
+    if (targets.length === 0) return { success: false, message: 'No pending dues found in selection' };
 
-    var fpsh = getSheet(FEE_PAYMENTS_SHEET);
-    if (!fpsh) return { success: false, message: 'Fee_Payments sheet not found' };
+    var fpsh = _ensureFeePaymentsSheet();
     var collectedById = getCurrentUserId(currentUser) || '';
     var ts = nowIso();
     var receipts = [], grandTotal = 0, allMonths = [];
 
-    keys.forEach(function(fsid) {
-      var g = groups[fsid];
-      var newPaymentId = nextPaymentId(fpsh);
-      var receiptNo = generateReceiptNumber(fpsh);
-      fpsh.appendRow([
-        newPaymentId, sid, parseInt(fsid, 10),
-        g.totalAmount, 0, 0, 0,
-        paymentDate, g.monthLabels.join(', '), paymentMode,
-        transactionRef, receiptNo, 'paid', collectedById,
-        remarks || ('Bulk payment for ' + g.monthLabels.length + ' month(s)'),
-        '0', ts, ts, '', 0, '', '', momoProvider3
-      ]);
-      g.rows.forEach(function(r) {
-        dsh.getRange(r.rowIdx, 7).setValue('paid');
-        dsh.getRange(r.rowIdx, 8).setValue(newPaymentId);
-        dsh.getRange(r.rowIdx, 9).setValue(r.amount);
-        dsh.getRange(r.rowIdx, 10).setValue(ts);
-        dsh.getRange(r.rowIdx, 12).setValue(ts);
+    for (var j = 0; j < targets.length; j++) {
+      var t = targets[j];
+      var fsid = parseInt(dueData[t.dueRowIdx][2], 10);
+      var ay = String((fmap[fsid] && fmap[fsid].year) || '');
+      var result = _applyPaymentToDue(dsh, dueData, t.dueRowIdx, t.remaining, 0, 0, {
+        fpsh: fpsh, studentId: sid, paymentDate: paymentDate, mode: paymentMode,
+        txnRef: transactionRef, remarks: remarks || 'Bulk payment', momoProvider: momoProvider3,
+        collectedBy: collectedById, academicYear: ay, ts: ts
       });
-      receipts.push({ paymentId: newPaymentId, receiptNo: receiptNo, amount: g.totalAmount, months: g.monthLabels.slice() });
-      grandTotal += g.totalAmount;
-      allMonths = allMonths.concat(g.monthLabels);
-    });
+      if (!result.ok) return { success: false, message: t.monthLabel + ': ' + result.message };
+      receipts.push({ paymentId: result.paymentId, receiptNo: result.receiptNo, amount: result.amountPaid, months: [t.monthLabel] });
+      grandTotal += result.amountPaid;
+      allMonths.push(t.monthLabel);
+    }
 
     addLog(currentUser, 'Multi-Month Payment', 'Student #' + sid + ' paid ' + grandTotal + ' for ' + allMonths.join(', '));
     return {
