@@ -21041,6 +21041,17 @@ function getStudentMonthlyDues(studentId, currentUser, currentRole) {
     var out = [];
     var summary = { total:0, pending:0, paid:0, totalAmt:0, pendingAmt:0, paidAmt:0, arrears:0, arrearsAmt:0 };
 
+    // ID → ReceiptNumber, so the per-due history below can show the actual receipt without a
+    // separate round trip — cheap since it's one column read, built only when this student has dues.
+    var receiptById = {};
+    try {
+      var fpsh = getSheet(FEE_PAYMENTS_SHEET);
+      if (fpsh) {
+        var pdata = fpsh.getDataRange().getValues();
+        for (var p = 1; p < pdata.length; p++) { receiptById[pdata[p][0]] = pdata[p][11] || ''; }
+      }
+    } catch (e) {}
+
     var activeTerm = 'term1', academicYear = '';
     try {
       var settingsRes = getSchoolSettings();
@@ -21057,12 +21068,13 @@ function getStudentMonthlyDues(studentId, currentUser, currentRole) {
       var fs = fmap[fsid];
       var billingMonth = data[i][3];
       var isArrears = status !== 'paid' && _isPastBillingPeriod(billingMonth, activeTerm, academicYear);
+      var payId = data[i][7] || '';
       out.push({
         ID: data[i][0], StudentID: data[i][1], FeeStructureID: fsid,
         FeeCategory: fs ? fs.category : '— deleted fee —',
         BillingMonth: billingMonth, BillingMonthLabel: data[i][4],
         Amount: amt, Status: status, IsArrears: isArrears,
-        PaymentID: data[i][7] || '', PaidAmount: paidAmt,
+        PaymentID: payId, ReceiptNumber: payId ? (receiptById[payId] || '') : '', PaidAmount: paidAmt,
         PaidDate: toIso(data[i][9]), CreatedAt: toIso(data[i][10])
       });
       summary.total++; summary.totalAmt += amt;

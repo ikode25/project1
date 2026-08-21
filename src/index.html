@@ -20054,6 +20054,115 @@
       );
     }
 
+    // student summary + running fee history — the "easy for collector/admin to see the whole
+    // picture" side panel next to the Record Payment form, so nobody has to close this modal and
+    // open StudentFeesModal separately just to check what's already been paid.
+    function FeeStudentSidePanel({ student, allDues, duesLoading, netPayable, payingNow, balanceDue }) {
+      if (!student) return null;
+      const initials = (student.FullName || '?').charAt(0).toUpperCase();
+      const billed = allDues.reduce((s, d) => s + (Number(d.Amount) || 0), 0);
+      const collected = allDues.reduce((s, d) => s + (Number(d.PaidAmount) || 0), 0);
+      const outstanding = Math.max(0, billed - collected);
+      const history = allDues.slice().sort((a, b) => String(b.BillingMonth).localeCompare(String(a.BillingMonth)));
+
+      const statusBadgeClass = (s) => s === 'paid' ? 'status-active' : s === 'partial' ? 'status-suspended' : 'role-clerk';
+
+      return (
+        <div style={{border:'1px solid #e0e0e0', borderRadius:'8px', overflow:'hidden', background:'#fff', position:'sticky', top:'0'}}>
+          <div style={{padding:'14px', display:'flex', gap:'10px', alignItems:'center', background:'#f8f9fa', borderBottom:'1px solid #eee'}}>
+            {student.PhotoURL
+              ? <img src={student.PhotoURL} alt="" style={{width:'44px', height:'44px', borderRadius:'50%', objectFit:'cover'}} />
+              : <div style={{width:'44px', height:'44px', borderRadius:'50%', background:'var(--navy-primary)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, fontSize:'16px', flexShrink:0}}>{initials}</div>}
+            <div style={{minWidth:0}}>
+              <div style={{fontWeight:700, fontSize:'14px', color:'var(--navy-primary)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{student.FullName}</div>
+              <div style={{fontSize:'11px', color:'#888'}}>{student.ClassLabel}</div>
+              <div style={{marginTop:'3px', display:'flex', gap:'4px', flexWrap:'wrap'}}>
+                <span className={`status-badge ${student.Status === 'active' ? 'status-active' : 'status-inactive'}`} style={{fontSize:'9px', padding:'1px 6px'}}>{student.Status}</span>
+                <span className="status-badge role-clerk" style={{fontSize:'9px', padding:'1px 6px', fontFamily:'monospace'}}>{student.AdmissionNumber}</span>
+              </div>
+            </div>
+          </div>
+
+          {(netPayable != null) && (
+            <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'1px', background:'#eee', fontSize:'11px', textAlign:'center'}}>
+              <div style={{background:'#fff', padding:'8px 4px'}}>
+                <div style={{color:'#888', fontSize:'9px', textTransform:'uppercase'}}>Net Payable</div>
+                <div style={{fontWeight:700}}>GH₵{netPayable.toFixed(2)}</div>
+              </div>
+              <div style={{background:'#fff', padding:'8px 4px'}}>
+                <div style={{color:'#888', fontSize:'9px', textTransform:'uppercase'}}>Paying Now</div>
+                <div style={{fontWeight:700, color:'#34a853'}}>GH₵{payingNow.toFixed(2)}</div>
+              </div>
+              <div style={{background:'#fff', padding:'8px 4px'}}>
+                <div style={{color:'#888', fontSize:'9px', textTransform:'uppercase'}}>Balance Due</div>
+                <div style={{fontWeight:700, color: balanceDue > 0 ? '#ea4335' : '#34a853'}}>GH₵{balanceDue.toFixed(2)}</div>
+              </div>
+            </div>
+          )}
+
+          <div style={{padding:'12px 14px 6px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+            <span style={{fontWeight:700, fontSize:'12px', color:'var(--navy-primary)'}}><i className="fas fa-history"></i> Previous Fee Records</span>
+            <span style={{fontSize:'11px', color:'#888'}}>{allDues.length} record{allDues.length === 1 ? '' : 's'}</span>
+          </div>
+
+          {duesLoading && <div style={{padding:'10px 14px', fontSize:'12px', color:'#888'}}><i className="fas fa-spinner fa-spin"></i> Loading…</div>}
+
+          {!duesLoading && allDues.length > 0 && (
+            <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'1px', background:'#eee', fontSize:'10px', textAlign:'center', margin:'0 14px 8px', border:'1px solid #eee'}}>
+              <div style={{background:'#fff', padding:'6px 2px'}}>
+                <div style={{color:'#888', textTransform:'uppercase'}}>Billed</div>
+                <div style={{fontWeight:700}}>GH₵{billed.toFixed(2)}</div>
+              </div>
+              <div style={{background:'#fff', padding:'6px 2px'}}>
+                <div style={{color:'#888', textTransform:'uppercase'}}>Collected</div>
+                <div style={{fontWeight:700, color:'#34a853'}}>GH₵{collected.toFixed(2)}</div>
+              </div>
+              <div style={{background:'#fff', padding:'6px 2px'}}>
+                <div style={{color:'#888', textTransform:'uppercase'}}>Outstanding</div>
+                <div style={{fontWeight:700, color: outstanding > 0 ? '#ea4335' : '#34a853'}}>GH₵{outstanding.toFixed(2)}</div>
+              </div>
+            </div>
+          )}
+
+          {!duesLoading && allDues.length === 0 && (
+            <div style={{padding:'10px 14px 14px', fontSize:'12px', color:'#888'}}>No fee records yet for this student.</div>
+          )}
+
+          {!duesLoading && history.length > 0 && (
+            <div style={{maxHeight:'260px', overflowY:'auto', borderTop:'1px solid #f0f0f0'}}>
+              <table style={{width:'100%', fontSize:'11px', borderCollapse:'collapse'}}>
+                <thead>
+                  <tr style={{background:'#001f3f', color:'#fff', position:'sticky', top:0}}>
+                    <th style={{padding:'5px 6px', textAlign:'left'}}>Period</th>
+                    <th style={{padding:'5px 6px', textAlign:'left'}}>Head</th>
+                    <th style={{padding:'5px 6px', textAlign:'right'}}>Paid</th>
+                    <th style={{padding:'5px 6px', textAlign:'right'}}>Due</th>
+                    <th style={{padding:'5px 6px', textAlign:'center'}}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map(d => {
+                    const due = Math.max(0, (Number(d.Amount) || 0) - (Number(d.PaidAmount) || 0));
+                    return (
+                      <tr key={d.ID} style={{borderBottom:'1px solid #f5f5f5'}} title={d.ReceiptNumber ? 'Receipt: ' + d.ReceiptNumber : ''}>
+                        <td style={{padding:'5px 6px'}}>{d.BillingMonthLabel}</td>
+                        <td style={{padding:'5px 6px', textTransform:'capitalize'}}>{d.FeeCategory}{d.IsArrears ? ' ⚠' : ''}</td>
+                        <td style={{padding:'5px 6px', textAlign:'right'}}>{Number(d.PaidAmount || 0).toFixed(2)}</td>
+                        <td style={{padding:'5px 6px', textAlign:'right', color: due > 0 ? '#ea4335' : 'inherit'}}>{due.toFixed(2)}</td>
+                        <td style={{padding:'5px 6px', textAlign:'center'}}>
+                          <span className={`status-badge ${statusBadgeClass(d.Status)}`} style={{fontSize:'9px', padding:'1px 5px'}}>{d.Status}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      );
+    }
+
     function FeePaymentModal({ payment, viewMode, currentUser, role, onClose, onSave }) {
       const isView = viewMode === true;
       const isAdmin = String(role).toLowerCase() === 'admin';
@@ -20066,10 +20175,11 @@
 
       // ============ STUDENT MODE STATE ============
       const [students, setStudents] = useState([]);
-      // outstanding dues for the picked student — this IS the "which term/month am I paying" picker
-      // now (replaces the old raw Fee Structure + free-text Billing Period fields). Arrears sort first.
-      const [dues, setDues] = useState([]);
+      // ALL of the picked student's dues (paid + unpaid) — feeds both the "Due to Pay" picker
+      // (filtered to unpaid below) and the side-panel's Previous Fee Records history. Arrears sort first.
+      const [allDues, setAllDues] = useState([]);
       const [duesLoading, setDuesLoading] = useState(false);
+      const dues = allDues.filter(d => d.Status !== 'paid');
       const [formData, setFormData] = useState({
         StudentID: payment?.StudentID ? String(payment.StudentID) : '',
         DueID: payment?.DueID ? String(payment.DueID) : '',
@@ -20105,20 +20215,72 @@
           .getAllStudents(currentUser, role);
       }, []);
 
-      // load the selected student's outstanding dues (student mode, ADD only — editing keeps its
+      // load the selected student's full due history (student mode, ADD only — editing keeps its
       // original due, no need to re-fetch the whole list)
-      useEffect(() => {
-        if (mode !== 'student' || !isAddNew || !formData.StudentID) { setDues([]); return; }
+      const reloadDues = () => {
+        if (mode !== 'student' || !isAddNew || !formData.StudentID) { setAllDues([]); return; }
         setDuesLoading(true);
         google.script.run
           .withSuccessHandler((res) => {
             setDuesLoading(false);
-            if (res.success) setDues((res.data || []).filter(d => d.Status !== 'paid'));
-            else { setDues([]); Swal.fire({ icon: 'error', title: 'Could not load dues', text: res.message }); }
+            if (res.success) setAllDues(res.data || []);
+            else { setAllDues([]); Swal.fire({ icon: 'error', title: 'Could not load dues', text: res.message }); }
           })
           .withFailureHandler((err) => { setDuesLoading(false); Swal.fire({ icon: 'error', title: 'Could not load dues', text: err.message }); })
           .getStudentMonthlyDues(formData.StudentID, currentUser, role);
-      }, [formData.StudentID, mode]);
+      };
+      useEffect(reloadDues, [formData.StudentID, mode]);
+
+      // admin-only quick add: configure a new billable fee type for this student's class right from
+      // the collection screen, instead of leaving to the separate Fee Structure page — then
+      // immediately regenerates + reloads dues so it shows up in the picker below.
+      const selectedStudentForFeeType = students.find(s => String(s.ID) === String(formData.StudentID));
+      const handleQuickAddFeeType = () => {
+        if (!selectedStudentForFeeType) { Swal.fire({ icon: 'warning', text: 'Pick a student first.' }); return; }
+        const categories = ['tuition','admission','transport','exam','library','sports','lab','annual','arrears','other'];
+        const frequencies = [['termly','Termly'],['monthly','Monthly'],['quarterly','Quarterly'],['half_yearly','Half-Yearly'],['annual','Annual'],['one_time','One-Time']];
+        Swal.fire({
+          title: 'Add Fee Type',
+          html:
+            `<div style="text-align:left;font-size:13px">` +
+            `<label style="font-weight:600">Fee Category</label>` +
+            `<select id="qft-cat" class="swal2-input" style="margin:4px 0 10px">${categories.map(c => `<option value="${c}">${c.charAt(0).toUpperCase()+c.slice(1)}</option>`).join('')}</select>` +
+            `<label style="font-weight:600">Amount (GH₵)</label>` +
+            `<input id="qft-amt" class="swal2-input" type="number" min="0" step="0.01" style="margin:4px 0 10px" />` +
+            `<label style="font-weight:600">Frequency</label>` +
+            `<select id="qft-freq" class="swal2-input" style="margin:4px 0">${frequencies.map(([v,l]) => `<option value="${v}" ${v==='termly'?'selected':''}>${l}</option>`).join('')}</select>` +
+            `</div>`,
+          showCancelButton: true, confirmButtonText: 'Add Fee Type', confirmButtonColor: '#001f3f',
+          preConfirm: () => {
+            const amt = parseFloat(document.getElementById('qft-amt').value);
+            if (!amt || amt <= 0) { Swal.showValidationMessage('Enter a valid amount'); return false; }
+            return {
+              category: document.getElementById('qft-cat').value,
+              amount: amt,
+              frequency: document.getElementById('qft-freq').value
+            };
+          }
+        }).then((r) => {
+          if (!r.isConfirmed) return;
+          google.script.run
+            .withSuccessHandler((res) => {
+              if (!res || !res.success) { Swal.fire({ icon: 'error', text: (res && res.message) || 'Could not add fee type' }); return; }
+              google.script.run.withSuccessHandler(() => reloadDues())
+                .withFailureHandler(() => reloadDues())
+                .generateStudentDues(formData.StudentID, currentUser);
+              Swal.fire({ icon: 'success', text: 'Fee type added — dues regenerated.', timer: 1800, showConfirmButton: false });
+            })
+            .withFailureHandler((err) => Swal.fire({ icon: 'error', text: (err && err.message) || 'Failed' }))
+            .addFeeStructure({
+              ClassID: selectedStudentForFeeType.ClassID,
+              FeeCategory: r.value.category,
+              Amount: r.value.amount,
+              Frequency: r.value.frequency,
+              AcademicYear: (window.SMS_SCHOOL && window.SMS_SCHOOL.AcademicYear) || new Date().getFullYear() + '-' + (new Date().getFullYear() + 1),
+              IsActive: true
+            }, currentUser, role);
+        });
+      };
 
       // load parents on first switch to parent-mode
       useEffect(() => {
@@ -20268,17 +20430,24 @@
       // selected parent record (for header label)
       const selectedParent = parents.find(p => String(p.ID) === String(selectedParentId));
 
+      // side panel (student summary + previous fee records) shows once a student is picked in the
+      // single-student ADD flow — this is what makes collection "easy to see at a glance" instead of
+      // needing to leave the form to check the student's history first
+      const showSidePanel = mode === 'student' && isAddNew && !!formData.StudentID;
+
       return (
         <div className="modal-overlay" onClick={onClose}>
-          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: mode === 'parent' ? '960px' : '820px'}}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth: showSidePanel ? '1180px' : (mode === 'parent' ? '960px' : '820px')}}>
             <div className="modal-header">
               <h3>
                 <i className="fas fa-money-bill-wave"></i>{' '}
                 {isView ? 'Payment Receipt' : (payment ? 'Edit Payment' : (mode === 'parent' ? 'Record Family Payment' : 'Record Payment'))}
+                {showSidePanel && selectedStudentForFeeType ? ' — ' + selectedStudentForFeeType.FullName : ''}
               </h3>
               <button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button>
             </div>
             <div className="modal-body">
+              <div style={{display:'grid', gridTemplateColumns: showSidePanel ? 'minmax(0,1fr) 320px' : '1fr', gap:'20px', alignItems:'start'}}>
               <form onSubmit={handleSubmit}>
 
                 {/* mode toggle — only when adding (not view, not edit) */}
@@ -20332,6 +20501,13 @@
                           <input type="date" value={formData.PaymentDate}
                             onChange={(e) => set('PaymentDate', e.target.value)} />
                         </div>
+                        {isAdmin && formData.StudentID && (
+                          <div className="form-group" style={{alignSelf:'end'}}>
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={handleQuickAddFeeType}>
+                              <i className="fas fa-plus"></i> Add Fee Type
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div style={{padding:'10px 14px',background:'#f8f9fa',border:'1px solid #dee2e6',marginBottom:'14px',fontSize:'13px'}}>
@@ -20681,6 +20857,18 @@
                   </button>
                 </div>
               </form>
+
+              {showSidePanel && (
+                <FeeStudentSidePanel
+                  student={selectedStudentForFeeType}
+                  allDues={allDues}
+                  duesLoading={duesLoading}
+                  netPayable={selectedDue ? adjustedRemaining : null}
+                  payingNow={selectedDue ? paidNow : null}
+                  balanceDue={selectedDue ? dueNow : null}
+                />
+              )}
+              </div>
             </div>
           </div>
         </div>
