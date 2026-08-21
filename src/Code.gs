@@ -8840,6 +8840,25 @@ function deleteFeeStructure(id, currentUser, currentRole) {
     if (!sh) return { success: false, message: 'Fee_Structure sheet not found' };
     var idn = parseInt(id, 10);
     if (isNaN(idn)) return { success: false, message: 'Invalid id' };
+
+    // block the delete if any Fee_Dues still point at this fee item and aren't settled — deleting it
+    // anyway would strand those dues exactly like the ones that showed up as "— deleted fee —" and
+    // couldn't be collected against. Waive or fully collect them first, then delete.
+    try {
+      var dsh = _ensureFeeDuesSheet();
+      var ddata = dsh.getDataRange().getValues();
+      var outstanding = 0;
+      for (var d = 1; d < ddata.length; d++) {
+        if (parseInt(ddata[d][2], 10) !== idn) continue;
+        var st = String(ddata[d][6] || '').toLowerCase();
+        if (st === 'paid' || st === 'carried_forward' || st === 'waived') continue;
+        outstanding++;
+      }
+      if (outstanding > 0) {
+        return { success: false, message: 'Can\'t delete — ' + outstanding + ' student due(s) still reference this fee item. Collect or waive them first (Fees Collection → student → Waive), then delete.' };
+      }
+    } catch (e) {}
+
     var data = sh.getDataRange().getValues();
     for (var i = 1; i < data.length; i++) {
       if (data[i][0] !== idn || String(data[i][9]) === '1') continue;
@@ -12437,15 +12456,28 @@ function setActiveAcademicSession(academicYear, term, currentUser, currentRole) 
     var foundRow = -1;
     for (var i = 1; i < data.length; i++) { if (parseInt(data[i][0], 10) === 1) { foundRow = i + 1; break; } }
     var ts = nowIso();
+    var prevYear = '', prevTerm = '';
     if (foundRow === -1) {
       var blank = new Array(SETTINGS_HEADERS.length).fill('');
       blank[0] = 1; blank[14] = ts; blank[15] = ts;
       sh.appendRow(blank);
       foundRow = sh.getLastRow();
+    } else {
+      prevYear = data[foundRow - 1][10] || '';
+      prevTerm = String(data[foundRow - 1][38] || 'term1').toLowerCase();
     }
     sh.getRange(foundRow, 11).setValue(ay);  // col 11 = AcademicYear
     sh.getRange(foundRow, 39).setValue(t);   // col 39 = ActiveTerm
     sh.getRange(foundRow, 16).setValue(ts);  // col 16 = UpdatedAt
+
+    // same rule as the automatic advance: moving forward a term WITHIN the same academic year
+    // (term1→term2, term2→term3) rolls any unpaid balance from the term just ending onto the next
+    // term's bill. A year change, a backward move, or jumping more than one term is left alone —
+    // those are deliberate corrections/rollovers an admin should review by hand.
+    var forwardOneTerm = ay === String(prevYear) && ((prevTerm === 'term1' && t === 'term2') || (prevTerm === 'term2' && t === 'term3'));
+    if (forwardOneTerm) {
+      try { _rollTermArrears(ay, prevTerm, t, currentUser); } catch (e) { Logger.log('arrears roll on manual term change failed: ' + e.toString()); }
+    }
 
     addLog(currentUser, 'Active Academic Session Changed', ay + ' — ' + t);
     return { success: true, message: 'Active session set to ' + ay + ' (' + ({ term1: 'Term 1', term2: 'Term 2', term3: 'Term 3' }[t]) + ')' };
@@ -12775,6 +12807,7 @@ function _autoAdvanceTerm(sh, row, sheetRow) {
     sh.getRange(sheetRow, 39).setValue(nextTerm); // col 39 = ActiveTerm
     sh.getRange(sheetRow, 16).setValue(nowIso());  // col 16 = UpdatedAt
     addLog('System', 'Active Term Auto-Advanced', activeTerm + ' → ' + nextTerm + ' (reopening date ' + reopening + ' reached)');
+    try { _rollTermArrears(row[10], activeTerm, nextTerm, 'System (auto-advance)'); } catch (e) { Logger.log('arrears roll on auto-advance failed: ' + e.toString()); }
     return nextTerm;
   } catch (e) {
     Logger.log('_autoAdvanceTerm failed: ' + e.toString());
@@ -21015,6 +21048,106 @@ function _isPastBillingPeriod(billingMonth, activeTerm, academicYear) {
   return false;
 }
 
+// Ghana basic-school billing rule, in the admin's own words: each term bills the class's normal
+// per-term fee — UNLESS the student still owes from the term just ending, in which case that
+// shortfall gets ADDED to the next term's bill (fee 1000 + 200 unpaid from last term = 1200 due
+// this term). This is what actually applies that rule: called the moment the school moves from one
+// term to the next WITHIN the same academic year (never term3 → a new year — that's the separate,
+// deliberate class-promotion arrears carry-forward in promoteStudents). For every student with an
+// unpaid/partial due in fromTerm, it adds the remaining balance onto their toTerm due for the same
+// fee item (creating one if that fee item's toTerm due doesn't exist yet) and marks the fromTerm due
+// 'carried_forward' so it drops out of "still owed" totals without erasing the record — the
+// student's Previous Fee Records history still shows exactly what happened and when.
+// Idempotent: a fromTerm due already marked 'carried_forward' is skipped, so calling this twice for
+// the same transition (e.g. auto-advance firing again, or admin re-confirming the same term) never
+// double-adds the arrears.
+function _rollTermArrears(academicYear, fromTerm, toTerm, currentUser) {
+  try {
+    var ay = String(academicYear || '').trim();
+    if (!ay || !fromTerm || !toTerm || fromTerm === toTerm) return { rolled: 0, totalRolled: 0 };
+    var dsh = _ensureFeeDuesSheet();
+    var data = dsh.getDataRange().getValues();
+    var fromKey = fromTerm + '-' + ay, toKey = toTerm + '-' + ay;
+
+    var byStudent = {}; // sid -> { from: [rowIdx...], to: { fsid: rowIdx } }
+    for (var i = 1; i < data.length; i++) {
+      var bm = String(data[i][3] || '');
+      if (bm !== fromKey && bm !== toKey) continue;
+      var sid = data[i][1];
+      if (!byStudent[sid]) byStudent[sid] = { from: [], to: {} };
+      if (bm === fromKey) byStudent[sid].from.push(i);
+      else byStudent[sid].to[data[i][2]] = i;
+    }
+
+    var ts = nowIso(), nextId = nextRowId(dsh), appendRows = [], rolled = 0, totalRolled = 0;
+    Object.keys(byStudent).forEach(function (sidKey) {
+      var sid = parseInt(sidKey, 10);
+      var rec = byStudent[sidKey];
+      rec.from.forEach(function (idx) {
+        var status = String(data[idx][6] || '').toLowerCase();
+        if (status === 'paid' || status === 'carried_forward' || status === 'waived') return;
+        var amt = parseFloat(data[idx][5]) || 0;
+        var paid = parseFloat(data[idx][8]) || 0;
+        var shortfall = Math.max(0, amt - paid);
+        if (shortfall <= 0) return;
+        var fsid = data[idx][2];
+        var toIdx = rec.to[fsid];
+        if (toIdx != null) {
+          var newAmt = (parseFloat(data[toIdx][5]) || 0) + shortfall;
+          dsh.getRange(toIdx + 1, 6).setValue(newAmt);
+          data[toIdx][5] = newAmt;
+        } else {
+          // this fee item has no toTerm due yet (e.g. the fee type was added mid-fromTerm, after
+          // toTerm's dues were already pre-generated) — create one carrying just the shortfall
+          var label = TERM_LABELS[toTerm] + ' ' + ay;
+          appendRows.push([nextId++, sid, fsid, toKey, label, shortfall, 'pending', '', 0, '', ts, ts]);
+        }
+        dsh.getRange(idx + 1, 7).setValue('carried_forward');
+        dsh.getRange(idx + 1, 12).setValue(ts);
+        data[idx][6] = 'carried_forward';
+        rolled++; totalRolled += shortfall;
+      });
+    });
+
+    if (appendRows.length > 0) {
+      var startRow = dsh.getLastRow() + 1;
+      dsh.getRange(startRow, 1, appendRows.length, FEE_DUE_HEADERS.length).setValues(appendRows);
+    }
+    if (rolled > 0) {
+      addLog(currentUser || 'System', 'Term Arrears Rolled Forward',
+        rolled + ' due(s), GH₵' + totalRolled.toFixed(2) + ' carried from ' + TERM_LABELS[fromTerm] + ' to ' + TERM_LABELS[toTerm] + ' (' + ay + ')');
+    }
+    return { rolled: rolled, totalRolled: totalRolled };
+  } catch (e) {
+    Logger.log('_rollTermArrears failed: ' + e.toString());
+    return { rolled: 0, totalRolled: 0 };
+  }
+}
+
+// admin-only escape hatch for a due that can never be collected against — most commonly one whose
+// Fee Structure item was deleted after the due was already generated (IsOrphaned in
+// getStudentMonthlyDues), but usable on any stuck due an admin decides to formally write off.
+// Sets Status='waived' so it drops out of every "still owed" total everywhere the ledger surfaces it.
+function waiveDue(dueId, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var idn = parseInt(dueId, 10);
+    if (isNaN(idn)) return { success: false, message: 'Invalid due id' };
+    var dsh = _ensureFeeDuesSheet();
+    var data = dsh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (parseInt(data[i][0], 10) !== idn) continue;
+      var status = String(data[i][6] || '').toLowerCase();
+      if (status === 'paid') return { success: false, message: 'This due is already fully paid — nothing to waive' };
+      dsh.getRange(i + 1, 7).setValue('waived');
+      dsh.getRange(i + 1, 12).setValue(nowIso());
+      addLog(currentUser, 'Fee Due Waived', 'Due #' + idn + ' for student #' + data[i][1]);
+      return { success: true, message: 'Due waived' };
+    }
+    return { success: false, message: 'Due not found' };
+  } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
+}
+
 // Read monthly dues for a student — role-scoped (student=self, parent=linked-only, admin/clerk=any)
 function getStudentMonthlyDues(studentId, currentUser, currentRole) {
   try {
@@ -21069,11 +21202,15 @@ function getStudentMonthlyDues(studentId, currentUser, currentRole) {
       var billingMonth = data[i][3];
       var isArrears = status !== 'paid' && _isPastBillingPeriod(billingMonth, activeTerm, academicYear);
       var payId = data[i][7] || '';
+      // the fee item this due was billed under has since been deleted from Fee Structure — it can
+      // no longer be sensibly collected against (the frontend excludes these from the "pick a due to
+      // pay" list), but the record stays visible here in history and an admin can Waive it.
+      var isOrphaned = !fs;
       out.push({
         ID: data[i][0], StudentID: data[i][1], FeeStructureID: fsid,
         FeeCategory: fs ? fs.category : '— deleted fee —',
         BillingMonth: billingMonth, BillingMonthLabel: data[i][4],
-        Amount: amt, Status: status, IsArrears: isArrears,
+        Amount: amt, Status: status, IsArrears: isArrears, IsOrphaned: isOrphaned,
         PaymentID: payId, ReceiptNumber: payId ? (receiptById[payId] || '') : '', PaidAmount: paidAmt,
         PaidDate: toIso(data[i][9]), CreatedAt: toIso(data[i][10])
       });

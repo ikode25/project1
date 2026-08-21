@@ -12713,6 +12713,7 @@
     function StudentFeesModal({ student, currentUser, role, onClose }) {
       const r = String(role).toLowerCase();
       const canPay = r === 'admin' || r === 'clerk' || r === 'bursar';
+      const isAdmin = r === 'admin';
       const [loading, setLoading] = useState(true);
       const [data, setData] = useState(null);
       const [statusFilter, setStatusFilter] = useState('');
@@ -12758,7 +12759,7 @@
         };
       }, [student.ID]);
 
-      const pendingDues = dues.filter(d => d.Status !== 'paid');
+      const pendingDues = dues.filter(d => d.Status !== 'paid' && !d.IsOrphaned);
       const remainingOf = (d) => Math.max(0, (parseFloat(d.Amount) || 0) - (parseFloat(d.PaidAmount) || 0));
       const selectedIds = Object.keys(selectedDues).filter(k => selectedDues[k]).map(k => parseInt(k, 10));
       const selectedTotal = pendingDues.filter(d => selectedDues[d.ID]).reduce((s, d) => s + remainingOf(d), 0);
@@ -12800,6 +12801,28 @@
             })
             .withFailureHandler((err) => { setPartialPaying(null); Swal.fire({ icon: 'error', title: 'Error', text: err.message }); })
             .addPayment({ StudentID: student.ID, DueID: due.ID, AmountPaid: r.value, PaymentMode: 'cash', PaymentDate: new Date().toISOString().split('T')[0] }, currentUser, role);
+        });
+      };
+
+      // admin-only write-off for a due that can never be collected against (its Fee Structure item
+      // was deleted after the due was already generated) — clears it off "still owed" totals for good
+      const [waiving, setWaiving] = useState(null);
+      const handleWaive = (due) => {
+        Swal.fire({
+          icon: 'warning', title: 'Waive this due?',
+          text: due.BillingMonthLabel + ' — GH₵' + remainingOf(due).toFixed(2) + ' will be written off (its fee type no longer exists).',
+          showCancelButton: true, confirmButtonText: 'Waive', confirmButtonColor: '#ea4335'
+        }).then((r) => {
+          if (!r.isConfirmed) return;
+          setWaiving(due.ID);
+          google.script.run
+            .withSuccessHandler((res) => {
+              setWaiving(null);
+              if (res.success) { Swal.fire({ icon: 'success', text: res.message, timer: 1800, showConfirmButton: false }); loadDues(); }
+              else Swal.fire({ icon: 'error', text: res.message });
+            })
+            .withFailureHandler((err) => { setWaiving(null); Swal.fire({ icon: 'error', text: (err && err.message) || 'Failed' }); })
+            .waiveDue(due.ID, currentUser, role);
         });
       };
 
@@ -13003,25 +13026,26 @@
                   <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill, minmax(220px, 1fr))',gap:'8px',marginBottom:'18px'}}>
                     {dues.map((d) => {
                       const isPaid = d.Status === 'paid';
+                      const isOrphaned = !isPaid && d.IsOrphaned;
                       const isSelected = !!selectedDues[d.ID];
                       const isArrears = !isPaid && d.IsArrears;
                       const isPartial = !isPaid && (parseFloat(d.PaidAmount) || 0) > 0;
                       const remaining = remainingOf(d);
                       return (
                         <div key={d.ID}
-                          onClick={() => canPay && !isPaid && toggleDue(d.ID)}
+                          onClick={() => canPay && !isPaid && !isOrphaned && toggleDue(d.ID)}
                           style={{
                             padding:'10px 12px',
-                            background: isPaid ? '#f0fbf4' : isArrears ? '#fdecea' : isSelected ? '#fff8e1' : '#fff',
-                            border: '1.5px solid ' + (isPaid ? '#a4d8b3' : isArrears ? '#ea4335' : isSelected ? '#fbbc04' : '#e1e6ec'),
+                            background: isPaid ? '#f0fbf4' : isOrphaned ? '#f5f5f5' : isArrears ? '#fdecea' : isSelected ? '#fff8e1' : '#fff',
+                            border: '1.5px solid ' + (isPaid ? '#a4d8b3' : isOrphaned ? '#ccc' : isArrears ? '#ea4335' : isSelected ? '#fbbc04' : '#e1e6ec'),
                             borderRadius:'6px',
-                            cursor: (canPay && !isPaid) ? 'pointer' : 'default',
+                            cursor: (canPay && !isPaid && !isOrphaned) ? 'pointer' : 'default',
                             position:'relative',
                             transition:'all 0.15s'
                           }}>
                           <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'4px'}}>
                             <div style={{fontWeight:700,color:'var(--navy-primary)',fontSize:'13px'}}>{d.BillingMonthLabel}</div>
-                            {canPay && !isPaid && (
+                            {canPay && !isPaid && !isOrphaned && (
                               <input type="checkbox" checked={isSelected} onChange={() => toggleDue(d.ID)} onClick={(e) => e.stopPropagation()}
                                 style={{cursor:'pointer',width:'16px',height:'16px',accentColor:'#fb8c00'}} />
                             )}
@@ -13030,8 +13054,8 @@
                           <div style={{fontSize:'11px',color:'#888',textTransform:'capitalize',marginBottom:'4px'}}>{d.FeeCategory}</div>
                           <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                             <span style={{fontWeight:700,fontSize:'14px',color:isPaid ? '#34a853' : '#ea4335'}}>GH₵{fmt(isPaid ? d.Amount : remaining)}</span>
-                            <span style={{fontSize:'10px',padding:'2px 7px',borderRadius:'10px',background: isPaid ? '#34a853' : '#ea4335',color:'#fff',fontWeight:700,textTransform:'uppercase'}}>
-                              {isPaid ? 'Paid' : isArrears ? 'Arrears' : isPartial ? 'Partial' : 'Pending'}
+                            <span style={{fontSize:'10px',padding:'2px 7px',borderRadius:'10px',background: isPaid ? '#34a853' : isOrphaned ? '#888' : '#ea4335',color:'#fff',fontWeight:700,textTransform:'uppercase'}}>
+                              {isPaid ? 'Paid' : isOrphaned ? 'Fee Deleted' : isArrears ? 'Arrears' : isPartial ? 'Partial' : 'Pending'}
                             </span>
                           </div>
                           {isPartial && (
@@ -13042,11 +13066,23 @@
                               <i className="fas fa-receipt"></i> {String(d.PaidDate).split('T')[0]}
                             </div>
                           )}
-                          {canPay && !isPaid && (
+                          {canPay && !isPaid && !isOrphaned && (
                             <button type="button" className="btn btn-secondary btn-sm" style={{marginTop:'8px',width:'100%',fontSize:'11px',padding:'4px 6px'}}
                               disabled={partialPaying === d.ID}
                               onClick={(e) => { e.stopPropagation(); handlePayPartial(d); }}>
                               {partialPaying === d.ID ? <><i className="fas fa-spinner fa-spin"></i> Recording…</> : <><i className="fas fa-hand-holding-usd"></i> Collect Payment</>}
+                            </button>
+                          )}
+                          {isOrphaned && (
+                            <div style={{fontSize:'10px',color:'#ea4335',marginTop:'6px'}}>
+                              <i className="fas fa-triangle-exclamation"></i> This fee type was deleted — can't collect against it.
+                            </div>
+                          )}
+                          {isAdmin && isOrphaned && (
+                            <button type="button" className="btn btn-secondary btn-sm" style={{marginTop:'6px',width:'100%',fontSize:'11px',padding:'4px 6px'}}
+                              disabled={waiving === d.ID}
+                              onClick={(e) => { e.stopPropagation(); handleWaive(d); }}>
+                              {waiving === d.ID ? <><i className="fas fa-spinner fa-spin"></i> Waiving…</> : <><i className="fas fa-eraser"></i> Waive</>}
                             </button>
                           )}
                         </div>
@@ -19402,7 +19438,7 @@
       const [viewMode, setViewMode] = useState('table');
       const tableInstanceRef = useRef(null);
 
-      const [filters, setFilters] = useState({ status: '', mode: '', search: '' });
+      const [filters, setFilters] = useState({ status: '', mode: '', search: '', dateScope: '' }); // dateScope: '' | 'today'
       const [arrearsStudent, setArrearsStudent] = useState(null);
       const [showAllArrears, setShowAllArrears] = useState(false);
 
@@ -19538,21 +19574,28 @@
       };
 
       const clearFilters = () => {
-        setFilters({ status: '', mode: '', search: '' });
+        setFilters({ status: '', mode: '', search: '', dateScope: '' });
         if (tableInstanceRef.current) tableInstanceRef.current.search('').columns().search('').draw();
       };
+
+      // "Today" scope so admin/bursar can see exactly who paid today, on top of whatever
+      // status/mode/text filters are also active — the daily collection register they asked for
+      const dateScopedRows = filters.dateScope === 'today'
+        ? (itemsData || []).filter(p => String(p.PaymentDate || '').slice(0, 10) === todayStr)
+        : (itemsData || []);
 
       useEffect(() => {
         if (tableInstanceRef.current && items.length > 0) applyFilters();
       }, [filters]);
 
-      // SWR data landed (first load or silent background refresh) → paint/repaint the table in place
+      // SWR data landed (first load or silent background refresh), or the Today scope toggled →
+      // paint/repaint the table in place
       useEffect(() => {
         if (typeof itemsData === 'undefined') return;
         if (tableInstanceRef.current) {
-          try { tableInstanceRef.current.clear().rows.add(itemsData).draw(false); applyFilters(); } catch (e) { initTable(itemsData); }
-        } else { initTable(itemsData); }
-      }, [itemsData]);
+          try { tableInstanceRef.current.clear().rows.add(dateScopedRows).draw(false); applyFilters(); } catch (e) { initTable(dateScopedRows); }
+        } else { initTable(dateScopedRows); }
+      }, [itemsData, filters.dateScope]);
 
       const handleSave = (data) => {
         // parent-mode bulk dispatch
@@ -19672,6 +19715,18 @@
       const totalCollected = items.reduce((sum, p) => sum + (parseFloat(p.AmountPaid) || 0), 0);
       const totalDue = items.reduce((sum, p) => sum + (parseFloat(p.AmountDue) || 0), 0);
 
+      // per-term collected breakdown, so admin can see at a glance how much came in each term —
+      // BillingPeriod on a due-linked payment is 'term1-2026-2027' etc.
+      const termCollected = { term1: 0, term2: 0, term3: 0 };
+      items.forEach(p => {
+        const m = String(p.BillingPeriod || '').match(/^(term[123])-/);
+        if (m) termCollected[m[1]] += (parseFloat(p.AmountPaid) || 0);
+      });
+      // today's daily register — how much came in and from how many receipts today specifically,
+      // independent of the Today toggle below (this always reflects the whole loaded year's "today")
+      const todaysPayments = items.filter(p => String(p.PaymentDate || '').slice(0, 10) === todayStr);
+      const todayCollected = todaysPayments.reduce((s, p) => s + (parseFloat(p.AmountPaid) || 0), 0);
+
       return (
         <div className="data-section">
           <div className="section-header">
@@ -19683,6 +19738,11 @@
                 {(paymentYears || []).map(y => <option key={y} value={y}>{y}</option>)}
               </select>
               <ViewToggle mode={viewMode} onChange={setViewMode} />
+              <button className={'btn btn-sm ' + (filters.dateScope === 'today' ? 'btn-primary' : 'btn-secondary')}
+                title="Show only payments recorded today"
+                onClick={() => setFilters({...filters, dateScope: filters.dateScope === 'today' ? '' : 'today'})}>
+                <i className="fas fa-calendar-day"></i> Today {todaysPayments.length > 0 ? `(${todaysPayments.length})` : ''}
+              </button>
               {(isAdmin || isClerk) && (
                 <button className="btn btn-success" onClick={() => { setEditing(null); setShowModal('add'); }}>
                   <i className="fas fa-plus"></i> Record Payment
@@ -19790,6 +19850,23 @@
               <div style={{flex:1,minWidth:'200px',padding:'12px 15px',background:'linear-gradient(135deg,var(--navy-primary),var(--navy-light))',color:'white',borderLeft:'4px solid var(--navy-light)'}}>
                 <div style={{fontSize:'11px',textTransform:'uppercase',letterSpacing:'0.5px',opacity:0.9}}>Receipts</div>
                 <div style={{fontSize:'24px',fontWeight:700,marginTop:'4px'}}>{items.length}</div>
+              </div>
+            </div>
+          )}
+
+          {/* per-term breakdown + today's collections — "financial report easier, know who paid
+              today" per the admin's own description of how these schools actually collect fees */}
+          {!loading && items.length > 0 && (
+            <div style={{display:'flex',gap:'10px',marginBottom:'15px',flexWrap:'wrap'}}>
+              {['term1','term2','term3'].map(t => (
+                <div key={t} style={{flex:1,minWidth:'150px',padding:'10px 14px',background:'#fff',border:'1px solid #e0e0e0',borderRadius:'6px',borderLeft:'4px solid #0074D9'}}>
+                  <div style={{fontSize:'11px',color:'#888',textTransform:'uppercase'}}>{TERM_LABELS[t]} Collected</div>
+                  <div style={{fontSize:'18px',fontWeight:700,color:'var(--navy-primary)'}}>GH₵{termCollected[t].toFixed(2)}</div>
+                </div>
+              ))}
+              <div style={{flex:1,minWidth:'150px',padding:'10px 14px',background:'#fff',border:'1px solid #e0e0e0',borderRadius:'6px',borderLeft:'4px solid #fbbc04'}}>
+                <div style={{fontSize:'11px',color:'#888',textTransform:'uppercase'}}><i className="fas fa-calendar-day"></i> Collected Today</div>
+                <div style={{fontSize:'18px',fontWeight:700,color:'#8a6100'}}>GH₵{todayCollected.toFixed(2)} <span style={{fontSize:'11px',fontWeight:400,color:'#888'}}>({todaysPayments.length})</span></div>
               </div>
             </div>
           )}
@@ -20144,13 +20221,14 @@
                   {history.map(d => {
                     const due = Math.max(0, (Number(d.Amount) || 0) - (Number(d.PaidAmount) || 0));
                     return (
-                      <tr key={d.ID} style={{borderBottom:'1px solid #f5f5f5'}} title={d.ReceiptNumber ? 'Receipt: ' + d.ReceiptNumber : ''}>
+                      <tr key={d.ID} style={{borderBottom:'1px solid #f5f5f5', opacity: d.IsOrphaned ? 0.6 : 1}}
+                        title={d.IsOrphaned ? 'Fee type deleted — can\'t collect. Waive it from Students → Fees.' : (d.ReceiptNumber ? 'Receipt: ' + d.ReceiptNumber : '')}>
                         <td style={{padding:'5px 6px'}}>{d.BillingMonthLabel}</td>
-                        <td style={{padding:'5px 6px', textTransform:'capitalize'}}>{d.FeeCategory}{d.IsArrears ? ' ⚠' : ''}</td>
+                        <td style={{padding:'5px 6px', textTransform:'capitalize'}}>{d.FeeCategory}{d.IsArrears ? ' ⚠' : ''}{d.IsOrphaned ? ' 🚫' : ''}</td>
                         <td style={{padding:'5px 6px', textAlign:'right'}}>{Number(d.PaidAmount || 0).toFixed(2)}</td>
                         <td style={{padding:'5px 6px', textAlign:'right', color: due > 0 ? '#ea4335' : 'inherit'}}>{due.toFixed(2)}</td>
                         <td style={{padding:'5px 6px', textAlign:'center'}}>
-                          <span className={`status-badge ${statusBadgeClass(d.Status)}`} style={{fontSize:'9px', padding:'1px 5px'}}>{d.Status}</span>
+                          <span className={`status-badge ${statusBadgeClass(d.Status)}`} style={{fontSize:'9px', padding:'1px 5px'}}>{d.IsOrphaned ? 'deleted' : d.Status}</span>
                         </td>
                       </tr>
                     );
@@ -20179,7 +20257,10 @@
       // (filtered to unpaid below) and the side-panel's Previous Fee Records history. Arrears sort first.
       const [allDues, setAllDues] = useState([]);
       const [duesLoading, setDuesLoading] = useState(false);
-      const dues = allDues.filter(d => d.Status !== 'paid');
+      // orphaned = the fee item this due was billed under has since been deleted from Fee Structure —
+      // it can't be sensibly collected against, so it's excluded here (still shown, with a Waive
+      // action, in the side panel's Previous Fee Records history below)
+      const dues = allDues.filter(d => d.Status !== 'paid' && !d.IsOrphaned);
       const [formData, setFormData] = useState({
         StudentID: payment?.StudentID ? String(payment.StudentID) : '',
         DueID: payment?.DueID ? String(payment.DueID) : '',
