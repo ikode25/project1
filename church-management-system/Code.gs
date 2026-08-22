@@ -49,11 +49,15 @@ var SHEETS = {
   CLUSTERS: 'Clusters',
   CLUSTER_FOLLOWUPS: 'ClusterFollowUps',
   USERS: 'Users',
+  SESSIONS: 'Sessions',
   AUDIT_LOG: 'AuditLog',
   ERRORS: 'Errors',
   RATE_LIMITS: 'RateLimits',
   SETTINGS: 'Settings'
 };
+
+/** How long a signed-in session stays valid before the user must log in again. */
+var SESSION_DURATION_HOURS = 12;
 
 /** Header rows per sheet, in column order. Column A is always the record ID. */
 var SCHEMA = {};
@@ -102,7 +106,10 @@ SCHEMA[SHEETS.CLUSTERS] = ['ID', 'Name', 'LeaderMemberID', 'LeaderName', 'Meetin
 SCHEMA[SHEETS.CLUSTER_FOLLOWUPS] = ['ID', 'ClusterID', 'ClusterName', 'MemberID', 'MemberName', 'FollowUpDate',
   'Type', 'Notes', 'Outcome', 'FollowedUpBy', 'CreatedAt'];
 
-SCHEMA[SHEETS.USERS] = ['ID', 'Email', 'FullName', 'Role', 'Active', 'Phone', 'CreatedAt', 'LastLogin'];
+SCHEMA[SHEETS.USERS] = ['ID', 'Username', 'PasswordHash', 'PasswordSalt', 'Email', 'FullName', 'Role', 'Active',
+  'Phone', 'CreatedAt', 'LastLogin'];
+
+SCHEMA[SHEETS.SESSIONS] = ['ID', 'Token', 'UserID', 'CreatedAt', 'ExpiresAt'];
 
 SCHEMA[SHEETS.AUDIT_LOG] = ['ID', 'Timestamp', 'UserEmail', 'Action', 'Entity', 'RecordID', 'Details'];
 
@@ -143,7 +150,7 @@ var ID_PREFIX = {
   MEMBERS: 'MEM', MEMBER_STATUS_HISTORY: 'MSH', VISITORS: 'VIS', ATTENDANCE: 'ATT', FINANCE: 'FIN',
   CAMPAIGNS: 'CMP', PLEDGES: 'PLG', EXPENSES: 'EXP', SMS_LOG: 'SMS', SMS_TEMPLATES: 'TPL', EQUIPMENT: 'EQP',
   PRAYER_REQUESTS: 'PRY', MESSAGE_THREADS: 'THR', MESSAGES: 'MSG', CLUSTERS: 'CLU', CLUSTER_FOLLOWUPS: 'FUP',
-  USERS: 'USR'
+  USERS: 'USR', SESSIONS: 'SES'
 };
 
 /** Default Settings sheet seed values */
@@ -380,9 +387,9 @@ function nowIso_() {
   return new Date().toISOString();
 }
 
+/** Identity string for audit/attribution — the signed-in user's Username, set per-request by api(). */
 function currentUserEmail_() {
-  var email = Session.getActiveUser().getEmail();
-  return email || Session.getEffectiveUser().getEmail() || 'unknown';
+  return __CTX_USER ? __CTX_USER.Username : 'public';
 }
 
 /** Strips tags/script content so any user text that gets echoed back into HTML can't inject markup. */
@@ -509,42 +516,20 @@ function formatMoney_(n) {
  * a hidden frontend button is never sufficient enforcement.
  */
 
-/** Returns the caller's Users-sheet record, or null if they're not provisioned. */
-function getCurrentUserRecord_() {
-  var email = currentUserEmail_();
-  var users = readAll_(SHEETS.USERS);
-  for (var i = 0; i < users.length; i++) {
-    if (String(users[i].Email).toLowerCase() === String(email).toLowerCase() && toBool_(users[i].Active)) {
-      return users[i];
-    }
-  }
-  return null;
-}
+/**
+ * Username/password authentication — no Google account required. login()
+ * mints a random session token (persisted in the Sessions sheet and cached);
+ * the client keeps it in localStorage and passes it to every call. api() is
+ * the single dispatcher for authenticated calls: it validates the token,
+ * sets the request-scoped __CTX_USER below, then invokes the requested
+ * function from a fixed whitelist (API_REGISTRY, defined further down) —
+ * never an arbitrary global reached by string name.
+ */
+var __CTX_USER = null; // set by api() for the duration of one request only; never persists across calls
 
-/** Client-callable: bootstraps the shell with the signed-in user's identity + role + permitted modules. */
-function getSessionInfo() {
-  return safeCall_('getSessionInfo', function () {
-    var email = currentUserEmail_();
-    var user = getCurrentUserRecord_();
-    if (!user) {
-      logAudit_('ACCESS_DENIED', 'Session', email, 'No active Users record for ' + email);
-      return { authorized: false, email: email, orgName: getSetting_('OrgName', APP_NAME) };
-    }
-    updateRow_(SHEETS.USERS, user.ID, { LastLogin: nowIso_() });
-    logAudit_('LOGIN', 'Session', user.ID, email + ' signed in');
-    var modules = {};
-    Object.keys(MODULE_PERMISSIONS).forEach(function (key) {
-      modules[key] = roleCan_(user.Role, key, 'view');
-    });
-    return {
-      authorized: true,
-      email: email,
-      fullName: user.FullName,
-      role: user.Role,
-      orgName: getSetting_('OrgName', APP_NAME),
-      modules: modules
-    };
-  });
+/** Returns the current request's signed-in Users-sheet record, or null if there isn't one. */
+function getCurrentUserRecord_() {
+  return __CTX_USER;
 }
 
 function roleCan_(role, moduleKey, action) {
@@ -558,11 +543,11 @@ function roleCan_(role, moduleKey, action) {
 function requireRole_(moduleKey, action) {
   var user = getCurrentUserRecord_();
   if (!user) {
-    logAudit_('ACCESS_DENIED', moduleKey, currentUserEmail_(), 'Unprovisioned user attempted ' + action);
-    throw new Error('Access denied: your account is not registered in ChurchMS.');
+    logAudit_('ACCESS_DENIED', moduleKey, 'anonymous', 'Unauthenticated request attempted ' + action);
+    throw new Error('Access denied: please sign in.');
   }
   if (!roleCan_(user.Role, moduleKey, action)) {
-    logAudit_('ACCESS_DENIED', moduleKey, user.ID, user.Email + ' (' + user.Role + ') attempted ' + action);
+    logAudit_('ACCESS_DENIED', moduleKey, user.ID, user.Username + ' (' + user.Role + ') attempted ' + action);
     throw new Error('Access denied: your role (' + user.Role + ') cannot ' + action + ' ' + moduleKey + '.');
   }
   return user;
@@ -571,10 +556,61 @@ function requireRole_(moduleKey, action) {
 function requireSuperAdmin_() {
   var user = getCurrentUserRecord_();
   if (!user || user.Role !== ROLES.SUPER_ADMIN) {
-    logAudit_('ACCESS_DENIED', 'settings', user ? user.ID : currentUserEmail_(), 'Non-SuperAdmin attempted a SuperAdmin-only action');
+    logAudit_('ACCESS_DENIED', 'settings', user ? user.ID : 'anonymous', 'Non-SuperAdmin attempted a SuperAdmin-only action');
     throw new Error('Access denied: this action requires the SuperAdmin role.');
   }
   return user;
+}
+
+/** Turns a plaintext password into a salted SHA-256 hex digest — no external crypto library needed. */
+function generateSalt_() {
+  return Utilities.getUuid().replace(/-/g, '');
+}
+function hashPassword_(password, salt) {
+  var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(password) + String(salt));
+  return bytes.map(function (b) { return ('0' + (b & 0xFF).toString(16)).slice(-2); }).join('');
+}
+
+/** Mints a session token for a just-authenticated user: one row in Sessions + a fast-path cache entry. */
+function createSession_(userId) {
+  var token = Utilities.getUuid();
+  var expiresAt = new Date(Date.now() + SESSION_DURATION_HOURS * 3600 * 1000).toISOString();
+  insertRow_(SHEETS.SESSIONS, { Token: token, UserID: userId, CreatedAt: nowIso_(), ExpiresAt: expiresAt }, 'SES');
+  CacheService.getScriptCache().put('sess_' + token, JSON.stringify({ userId: userId, expiresAt: expiresAt }), 21600);
+  return { token: token, expiresAt: expiresAt };
+}
+
+/** Validates a session token (cache first, Sessions sheet fallback) and returns the signed-in user. Throws if invalid/expired. */
+function requireSession_(token) {
+  if (isBlank_(token)) throw new Error('Your session has expired. Please sign in again.');
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get('sess_' + token);
+  var session = null;
+  if (cached) {
+    session = JSON.parse(cached);
+  } else {
+    var row = readAll_(SHEETS.SESSIONS).filter(function (r) { return r.Token === token; })[0];
+    if (row) session = { userId: row.UserID, expiresAt: row.ExpiresAt };
+  }
+  if (!session || new Date(session.expiresAt) < new Date()) {
+    destroySession_(token);
+    throw new Error('Your session has expired. Please sign in again.');
+  }
+  var user = getById_(SHEETS.USERS, session.userId);
+  if (!user || !toBool_(user.Active)) throw new Error('Your account is no longer active.');
+  return user;
+}
+
+function destroySession_(token) {
+  CacheService.getScriptCache().remove('sess_' + token);
+  var row = readAll_(SHEETS.SESSIONS).filter(function (r) { return r.Token === token; })[0];
+  if (row) deleteRow_(SHEETS.SESSIONS, row.ID);
+}
+
+function modulePermissionsFor_(role) {
+  var modules = {};
+  Object.keys(MODULE_PERMISSIONS).forEach(function (key) { modules[key] = roleCan_(role, key, 'view'); });
+  return modules;
 }
 
 function logAudit_(action, entity, recordId, details) {
@@ -592,36 +628,159 @@ function logAudit_(action, entity, recordId, details) {
   }
 }
 
-/** Client-callable, SuperAdmin/Admin only: list + manage the Users/Roles sheet. */
-function listUsers() {
-  return safeCall_('listUsers', function () {
-    requireRole_('settings', 'view');
-    return readAll_(SHEETS.USERS);
+/** Client-callable, no session required: authenticates a username/password and mints a session token. */
+function login(username, password) {
+  return safeCall_('login', function () {
+    checkRateLimit_('login_' + String(username || '').toLowerCase(), 8, 300);
+    requireFields_({ username: username, password: password }, ['username', 'password']);
+    var match = readAll_(SHEETS.USERS).filter(function (u) {
+      return String(u.Username || '').toLowerCase() === String(username).toLowerCase();
+    })[0];
+    if (!match || !toBool_(match.Active) || hashPassword_(password, match.PasswordSalt) !== match.PasswordHash) {
+      logAudit_('LOGIN_FAILED', 'Session', match ? match.ID : 'unknown', 'Failed login attempt for "' + sanitizeText_(username) + '"');
+      throw new Error('Invalid username or password.');
+    }
+    var session = createSession_(match.ID);
+    updateRow_(SHEETS.USERS, match.ID, { LastLogin: nowIso_() });
+    __CTX_USER = match; // briefly, so logAudit_'s "who did this" column reads the right username
+    logAudit_('LOGIN', 'Session', match.ID, match.Username + ' signed in');
+    __CTX_USER = null;
+    return {
+      token: session.token, expiresAt: session.expiresAt, username: match.Username, fullName: match.FullName,
+      role: match.Role, orgName: getSetting_('OrgName', APP_NAME), modules: modulePermissionsFor_(match.Role)
+    };
   });
 }
 
+/** Client-callable, no session required: invalidates a token so the next page load shows the login screen. */
+function logout(token) {
+  return safeCall_('logout', function () {
+    if (!isBlank_(token)) destroySession_(token);
+    return { ok: true };
+  });
+}
+
+/** Client-callable, called with the token as an explicit argument (not via api()): re-hydrates the shell after a page reload. */
+function getSessionInfo(token) {
+  return safeCall_('getSessionInfo', function () {
+    var user = requireSession_(token);
+    return {
+      token: token, username: user.Username, fullName: user.FullName, role: user.Role,
+      orgName: getSetting_('OrgName', APP_NAME), modules: modulePermissionsFor_(user.Role)
+    };
+  });
+}
+
+/**
+ * Whitelist of every function reachable from the browser through api().
+ * Nothing outside this map is callable by name from the client — internal
+ * `_`-suffixed helpers and raw sheet access stay server-only.
+ */
+var API_REGISTRY = {
+  listMembers: listMembers, getMember: getMember, saveMember: saveMember, deleteMember: deleteMember,
+  transferMember: transferMember, uploadMemberPhoto: uploadMemberPhoto, uploadMemberDocument: uploadMemberDocument,
+  removeMemberDocument: removeMemberDocument, getCustomFieldsConfig: getCustomFieldsConfig,
+  saveCustomFieldsConfig: saveCustomFieldsConfig,
+  getDashboardData: getDashboardData,
+  listVisitors: listVisitors, saveVisitor: saveVisitor, deleteVisitor: deleteVisitor,
+  convertVisitorToMember: convertVisitorToMember,
+  listAttendance: listAttendance, getMemberQrUrl: getMemberQrUrl, recordAttendance: recordAttendance,
+  deleteAttendance: deleteAttendance,
+  listFinance: listFinance, saveFinanceRecord: saveFinanceRecord, deleteFinanceRecord: deleteFinanceRecord,
+  listCampaigns: listCampaigns, saveCampaign: saveCampaign, listPledges: listPledges, savePledge: savePledge,
+  listExpenses: listExpenses, saveExpense: saveExpense, decideExpense: decideExpense,
+  uploadExpenseReceipt: uploadExpenseReceipt, getFinanceSummary: getFinanceSummary,
+  generateDonorStatement: generateDonorStatement,
+  listSmsTemplates: listSmsTemplates, saveSmsTemplate: saveSmsTemplate, deleteSmsTemplate: deleteSmsTemplate,
+  getSmsGroupOptions: getSmsGroupOptions, sendBulkSms: sendBulkSms, sendSingleSms: sendSingleSms,
+  listSmsLog: listSmsLog, toggleMemberSmsOptOut: toggleMemberSmsOptOut,
+  listEquipment: listEquipment, saveEquipment: saveEquipment, deleteEquipment: deleteEquipment,
+  getAttendanceReport: getAttendanceReport, getGrowthReport: getGrowthReport,
+  getClusterEffectivenessReport: getClusterEffectivenessReport, getMemberEngagementReport: getMemberEngagementReport,
+  exportSheetCsv: exportSheetCsv,
+  listClusters: listClusters, saveCluster: saveCluster, deleteCluster: deleteCluster,
+  listClusterFollowUps: listClusterFollowUps, saveClusterFollowUp: saveClusterFollowUp,
+  deleteClusterFollowUp: deleteClusterFollowUp,
+  listPrayerRequests: listPrayerRequests, updatePrayerRequest: updatePrayerRequest,
+  listMessageThreads: listMessageThreads, createMessageThread: createMessageThread,
+  listThreadMessages: listThreadMessages, sendMessage: sendMessage, listMessagingContacts: listMessagingContacts,
+  sendCustomEventReminder: sendCustomEventReminder,
+  getSettings: getSettings, saveSettings: saveSettings, runBackupNow: runBackupNow,
+  archiveOldRecords: archiveOldRecords, listUsers: listUsers, saveUser: saveUser, deleteUser: deleteUser,
+  changeMyPassword: changeMyPassword, getAuditLog: getAuditLog,
+  getWebAppUrl: getWebAppUrl
+};
+
+/**
+ * Single dispatcher for every authenticated client call:
+ * google.script.run.api(token, 'listMembers', [...args]). login(), logout(),
+ * getSessionInfo(), publicCheckIn() and submitPrayerRequest() are called
+ * directly by the client and are not routed through here.
+ */
+function api(token, fnName, args) {
+  return safeCall_('api:' + fnName, function () {
+    var user = requireSession_(token);
+    var fn = API_REGISTRY[fnName];
+    if (!fn) throw new Error('Unknown function: ' + fnName);
+    __CTX_USER = user;
+    try {
+      return fn.apply(null, args || []);
+    } finally {
+      __CTX_USER = null;
+    }
+  });
+}
+
+/** Client-callable, SuperAdmin/Admin only: list + manage the Users/Roles sheet. Password hash/salt never leave the server. */
+function listUsers() {
+  return safeCall_('listUsers', function () {
+    requireRole_('settings', 'view');
+    return readAll_(SHEETS.USERS).map(function (u) {
+      var copy = {};
+      Object.keys(u).forEach(function (k) { if (k !== 'PasswordHash' && k !== 'PasswordSalt') copy[k] = u[k]; });
+      return copy;
+    });
+  });
+}
+
+/** Creates or updates a user. `data.Password` is required when creating, optional on edit (set only to change it). */
 function saveUser(data) {
   return safeCall_('saveUser', function () {
     requireRole_('settings', 'mutate');
-    requireFields_(data, ['Email', 'FullName', 'Role']);
-    if (!isValidEmail_(data.Email)) throw new Error('Invalid email address.');
+    requireFields_(data, ['Username', 'FullName', 'Role']);
     requireEnum_(data.Role, ALL_ROLES, 'Role');
+    if (!isValidEmail_(data.Email)) throw new Error('Invalid email address.');
+    var username = sanitizeText_(data.Username).toLowerCase().replace(/\s+/g, '');
+    if (!/^[a-z0-9._-]{3,40}$/.test(username)) throw new Error('Username must be 3-40 characters: letters, numbers, dot, dash or underscore.');
+    var dupe = readAll_(SHEETS.USERS).filter(function (u) { return u.Username.toLowerCase() === username && u.ID !== data.ID; })[0];
+    if (dupe) throw new Error('That username is already taken.');
+
     var payload = {
-      Email: sanitizeText_(data.Email).toLowerCase(),
+      Username: username,
       FullName: sanitizeText_(data.FullName),
       Role: data.Role,
       Active: data.Active === false ? 'FALSE' : 'TRUE',
-      Phone: sanitizeText_(data.Phone || '')
+      Phone: sanitizeText_(data.Phone || ''),
+      Email: sanitizeText_(data.Email || '')
     };
+    if (data.Password) {
+      if (String(data.Password).length < 8) throw new Error('Password must be at least 8 characters.');
+      var salt = generateSalt_();
+      payload.PasswordSalt = salt;
+      payload.PasswordHash = hashPassword_(data.Password, salt);
+    }
+
     var record;
     if (data.ID) {
       record = updateRow_(SHEETS.USERS, data.ID, payload);
-      logAudit_('UPDATE', 'Users', data.ID, 'Updated user ' + payload.Email);
+      logAudit_('UPDATE', 'Users', data.ID, 'Updated user ' + payload.Username);
     } else {
+      if (!data.Password) throw new Error('A password is required for new users.');
       payload.CreatedAt = nowIso_();
       record = insertRow_(SHEETS.USERS, payload, ID_PREFIX.USERS);
-      logAudit_('CREATE', 'Users', record.ID, 'Added user ' + payload.Email + ' as ' + payload.Role);
+      logAudit_('CREATE', 'Users', record.ID, 'Added user ' + payload.Username + ' as ' + payload.Role);
     }
+    delete record.PasswordHash; delete record.PasswordSalt;
     return record;
   });
 }
@@ -631,6 +790,20 @@ function deleteUser(id) {
     requireSuperAdmin_();
     deleteRow_(SHEETS.USERS, id);
     logAudit_('DELETE', 'Users', id, 'Removed user');
+    return { ok: true };
+  });
+}
+
+/** Client-callable: the signed-in user changes their own password. */
+function changeMyPassword(oldPassword, newPassword) {
+  return safeCall_('changeMyPassword', function () {
+    var user = getCurrentUserRecord_();
+    if (!user) throw new Error('Access denied: please sign in.');
+    if (hashPassword_(oldPassword, user.PasswordSalt) !== user.PasswordHash) throw new Error('Current password is incorrect.');
+    if (String(newPassword || '').length < 8) throw new Error('New password must be at least 8 characters.');
+    var salt = generateSalt_();
+    updateRow_(SHEETS.USERS, user.ID, { PasswordSalt: salt, PasswordHash: hashPassword_(newPassword, salt) });
+    logAudit_('UPDATE', 'Users', user.ID, 'Changed own password');
     return { ok: true };
   });
 }
@@ -688,11 +861,17 @@ function runInitialSetup() {
 
   applyDataValidation_(ss);
   seedSettings_();
-  seedSuperAdmin_();
+  var seededCredentials = seedSuperAdmin_();
   ensureAttachmentsFolder_();
   installTriggers_();
 
-  return { spreadsheet: ss, url: ss.getUrl() };
+  if (seededCredentials) {
+    Logger.log('ChurchMS: first SuperAdmin login created — username: "%s"  password: "%s". ' +
+      'Sign in with these, then change the password immediately (Settings → Users, or your account menu).',
+      seededCredentials.username, seededCredentials.password);
+  }
+
+  return { spreadsheet: ss, url: ss.getUrl(), seededCredentials: seededCredentials };
 }
 
 function applyDataValidation_(ss) {
@@ -736,19 +915,24 @@ function seedSettings_() {
   });
 }
 
+/** Seeds the first login (username: admin) only if the Users sheet is empty. Returns the one-time password, or null if a SuperAdmin already exists. */
 function seedSuperAdmin_() {
   var users = readAll_(SHEETS.USERS);
-  if (users.length > 0) return;
-  var email = Session.getEffectiveUser().getEmail() || Session.getActiveUser().getEmail();
-  if (!email) return;
+  if (users.length > 0) return null;
+  var tempPassword = 'ChangeMe-' + Math.random().toString(36).slice(2, 8);
+  var salt = generateSalt_();
   insertRow_(SHEETS.USERS, {
-    Email: email.toLowerCase(),
+    Username: 'admin',
+    PasswordHash: hashPassword_(tempPassword, salt),
+    PasswordSalt: salt,
+    Email: '',
     FullName: 'System Administrator',
     Role: ROLES.SUPER_ADMIN,
     Active: 'TRUE',
     Phone: '',
     CreatedAt: nowIso_()
   }, ID_PREFIX.USERS);
+  return { username: 'admin', password: tempPassword };
 }
 
 function ensureAttachmentsFolder_() {
@@ -776,26 +960,23 @@ function installTriggers_() {
 /**
  * doGet — the single entry point. `pageMode` (passed into the Index
  * template) decides which section of Index.html renders:
- *   app     -> full admin dashboard (default; requires a provisioned user)
- *   denied  -> access-restricted message (signed in, but not provisioned)
+ *   app     -> the app shell, holding both the login form and the admin
+ *              dashboard; client-side JS picks between them based on
+ *              whether a valid session token is stored in the browser
  *   checkin -> public, mobile-friendly attendance check-in (QR link target)
  *   prayer  -> public prayer request submission form
+ * Authentication is username/password (see login()/api() below), not a
+ * Google account — doGet itself never checks identity.
  */
 function doGet(e) {
   try {
     var page = (e && e.parameter && e.parameter.page) || 'app';
     var tmpl = HtmlService.createTemplateFromFile('Index');
     tmpl.orgName = getSetting_('OrgName', APP_NAME);
-    tmpl.userEmail = currentUserEmail_();
     tmpl.memberId = (e && e.parameter && e.parameter.id) || '';
-
-    if (page === 'checkin') {
-      tmpl.pageMode = 'checkin';
-    } else if (page === 'prayer') {
-      tmpl.pageMode = 'prayer';
-    } else {
-      tmpl.pageMode = getCurrentUserRecord_() ? 'app' : 'denied';
-    }
+    // 'app' always renders the same shell — it holds both the login form and the
+    // dashboard; client-side JS (a stored session token) decides which one shows.
+    tmpl.pageMode = (page === 'checkin') ? 'checkin' : (page === 'prayer') ? 'prayer' : 'app';
 
     return tmpl.evaluate()
       .setTitle(getSetting_('OrgName', APP_NAME) + ' | ' + APP_TAGLINE)
@@ -877,7 +1058,7 @@ function saveMember(data) {
       SmsOptOut: data.SmsOptOut ? 'TRUE' : 'FALSE',
       Notes: sanitizeText_(data.Notes || ''),
       UpdatedAt: nowIso_(),
-      UpdatedBy: actingUser.Email
+      UpdatedBy: actingUser.Username
     };
 
     var record;
@@ -896,7 +1077,7 @@ function saveMember(data) {
       payload.PhotoFileId = '';
       payload.DocumentLinks = '[]';
       payload.CreatedAt = nowIso_();
-      payload.CreatedBy = actingUser.Email;
+      payload.CreatedBy = actingUser.Username;
       record = insertRow_(SHEETS.MEMBERS, payload, ID_PREFIX.MEMBERS);
       recordStatusChange_(record.ID, payload.FirstName + ' ' + payload.LastName, '', payload.MembershipStatus, 'Onboarded');
       logAudit_('CREATE', 'Members', record.ID, 'Added member ' + payload.FirstName + ' ' + payload.LastName);
@@ -1214,7 +1395,7 @@ function saveVisitor(data) {
       logAudit_('UPDATE', 'Visitors', data.ID, 'Updated visitor ' + payload.FirstName + ' ' + payload.LastName);
     } else {
       payload.CreatedAt = nowIso_();
-      payload.CreatedBy = user.Email;
+      payload.CreatedBy = user.Username;
       payload.ConvertedMemberID = '';
       record = insertRow_(SHEETS.VISITORS, payload, ID_PREFIX.VISITORS);
       logAudit_('CREATE', 'Visitors', record.ID, 'Logged visitor ' + payload.FirstName + ' ' + payload.LastName);
@@ -1291,7 +1472,7 @@ function getMemberQrUrl(memberId) {
 function recordAttendance(data) {
   return safeCall_('recordAttendance', function () {
     var user = requireRole_('attendance', 'mutate');
-    return checkInMember_(data.MemberID, data.ServiceType, data.ServiceDate, 'Manual', user.Email, data.Notes);
+    return checkInMember_(data.MemberID, data.ServiceType, data.ServiceDate, 'Manual', user.Username, data.Notes);
   });
 }
 
@@ -1399,7 +1580,7 @@ function saveFinanceRecord(data) {
       Recurring: data.Recurring ? 'TRUE' : 'FALSE',
       Date: data.Date,
       ReceiptNumber: data.ReceiptNumber || ('RCT-' + Date.now()),
-      RecordedBy: user.Email,
+      RecordedBy: user.Username,
       Notes: sanitizeText_(data.Notes || '')
     };
 
@@ -1489,7 +1670,7 @@ function savePledge(data) {
     if (data.ID) {
       record = updateRow_(SHEETS.PLEDGES, data.ID, payload);
     } else {
-      payload.CreatedAt = nowIso_(); payload.CreatedBy = user.Email;
+      payload.CreatedAt = nowIso_(); payload.CreatedBy = user.Username;
       record = insertRow_(SHEETS.PLEDGES, payload, ID_PREFIX.PLEDGES);
     }
     logAudit_('UPDATE', 'Pledges', record.ID, 'Saved pledge for ' + payload.MemberName);
@@ -1532,7 +1713,7 @@ function saveExpense(data) {
     if (data.ID) {
       record = updateRow_(SHEETS.EXPENSES, data.ID, payload);
     } else {
-      payload.Status = 'Pending'; payload.RequestedBy = user.Email; payload.ApprovedBy = '';
+      payload.Status = 'Pending'; payload.RequestedBy = user.Username; payload.ApprovedBy = '';
       payload.ReceiptFileId = ''; payload.CreatedAt = nowIso_();
       record = insertRow_(SHEETS.EXPENSES, payload, ID_PREFIX.EXPENSES);
     }
@@ -1545,8 +1726,8 @@ function decideExpense(id, decision) {
   return safeCall_('decideExpense', function () {
     var user = requireRole_('finance', 'mutate');
     requireEnum_(decision, ['Approved', 'Rejected'], 'Decision');
-    var record = updateRow_(SHEETS.EXPENSES, id, { Status: decision, ApprovedBy: user.Email });
-    logAudit_('UPDATE', 'Expenses', id, decision + ' by ' + user.Email);
+    var record = updateRow_(SHEETS.EXPENSES, id, { Status: decision, ApprovedBy: user.Username });
+    logAudit_('UPDATE', 'Expenses', id, decision + ' by ' + user.Username);
     return record;
   });
 }
@@ -1658,7 +1839,7 @@ function saveSmsTemplate(data) {
     if (data.ID) {
       record = updateRow_(SHEETS.SMS_TEMPLATES, data.ID, payload);
     } else {
-      payload.CreatedAt = nowIso_(); payload.CreatedBy = user.Email;
+      payload.CreatedAt = nowIso_(); payload.CreatedBy = user.Username;
       record = insertRow_(SHEETS.SMS_TEMPLATES, payload, ID_PREFIX.SMS_TEMPLATES);
     }
     return record;
@@ -1726,7 +1907,7 @@ function sendBulkSms(group, message, scheduledFor) {
         insertRow_(SHEETS.SMS_LOG, {
           RecipientPhone: normalizePhone_(r.Phone), RecipientMemberID: r.ID || '', RecipientName: name.trim(),
           MessageBody: personalized, Provider: getSetting_('SmsProvider', 'arkesel'), Status: 'Scheduled',
-          SentAt: '', ScheduledFor: scheduledFor, GroupLabel: group, ErrorDetail: '', CreatedBy: user.Email
+          SentAt: '', ScheduledFor: scheduledFor, GroupLabel: group, ErrorDetail: '', CreatedBy: user.Username
         }, ID_PREFIX.SMS_LOG);
         results.scheduled++;
         return;
@@ -1735,7 +1916,7 @@ function sendBulkSms(group, message, scheduledFor) {
       insertRow_(SHEETS.SMS_LOG, {
         RecipientPhone: normalizePhone_(r.Phone), RecipientMemberID: r.ID || '', RecipientName: name.trim(),
         MessageBody: personalized, Provider: outcome.provider, Status: outcome.ok ? 'Sent' : 'Failed',
-        SentAt: nowIso_(), ScheduledFor: '', GroupLabel: group, ErrorDetail: outcome.ok ? '' : outcome.error, CreatedBy: user.Email
+        SentAt: nowIso_(), ScheduledFor: '', GroupLabel: group, ErrorDetail: outcome.ok ? '' : outcome.error, CreatedBy: user.Username
       }, ID_PREFIX.SMS_LOG);
       if (outcome.ok) results.sent++; else results.failed++;
     });
@@ -1754,7 +1935,7 @@ function sendSingleSms(phone, message, memberId) {
     insertRow_(SHEETS.SMS_LOG, {
       RecipientPhone: normalizePhone_(phone), RecipientMemberID: memberId || '', RecipientName: '',
       MessageBody: message, Provider: outcome.provider, Status: outcome.ok ? 'Sent' : 'Failed',
-      SentAt: nowIso_(), ScheduledFor: '', GroupLabel: 'direct', ErrorDetail: outcome.ok ? '' : outcome.error, CreatedBy: user.Email
+      SentAt: nowIso_(), ScheduledFor: '', GroupLabel: 'direct', ErrorDetail: outcome.ok ? '' : outcome.error, CreatedBy: user.Username
     }, ID_PREFIX.SMS_LOG);
     return outcome;
   });
@@ -2080,7 +2261,7 @@ function saveClusterFollowUp(data) {
     var payload = {
       ClusterID: data.ClusterID, ClusterName: cluster.Name, MemberID: data.MemberID,
       MemberName: member.FirstName + ' ' + member.LastName, FollowUpDate: data.FollowUpDate, Type: data.Type,
-      Notes: sanitizeText_(data.Notes || ''), Outcome: sanitizeText_(data.Outcome || ''), FollowedUpBy: user.Email
+      Notes: sanitizeText_(data.Notes || ''), Outcome: sanitizeText_(data.Outcome || ''), FollowedUpBy: user.Username
     };
     var record;
     if (data.ID) {
@@ -2142,7 +2323,7 @@ function updatePrayerRequest(data) {
     var user = requireRole_('sms', 'mutate');
     requireEnum_(data.Status, OPTIONS.PRAYER_STATUS, 'Status');
     var record = updateRow_(SHEETS.PRAYER_REQUESTS, data.ID, {
-      Status: data.Status, AssignedTo: sanitizeText_(data.AssignedTo || user.Email),
+      Status: data.Status, AssignedTo: sanitizeText_(data.AssignedTo || user.Username),
       ResponseNotes: sanitizeText_(data.ResponseNotes || '')
     });
     logAudit_('UPDATE', 'PrayerRequests', data.ID, 'Set status to ' + data.Status);
@@ -2157,7 +2338,7 @@ function listMessageThreads() {
     var user = requireRole_('sms', 'view');
     var threads = readAll_(SHEETS.MESSAGE_THREADS).filter(function (t) {
       var participants = safeJson_(t.Participants) || [];
-      return participants.indexOf(user.Email) !== -1;
+      return participants.indexOf(user.Username) !== -1;
     });
     var messages = readAll_(SHEETS.MESSAGES);
     return threads.map(function (t) {
@@ -2168,14 +2349,14 @@ function listMessageThreads() {
   });
 }
 
-function createMessageThread(name, participantEmails, type) {
+function createMessageThread(name, participantUsernames, type) {
   return safeCall_('createMessageThread', function () {
     var user = requireRole_('sms', 'view');
-    if (!Array.isArray(participantEmails) || !participantEmails.length) throw new Error('Select at least one participant.');
-    var participants = uniq_(participantEmails.concat([user.Email]));
+    if (!Array.isArray(participantUsernames) || !participantUsernames.length) throw new Error('Select at least one participant.');
+    var participants = uniq_(participantUsernames.concat([user.Username]));
     var record = insertRow_(SHEETS.MESSAGE_THREADS, {
       Type: type === 'Group' ? 'Group' : 'Direct', Name: sanitizeText_(name || participants.join(', ')),
-      Participants: JSON.stringify(participants), CreatedAt: nowIso_(), CreatedBy: user.Email
+      Participants: JSON.stringify(participants), CreatedAt: nowIso_(), CreatedBy: user.Username
     }, ID_PREFIX.MESSAGE_THREADS);
     return record;
   });
@@ -2184,13 +2365,13 @@ function createMessageThread(name, participantEmails, type) {
 function listThreadMessages(threadId) {
   return safeCall_('listThreadMessages', function () {
     var user = requireRole_('sms', 'view');
-    assertThreadMember_(threadId, user.Email);
+    assertThreadMember_(threadId, user.Username);
     var messages = readAll_(SHEETS.MESSAGES).filter(function (m) { return m.ThreadID === threadId; })
       .sort(function (a, b) { return new Date(a.SentAt) - new Date(b.SentAt); });
     messages.forEach(function (m) {
       var readBy = safeJson_(m.ReadBy) || [];
-      if (readBy.indexOf(user.Email) === -1) {
-        readBy.push(user.Email);
+      if (readBy.indexOf(user.Username) === -1) {
+        readBy.push(user.Username);
         updateRow_(SHEETS.MESSAGES, m.ID, { ReadBy: JSON.stringify(readBy) });
       }
     });
@@ -2201,21 +2382,21 @@ function listThreadMessages(threadId) {
 function sendMessage(threadId, body, attachmentDriveUrl) {
   return safeCall_('sendMessage', function () {
     var user = requireRole_('sms', 'view');
-    assertThreadMember_(threadId, user.Email);
+    assertThreadMember_(threadId, user.Username);
     if (isBlank_(body)) throw new Error('Message cannot be empty.');
     var record = insertRow_(SHEETS.MESSAGES, {
-      ThreadID: threadId, FromUser: user.Email, Body: sanitizeText_(body),
-      Attachments: attachmentDriveUrl || '', SentAt: nowIso_(), ReadBy: JSON.stringify([user.Email])
+      ThreadID: threadId, FromUser: user.Username, Body: sanitizeText_(body),
+      Attachments: attachmentDriveUrl || '', SentAt: nowIso_(), ReadBy: JSON.stringify([user.Username])
     }, ID_PREFIX.MESSAGES);
     return record;
   });
 }
 
-function assertThreadMember_(threadId, email) {
+function assertThreadMember_(threadId, username) {
   var thread = getById_(SHEETS.MESSAGE_THREADS, threadId);
   if (!thread) throw new Error('Conversation not found.');
   var participants = safeJson_(thread.Participants) || [];
-  if (participants.indexOf(email) === -1) throw new Error('Access denied: not a participant in this conversation.');
+  if (participants.indexOf(username) === -1) throw new Error('Access denied: not a participant in this conversation.');
   return thread;
 }
 
@@ -2223,8 +2404,8 @@ function assertThreadMember_(threadId, email) {
 function listMessagingContacts() {
   return safeCall_('listMessagingContacts', function () {
     var user = requireRole_('sms', 'view');
-    return readAll_(SHEETS.USERS).filter(function (u) { return toBool_(u.Active) && u.Email !== user.Email; })
-      .map(function (u) { return { email: u.Email, name: u.FullName, role: u.Role }; });
+    return readAll_(SHEETS.USERS).filter(function (u) { return toBool_(u.Active) && u.Username !== user.Username; })
+      .map(function (u) { return { username: u.Username, name: u.FullName, role: u.Role }; });
   });
 }
 
@@ -2281,7 +2462,7 @@ function sendAbsenceNotifications_() {
   var weeks = Number(getSetting_('AbsenceThresholdWeeks', '3')) || 3;
   var absentees = findAbsentMembers_(weeks);
   var adminEmails = readAll_(SHEETS.USERS).filter(function (u) {
-    return toBool_(u.Active) && (u.Role === ROLES.SUPER_ADMIN || u.Role === ROLES.ADMIN || u.Role === ROLES.CLUSTER_LEADER);
+    return toBool_(u.Active) && !isBlank_(u.Email) && (u.Role === ROLES.SUPER_ADMIN || u.Role === ROLES.ADMIN || u.Role === ROLES.CLUSTER_LEADER);
   }).map(function (u) { return u.Email; });
   if (!absentees.length || !adminEmails.length) return;
   var body = 'The following active members have not checked in for ' + weeks + '+ weeks:\n\n'
