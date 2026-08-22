@@ -42,11 +42,11 @@ Organized top-to-bottom with `======` banner comments — search for these secti
    - creates the backing spreadsheet ("ChurchMS Database") and stores its ID in Script Properties
    - creates every sheet tab with its header row and dropdown data validation
    - seeds default Settings (edit these later from the Settings module)
-   - creates the first login — username **`admin`** with a random one-time password — and writes it to the execution log (**View → Logs** / `Ctrl+Enter`) as `ChurchMS: first SuperAdmin login created — username: "admin"  password: "..."`. Copy it from there; it isn't shown anywhere else.
+   - creates the first login — username **`admin`**, password **`admin123`** — a fixed default, not a secret.
    - creates a Drive folder for attachments (photos, documents, receipts) and one for backups
    - installs the time-driven triggers (daily notifications digest, hourly scheduled-SMS processor, weekly backup)
 4. **Deploy → New deployment → Web app**. Execute as "Me", access "Anyone" (the app no longer relies on the visitor's Google identity — access is username/password — so "Anyone" is the normal choice; a domain-restricted deployment also works and simply adds a Google sign-in step in front of ChurchMS's own login).
-5. Open the deployed URL and sign in with the `admin` username/password from step 3, then immediately set a new password from your account menu (click your name in the sidebar → Change Password).
+5. Open the deployed URL and sign in with `admin` / `admin123`, then **immediately** set a new password from your account menu (click your name in the sidebar → Change Password) — anyone who finds your web app URL can otherwise sign in with this well-known default.
 6. Under **Settings → Users**, add your team: pick a username, a temporary password, and a role (`Admin`, `FinanceOfficer`, `ClusterLeader`, `CommunicationOfficer`, `Viewer`). Only users listed there — and marked Active — can sign in; each person should change their password after their first login.
 7. Under **Settings → SMS Providers**, pick Arkesel, Hubtel, or a custom REST gateway and enter credentials.
 

@@ -867,7 +867,7 @@ function runInitialSetup() {
 
   if (seededCredentials) {
     Logger.log('ChurchMS: first SuperAdmin login created — username: "%s"  password: "%s". ' +
-      'Sign in with these, then change the password immediately (Settings → Users, or your account menu).',
+      'This is a default password, not a secret — sign in and change it immediately from your account menu (or Settings → Users).',
       seededCredentials.username, seededCredentials.password);
   }
 
@@ -919,7 +919,7 @@ function seedSettings_() {
 function seedSuperAdmin_() {
   var users = readAll_(SHEETS.USERS);
   if (users.length > 0) return null;
-  var tempPassword = 'ChangeMe-' + Math.random().toString(36).slice(2, 8);
+  var tempPassword = 'admin123';
   var salt = generateSalt_();
   insertRow_(SHEETS.USERS, {
     Username: 'admin',
