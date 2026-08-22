@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <title><?= orgName ?> | Access Restricted</title>
+  <?!= include('Styles'); ?>
+</head>
+<body>
+<?!= include('Icons'); ?>
+<div class="gate-container">
+  <div class="gate-box">
+    <div class="gate-ring"><svg class="icon-lg"><use href="#ic-lock"></use></svg></div>
+    <h2>Access Restricted</h2>
+    <p class="gate-sub"><?= orgName ?> Administration</p>
+    <div class="gate-detail">
+      You're signed in as <b><?= userEmail ?></b>, but this Google account isn't registered in ChurchMS yet.
+      Ask a SuperAdmin to add you under <b>Settings → Users</b>, then reload this page.
+    </div>
+    <div class="flex" style="justify-content:center">
+      <button class="btn btn-primary" onclick="location.reload()">
+        <svg class="icon"><use href="#ic-refresh"></use></svg> Try Again
+      </button>
+    </div>
+    <div class="gate-footer">Advanced Church Management System</div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,227 @@
+<div class="view" id="view-members">
+  <div class="page-head">
+    <div><h1>Members</h1><p>Profiles, custom fields, documents and membership lifecycle.</p></div>
+    <div class="page-actions">
+      <select id="members-status-filter" class="btn btn-outline" style="font-weight:600">
+        <option value="">All statuses</option>
+      </select>
+      <button class="btn btn-primary" id="members-add-btn"><svg class="icon"><use href="#ic-plus"></use></svg> Add Member</button>
+    </div>
+  </div>
+  <div class="card card-pad">
+    <div id="members-table"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var MEMBER_FIELDS = [
+    { key: 'FirstName', label: 'First Name', required: true, half: true },
+    { key: 'LastName', label: 'Last Name', required: true, half: true },
+    { key: 'Gender', label: 'Gender', type: 'select', options: ['Male', 'Female'], half: true },
+    { key: 'DOB', label: 'Date of Birth', type: 'date', half: true },
+    { key: 'Phone', label: 'Phone', required: true, type: 'tel', half: true },
+    { key: 'Email', label: 'Email', type: 'email', half: true },
+    { key: 'Address', label: 'Address', type: 'textarea' },
+    { key: 'MaritalStatus', label: 'Marital Status', type: 'select', options: ['Single', 'Married', 'Divorced', 'Widowed'], half: true },
+    { key: 'MembershipStatus', label: 'Membership Status', type: 'select', options: ['New', 'Active', 'Inactive', 'Transferred', 'Deceased'], half: true },
+    { key: 'MembershipDate', label: 'Membership Date', type: 'date', half: true },
+    { key: 'MembershipClass', label: 'Membership Class', half: true },
+    { key: 'Cluster', label: 'Cluster', half: true },
+    { key: 'Department', label: 'Department', half: true },
+    { key: 'EmergencyContactName', label: 'Emergency Contact Name', half: true },
+    { key: 'EmergencyContactPhone', label: 'Emergency Contact Phone', type: 'tel', half: true },
+    { key: 'Notes', label: 'Notes', type: 'textarea' },
+    { key: 'SmsOptOut', label: 'Opted out of SMS', type: 'checkbox' }
+  ];
+
+  var allMembers = [], table = null, customFieldsConfig = [];
+
+  function statusBadge(status) {
+    var cls = { Active: 'badge-green', New: 'badge-blue', Inactive: 'badge-gray', Transferred: 'badge-amber', Deceased: 'badge-red' }[status] || 'badge-gray';
+    return '<span class="badge ' + cls + '">' + status + '</span>';
+  }
+
+  function renderTable() {
+    var filterVal = document.getElementById('members-status-filter').value;
+    var rows = filterVal ? allMembers.filter(function (m) { return m.MembershipStatus === filterVal; }) : allMembers;
+    var cols = [
+      { label: 'Member', render: function (m) {
+        return '<div class="flex gap-10"><div class="avatar-circle">' + (m.PhotoFileId ? '<img src="https://drive.google.com/thumbnail?id=' + m.PhotoFileId + '">' : Church.fmt.initials(m.FirstName + ' ' + m.LastName)) + '</div>' +
+          '<div><div style="font-weight:700">' + Church.fmt.escape(m.FirstName + ' ' + m.LastName) + '</div><div class="muted" style="font-size:11.5px">' + Church.fmt.escape(m.ID) + '</div></div></div>';
+      } },
+      { label: 'Contact', render: function (m) { return Church.fmt.escape(m.Phone || '—') + '<br><span class="muted" style="font-size:11.5px">' + Church.fmt.escape(m.Email || '') + '</span>'; } },
+      { label: 'Status', render: function (m) { return statusBadge(m.MembershipStatus); } },
+      { label: 'Cluster', render: function (m) { return Church.fmt.escape(m.Cluster || '—'); } },
+      { label: 'Member Since', render: function (m) { return Church.fmt.date(m.MembershipDate); } }
+    ];
+    var container = document.getElementById('members-table');
+    if (table) { table.refresh(rows); }
+    else {
+      table = Church.dataTable(container, {
+        columns: cols, rows: rows, searchKeys: ['FirstName', 'LastName', 'Phone', 'Email', 'ID'],
+        searchId: 'members-search', searchPlaceholder: 'Search members by name, phone, email…',
+        rowActions: function (m) { return '<button class="btn btn-ghost btn-icon btn-sm" title="View / Edit" data-view="1"><svg class="icon-sm"><use href="#ic-chevron-right"></use></svg></button>'; },
+        onEdit: openMemberModal, onDelete: function (m) { deleteMember(m); },
+        empty: { icon: 'ic-members', title: 'No members yet — click "Add Member" to get started' }
+      });
+      container.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-view]');
+        if (!btn) return;
+        var tr = e.target.closest('tr[data-id]');
+        var m = allMembers.find(function (x) { return x.ID === tr.dataset.id; });
+        if (m) openMemberModal(m);
+      });
+    }
+  }
+
+  function deleteMember(m) {
+    Church.confirm('Delete ' + m.FirstName + ' ' + m.LastName + '? This removes their full profile.').then(function (ok) {
+      if (!ok) return;
+      Church.task('deleteMember', m.ID).then(function () { Church.toast('Member removed', 'success'); load(); });
+    });
+  }
+
+  function customFieldToFieldDef(cf) {
+    return { key: cf.key, label: cf.label, type: cf.type || 'text', options: cf.options || [] };
+  }
+
+  function openMemberModal(member) {
+    member = member || {};
+    var isNew = !member.ID;
+    var tabs = ['Profile', 'Custom Fields', 'Documents', 'History'];
+    var html = '<div class="modal-head"><h3><svg class="icon"><use href="#ic-members"></use></svg>' + (isNew ? 'Add Member' : member.FirstName + ' ' + member.LastName) + '</h3>' +
+      '<div class="modal-close" onclick="Church.modal.close()"><svg class="icon"><use href="#ic-close"></use></svg></div></div>' +
+      '<div class="modal-body">' +
+      '<div class="tabbar" id="mm-tabs">' + tabs.map(function (t, i) { return '<div class="tab-btn' + (i === 0 ? ' active' : '') + '" data-tab="' + i + '">' + t + '</div>'; }).join('') + '</div>' +
+      '<div class="tab-panel active" data-panel="0">' +
+      (!isNew ? '<div class="flex gap-14" style="margin-bottom:16px"><div class="avatar-circle" style="width:64px;height:64px;font-size:20px">' +
+        (member.PhotoFileId ? '<img src="https://drive.google.com/thumbnail?id=' + member.PhotoFileId + '">' : Church.fmt.initials(member.FirstName + ' ' + member.LastName)) + '</div>' +
+        '<div><label class="btn btn-outline btn-sm" style="cursor:pointer">Upload Photo<input type="file" id="mm-photo-input" accept="image/*" style="display:none"></label>' +
+        '<div class="muted" style="font-size:11px;margin-top:6px">JPG/PNG, stored in Google Drive</div></div></div>' : '') +
+      '<div id="mm-profile-fields"></div></div>' +
+      '<div class="tab-panel" data-panel="1"><div id="mm-custom-fields"></div>' +
+      (!customFieldsConfig.length ? '<div class="empty-state">No custom fields configured. Add some under Settings → Custom Fields.</div>' : '') + '</div>' +
+      '<div class="tab-panel" data-panel="2">' +
+      (isNew ? '<div class="empty-state">Save the member first, then attach documents (certificates, IDs, etc.).</div>' :
+        '<div class="field"><label>Upload Document</label><div class="flex gap-10"><input type="text" id="mm-doc-label" placeholder="Label, e.g. Baptism Certificate" style="flex:1;padding:10px 12px;border:1.5px solid var(--line);border-radius:8px"><label class="btn btn-outline btn-sm" style="cursor:pointer">Choose File<input type="file" id="mm-doc-input" style="display:none"></label></div></div>' +
+        '<div id="mm-doc-list"></div>') + '</div>' +
+      '<div class="tab-panel" data-panel="3"><div id="mm-history"></div></div>' +
+      '</div>' +
+      '<div class="modal-foot">' +
+      (!isNew ? '<button class="btn btn-outline" id="mm-transfer" style="margin-right:auto"><svg class="icon-sm"><use href="#ic-arrow-right"></use></svg> Transfer</button>' : '') +
+      '<button class="btn btn-outline" onclick="Church.modal.close()">Cancel</button>' +
+      '<button class="btn btn-primary" id="mm-save">Save Member</button></div>';
+
+    Church.modal.open(html, { lg: true });
+    document.getElementById('mm-profile-fields').innerHTML = Church.renderFields(MEMBER_FIELDS, member);
+
+    var customDefs = customFieldsConfig.map(customFieldToFieldDef);
+    var cfValues = {};
+    try { cfValues = JSON.parse(member.CustomFields || '{}'); } catch (e) {}
+    document.getElementById('mm-custom-fields').innerHTML = customDefs.length ? Church.renderFields(customDefs, cfValues) : '';
+
+    document.querySelectorAll('#mm-tabs .tab-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('#mm-tabs .tab-btn').forEach(function (b) { b.classList.remove('active'); });
+        document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
+        btn.classList.add('active');
+        document.querySelector('.tab-panel[data-panel="' + btn.dataset.tab + '"]').classList.add('active');
+      });
+    });
+
+    if (!isNew) {
+      renderDocs(member);
+      renderHistory(member);
+      var photoInput = document.getElementById('mm-photo-input');
+      if (photoInput) photoInput.addEventListener('change', function (e) {
+        var file = e.target.files[0]; if (!file) return;
+        Church.fileToBase64(file).then(function (b64) {
+          return Church.task('uploadMemberPhoto', member.ID, b64, file.type, file.name);
+        }).then(function () { Church.toast('Photo updated', 'success'); load().then(function () { openMemberModal(allMembers.find(function (m) { return m.ID === member.ID; })); }); });
+      });
+      var docInput = document.getElementById('mm-doc-input');
+      if (docInput) docInput.addEventListener('change', function (e) {
+        var file = e.target.files[0]; if (!file) return;
+        var label = document.getElementById('mm-doc-label').value || file.name;
+        Church.fileToBase64(file).then(function (b64) {
+          return Church.task('uploadMemberDocument', member.ID, b64, file.type, file.name, label);
+        }).then(function (docs) { Church.toast('Document uploaded', 'success'); member.DocumentLinks = JSON.stringify(docs); renderDocs(member); });
+      });
+      document.getElementById('mm-transfer').addEventListener('click', function () { openTransferModal(member); });
+    }
+
+    document.getElementById('mm-save').addEventListener('click', function () {
+      var payload = Church.readFields(document.getElementById('mm-profile-fields'), MEMBER_FIELDS);
+      if (customDefs.length) payload.CustomFieldValues = Church.readFields(document.getElementById('mm-custom-fields'), customDefs);
+      if (!isNew) payload.ID = member.ID;
+      Church.task('saveMember', payload).then(function () {
+        Church.toast('Member saved', 'success'); Church.modal.close(); load();
+      });
+    });
+  }
+
+  function renderDocs(member) {
+    var docs = []; try { docs = JSON.parse(member.DocumentLinks || '[]'); } catch (e) {}
+    var el = document.getElementById('mm-doc-list');
+    if (!el) return;
+    el.innerHTML = !docs.length ? '<div class="empty-state" style="padding:24px">No documents yet</div>' :
+      docs.map(function (d) {
+        return '<div class="flex gap-10" style="padding:9px 0;border-bottom:1px solid var(--line)"><svg class="icon"><use href="#ic-paperclip"></use></svg>' +
+          '<a href="https://drive.google.com/file/d/' + d.fileId + '/view" target="_blank" style="flex:1;color:var(--green-primary);font-weight:600">' + Church.fmt.escape(d.label) + '</a>' +
+          '<button class="btn btn-ghost btn-icon btn-sm" data-rm="' + d.fileId + '"><svg class="icon-sm"><use href="#ic-trash"></use></svg></button></div>';
+      }).join('');
+    el.querySelectorAll('[data-rm]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        Church.task('removeMemberDocument', member.ID, btn.dataset.rm).then(function (docs) { member.DocumentLinks = JSON.stringify(docs); renderDocs(member); });
+      });
+    });
+  }
+
+  function renderHistory(member) {
+    var el = document.getElementById('mm-history');
+    var hist = member.History || [];
+    el.innerHTML = !hist.length ? '<div class="empty-state" style="padding:24px">No status history</div>' :
+      hist.slice().reverse().map(function (h) {
+        return '<div style="padding:10px 0;border-bottom:1px solid var(--line)"><div style="font-weight:700;font-size:13px">' +
+          (h.OldStatus ? Church.fmt.escape(h.OldStatus) + ' → ' : '') + Church.fmt.escape(h.NewStatus) + '</div>' +
+          '<div class="muted" style="font-size:11.5px">' + Church.fmt.datetime(h.ChangedAt) + ' · ' + Church.fmt.escape(h.ChangedBy) + (h.Reason ? ' · ' + Church.fmt.escape(h.Reason) : '') + '</div></div>';
+      }).join('');
+  }
+
+  function openTransferModal(member) {
+    Church.modal.open('<div class="modal-head"><h3><svg class="icon"><use href="#ic-arrow-right"></use></svg>Transfer Member</h3>' +
+      '<div class="modal-close" onclick="Church.modal.close()"><svg class="icon"><use href="#ic-close"></use></svg></div></div>' +
+      '<div class="modal-body"><div class="field"><label>Destination Church / Branch</label><input id="tr-dest" placeholder="e.g. Grace Chapel, Kumasi"></div>' +
+      '<div class="field"><label>Reason</label><textarea id="tr-reason"></textarea></div></div>' +
+      '<div class="modal-foot"><button class="btn btn-outline" onclick="Church.modal.close()">Cancel</button>' +
+      '<button class="btn btn-primary" id="tr-save">Confirm Transfer</button></div>');
+    document.getElementById('tr-save').addEventListener('click', function () {
+      var dest = document.getElementById('tr-dest').value, reason = document.getElementById('tr-reason').value;
+      if (!dest) { Church.toast('Destination is required', 'error'); return; }
+      Church.task('transferMember', member.ID, dest, reason).then(function () { Church.toast('Member transferred', 'success'); Church.modal.close(); load(); });
+    });
+  }
+
+  function populateStatusFilter() {
+    var sel = document.getElementById('members-status-filter');
+    ['New', 'Active', 'Inactive', 'Transferred', 'Deceased'].forEach(function (s) {
+      var o = document.createElement('option'); o.value = s; o.textContent = s; sel.appendChild(o);
+    });
+    sel.addEventListener('change', renderTable);
+  }
+
+  function load() {
+    return Church.task('listMembers').then(function (members) {
+      allMembers = members;
+      renderTable();
+    });
+  }
+
+  document.getElementById('members-add-btn').addEventListener('click', function () { openMemberModal({}); });
+  populateStatusFilter();
+  Church.run('getCustomFieldsConfig').then(function (cfg) { customFieldsConfig = cfg || []; });
+
+  Church.views.members = { mount: load, refresh: load };
+})();
+</script>

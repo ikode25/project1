@@ -1,0 +1,89 @@
+<div class="view" id="view-visitors">
+  <div class="page-head">
+    <div><h1>Visitors</h1><p>First-time and returning guests, follow-up status and conversion.</p></div>
+    <div class="page-actions">
+      <button class="btn btn-primary" id="visitors-add-btn"><svg class="icon"><use href="#ic-plus"></use></svg> Log Visitor</button>
+    </div>
+  </div>
+  <div class="card card-pad"><div id="visitors-table"></div></div>
+</div>
+
+<script>
+(function () {
+  var FIELDS = [
+    { key: 'FirstName', label: 'First Name', required: true, half: true },
+    { key: 'LastName', label: 'Last Name', required: true, half: true },
+    { key: 'Phone', label: 'Phone', type: 'tel', half: true },
+    { key: 'Email', label: 'Email', type: 'email', half: true },
+    { key: 'VisitDate', label: 'Visit Date', type: 'date', required: true, half: true },
+    { key: 'HowHeard', label: 'How They Heard About Us', half: true },
+    { key: 'Address', label: 'Address' },
+    { key: 'Interest', label: 'Interest / Ministry Area', half: true },
+    { key: 'FollowUpStatus', label: 'Follow-up Status', type: 'select', options: ['New', 'Contacted', 'Converted', 'Closed'], half: true },
+    { key: 'AssignedTo', label: 'Assigned To' },
+    { key: 'Notes', label: 'Notes', type: 'textarea' }
+  ];
+  var all = [], table = null;
+
+  function statusBadge(s) {
+    var cls = { New: 'badge-blue', Contacted: 'badge-amber', Converted: 'badge-green', Closed: 'badge-gray' }[s] || 'badge-gray';
+    return '<span class="badge ' + cls + '">' + s + '</span>';
+  }
+
+  function render() {
+    var cols = [
+      { label: 'Visitor', render: function (v) { return '<div style="font-weight:700">' + Church.fmt.escape(v.FirstName + ' ' + v.LastName) + '</div><div class="muted" style="font-size:11.5px">' + Church.fmt.escape(v.Phone || v.Email || '') + '</div>'; } },
+      { label: 'Visit Date', render: function (v) { return Church.fmt.date(v.VisitDate); } },
+      { label: 'Status', render: function (v) { return statusBadge(v.FollowUpStatus); } },
+      { label: 'Assigned To', key: 'AssignedTo' }
+    ];
+    if (table) { table.refresh(all); return; }
+    table = Church.dataTable(document.getElementById('visitors-table'), {
+      columns: cols, rows: all, searchKeys: ['FirstName', 'LastName', 'Phone', 'Email'],
+      searchPlaceholder: 'Search visitors…', onEdit: openModal, onDelete: remove,
+      rowActions: function (v) { return v.ConvertedMemberID ? '' : '<button class="btn btn-ghost btn-icon btn-sm" title="Convert to Member" data-conv="1"><svg class="icon-sm"><use href="#ic-check-circle"></use></svg></button>'; },
+      empty: { icon: 'ic-visitor', title: 'No visitors logged yet' }
+    });
+    document.getElementById('visitors-table').addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-conv]'); if (!btn) return;
+      var tr = e.target.closest('tr[data-id]'); var v = all.find(function (x) { return x.ID === tr.dataset.id; });
+      if (v) convert(v);
+    });
+  }
+
+  function remove(v) {
+    Church.confirm('Delete visitor record for ' + v.FirstName + ' ' + v.LastName + '?').then(function (ok) {
+      if (ok) Church.task('deleteVisitor', v.ID).then(function () { Church.toast('Visitor removed', 'success'); load(); });
+    });
+  }
+
+  function convert(v) {
+    Church.confirm('Convert ' + v.FirstName + ' ' + v.LastName + ' into a full Member?', { danger: false, okLabel: 'Convert' }).then(function (ok) {
+      if (!ok) return;
+      Church.task('convertVisitorToMember', v.ID).then(function () { Church.toast('Converted to member', 'success'); load(); });
+    });
+  }
+
+  function openModal(visitor) {
+    visitor = visitor || {};
+    var isNew = !visitor.ID;
+    Church.modal.open('<div class="modal-head"><h3><svg class="icon"><use href="#ic-visitor"></use></svg>' + (isNew ? 'Log Visitor' : 'Edit Visitor') + '</h3>' +
+      '<div class="modal-close" onclick="Church.modal.close()"><svg class="icon"><use href="#ic-close"></use></svg></div></div>' +
+      '<div class="modal-body" id="v-fields"></div>' +
+      '<div class="modal-foot"><button class="btn btn-outline" onclick="Church.modal.close()">Cancel</button><button class="btn btn-primary" id="v-save">Save</button></div>');
+    document.getElementById('v-fields').innerHTML = Church.renderFields(FIELDS, visitor);
+    document.getElementById('v-save').addEventListener('click', function () {
+      var payload = Church.readFields(document.getElementById('v-fields'), FIELDS);
+      if (!isNew) payload.ID = visitor.ID;
+      Church.task('saveVisitor', payload).then(function () { Church.toast('Visitor saved', 'success'); Church.modal.close(); load(); });
+    });
+  }
+
+  function load() {
+    return Church.task('listVisitors').then(function (rows) { all = rows; render(); });
+  }
+
+  document.getElementById('visitors-add-btn').addEventListener('click', function () { openModal({}); });
+  Church.views.visitors = { mount: load, refresh: load };
+})();
+</script>

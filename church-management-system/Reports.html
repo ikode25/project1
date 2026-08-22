@@ -1,0 +1,108 @@
+<div class="view" id="view-reports">
+  <div class="page-head"><div><h1>Reports &amp; Analytics</h1><p>Attendance patterns, financial trends, growth and engagement.</p></div></div>
+
+  <div class="tabbar" id="rpt-tabs">
+    <div class="tab-btn active" data-tab="attendance">Attendance</div>
+    <div class="tab-btn" data-tab="growth">Growth</div>
+    <div class="tab-btn" data-tab="cluster">Cluster Effectiveness</div>
+    <div class="tab-btn" data-tab="engagement">Engagement</div>
+    <div class="tab-btn" data-tab="export">Export</div>
+  </div>
+
+  <div class="tab-panel active" data-panel="attendance">
+    <div class="card"><div class="card-head"><h3>Attendance Over Time</h3></div><div class="card-pad"><div id="chart-rpt-attendance" style="height:260px"></div></div></div>
+  </div>
+
+  <div class="tab-panel" data-panel="growth">
+    <div class="card"><div class="card-head"><h3>Membership Growth</h3></div><div class="card-pad"><div id="chart-rpt-growth" style="height:260px"></div></div></div>
+  </div>
+
+  <div class="tab-panel" data-panel="cluster">
+    <div class="card card-pad"><div id="cluster-report-table"></div></div>
+  </div>
+
+  <div class="tab-panel" data-panel="engagement">
+    <div class="card card-pad"><div id="engagement-table"></div></div>
+  </div>
+
+  <div class="tab-panel" data-panel="export">
+    <div class="card card-pad">
+      <p class="muted" style="margin-bottom:16px">Download any dataset as CSV, or open the live spreadsheet directly.</p>
+      <div class="grid grid-3" id="export-buttons"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  document.querySelectorAll('#rpt-tabs .tab-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('#rpt-tabs .tab-btn').forEach(function (b) { b.classList.remove('active'); });
+      document.querySelectorAll('#view-reports .tab-panel').forEach(function (p) { p.classList.remove('active'); });
+      btn.classList.add('active'); document.querySelector('#view-reports .tab-panel[data-panel="' + btn.dataset.tab + '"]').classList.add('active');
+    });
+  });
+
+  function loadAttendance() {
+    Church.task('getAttendanceReport', '', '').then(function (r) {
+      Church.loadCharts().then(function () {
+        var t = new google.visualization.DataTable(); t.addColumn('string', 'Date'); t.addColumn('number', 'Check-ins');
+        r.series.forEach(function (s) { t.addRow([s.date.slice(5), s.count]); });
+        new google.visualization.ColumnChart(document.getElementById('chart-rpt-attendance')).draw(t, { legend: 'none', colors: ['#22c55e'], chartArea: { width: '92%', height: '78%' } });
+      });
+    });
+  }
+
+  function loadGrowth() {
+    Church.task('getGrowthReport', 12).then(function (r) {
+      Church.loadCharts().then(function () {
+        var t = new google.visualization.DataTable(); t.addColumn('string', 'Month'); t.addColumn('number', 'Total Members');
+        r.memberGrowth.forEach(function (m) { t.addRow([m.month, m.total]); });
+        new google.visualization.LineChart(document.getElementById('chart-rpt-growth')).draw(t, { legend: 'none', colors: ['#0b3d2e'], lineWidth: 3, pointSize: 5, chartArea: { width: '92%', height: '78%' } });
+      });
+    });
+  }
+
+  function loadClusterReport() {
+    Church.task('getClusterEffectivenessReport').then(function (rows) {
+      document.getElementById('cluster-report-table').innerHTML = !rows.length ? '<div class="empty-state">No clusters yet</div>' :
+        '<div class="table-wrap"><table class="data-table"><thead><tr><th>Cluster</th><th>Leader</th><th>Members</th><th>Avg Attendance / Member</th><th>Follow-ups</th></tr></thead><tbody>' +
+        rows.map(function (r) { return '<tr><td>' + Church.fmt.escape(r.cluster) + '</td><td>' + Church.fmt.escape(r.leader || '—') + '</td><td>' + r.memberCount + '</td><td>' + r.avgAttendancePerMember + '</td><td>' + r.followUps + '</td></tr>'; }).join('') +
+        '</tbody></table></div>';
+    });
+  }
+
+  function loadEngagement() {
+    Church.task('getMemberEngagementReport').then(function (rows) {
+      document.getElementById('engagement-table').innerHTML = !rows.length ? '<div class="empty-state">No members yet</div>' :
+        '<div class="table-wrap"><table class="data-table"><thead><tr><th>Member</th><th>Engagement Score</th></tr></thead><tbody>' +
+        rows.slice(0, 50).map(function (r) {
+          return '<tr><td>' + Church.fmt.escape(r.name) + '</td><td style="width:220px"><div class="flex gap-10"><div class="progress-bar" style="flex:1"><div style="width:' + r.score + '%"></div></div><b>' + r.score + '</b></div></td></tr>';
+        }).join('') + '</tbody></table></div>';
+    });
+  }
+
+  var EXPORTS = [
+    { key: 'MEMBERS', label: 'Members' }, { key: 'VISITORS', label: 'Visitors' }, { key: 'ATTENDANCE', label: 'Attendance' },
+    { key: 'FINANCE', label: 'Giving' }, { key: 'EXPENSES', label: 'Expenses' }, { key: 'EQUIPMENT', label: 'Equipment' }
+  ];
+  function setupExports() {
+    document.getElementById('export-buttons').innerHTML = EXPORTS.map(function (e) {
+      return '<button class="btn btn-outline" data-export="' + e.key + '"><svg class="icon"><use href="#ic-download"></use></svg> ' + e.label + ' CSV</button>';
+    }).join('');
+    document.querySelectorAll('[data-export]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        Church.task('exportSheetCsv', btn.dataset.export).then(function (csv) {
+          var blob = new Blob([csv], { type: 'text/csv' });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a'); a.href = url; a.download = btn.dataset.export.toLowerCase() + '.csv'; document.body.appendChild(a); a.click(); a.remove();
+          URL.revokeObjectURL(url);
+        });
+      });
+    });
+  }
+
+  function mount() { loadAttendance(); loadGrowth(); loadClusterReport(); loadEngagement(); setupExports(); }
+  Church.views.reports = { mount: mount, refresh: mount };
+})();
+</script>

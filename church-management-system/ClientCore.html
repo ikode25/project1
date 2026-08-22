@@ -1,0 +1,353 @@
+<!-- ClientCore.html : shared client-side JS — router, google.script.run helper, toast/modal/loader, generic CRUD UI builders. -->
+<script src="https://www.gstatic.com/charts/loader.js"></script>
+<script>
+(function (global) {
+  'use strict';
+
+  var Church = {
+    session: null,
+    _mounted: {},
+    views: {} // populated by each module partial: Church.views.members = { mount, refresh }
+  };
+
+  /* ---------------- google.script.run promise wrapper ---------------- */
+  Church.run = function (fnName) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return new Promise(function (resolve, reject) {
+      var caller = google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(function (err) { reject(err); });
+      caller[fnName].apply(caller, args);
+    });
+  };
+
+  /* ---------------- toast ---------------- */
+  Church.toast = function (message, type) {
+    var stack = document.getElementById('toast-stack');
+    var el = document.createElement('div');
+    el.className = 'toast' + (type === 'error' ? ' t-error' : type === 'success' ? ' t-success' : '');
+    el.innerHTML = '<svg class="icon"><use href="#' + (type === 'error' ? 'ic-alert' : 'ic-check-circle') + '"></use></svg><span></span>';
+    el.querySelector('span').textContent = message;
+    stack.appendChild(el);
+    setTimeout(function () { el.style.transition = 'opacity .3s'; el.style.opacity = '0'; setTimeout(function () { el.remove(); }, 300); }, 3600);
+  };
+  Church.error = function (err) {
+    var msg = (err && err.message) ? err.message : String(err);
+    Church.toast(msg, 'error');
+  };
+
+  /* ---------------- loader ---------------- */
+  var loaderDepth = 0;
+  Church.loading = function (show) {
+    loaderDepth = Math.max(0, loaderDepth + (show ? 1 : -1));
+    document.getElementById('loader-overlay').classList.toggle('show', loaderDepth > 0);
+  };
+
+  /** Wraps a Church.run call with the global loader + standard error toast. */
+  Church.task = function (fnName) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    Church.loading(true);
+    return Church.run.apply(null, [fnName].concat(args))
+      .catch(function (err) { Church.error(err); throw err; })
+      .finally(function () { Church.loading(false); });
+  };
+
+  /* ---------------- modal ---------------- */
+  Church.modal = {
+    open: function (html, opts) {
+      opts = opts || {};
+      var backdrop = document.getElementById('modal-backdrop');
+      var box = document.getElementById('modal-box');
+      box.className = 'modal' + (opts.lg ? ' modal-lg' : '');
+      box.innerHTML = html;
+      backdrop.classList.add('show');
+      document.body.style.overflow = 'hidden';
+    },
+    close: function () {
+      document.getElementById('modal-backdrop').classList.remove('show');
+      document.getElementById('modal-box').innerHTML = '';
+      document.body.style.overflow = '';
+    }
+  };
+  document.addEventListener('DOMContentLoaded', function () {
+    document.getElementById('modal-backdrop').addEventListener('click', function (e) {
+      if (e.target.id === 'modal-backdrop') Church.modal.close();
+    });
+  });
+
+  /* ---------------- nav config ---------------- */
+  Church.NAV = [
+    { key: 'dashboard', label: 'Dashboard', icon: 'ic-dashboard' },
+    { key: 'members', label: 'Members', icon: 'ic-members' },
+    { key: 'visitors', label: 'Visitors', icon: 'ic-visitor' },
+    { key: 'attendance', label: 'Attendance', icon: 'ic-attendance' },
+    { key: 'finance', label: 'Finance', icon: 'ic-finance' },
+    { key: 'sms', label: 'Bulk SMS', icon: 'ic-sms' },
+    { key: 'equipment', label: 'Equipment', icon: 'ic-equipment' },
+    { key: 'reports', label: 'Reports', icon: 'ic-reports' },
+    { key: 'settings', label: 'Settings', icon: 'ic-settings' },
+    { key: 'cluster', label: 'Cluster Follow-up', icon: 'ic-cluster' }
+  ];
+  Church.TITLES = {
+    dashboard: 'Dashboard', members: 'Members', visitors: 'Visitors', attendance: 'Attendance',
+    finance: 'Finance', sms: 'Communication Center', equipment: 'Equipment', reports: 'Reports & Analytics',
+    settings: 'Settings', cluster: 'Cluster Follow-up'
+  };
+
+  /* ---------------- router ---------------- */
+  Church.navigate = function (key) {
+    if (!Church.session || !Church.session.modules[key]) return;
+    document.querySelectorAll('.nav-item').forEach(function (el) { el.classList.toggle('active', el.dataset.key === key); });
+    document.querySelectorAll('.view').forEach(function (el) { el.classList.toggle('active', el.id === 'view-' + key); });
+    document.getElementById('topbar-title').textContent = Church.TITLES[key] || key;
+    closeMobileSidebar();
+    var view = Church.views[key];
+    if (view) {
+      if (!Church._mounted[key] && view.mount) { view.mount(); Church._mounted[key] = true; }
+      else if (view.refresh) { view.refresh(); }
+    }
+    location.hash = key;
+  };
+
+  function closeMobileSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebar-overlay').classList.remove('show');
+  }
+
+  /* ---------------- bootstrap ---------------- */
+  Church.initApp = function () {
+    Church.loading(true);
+    Church.run('getSessionInfo').then(function (session) {
+      Church.loading(false);
+      if (!session.authorized) {
+        document.body.innerHTML = renderAccessDenied_(session);
+        return;
+      }
+      Church.session = session;
+      renderSidebar_(session);
+      wireChrome_();
+      var startKey = (location.hash || '').replace('#', '');
+      if (!startKey || !session.modules[startKey]) startKey = 'dashboard';
+      Church.navigate(startKey);
+    }).catch(function (err) {
+      Church.loading(false);
+      document.body.innerHTML = '<div class="empty-state" style="padding-top:80px"><h2>Unable to load ChurchMS</h2><p>' + (err.message || err) + '</p></div>';
+    });
+  };
+
+  function renderSidebar_(session) {
+    var nav = document.getElementById('sidebar-nav');
+    nav.innerHTML = Church.NAV.filter(function (n) { return session.modules[n.key]; }).map(function (n) {
+      return '<div class="nav-item" data-key="' + n.key + '" onclick="Church.navigate(\'' + n.key + '\')">' +
+        '<svg class="icon"><use href="#' + n.icon + '"></use></svg><span>' + n.label + '</span></div>';
+    }).join('');
+    document.getElementById('sidebar-user-name').textContent = session.fullName || session.email;
+    document.getElementById('sidebar-user-role').textContent = session.role;
+    document.getElementById('brand-org-name').textContent = session.orgName;
+  }
+
+  function renderAccessDenied_(session) {
+    return '<div class="gate-container"><div class="gate-box">' +
+      '<div class="gate-ring"><svg class="icon-lg"><use href="#ic-lock"></use></svg></div>' +
+      '<h2>Access Restricted</h2><p class="gate-sub">' + (session.orgName || 'ChurchMS') + ' Administration</p>' +
+      '<div class="gate-detail">Signed in as <b>' + session.email + '</b>, but this account is not yet provisioned in ChurchMS. Ask a SuperAdmin to add you under Settings → Users.</div>' +
+      '<div class="gate-footer">Advanced Church Management System</div></div></div>';
+  }
+
+  function wireChrome_() {
+    document.getElementById('topbar-menu-btn').addEventListener('click', function () {
+      document.getElementById('sidebar').classList.add('open');
+      document.getElementById('sidebar-overlay').classList.add('show');
+    });
+    document.getElementById('sidebar-overlay').addEventListener('click', closeMobileSidebar);
+    document.getElementById('sidebar-logout').addEventListener('click', function () {
+      Church.modal.open('<div class="modal-head"><h3><svg class="icon"><use href="#ic-logout"></use></svg>Sign Out</h3><div class="modal-close" onclick="Church.modal.close()"><svg class="icon"><use href="#ic-close"></use></svg></div></div>' +
+        '<div class="modal-body">To switch accounts, sign out of your Google account in this browser, or close this tab.</div>' +
+        '<div class="modal-foot"><button class="btn btn-outline" onclick="Church.modal.close()">Close</button></div>');
+    });
+    var searchInput = document.getElementById('topbar-search-input');
+    if (searchInput) {
+      searchInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && searchInput.value.trim()) {
+          Church.navigate('members');
+          setTimeout(function () {
+            var mSearch = document.getElementById('members-search');
+            if (mSearch) { mSearch.value = searchInput.value.trim(); mSearch.dispatchEvent(new Event('input')); }
+          }, 60);
+        }
+      });
+    }
+  }
+
+  /* ---------------- Google Charts loader ---------------- */
+  Church._chartsReady = null;
+  Church.loadCharts = function () {
+    if (Church._chartsReady) return Church._chartsReady;
+    Church._chartsReady = new Promise(function (resolve) {
+      google.charts.load('current', { packages: ['corechart'] });
+      google.charts.setOnLoadCallback(resolve);
+    });
+    return Church._chartsReady;
+  };
+
+  /* ---------------- small formatting helpers ---------------- */
+  Church.fmt = {
+    money: function (n) { return 'GHS ' + (Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+    date: function (iso) { if (!iso) return '—'; var d = new Date(iso); return isNaN(d) ? String(iso).split('T')[0] : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); },
+    datetime: function (iso) { if (!iso) return '—'; var d = new Date(iso); return isNaN(d) ? String(iso) : d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); },
+    initials: function (name) { return (name || '').split(' ').filter(Boolean).slice(0, 2).map(function (p) { return p[0]; }).join('').toUpperCase() || '?'; },
+    escape: function (s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+  };
+
+  /* ---------------- generic data table ---------------- */
+  /**
+   * Church.dataTable(container, { columns:[{key,label,render?}], rows, searchKeys, onEdit, onDelete, empty:{icon,title,text} }
+   * Renders a searchable table with edit/delete row actions. Returns { refresh(rows) }.
+   */
+  Church.dataTable = function (container, opts) {
+    var state = { rows: opts.rows || [], filtered: opts.rows || [], q: '' };
+
+    function applyFilter() {
+      if (!state.q) { state.filtered = state.rows; return; }
+      var q = state.q.toLowerCase();
+      state.filtered = state.rows.filter(function (r) {
+        return (opts.searchKeys || Object.keys(r)).some(function (k) { return String(r[k] || '').toLowerCase().indexOf(q) !== -1; });
+      });
+    }
+
+    function render() {
+      applyFilter();
+      var rowsHtml;
+      if (!state.filtered.length) {
+        rowsHtml = '<tr><td colspan="' + (opts.columns.length + (opts.onEdit || opts.onDelete ? 1 : 0)) + '">' +
+          '<div class="table-empty"><svg class="icon-lg"><use href="#' + ((opts.empty && opts.empty.icon) || 'ic-search') + '"></use></svg>' +
+          '<div>' + ((opts.empty && opts.empty.title) || 'No records found') + '</div></div></td></tr>';
+      } else {
+        rowsHtml = state.filtered.map(function (row) {
+          var cells = opts.columns.map(function (c) {
+            var val = c.render ? c.render(row) : Church.fmt.escape(row[c.key]);
+            return '<td>' + val + '</td>';
+          }).join('');
+          var actions = '';
+          if (opts.onEdit || opts.onDelete || opts.rowActions) {
+            actions = '<td><div class="row-actions">' +
+              (opts.rowActions ? opts.rowActions(row) : '') +
+              (opts.onEdit ? '<button class="btn btn-ghost btn-icon btn-sm" title="Edit" data-act="edit"><svg class="icon-sm"><use href="#ic-edit"></use></svg></button>' : '') +
+              (opts.onDelete ? '<button class="btn btn-ghost btn-icon btn-sm" title="Delete" data-act="del"><svg class="icon-sm"><use href="#ic-trash"></use></svg></button>' : '') +
+              '</div></td>';
+          }
+          return '<tr data-id="' + row.ID + '">' + cells + actions + '</tr>';
+        }).join('');
+      }
+      container.innerHTML =
+        (opts.searchable === false ? '' : '<div class="flex gap-10" style="margin-bottom:12px">' +
+          '<div class="topbar-search" style="width:280px"><svg class="icon"><use href="#ic-search"></use></svg>' +
+          '<input placeholder="' + (opts.searchPlaceholder || 'Search…') + '" id="' + (opts.searchId || '') + '" class="dt-search"></div></div>') +
+        '<div class="table-wrap"><table class="data-table"><thead><tr>' +
+        opts.columns.map(function (c) { return '<th>' + c.label + '</th>'; }).join('') +
+        (opts.onEdit || opts.onDelete || opts.rowActions ? '<th class="text-right">Actions</th>' : '') +
+        '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>';
+
+      var searchEl = container.querySelector('.dt-search');
+      if (searchEl) searchEl.addEventListener('input', function (e) { state.q = e.target.value; render(); });
+
+      container.querySelectorAll('tbody tr[data-id]').forEach(function (tr) {
+        var id = tr.dataset.id;
+        var row = state.rows.find(function (r) { return r.ID === id; });
+        var editBtn = tr.querySelector('[data-act="edit"]');
+        var delBtn = tr.querySelector('[data-act="del"]');
+        if (editBtn) editBtn.addEventListener('click', function () { opts.onEdit(row); });
+        if (delBtn) delBtn.addEventListener('click', function () {
+          Church.confirm('Delete this record? This cannot be undone.').then(function (ok) { if (ok) opts.onDelete(row); });
+        });
+      });
+    }
+
+    render();
+    return {
+      refresh: function (rows) { state.rows = rows; render(); }
+    };
+  };
+
+  /* ---------------- confirm dialog ---------------- */
+  Church.confirm = function (message, opts) {
+    opts = opts || {};
+    return new Promise(function (resolve) {
+      Church.modal.open(
+        '<div class="modal-head"><h3><svg class="icon"><use href="#ic-alert"></use></svg>' + (opts.title || 'Please Confirm') + '</h3>' +
+        '<div class="modal-close" id="cf-cancel-x"><svg class="icon"><use href="#ic-close"></use></svg></div></div>' +
+        '<div class="modal-body">' + Church.fmt.escape(message) + '</div>' +
+        '<div class="modal-foot"><button class="btn btn-outline" id="cf-cancel">Cancel</button>' +
+        '<button class="btn ' + (opts.danger === false ? 'btn-primary' : 'btn-danger') + '" id="cf-ok">' + (opts.okLabel || 'Delete') + '</button></div>'
+      );
+      var done = function (v) { Church.modal.close(); resolve(v); };
+      document.getElementById('cf-cancel').onclick = function () { done(false); };
+      document.getElementById('cf-cancel-x').onclick = function () { done(false); };
+      document.getElementById('cf-ok').onclick = function () { done(true); };
+    });
+  };
+
+  /* ---------------- generic form-field renderer (used by module form modals) ---------------- */
+  /** fields: [{key,label,type:'text'|'email'|'tel'|'date'|'number'|'select'|'textarea'|'checkbox', options?, required?, half?}] */
+  Church.renderFields = function (fields, values) {
+    values = values || {};
+    var html = '';
+    var i = 0;
+    while (i < fields.length) {
+      var f = fields[i];
+      if (f.half && fields[i + 1] && fields[i + 1].half) {
+        html += '<div class="field-row">' + fieldHtml_(f, values) + fieldHtml_(fields[i + 1], values) + '</div>';
+        i += 2;
+      } else {
+        html += fieldHtml_(f, values);
+        i += 1;
+      }
+    }
+    return html;
+  };
+  function fieldHtml_(f, values) {
+    var val = values[f.key];
+    var req = f.required ? ' <span class="req">*</span>' : '';
+    var name = 'data-field="' + f.key + '"';
+    if (f.type === 'select') {
+      var opts = (f.options || []).map(function (o) {
+        var ov = typeof o === 'object' ? o.value : o;
+        var ol = typeof o === 'object' ? o.label : o;
+        return '<option value="' + Church.fmt.escape(ov) + '"' + (String(val) === String(ov) ? ' selected' : '') + '>' + Church.fmt.escape(ol) + '</option>';
+      }).join('');
+      return '<div class="field"><label>' + f.label + req + '</label><select ' + name + '><option value="">— Select —</option>' + opts + '</select></div>';
+    }
+    if (f.type === 'textarea') {
+      return '<div class="field"><label>' + f.label + req + '</label><textarea ' + name + '>' + Church.fmt.escape(val || '') + '</textarea></div>';
+    }
+    if (f.type === 'checkbox') {
+      return '<div class="field checkbox-row"><input type="checkbox" ' + name + ' id="cb-' + f.key + '" ' + (val ? 'checked' : '') + '><label for="cb-' + f.key + '" style="margin:0">' + f.label + '</label></div>';
+    }
+    return '<div class="field"><label>' + f.label + req + '</label><input type="' + (f.type || 'text') + '" ' + name + ' value="' + Church.fmt.escape(val == null ? '' : val) + '" placeholder="' + (f.placeholder || '') + '"></div>';
+  }
+  /** Reads a form container built with renderFields back into a plain object. */
+  Church.readFields = function (containerEl, fields) {
+    var out = {};
+    fields.forEach(function (f) {
+      var el = containerEl.querySelector('[data-field="' + f.key + '"]');
+      if (!el) return;
+      if (f.type === 'checkbox') out[f.key] = el.checked;
+      else if (f.type === 'number') out[f.key] = el.value === '' ? '' : Number(el.value);
+      else out[f.key] = el.value;
+    });
+    return out;
+  };
+
+  /* ---------------- file -> base64 helper (for Drive uploads) ---------------- */
+  Church.fileToBase64 = function (file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(reader.result.split(',')[1]); };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  global.Church = Church;
+})(window);
+</script>
