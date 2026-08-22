@@ -4,11 +4,684 @@
   <base target="_top">
   <meta charset="UTF-8">
   <title><?= orgName ?> | ChurchMS</title>
-  <?!= include('Styles'); ?>
+<!-- Styles.html : shared design system — gradient green/black theme on a white base. -->
+<style>
+  :root {
+    --green-dark: #04140f;
+    --green-primary: #0b3d2e;
+    --green-mid: #146c43;
+    --green-accent: #22c55e;
+    --green-soft: #e8f7ee;
+    --black: #0a0d0c;
+    --white: #ffffff;
+    --ink: #101615;
+    --ink-soft: #4b5a55;
+    --line: #e3e9e6;
+    --bg: #f5f8f6;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --info: #2563eb;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow-sm: 0 1px 2px rgba(4,20,15,.06);
+    --shadow-md: 0 6px 20px rgba(4,20,15,.08);
+    --shadow-lg: 0 20px 50px rgba(4,20,15,.22);
+    --sidebar-w: 264px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-tap-highlight-color: transparent;
+  }
+  a { color: inherit; }
+  input, select, textarea, button { font-family: inherit; font-size: 14.5px; }
+  .icon { width: 18px; height: 18px; display: inline-block; vertical-align: -3px; flex-shrink: 0; }
+  .icon-sm { width: 15px; height: 15px; vertical-align: -2px; }
+  .icon-lg { width: 26px; height: 26px; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #c9d4cf; border-radius: 8px; }
+
+  /* ---------- Access gate / login-style page ---------- */
+  .gate-container {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
+    position: relative; overflow: hidden;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(34,197,94,.28) 0%, transparent 45%),
+      radial-gradient(circle at 85% 80%, rgba(34,197,94,.18) 0%, transparent 50%),
+      linear-gradient(135deg, var(--green-dark) 0%, var(--green-primary) 55%, var(--black) 100%);
+  }
+  .gate-container::before {
+    content:''; position:absolute; inset:0; pointer-events:none;
+    background-image: radial-gradient(rgba(255,255,255,.05) 1px, transparent 1px); background-size: 26px 26px;
+  }
+  .gate-box {
+    position: relative; background: var(--white); padding: 44px 38px 34px; border-radius: 18px;
+    box-shadow: var(--shadow-lg); width: 100%; max-width: 430px; text-align: center;
+    animation: gate-in .45s ease-out;
+  }
+  @keyframes gate-in { from { transform: translateY(14px); opacity:0; } to { transform:none; opacity:1; } }
+  .gate-ring {
+    width: 88px; height: 88px; margin: -76px auto 20px; padding: 4px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--green-primary), var(--green-accent));
+    box-shadow: 0 10px 26px rgba(11,61,46,.35); display:flex; align-items:center; justify-content:center;
+  }
+  .gate-ring .icon-lg { color: #fff; width: 40px; height: 40px; }
+  .gate-box h2 { color: var(--green-primary); font-size: 21px; font-weight: 800; margin-bottom: 6px; }
+  .gate-sub { color: #8a938f; font-size: 13px; margin-bottom: 22px; font-weight: 500; }
+  .gate-detail { background: #f6f9f7; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; font-size: 13px; color: var(--ink-soft); text-align: left; margin-bottom: 18px; }
+  .gate-detail b { color: var(--ink); }
+  .gate-footer { margin-top: 20px; padding-top: 16px; border-top: 1px solid #eef2f0; font-size: 11.5px; color: #9aa4a0; }
+
+  /* ---------- App shell ---------- */
+  .app-container { display: flex; height: 100vh; overflow: hidden; }
+
+  .sidebar-overlay { display:none; position:fixed; inset:0; background:rgba(4,20,15,.55); z-index:999; opacity:0; }
+  .sidebar-overlay.show { display:block; opacity:1; }
+
+  .sidebar {
+    width: var(--sidebar-w); flex-shrink: 0; height: 100vh; color: #fff; display:flex; flex-direction: column;
+    background: linear-gradient(180deg, var(--green-primary) 0%, var(--green-dark) 55%, var(--black) 100%);
+    box-shadow: 2px 0 14px rgba(0,0,0,.14); position: relative; z-index: 1000; overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .sidebar::-webkit-scrollbar { display: none; }
+  .sidebar-brand { display:flex; align-items:center; gap:12px; padding: 22px 20px 18px; }
+  .sidebar-brand .brand-mark {
+    width: 42px; height: 42px; border-radius: 12px; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    background: linear-gradient(135deg, var(--green-accent), var(--green-mid)); box-shadow: 0 6px 16px rgba(34,197,94,.3);
+  }
+  .sidebar-brand .brand-mark .icon { width: 22px; height: 22px; color:#04140f; }
+  .sidebar-brand .brand-text { min-width: 0; }
+  .sidebar-brand .brand-name { font-weight: 800; font-size: 15.5px; letter-spacing: .2px; white-space: nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sidebar-brand .brand-tag { font-size: 10.5px; color: rgba(255,255,255,.55); text-transform: uppercase; letter-spacing: .6px; }
+
+  .sidebar-nav { flex: 1; padding: 8px 12px; display:flex; flex-direction: column; gap: 2px; }
+  .nav-item {
+    display:flex; align-items:center; gap: 12px; padding: 11px 12px; border-radius: 10px; color: rgba(255,255,255,.72);
+    cursor: pointer; font-size: 13.8px; font-weight: 600; transition: background .15s, color .15s; user-select:none;
+    border: 1px solid transparent;
+  }
+  .nav-item .icon { color: rgba(255,255,255,.55); transition: color .15s; }
+  .nav-item:hover { background: rgba(255,255,255,.07); color: #fff; }
+  .nav-item:hover .icon { color: #fff; }
+  .nav-item.active { background: linear-gradient(135deg, rgba(34,197,94,.22), rgba(34,197,94,.08)); color:#fff; border-color: rgba(34,197,94,.35); }
+  .nav-item.active .icon { color: var(--green-accent); }
+  .nav-item .badge-count { margin-left:auto; background: var(--green-accent); color:#04140f; font-size:10.5px; font-weight:800; padding:1px 7px; border-radius:20px; }
+
+  .sidebar-footer { padding: 14px 16px 18px; border-top: 1px solid rgba(255,255,255,.08); display:flex; align-items:center; gap:10px; }
+  .sidebar-user-avatar { width:36px; height:36px; border-radius:50%; background: rgba(255,255,255,.1); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .sidebar-user-avatar .icon { color: rgba(255,255,255,.8); }
+  .sidebar-user-info { min-width:0; flex:1; }
+  .sidebar-user-name { font-size:12.8px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sidebar-user-role { font-size:10.8px; color: rgba(255,255,255,.5); }
+  .sidebar-logout { color: rgba(255,255,255,.55); cursor:pointer; padding:6px; border-radius:8px; }
+  .sidebar-logout:hover { color:#fff; background: rgba(255,255,255,.08); }
+
+  .main-area { flex:1; display:flex; flex-direction: column; min-width:0; height:100vh; overflow:hidden; }
+  .topbar {
+    height: 62px; flex-shrink:0; background: var(--white); border-bottom: 1px solid var(--line);
+    display:flex; align-items:center; gap:14px; padding: 0 22px; box-shadow: var(--shadow-sm);
+  }
+  .topbar-menu-btn { display:none; color: var(--green-primary); cursor:pointer; }
+  .topbar-title { font-size: 17px; font-weight: 800; color: var(--ink); }
+  .topbar-spacer { flex:1; }
+  .topbar-search { display:flex; align-items:center; gap:8px; background:#f2f5f3; border:1px solid var(--line); border-radius:10px; padding:8px 12px; width:260px; color:#8a938f; }
+  .topbar-search input { border:none; background:transparent; outline:none; flex:1; color:var(--ink); }
+  .topbar-icon-btn { position:relative; color: var(--ink-soft); cursor:pointer; padding:8px; border-radius:10px; }
+  .topbar-icon-btn:hover { background:#f2f5f3; color:var(--green-primary); }
+  .topbar-icon-btn .dot { position:absolute; top:6px; right:6px; width:8px; height:8px; border-radius:50%; background: var(--danger); border:2px solid #fff; }
+
+  .content-area { flex:1; overflow-y:auto; padding: 22px; }
+  .view { display:none; animation: view-in .25s ease; }
+  .view.active { display:block; }
+  @keyframes view-in { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform:none; } }
+
+  .page-head { display:flex; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom: 20px; }
+  .page-head h1 { font-size: 21px; font-weight: 800; color: var(--ink); }
+  .page-head p { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
+  .page-actions { display:flex; gap:10px; flex-wrap: wrap; }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    display:inline-flex; align-items:center; gap:8px; padding: 10px 16px; border-radius: 10px; border:1px solid transparent;
+    font-weight:700; font-size:13.5px; cursor:pointer; transition: all .15s; white-space:nowrap;
+  }
+  .btn-primary { background: linear-gradient(135deg, var(--green-primary), var(--green-accent)); color:#fff; box-shadow: 0 6px 16px rgba(11,61,46,.25); }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(34,197,94,.32); }
+  .btn-outline { background:#fff; border-color: var(--line); color: var(--ink); }
+  .btn-outline:hover { border-color: var(--green-accent); color: var(--green-primary); }
+  .btn-ghost { background: transparent; color: var(--ink-soft); }
+  .btn-ghost:hover { background:#f2f5f3; color: var(--ink); }
+  .btn-danger { background: #fff5f5; color: var(--danger); border-color:#fbdada; }
+  .btn-danger:hover { background: var(--danger); color:#fff; }
+  .btn-sm { padding: 7px 12px; font-size: 12.5px; border-radius: 8px; }
+  .btn:disabled { opacity:.55; cursor:not-allowed; transform:none !important; }
+  .btn-icon { padding: 8px; border-radius: 8px; }
+
+  /* ---------- Cards / KPIs ---------- */
+  .grid { display:grid; gap: 16px; }
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid-2 { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 1100px) { .grid-4 { grid-template-columns: repeat(2,1fr); } .grid-3 { grid-template-columns: repeat(2,1fr); } }
+  @media (max-width: 640px) { .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; } }
+
+  .card { background:#fff; border:1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
+  .card-pad { padding: 18px 20px; }
+  .card-head { display:flex; align-items:center; justify-content:space-between; padding: 16px 20px; border-bottom:1px solid var(--line); }
+  .card-head h3 { font-size: 14.5px; font-weight: 800; color: var(--ink); }
+  .card-head p { font-size: 12px; color: var(--ink-soft); margin-top:1px; }
+
+  .kpi-card { padding: 18px 20px; border-radius: var(--radius); color:#fff; position:relative; overflow:hidden; box-shadow: var(--shadow-md); }
+  .kpi-card .icon-wrap { width:38px; height:38px; border-radius:10px; background: rgba(255,255,255,.18); display:flex; align-items:center; justify-content:center; margin-bottom: 14px; }
+  .kpi-card .icon-wrap .icon { color:#fff; }
+  .kpi-card .kpi-value { font-size: 26px; font-weight: 800; letter-spacing: -.3px; }
+  .kpi-card .kpi-label { font-size: 12.5px; opacity:.9; margin-top: 2px; font-weight: 600; }
+  .kpi-card .kpi-delta { display:flex; align-items:center; gap:4px; font-size:11.5px; margin-top:10px; opacity:.9; font-weight:700; }
+  .kpi-g1 { background: linear-gradient(135deg, var(--green-primary), var(--green-mid)); }
+  .kpi-g2 { background: linear-gradient(135deg, #0f172a, #1e293b); }
+  .kpi-g3 { background: linear-gradient(135deg, var(--green-accent), #16a34a); }
+  .kpi-g4 { background: linear-gradient(135deg, #059669, var(--green-dark)); }
+
+  /* ---------- Tables ---------- */
+  .table-wrap { overflow-x:auto; border-radius: var(--radius); border:1px solid var(--line); background:#fff; }
+  table.data-table { width:100%; border-collapse: collapse; font-size: 13.3px; min-width: 640px; }
+  table.data-table thead th {
+    text-align:left; padding: 12px 16px; background: linear-gradient(180deg, var(--green-primary), var(--green-dark));
+    color:#fff; font-weight:700; font-size:11.8px; text-transform:uppercase; letter-spacing:.4px; white-space:nowrap;
+  }
+  table.data-table tbody td { padding: 11px 16px; border-bottom: 1px solid var(--line); color: var(--ink); vertical-align: middle; }
+  table.data-table tbody tr:last-child td { border-bottom:none; }
+  table.data-table tbody tr:hover { background: var(--green-soft); }
+  .table-empty { padding: 46px 20px; text-align:center; color: var(--ink-soft); }
+  .table-empty .icon-lg { color:#c3d0ca; margin-bottom:10px; }
+  .row-actions { display:flex; gap:6px; justify-content:flex-end; }
+
+  /* ---------- Badges / pills ---------- */
+  .badge { display:inline-flex; align-items:center; gap:5px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight:700; white-space:nowrap; }
+  .badge-green { background: #e8f9ee; color: #14803c; }
+  .badge-amber { background: #fef6e6; color: #b8720a; }
+  .badge-red { background: #fdecec; color: #c2312a; }
+  .badge-blue { background: #eaf1fd; color: #1d4ed8; }
+  .badge-gray { background: #f0f2f1; color: #5a6663; }
+  .badge-dark { background: #0b3d2e; color:#fff; }
+
+  /* ---------- Forms ---------- */
+  .field { margin-bottom: 16px; }
+  .field label { display:block; font-size:12px; font-weight:700; color: var(--ink-soft); margin-bottom: 6px; letter-spacing:.2px; }
+  .field .req { color: var(--danger); }
+  .field input, .field select, .field textarea {
+    width:100%; padding: 10px 12px; border:1.5px solid var(--line); border-radius: var(--radius-sm); color: var(--ink);
+    background:#fff; transition: border-color .15s, box-shadow .15s;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { outline:none; border-color: var(--green-accent); box-shadow: 0 0 0 3px rgba(34,197,94,.14); }
+  .field textarea { min-height: 84px; resize: vertical; }
+  .field-hint { font-size: 11px; color:#9aa4a0; margin-top:4px; }
+  .field-row { display:grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width:560px){ .field-row { grid-template-columns: 1fr; } }
+  .checkbox-row { display:flex; align-items:center; gap:8px; }
+  .checkbox-row input { width:auto; accent-color: var(--green-accent); }
+
+  /* ---------- Modal ---------- */
+  .modal-backdrop { position:fixed; inset:0; background: rgba(4,20,15,.5); z-index: 2000; display:none; align-items:flex-start; justify-content:center; padding: 40px 16px; overflow-y:auto; }
+  .modal-backdrop.show { display:flex; }
+  .modal { background:#fff; border-radius: 16px; width:100%; max-width: 620px; box-shadow: var(--shadow-lg); animation: modal-in .2s ease; margin-bottom: 40px; }
+  .modal.modal-lg { max-width: 860px; }
+  @keyframes modal-in { from { opacity:0; transform: translateY(10px) scale(.98);} to { opacity:1; transform:none; } }
+  .modal-head { display:flex; align-items:center; justify-content:space-between; padding: 18px 22px; border-bottom:1px solid var(--line); }
+  .modal-head h3 { font-size:16px; font-weight:800; display:flex; align-items:center; gap:9px; }
+  .modal-close { cursor:pointer; color:#9aa4a0; padding:6px; border-radius:8px; }
+  .modal-close:hover { background:#f2f5f3; color:var(--ink); }
+  .modal-body { padding: 20px 22px; max-height: 65vh; overflow-y:auto; }
+  .modal-foot { display:flex; justify-content:flex-end; gap:10px; padding: 16px 22px; border-top:1px solid var(--line); }
+
+  /* ---------- Tabs ---------- */
+  .tabbar { display:flex; gap:4px; border-bottom: 1px solid var(--line); margin-bottom: 18px; overflow-x:auto; }
+  .tab-btn { padding: 10px 16px; font-weight:700; font-size:13px; color: var(--ink-soft); cursor:pointer; border-bottom:2.5px solid transparent; white-space:nowrap; }
+  .tab-btn:hover { color: var(--green-primary); }
+  .tab-btn.active { color: var(--green-primary); border-color: var(--green-accent); }
+  .tab-panel { display:none; }
+  .tab-panel.active { display:block; }
+
+  /* ---------- Alerts ---------- */
+  .alert-row { display:flex; align-items:center; gap:12px; padding: 12px 16px; border-radius: 10px; border-left: 4px solid; background:#fff; margin-bottom:10px; font-size:13.3px; }
+  .alert-row .icon { flex-shrink:0; }
+  .alert-red { border-color: var(--danger); background: #fff6f6; color:#8a2b26; }
+  .alert-orange { border-color:#fb923c; background:#fff8f1; color:#8a4c17; }
+  .alert-amber { border-color: var(--warning); background:#fffaf0; color:#8a640d; }
+  .alert-green { border-color: var(--success); background: var(--green-soft); color:#14532d; }
+  .alert-blue { border-color: var(--info); background:#f0f5ff; color:#1e3a8a; }
+
+  /* ---------- Toast ---------- */
+  .toast-stack { position:fixed; top:18px; right:18px; z-index: 3000; display:flex; flex-direction:column; gap:10px; }
+  .toast { display:flex; align-items:center; gap:10px; background:#0f2a20; color:#fff; padding:12px 16px; border-radius:10px; box-shadow: var(--shadow-lg); font-size:13.3px; font-weight:600; min-width:240px; animation: toast-in .2s ease; }
+  .toast.t-error { background:#7f1d1d; }
+  .toast.t-success { background: linear-gradient(135deg, var(--green-primary), var(--green-mid)); }
+  @keyframes toast-in { from { opacity:0; transform: translateX(20px);} to { opacity:1; transform:none;} }
+
+  /* ---------- Loader ---------- */
+  .loader-overlay { position:fixed; inset:0; background: rgba(255,255,255,.7); z-index: 4000; display:none; align-items:center; justify-content:center; }
+  .loader-overlay.show { display:flex; }
+  .spinner { width:38px; height:38px; border-radius:50%; border: 3.5px solid #d7e6dd; border-top-color: var(--green-accent); animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .btn .spinner { width:14px; height:14px; border-width:2px; }
+
+  /* ---------- Misc utility ---------- */
+  .muted { color: var(--ink-soft); }
+  .text-right { text-align:right; }
+  .flex { display:flex; align-items:center; }
+  .gap-8 { gap:8px; } .gap-10 { gap:10px; } .gap-14 { gap:14px; }
+  .mono { font-family: 'SF Mono', Consolas, monospace; }
+  .avatar-circle { width:34px; height:34px; border-radius:50%; background: var(--green-soft); color: var(--green-primary); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12.5px; flex-shrink:0; overflow:hidden; }
+  .avatar-circle img { width:100%; height:100%; object-fit:cover; }
+  .progress-bar { height:8px; border-radius: 6px; background:#eef2f0; overflow:hidden; }
+  .progress-bar > div { height:100%; background: linear-gradient(90deg, var(--green-primary), var(--green-accent)); border-radius:6px; }
+  .empty-state { text-align:center; padding: 50px 20px; color: var(--ink-soft); }
+  .empty-state .icon-lg { color:#c3d0ca; }
+  .sr-only { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); }
+
+  /* ---------- Public pages (check-in / prayer) ---------- */
+  .public-page { min-height:100vh; background: linear-gradient(160deg, var(--green-dark), var(--green-primary) 60%, var(--black)); display:flex; align-items:center; justify-content:center; padding: 24px; }
+  .public-card { background:#fff; border-radius:20px; max-width:460px; width:100%; padding: 32px 26px; box-shadow: var(--shadow-lg); text-align:center; }
+  .public-card .brand-mark { width:60px; height:60px; margin: 0 auto 16px; border-radius:16px; background: linear-gradient(135deg, var(--green-accent), var(--green-mid)); display:flex; align-items:center; justify-content:center; }
+  .public-card .brand-mark .icon { width:32px; height:32px; color:#04140f; }
+
+  @media print {
+    .sidebar, .topbar, .page-actions, .row-actions, .modal-backdrop, .toast-stack { display:none !important; }
+    .content-area { overflow: visible; padding:0; }
+    .main-area, .app-container { height:auto; overflow:visible; }
+  }
+
+  /* ---------- Responsive sidebar ---------- */
+  @media (max-width: 900px) {
+    .sidebar { position: fixed; left:0; top:0; transform: translateX(-100%); transition: transform .2s ease; }
+    .sidebar.open { transform: translateX(0); }
+    .topbar-menu-btn { display:flex; }
+    .topbar-search { display:none; }
+  }
+</style>
 </head>
 <body>
 
-<?!= include('Icons'); ?>
+<!-- Icons.html : one inline SVG sprite, hand-authored ultra-modern line icons. No emoji, no icon fonts. -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+<defs></defs>
+
+<symbol id="ic-church" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 2v5"/><path d="M9.5 4.5h5"/>
+  <path d="M12 7 4 12v9h16v-9L12 7Z"/>
+  <path d="M9 21v-6a3 3 0 0 1 6 0v6"/>
+</symbol>
+
+<symbol id="ic-dashboard" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3" y="3" width="8" height="9" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/>
+  <rect x="13" y="12" width="8" height="9" rx="1.5"/><rect x="3" y="16" width="8" height="5" rx="1.5"/>
+</symbol>
+
+<symbol id="ic-members" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="9" cy="8" r="3.2"/><path d="M2.8 20c.6-3.4 3.2-5.5 6.2-5.5s5.6 2.1 6.2 5.5"/>
+  <path d="M16 4.3a3.2 3.2 0 0 1 0 6.2"/><path d="M17.5 14.6c2.6.5 4.3 2.4 4.7 5.4"/>
+</symbol>
+
+<symbol id="ic-visitor" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="9" cy="8" r="3.2"/><path d="M2.8 20c.6-3.4 3.2-5.5 6.2-5.5s5.6 2.1 6.2 5.5"/>
+  <path d="M18.5 8v6"/><path d="M15.5 11h6"/>
+</symbol>
+
+<symbol id="ic-attendance" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18"/><path d="M8 2.5v4"/><path d="M16 2.5v4"/>
+  <path d="m8.5 14 2.2 2.2L15.5 12"/>
+</symbol>
+
+<symbol id="ic-finance" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3 7.5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9Z"/>
+  <path d="M3 10.5h18"/><circle cx="16.5" cy="15" r="1.4"/>
+</symbol>
+
+<symbol id="ic-sms" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M21 11.5a8 8 0 0 1-11.6 7.1L3 20l1.5-5.2A8 8 0 1 1 21 11.5Z"/>
+  <path d="M8 11h.01"/><path d="M12 11h.01"/><path d="M16 11h.01"/>
+</symbol>
+
+<symbol id="ic-equipment" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8"/><path d="M12 16v4"/>
+</symbol>
+
+<symbol id="ic-reports" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4 20V10"/><path d="M11 20V4"/><path d="M18 20v-7"/><path d="M2.5 20h19"/>
+</symbol>
+
+<symbol id="ic-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="3"/>
+  <path d="M19.4 13.5a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.9 2.9l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.9-2.9l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H2.5a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.9-2.9l.1.1a1.7 1.7 0 0 0 1.9.3H8.9a1.7 1.7 0 0 0 1-1.6V2.5a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.9 2.9l-.1.1a1.7 1.7 0 0 0-.3 1.9V8.9a1.7 1.7 0 0 0 1.6 1h.2a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1Z"/>
+</symbol>
+
+<symbol id="ic-cluster" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="12" cy="18" r="2.4"/>
+  <path d="M7.8 7.6 10.3 16"/><path d="M16.2 7.6 13.7 16"/>
+</symbol>
+
+<symbol id="ic-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6 9a6 6 0 0 1 12 0c0 4 1.5 5.5 1.5 5.5H4.5S6 13 6 9Z"/><path d="M10 19a2 2 0 0 0 4 0"/>
+</symbol>
+
+<symbol id="ic-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.35-4.35"/>
+</symbol>
+
+<symbol id="ic-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 5v14"/><path d="M5 12h14"/>
+</symbol>
+
+<symbol id="ic-edit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/>
+</symbol>
+
+<symbol id="ic-trash" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4 7h16"/><path d="M9 7V4.5h6V7"/><path d="M6 7l1 13a1.5 1.5 0 0 0 1.5 1.4h7a1.5 1.5 0 0 0 1.5-1.4L18 7"/>
+  <path d="M10 11v6"/><path d="M14 11v6"/>
+</symbol>
+
+<symbol id="ic-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 19.5h16"/>
+</symbol>
+
+<symbol id="ic-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 15V3"/><path d="m7 8 5-5 5 5"/><path d="M4 19.5h16"/>
+</symbol>
+
+<symbol id="ic-qrcode" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+  <rect x="3" y="14" width="7" height="7" rx="1"/>
+  <path d="M14 14h3v3h-3z"/><path d="M20 14h1v2"/><path d="M14 20h2v1"/><path d="M20 19v2h-2"/>
+</symbol>
+
+<symbol id="ic-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="m5 5 14 14"/><path d="m19 5-14 14"/>
+</symbol>
+
+<symbol id="ic-chevron-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="m6 9 6 6 6-6"/>
+</symbol>
+
+<symbol id="ic-chevron-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="m9 6 6 6-6 6"/>
+</symbol>
+
+<symbol id="ic-logout" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M9 4H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H9"/>
+  <path d="M14.5 16.5 19 12l-4.5-4.5"/><path d="M19 12H9"/>
+</symbol>
+
+<symbol id="ic-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>
+</symbol>
+
+<symbol id="ic-phone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6.5 3.5h3l1.4 4.4-2.2 1.8a13 13 0 0 0 5.6 5.6l1.8-2.2 4.4 1.4v3a1.6 1.6 0 0 1-1.7 1.6A16.5 16.5 0 0 1 4.9 5.2 1.6 1.6 0 0 1 6.5 3.5Z"/>
+</symbol>
+
+<symbol id="ic-mail" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3.5 6 8.5 7 8.5-7"/>
+</symbol>
+
+<symbol id="ic-filter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.5 5h17L14 12.5V19l-4 2v-8.5L3.5 5Z"/>
+</symbol>
+
+<symbol id="ic-check-circle" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="9"/><path d="m8.5 12.5 2.3 2.3L16 10"/>
+</symbol>
+
+<symbol id="ic-alert" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3.5 2.5 20h19L12 3.5Z"/><path d="M12 10v4.5"/><path d="M12 17.5h.01"/>
+</symbol>
+
+<symbol id="ic-clock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>
+</symbol>
+
+<symbol id="ic-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3" y="4.5" width="18" height="16" rx="2"/><path d="M3 9.5h18"/><path d="M8 2.5v4"/><path d="M16 2.5v4"/>
+</symbol>
+
+<symbol id="ic-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7H8l1.2-2h5.6L16 7h2.5A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5v-9Z"/>
+  <circle cx="12" cy="13" r="3.4"/>
+</symbol>
+
+<symbol id="ic-image" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.6"/><path d="m4 17 5-5 4 4 3-3 4 4"/>
+</symbol>
+
+<symbol id="ic-paperclip" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M18 9.5 10.5 17a3.2 3.2 0 0 1-4.5-4.5L14 4.5a2.1 2.1 0 0 1 3 3L9.5 15a1 1 0 0 1-1.5-1.4L15 6.5"/>
+</symbol>
+
+<symbol id="ic-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M21 3 3 10.5l7.5 3L14 21l7-18Z"/><path d="M10.5 13.5 21 3"/>
+</symbol>
+
+<symbol id="ic-star" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="m12 3 2.7 5.9 6.3.7-4.7 4.4 1.3 6.4L12 17.3 6.4 20.4l1.3-6.4L3 9.6l6.3-.7L12 3Z"/>
+</symbol>
+
+<symbol id="ic-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/>
+</symbol>
+
+<symbol id="ic-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.5 3.5 20.5 20.5"/><path d="M10.6 5.7A10.6 10.6 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a15 15 0 0 1-3.4 4.1"/>
+  <path d="M6.7 7.1A15 15 0 0 0 2.5 12S6 18.5 12 18.5a9.6 9.6 0 0 0 3.3-.6"/><path d="M9.9 10a3 3 0 0 0 4.1 4.1"/>
+</symbol>
+
+<symbol id="ic-lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>
+</symbol>
+
+<symbol id="ic-avatar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="9.8" r="3.2"/><path d="M5.5 19a7 7 0 0 1 13 0"/>
+</symbol>
+
+<symbol id="ic-building" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="4" y="3" width="12" height="18" rx="1"/><path d="M16 9h4v12h-4"/>
+  <path d="M7.5 7h1"/><path d="M11.5 7h1"/><path d="M7.5 11h1"/><path d="M11.5 11h1"/><path d="M7.5 15h1"/><path d="M11.5 15h1"/>
+</symbol>
+
+<symbol id="ic-card" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="2.5" y="5.5" width="19" height="13" rx="2"/><path d="M2.5 10h19"/><path d="M6 14.5h4"/>
+</symbol>
+
+<symbol id="ic-trend-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="m3 16 6-6 4 4 8-9"/><path d="M15 5h6v6"/>
+</symbol>
+
+<symbol id="ic-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M20 11a8 8 0 0 0-14.6-4.4L3 9"/><path d="M3 4v5h5"/>
+  <path d="M4 13a8 8 0 0 0 14.6 4.4L21 15"/><path d="M21 20v-5h-5"/>
+</symbol>
+
+<symbol id="ic-print" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M6 8.5V3h12v5.5"/><rect x="3.5" y="8.5" width="17" height="8" rx="1.5"/><path d="M6 15h12v6H6z"/>
+</symbol>
+
+<symbol id="ic-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-6h4v6"/>
+</symbol>
+
+<symbol id="ic-info" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><path d="M12 7.8h.01"/>
+</symbol>
+
+<symbol id="ic-more" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+  <circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/>
+</symbol>
+
+<symbol id="ic-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="m4 12 5.5 5.5L20 6.5"/>
+</symbol>
+
+<symbol id="ic-pray" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3v6.5"/><path d="M12 9.5c-1.2 3-3 4.6-5.5 6 1 3.6 3 5 5.5 5.5"/>
+  <path d="M12 9.5c1.2 3 3 4.6 5.5 6-1 3.6-3 5-5.5 5.5"/>
+</symbol>
+
+<symbol id="ic-message-square" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4 4.5h16v11H9L4 19.5v-4h0v-11Z"/>
+</symbol>
+
+<symbol id="ic-gift" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="3.5" y="9" width="17" height="4.5" rx="1"/><rect x="4.5" y="13.5" width="15" height="7" rx="1"/>
+  <path d="M12 9v11.5"/><path d="M12 9C10 6 6.5 5.5 6 7.5c-.4 1.7 2 1.9 6 1.5Z"/>
+  <path d="M12 9c2-3 5.5-3.5 6-1.5.4 1.7-2 1.9-6 1.5Z"/>
+</symbol>
+
+<symbol id="ic-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 3 4.5 5.8V11c0 5 3 8.4 7.5 10 4.5-1.6 7.5-5 7.5-10V5.8L12 3Z"/><path d="m8.7 12.2 2.3 2.3 4.3-4.5"/>
+</symbol>
+
+<symbol id="ic-database" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <ellipse cx="12" cy="5.5" rx="8" ry="3"/><path d="M4 5.5v13c0 1.7 3.6 3 8 3s8-1.3 8-3v-13"/>
+  <path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>
+</symbol>
+
+<symbol id="ic-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4 12h16"/><path d="m13 5 7 7-7 7"/>
+</symbol>
+
+</svg>
+
+<? if (pageMode == 'denied') { ?>
+
+<div class="gate-container">
+  <div class="gate-box">
+    <div class="gate-ring"><svg class="icon-lg"><use href="#ic-lock"></use></svg></div>
+    <h2>Access Restricted</h2>
+    <p class="gate-sub"><?= orgName ?> Administration</p>
+    <div class="gate-detail">
+      You're signed in as <b><?= userEmail ?></b>, but this Google account isn't registered in ChurchMS yet.
+      Ask a SuperAdmin to add you under <b>Settings → Users</b>, then reload this page.
+    </div>
+    <div class="flex" style="justify-content:center">
+      <button class="btn btn-primary" onclick="location.reload()">
+        <svg class="icon"><use href="#ic-refresh"></use></svg> Try Again
+      </button>
+    </div>
+    <div class="gate-footer">Advanced Church Management System</div>
+  </div>
+</div>
+
+<? } else if (pageMode == 'checkin') { ?>
+
+<div class="public-page">
+  <div class="public-card">
+    <div class="brand-mark"><svg class="icon"><use href="#ic-church"></use></svg></div>
+    <h2 style="color:var(--green-primary);font-size:20px;font-weight:800;margin-bottom:4px"><?= orgName ?></h2>
+    <p class="muted" style="margin-bottom:22px">Service Check-In</p>
+
+    <div id="ci-step-id" style="display:<?= memberId ? 'none' : 'block' ?>">
+      <div class="field" style="text-align:left">
+        <label>Member ID</label>
+        <input id="ci-id-input" placeholder="e.g. MEM-000123" style="font-size:16px;text-align:center;letter-spacing:1px">
+        <div class="field-hint">Scan your QR card, or ask an usher for your ID.</div>
+      </div>
+    </div>
+
+    <div class="field" style="text-align:left">
+      <label>Today's Service</label>
+      <select id="ci-service-select"></select>
+    </div>
+
+    <button class="btn btn-primary" id="ci-go-btn" style="width:100%;justify-content:center;padding:14px">
+      <svg class="icon"><use href="#ic-check-circle"></use></svg> Check In
+    </button>
+
+    <div id="ci-result" style="margin-top:18px"></div>
+  </div>
+</div>
+
+<script>
+  var PRESET_ID = <?!= JSON.stringify(memberId || '') ?>;
+  var SERVICE_TYPES = ['Sunday Service', 'Midweek Service', 'Prayer Meeting', 'Youth Service', 'Special Event'];
+  var sel = document.getElementById('ci-service-select');
+  SERVICE_TYPES.forEach(function (s) { sel.appendChild(new Option(s, s)); });
+
+  function setResult(html) { document.getElementById('ci-result').innerHTML = html; }
+
+  document.getElementById('ci-go-btn').addEventListener('click', function () {
+    var id = PRESET_ID || document.getElementById('ci-id-input').value.trim().toUpperCase();
+    if (!id) { setResult('<div class="alert-row alert-red"><svg class="icon"><use href="#ic-alert"></use></svg>Please enter your Member ID.</div>'); return; }
+    var btn = this; btn.disabled = true; btn.innerHTML = '<div class="spinner"></div> Checking in…';
+    google.script.run
+      .withSuccessHandler(function (record) {
+        btn.disabled = false; btn.innerHTML = '<svg class="icon"><use href="#ic-check-circle"></use></svg> Check In';
+        setResult('<div class="alert-row alert-green"><svg class="icon"><use href="#ic-check-circle"></use></svg>Welcome, ' + record.MemberName + '! You\'re checked in for ' + record.ServiceType + '.</div>');
+      })
+      .withFailureHandler(function (err) {
+        btn.disabled = false; btn.innerHTML = '<svg class="icon"><use href="#ic-check-circle"></use></svg> Check In';
+        setResult('<div class="alert-row alert-red"><svg class="icon"><use href="#ic-alert"></use></svg>' + (err.message || err) + '</div>');
+      })
+      .publicCheckIn(id, sel.value);
+  });
+</script>
+
+<? } else if (pageMode == 'prayer') { ?>
+
+<div class="public-page">
+  <div class="public-card">
+    <div class="brand-mark"><svg class="icon"><use href="#ic-pray"></use></svg></div>
+    <h2 style="color:var(--green-primary);font-size:20px;font-weight:800;margin-bottom:4px"><?= orgName ?></h2>
+    <p class="muted" style="margin-bottom:22px">Submit a Prayer Request</p>
+
+    <div id="pr-form">
+      <div class="field" style="text-align:left"><label>Your Name (optional)</label><input id="pr-name" placeholder="Leave blank to stay anonymous"></div>
+      <div class="field" style="text-align:left"><label>Phone or Email (optional, for follow-up)</label><input id="pr-contact"></div>
+      <div class="field" style="text-align:left"><label>Your Prayer Request</label><textarea id="pr-text" placeholder="Share what's on your heart…" style="min-height:120px"></textarea></div>
+      <div class="field" style="text-align:left">
+        <label>Who can see this?</label>
+        <select id="pr-visibility">
+          <option value="Private">Private — pastoral team only</option>
+          <option value="Prayer Team">Prayer Team — our prayer chain</option>
+          <option value="Public">Public — church prayer wall</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" id="pr-submit-btn" style="width:100%;justify-content:center;padding:14px">
+        <svg class="icon"><use href="#ic-send"></use></svg> Submit Request
+      </button>
+    </div>
+    <div id="pr-result" style="margin-top:16px"></div>
+  </div>
+</div>
+
+<script>
+  document.getElementById('pr-submit-btn').addEventListener('click', function () {
+    var text = document.getElementById('pr-text').value.trim();
+    if (!text) { document.getElementById('pr-result').innerHTML = '<div class="alert-row alert-red"><svg class="icon"><use href="#ic-alert"></use></svg>Please write your prayer request.</div>'; return; }
+    var btn = this; btn.disabled = true; btn.innerHTML = '<div class="spinner"></div> Sending…';
+    google.script.run
+      .withSuccessHandler(function () {
+        document.getElementById('pr-form').style.display = 'none';
+        document.getElementById('pr-result').innerHTML = '<div class="alert-row alert-green"><svg class="icon"><use href="#ic-check-circle"></use></svg>Thank you. Your request has been received and our team will be praying with you.</div>';
+      })
+      .withFailureHandler(function (err) {
+        btn.disabled = false; btn.innerHTML = '<svg class="icon"><use href="#ic-send"></use></svg> Submit Request';
+        document.getElementById('pr-result').innerHTML = '<div class="alert-row alert-red"><svg class="icon"><use href="#ic-alert"></use></svg>' + (err.message || err) + '</div>';
+      })
+      .submitPrayerRequest({
+        RequesterName: document.getElementById('pr-name').value,
+        RequesterContact: document.getElementById('pr-contact').value,
+        RequestText: text,
+        Visibility: document.getElementById('pr-visibility').value
+      });
+  });
+</script>
+
+<? } else { ?>
 
 <div id="toast-stack" class="toast-stack"></div>
 <div id="loader-overlay" class="loader-overlay"><div class="spinner"></div></div>
@@ -49,23 +722,1973 @@
     </header>
 
     <main class="content-area">
-      <?!= include('Dashboard'); ?>
-      <?!= include('Members'); ?>
-      <?!= include('Visitors'); ?>
-      <?!= include('Attendance'); ?>
-      <?!= include('Finance'); ?>
-      <?!= include('Communication'); ?>
-      <?!= include('Equipment'); ?>
-      <?!= include('Reports'); ?>
-      <?!= include('SettingsView'); ?>
-      <?!= include('ClusterFollowUp'); ?>
+<div class="view" id="view-dashboard">
+  <div class="page-head">
+    <div>
+      <h1>Welcome back 👋</h1>
+      <p>Here's what's happening across your church today.</p>
+    </div>
+    <div class="page-actions">
+      <button class="btn btn-outline" id="dash-refresh"><svg class="icon"><use href="#ic-refresh"></use></svg> Refresh</button>
+    </div>
+  </div>
+
+  <div class="grid grid-4" id="dash-kpis" style="margin-bottom:18px"></div>
+
+  <div class="grid grid-2" style="margin-bottom:18px">
+    <div class="card">
+      <div class="card-head"><div><h3>Attendance Trend</h3><p>Check-ins per recent service</p></div><svg class="icon" style="color:#c3d0ca"><use href="#ic-attendance"></use></svg></div>
+      <div class="card-pad"><div id="chart-attendance" style="height:220px"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div><h3>Giving Trend</h3><p>Total giving by month</p></div><svg class="icon" style="color:#c3d0ca"><use href="#ic-finance"></use></svg></div>
+      <div class="card-pad"><div id="chart-giving" style="height:220px"></div></div>
+    </div>
+  </div>
+
+  <div class="grid grid-2" style="margin-bottom:18px">
+    <div class="card">
+      <div class="card-head"><div><h3>Member Growth</h3><p>Cumulative membership, last 6 months</p></div><svg class="icon" style="color:#c3d0ca"><use href="#ic-trend-up"></use></svg></div>
+      <div class="card-pad"><div id="chart-growth" style="height:220px"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div><h3>Membership Status</h3><p>Current breakdown</p></div><svg class="icon" style="color:#c3d0ca"><use href="#ic-members"></use></svg></div>
+      <div class="card-pad"><div id="chart-status" style="height:220px"></div></div>
+    </div>
+  </div>
+
+  <div class="grid grid-3">
+    <div class="card" style="grid-column: span 1">
+      <div class="card-head"><h3>Alerts</h3></div>
+      <div class="card-pad" id="dash-alerts"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>Upcoming Birthdays</h3></div>
+      <div class="card-pad" id="dash-birthdays"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h3>Membership Anniversaries</h3></div>
+      <div class="card-pad" id="dash-anniversaries"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  function kpiCard(icon, gradClass, value, label, sub) {
+    return '<div class="kpi-card ' + gradClass + '"><div class="icon-wrap"><svg class="icon"><use href="#' + icon + '"></use></svg></div>' +
+      '<div class="kpi-value">' + value + '</div><div class="kpi-label">' + label + '</div>' +
+      (sub ? '<div class="kpi-delta"><svg class="icon-sm"><use href="#ic-trend-up"></use></svg>' + sub + '</div>' : '') + '</div>';
+  }
+
+  function renderAlerts(alerts) {
+    var iconFor = { red: 'ic-alert', orange: 'ic-alert', amber: 'ic-alert', green: 'ic-check-circle', blue: 'ic-info' };
+    document.getElementById('dash-alerts').innerHTML = alerts.map(function (a) {
+      return '<div class="alert-row alert-' + a.level + '"><svg class="icon"><use href="#' + iconFor[a.level] + '"></use></svg><span>' + Church.fmt.escape(a.text) + '</span></div>';
+    }).join('') || '<div class="empty-state">No alerts</div>';
+  }
+
+  function renderPeople(containerId, list, dateLabel) {
+    var el = document.getElementById(containerId);
+    if (!list.length) { el.innerHTML = '<div class="empty-state">Nothing in the next 14 days</div>'; return; }
+    el.innerHTML = list.map(function (p) {
+      return '<div class="flex gap-10" style="padding:9px 0;border-bottom:1px solid var(--line)">' +
+        '<div class="avatar-circle">' + Church.fmt.initials(p.name) + '</div>' +
+        '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13px">' + Church.fmt.escape(p.name) + '</div>' +
+        '<div class="muted" style="font-size:11.5px">' + Church.fmt.date(p.date) + (p.turning ? ' · turning ' + p.turning : '') + (p.years ? ' · ' + p.years + ' yr(s)' : '') + '</div></div>' +
+        '<span class="badge ' + (p.daysAway === 0 ? 'badge-green' : 'badge-gray') + '">' + (p.daysAway === 0 ? 'Today' : p.daysAway + 'd') + '</span></div>';
+    }).join('');
+  }
+
+  function drawCharts(data) {
+    Church.loadCharts().then(function () {
+      var green = '#0b3d2e', accent = '#22c55e', dark = '#146c43';
+
+      var attTable = new google.visualization.DataTable();
+      attTable.addColumn('string', 'Date'); attTable.addColumn('number', 'Check-ins');
+      data.charts.attendanceTrend.forEach(function (r) { attTable.addRow([r.date.slice(5), r.count]); });
+      new google.visualization.ColumnChart(document.getElementById('chart-attendance')).draw(attTable, {
+        legend: 'none', colors: [accent], chartArea: { width: '88%', height: '72%' },
+        vAxis: { gridlines: { color: '#eef2f0' } }, hAxis: { textStyle: { fontSize: 11 } }
+      });
+
+      var giveTable = new google.visualization.DataTable();
+      giveTable.addColumn('string', 'Month'); giveTable.addColumn('number', 'Giving');
+      data.charts.givingTrend.forEach(function (r) { giveTable.addRow([r.month, r.amount]); });
+      new google.visualization.AreaChart(document.getElementById('chart-giving')).draw(giveTable, {
+        legend: 'none', colors: [green], chartArea: { width: '88%', height: '72%' },
+        areaOpacity: 0.18, vAxis: { gridlines: { color: '#eef2f0' } }
+      });
+
+      var growTable = new google.visualization.DataTable();
+      growTable.addColumn('string', 'Month'); growTable.addColumn('number', 'Members');
+      data.charts.memberGrowth.forEach(function (r) { growTable.addRow([r.month, r.total]); });
+      new google.visualization.LineChart(document.getElementById('chart-growth')).draw(growTable, {
+        legend: 'none', colors: [dark], lineWidth: 3, pointSize: 5, chartArea: { width: '88%', height: '72%' },
+        vAxis: { gridlines: { color: '#eef2f0' } }
+      });
+
+      var statusTable = new google.visualization.DataTable();
+      statusTable.addColumn('string', 'Status'); statusTable.addColumn('number', 'Members');
+      data.charts.statusBreakdown.filter(function (s) { return s.count > 0; }).forEach(function (r) { statusTable.addRow([r.status, r.count]); });
+      new google.visualization.PieChart(document.getElementById('chart-status')).draw(statusTable, {
+        legend: { position: 'right', textStyle: { fontSize: 11 } }, pieHole: 0.5,
+        colors: ['#22c55e', '#0b3d2e', '#94a3b8', '#f59e0b', '#ef4444'], chartArea: { width: '90%', height: '85%' }
+      });
+    });
+  }
+
+  function load() {
+    Church.task('getDashboardData').then(function (data) {
+      var k = data.kpis;
+      document.getElementById('dash-kpis').innerHTML =
+        kpiCard('ic-members', 'kpi-g1', k.totalMembers, 'Total Members', k.newThisMonth + ' new this month') +
+        kpiCard('ic-visitor', 'kpi-g2', k.visitorsThisMonth, 'Visitors This Month', '') +
+        kpiCard('ic-attendance', 'kpi-g3', k.lastServiceAttendance, 'Last Service Attendance', '') +
+        kpiCard('ic-finance', 'kpi-g4', Church.fmt.money(k.givingThisMonth), 'Giving This Month', k.pendingExpenses + ' expense(s) pending');
+      renderAlerts(data.alerts);
+      renderPeople('dash-birthdays', data.birthdays, 'birthday');
+      renderPeople('dash-anniversaries', data.anniversaries, 'anniversary');
+      drawCharts(data);
+    });
+  }
+
+  document.getElementById('dash-refresh').addEventListener('click', load);
+  Church.views.dashboard = { mount: load, refresh: load };
+})();
+</script>
+
+<div class="view" id="view-members">
+  <div class="page-head">
+    <div><h1>Members</h1><p>Profiles, custom fields, documents and membership lifecycle.</p></div>
+    <div class="page-actions">
+      <select id="members-status-filter" class="btn btn-outline" style="font-weight:600">
+        <option value="">All statuses</option>
+      </select>
+      <button class="btn btn-primary" id="members-add-btn"><svg class="icon"><use href="#ic-plus"></use></svg> Add Member</button>
+    </div>
+  </div>
+  <div class="card card-pad">
+    <div id="members-table"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var MEMBER_FIELDS = [
+    { key: 'FirstName', label: 'First Name', required: true, half: true },
+    { key: 'LastName', label: 'Last Name', required: true, half: true },
+    { key: 'Gender', label: 'Gender', type: 'select', options: ['Male', 'Female'], half: true },
+    { key: 'DOB', label: 'Date of Birth', type: 'date', half: true },
+    { key: 'Phone', label: 'Phone', required: true, type: 'tel', half: true },
+    { key: 'Email', label: 'Email', type: 'email', half: true },
+    { key: 'Address', label: 'Address', type: 'textarea' },
+    { key: 'MaritalStatus', label: 'Marital Status', type: 'select', options: ['Single', 'Married', 'Divorced', 'Widowed'], half: true },
+    { key: 'MembershipStatus', label: 'Membership Status', type: 'select', options: ['New', 'Active', 'Inactive', 'Transferred', 'Deceased'], half: true },
+    { key: 'MembershipDate', label: 'Membership Date', type: 'date', half: true },
+    { key: 'MembershipClass', label: 'Membership Class', half: true },
+    { key: 'Cluster', label: 'Cluster', half: true },
+    { key: 'Department', label: 'Department', half: true },
+    { key: 'EmergencyContactName', label: 'Emergency Contact Name', half: true },
+    { key: 'EmergencyContactPhone', label: 'Emergency Contact Phone', type: 'tel', half: true },
+    { key: 'Notes', label: 'Notes', type: 'textarea' },
+    { key: 'SmsOptOut', label: 'Opted out of SMS', type: 'checkbox' }
+  ];
+
+  var allMembers = [], table = null, customFieldsConfig = [];
+
+  function statusBadge(status) {
+    var cls = { Active: 'badge-green', New: 'badge-blue', Inactive: 'badge-gray', Transferred: 'badge-amber', Deceased: 'badge-red' }[status] || 'badge-gray';
+    return '<span class="badge ' + cls + '">' + status + '</span>';
+  }
+
+  function renderTable() {
+    var filterVal = document.getElementById('members-status-filter').value;
+    var rows = filterVal ? allMembers.filter(function (m) { return m.MembershipStatus === filterVal; }) : allMembers;
+    var cols = [
+      { label: 'Member', render: function (m) {
+        return '<div class="flex gap-10"><div class="avatar-circle">' + (m.PhotoFileId ? '<img src="https://drive.google.com/thumbnail?id=' + m.PhotoFileId + '">' : Church.fmt.initials(m.FirstName + ' ' + m.LastName)) + '</div>' +
+          '<div><div style="font-weight:700">' + Church.fmt.escape(m.FirstName + ' ' + m.LastName) + '</div><div class="muted" style="font-size:11.5px">' + Church.fmt.escape(m.ID) + '</div></div></div>';
+      } },
+      { label: 'Contact', render: function (m) { return Church.fmt.escape(m.Phone || '—') + '<br><span class="muted" style="font-size:11.5px">' + Church.fmt.escape(m.Email || '') + '</span>'; } },
+      { label: 'Status', render: function (m) { return statusBadge(m.MembershipStatus); } },
+      { label: 'Cluster', render: function (m) { return Church.fmt.escape(m.Cluster || '—'); } },
+      { label: 'Member Since', render: function (m) { return Church.fmt.date(m.MembershipDate); } }
+    ];
+    var container = document.getElementById('members-table');
+    if (table) { table.refresh(rows); }
+    else {
+      table = Church.dataTable(container, {
+        columns: cols, rows: rows, searchKeys: ['FirstName', 'LastName', 'Phone', 'Email', 'ID'],
+        searchId: 'members-search', searchPlaceholder: 'Search members by name, phone, email…',
+        rowActions: function (m) { return '<button class="btn btn-ghost btn-icon btn-sm" title="View / Edit" data-view="1"><svg class="icon-sm"><use href="#ic-chevron-right"></use></svg></button>'; },
+        onEdit: openMemberModal, onDelete: function (m) { deleteMember(m); },
+        empty: { icon: 'ic-members', title: 'No members yet — click "Add Member" to get started' }
+      });
+      container.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-view]');
+        if (!btn) return;
+        var tr = e.target.closest('tr[data-id]');
+        var m = allMembers.find(function (x) { return x.ID === tr.dataset.id; });
+        if (m) openMemberModal(m);
+      });
+    }
+  }
+
+  function deleteMember(m) {
+    Church.confirm('Delete ' + m.FirstName + ' ' + m.LastName + '? This removes their full profile.').then(function (ok) {
+      if (!ok) return;
+      Church.task('deleteMember', m.ID).then(function () { Church.toast('Member removed', 'success'); load(); });
+    });
+  }
+
+  function customFieldToFieldDef(cf) {
+    return { key: cf.key, label: cf.label, type: cf.type || 'text', options: cf.options || [] };
+  }
+
+  function openMemberModal(member) {
+    member = member || {};
+    var isNew = !member.ID;
+    var tabs = ['Profile', 'Custom Fields', 'Documents', 'History'];
+    var html = '<div class="modal-head"><h3><svg class="icon"><use href="#ic-members"></use></svg>' + (isNew ? 'Add Member' : member.FirstName + ' ' + member.LastName) + '</h3>' +
+      '<div class="modal-close" onclick="Church.modal.close()"><svg class="icon"><use href="#ic-close"></use></svg></div></div>' +
+      '<div class="modal-body">' +
+      '<div class="tabbar" id="mm-tabs">' + tabs.map(function (t, i) { return '<div class="tab-btn' + (i === 0 ? ' active' : '') + '" data-tab="' + i + '">' + t + '</div>'; }).join('') + '</div>' +
+      '<div class="tab-panel active" data-panel="0">' +
+      (!isNew ? '<div class="flex gap-14" style="margin-bottom:16px"><div class="avatar-circle" style="width:64px;height:64px;font-size:20px">' +
+        (member.PhotoFileId ? '<img src="https://drive.google.com/thumbnail?id=' + member.PhotoFileId + '">' : Church.fmt.initials(member.FirstName + ' ' + member.LastName)) + '</div>' +
+        '<div><label class="btn btn-outline btn-sm" style="cursor:pointer">Upload Photo<input type="file" id="mm-photo-input" accept="image/*" style="display:none"></label>' +
+        '<div class="muted" style="font-size:11px;margin-top:6px">JPG/PNG, stored in Google Drive</div></div></div>' : '') +
+      '<div id="mm-profile-fields"></div></div>' +
+      '<div class="tab-panel" data-panel="1"><div id="mm-custom-fields"></div>' +
+      (!customFieldsConfig.length ? '<div class="empty-state">No custom fields configured. Add some under Settings → Custom Fields.</div>' : '') + '</div>' +
+      '<div class="tab-panel" data-panel="2">' +
+      (isNew ? '<div class="empty-state">Save the member first, then attach documents (certificates, IDs, etc.).</div>' :
+        '<div class="field"><label>Upload Document</label><div class="flex gap-10"><input type="text" id="mm-doc-label" placeholder="Label, e.g. Baptism Certificate" style="flex:1;padding:10px 12px;border:1.5px solid var(--line);border-radius:8px"><label class="btn btn-outline btn-sm" style="cursor:pointer">Choose File<input type="file" id="mm-doc-input" style="display:none"></label></div></div>' +
+        '<div id="mm-doc-list"></div>') + '</div>' +
+      '<div class="tab-panel" data-panel="3"><div id="mm-history"></div></div>' +
+      '</div>' +
+      '<div class="modal-foot">' +
+      (!isNew ? '<button class="btn btn-outline" id="mm-transfer" style="margin-right:auto"><svg class="icon-sm"><use href="#ic-arrow-right"></use></svg> Transfer</button>' : '') +
+      '<button class="btn btn-outline" onclick="Church.modal.close()">Cancel</button>' +
+      '<button class="btn btn-primary" id="mm-save">Save Member</button></div>';
+
+    Church.modal.open(html, { lg: true });
+    document.getElementById('mm-profile-fields').innerHTML = Church.renderFields(MEMBER_FIELDS, member);
+
+    var customDefs = customFieldsConfig.map(customFieldToFieldDef);
+    var cfValues = {};
+    try { cfValues = JSON.parse(member.CustomFields || '{}'); } catch (e) {}
+    document.getElementById('mm-custom-fields').innerHTML = customDefs.length ? Church.renderFields(customDefs, cfValues) : '';
+
+    document.querySelectorAll('#mm-tabs .tab-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        document.querySelectorAll('#mm-tabs .tab-btn').forEach(function (b) { b.classList.remove('active'); });
+        document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
+        btn.classList.add('active');
+        document.querySelector('.tab-panel[data-panel="' + btn.dataset.tab + '"]').classList.add('active');
+      });
+    });
+
+    if (!isNew) {
+      renderDocs(member);
+      renderHistory(member);
+      var photoInput = document.getElementById('mm-photo-input');
+      if (photoInput) photoInput.addEventListener('change', function (e) {
+        var file = e.target.files[0]; if (!file) return;
+        Church.fileToBase64(file).then(function (b64) {
+          return Church.task('uploadMemberPhoto', member.ID, b64, file.type, file.name);
+        }).then(function () { Church.toast('Photo updated', 'success'); load().then(function () { openMemberModal(allMembers.find(function (m) { return m.ID === member.ID; })); }); });
+      });
+      var docInput = document.getElementById('mm-doc-input');
+      if (docInput) docInput.addEventListener('change', function (e) {
+        var file = e.target.files[0]; if (!file) return;
+        var label = document.getElementById('mm-doc-label').value || file.name;
+        Church.fileToBase64(file).then(function (b64) {
+          return Church.task('uploadMemberDocument', member.ID, b64, file.type, file.name, label);
+        }).then(function (docs) { Church.toast('Document uploaded', 'success'); member.DocumentLinks = JSON.stringify(docs); renderDocs(member); });
+      });
+      document.getElementById('mm-transfer').addEventListener('click', function () { openTransferModal(member); });
+    }
+
+    document.getElementById('mm-save').addEventListener('click', function () {
+      var payload = Church.readFields(document.getElementById('mm-profile-fields'), MEMBER_FIELDS);
+      if (customDefs.length) payload.CustomFieldValues = Church.readFields(document.getElementById('mm-custom-fields'), customDefs);
+      if (!isNew) payload.ID = member.ID;
+      Church.task('saveMember', payload).then(function () {
+        Church.toast('Member saved', 'success'); Church.modal.close(); load();
+      });
+    });
+  }
+
+  function renderDocs(member) {
+    var docs = []; try { docs = JSON.parse(member.DocumentLinks || '[]'); } catch (e) {}
+    var el = document.getElementById('mm-doc-list');
+    if (!el) return;
+    el.innerHTML = !docs.length ? '<div class="empty-state" style="padding:24px">No documents yet</div>' :
+      docs.map(function (d) {
+        return '<div class="flex gap-10" style="padding:9px 0;border-bottom:1px solid var(--line)"><svg class="icon"><use href="#ic-paperclip"></use></svg>' +
+          '<a href="https://drive.google.com/file/d/' + d.fileId + '/view" target="_blank" style="flex:1;color:var(--green-primary);font-weight:600">' + Church.fmt.escape(d.label) + '</a>' +
+          '<button class="btn btn-ghost btn-icon btn-sm" data-rm="' + d.fileId + '"><svg class="icon-sm"><use href="#ic-trash"></use></svg></button></div>';
+      }).join('');
+    el.querySelectorAll('[data-rm]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        Church.task('removeMemberDocument', member.ID, btn.dataset.rm).then(function (docs) { member.DocumentLinks = JSON.stringify(docs); renderDocs(member); });
+      });
+    });
+  }
+
+  function renderHistory(member) {
+    var el = document.getElementById('mm-history');
+    var hist = member.History || [];
+    el.innerHTML = !hist.length ? '<div class="empty-state" style="padding:24px">No status history</div>' :
+      hist.slice().reverse().map(function (h) {
+        return '<div style="padding:10px 0;border-bottom:1px solid var(--line)"><div style="font-weight:700;font-size:13px">' +
+          (h.OldStatus ? Church.fmt.escape(h.OldStatus) + ' → ' : '') + Church.fmt.escape(h.NewStatus) + '</div>' +
+          '<div class="muted" style="font-size:11.5px">' + Church.fmt.datetime(h.ChangedAt) + ' · ' + Church.fmt.escape(h.ChangedBy) + (h.Reason ? ' · ' + Church.fmt.escape(h.Reason) : '') + '</div></div>';
+      }).join('');
+  }
+
+  function openTransferModal(member) {
+    Church.modal.open('<div class="modal-head"><h3><svg class="icon"><use href="#ic-arrow-right"></use></svg>Transfer Member</h3>' +
+      '<div class="modal-close" onclick="Church.modal.close()"><svg class="icon"><use href="#ic-close"></use></svg></div></div>' +
+      '<div class="modal-body"><div class="field"><label>Destination Church / Branch</label><input id="tr-dest" placeholder="e.g. Grace Chapel, Kumasi"></div>' +
+      '<div class="field"><label>Reason</label><textarea id="tr-reason"></textarea></div></div>' +
+      '<div class="modal-foot"><button class="btn btn-outline" onclick="Church.modal.close()">Cancel</button>' +
+      '<button class="btn btn-primary" id="tr-save">Confirm Transfer</button></div>');
+    document.getElementById('tr-save').addEventListener('click', function () {
+      var dest = document.getElementById('tr-dest').value, reason = document.getElementById('tr-reason').value;
+      if (!dest) { Church.toast('Destination is required', 'error'); return; }
+      Church.task('transferMember', member.ID, dest, reason).then(function () { Church.toast('Member transferred', 'success'); Church.modal.close(); load(); });
+    });
+  }
+
+  function populateStatusFilter() {
+    var sel = document.getElementById('members-status-filter');
+    ['New', 'Active', 'Inactive', 'Transferred', 'Deceased'].forEach(function (s) {
+      var o = document.createElement('option'); o.value = s; o.textContent = s; sel.appendChild(o);
+    });
+    sel.addEventListener('change', renderTable);
+  }
+
+  function load() {
+    return Church.task('listMembers').then(function (members) {
+      allMembers = members;
+      renderTable();
+    });
+  }
+
+  document.getElementById('members-add-btn').addEventListener('click', function () { openMemberModal({}); });
+  populateStatusFilter();
+  Church.run('getCustomFieldsConfig').then(function (cfg) { customFieldsConfig = cfg || []; });
+
+  Church.views.members = { mount: load, refresh: load };
+})();
+</script>
+
+<div class="view" id="view-visitors">
+  <div class="page-head">
+    <div><h1>Visitors</h1><p>First-time and returning guests, follow-up status and conversion.</p></div>
+    <div class="page-actions">
+      <button class="btn btn-primary" id="visitors-add-btn"><svg class="icon"><use href="#ic-plus"></use></svg> Log Visitor</button>
+    </div>
+  </div>
+  <div class="card card-pad"><div id="visitors-table"></div></div>
+</div>
+
+<script>
+(function () {
+  var FIELDS = [
+    { key: 'FirstName', label: 'First Name', required: true, half: true },
+    { key: 'LastName', label: 'Last Name', required: true, half: true },
+    { key: 'Phone', label: 'Phone', type: 'tel', half: true },
+    { key: 'Email', label: 'Email', type: 'email', half: true },
+    { key: 'VisitDate', label: 'Visit Date', type: 'date', required: true, half: true },
+    { key: 'HowHeard', label: 'How They Heard About Us', half: true },
+    { key: 'Address', label: 'Address' },
+    { key: 'Interest', label: 'Interest / Ministry Area', half: true },
+    { key: 'FollowUpStatus', label: 'Follow-up Status', type: 'select', options: ['New', 'Contacted', 'Converted', 'Closed'], half: true },
+    { key: 'AssignedTo', label: 'Assigned To' },
+    { key: 'Notes', label: 'Notes', type: 'textarea' }
+  ];
+  var all = [], table = null;
+
+  function statusBadge(s) {
+    var cls = { New: 'badge-blue', Contacted: 'badge-amber', Converted: 'badge-green', Closed: 'badge-gray' }[s] || 'badge-gray';
+    return '<span class="badge ' + cls + '">' + s + '</span>';
+  }
+
+  function render() {
+    var cols = [
+      { label: 'Visitor', render: function (v) { return '<div style="font-weight:700">' + Church.fmt.escape(v.FirstName + ' ' + v.LastName) + '</div><div class="muted" style="font-size:11.5px">' + Church.fmt.escape(v.Phone || v.Email || '') + '</div>'; } },
+      { label: 'Visit Date', render: function (v) { return Church.fmt.date(v.VisitDate); } },
+      { label: 'Status', render: function (v) { return statusBadge(v.FollowUpStatus); } },
+      { label: 'Assigned To', key: 'AssignedTo' }
+    ];
+    if (table) { table.refresh(all); return; }
+    table = Church.dataTable(document.getElementById('visitors-table'), {
+      columns: cols, rows: all, searchKeys: ['FirstName', 'LastName', 'Phone', 'Email'],
+      searchPlaceholder: 'Search visitors…', onEdit: openModal, onDelete: remove,
+      rowActions: function (v) { return v.ConvertedMemberID ? '' : '<button class="btn btn-ghost btn-icon btn-sm" title="Convert to Member" data-conv="1"><svg class="icon-sm"><use href="#ic-check-circle"></use></svg></button>'; },
+      empty: { icon: 'ic-visitor', title: 'No visitors logged yet' }
+    });
+    document.getElementById('visitors-table').addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-conv]'); if (!btn) return;
+      var tr = e.target.closest('tr[data-id]'); var v = all.find(function (x) { return x.ID === tr.dataset.id; });
+      if (v) convert(v);
+    });
+  }
+
+  function remove(v) {
+    Church.confirm('Delete visitor record for ' + v.FirstName + ' ' + v.LastName + '?').then(function (ok) {
+      if (ok) Church.task('deleteVisitor', v.ID).then(function () { Church.toast('Visitor removed', 'success'); load(); });
+    });
+  }
+
+  function convert(v) {
+    Church.confirm('Convert ' + v.FirstName + ' ' + v.LastName + ' into a full Member?', { danger: false, okLabel: 'Convert' }).then(function (ok) {
+      if (!ok) return;
+      Church.task('convertVisitorToMember', v.ID).then(function () { Church.toast('Converted to member', 'success'); load(); });
+    });
+  }
+
+  function openModal(visitor) {
+    visitor = visitor || {};
+    var isNew = !visitor.ID;
+    Church.modal.open('<div class="modal-head"><h3><svg class="icon"><use href="#ic-visitor"></use></svg>' + (isNew ? 'Log Visitor' : 'Edit Visitor') + '</h3>' +
+      '<div class="modal-close" onclick="Church.modal.close()"><svg class="icon"><use href="#ic-close"></use></svg></div></div>' +
+      '<div class="modal-body" id="v-fields"></div>' +
+      '<div class="modal-foot"><button class="btn btn-outline" onclick="Church.modal.close()">Cancel</button><button class="btn btn-primary" id="v-save">Save</button></div>');
+    document.getElementById('v-fields').innerHTML = Church.renderFields(FIELDS, visitor);
+    document.getElementById('v-save').addEventListener('click', function () {
+      var payload = Church.readFields(document.getElementById('v-fields'), FIELDS);
+      if (!isNew) payload.ID = visitor.ID;
+      Church.task('saveVisitor', payload).then(function () { Church.toast('Visitor saved', 'success'); Church.modal.close(); load(); });
+    });
+  }
+
+  function load() {
+    return Church.task('listVisitors').then(function (rows) { all = rows; render(); });
+  }
+
+  document.getElementById('visitors-add-btn').addEventListener('click', function () { openModal({}); });
+  Church.views.visitors = { mount: load, refresh: load };
+})();
+</script>
+
+<div class="view" id="view-attendance">
+  <div class="page-head">
+    <div><h1>Attendance</h1><p>Digital check-in, service tracking and per-member history.</p></div>
+  </div>
+
+  <div class="tabbar" id="att-tabs">
+    <div class="tab-btn active" data-tab="checkin">Check-In</div>
+    <div class="tab-btn" data-tab="records">Records</div>
+    <div class="tab-btn" data-tab="qr">QR Codes</div>
+  </div>
+
+  <div class="tab-panel active" data-panel="checkin">
+    <div class="card card-pad" style="max-width:520px">
+      <div class="field">
+        <label>Member</label>
+        <input id="ci-member-search" placeholder="Type a name…" autocomplete="off">
+        <div id="ci-member-results" style="border:1px solid var(--line);border-radius:8px;margin-top:6px;max-height:180px;overflow-y:auto;display:none"></div>
+        <div id="ci-member-selected" class="muted" style="margin-top:6px;font-size:12.5px"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Service Type</label><select id="ci-service-type"></select></div>
+        <div class="field"><label>Service Date</label><input type="date" id="ci-service-date"></div>
+      </div>
+      <button class="btn btn-primary" id="ci-submit" style="width:100%;justify-content:center"><svg class="icon"><use href="#ic-check-circle"></use></svg> Check In</button>
+    </div>
+  </div>
+
+  <div class="tab-panel" data-panel="records">
+    <div class="card card-pad">
+      <div class="field-row" style="margin-bottom:14px">
+        <div class="field" style="margin-bottom:0"><label>Filter by Date</label><input type="date" id="att-filter-date"></div>
+        <div class="field" style="margin-bottom:0"><label>Filter by Service</label><select id="att-filter-service"><option value="">All services</option></select></div>
+      </div>
+      <div id="att-table"></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" data-panel="qr">
+    <div class="card card-pad" style="max-width:420px">
+      <div class="field">
+        <label>Member</label>
+        <input id="qr-member-search" placeholder="Type a name…" autocomplete="off">
+        <div id="qr-member-results" style="border:1px solid var(--line);border-radius:8px;margin-top:6px;max-height:180px;overflow-y:auto;display:none"></div>
+      </div>
+      <div id="qr-display" style="text-align:center"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var SERVICE_TYPES = ['Sunday Service', 'Midweek Service', 'Prayer Meeting', 'Youth Service', 'Special Event'];
+  var members = [], attRows = [], attTable = null, selectedMemberId = null;
+
+  document.querySelectorAll('#att-tabs .tab-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('#att-tabs .tab-btn').forEach(function (b) { b.classList.remove('active'); });
+      document.querySelectorAll('#view-attendance .tab-panel').forEach(function (p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      document.querySelector('#view-attendance .tab-panel[data-panel="' + btn.dataset.tab + '"]').classList.add('active');
+    });
+  });
+
+  function fillServiceSelects() {
+    var sel = document.getElementById('ci-service-type');
+    var filt = document.getElementById('att-filter-service');
+    SERVICE_TYPES.forEach(function (s) {
+      sel.appendChild(new Option(s, s));
+      filt.appendChild(new Option(s, s));
+    });
+    document.getElementById('ci-service-date').value = new Date().toISOString().split('T')[0];
+  }
+
+  function wireMemberSearch(inputId, resultsId, onPick) {
+    var input = document.getElementById(inputId), results = document.getElementById(resultsId);
+    input.addEventListener('input', function () {
+      var q = input.value.trim().toLowerCase();
+      if (!q) { results.style.display = 'none'; return; }
+      var matches = members.filter(function (m) { return (m.FirstName + ' ' + m.LastName).toLowerCase().indexOf(q) !== -1; }).slice(0, 8);
+      results.innerHTML = matches.map(function (m) { return '<div class="flex gap-10" data-id="' + m.ID + '" style="padding:8px 12px;cursor:pointer"><div class="avatar-circle" style="width:26px;height:26px;font-size:10px">' + Church.fmt.initials(m.FirstName + ' ' + m.LastName) + '</div>' + Church.fmt.escape(m.FirstName + ' ' + m.LastName) + '</div>'; }).join('') || '<div class="muted" style="padding:8px 12px">No matches</div>';
+      results.style.display = 'block';
+      results.querySelectorAll('[data-id]').forEach(function (row) {
+        row.addEventListener('mouseenter', function () { row.style.background = '#f2f5f3'; });
+        row.addEventListener('click', function () {
+          var m = members.find(function (x) { return x.ID === row.dataset.id; });
+          onPick(m); results.style.display = 'none'; input.value = m.FirstName + ' ' + m.LastName;
+        });
+      });
+    });
+  }
+
+  function loadMembers() {
+    return Church.run('listMembers').then(function (m) { members = m; });
+  }
+
+  /* ---- Check-in tab ---- */
+  function wireCheckIn() {
+    wireMemberSearch('ci-member-search', 'ci-member-results', function (m) {
+      selectedMemberId = m.ID;
+      document.getElementById('ci-member-selected').textContent = 'Selected: ' + m.FirstName + ' ' + m.LastName + ' (' + m.ID + ')';
+    });
+    document.getElementById('ci-submit').addEventListener('click', function () {
+      if (!selectedMemberId) { Church.toast('Select a member first', 'error'); return; }
+      Church.task('recordAttendance', {
+        MemberID: selectedMemberId,
+        ServiceType: document.getElementById('ci-service-type').value,
+        ServiceDate: document.getElementById('ci-service-date').value
+      }).then(function () {
+        Church.toast('Checked in', 'success');
+        selectedMemberId = null; document.getElementById('ci-member-search').value = ''; document.getElementById('ci-member-selected').textContent = '';
+        if (document.querySelector('.tab-panel[data-panel="records"]').classList.contains('active')) loadRecords();
+      });
+    });
+  }
+
+  /* ---- Records tab ---- */
+  function loadRecords() {
+    var filters = { serviceDate: document.getElementById('att-filter-date').value, serviceType: document.getElementById('att-filter-service').value };
+    Church.task('listAttendance', filters).then(function (rows) {
+      attRows = rows;
+      var cols = [
+        { label: 'Member', key: 'MemberName' },
+        { label: 'Service', key: 'ServiceType' },
+        { label: 'Date', render: function (r) { return Church.fmt.date(r.ServiceDate); } },
+        { label: 'Checked In', render: function (r) { return Church.fmt.datetime(r.CheckInTime); } },
+        { label: 'Method', render: function (r) { return '<span class="badge ' + (r.CheckInMethod === 'QR' ? 'badge-green' : 'badge-gray') + '">' + r.CheckInMethod + '</span>'; } }
+      ];
+      if (attTable) attTable.refresh(rows);
+      else attTable = Church.dataTable(document.getElementById('att-table'), {
+        columns: cols, rows: rows, searchKeys: ['MemberName', 'ServiceType'], searchPlaceholder: 'Search records…',
+        onDelete: function (r) { Church.task('deleteAttendance', r.ID).then(function () { Church.toast('Record removed', 'success'); loadRecords(); }); },
+        empty: { icon: 'ic-attendance', title: 'No attendance records for this filter' }
+      });
+    });
+  }
+  document.getElementById('att-filter-date').addEventListener('change', loadRecords);
+  document.getElementById('att-filter-service').addEventListener('change', loadRecords);
+
+  /* ---- QR tab ---- */
+  function wireQr() {
+    wireMemberSearch('qr-member-search', 'qr-member-results', function (m) {
+      Church.task('getMemberQrUrl', m.ID).then(function (url) {
+        document.getElementById('qr-display').innerHTML =
+          '<img src="' + url + '" style="border-radius:12px;border:1px solid var(--line);margin:14px 0" width="220" height="220">' +
+          '<div style="font-weight:800">' + Church.fmt.escape(m.FirstName + ' ' + m.LastName) + '</div>' +
+          '<div class="muted mono" style="font-size:12px;margin-bottom:14px">' + m.ID + '</div>' +
+          '<button class="btn btn-outline btn-sm" onclick="window.print()"><svg class="icon-sm"><use href="#ic-print"></use></svg> Print Card</button>';
+      });
+    });
+  }
+
+  function mount() {
+    fillServiceSelects();
+    loadMembers().then(function () { wireCheckIn(); wireQr(); });
+    loadRecords();
+  }
+
+  Church.views.attendance = { mount: mount, refresh: loadRecords };
+})();
+</script>
+
+<div class="view" id="view-finance">
+  <div class="page-head"><div><h1>Finance</h1><p>Giving, pledges, campaigns, expense approvals and reporting.</p></div></div>
+
+  <div class="tabbar" id="fin-tabs">
+    <div class="tab-btn active" data-tab="giving">Giving</div>
+    <div class="tab-btn" data-tab="pledges">Pledges &amp; Campaigns</div>
+    <div class="tab-btn" data-tab="expenses">Expenses</div>
+    <div class="tab-btn" data-tab="reports">Reports</div>
+  </div>
+
+  <div class="tab-panel active" data-panel="giving">
+    <div class="page-actions" style="margin-bottom:14px"><button class="btn btn-primary" id="fin-add-giving"><svg class="icon"><use href="#ic-plus"></use></svg> Record Giving</button></div>
+    <div class="card card-pad"><div id="giving-table"></div></div>
+  </div>
+
+  <div class="tab-panel" data-panel="pledges">
+    <div class="grid grid-2" style="align-items:start">
+      <div>
+        <div class="page-actions" style="margin-bottom:14px"><button class="btn btn-outline" id="fin-add-campaign"><svg class="icon"><use href="#ic-plus"></use></svg> New Campaign</button></div>
+        <div class="card card-pad"><div id="campaign-list"></div></div>
+      </div>
+      <div>
+        <div class="page-actions" style="margin-bottom:14px"><button class="btn btn-primary" id="fin-add-pledge"><svg class="icon"><use href="#ic-plus"></use></svg> New Pledge</button></div>
+        <div class="card card-pad"><div id="pledge-list"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-panel" data-panel="expenses">
+    <div class="page-actions" style="margin-bottom:14px"><button class="btn btn-primary" id="fin-add-expense"><svg class="icon"><use href="#ic-plus"></use></svg> New Expense Claim</button></div>
+    <div class="card card-pad"><div id="expense-table"></div></div>
+  </div>
+
+  <div class="tab-panel" data-panel="reports">
+    <div class="field-row" style="max-width:520px;margin-bottom:16px">
+      <div class="field" style="margin-bottom:0"><label>From</label><input type="date" id="rep-from"></div>
+      <div class="field" style="margin-bottom:0"><label>To</label><input type="date" id="rep-to"></div>
+    </div>
+    <button class="btn btn-outline" id="rep-run" style="margin-bottom:16px"><svg class="icon"><use href="#ic-refresh"></use></svg> Run Report</button>
+    <div class="grid grid-3" id="rep-summary" style="margin-bottom:18px"></div>
+    <div class="grid grid-2">
+      <div class="card"><div class="card-head"><h3>Giving by Type</h3></div><div class="card-pad"><div id="chart-fin-type" style="height:220px"></div></div></div>
+      <div class="card"><div class="card-head"><h3>Expenses by Category</h3></div><div class="card-pad"><div id="chart-fin-cat" style="height:220px"></div></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var members = [], campaigns = [], givingRows = [], pledgeRows = [], expenseRows = [];
+  var givingTable = null, expenseTable = null;
+
+  document.querySelectorAll('#fin-tabs .tab-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('#fin-tabs .tab-btn').forEach(function (b) { b.classList.remove('active'); });
+      document.querySelectorAll('#view-finance .tab-panel').forEach(function (p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      document.querySelector('#view-finance .tab-panel[data-panel="' + btn.dataset.tab + '"]').classList.add('active');
+    });
+  });
+
+  function memberOptions() { return members.map(function (m) { return { value: m.ID, label: m.FirstName + ' ' + m.LastName }; }); }
+  function campaignOptions() { return campaigns.map(function (c) { return { value: c.ID, label: c.Name }; }); }
+
+  /* ---------- Giving ---------- */
+  var GIVING_FIELDS = [
+    { key: 'Type', label: 'Type', type: 'select', options: ['Tithe', 'Offering', 'Donation', 'Pledge Payment'], required: true, half: true },
+    { key: 'Amount', label: 'Amount (GHS)', type: 'number', required: true, half: true },
+    { key: 'DonorMemberID', label: 'Donor (leave blank for anonymous)', type: 'select', half: true },
+    { key: 'PaymentMethod', label: 'Payment Method', type: 'select', options: ['Cash', 'Mobile Money', 'Bank Transfer', 'Card', 'Cheque'], required: true, half: true },
+    { key: 'CampaignID', label: 'Campaign', type: 'select', half: true },
+    { key: 'Date', label: 'Date', type: 'date', required: true, half: true },
+    { key: 'Recurring', label: 'Recurring gift', type: 'checkbox' },
+    { key: 'Notes', label: 'Notes', type: 'textarea' }
+  ];
+
+  function loadGiving() {
+    Church.task('listFinance').then(function (rows) {
+      givingRows = rows;
+      var cols = [
+        { label: 'Donor', key: 'DonorName' },
+        { label: 'Type', render: function (r) { return '<span class="badge badge-green">' + r.Type + '</span>'; } },
+        { label: 'Amount', render: function (r) { return '<b>' + Church.fmt.money(r.Amount) + '</b>'; } },
+        { label: 'Method', key: 'PaymentMethod' },
+        { label: 'Date', render: function (r) { return Church.fmt.date(r.Date); } },
+        { label: 'Receipt', render: function (r) { return '<span class="mono muted">' + Church.fmt.escape(r.ReceiptNumber) + '</span>'; } }
+      ];
+      if (givingTable) givingTable.refresh(rows);
+      else givingTable = Church.dataTable(document.getElementById('giving-table'), {
+        columns: cols, rows: rows, searchKeys: ['DonorName', 'Type', 'ReceiptNumber'], searchPlaceholder: 'Search giving records…',
+        onDelete: function (r) { Church.task('deleteFinanceRecord', r.ID).then(function () { Church.toast('Removed', 'success'); loadGiving(); }); },
+        empty: { icon: 'ic-finance', title: 'No giving recorded yet' }
+      });
+    });
+  }
+
+  function openGivingModal() {
+    var fields = GIVING_FIELDS.map(function (f) { if (f.key === 'DonorMemberID') f.options = memberOptions(); if (f.key === 'CampaignID') f.options = campaignOptions(); return f; });
+    Church.modal.open('<div class="modal-head"><h3><svg class="icon"><use href="#ic-finance"></use></svg>Record Giving</h3><div class="modal-close" onclick="Church.modal.close()"><svg class="icon"><use href="#ic-close"></use></svg></div></div>' +
+      '<div class="modal-body" id="gv-fields"></div><div class="modal-foot"><button class="btn btn-outline" onclick="Church.modal.close()">Cancel</button><button class="btn btn-primary" id="gv-save">Save</button></div>');
+    document.getElementById('gv-fields').innerHTML = Church.renderFields(fields, { Date: new Date().toISOString().split('T')[0] });
+    document.getElementById('gv-save').addEventListener('click', function () {
+      var payload = Church.readFields(document.getElementById('gv-fields'), fields);
+      Church.task('saveFinanceRecord', payload).then(function () { Church.toast('Giving recorded', 'success'); Church.modal.close(); loadGiving(); });
+    });
+  }
+  document.getElementById('fin-add-giving').addEventListener('click', openGivingModal);
+
+  /* ---------- Campaigns ---------- */
+  function loadCampaigns() {
+    return Church.run('listCampaigns').then(function (rows) {
+      campaigns = rows;
+      document.getElementById('campaign-list').innerHTML = !rows.length ? '<div class="empty-state">No campaigns yet</div>' :
+        rows.map(function (c) { return '<div style="padding:10px 0;border-bottom:1px solid var(--line)"><div class="flex" style="justify-content:space-between"><b>' + Church.fmt.escape(c.Name) + '</b><span class="badge badge-gray">' + c.Status + '</span></div><div class="muted" style="font-size:12px">Goal: ' + Church.fmt.money(c.Goal) + '</div></div>'; }).join('');
+    });
+  }
+  document.getElementById('fin-add-campaign').addEventListener('click', function () {
+    Church.modal.open('<div class="modal-head"><h3><svg class="icon"><use href="#ic-gift"></use></svg>New Campaign</h3><div class="modal-close" onclick="Church.modal.close()"><svg class="icon"><use href="#ic-close"></use></svg></div></div>' +
+      '<div class="modal-body" id="cm-fields"></div><div class="modal-foot"><button class="btn btn-outline" onclick="Church.modal.close()">Cancel</button><button class="btn btn-primary" id="cm-save">Save</button></div>');
+    var fields = [
+      { key: 'Name', label: 'Campaign Name', required: true },
+      { key: 'Goal', label: 'Goal (GHS)', type: 'number', required: true, half: true },
+      { key: 'Status', label: 'Status', type: 'select', options: ['Active', 'Completed', 'Cancelled'], half: true },
+      { key: 'StartDate', label: 'Start Date', type: 'date', half: true },
+      { key: 'EndDate', label: 'End Date', type: 'date', half: true }
+    ];
+    document.getElementById('cm-fields').innerHTML = Church.renderFields(fields, {});
+    document.getElementById('cm-save').addEventListener('click', function () {
+      Church.task('saveCampaign', Church.readFields(document.getElementById('cm-fields'), fields)).then(function () { Church.toast('Campaign saved', 'success'); Church.modal.close(); loadCampaigns(); });
+    });
+  });
+
+  /* ---------- Pledges ---------- */
+  function loadPledges() {
+    Church.task('listPledges').then(function (rows) {
+      pledgeRows = rows;
+      document.getElementById('pledge-list').innerHTML = !rows.length ? '<div class="empty-state">No pledges yet</div>' :
+        rows.map(function (p) {
+          return '<div style="padding:12px 0;border-bottom:1px solid var(--line)">' +
+            '<div class="flex" style="justify-content:space-between"><b>' + Church.fmt.escape(p.MemberName) + '</b><span class="muted" style="font-size:12px">' + Church.fmt.escape(p.CampaignName) + '</span></div>' +
+            '<div class="progress-bar" style="margin:8px 0"><div style="width:' + p.PercentPaid + '%"></div></div>' +
+            '<div class="flex" style="justify-content:space-between;font-size:12px" class="muted"><span>' + Church.fmt.money(p.PaidAmount) + ' of ' + Church.fmt.money(p.PledgedAmount) + '</span><span class="badge ' + (p.Status === 'Fulfilled' ? 'badge-green' : p.Status === 'Overdue' ? 'badge-red' : 'badge-blue') + '">' + p.Status + '</span></div></div>';
+        }).join('');
+    });
+  }
+  document.getElementById('fin-add-pledge').addEventListener('click', function () {
+    var fields = [
+      { key: 'MemberID', label: 'Member', type: 'select', options: memberOptions(), required: true },
+      { key: 'CampaignID', label: 'Campaign', type: 'select', options: campaignOptions(), required: true },
+      { key: 'PledgedAmount', label: 'Pledged Amount (GHS)', type: 'number', required: true, half: true },
+      { key: 'Status', label: 'Status', type: 'select', options: ['Active', 'Fulfilled', 'Overdue', 'Cancelled'], half: true },
+      { key: 'StartDate', label: 'Start Date', type: 'date', half: true },
+      { key: 'EndDate', label: 'End Date', type: 'date', half: true },
+      { key: 'Notes', label: 'Notes', type: 'textarea' }
+    ];
+    Church.modal.open('<div class="modal-head"><h3><svg class="icon"><use href="#ic-gift"></use></svg>New Pledge</h3><div class="modal-close" onclick="Church.modal.close()"><svg class="icon"><use href="#ic-close"></use></svg></div></div>' +
+      '<div class="modal-body" id="pl-fields"></div><div class="modal-foot"><button class="btn btn-outline" onclick="Church.modal.close()">Cancel</button><button class="btn btn-primary" id="pl-save">Save</button></div>');
+    document.getElementById('pl-fields').innerHTML = Church.renderFields(fields, {});
+    document.getElementById('pl-save').addEventListener('click', function () {
+      Church.task('savePledge', Church.readFields(document.getElementById('pl-fields'), fields)).then(function () { Church.toast('Pledge saved', 'success'); Church.modal.close(); loadPledges(); });
+    });
+  });
+
+  /* ---------- Expenses ---------- */
+  function loadExpenses() {
+    Church.task('listExpenses').then(function (rows) {
+      expenseRows = rows;
+      var cols = [
+        { label: 'Description', key: 'Description' },
+        { label: 'Category', key: 'Category' },
+        { label: 'Amount', render: function (r) { return Church.fmt.money(r.Amount); } },
+        { label: 'Date', render: function (r) { return Church.fmt.date(r.Date); } },
+        { label: 'Status', render: function (r) { return '<span class="badge ' + (r.Status === 'Approved' ? 'badge-green' : r.Status === 'Rejected' ? 'badge-red' : 'badge-amber') + '">' + r.Status + '</span>'; } }
+      ];
+      if (expenseTable) expenseTable.refresh(rows);
+      else expenseTable = Church.dataTable(document.getElementById('expense-table'), {
+        columns: cols, rows: rows, searchKeys: ['Description', 'Category'], searchPlaceholder: 'Search expenses…',
+        rowActions: function (r) {
+          if (r.Status !== 'Pending') return '';
+          return '<button class="btn btn-ghost btn-icon btn-sm" title="Approve" data-approve="1"><svg class="icon-sm" style="color:var(--success)"><use href="#ic-check"></use></svg></button>' +
+            '<button class="btn btn-ghost btn-icon btn-sm" title="Reject" data-reject="1"><svg class="icon-sm" style="color:var(--danger)"><use href="#ic-close"></use></svg></button>';
+        },
+        empty: { icon: 'ic-finance', title: 'No expense claims yet' }
+      });
+      document.getElementById('expense-table').onclick = function (e) {
+        var tr = e.target.closest('tr[data-id]'); if (!tr) return;
+        if (e.target.closest('[data-approve]')) Church.task('decideExpense', tr.dataset.id, 'Approved').then(function () { Church.toast('Approved', 'success'); loadExpenses(); });
+        if (e.target.closest('[data-reject]')) Church.task('decideExpense', tr.dataset.id, 'Rejected').then(function () { Church.toast('Rejected', 'success'); loadExpenses(); });
+      };
+    });
+  }
+  document.getElementById('fin-add-expense').addEventListener('click', function () {
+    var fields = [
+      { key: 'Description', label: 'Description', required: true },
+      { key: 'Category', label: 'Category', required: true, half: true },
+      { key: 'Department', label: 'Department', half: true },
+      { key: 'Amount', label: 'Amount (GHS)', type: 'number', required: true, half: true },
+      { key: 'Date', label: 'Date', type: 'date', required: true, half: true },
+      { key: 'BudgetLine', label: 'Budget Line' }
+    ];
+    Church.modal.open('<div class="modal-head"><h3><svg class="icon"><use href="#ic-card"></use></svg>New Expense Claim</h3><div class="modal-close" onclick="Church.modal.close()"><svg class="icon"><use href="#ic-close"></use></svg></div></div>' +
+      '<div class="modal-body" id="ex-fields"></div><div class="modal-foot"><button class="btn btn-outline" onclick="Church.modal.close()">Cancel</button><button class="btn btn-primary" id="ex-save">Submit</button></div>');
+    document.getElementById('ex-fields').innerHTML = Church.renderFields(fields, { Date: new Date().toISOString().split('T')[0] });
+    document.getElementById('ex-save').addEventListener('click', function () {
+      Church.task('saveExpense', Church.readFields(document.getElementById('ex-fields'), fields)).then(function () { Church.toast('Expense submitted for approval', 'success'); Church.modal.close(); loadExpenses(); });
+    });
+  });
+
+  /* ---------- Reports ---------- */
+  function runReport() {
+    var from = document.getElementById('rep-from').value, to = document.getElementById('rep-to').value;
+    Church.task('getFinanceSummary', from, to).then(function (s) {
+      document.getElementById('rep-summary').innerHTML =
+        '<div class="kpi-card kpi-g1"><div class="icon-wrap"><svg class="icon"><use href="#ic-finance"></use></svg></div><div class="kpi-value">' + Church.fmt.money(s.totalGiving) + '</div><div class="kpi-label">Total Giving</div></div>' +
+        '<div class="kpi-card kpi-g2"><div class="icon-wrap"><svg class="icon"><use href="#ic-card"></use></svg></div><div class="kpi-value">' + Church.fmt.money(s.totalExpense) + '</div><div class="kpi-label">Total Expenses</div></div>' +
+        '<div class="kpi-card kpi-g3"><div class="icon-wrap"><svg class="icon"><use href="#ic-trend-up"></use></svg></div><div class="kpi-value">' + Church.fmt.money(s.net) + '</div><div class="kpi-label">Net Position</div></div>';
+      Church.loadCharts().then(function () {
+        var t1 = new google.visualization.DataTable(); t1.addColumn('string', 'Type'); t1.addColumn('number', 'Amount');
+        Object.keys(s.byType).forEach(function (k) { t1.addRow([k, s.byType[k]]); });
+        new google.visualization.PieChart(document.getElementById('chart-fin-type')).draw(t1, { pieHole: 0.5, colors: ['#22c55e', '#0b3d2e', '#146c43', '#94a3b8'], chartArea: { width: '90%', height: '85%' }, legend: { textStyle: { fontSize: 11 } } });
+        var t2 = new google.visualization.DataTable(); t2.addColumn('string', 'Category'); t2.addColumn('number', 'Amount');
+        Object.keys(s.byCategory).forEach(function (k) { t2.addRow([k, s.byCategory[k]]); });
+        new google.visualization.ColumnChart(document.getElementById('chart-fin-cat')).draw(t2, { legend: 'none', colors: ['#ef4444'], chartArea: { width: '88%', height: '72%' } });
+      });
+    });
+  }
+  document.getElementById('rep-run').addEventListener('click', runReport);
+
+  function mount() {
+    Church.run('listMembers').then(function (m) { members = m; });
+    loadCampaigns().then(loadPledges);
+    loadGiving();
+    loadExpenses();
+    runReport();
+  }
+  Church.views.finance = { mount: mount, refresh: function () { loadGiving(); loadExpenses(); loadPledges(); } };
+})();
+</script>
+
+<div class="view" id="view-sms">
+  <div class="page-head"><div><h1>Communication Center</h1><p>Bulk SMS, prayer requests and internal messaging.</p></div></div>
+
+  <div class="tabbar" id="comm-tabs">
+    <div class="tab-btn active" data-tab="bulk">Bulk SMS</div>
+    <div class="tab-btn" data-tab="templates">Templates</div>
+    <div class="tab-btn" data-tab="log">Delivery Log</div>
+    <div class="tab-btn" data-tab="prayer">Prayer Requests</div>
+    <div class="tab-btn" data-tab="messages">Messaging</div>
+  </div>
+
+  <div class="tab-panel active" data-panel="bulk">
+    <div class="card card-pad" style="max-width:620px">
+      <div class="field">
+        <label>Send To</label>
+        <select id="sms-group">
+          <option value="all">All Members</option>
+          <option value="active">Active Members</option>
+          <option value="new">New Members</option>
+          <option value="visitors">Visitors</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Message <span class="muted" style="font-weight:400">(use {name} to personalize)</span></label>
+        <textarea id="sms-message" placeholder="Type your message…"></textarea>
+        <div class="field-hint"><span id="sms-char-count">0</span> characters</div>
+      </div>
+      <div class="field">
+        <label>Use a Template</label>
+        <select id="sms-template-pick"><option value="">— None —</option></select>
+      </div>
+      <div class="field checkbox-row"><input type="checkbox" id="sms-schedule-toggle"><label for="sms-schedule-toggle" style="margin:0">Schedule for later</label></div>
+      <div class="field" id="sms-schedule-field" style="display:none"><label>Send At</label><input type="datetime-local" id="sms-schedule-at"></div>
+      <button class="btn btn-primary" id="sms-send-btn" style="width:100%;justify-content:center"><svg class="icon"><use href="#ic-send"></use></svg> Send</button>
+    </div>
+  </div>
+
+  <div class="tab-panel" data-panel="templates">
+    <div class="page-actions" style="margin-bottom:14px"><button class="btn btn-primary" id="tpl-add-btn"><svg class="icon"><use href="#ic-plus"></use></svg> New Template</button></div>
+    <div class="card card-pad"><div id="tpl-list"></div></div>
+  </div>
+
+  <div class="tab-panel" data-panel="log">
+    <div class="card card-pad"><div id="sms-log-table"></div></div>
+  </div>
+
+  <div class="tab-panel" data-panel="prayer">
+    <div class="card card-pad"><div id="prayer-table"></div></div>
+    <div class="card card-pad" style="margin-top:14px">
+      <b style="font-size:13px">Public submission link</b>
+      <div class="flex gap-10" style="margin-top:8px"><input readonly id="prayer-public-link" class="mono" style="flex:1;padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;font-size:12px"></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" data-panel="messages">
+    <div class="grid" style="grid-template-columns:280px 1fr;gap:16px;align-items:start">
+      <div class="card">
+        <div class="card-head"><h3>Conversations</h3><button class="btn btn-ghost btn-icon btn-sm" id="msg-new-btn"><svg class="icon-sm"><use href="#ic-plus"></use></svg></button></div>
+        <div id="thread-list"></div>
+      </div>
+      <div class="card" style="min-height:420px;display:flex;flex-direction:column">
+        <div class="card-head" id="chat-header"><h3>Select a conversation</h3></div>
+        <div id="chat-body" style="flex:1;overflow-y:auto;padding:16px;max-height:400px"></div>
+        <div style="padding:12px 16px;border-top:1px solid var(--line);display:none" id="chat-input-row">
+          <div class="flex gap-10">
+            <input id="chat-input" placeholder="Type a message…" style="flex:1;padding:10px 12px;border:1.5px solid var(--line);border-radius:8px">
+            <button class="btn btn-primary btn-icon" id="chat-send"><svg class="icon"><use href="#ic-send"></use></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  document.querySelectorAll('#comm-tabs .tab-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('#comm-tabs .tab-btn').forEach(function (b) { b.classList.remove('active'); });
+      document.querySelectorAll('#view-sms .tab-panel').forEach(function (p) { p.classList.remove('active'); });
+      btn.classList.add('active'); document.querySelector('#view-sms .tab-panel[data-panel="' + btn.dataset.tab + '"]').classList.add('active');
+      if (btn.dataset.tab === 'log') loadSmsLog();
+      if (btn.dataset.tab === 'prayer') loadPrayer();
+      if (btn.dataset.tab === 'messages') loadThreads();
+    });
+  });
+
+  /* ---------- Bulk SMS ---------- */
+  var groupOptsLoaded = false;
+  function loadGroupOptions() {
+    if (groupOptsLoaded) return; groupOptsLoaded = true;
+    Church.run('getSmsGroupOptions').then(function (opts) {
+      var sel = document.getElementById('sms-group');
+      opts.clusters.forEach(function (c) { sel.appendChild(new Option('Cluster: ' + c, 'cluster:' + c)); });
+      opts.departments.forEach(function (d) { sel.appendChild(new Option('Department: ' + d, 'department:' + d)); });
+    });
+  }
+  document.getElementById('sms-message').addEventListener('input', function (e) {
+    document.getElementById('sms-char-count').textContent = e.target.value.length;
+  });
+  document.getElementById('sms-schedule-toggle').addEventListener('change', function (e) {
+    document.getElementById('sms-schedule-field').style.display = e.target.checked ? 'block' : 'none';
+  });
+  document.getElementById('sms-template-pick').addEventListener('change', function (e) {
+    var t = templates.find(function (x) { return x.ID === e.target.value; });
+    if (t) document.getElementById('sms-message').value = t.Body;
+    document.getElementById('sms-message').dispatchEvent(new Event('input'));
+  });
+  document.getElementById('sms-send-btn').addEventListener('click', function () {
+    var msg = document.getElementById('sms-message').value.trim();
+    if (!msg) { Church.toast('Message body is required', 'error'); return; }
+    var group = document.getElementById('sms-group').value;
+    var scheduled = document.getElementById('sms-schedule-toggle').checked ? document.getElementById('sms-schedule-at').value : null;
+    Church.task('sendBulkSms', group, msg, scheduled || null).then(function (res) {
+      Church.toast(scheduled ? (res.scheduled + ' message(s) scheduled') : (res.sent + ' sent, ' + res.failed + ' failed'), 'success');
+      document.getElementById('sms-message').value = ''; document.getElementById('sms-char-count').textContent = '0';
+    });
+  });
+
+  /* ---------- Templates ---------- */
+  var templates = [];
+  function loadTemplates() {
+    return Church.run('listSmsTemplates').then(function (rows) {
+      templates = rows;
+      var pick = document.getElementById('sms-template-pick');
+      pick.innerHTML = '<option value="">— None —</option>' + rows.map(function (t) { return '<option value="' + t.ID + '">' + Church.fmt.escape(t.Name) + '</option>'; }).join('');
+      document.getElementById('tpl-list').innerHTML = !rows.length ? '<div class="empty-state">No templates yet</div>' :
+        rows.map(function (t) {
+          return '<div style="padding:10px 0;border-bottom:1px solid var(--line)"><div class="flex" style="justify-content:space-between"><b>' + Church.fmt.escape(t.Name) + '</b>' +
+            '<button class="btn btn-ghost btn-icon btn-sm" data-del="' + t.ID + '"><svg class="icon-sm"><use href="#ic-trash"></use></svg></button></div>' +
+            '<div class="muted" style="font-size:12.5px">' + Church.fmt.escape(t.Body) + '</div></div>';
+        }).join('');
+      document.querySelectorAll('#tpl-list [data-del]').forEach(function (btn) {
+        btn.addEventListener('click', function () { Church.task('deleteSmsTemplate', btn.dataset.del).then(loadTemplates); });
+      });
+    });
+  }
+  document.getElementById('tpl-add-btn').addEventListener('click', function () {
+    Church.modal.open('<div class="modal-head"><h3><svg class="icon"><use href="#ic-sms"></use></svg>New Template</h3><div class="modal-close" onclick="Church.modal.close()"><svg class="icon"><use href="#ic-close"></use></svg></div></div>' +
+      '<div class="modal-body"><div class="field"><label>Name</label><input id="tpl-name"></div><div class="field"><label>Body</label><textarea id="tpl-body" placeholder="Hi {name}, ..."></textarea></div></div>' +
+      '<div class="modal-foot"><button class="btn btn-outline" onclick="Church.modal.close()">Cancel</button><button class="btn btn-primary" id="tpl-save">Save</button></div>');
+    document.getElementById('tpl-save').addEventListener('click', function () {
+      Church.task('saveSmsTemplate', { Name: document.getElementById('tpl-name').value, Body: document.getElementById('tpl-body').value })
+        .then(function () { Church.toast('Template saved', 'success'); Church.modal.close(); loadTemplates(); });
+    });
+  });
+
+  /* ---------- Delivery log ---------- */
+  var logLoaded = false;
+  function loadSmsLog() {
+    Church.task('listSmsLog').then(function (rows) {
+      document.getElementById('sms-log-table').innerHTML = !rows.length ? '<div class="empty-state">No messages sent yet</div>' :
+        '<div class="table-wrap"><table class="data-table"><thead><tr><th>Recipient</th><th>Message</th><th>Status</th><th>Provider</th><th>Sent</th></tr></thead><tbody>' +
+        rows.map(function (r) {
+          return '<tr><td>' + Church.fmt.escape(r.RecipientName || r.RecipientPhone) + '</td><td style="max-width:280px">' + Church.fmt.escape(r.MessageBody) + '</td>' +
+            '<td><span class="badge ' + (r.Status === 'Sent' ? 'badge-green' : r.Status === 'Failed' ? 'badge-red' : 'badge-amber') + '">' + r.Status + '</span></td>' +
+            '<td>' + r.Provider + '</td><td>' + Church.fmt.datetime(r.SentAt || r.ScheduledFor) + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+    });
+  }
+
+  /* ---------- Prayer requests ---------- */
+  var prayerTable = null;
+  function loadPrayer() {
+    Church.run('getWebAppUrl').then(function (url) { document.getElementById('prayer-public-link').value = url + '?page=prayer'; });
+    Church.task('listPrayerRequests').then(function (rows) {
+      var cols = [
+        { label: 'Requester', render: function (r) { return Church.fmt.escape(r.RequesterName) + (r.Visibility === 'Private' ? ' <svg class="icon-sm"><use href="#ic-lock"></use></svg>' : ''); } },
+        { label: 'Request', render: function (r) { return '<div style="max-width:320px">' + Church.fmt.escape(r.RequestText) + '</div>'; } },
+        { label: 'Status', render: function (r) { return '<span class="badge ' + (r.Status === 'Answered' ? 'badge-green' : r.Status === 'New' ? 'badge-blue' : r.Status === 'Closed' ? 'badge-gray' : 'badge-amber') + '">' + r.Status + '</span>'; } },
+        { label: 'Submitted', render: function (r) { return Church.fmt.date(r.SubmittedAt); } }
+      ];
+      if (prayerTable) prayerTable.refresh(rows);
+      else prayerTable = Church.dataTable(document.getElementById('prayer-table'), {
+        columns: cols, rows: rows, searchKeys: ['RequesterName', 'RequestText'], searchPlaceholder: 'Search prayer requests…',
+        onEdit: openPrayerModal, empty: { icon: 'ic-pray', title: 'No prayer requests yet' }
+      });
+    });
+  }
+  function openPrayerModal(r) {
+    Church.modal.open('<div class="modal-head"><h3><svg class="icon"><use href="#ic-pray"></use></svg>Prayer Request</h3><div class="modal-close" onclick="Church.modal.close()"><svg class="icon"><use href="#ic-close"></use></svg></div></div>' +
+      '<div class="modal-body"><p style="margin-bottom:14px;color:var(--ink-soft)">' + Church.fmt.escape(r.RequestText) + '</p>' +
+      '<div class="field"><label>Status</label><select id="pr-status"></select></div>' +
+      '<div class="field"><label>Assigned To</label><input id="pr-assigned" value="' + Church.fmt.escape(r.AssignedTo || '') + '"></div>' +
+      '<div class="field"><label>Response Notes</label><textarea id="pr-notes">' + Church.fmt.escape(r.ResponseNotes || '') + '</textarea></div></div>' +
+      '<div class="modal-foot"><button class="btn btn-outline" onclick="Church.modal.close()">Cancel</button><button class="btn btn-primary" id="pr-save">Save</button></div>');
+    var sel = document.getElementById('pr-status');
+    ['New', 'In Progress', 'Answered', 'Closed'].forEach(function (s) { sel.appendChild(new Option(s, s, false, s === r.Status)); });
+    document.getElementById('pr-save').addEventListener('click', function () {
+      Church.task('updatePrayerRequest', { ID: r.ID, Status: sel.value, AssignedTo: document.getElementById('pr-assigned').value, ResponseNotes: document.getElementById('pr-notes').value })
+        .then(function () { Church.toast('Updated', 'success'); Church.modal.close(); loadPrayer(); });
+    });
+  }
+
+  /* ---------- Internal messaging ---------- */
+  var activeThread = null, contacts = [];
+  function loadThreads() {
+    Church.task('listMessageThreads').then(function (threads) {
+      document.getElementById('thread-list').innerHTML = !threads.length ? '<div class="empty-state" style="padding:24px">No conversations yet</div>' :
+        threads.map(function (t) {
+          return '<div class="nav-item" style="color:var(--ink);margin:4px 8px" data-thread="' + t.ID + '"><svg class="icon"><use href="#ic-message-square"></use></svg>' +
+            '<span style="overflow:hidden;text-overflow:ellipsis">' + Church.fmt.escape(t.Name) + '</span></div>';
+        }).join('');
+      document.querySelectorAll('[data-thread]').forEach(function (el) { el.addEventListener('click', function () { openThread(threads.find(function (t) { return t.ID === el.dataset.thread; })); }); });
+    });
+    if (!contacts.length) Church.run('listMessagingContacts').then(function (c) { contacts = c; });
+  }
+  function openThread(thread) {
+    activeThread = thread;
+    document.getElementById('chat-header').innerHTML = '<h3>' + Church.fmt.escape(thread.Name) + '</h3>';
+    document.getElementById('chat-input-row').style.display = 'block';
+    Church.task('listThreadMessages', thread.ID).then(function (msgs) {
+      document.getElementById('chat-body').innerHTML = !msgs.length ? '<div class="empty-state">Say hello 👋</div>' :
+        msgs.map(function (m) {
+          var mine = m.FromUser === Church.session.email;
+          return '<div style="margin-bottom:10px;text-align:' + (mine ? 'right' : 'left') + '"><div style="display:inline-block;max-width:75%;padding:9px 13px;border-radius:12px;background:' + (mine ? 'var(--green-primary)' : '#f0f3f1') + ';color:' + (mine ? '#fff' : 'var(--ink)') + '">' +
+            (!mine ? '<div style="font-size:10.5px;opacity:.7;margin-bottom:2px">' + Church.fmt.escape(m.FromUser) + '</div>' : '') +
+            Church.fmt.escape(m.Body) + '</div><div class="muted" style="font-size:10.5px;margin-top:2px">' + Church.fmt.datetime(m.SentAt) + '</div></div>';
+        }).join('');
+      document.getElementById('chat-body').scrollTop = 999999;
+    });
+  }
+  document.getElementById('chat-send').addEventListener('click', function () {
+    var input = document.getElementById('chat-input');
+    if (!activeThread || !input.value.trim()) return;
+    Church.task('sendMessage', activeThread.ID, input.value.trim()).then(function () { input.value = ''; openThread(activeThread); loadThreads(); });
+  });
+  document.getElementById('msg-new-btn').addEventListener('click', function () {
+    Church.modal.open('<div class="modal-head"><h3><svg class="icon"><use href="#ic-message-square"></use></svg>New Conversation</h3><div class="modal-close" onclick="Church.modal.close()"><svg class="icon"><use href="#ic-close"></use></svg></div></div>' +
+      '<div class="modal-body"><div class="field"><label>Name (optional, for group chats)</label><input id="nc-name"></div>' +
+      '<div class="field"><label>Participants</label><select id="nc-participants" multiple size="6">' +
+      contacts.map(function (c) { return '<option value="' + c.email + '">' + Church.fmt.escape(c.name) + ' (' + c.role + ')</option>'; }).join('') + '</select></div></div>' +
+      '<div class="modal-foot"><button class="btn btn-outline" onclick="Church.modal.close()">Cancel</button><button class="btn btn-primary" id="nc-save">Start</button></div>');
+    document.getElementById('nc-save').addEventListener('click', function () {
+      var sel = Array.prototype.map.call(document.getElementById('nc-participants').selectedOptions, function (o) { return o.value; });
+      if (!sel.length) { Church.toast('Select at least one participant', 'error'); return; }
+      Church.task('createMessageThread', document.getElementById('nc-name').value, sel, sel.length > 1 ? 'Group' : 'Direct')
+        .then(function (t) { Church.toast('Conversation started', 'success'); Church.modal.close(); loadThreads(); });
+    });
+  });
+
+  function mount() {
+    loadGroupOptions();
+    loadTemplates();
+  }
+  Church.views.sms = { mount: mount, refresh: mount };
+})();
+</script>
+
+<div class="view" id="view-equipment">
+  <div class="page-head">
+    <div><h1>Equipment</h1><p>Church asset inventory, assignment and condition tracking.</p></div>
+    <div class="page-actions"><button class="btn btn-primary" id="eq-add-btn"><svg class="icon"><use href="#ic-plus"></use></svg> Add Equipment</button></div>
+  </div>
+  <div class="card card-pad"><div id="eq-table"></div></div>
+</div>
+
+<script>
+(function () {
+  var FIELDS = [
+    { key: 'Name', label: 'Equipment Name', required: true, half: true },
+    { key: 'Category', label: 'Category', required: true, half: true },
+    { key: 'SerialNumber', label: 'Serial Number', half: true },
+    { key: 'Status', label: 'Status', type: 'select', options: ['Available', 'In Use', 'Maintenance', 'Retired'], half: true },
+    { key: 'Location', label: 'Location', half: true },
+    { key: 'AssignedTo', label: 'Assigned To', half: true },
+    { key: 'PurchaseDate', label: 'Purchase Date', type: 'date', half: true },
+    { key: 'Condition', label: 'Condition', type: 'select', options: ['Excellent', 'Good', 'Fair', 'Poor'], half: true },
+    { key: 'Notes', label: 'Notes', type: 'textarea' }
+  ];
+  var all = [], table = null;
+
+  function statusBadge(s) {
+    var cls = { Available: 'badge-green', 'In Use': 'badge-blue', Maintenance: 'badge-amber', Retired: 'badge-gray' }[s] || 'badge-gray';
+    return '<span class="badge ' + cls + '">' + s + '</span>';
+  }
+
+  function render() {
+    var cols = [
+      { label: 'Name', render: function (e) { return '<b>' + Church.fmt.escape(e.Name) + '</b><div class="muted" style="font-size:11.5px">' + Church.fmt.escape(e.Category) + '</div>'; } },
+      { label: 'Serial #', render: function (e) { return '<span class="mono">' + Church.fmt.escape(e.SerialNumber || '—') + '</span>'; } },
+      { label: 'Status', render: function (e) { return statusBadge(e.Status); } },
+      { label: 'Location', key: 'Location' },
+      { label: 'Assigned To', render: function (e) { return Church.fmt.escape(e.AssignedTo || '—'); } },
+      { label: 'Condition', key: 'Condition' }
+    ];
+    if (table) { table.refresh(all); return; }
+    table = Church.dataTable(document.getElementById('eq-table'), {
+      columns: cols, rows: all, searchKeys: ['Name', 'Category', 'SerialNumber', 'Location'], searchPlaceholder: 'Search equipment…',
+      onEdit: openModal, onDelete: function (e) { Church.confirm('Remove ' + e.Name + ' from inventory?').then(function (ok) { if (ok) Church.task('deleteEquipment', e.ID).then(function () { Church.toast('Removed', 'success'); load(); }); }); },
+      empty: { icon: 'ic-equipment', title: 'No equipment recorded yet' }
+    });
+  }
+
+  function openModal(item) {
+    item = item || {};
+    var isNew = !item.ID;
+    Church.modal.open('<div class="modal-head"><h3><svg class="icon"><use href="#ic-equipment"></use></svg>' + (isNew ? 'Add Equipment' : 'Edit Equipment') + '</h3><div class="modal-close" onclick="Church.modal.close()"><svg class="icon"><use href="#ic-close"></use></svg></div></div>' +
+      '<div class="modal-body" id="eq-fields"></div><div class="modal-foot"><button class="btn btn-outline" onclick="Church.modal.close()">Cancel</button><button class="btn btn-primary" id="eq-save">Save</button></div>');
+    document.getElementById('eq-fields').innerHTML = Church.renderFields(FIELDS, item);
+    document.getElementById('eq-save').addEventListener('click', function () {
+      var payload = Church.readFields(document.getElementById('eq-fields'), FIELDS);
+      if (!isNew) payload.ID = item.ID;
+      Church.task('saveEquipment', payload).then(function () { Church.toast('Saved', 'success'); Church.modal.close(); load(); });
+    });
+  }
+
+  function load() { return Church.task('listEquipment').then(function (rows) { all = rows; render(); }); }
+  document.getElementById('eq-add-btn').addEventListener('click', function () { openModal({}); });
+  Church.views.equipment = { mount: load, refresh: load };
+})();
+</script>
+
+<div class="view" id="view-reports">
+  <div class="page-head"><div><h1>Reports &amp; Analytics</h1><p>Attendance patterns, financial trends, growth and engagement.</p></div></div>
+
+  <div class="tabbar" id="rpt-tabs">
+    <div class="tab-btn active" data-tab="attendance">Attendance</div>
+    <div class="tab-btn" data-tab="growth">Growth</div>
+    <div class="tab-btn" data-tab="cluster">Cluster Effectiveness</div>
+    <div class="tab-btn" data-tab="engagement">Engagement</div>
+    <div class="tab-btn" data-tab="export">Export</div>
+  </div>
+
+  <div class="tab-panel active" data-panel="attendance">
+    <div class="card"><div class="card-head"><h3>Attendance Over Time</h3></div><div class="card-pad"><div id="chart-rpt-attendance" style="height:260px"></div></div></div>
+  </div>
+
+  <div class="tab-panel" data-panel="growth">
+    <div class="card"><div class="card-head"><h3>Membership Growth</h3></div><div class="card-pad"><div id="chart-rpt-growth" style="height:260px"></div></div></div>
+  </div>
+
+  <div class="tab-panel" data-panel="cluster">
+    <div class="card card-pad"><div id="cluster-report-table"></div></div>
+  </div>
+
+  <div class="tab-panel" data-panel="engagement">
+    <div class="card card-pad"><div id="engagement-table"></div></div>
+  </div>
+
+  <div class="tab-panel" data-panel="export">
+    <div class="card card-pad">
+      <p class="muted" style="margin-bottom:16px">Download any dataset as CSV, or open the live spreadsheet directly.</p>
+      <div class="grid grid-3" id="export-buttons"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  document.querySelectorAll('#rpt-tabs .tab-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('#rpt-tabs .tab-btn').forEach(function (b) { b.classList.remove('active'); });
+      document.querySelectorAll('#view-reports .tab-panel').forEach(function (p) { p.classList.remove('active'); });
+      btn.classList.add('active'); document.querySelector('#view-reports .tab-panel[data-panel="' + btn.dataset.tab + '"]').classList.add('active');
+    });
+  });
+
+  function loadAttendance() {
+    Church.task('getAttendanceReport', '', '').then(function (r) {
+      Church.loadCharts().then(function () {
+        var t = new google.visualization.DataTable(); t.addColumn('string', 'Date'); t.addColumn('number', 'Check-ins');
+        r.series.forEach(function (s) { t.addRow([s.date.slice(5), s.count]); });
+        new google.visualization.ColumnChart(document.getElementById('chart-rpt-attendance')).draw(t, { legend: 'none', colors: ['#22c55e'], chartArea: { width: '92%', height: '78%' } });
+      });
+    });
+  }
+
+  function loadGrowth() {
+    Church.task('getGrowthReport', 12).then(function (r) {
+      Church.loadCharts().then(function () {
+        var t = new google.visualization.DataTable(); t.addColumn('string', 'Month'); t.addColumn('number', 'Total Members');
+        r.memberGrowth.forEach(function (m) { t.addRow([m.month, m.total]); });
+        new google.visualization.LineChart(document.getElementById('chart-rpt-growth')).draw(t, { legend: 'none', colors: ['#0b3d2e'], lineWidth: 3, pointSize: 5, chartArea: { width: '92%', height: '78%' } });
+      });
+    });
+  }
+
+  function loadClusterReport() {
+    Church.task('getClusterEffectivenessReport').then(function (rows) {
+      document.getElementById('cluster-report-table').innerHTML = !rows.length ? '<div class="empty-state">No clusters yet</div>' :
+        '<div class="table-wrap"><table class="data-table"><thead><tr><th>Cluster</th><th>Leader</th><th>Members</th><th>Avg Attendance / Member</th><th>Follow-ups</th></tr></thead><tbody>' +
+        rows.map(function (r) { return '<tr><td>' + Church.fmt.escape(r.cluster) + '</td><td>' + Church.fmt.escape(r.leader || '—') + '</td><td>' + r.memberCount + '</td><td>' + r.avgAttendancePerMember + '</td><td>' + r.followUps + '</td></tr>'; }).join('') +
+        '</tbody></table></div>';
+    });
+  }
+
+  function loadEngagement() {
+    Church.task('getMemberEngagementReport').then(function (rows) {
+      document.getElementById('engagement-table').innerHTML = !rows.length ? '<div class="empty-state">No members yet</div>' :
+        '<div class="table-wrap"><table class="data-table"><thead><tr><th>Member</th><th>Engagement Score</th></tr></thead><tbody>' +
+        rows.slice(0, 50).map(function (r) {
+          return '<tr><td>' + Church.fmt.escape(r.name) + '</td><td style="width:220px"><div class="flex gap-10"><div class="progress-bar" style="flex:1"><div style="width:' + r.score + '%"></div></div><b>' + r.score + '</b></div></td></tr>';
+        }).join('') + '</tbody></table></div>';
+    });
+  }
+
+  var EXPORTS = [
+    { key: 'MEMBERS', label: 'Members' }, { key: 'VISITORS', label: 'Visitors' }, { key: 'ATTENDANCE', label: 'Attendance' },
+    { key: 'FINANCE', label: 'Giving' }, { key: 'EXPENSES', label: 'Expenses' }, { key: 'EQUIPMENT', label: 'Equipment' }
+  ];
+  function setupExports() {
+    document.getElementById('export-buttons').innerHTML = EXPORTS.map(function (e) {
+      return '<button class="btn btn-outline" data-export="' + e.key + '"><svg class="icon"><use href="#ic-download"></use></svg> ' + e.label + ' CSV</button>';
+    }).join('');
+    document.querySelectorAll('[data-export]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        Church.task('exportSheetCsv', btn.dataset.export).then(function (csv) {
+          var blob = new Blob([csv], { type: 'text/csv' });
+          var url = URL.createObjectURL(blob);
+          var a = document.createElement('a'); a.href = url; a.download = btn.dataset.export.toLowerCase() + '.csv'; document.body.appendChild(a); a.click(); a.remove();
+          URL.revokeObjectURL(url);
+        });
+      });
+    });
+  }
+
+  function mount() { loadAttendance(); loadGrowth(); loadClusterReport(); loadEngagement(); setupExports(); }
+  Church.views.reports = { mount: mount, refresh: mount };
+})();
+</script>
+
+<div class="view" id="view-settings">
+  <div class="page-head"><div><h1>Settings</h1><p>Organization info, custom fields, SMS providers, users and backups.</p></div></div>
+
+  <div class="tabbar" id="set-tabs">
+    <div class="tab-btn active" data-tab="general">General</div>
+    <div class="tab-btn" data-tab="fields">Custom Fields</div>
+    <div class="tab-btn" data-tab="smsprov">SMS Providers</div>
+    <div class="tab-btn" data-tab="users">Users &amp; Roles</div>
+    <div class="tab-btn" data-tab="backup">Backup &amp; Audit</div>
+  </div>
+
+  <div class="tab-panel active" data-panel="general">
+    <div class="card card-pad" style="max-width:560px" id="general-fields-wrap">
+      <div id="general-fields"></div>
+      <button class="btn btn-primary" id="general-save">Save Settings</button>
+    </div>
+  </div>
+
+  <div class="tab-panel" data-panel="fields">
+    <div class="card card-pad">
+      <p class="muted" style="margin-bottom:14px">Extra fields shown on every Member profile, under the "Custom Fields" tab.</p>
+      <div id="cf-rows"></div>
+      <button class="btn btn-outline" id="cf-add-row" style="margin-top:10px"><svg class="icon"><use href="#ic-plus"></use></svg> Add Field</button>
+      <div style="margin-top:16px"><button class="btn btn-primary" id="cf-save">Save Custom Fields</button></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" data-panel="smsprov">
+    <div class="card card-pad" style="max-width:560px">
+      <div class="field"><label>Active Provider</label><select id="sp-provider"><option value="arkesel">Arkesel</option><option value="hubtel">Hubtel</option><option value="custom">Custom Gateway</option></select></div>
+      <div id="sp-arkesel" class="sp-block">
+        <div class="field"><label>Arkesel API Key</label><input id="sp-arkesel-key" type="password"></div>
+        <div class="field"><label>Sender ID</label><input id="sp-arkesel-sender"></div>
+      </div>
+      <div id="sp-hubtel" class="sp-block" style="display:none">
+        <div class="field-row"><div class="field"><label>Client ID</label><input id="sp-hubtel-id"></div><div class="field"><label>Client Secret</label><input id="sp-hubtel-secret" type="password"></div></div>
+        <div class="field"><label>Sender ID</label><input id="sp-hubtel-sender"></div>
+      </div>
+      <div id="sp-custom" class="sp-block" style="display:none">
+        <div class="field"><label>Endpoint URL</label><input id="sp-custom-endpoint" placeholder="https://..."></div>
+        <div class="field-row"><div class="field"><label>Method</label><select id="sp-custom-method"><option>POST</option><option>GET</option></select></div><div class="field"><label>API Key</label><input id="sp-custom-key" type="password"></div></div>
+        <div class="field-row"><div class="field"><label>Phone Field Name</label><input id="sp-custom-phonefield"></div><div class="field"><label>Message Field Name</label><input id="sp-custom-msgfield"></div></div>
+      </div>
+      <button class="btn btn-primary" id="sp-save">Save SMS Settings</button>
+    </div>
+  </div>
+
+  <div class="tab-panel" data-panel="users">
+    <div class="page-actions" style="margin-bottom:14px"><button class="btn btn-primary" id="usr-add-btn"><svg class="icon"><use href="#ic-plus"></use></svg> Add User</button></div>
+    <div class="card card-pad"><div id="usr-table"></div></div>
+  </div>
+
+  <div class="tab-panel" data-panel="backup">
+    <div class="card card-pad" style="margin-bottom:16px">
+      <div class="flex" style="justify-content:space-between">
+        <div><b>Scheduled Backups</b><div class="muted" style="font-size:12.5px">Weekly backups run automatically. Retention: <span id="bk-retention"></span> years.</div></div>
+        <button class="btn btn-outline" id="bk-run-now"><svg class="icon"><use href="#ic-database"></use></svg> Backup Now</button>
+      </div>
+    </div>
+    <div class="card card-pad"><h3 style="margin-bottom:12px;font-size:14px">Recent Audit Trail</h3><div id="audit-table"></div></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  document.querySelectorAll('#set-tabs .tab-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('#set-tabs .tab-btn').forEach(function (b) { b.classList.remove('active'); });
+      document.querySelectorAll('#view-settings .tab-panel').forEach(function (p) { p.classList.remove('active'); });
+      btn.classList.add('active'); document.querySelector('#view-settings .tab-panel[data-panel="' + btn.dataset.tab + '"]').classList.add('active');
+      if (btn.dataset.tab === 'users') loadUsers();
+      if (btn.dataset.tab === 'backup') loadAudit();
+    });
+  });
+
+  var GENERAL_FIELDS = [
+    { key: 'OrgName', label: 'Organization Name', required: true },
+    { key: 'AbsenceThresholdWeeks', label: 'Absence Alert Threshold (weeks)', type: 'number', half: true },
+    { key: 'CheckInWindowMinutes', label: 'Check-In Window (minutes)', type: 'number', half: true }
+  ];
+  var settingsCache = {};
+
+  function loadSettings() {
+    return Church.task('getSettings').then(function (s) {
+      settingsCache = s;
+      document.getElementById('general-fields').innerHTML = Church.renderFields(GENERAL_FIELDS, s);
+      document.getElementById('sp-provider').value = s.SmsProvider || 'arkesel';
+      toggleProviderBlocks();
+      document.getElementById('sp-arkesel-sender').value = s.Sms_Arkesel_SenderId || '';
+      document.getElementById('sp-hubtel-id').value = s.Sms_Hubtel_ClientId || '';
+      document.getElementById('sp-hubtel-sender').value = s.Sms_Hubtel_SenderId || '';
+      document.getElementById('sp-custom-endpoint').value = s.Sms_Custom_Endpoint || '';
+      document.getElementById('sp-custom-method').value = s.Sms_Custom_Method || 'POST';
+      document.getElementById('sp-custom-phonefield').value = s.Sms_Custom_PhoneField || 'to';
+      document.getElementById('sp-custom-msgfield').value = s.Sms_Custom_MessageField || 'message';
+      document.getElementById('bk-retention').textContent = s.RetentionYears || '7';
+    });
+  }
+  document.getElementById('general-save').addEventListener('click', function () {
+    var payload = Church.readFields(document.getElementById('general-fields'), GENERAL_FIELDS);
+    Church.task('saveSettings', payload).then(function () { Church.toast('Settings saved', 'success'); });
+  });
+
+  function toggleProviderBlocks() {
+    var p = document.getElementById('sp-provider').value;
+    ['arkesel', 'hubtel', 'custom'].forEach(function (k) { document.getElementById('sp-' + k).style.display = k === p ? 'block' : 'none'; });
+  }
+  document.getElementById('sp-provider').addEventListener('change', toggleProviderBlocks);
+  document.getElementById('sp-save').addEventListener('click', function () {
+    var payload = {
+      SmsProvider: document.getElementById('sp-provider').value,
+      Sms_Arkesel_SenderId: document.getElementById('sp-arkesel-sender').value,
+      Sms_Hubtel_ClientId: document.getElementById('sp-hubtel-id').value,
+      Sms_Hubtel_SenderId: document.getElementById('sp-hubtel-sender').value,
+      Sms_Custom_Endpoint: document.getElementById('sp-custom-endpoint').value,
+      Sms_Custom_Method: document.getElementById('sp-custom-method').value,
+      Sms_Custom_PhoneField: document.getElementById('sp-custom-phonefield').value,
+      Sms_Custom_MessageField: document.getElementById('sp-custom-msgfield').value
+    };
+    var arkKey = document.getElementById('sp-arkesel-key').value; if (arkKey) payload.Sms_Arkesel_ApiKey = arkKey;
+    var hubSecret = document.getElementById('sp-hubtel-secret').value; if (hubSecret) payload.Sms_Hubtel_ClientSecret = hubSecret;
+    var custKey = document.getElementById('sp-custom-key').value; if (custKey) payload.Sms_Custom_ApiKey = custKey;
+    Church.task('saveSettings', payload).then(function () { Church.toast('SMS settings saved', 'success'); });
+  });
+
+  /* ---------- Custom fields ---------- */
+  var cfRows = [];
+  function renderCfRows() {
+    document.getElementById('cf-rows').innerHTML = cfRows.map(function (f, i) {
+      return '<div class="field-row" style="align-items:end;margin-bottom:10px" data-idx="' + i + '">' +
+        '<div class="field" style="margin-bottom:0"><label>Field Key</label><input class="cf-key" value="' + Church.fmt.escape(f.key) + '" placeholder="e.g. spiritualGift"></div>' +
+        '<div class="field" style="margin-bottom:0"><label>Label</label><input class="cf-label" value="' + Church.fmt.escape(f.label) + '" placeholder="e.g. Spiritual Gift"></div>' +
+        '</div>' +
+        '<div class="flex gap-10" style="margin-bottom:16px"><select class="cf-type" style="max-width:160px"><option value="text"' + (f.type === 'text' ? ' selected' : '') + '>Text</option><option value="date"' + (f.type === 'date' ? ' selected' : '') + '>Date</option><option value="select"' + (f.type === 'select' ? ' selected' : '') + '>Dropdown</option></select>' +
+        '<input class="cf-options" placeholder="Dropdown options, comma separated" value="' + Church.fmt.escape((f.options || []).join(', ')) + '" style="flex:1;padding:10px 12px;border:1.5px solid var(--line);border-radius:8px">' +
+        '<button class="btn btn-ghost btn-icon btn-sm" data-rm="' + i + '"><svg class="icon-sm"><use href="#ic-trash"></use></svg></button></div>';
+    }).join('') || '<div class="empty-state" style="padding:20px">No custom fields yet</div>';
+    document.querySelectorAll('#cf-rows [data-rm]').forEach(function (btn) { btn.addEventListener('click', function () { cfRows.splice(Number(btn.dataset.rm), 1); renderCfRows(); }); });
+  }
+  document.getElementById('cf-add-row').addEventListener('click', function () { cfRows.push({ key: '', label: '', type: 'text', options: [] }); renderCfRows(); });
+  document.getElementById('cf-save').addEventListener('click', function () {
+    var rows = Array.prototype.slice.call(document.querySelectorAll('#cf-rows [data-idx]')).map(function (row) {
+      return {
+        key: row.querySelector('.cf-key').value.trim(),
+        label: row.querySelector('.cf-label').value.trim(),
+        type: row.querySelector('.cf-type').value,
+        options: row.querySelector('.cf-options').value.split(',').map(function (s) { return s.trim(); }).filter(Boolean)
+      };
+    }).filter(function (f) { return f.key && f.label; });
+    Church.task('saveCustomFieldsConfig', rows).then(function () { Church.toast('Custom fields saved', 'success'); });
+  });
+  function loadCustomFields() {
+    Church.run('getCustomFieldsConfig').then(function (rows) { cfRows = rows || []; renderCfRows(); });
+  }
+
+  /* ---------- Users & roles ---------- */
+  var usrTable = null;
+  var ROLES = ['SuperAdmin', 'Admin', 'FinanceOfficer', 'ClusterLeader', 'CommunicationOfficer', 'Viewer'];
+  function loadUsers() {
+    Church.task('listUsers').then(function (rows) {
+      var cols = [
+        { label: 'Name', key: 'FullName' }, { label: 'Email', key: 'Email' },
+        { label: 'Role', render: function (u) { return '<span class="badge badge-dark">' + u.Role + '</span>'; } },
+        { label: 'Active', render: function (u) { return u.Active === 'FALSE' || u.Active === false ? '<span class="badge badge-gray">Inactive</span>' : '<span class="badge badge-green">Active</span>'; } }
+      ];
+      if (usrTable) usrTable.refresh(rows);
+      else usrTable = Church.dataTable(document.getElementById('usr-table'), {
+        columns: cols, rows: rows, searchKeys: ['FullName', 'Email'], searchPlaceholder: 'Search users…',
+        onEdit: openUserModal, onDelete: function (u) { Church.confirm('Remove ' + u.FullName + '?').then(function (ok) { if (ok) Church.task('deleteUser', u.ID).then(function () { Church.toast('Removed', 'success'); loadUsers(); }); }); },
+        empty: { icon: 'ic-members', title: 'No users yet' }
+      });
+    });
+  }
+  function openUserModal(u) {
+    u = u || {};
+    var isNew = !u.ID;
+    var fields = [
+      { key: 'FullName', label: 'Full Name', required: true, half: true },
+      { key: 'Email', label: 'Google Account Email', required: true, half: true },
+      { key: 'Role', label: 'Role', type: 'select', options: ROLES, required: true, half: true },
+      { key: 'Phone', label: 'Phone', half: true },
+      { key: 'Active', label: 'Active', type: 'checkbox' }
+    ];
+    Church.modal.open('<div class="modal-head"><h3><svg class="icon"><use href="#ic-shield"></use></svg>' + (isNew ? 'Add User' : 'Edit User') + '</h3><div class="modal-close" onclick="Church.modal.close()"><svg class="icon"><use href="#ic-close"></use></svg></div></div>' +
+      '<div class="modal-body" id="usr-fields"></div><div class="modal-foot"><button class="btn btn-outline" onclick="Church.modal.close()">Cancel</button><button class="btn btn-primary" id="usr-save">Save</button></div>');
+    document.getElementById('usr-fields').innerHTML = Church.renderFields(fields, Object.assign({ Active: isNew ? true : u.Active !== 'FALSE' }, u));
+    document.getElementById('usr-save').addEventListener('click', function () {
+      var payload = Church.readFields(document.getElementById('usr-fields'), fields);
+      if (!isNew) payload.ID = u.ID;
+      Church.task('saveUser', payload).then(function () { Church.toast('User saved', 'success'); Church.modal.close(); loadUsers(); });
+    });
+  }
+  document.getElementById('usr-add-btn').addEventListener('click', function () { openUserModal({}); });
+
+  /* ---------- Backup & audit ---------- */
+  document.getElementById('bk-run-now').addEventListener('click', function () {
+    Church.task('runBackupNow').then(function (r) { Church.toast('Backup created', 'success'); window.open(r.url, '_blank'); });
+  });
+  function loadAudit() {
+    Church.task('getAuditLog', 100).then(function (rows) {
+      document.getElementById('audit-table').innerHTML = !rows.length ? '<div class="empty-state">No audit events yet</div>' :
+        '<div class="table-wrap"><table class="data-table"><thead><tr><th>When</th><th>User</th><th>Action</th><th>Entity</th><th>Details</th></tr></thead><tbody>' +
+        rows.map(function (r) { return '<tr><td>' + Church.fmt.datetime(r.Timestamp) + '</td><td>' + Church.fmt.escape(r.UserEmail) + '</td><td><span class="badge badge-gray">' + r.Action + '</span></td><td>' + r.Entity + '</td><td class="muted">' + Church.fmt.escape(r.Details) + '</td></tr>'; }).join('') +
+        '</tbody></table></div>';
+    });
+  }
+
+  function mount() { loadSettings(); loadCustomFields(); }
+  Church.views.settings = { mount: mount, refresh: mount };
+})();
+</script>
+
+<div class="view" id="view-cluster">
+  <div class="page-head"><div><h1>Cluster Follow-up</h1><p>Small groups, leaders, and per-member follow-up logs.</p></div></div>
+
+  <div class="tabbar" id="cl-tabs">
+    <div class="tab-btn active" data-tab="clusters">Clusters</div>
+    <div class="tab-btn" data-tab="followups">Follow-up Log</div>
+  </div>
+
+  <div class="tab-panel active" data-panel="clusters">
+    <div class="page-actions" style="margin-bottom:14px"><button class="btn btn-primary" id="cl-add-btn"><svg class="icon"><use href="#ic-plus"></use></svg> New Cluster</button></div>
+    <div class="card card-pad"><div id="cl-table"></div></div>
+  </div>
+
+  <div class="tab-panel" data-panel="followups">
+    <div class="page-actions" style="margin-bottom:14px"><button class="btn btn-primary" id="fu-add-btn"><svg class="icon"><use href="#ic-plus"></use></svg> Log Follow-up</button></div>
+    <div class="card card-pad"><div id="fu-table"></div></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var clusters = [], members = [], followups = [], clTable = null, fuTable = null;
+
+  document.querySelectorAll('#cl-tabs .tab-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('#cl-tabs .tab-btn').forEach(function (b) { b.classList.remove('active'); });
+      document.querySelectorAll('#view-cluster .tab-panel').forEach(function (p) { p.classList.remove('active'); });
+      btn.classList.add('active'); document.querySelector('#view-cluster .tab-panel[data-panel="' + btn.dataset.tab + '"]').classList.add('active');
+    });
+  });
+
+  function loadClusters() {
+    return Church.task('listClusters').then(function (rows) {
+      clusters = rows;
+      var cols = [
+        { label: 'Cluster', key: 'Name' },
+        { label: 'Leader', key: 'LeaderName' },
+        { label: 'Members', render: function (c) { return '<span class="badge badge-green">' + c.MemberCount + '</span>'; } },
+        { label: 'Meets', key: 'MeetingDay' },
+        { label: 'Location', key: 'Location' },
+        { label: 'Status', render: function (c) { return '<span class="badge ' + (c.Status === 'Active' ? 'badge-green' : 'badge-gray') + '">' + c.Status + '</span>'; } }
+      ];
+      if (clTable) clTable.refresh(rows);
+      else clTable = Church.dataTable(document.getElementById('cl-table'), {
+        columns: cols, rows: rows, searchKeys: ['Name', 'LeaderName'], searchPlaceholder: 'Search clusters…',
+        onEdit: openClusterModal, onDelete: function (c) { Church.confirm('Delete cluster ' + c.Name + '?').then(function (ok) { if (ok) Church.task('deleteCluster', c.ID).then(function () { Church.toast('Deleted', 'success'); loadClusters(); }); }); },
+        empty: { icon: 'ic-cluster', title: 'No clusters yet' }
+      });
+    });
+  }
+
+  function openClusterModal(c) {
+    c = c || {};
+    var isNew = !c.ID;
+    var fields = [
+      { key: 'Name', label: 'Cluster Name', required: true },
+      { key: 'LeaderMemberID', label: 'Leader', type: 'select', options: members.map(function (m) { return { value: m.ID, label: m.FirstName + ' ' + m.LastName }; }), half: true },
+      { key: 'MeetingDay', label: 'Meeting Day', half: true },
+      { key: 'Location', label: 'Location', half: true },
+      { key: 'Status', label: 'Status', type: 'select', options: ['Active', 'Inactive'], half: true },
+      { key: 'Notes', label: 'Notes', type: 'textarea' }
+    ];
+    Church.modal.open('<div class="modal-head"><h3><svg class="icon"><use href="#ic-cluster"></use></svg>' + (isNew ? 'New Cluster' : 'Edit Cluster') + '</h3><div class="modal-close" onclick="Church.modal.close()"><svg class="icon"><use href="#ic-close"></use></svg></div></div>' +
+      '<div class="modal-body" id="cl-fields"></div><div class="modal-foot"><button class="btn btn-outline" onclick="Church.modal.close()">Cancel</button><button class="btn btn-primary" id="cl-save">Save</button></div>');
+    document.getElementById('cl-fields').innerHTML = Church.renderFields(fields, c);
+    document.getElementById('cl-save').addEventListener('click', function () {
+      var payload = Church.readFields(document.getElementById('cl-fields'), fields);
+      if (!isNew) payload.ID = c.ID;
+      Church.task('saveCluster', payload).then(function () { Church.toast('Saved', 'success'); Church.modal.close(); loadClusters(); });
+    });
+  }
+  document.getElementById('cl-add-btn').addEventListener('click', function () { openClusterModal({}); });
+
+  function loadFollowUps() {
+    return Church.task('listClusterFollowUps').then(function (rows) {
+      followups = rows;
+      var cols = [
+        { label: 'Member', key: 'MemberName' },
+        { label: 'Cluster', key: 'ClusterName' },
+        { label: 'Type', render: function (f) { return '<span class="badge badge-blue">' + f.Type + '</span>'; } },
+        { label: 'Date', render: function (f) { return Church.fmt.date(f.FollowUpDate); } },
+        { label: 'Outcome', key: 'Outcome' },
+        { label: 'By', key: 'FollowedUpBy' }
+      ];
+      if (fuTable) fuTable.refresh(rows);
+      else fuTable = Church.dataTable(document.getElementById('fu-table'), {
+        columns: cols, rows: rows, searchKeys: ['MemberName', 'ClusterName'], searchPlaceholder: 'Search follow-ups…',
+        onDelete: function (f) { Church.task('deleteClusterFollowUp', f.ID).then(function () { Church.toast('Removed', 'success'); loadFollowUps(); }); },
+        empty: { icon: 'ic-cluster', title: 'No follow-ups logged yet' }
+      });
+    });
+  }
+  document.getElementById('fu-add-btn').addEventListener('click', function () {
+    var fields = [
+      { key: 'ClusterID', label: 'Cluster', type: 'select', options: clusters.map(function (c) { return { value: c.ID, label: c.Name }; }), required: true },
+      { key: 'MemberID', label: 'Member', type: 'select', options: members.map(function (m) { return { value: m.ID, label: m.FirstName + ' ' + m.LastName }; }), required: true },
+      { key: 'Type', label: 'Type', type: 'select', options: ['Visit', 'Call', 'Message'], required: true, half: true },
+      { key: 'FollowUpDate', label: 'Date', type: 'date', required: true, half: true },
+      { key: 'Outcome', label: 'Outcome' },
+      { key: 'Notes', label: 'Notes', type: 'textarea' }
+    ];
+    Church.modal.open('<div class="modal-head"><h3><svg class="icon"><use href="#ic-cluster"></use></svg>Log Follow-up</h3><div class="modal-close" onclick="Church.modal.close()"><svg class="icon"><use href="#ic-close"></use></svg></div></div>' +
+      '<div class="modal-body" id="fu-fields"></div><div class="modal-foot"><button class="btn btn-outline" onclick="Church.modal.close()">Cancel</button><button class="btn btn-primary" id="fu-save">Save</button></div>');
+    document.getElementById('fu-fields').innerHTML = Church.renderFields(fields, { FollowUpDate: new Date().toISOString().split('T')[0] });
+    document.getElementById('fu-save').addEventListener('click', function () {
+      Church.task('saveClusterFollowUp', Church.readFields(document.getElementById('fu-fields'), fields)).then(function () { Church.toast('Saved', 'success'); Church.modal.close(); loadFollowUps(); });
+    });
+  });
+
+  function mount() {
+    Church.run('listMembers').then(function (m) { members = m; });
+    loadClusters();
+    loadFollowUps();
+  }
+  Church.views.cluster = { mount: mount, refresh: function () { loadClusters(); loadFollowUps(); } };
+})();
+</script>
+
     </main>
   </div>
 </div>
 
-<?!= include('ClientCore'); ?>
+<!-- ClientCore.html : shared client-side JS — router, google.script.run helper, toast/modal/loader, generic CRUD UI builders. -->
+<script src="https://www.gstatic.com/charts/loader.js"></script>
+<script>
+(function (global) {
+  'use strict';
+
+  var Church = {
+    session: null,
+    _mounted: {},
+    views: {} // populated by each module partial: Church.views.members = { mount, refresh }
+  };
+
+  /* ---------------- google.script.run promise wrapper ---------------- */
+  Church.run = function (fnName) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return new Promise(function (resolve, reject) {
+      var caller = google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(function (err) { reject(err); });
+      caller[fnName].apply(caller, args);
+    });
+  };
+
+  /* ---------------- toast ---------------- */
+  Church.toast = function (message, type) {
+    var stack = document.getElementById('toast-stack');
+    var el = document.createElement('div');
+    el.className = 'toast' + (type === 'error' ? ' t-error' : type === 'success' ? ' t-success' : '');
+    el.innerHTML = '<svg class="icon"><use href="#' + (type === 'error' ? 'ic-alert' : 'ic-check-circle') + '"></use></svg><span></span>';
+    el.querySelector('span').textContent = message;
+    stack.appendChild(el);
+    setTimeout(function () { el.style.transition = 'opacity .3s'; el.style.opacity = '0'; setTimeout(function () { el.remove(); }, 300); }, 3600);
+  };
+  Church.error = function (err) {
+    var msg = (err && err.message) ? err.message : String(err);
+    Church.toast(msg, 'error');
+  };
+
+  /* ---------------- loader ---------------- */
+  var loaderDepth = 0;
+  Church.loading = function (show) {
+    loaderDepth = Math.max(0, loaderDepth + (show ? 1 : -1));
+    document.getElementById('loader-overlay').classList.toggle('show', loaderDepth > 0);
+  };
+
+  /** Wraps a Church.run call with the global loader + standard error toast. */
+  Church.task = function (fnName) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    Church.loading(true);
+    return Church.run.apply(null, [fnName].concat(args))
+      .catch(function (err) { Church.error(err); throw err; })
+      .finally(function () { Church.loading(false); });
+  };
+
+  /* ---------------- modal ---------------- */
+  Church.modal = {
+    open: function (html, opts) {
+      opts = opts || {};
+      var backdrop = document.getElementById('modal-backdrop');
+      var box = document.getElementById('modal-box');
+      box.className = 'modal' + (opts.lg ? ' modal-lg' : '');
+      box.innerHTML = html;
+      backdrop.classList.add('show');
+      document.body.style.overflow = 'hidden';
+    },
+    close: function () {
+      document.getElementById('modal-backdrop').classList.remove('show');
+      document.getElementById('modal-box').innerHTML = '';
+      document.body.style.overflow = '';
+    }
+  };
+  document.addEventListener('DOMContentLoaded', function () {
+    document.getElementById('modal-backdrop').addEventListener('click', function (e) {
+      if (e.target.id === 'modal-backdrop') Church.modal.close();
+    });
+  });
+
+  /* ---------------- nav config ---------------- */
+  Church.NAV = [
+    { key: 'dashboard', label: 'Dashboard', icon: 'ic-dashboard' },
+    { key: 'members', label: 'Members', icon: 'ic-members' },
+    { key: 'visitors', label: 'Visitors', icon: 'ic-visitor' },
+    { key: 'attendance', label: 'Attendance', icon: 'ic-attendance' },
+    { key: 'finance', label: 'Finance', icon: 'ic-finance' },
+    { key: 'sms', label: 'Bulk SMS', icon: 'ic-sms' },
+    { key: 'equipment', label: 'Equipment', icon: 'ic-equipment' },
+    { key: 'reports', label: 'Reports', icon: 'ic-reports' },
+    { key: 'settings', label: 'Settings', icon: 'ic-settings' },
+    { key: 'cluster', label: 'Cluster Follow-up', icon: 'ic-cluster' }
+  ];
+  Church.TITLES = {
+    dashboard: 'Dashboard', members: 'Members', visitors: 'Visitors', attendance: 'Attendance',
+    finance: 'Finance', sms: 'Communication Center', equipment: 'Equipment', reports: 'Reports & Analytics',
+    settings: 'Settings', cluster: 'Cluster Follow-up'
+  };
+
+  /* ---------------- router ---------------- */
+  Church.navigate = function (key) {
+    if (!Church.session || !Church.session.modules[key]) return;
+    document.querySelectorAll('.nav-item').forEach(function (el) { el.classList.toggle('active', el.dataset.key === key); });
+    document.querySelectorAll('.view').forEach(function (el) { el.classList.toggle('active', el.id === 'view-' + key); });
+    document.getElementById('topbar-title').textContent = Church.TITLES[key] || key;
+    closeMobileSidebar();
+    var view = Church.views[key];
+    if (view) {
+      if (!Church._mounted[key] && view.mount) { view.mount(); Church._mounted[key] = true; }
+      else if (view.refresh) { view.refresh(); }
+    }
+    location.hash = key;
+  };
+
+  function closeMobileSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebar-overlay').classList.remove('show');
+  }
+
+  /* ---------------- bootstrap ---------------- */
+  Church.initApp = function () {
+    Church.loading(true);
+    Church.run('getSessionInfo').then(function (session) {
+      Church.loading(false);
+      if (!session.authorized) {
+        document.body.innerHTML = renderAccessDenied_(session);
+        return;
+      }
+      Church.session = session;
+      renderSidebar_(session);
+      wireChrome_();
+      var startKey = (location.hash || '').replace('#', '');
+      if (!startKey || !session.modules[startKey]) startKey = 'dashboard';
+      Church.navigate(startKey);
+    }).catch(function (err) {
+      Church.loading(false);
+      document.body.innerHTML = '<div class="empty-state" style="padding-top:80px"><h2>Unable to load ChurchMS</h2><p>' + (err.message || err) + '</p></div>';
+    });
+  };
+
+  function renderSidebar_(session) {
+    var nav = document.getElementById('sidebar-nav');
+    nav.innerHTML = Church.NAV.filter(function (n) { return session.modules[n.key]; }).map(function (n) {
+      return '<div class="nav-item" data-key="' + n.key + '" onclick="Church.navigate(\'' + n.key + '\')">' +
+        '<svg class="icon"><use href="#' + n.icon + '"></use></svg><span>' + n.label + '</span></div>';
+    }).join('');
+    document.getElementById('sidebar-user-name').textContent = session.fullName || session.email;
+    document.getElementById('sidebar-user-role').textContent = session.role;
+    document.getElementById('brand-org-name').textContent = session.orgName;
+  }
+
+  function renderAccessDenied_(session) {
+    return '<div class="gate-container"><div class="gate-box">' +
+      '<div class="gate-ring"><svg class="icon-lg"><use href="#ic-lock"></use></svg></div>' +
+      '<h2>Access Restricted</h2><p class="gate-sub">' + (session.orgName || 'ChurchMS') + ' Administration</p>' +
+      '<div class="gate-detail">Signed in as <b>' + session.email + '</b>, but this account is not yet provisioned in ChurchMS. Ask a SuperAdmin to add you under Settings → Users.</div>' +
+      '<div class="gate-footer">Advanced Church Management System</div></div></div>';
+  }
+
+  function wireChrome_() {
+    document.getElementById('topbar-menu-btn').addEventListener('click', function () {
+      document.getElementById('sidebar').classList.add('open');
+      document.getElementById('sidebar-overlay').classList.add('show');
+    });
+    document.getElementById('sidebar-overlay').addEventListener('click', closeMobileSidebar);
+    document.getElementById('sidebar-logout').addEventListener('click', function () {
+      Church.modal.open('<div class="modal-head"><h3><svg class="icon"><use href="#ic-logout"></use></svg>Sign Out</h3><div class="modal-close" onclick="Church.modal.close()"><svg class="icon"><use href="#ic-close"></use></svg></div></div>' +
+        '<div class="modal-body">To switch accounts, sign out of your Google account in this browser, or close this tab.</div>' +
+        '<div class="modal-foot"><button class="btn btn-outline" onclick="Church.modal.close()">Close</button></div>');
+    });
+    var searchInput = document.getElementById('topbar-search-input');
+    if (searchInput) {
+      searchInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && searchInput.value.trim()) {
+          Church.navigate('members');
+          setTimeout(function () {
+            var mSearch = document.getElementById('members-search');
+            if (mSearch) { mSearch.value = searchInput.value.trim(); mSearch.dispatchEvent(new Event('input')); }
+          }, 60);
+        }
+      });
+    }
+  }
+
+  /* ---------------- Google Charts loader ---------------- */
+  Church._chartsReady = null;
+  Church.loadCharts = function () {
+    if (Church._chartsReady) return Church._chartsReady;
+    Church._chartsReady = new Promise(function (resolve) {
+      google.charts.load('current', { packages: ['corechart'] });
+      google.charts.setOnLoadCallback(resolve);
+    });
+    return Church._chartsReady;
+  };
+
+  /* ---------------- small formatting helpers ---------------- */
+  Church.fmt = {
+    money: function (n) { return 'GHS ' + (Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); },
+    date: function (iso) { if (!iso) return '—'; var d = new Date(iso); return isNaN(d) ? String(iso).split('T')[0] : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }); },
+    datetime: function (iso) { if (!iso) return '—'; var d = new Date(iso); return isNaN(d) ? String(iso) : d.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); },
+    initials: function (name) { return (name || '').split(' ').filter(Boolean).slice(0, 2).map(function (p) { return p[0]; }).join('').toUpperCase() || '?'; },
+    escape: function (s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+  };
+
+  /* ---------------- generic data table ---------------- */
+  /**
+   * Church.dataTable(container, { columns:[{key,label,render?}], rows, searchKeys, onEdit, onDelete, empty:{icon,title,text} }
+   * Renders a searchable table with edit/delete row actions. Returns { refresh(rows) }.
+   */
+  Church.dataTable = function (container, opts) {
+    var state = { rows: opts.rows || [], filtered: opts.rows || [], q: '' };
+
+    function applyFilter() {
+      if (!state.q) { state.filtered = state.rows; return; }
+      var q = state.q.toLowerCase();
+      state.filtered = state.rows.filter(function (r) {
+        return (opts.searchKeys || Object.keys(r)).some(function (k) { return String(r[k] || '').toLowerCase().indexOf(q) !== -1; });
+      });
+    }
+
+    function render() {
+      applyFilter();
+      var rowsHtml;
+      if (!state.filtered.length) {
+        rowsHtml = '<tr><td colspan="' + (opts.columns.length + (opts.onEdit || opts.onDelete ? 1 : 0)) + '">' +
+          '<div class="table-empty"><svg class="icon-lg"><use href="#' + ((opts.empty && opts.empty.icon) || 'ic-search') + '"></use></svg>' +
+          '<div>' + ((opts.empty && opts.empty.title) || 'No records found') + '</div></div></td></tr>';
+      } else {
+        rowsHtml = state.filtered.map(function (row) {
+          var cells = opts.columns.map(function (c) {
+            var val = c.render ? c.render(row) : Church.fmt.escape(row[c.key]);
+            return '<td>' + val + '</td>';
+          }).join('');
+          var actions = '';
+          if (opts.onEdit || opts.onDelete || opts.rowActions) {
+            actions = '<td><div class="row-actions">' +
+              (opts.rowActions ? opts.rowActions(row) : '') +
+              (opts.onEdit ? '<button class="btn btn-ghost btn-icon btn-sm" title="Edit" data-act="edit"><svg class="icon-sm"><use href="#ic-edit"></use></svg></button>' : '') +
+              (opts.onDelete ? '<button class="btn btn-ghost btn-icon btn-sm" title="Delete" data-act="del"><svg class="icon-sm"><use href="#ic-trash"></use></svg></button>' : '') +
+              '</div></td>';
+          }
+          return '<tr data-id="' + row.ID + '">' + cells + actions + '</tr>';
+        }).join('');
+      }
+      container.innerHTML =
+        (opts.searchable === false ? '' : '<div class="flex gap-10" style="margin-bottom:12px">' +
+          '<div class="topbar-search" style="width:280px"><svg class="icon"><use href="#ic-search"></use></svg>' +
+          '<input placeholder="' + (opts.searchPlaceholder || 'Search…') + '" id="' + (opts.searchId || '') + '" class="dt-search"></div></div>') +
+        '<div class="table-wrap"><table class="data-table"><thead><tr>' +
+        opts.columns.map(function (c) { return '<th>' + c.label + '</th>'; }).join('') +
+        (opts.onEdit || opts.onDelete || opts.rowActions ? '<th class="text-right">Actions</th>' : '') +
+        '</tr></thead><tbody>' + rowsHtml + '</tbody></table></div>';
+
+      var searchEl = container.querySelector('.dt-search');
+      if (searchEl) searchEl.addEventListener('input', function (e) { state.q = e.target.value; render(); });
+
+      container.querySelectorAll('tbody tr[data-id]').forEach(function (tr) {
+        var id = tr.dataset.id;
+        var row = state.rows.find(function (r) { return r.ID === id; });
+        var editBtn = tr.querySelector('[data-act="edit"]');
+        var delBtn = tr.querySelector('[data-act="del"]');
+        if (editBtn) editBtn.addEventListener('click', function () { opts.onEdit(row); });
+        if (delBtn) delBtn.addEventListener('click', function () {
+          Church.confirm('Delete this record? This cannot be undone.').then(function (ok) { if (ok) opts.onDelete(row); });
+        });
+      });
+    }
+
+    render();
+    return {
+      refresh: function (rows) { state.rows = rows; render(); }
+    };
+  };
+
+  /* ---------------- confirm dialog ---------------- */
+  Church.confirm = function (message, opts) {
+    opts = opts || {};
+    return new Promise(function (resolve) {
+      Church.modal.open(
+        '<div class="modal-head"><h3><svg class="icon"><use href="#ic-alert"></use></svg>' + (opts.title || 'Please Confirm') + '</h3>' +
+        '<div class="modal-close" id="cf-cancel-x"><svg class="icon"><use href="#ic-close"></use></svg></div></div>' +
+        '<div class="modal-body">' + Church.fmt.escape(message) + '</div>' +
+        '<div class="modal-foot"><button class="btn btn-outline" id="cf-cancel">Cancel</button>' +
+        '<button class="btn ' + (opts.danger === false ? 'btn-primary' : 'btn-danger') + '" id="cf-ok">' + (opts.okLabel || 'Delete') + '</button></div>'
+      );
+      var done = function (v) { Church.modal.close(); resolve(v); };
+      document.getElementById('cf-cancel').onclick = function () { done(false); };
+      document.getElementById('cf-cancel-x').onclick = function () { done(false); };
+      document.getElementById('cf-ok').onclick = function () { done(true); };
+    });
+  };
+
+  /* ---------------- generic form-field renderer (used by module form modals) ---------------- */
+  /** fields: [{key,label,type:'text'|'email'|'tel'|'date'|'number'|'select'|'textarea'|'checkbox', options?, required?, half?}] */
+  Church.renderFields = function (fields, values) {
+    values = values || {};
+    var html = '';
+    var i = 0;
+    while (i < fields.length) {
+      var f = fields[i];
+      if (f.half && fields[i + 1] && fields[i + 1].half) {
+        html += '<div class="field-row">' + fieldHtml_(f, values) + fieldHtml_(fields[i + 1], values) + '</div>';
+        i += 2;
+      } else {
+        html += fieldHtml_(f, values);
+        i += 1;
+      }
+    }
+    return html;
+  };
+  function fieldHtml_(f, values) {
+    var val = values[f.key];
+    var req = f.required ? ' <span class="req">*</span>' : '';
+    var name = 'data-field="' + f.key + '"';
+    if (f.type === 'select') {
+      var opts = (f.options || []).map(function (o) {
+        var ov = typeof o === 'object' ? o.value : o;
+        var ol = typeof o === 'object' ? o.label : o;
+        return '<option value="' + Church.fmt.escape(ov) + '"' + (String(val) === String(ov) ? ' selected' : '') + '>' + Church.fmt.escape(ol) + '</option>';
+      }).join('');
+      return '<div class="field"><label>' + f.label + req + '</label><select ' + name + '><option value="">— Select —</option>' + opts + '</select></div>';
+    }
+    if (f.type === 'textarea') {
+      return '<div class="field"><label>' + f.label + req + '</label><textarea ' + name + '>' + Church.fmt.escape(val || '') + '</textarea></div>';
+    }
+    if (f.type === 'checkbox') {
+      return '<div class="field checkbox-row"><input type="checkbox" ' + name + ' id="cb-' + f.key + '" ' + (val ? 'checked' : '') + '><label for="cb-' + f.key + '" style="margin:0">' + f.label + '</label></div>';
+    }
+    return '<div class="field"><label>' + f.label + req + '</label><input type="' + (f.type || 'text') + '" ' + name + ' value="' + Church.fmt.escape(val == null ? '' : val) + '" placeholder="' + (f.placeholder || '') + '"></div>';
+  }
+  /** Reads a form container built with renderFields back into a plain object. */
+  Church.readFields = function (containerEl, fields) {
+    var out = {};
+    fields.forEach(function (f) {
+      var el = containerEl.querySelector('[data-field="' + f.key + '"]');
+      if (!el) return;
+      if (f.type === 'checkbox') out[f.key] = el.checked;
+      else if (f.type === 'number') out[f.key] = el.value === '' ? '' : Number(el.value);
+      else out[f.key] = el.value;
+    });
+    return out;
+  };
+
+  /* ---------------- file -> base64 helper (for Drive uploads) ---------------- */
+  Church.fileToBase64 = function (file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(reader.result.split(',')[1]); };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  global.Church = Church;
+})(window);
+</script>
 <script>
   document.addEventListener('DOMContentLoaded', function () { Church.initApp(); });
 </script>
+
+<? } ?>
 </body>
 </html>
