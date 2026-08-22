@@ -838,7 +838,9 @@ function runInitialSetup() {
     try { ss = SpreadsheetApp.openById(id); } catch (e) { ss = null; }
   }
   if (!ss) {
-    ss = SpreadsheetApp.create(APP_NAME + ' Database');
+    // Container-bound (pasted into Extensions > Apps Script on a Sheet): use that Sheet as the database.
+    // Standalone script project: no bound Sheet exists, so create a dedicated one.
+    ss = SpreadsheetApp.getActiveSpreadsheet() || SpreadsheetApp.create(APP_NAME + ' Database');
     props.setProperty(PROP_SPREADSHEET_ID, ss.getId());
   }
 
@@ -933,6 +935,31 @@ function seedSuperAdmin_() {
     CreatedAt: nowIso_()
   }, ID_PREFIX.USERS);
   return { username: 'admin', password: tempPassword };
+}
+
+/**
+ * Recovery utility — NOT reachable from the browser (deliberately left out of
+ * API_REGISTRY). Run this manually from the Apps Script editor's function
+ * dropdown any time you're locked out: it force-resets (or creates) the
+ * "admin" login to password "admin123", regardless of what's already in the
+ * Users sheet. Safe to run repeatedly.
+ */
+function resetAdminPassword() {
+  var users = readAll_(SHEETS.USERS);
+  var admin = users.filter(function (u) { return String(u.Username || '').toLowerCase() === 'admin'; })[0];
+  var salt = generateSalt_();
+  var hash = hashPassword_('admin123', salt);
+  if (admin) {
+    updateRow_(SHEETS.USERS, admin.ID, { PasswordHash: hash, PasswordSalt: salt, Active: 'TRUE' });
+    Logger.log('ChurchMS: reset "admin" password to "admin123".');
+  } else {
+    insertRow_(SHEETS.USERS, {
+      Username: 'admin', PasswordHash: hash, PasswordSalt: salt, Email: '', FullName: 'System Administrator',
+      Role: ROLES.SUPER_ADMIN, Active: 'TRUE', Phone: '', CreatedAt: nowIso_()
+    }, ID_PREFIX.USERS);
+    Logger.log('ChurchMS: created "admin" with password "admin123".');
+  }
+  return { username: 'admin', password: 'admin123' };
 }
 
 function ensureAttachmentsFolder_() {

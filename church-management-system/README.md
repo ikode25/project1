@@ -36,19 +36,29 @@ Organized top-to-bottom with `======` banner comments — search for these secti
 
 ## Deploying
 
-1. Create a new Apps Script project at [script.google.com](https://script.google.com) (or `clasp create`).
-2. Copy `Code.gs` and `Index.html` into the project as-is (rename the default `Code.gs`/create a new HTML file named exactly `Index`).
-3. In the Apps Script editor, select `runInitialSetup` from the function dropdown (near the top of the Setup section in `Code.gs`) and click **Run**. This:
-   - creates the backing spreadsheet ("ChurchMS Database") and stores its ID in Script Properties
+You can run ChurchMS either as a **standalone** script project or **bound to a Google Sheet** (Extensions → Apps Script from inside a spreadsheet) — the same two files work for both. If bound, it uses that Sheet as its database; if standalone, it creates its own dedicated spreadsheet the first time it runs. You don't need to configure which — `runInitialSetup` detects it automatically.
+
+1. **Standalone**: create a new project at [script.google.com](https://script.google.com). **Bound to a Sheet**: open (or create) a Google Sheet → Extensions → Apps Script.
+2. In the editor, replace the default `Code.gs` content with this project's `Code.gs`. Then add a new HTML file (File → New → HTML) named exactly `Index` and paste this project's `Index.html` into it. Save (Ctrl+S / Cmd+S).
+3. Select `runInitialSetup` from the function dropdown at the top of the editor and click **Run**. First run asks you to authorize the script (Review permissions → your account → Advanced → Go to project (unsafe) → Allow — this warning is normal for your own unpublished script). This:
+   - uses the Sheet you're bound to as the database (or creates a dedicated "ChurchMS Database" spreadsheet if standalone), and stores its ID in Script Properties
    - creates every sheet tab with its header row and dropdown data validation
    - seeds default Settings (edit these later from the Settings module)
-   - creates the first login — username **`admin`**, password **`admin123`** — a fixed default, not a secret.
+   - creates the first login — username **`admin`**, password **`admin123`** — a fixed default, not a secret, and only created if the Users sheet is still empty (see **Resetting the admin password** below if you've already run this once)
    - creates a Drive folder for attachments (photos, documents, receipts) and one for backups
    - installs the time-driven triggers (daily notifications digest, hourly scheduled-SMS processor, weekly backup)
 4. **Deploy → New deployment → Web app**. Execute as "Me", access "Anyone" (the app no longer relies on the visitor's Google identity — access is username/password — so "Anyone" is the normal choice; a domain-restricted deployment also works and simply adds a Google sign-in step in front of ChurchMS's own login).
 5. Open the deployed URL and sign in with `admin` / `admin123`, then **immediately** set a new password from your account menu (click your name in the sidebar → Change Password) — anyone who finds your web app URL can otherwise sign in with this well-known default.
 6. Under **Settings → Users**, add your team: pick a username, a temporary password, and a role (`Admin`, `FinanceOfficer`, `ClusterLeader`, `CommunicationOfficer`, `Viewer`). Only users listed there — and marked Active — can sign in; each person should change their password after their first login.
 7. Under **Settings → SMS Providers**, pick Arkesel, Hubtel, or a custom REST gateway and enter credentials.
+
+### Redeploying after you change the code
+
+A web app's `/exec` URL serves a **fixed snapshot**, not your latest saved code — editing `Code.gs`/`Index.html` again doesn't update it by itself. After any change: **Deploy → Manage deployments** → pencil icon on the active deployment → Version: **New version** → **Deploy**. (The same `/exec` URL keeps working; only its content updates.)
+
+### Resetting the admin password
+
+`runInitialSetup` only seeds `admin` / `admin123` when the Users sheet is completely empty — running it again later won't touch an existing account. If you're locked out (wrong password, forgot it, or it was seeded before you knew the default), select **`resetAdminPassword`** from the function dropdown and click **Run**. It force-resets (or creates, if missing) the `admin` login back to `admin123`, no matter what's currently in the sheet. It's intentionally left out of the app's own function whitelist, so it's only reachable from the Apps Script editor — never from the web app itself.
 
 ### Public pages
 
