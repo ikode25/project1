@@ -12369,8 +12369,11 @@ function getPublicReportCard(admissionNumber, code, examId) {
   }
 }
 
-// admin only — creates a public share link for one student's report card, optionally SMSing it
-function createReportCardShareLink(studentId, examId, phone, currentUser, currentRole) {
+// admin only — creates a public share link for one student's report card. channel: 'sms' (default,
+// texts the link directly via the configured SMS gateway), 'whatsapp' (no paid Business API
+// configured, so — same as the admissions digest — this hands back a wa.me "click to chat" link
+// pre-filled with the message; admin clicks it once to finish sending), or '' (just create the link).
+function createReportCardShareLink(studentId, examId, phone, currentUser, currentRole, channel) {
   try {
     if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
     var sid = parseInt(studentId, 10), eid = parseInt(examId, 10);
@@ -12386,15 +12389,23 @@ function createReportCardShareLink(studentId, examId, phone, currentUser, curren
     sh.appendRow([id, token, sid, eid, expiresAt, getCurrentUserId(currentUser) || '', ts]);
 
     var link = _publicAppLinkServer('?public=reportcard&token=' + token);
+    var ch = String(channel || (phone ? 'sms' : '')).toLowerCase();
 
-    var smsResult = null;
-    if (phone) {
-      var msg = check.data.student.FullName + "'s report card is ready to view: " + link;
+    var smsResult = null, waLink = null;
+    var msg = check.data.student.FullName + "'s report card is ready to view: " + link;
+    if (phone && ch === 'whatsapp') {
+      var waNumber = String(phone).replace(/[^0-9]/g, '');
+      waLink = 'https://wa.me/' + waNumber + '?text=' + encodeURIComponent(msg);
+    } else if (phone) {
       smsResult = sendSms(phone, msg, 'report_card', sid, currentUser, currentRole);
     }
 
-    addLog(currentUser, 'Report Card Share Link Created', check.data.student.FullName + (phone ? ' — SMSed to ' + phone : ''));
-    return { success: true, message: phone ? 'Report card link sent via SMS' : 'Report card link created', link: link, smsResult: smsResult };
+    addLog(currentUser, 'Report Card Share Link Created', check.data.student.FullName + (phone ? ' — ' + ch + ' to ' + phone : ''));
+    return {
+      success: true,
+      message: ch === 'whatsapp' ? 'WhatsApp link ready — click Send to finish' : (phone ? 'Report card link sent via SMS' : 'Report card link created'),
+      link: link, smsResult: smsResult, waLink: waLink
+    };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
@@ -21270,6 +21281,127 @@ function getArrearsOverview(currentUser, currentRole) {
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
+}
+
+// Per-student itemized fee bill for a target term/year — what gets sent/printed home to parents
+// BEFORE vacation so they know exactly what's due when the next term reopens: the target term's
+// normal fee item(s) for the student's class, plus (as a clearly separate line, not silently merged
+// into one number) any balance still unpaid from an earlier term of the same academic year. This is
+// a read-time PREVIEW — it doesn't touch Fee_Dues. The real merge into the next term's due amount
+// still happens automatically via _rollTermArrears() at the moment the school actually advances into
+// that term, so generating bills early (while still in the term that's ending) can never double-count.
+function getAllTermBills(term, academicYear, currentUser, currentRole) {
+  try {
+    if (!isFinanceStaff(currentRole)) return { success: false, message: 'Forbidden — admin/clerk/bursar only' };
+    var t = String(term || '').toLowerCase();
+    if (['term1', 'term2', 'term3'].indexOf(t) === -1) return { success: false, message: 'Invalid term' };
+    var ay = String(academicYear || '').trim();
+    if (!validAcademicYear(ay)) return { success: false, message: 'AcademicYear must be YYYY-YYYY' };
+
+    var ssh = getSheet(STUDENTS_SHEET);
+    if (!ssh) return { success: false, message: 'Students sheet not found' };
+    var sdata = ssh.getDataRange().getValues();
+    var cmap = getClassesMap();
+
+    var fsh = getSheet(FEE_STRUCTURE_SHEET);
+    var fsdata = fsh ? fsh.getDataRange().getValues() : [];
+    var feesByClass = {}; // classId -> [{ID, Category, Amount}] active termly fee items for this year
+    for (var f = 1; f < fsdata.length; f++) {
+      if (String(fsdata[f][9]) === '1') continue; // deleted
+      if (String(fsdata[f][8]) !== '1') continue; // inactive
+      if (String(fsdata[f][4] || '').toLowerCase() !== 'termly') continue;
+      if (String(fsdata[f][5] || '').trim() !== ay) continue;
+      var cid0 = parseInt(fsdata[f][1], 10);
+      if (!feesByClass[cid0]) feesByClass[cid0] = [];
+      feesByClass[cid0].push({ ID: fsdata[f][0], Category: String(fsdata[f][2] || '').toLowerCase(), Amount: parseFloat(fsdata[f][3]) || 0 });
+    }
+
+    var dsh = _ensureFeeDuesSheet();
+    var ddata = dsh.getDataRange().getValues();
+    var dueIndex = {}; // 'studentId|fsid|billingMonth' -> Amount (already generated due, if any)
+    for (var d = 1; d < ddata.length; d++) {
+      dueIndex[ddata[d][1] + '|' + ddata[d][2] + '|' + ddata[d][3]] = parseFloat(ddata[d][5]) || 0;
+    }
+
+    var out = [];
+    for (var i = 1; i < sdata.length; i++) {
+      if (String(sdata[i][36]) === '1') continue; // deleted
+      if (String(sdata[i][35] || '').toLowerCase() !== 'active') continue; // withdrawn/inactive skipped
+      var sid = sdata[i][0];
+      var clsId = parseInt(sdata[i][25], 10);
+      var feeItems = feesByClass[clsId] || [];
+      if (!feeItems.length) continue; // nothing billed for this class this year
+
+      var lines = feeItems.map(function (fee) {
+        var known = dueIndex[sid + '|' + fee.ID + '|' + t + '-' + ay];
+        return { Category: fee.Category, Label: TERM_LABELS[t] + ' Fee', Amount: known != null ? known : fee.Amount };
+      });
+
+      // arrears preview: unpaid termly dues this academic year, strictly before the target term
+      var arrears = 0;
+      for (var d2 = 1; d2 < ddata.length; d2++) {
+        if (parseInt(ddata[d2][1], 10) !== sid) continue;
+        var m = String(ddata[d2][3] || '').match(/^(term[123])-(.+)$/);
+        if (!m || m[2] !== ay) continue;
+        if ((_TERM_ORDER[m[1]] || 0) >= (_TERM_ORDER[t] || 0)) continue;
+        var st = String(ddata[d2][6] || '').toLowerCase();
+        if (st === 'paid' || st === 'carried_forward' || st === 'waived') continue;
+        arrears += Math.max(0, (parseFloat(ddata[d2][5]) || 0) - (parseFloat(ddata[d2][8]) || 0));
+      }
+      if (arrears > 0.01) lines.push({ Category: 'arrears', Label: 'Arrears (previous term)', Amount: Math.round(arrears * 100) / 100 });
+
+      var total = lines.reduce(function (s, l) { return s + l.Amount; }, 0);
+      var phone = sdata[i][23] || sdata[i][17] || sdata[i][20] || sdata[i][9] || ''; // Guardian → Father → Mother → student's own mobile
+      out.push({
+        StudentID: sid,
+        FullName: [sdata[i][2], sdata[i][3], sdata[i][4]].filter(function (x) { return x; }).join(' '),
+        AdmissionNumber: sdata[i][1],
+        ClassID: clsId, ClassLabel: cmap[clsId] ? cmap[clsId].label : '— deleted class —',
+        Lines: lines, Total: Math.round(total * 100) / 100,
+        Phone: String(phone || '').trim(), Email: sdata[i][10] || ''
+      });
+    }
+    out.sort(function (a, b) { return String(a.ClassLabel).localeCompare(String(b.ClassLabel)) || String(a.FullName).localeCompare(String(b.FullName)); });
+    return { success: true, data: out, term: t, academicYear: ay };
+  } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
+}
+
+// admin only — bulk-emails every student's term bill to whichever parent email is on file. SMS goes
+// through the existing sendBulkSms (the frontend builds recipients from getAllTermBills' data), and
+// WhatsApp has no bulk API without a paid Business account, so those stay one-click-per-parent
+// wa.me links built client-side from the same data — this function only owns the email channel.
+function sendTermBillEmails(term, academicYear, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var billsRes = getAllTermBills(term, academicYear, currentUser, currentRole);
+    if (!billsRes.success) return billsRes;
+
+    var settingsRes = getSchoolSettings();
+    var schoolName = (settingsRes.data && settingsRes.data.SchoolName) || 'School';
+    var termLabel = TERM_LABELS[String(term).toLowerCase()] || term;
+
+    var sent = 0, skipped = 0;
+    billsRes.data.forEach(function (b) {
+      var email = String(b.Email || '').trim();
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { skipped++; return; }
+      var rows = b.Lines.map(function (l) {
+        return '<tr><td style="padding:4px 8px;border-bottom:1px solid #eee">' + l.Label + ' (' + l.Category + ')</td>' +
+               '<td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right">GH₵' + l.Amount.toFixed(2) + '</td></tr>';
+      }).join('');
+      var html = '<div style="font-family:Arial,sans-serif;max-width:480px">' +
+        '<h3 style="color:#001f3f">' + schoolName + ' — ' + termLabel + ' (' + academicYear + ') Fees Bill</h3>' +
+        '<p><b>' + b.FullName + '</b> — ' + b.AdmissionNumber + ' — ' + b.ClassLabel + '</p>' +
+        '<table style="border-collapse:collapse;width:100%">' + rows +
+        '<tr><td style="padding:6px 8px;font-weight:bold;border-top:2px solid #001f3f">Total Due</td>' +
+        '<td style="padding:6px 8px;text-align:right;font-weight:bold;border-top:2px solid #001f3f">GH₵' + b.Total.toFixed(2) + '</td></tr></table>' +
+        '<p>Please settle this before the term reopens. Thank you.</p></div>';
+      try { MailApp.sendEmail({ to: email, subject: schoolName + ' — ' + termLabel + ' Fees Bill', htmlBody: html }); sent++; }
+      catch (e) { skipped++; }
+    });
+
+    addLog(currentUser, 'Term Bills Emailed', sent + ' sent, ' + skipped + ' skipped (' + termLabel + ' ' + academicYear + ')');
+    return { success: true, message: sent + ' email(s) sent' + (skipped ? ', ' + skipped + ' skipped (no/invalid email on file)' : ''), sent: sent, skipped: skipped };
+  } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
 }
 
 // Pay multiple month dues at once — creates Fee_Payments row(s), marks dues paid, returns receipts.

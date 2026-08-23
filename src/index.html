@@ -3158,6 +3158,10 @@
       body.print-target * { visibility: hidden !important; }
       body.print-target .report-card, body.print-target .report-card *,
       body.print-target .tt-wrap, body.print-target .tt-wrap * { visibility: visible !important; }
+      body.print-target .fee-bill-bulk-wrap, body.print-target .fee-bill-bulk-wrap * { visibility: visible !important; }
+      body.print-target .fee-bill-bulk-wrap { position: static !important; width: 100% !important; }
+      body.print-target .fee-bill-card { page-break-after: always; width: 100% !important; box-sizing: border-box; }
+      body.print-target .fee-bill-card:last-child { page-break-after: avoid; }
       /* explicit opt-out for controls nested INSIDE a visible .report-card/.tt-wrap (e.g. inline
          edit/delete icons on the Admission Requirements print view) that shouldn't print */
       body.print-target .no-print { display: none !important; }
@@ -4465,6 +4469,7 @@
       recruitment:  { icon: 'briefcase',        label: 'Recruitment',        group: 'admin' },
       feeStructure: { icon: 'money-bill-wave',       label: 'Fee Structure',      group: 'finance' },
       feePayments:  { icon: 'money-bill-wave',  label: 'Fees Collection',    group: 'finance' },
+      feeBills:     { icon: 'file-invoice',     label: 'Fee Bills',          group: 'finance' },
       accounts:     { icon: 'wallet',           label: 'Daily Accounts',     group: 'finance' },
       sms:          { icon: 'sms',              label: 'SMS Center',         group: 'communication' },
       foodMenu:     { icon: 'utensils',         label: 'Food Menu',          group: 'daily' },
@@ -4495,13 +4500,13 @@
     //  - student: timetable + attendance + marks + notices first
     //  - parent: notices + child's attendance/marks/fees first
     const MENU_PRIORITY = {
-      admin: ['dashboard','ownerPortal','reports','admissions','admissionReqs','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','questionBank','onlineLinks','hallTickets','feePayments','accounts','feeStructure','pos','stockTransactions','vendors','payroll','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','recruitment','trash','account','settings','about'],
+      admin: ['dashboard','ownerPortal','reports','admissions','admissionReqs','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','questionBank','onlineLinks','hallTickets','feePayments','feeBills','accounts','feeStructure','pos','stockTransactions','vendors','payroll','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','recruitment','trash','account','settings','about'],
       // headteacher (internal role id stays 'supervisor' — see ROLE_DISPLAY_LABEL) — system-wide
       // oversight: academic operations plus Owner Portal's financial/activity monitoring
       supervisor: ['dashboard','ownerPortal','reports','attendance','substitutes','marks','hallTickets','exams','notices','ptm','calendar','discipline','conduct','helpdesk','complaints','lessonPlans','logbook','activities','students','parents','classes','subjects','assignments','documents','timetable','account','about'],
       clerk: ['admissions','admissionReqs','students','parents','feePayments','accounts','feeStructure','sms','reports','attendance','helpdesk','complaints','documents','assets','inventory','timetable','classes','notices','calendar','trash','account','about'],
       // bursar/accountant — finance + asset/stock inventory only, nothing else (per-role scoped portal)
-      bursar: ['dashboard','feePayments','feeStructure','pos','stockTransactions','vendors','accounts','payroll','assets','inventory','trash','account','about'],
+      bursar: ['dashboard','feePayments','feeBills','feeStructure','pos','stockTransactions','vendors','accounts','payroll','assets','inventory','trash','account','about'],
       teacher: ['timetable','attendance','substitutes','marks','questionBank','onlineLinks','payroll','hallTickets','exams','lessonPlans','ptm','logbook','students','discipline','conduct','activities','notices','reports','calendar','documents','complaints','classes','subjects','trash','account','about'],
       // student: dashboard → own-class academics → own records → support → profile. Read-only everywhere except helpdesk/complaints/account.
       student: ['dashboard','timetable','attendance','marks','hallTickets','exams','onlineLinks','notices','calendar','feePayments','feeStructure','activities','conduct','discipline','documents','helpdesk','complaints','account','about'],
@@ -14325,7 +14330,33 @@
               else Swal.fire({ icon: 'error', title: 'Error', text: (r && r.message) || 'Failed' });
             })
             .withFailureHandler((err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }))
-            .createReportCardShareLink(student.ID, examId, res.value.trim(), currentUser, role);
+            .createReportCardShareLink(student.ID, examId, res.value.trim(), currentUser, role, 'sms');
+        });
+      };
+
+      // no paid WhatsApp Business API is configured, so this hands back a wa.me "click to chat"
+      // link pre-filled with the report card link — one click here, one click on WhatsApp to finish
+      const handleSendWhatsApp = () => {
+        const defaultPhone = student.FatherMobile || student.MotherMobile || student.GuardianMobile || student.Mobile || '';
+        Swal.fire({
+          icon: 'question', title: 'Send Report Card via WhatsApp',
+          text: 'Opens WhatsApp with the link pre-filled — no login needed for the parent.',
+          input: 'text', inputLabel: 'Parent WhatsApp number', inputValue: defaultPhone,
+          inputValidator: (v) => !v && 'Enter a phone number',
+          showCancelButton: true, confirmButtonText: 'Create Link'
+        }).then((res) => {
+          if (!res.isConfirmed) return;
+          google.script.run
+            .withSuccessHandler((r) => {
+              if (r && r.success && r.waLink) {
+                Swal.fire({
+                  icon: 'success', title: 'Link ready', text: 'Click below to open WhatsApp and send it.',
+                  confirmButtonText: 'Open WhatsApp'
+                }).then(() => window.open(r.waLink, '_blank'));
+              } else Swal.fire({ icon: 'error', title: 'Error', text: (r && r.message) || 'Failed' });
+            })
+            .withFailureHandler((err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }))
+            .createReportCardShareLink(student.ID, examId, res.value.trim(), currentUser, role, 'whatsapp');
         });
       };
 
@@ -14370,6 +14401,11 @@
                 {r === 'admin' && (
                   <button className="btn btn-secondary" onClick={handleSendSms} disabled={!card || !card.exam?.IsPublished} title={card && !card.exam?.IsPublished ? 'Publish this exam first' : 'SMS a link to the parent'}>
                     <i className="fas fa-sms"></i> Send to Parent (SMS)
+                  </button>
+                )}
+                {r === 'admin' && (
+                  <button className="btn btn-secondary" onClick={handleSendWhatsApp} disabled={!card || !card.exam?.IsPublished} title={card && !card.exam?.IsPublished ? 'Publish this exam first' : 'WhatsApp a link to the parent'} style={{color:'#25D366',borderColor:'#25D366'}}>
+                    <i className="fab fa-whatsapp"></i> Send to Parent (WhatsApp)
                   </button>
                 )}
               </div>
@@ -20943,6 +20979,280 @@
               </div>
             </div>
           </div>
+        </div>
+      );
+    }
+
+    // ============== Fee Bills (term-end, send-home) ==============
+    // Generates each student's itemized bill for a chosen term/year — the school's normal fee for
+    // that term plus any arrears carried from an earlier term this year, shown as a distinct line —
+    // and lets admin send it home three ways before vacation: SMS (direct, via the existing SMS
+    // gateway), WhatsApp (no paid Business API configured, so a wa.me link per parent — one click
+    // each to finish sending, same pattern as the admissions digest), and Email (formatted, for
+    // parents who have one on file). A Print action lays out one bill per page for a paper copy.
+    function FeeBillsView({ currentUser, role, schoolSettings }) {
+      const r = String(role).toLowerCase();
+      const ss = schoolSettings || {};
+      const [selectedTerm, setSelectedTerm] = useState(ss.ActiveTerm || 'term1');
+      const [selectedYear, setSelectedYear] = useState(ss.AcademicYear || (() => { const y = new Date().getFullYear(); return y + '-' + (y + 1); })());
+      const [classFilter, setClassFilter] = useState('');
+      const [search, setSearch] = useState('');
+      const [sendingSms, setSendingSms] = useState(false);
+      const [sendingEmail, setSendingEmail] = useState(false);
+      const [showWaModal, setShowWaModal] = useState(false);
+
+      const cacheKey = 'getAllTermBills:' + selectedTerm + ':' + selectedYear;
+      const { data: billsData, error: loadError, isLoading: loading, isValidating: syncing, mutate: refresh } =
+        useSWR(cacheKey, () => swrFetcher('getAllTermBills', selectedTerm, selectedYear, currentUser, role));
+      const bills = billsData || [];
+
+      const classOpts = [...new Map(bills.map(b => [b.ClassID, b.ClassLabel])).entries()]
+        .map(([value, label]) => ({ value: String(value), label })).sort((a, b) => a.label.localeCompare(b.label));
+
+      const visible = bills.filter(b => {
+        if (classFilter && String(b.ClassID) !== classFilter) return false;
+        if (search && !(b.FullName + ' ' + b.AdmissionNumber).toLowerCase().includes(search.toLowerCase())) return false;
+        return true;
+      });
+
+      const totalAmount = visible.reduce((s, b) => s + b.Total, 0);
+      const withArrears = visible.filter(b => b.Lines.some(l => l.Category === 'arrears')).length;
+      const schoolName = ss.SchoolName || 'School';
+      const termLabel = TERM_LABELS[selectedTerm] || selectedTerm;
+
+      const billMessage = (b) =>
+        `${b.FullName} (${b.ClassLabel}) — ${termLabel} ${selectedYear} Fees Bill: ` +
+        b.Lines.map(l => `${l.Label}: GH₵${l.Amount.toFixed(2)}`).join(', ') +
+        `. TOTAL DUE: GH₵${b.Total.toFixed(2)}. Please pay before reopening. — ${schoolName}`;
+
+      const handleSendAllSms = () => {
+        const recipients = visible.filter(b => b.Phone).map(b => ({ phone: b.Phone, studentId: b.StudentID, vars: {} }));
+        if (recipients.length === 0) { Swal.fire({ icon: 'warning', text: 'No students with a phone number on file in this view.' }); return; }
+        Swal.fire({
+          icon: 'question', title: `Send ${termLabel} bill to ${recipients.length} parent(s) via SMS?`,
+          text: 'Each message is personalized with that student\'s own breakdown and total.',
+          showCancelButton: true, confirmButtonText: 'Send SMS'
+        }).then(rr => {
+          if (!rr.isConfirmed) return;
+          setSendingSms(true);
+          // one bulk call per student (each needs its own line-item breakdown, so no shared template)
+          let done = 0, sent = 0, failed = 0;
+          visible.filter(b => b.Phone).forEach(b => {
+            google.script.run.withSuccessHandler(res => {
+              done++; if (res && res.success) sent++; else failed++;
+              if (done === recipients.length) finish();
+            }).withFailureHandler(() => { done++; failed++; if (done === recipients.length) finish(); })
+              .sendSms(b.Phone, billMessage(b), 'fee_bill', b.StudentID, currentUser, role);
+          });
+          const finish = () => {
+            setSendingSms(false);
+            Swal.fire({ icon: failed === 0 ? 'success' : 'warning', text: sent + ' sent' + (failed ? ', ' + failed + ' failed' : '') });
+          };
+        });
+      };
+
+      const handleSendAllEmail = () => {
+        Swal.fire({
+          icon: 'question', title: `Email ${termLabel} bills?`,
+          text: 'Sends to whichever parent email is on file for each student in this view.',
+          showCancelButton: true, confirmButtonText: 'Send Email'
+        }).then(rr => {
+          if (!rr.isConfirmed) return;
+          setSendingEmail(true);
+          google.script.run.withSuccessHandler(res => {
+            setSendingEmail(false);
+            if (res && res.success) Swal.fire({ icon: 'success', text: res.message });
+            else Swal.fire({ icon: 'error', text: (res && res.message) || 'Failed' });
+          }).withFailureHandler(err => { setSendingEmail(false); Swal.fire({ icon: 'error', text: (err && err.message) || 'Failed' }); })
+            .sendTermBillEmails(selectedTerm, selectedYear, currentUser, role);
+        });
+      };
+
+      const handlePrint = () => {
+        document.body.classList.add('print-target');
+        setTimeout(() => { window.print(); setTimeout(() => document.body.classList.remove('print-target'), 250); }, 60);
+      };
+
+      const waLinks = visible.filter(b => b.Phone).map(b => ({
+        label: b.FullName, phone: b.Phone,
+        url: 'https://wa.me/' + b.Phone.replace(/[^0-9]/g, '') + '?text=' + encodeURIComponent(billMessage(b))
+      }));
+
+      return (
+        <div className="data-section">
+          <div className="section-header">
+            <h2><i className="fas fa-file-invoice"></i> Fee Bills{syncing && <span className="swr-syncing"><i className="fas fa-arrows-rotate fa-spin"></i> syncing…</span>}</h2>
+            <div style={{display:'flex',gap:'8px',flexWrap:'wrap'}}>
+              <SearchableDropdown options={[{value:'term1',label:'Term 1'},{value:'term2',label:'Term 2'},{value:'term3',label:'Term 3'}]}
+                value={selectedTerm} onChange={setSelectedTerm} placeholder="Term" />
+              <input type="text" value={selectedYear} onChange={e => setSelectedYear(e.target.value)} placeholder="2026-2027"
+                style={{width:'110px',padding:'8px 10px',border:'1px solid #ccc',fontSize:'13px'}} title="Academic Year" />
+            </div>
+          </div>
+
+          <div className="settings-info-message" style={{marginBottom:'15px'}}>
+            <i className="fas fa-info-circle" style={{marginRight:'6px'}}></i>
+            Generate the <strong>next</strong> term's bill before vacation — it includes that term's normal fee plus any arrears still owing from an earlier term, so parents know the full amount before reopening.
+          </div>
+
+          {loadError && !loading && (
+            <div className="settings-info-message" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>
+              <i className="fas fa-triangle-exclamation" style={{marginRight:'6px',color:'#ea4335'}}></i>
+              Couldn't load bills — {String((loadError && loadError.message) || loadError)}.
+            </div>
+          )}
+
+          {!loading && bills.length > 0 && (
+            <div style={{display:'flex',gap:'12px',marginBottom:'15px',flexWrap:'wrap'}}>
+              <div style={{flex:1,minWidth:'160px',padding:'12px 15px',background:'#fff',border:'1px solid #e0e0e0',borderRadius:'6px',borderLeft:'4px solid #001f3f'}}>
+                <div style={{fontSize:'11px',color:'#888',textTransform:'uppercase'}}>Students Billed</div>
+                <div style={{fontSize:'22px',fontWeight:700,color:'var(--navy-primary)'}}>{visible.length}</div>
+              </div>
+              <div style={{flex:1,minWidth:'160px',padding:'12px 15px',background:'#fff',border:'1px solid #e0e0e0',borderRadius:'6px',borderLeft:'4px solid #34a853'}}>
+                <div style={{fontSize:'11px',color:'#888',textTransform:'uppercase'}}>Total Billed</div>
+                <div style={{fontSize:'22px',fontWeight:700,color:'#34a853'}}>GH₵{totalAmount.toFixed(2)}</div>
+              </div>
+              <div style={{flex:1,minWidth:'160px',padding:'12px 15px',background:'#fff',border:'1px solid #e0e0e0',borderRadius:'6px',borderLeft:'4px solid #ea4335'}}>
+                <div style={{fontSize:'11px',color:'#888',textTransform:'uppercase'}}>With Arrears</div>
+                <div style={{fontSize:'22px',fontWeight:700,color:'#ea4335'}}>{withArrears}</div>
+              </div>
+            </div>
+          )}
+
+          {!loading && bills.length > 0 && (
+            <div style={{display:'flex',gap:'8px',flexWrap:'wrap',marginBottom:'15px'}}>
+              {r === 'admin' && (
+                <button className="btn btn-primary btn-sm" disabled={sendingSms} onClick={handleSendAllSms}>
+                  {sendingSms ? <><i className="fas fa-spinner fa-spin"></i> Sending…</> : <><i className="fas fa-sms"></i> Send All (SMS)</>}
+                </button>
+              )}
+              <button className="btn btn-secondary btn-sm" style={{color:'#25D366',borderColor:'#25D366'}} onClick={() => setShowWaModal(true)}>
+                <i className="fab fa-whatsapp"></i> Send via WhatsApp ({waLinks.length})
+              </button>
+              {r === 'admin' && (
+                <button className="btn btn-secondary btn-sm" disabled={sendingEmail} onClick={handleSendAllEmail}>
+                  {sendingEmail ? <><i className="fas fa-spinner fa-spin"></i> Sending…</> : <><i className="fas fa-envelope"></i> Send All (Email)</>}
+                </button>
+              )}
+              <button className="btn btn-secondary btn-sm" onClick={handlePrint}>
+                <i className="fas fa-print"></i> Print All
+              </button>
+            </div>
+          )}
+
+          {!loading && bills.length > 0 && (
+            <div className="filters-section" style={{marginBottom:'15px'}}>
+              <div className="filters-grid">
+                <div className="filter-group">
+                  <label><i className="fas fa-search"></i> Search</label>
+                  <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Student name or admission no…" className="filter-input" />
+                </div>
+                <div className="filter-group">
+                  <label><i className="fas fa-school"></i> Class</label>
+                  <SearchableDropdown options={classOpts} value={classFilter} onChange={setClassFilter} placeholder="All Classes" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {loading && <TableSkeleton rows={6} columns={6} />}
+          {!loading && bills.length === 0 && (
+            <div style={{textAlign:'center',padding:'40px',color:'#888',background:'#f8f9fa'}}>
+              No termly fee items are configured for {selectedYear}, or no active students are billed under them.
+            </div>
+          )}
+
+          {!loading && visible.length > 0 && (
+            <div className="about-table-wrapper">
+              <table className="about-roles-table">
+                <thead>
+                  <tr><th>Student</th><th>Class</th><th>Breakdown</th><th>Total</th><th>Contact</th></tr>
+                </thead>
+                <tbody>
+                  {visible.map(b => (
+                    <tr key={b.StudentID}>
+                      <td>
+                        <div style={{fontWeight:600,color:'var(--navy-primary)'}}>{b.FullName}</div>
+                        <div style={{fontSize:'11px',color:'#888',fontFamily:'monospace'}}>{b.AdmissionNumber}</div>
+                      </td>
+                      <td>{b.ClassLabel}</td>
+                      <td style={{fontSize:'12px'}}>
+                        {b.Lines.map((l, idx) => (
+                          <div key={idx} style={{color: l.Category === 'arrears' ? '#ea4335' : 'inherit'}}>
+                            {l.Label}: GH₵{l.Amount.toFixed(2)}
+                          </div>
+                        ))}
+                      </td>
+                      <td style={{fontWeight:700}}>GH₵{b.Total.toFixed(2)}</td>
+                      <td style={{fontSize:'12px'}}>
+                        {b.Phone ? <div><i className="fas fa-phone"></i> {b.Phone}</div> : <div style={{color:'#bbb'}}>No phone</div>}
+                        {b.Email ? <div><i className="fas fa-envelope"></i> {b.Email}</div> : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* hidden bulk-print layout — visible only under body.print-target */}
+          <div className="fee-bill-bulk-wrap no-print" style={{position:'fixed',left:'-9999px',top:0}}>
+            {visible.map(b => (
+              <div key={b.StudentID} className="fee-bill-card" style={{padding:'24px',fontFamily:'Arial,sans-serif'}}>
+                <h2 style={{color:'#001f3f',borderBottom:'2px solid #001f3f',paddingBottom:'8px'}}>{schoolName}</h2>
+                <h3 style={{margin:'6px 0'}}>{termLabel} {selectedYear} — Fees Bill</h3>
+                <p><strong>{b.FullName}</strong> ({b.AdmissionNumber}) — {b.ClassLabel}</p>
+                <table style={{width:'100%',borderCollapse:'collapse',marginTop:'14px'}}>
+                  <thead>
+                    <tr style={{background:'#001f3f',color:'#fff'}}>
+                      <th style={{padding:'8px',textAlign:'left'}}>Item</th>
+                      <th style={{padding:'8px',textAlign:'right'}}>Amount (GH₵)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {b.Lines.map((l, idx) => (
+                      <tr key={idx} style={{borderBottom:'1px solid #ddd'}}>
+                        <td style={{padding:'8px'}}>{l.Label}</td>
+                        <td style={{padding:'8px',textAlign:'right'}}>{l.Amount.toFixed(2)}</td>
+                      </tr>
+                    ))}
+                    <tr style={{fontWeight:700,borderTop:'2px solid #001f3f'}}>
+                      <td style={{padding:'8px'}}>TOTAL DUE</td>
+                      <td style={{padding:'8px',textAlign:'right'}}>{b.Total.toFixed(2)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p style={{marginTop:'20px',fontSize:'12px',color:'#555'}}>Please settle this bill before the term reopens. Thank you.</p>
+              </div>
+            ))}
+          </div>
+
+          {showWaModal && (
+            <div className="modal-overlay" onClick={() => setShowWaModal(false)}>
+              <div className="modal" onClick={e => e.stopPropagation()} style={{maxWidth:'560px'}}>
+                <div className="modal-header">
+                  <h3><i className="fab fa-whatsapp"></i> Send via WhatsApp</h3>
+                  <button className="close-btn" onClick={() => setShowWaModal(false)}><i className="fas fa-times"></i></button>
+                </div>
+                <div className="modal-body">
+                  <div className="settings-info-message" style={{marginBottom:'12px'}}>
+                    No paid WhatsApp Business API is configured, so each link below opens WhatsApp with the bill pre-filled — click each one to finish sending.
+                  </div>
+                  <div style={{maxHeight:'360px',overflowY:'auto'}}>
+                    {waLinks.map((w, i) => (
+                      <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:'1px solid #f0f0f0'}}>
+                        <span style={{fontSize:'13px'}}>{w.label} <span style={{color:'#888',fontFamily:'monospace',fontSize:'11px'}}>{w.phone}</span></span>
+                        <a href={w.url} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm" style={{color:'#25D366',borderColor:'#25D366'}}>
+                          <i className="fab fa-whatsapp"></i> Send
+                        </a>
+                      </div>
+                    ))}
+                    {waLinks.length === 0 && <div style={{color:'#888',textAlign:'center',padding:'20px'}}>No students with a phone number in this view.</div>}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       );
     }
@@ -32845,6 +33155,7 @@
       const canSeePos = r === 'admin' || isBursar;
       const canSeeStockTransactions = r === 'admin' || isBursar;
       const canSeeVendors = r === 'admin' || isBursar;
+      const canSeeFeeBills = r === 'admin' || isBursar;
       const canSeeReports = r === 'admin' || r === 'clerk' || r === 'supervisor' || r === 'teacher';
       const canSeeTrash = r === 'admin' || r === 'clerk' || r === 'teacher' || isBursar;
 
@@ -32954,6 +33265,8 @@
           return canSeeStockTransactions ? <StockTransactionsView currentUser={user} role={role} /> : denied('Stock Transactions');
         case 'vendors':
           return canSeeVendors ? <VendorsView currentUser={user} role={role} /> : denied('Vendors');
+        case 'feeBills':
+          return canSeeFeeBills ? <FeeBillsView currentUser={user} role={role} schoolSettings={schoolSettings} /> : denied('Fee Bills');
         case 'trash':
           return canSeeTrash ? <TrashView currentUser={user} role={role} /> : denied('Trash');
         case 'settings':
