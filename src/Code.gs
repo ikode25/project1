@@ -366,7 +366,76 @@ var PERIOD_HEADERS = ['ID','PeriodNumber','StartTime','EndTime','IsBreak','Label
 // matters (Exams, Fee_Structure, Admissions, LessonPlans, etc.) already carries its own
 // AcademicYear/Term columns, so old sessions stay fully queryable forever; this pair only drives
 // which session NEW records default into and what the dashboard banner shows.)
-var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt','ShowOverallPositionOnReportCard','ShowSubjectAverageOnReportCard','SchoolStampURL','HeadteacherSignatureURL','AdminSignatureURL','PublicAppBaseURL','ActiveTerm','DietaryOptions','BursarEmail','BursarPhone','HeadteacherEmail','HeadteacherPhone','UngradedStages','ShowInterestTalentOnReportCard','ShowConductOnReportCard','ShowAttitudeOnReportCard','ShowClassTeacherRemarkOnReportCard','ShowHeadteacherRemarkOnReportCard','SessionTimeoutMinutes','UseUnifiedGrading','ReportCardTemplate','TermDatesJSON'];
+var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt','ShowOverallPositionOnReportCard','ShowSubjectAverageOnReportCard','SchoolStampURL','HeadteacherSignatureURL','AdminSignatureURL','PublicAppBaseURL','ActiveTerm','DietaryOptions','BursarEmail','BursarPhone','HeadteacherEmail','HeadteacherPhone','UngradedStages','ShowInterestTalentOnReportCard','ShowConductOnReportCard','ShowAttitudeOnReportCard','ShowClassTeacherRemarkOnReportCard','ShowHeadteacherRemarkOnReportCard','SessionTimeoutMinutes','UseUnifiedGrading','ReportCardTemplate','TermDatesJSON','FeeCategoriesCSV'];
+// col 55 = FeeCategoriesCSV — admin-editable CSV of "value|label" pairs for the Fee Category picker
+// on Fee Structure (mirrors DietaryOptions above). The old hardcoded 10-item list is now just the
+// fallback seed, not a fixed enum — admin can add a category the school actually uses (e.g. "PTA
+// Fee", "Feeding") without needing a code change.
+function defaultFeeCategories() {
+  return [
+    { v: 'tuition', l: 'Tuition' }, { v: 'admission', l: 'Admission' }, { v: 'transport', l: 'Transport' },
+    { v: 'exam', l: 'Exam' }, { v: 'library', l: 'Library' }, { v: 'sports', l: 'Sports' },
+    { v: 'lab', l: 'Lab' }, { v: 'annual', l: 'Annual' }, { v: 'arrears', l: 'Arrears (Carried Forward)' },
+    { v: 'other', l: 'Other' }
+  ];
+}
+function parseFeeCategoriesCsv(csv) {
+  var raw = String(csv || '').trim();
+  if (!raw) return defaultFeeCategories();
+  var out = raw.split(',').map(function (pair) {
+    var parts = String(pair).split('|');
+    var v = (parts[0] || '').trim();
+    var l = (parts[1] || '').trim();
+    return v ? { v: v, l: l || v } : null;
+  }).filter(Boolean);
+  return out.length ? out : defaultFeeCategories();
+}
+function feeCategoriesToCsv(list) {
+  return (list || []).map(function (o) {
+    var v = String(o.v || o.value || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+    var l = String(o.l || o.label || '').trim().slice(0, 60);
+    return v ? (v + '|' + l) : null;
+  }).filter(Boolean).join(',');
+}
+function getFeeCategories() {
+  try {
+    var sh = getSheet(SETTINGS_SHEET);
+    if (!sh) return { success: true, data: defaultFeeCategories() };
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (parseInt(data[i][0], 10) === 1) return { success: true, data: parseFeeCategoriesCsv(data[i][54]) };
+    }
+    return { success: true, data: defaultFeeCategories() };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString(), data: defaultFeeCategories() };
+  }
+}
+function updateFeeCategories(list, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    if (!Array.isArray(list) || !list.length) return { success: false, message: 'Provide at least one fee category' };
+    var csv = feeCategoriesToCsv(list);
+    if (!csv) return { success: false, message: 'Provide at least one valid fee category' };
+    var sh = getSheet(SETTINGS_SHEET);
+    if (!sh) return { success: false, message: 'Settings sheet not found. Run setup() first.' };
+    var data = sh.getDataRange().getValues();
+    var foundRow = -1;
+    for (var i = 1; i < data.length; i++) { if (parseInt(data[i][0], 10) === 1) { foundRow = i + 1; break; } }
+    var ts = nowIso();
+    if (foundRow === -1) {
+      var blank = new Array(SETTINGS_HEADERS.length).fill('');
+      blank[0] = 1; blank[14] = ts; blank[15] = ts;
+      sh.appendRow(blank);
+      foundRow = sh.getLastRow();
+    }
+    sh.getRange(foundRow, 55).setValue(csv); // col 55 = FeeCategoriesCSV
+    sh.getRange(foundRow, 16).setValue(ts);  // col 16 = UpdatedAt
+    addLog(currentUser, 'Fee Categories Updated', String(list.length) + ' categories');
+    return { success: true, message: 'Fee categories updated', data: parseFeeCategoriesCsv(csv) };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
 // col 40 = DietaryOptions — admin-editable CSV of "value|label" pairs shown as checkboxes on the
 // student form (Ghana-appropriate defaults; the old hardcoded Halal/Kosher/Pescatarian/etc. list
 // is now just the fallback seed, not a fixed enum — see defaultDietaryOptions()).
@@ -8650,7 +8719,7 @@ function addFeeStructure(data, currentUser, currentRole) {
     if (!data.ClassID || !data.FeeCategory || data.Amount == null || !data.Frequency || !data.AcademicYear) {
       return { success: false, message: 'ClassID, FeeCategory, Amount, Frequency, AcademicYear are required' };
     }
-    var allowedCats = ['tuition','admission','transport','exam','library','sports','lab','annual','arrears','other'];
+    var allowedCats = getFeeCategories().data.map(function (o) { return o.v; });
     var cat = String(data.FeeCategory).toLowerCase();
     if (allowedCats.indexOf(cat) === -1) return { success: false, message: 'Invalid fee category' };
     var allowedFreq = ['monthly','termly','quarterly','half_yearly','annual','one_time'];
@@ -8710,7 +8779,7 @@ function addFeeTypeBulk(d, currentUser, currentRole) {
     var sh = getSheet(FEE_STRUCTURE_SHEET);
     if (!sh) return { success: false, message: 'Fee_Structure sheet not found' };
 
-    var allowedCats = ['tuition','admission','transport','exam','library','sports','lab','annual','arrears','other'];
+    var allowedCats = getFeeCategories().data.map(function (o) { return o.v; });
     var cat = String(d.FeeCategory || '').toLowerCase();
     if (allowedCats.indexOf(cat) === -1) return { success: false, message: 'Invalid fee category' };
     var allowedFreq = ['monthly','termly','quarterly','half_yearly','annual','one_time'];
@@ -8770,7 +8839,7 @@ function updateFeeStructure(id, data, currentUser, currentRole) {
     if (!data.ClassID || !data.FeeCategory || data.Amount == null || !data.Frequency || !data.AcademicYear) {
       return { success: false, message: 'Required fields missing' };
     }
-    var allowedCats = ['tuition','admission','transport','exam','library','sports','lab','annual','arrears','other'];
+    var allowedCats = getFeeCategories().data.map(function (o) { return o.v; });
     var cat = String(data.FeeCategory).toLowerCase();
     if (allowedCats.indexOf(cat) === -1) return { success: false, message: 'Invalid fee category' };
     var allowedFreq = ['monthly','termly','quarterly','half_yearly','annual','one_time'];
@@ -12917,7 +12986,8 @@ function getSchoolSettings() {
             SessionTimeoutMinutes: parseInt(data[i][50], 10) || 60,
             UseUnifiedGrading: String(data[i][51]) === '1',
             ReportCardTemplate: data[i][52] || 'classic',
-            TermDates: (function () { try { return JSON.parse(data[i][53] || '{}'); } catch (e) { return {}; } })()
+            TermDates: (function () { try { return JSON.parse(data[i][53] || '{}'); } catch (e) { return {}; } })(),
+            FeeCategories: parseFeeCategoriesCsv(data[i][54])
           }
         };
       }
@@ -12967,6 +13037,7 @@ function defaultSchoolSettings() {
     SessionTimeoutMinutes: 60,
     UseUnifiedGrading: false,
     ReportCardTemplate: 'classic',
+    FeeCategories: defaultFeeCategories(),
     TermDates: {}
   };
 }
@@ -21188,6 +21259,36 @@ function deleteFeeDue(dueId, currentUser, currentRole) {
       dsh.deleteRow(i + 1);
       addLog(currentUser, 'Fee Due Deleted', 'Due #' + idn + ' for student #' + sid);
       return { success: true, message: 'Due deleted' };
+    }
+    return { success: false, message: 'Due not found' };
+  } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
+}
+
+// admin-only per-student override for ONE bill line — e.g. a scholarship/sibling discount that
+// applies to just this student, not the whole class (editing Fee Structure would change it for
+// everyone in the class instead). Only the due's Amount changes; PaidAmount stays exactly what was
+// actually collected, so the remaining balance and status recompute automatically from the new figure.
+function updateDueAmount(dueId, newAmount, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var idn = parseInt(dueId, 10);
+    if (isNaN(idn)) return { success: false, message: 'Invalid due id' };
+    var amt = parseFloat(newAmount);
+    if (isNaN(amt) || amt < 0) return { success: false, message: 'Enter a valid amount' };
+    var dsh = _ensureFeeDuesSheet();
+    var data = dsh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (parseInt(data[i][0], 10) !== idn) continue;
+      var status = String(data[i][6] || '').toLowerCase();
+      if (status === 'carried_forward' || status === 'waived') return { success: false, message: 'Can\'t edit a ' + status + ' due' };
+      var paidAmt = parseFloat(data[i][8]) || 0;
+      if (amt < paidAmt) return { success: false, message: 'New amount (GH₵' + amt.toFixed(2) + ') can\'t be less than the GH₵' + paidAmt.toFixed(2) + ' already collected' };
+      var newStatus = (amt - paidAmt) <= 0.01 ? 'paid' : (paidAmt > 0 ? 'partial' : 'pending');
+      dsh.getRange(i + 1, 6).setValue(amt);
+      dsh.getRange(i + 1, 7).setValue(newStatus);
+      dsh.getRange(i + 1, 12).setValue(nowIso());
+      addLog(currentUser, 'Fee Due Amount Adjusted', 'Due #' + idn + ' for student #' + data[i][1] + ' → GH₵' + amt.toFixed(2));
+      return { success: true, message: 'Due amount updated to GH₵' + amt.toFixed(2) };
     }
     return { success: false, message: 'Due not found' };
   } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }

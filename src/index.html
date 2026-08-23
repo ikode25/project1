@@ -12863,6 +12863,30 @@
         });
       };
 
+      // per-student override for one bill line — e.g. a scholarship/sibling discount for just this
+      // student, without touching the class-wide Fee Structure rate everyone else still pays.
+      const [editingAmountDue, setEditingAmountDue] = useState(null);
+      const handleEditAmount = (due) => {
+        Swal.fire({
+          icon: 'question', title: 'Edit this student\'s bill amount',
+          text: due.BillingMonthLabel + ' — ' + due.FeeCategory + ' (class-standard rate applies to everyone else)',
+          input: 'number', inputValue: due.Amount, inputAttributes: { min: 0, step: 0.01 },
+          inputValidator: (v) => (v === '' || isNaN(v) || parseFloat(v) < 0) && 'Enter a valid amount',
+          showCancelButton: true, confirmButtonText: 'Save'
+        }).then((r) => {
+          if (!r.isConfirmed) return;
+          setEditingAmountDue(due.ID);
+          google.script.run
+            .withSuccessHandler((res) => {
+              setEditingAmountDue(null);
+              if (res.success) { Swal.fire({ icon: 'success', text: res.message, timer: 1800, showConfirmButton: false }); loadDues(); }
+              else Swal.fire({ icon: 'error', text: res.message });
+            })
+            .withFailureHandler((err) => { setEditingAmountDue(null); Swal.fire({ icon: 'error', text: (err && err.message) || 'Failed' }); })
+            .updateDueAmount(due.ID, r.value, currentUser, role);
+        });
+      };
+
       const handlePay = () => {
         if (selectedIds.length === 0) { Swal.fire({ icon: 'warning', text: 'Select at least one month' }); return; }
         setPaying(true);
@@ -13120,6 +13144,14 @@
                               disabled={waiving === d.ID}
                               onClick={(e) => { e.stopPropagation(); handleWaive(d); }}>
                               {waiving === d.ID ? <><i className="fas fa-spinner fa-spin"></i> Waiving…</> : <><i className="fas fa-eraser"></i> Waive</>}
+                            </button>
+                          )}
+                          {isAdmin && !isOrphaned && d.Status !== 'waived' && (
+                            <button type="button" className="btn btn-secondary btn-sm" style={{marginTop:'6px',width:'100%',fontSize:'11px',padding:'4px 6px'}}
+                              disabled={editingAmountDue === d.ID}
+                              onClick={(e) => { e.stopPropagation(); handleEditAmount(d); }}
+                              title="Override just this student's bill for this item — a scholarship/discount, e.g.">
+                              {editingAmountDue === d.ID ? <><i className="fas fa-spinner fa-spin"></i> Saving…</> : <><i className="fas fa-edit"></i> Edit Amount</>}
                             </button>
                           )}
                           {isAdmin && !isPaid && (parseFloat(d.PaidAmount) || 0) === 0 && (
@@ -18353,6 +18385,7 @@
       const [editing, setEditing] = useState(null);
       const [showBulkModal, setShowBulkModal] = useState(false);
       const [bulkSaving, setBulkSaving] = useState(false);
+      const [showCategoriesModal, setShowCategoriesModal] = useState(false);
       const [viewMode, setViewMode] = useState('grid');
       const [expandedGroup, setExpandedGroup] = useState(null);
       const tableInstanceRef = useRef(null);
@@ -18563,6 +18596,11 @@
                   </button>
                 </>
               )}
+              {r === 'admin' && (
+                <button className="btn btn-secondary" onClick={() => setShowCategoriesModal(true)} title="Add or rename the fee categories available to pick from">
+                  <i className="fas fa-tags"></i> Manage Categories
+                </button>
+              )}
             </div>
           </div>
 
@@ -18724,6 +18762,78 @@
               onSave={handleBulkSave}
             />
           )}
+          {showCategoriesModal && (
+            <ManageFeeCategoriesModal
+              currentUser={currentUser} role={role}
+              onClose={() => setShowCategoriesModal(false)}
+            />
+          )}
+        </div>
+      );
+    }
+
+    // admin-only category list editor — mirrors the Dietary Options pattern in Settings. Fee
+    // categories used to be a fixed 10-item enum; this makes it school-configurable (e.g. a "PTA
+    // Fee" or "Feeding" category the fixed list never had).
+    function ManageFeeCategoriesModal({ currentUser, role, onClose }) {
+      const seed = (window.SMS_SCHOOL && window.SMS_SCHOOL.FeeCategories) || [];
+      const [cats, setCats] = useState(seed.length ? seed.map(o => ({ v: o.v, l: o.l })) : [{ v: '', l: '' }]);
+      const [saving, setSaving] = useState(false);
+      const setCat = (i, key, val) => setCats(prev => prev.map((c, idx) => idx === i ? { ...c, [key]: val } : c));
+      const addRow = () => setCats(prev => [...prev, { v: '', l: '' }]);
+      const removeRow = (i) => setCats(prev => prev.filter((_, idx) => idx !== i));
+
+      const submit = (e) => {
+        e.preventDefault();
+        const clean = cats.map(c => ({ v: String(c.l || c.v || '').trim().toLowerCase().replace(/[^a-z0-9\s_]/g, '').replace(/\s+/g, '_'), l: String(c.l || c.v || '').trim() })).filter(c => c.v);
+        if (!clean.length) { Swal.fire({ icon: 'warning', text: 'Add at least one category.' }); return; }
+        setSaving(true);
+        google.script.run.withSuccessHandler(res => {
+          setSaving(false);
+          if (res && res.success) {
+            if (window.SMS_SCHOOL) window.SMS_SCHOOL.FeeCategories = res.data;
+            Swal.fire({ icon: 'success', text: res.message, timer: 1800, showConfirmButton: false });
+            onClose();
+          } else Swal.fire({ icon: 'error', text: (res && res.message) || 'Failed' });
+        }).withFailureHandler(err => { setSaving(false); Swal.fire({ icon: 'error', text: (err && err.message) || 'Failed' }); })
+          .updateFeeCategories(clean, currentUser, role);
+      };
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{maxWidth:'560px'}}>
+            <div className="modal-header">
+              <h3><i className="fas fa-tags"></i> Manage Fee Categories</h3>
+              <button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button>
+            </div>
+            <div className="modal-body">
+              <div className="settings-info-message" style={{marginBottom:'12px'}}>
+                <i className="fas fa-info-circle" style={{marginRight:'6px'}}></i>
+                These are the categories offered when adding a fee type (e.g. Tuition, Exam). Add one your school actually charges — like "PTA Fee" or "Feeding" — or rename an existing one.
+              </div>
+              <form onSubmit={submit}>
+                {cats.map((c, i) => (
+                  <div key={i} style={{display:'flex',gap:'8px',marginBottom:'8px',alignItems:'center'}}>
+                    <input type="text" value={c.l} onChange={e => setCat(i, 'l', e.target.value)} placeholder="Category name (e.g. Feeding)"
+                      style={{flex:1,padding:'8px 10px',border:'1px solid #ddd',borderRadius:'6px'}} maxLength="60" />
+                    <button type="button" onClick={() => removeRow(i)} disabled={cats.length === 1}
+                      style={{background:'none',border:'none',color: cats.length === 1 ? '#ccc' : '#ea4335',cursor: cats.length === 1 ? 'not-allowed' : 'pointer',fontSize:'16px'}}>
+                      <i className="fas fa-times"></i>
+                    </button>
+                  </div>
+                ))}
+                <button type="button" className="btn btn-secondary btn-sm" onClick={addRow} style={{marginBottom:'14px'}}>
+                  <i className="fas fa-plus"></i> Add Category
+                </button>
+                <div className="form-actions">
+                  <button type="submit" className="btn btn-primary" disabled={saving}>
+                    {saving ? <><i className="fas fa-spinner fa-spin"></i> Saving…</> : <><i className="fas fa-save"></i> Save</>}
+                  </button>
+                  <button type="button" className="btn btn-secondary" onClick={onClose}><i className="fas fa-times"></i> Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
         </div>
       );
     }
@@ -18774,14 +18884,8 @@
               <form onSubmit={handleSubmit}>
                 <div className="form-grid">
                   <SearchableDropdown label="Fee Category" icon="fas fa-tag"
-                    options={[
-                      { value: 'tuition', label: 'Tuition' }, { value: 'admission', label: 'Admission' },
-                      { value: 'transport', label: 'Transport' }, { value: 'exam', label: 'Exam' },
-                      { value: 'library', label: 'Library' }, { value: 'sports', label: 'Sports' },
-                      { value: 'lab', label: 'Lab' }, { value: 'annual', label: 'Annual' },
-                      { value: 'arrears', label: 'Arrears (Carried Forward)' }, { value: 'other', label: 'Other' }
-                    ]}
-                    value={meta.FeeCategory} onChange={(v) => setM('FeeCategory', v)} placeholder="Select..." />
+                    options={((window.SMS_SCHOOL && window.SMS_SCHOOL.FeeCategories) || []).map(o => ({ value: o.v, label: o.l }))}
+                    value={meta.FeeCategory} onChange={(v) => setM('FeeCategory', v)} placeholder="Select... (or Manage Categories to add one)" />
                   <SearchableDropdown label="Frequency" icon="fas fa-redo"
                     options={['monthly','quarterly','half_yearly','annual','one_time'].map(v => ({ value: v, label: v.replace('_',' ').replace(/\b\w/g, c => c.toUpperCase()) }))}
                     value={meta.Frequency} onChange={(v) => setM('Frequency', v)} placeholder="Select..." />
@@ -18911,18 +19015,7 @@
                   />
                   <SearchableDropdown
                     label="Fee Category" icon="fas fa-tag"
-                    options={[
-                      { value: 'tuition', label: 'Tuition' },
-                      { value: 'admission', label: 'Admission' },
-                      { value: 'transport', label: 'Transport' },
-                      { value: 'exam', label: 'Exam' },
-                      { value: 'library', label: 'Library' },
-                      { value: 'sports', label: 'Sports' },
-                      { value: 'lab', label: 'Lab' },
-                      { value: 'annual', label: 'Annual' },
-                      { value: 'arrears', label: 'Arrears (Carried Forward)' },
-                      { value: 'other', label: 'Other' }
-                    ]}
+                    options={((window.SMS_SCHOOL && window.SMS_SCHOOL.FeeCategories) || []).map(o => ({ value: o.v, label: o.l }))}
                     value={formData.FeeCategory}
                     onChange={(v) => set('FeeCategory', v)}
                     placeholder="Select category..."
