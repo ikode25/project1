@@ -20696,7 +20696,9 @@ function _feeDuesOutstandingMaps() {
     var dsh = getSheet(FEE_DUES_SHEET);
     if (dsh) {
       var data = dsh.getDataRange().getValues();
+      var fmapOut = getFeeStructuresLite(); // cached — orphaned (deleted fee item) dues never count as outstanding
       for (var i = 1; i < data.length; i++) {
+        if (!fmapOut[data[i][2]]) continue; // orphaned
         var status = String(data[i][6] || '').toLowerCase();
         if (status === 'paid' || status === 'carried_forward' || status === 'waived') continue;
         var remaining = Math.max(0, (parseFloat(data[i][5]) || 0) - (parseFloat(data[i][8]) || 0));
@@ -21080,6 +21082,13 @@ function _rollTermArrears(academicYear, fromTerm, toTerm, currentUser) {
     var data = dsh.getDataRange().getValues();
     var fromKey = fromTerm + '-' + ay, toKey = toTerm + '-' + ay;
 
+    // never roll a due whose fee item has since been deleted — that's a stale/orphaned record (see
+    // getStudentMonthlyDues' IsOrphaned), not real money owed, and it should be waived, not carried
+    var fsh2 = getSheet(FEE_STRUCTURE_SHEET);
+    var fsdata2 = fsh2 ? fsh2.getDataRange().getValues() : [];
+    var validFsidSet2 = {};
+    for (var vf = 1; vf < fsdata2.length; vf++) { if (String(fsdata2[vf][9]) !== '1') validFsidSet2[fsdata2[vf][0]] = true; }
+
     var byStudent = {}; // sid -> { from: [rowIdx...], to: { fsid: rowIdx } }
     for (var i = 1; i < data.length; i++) {
       var bm = String(data[i][3] || '');
@@ -21095,6 +21104,7 @@ function _rollTermArrears(academicYear, fromTerm, toTerm, currentUser) {
       var sid = parseInt(sidKey, 10);
       var rec = byStudent[sidKey];
       rec.from.forEach(function (idx) {
+        if (!validFsidSet2[data[idx][2]]) return; // orphaned — waive it instead, never roll it forward
         var status = String(data[idx][6] || '').toLowerCase();
         if (status === 'paid' || status === 'carried_forward' || status === 'waived') return;
         var amt = parseFloat(data[idx][5]) || 0;
@@ -21154,6 +21164,30 @@ function waiveDue(dueId, currentUser, currentRole) {
       dsh.getRange(i + 1, 12).setValue(nowIso());
       addLog(currentUser, 'Fee Due Waived', 'Due #' + idn + ' for student #' + data[i][1]);
       return { success: true, message: 'Due waived' };
+    }
+    return { success: false, message: 'Due not found' };
+  } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
+}
+
+// admin-only — actually removes a bad due row (garbage from an old bug, a duplicate, a wrongly
+// generated one, etc). Only allowed while PaidAmount is 0 — the moment real money has been collected
+// against a due it needs an audit trail, so waiveDue() (which keeps the row, just zeroes it out of
+// every total) is the right tool from that point on, not deletion.
+function deleteFeeDue(dueId, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var idn = parseInt(dueId, 10);
+    if (isNaN(idn)) return { success: false, message: 'Invalid due id' };
+    var dsh = _ensureFeeDuesSheet();
+    var data = dsh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (parseInt(data[i][0], 10) !== idn) continue;
+      var paidAmt = parseFloat(data[i][8]) || 0;
+      if (paidAmt > 0) return { success: false, message: 'This due already has GH₵' + paidAmt.toFixed(2) + ' collected against it — Waive it instead so the payment stays on record' };
+      var sid = data[i][1];
+      dsh.deleteRow(i + 1);
+      addLog(currentUser, 'Fee Due Deleted', 'Due #' + idn + ' for student #' + sid);
+      return { success: true, message: 'Due deleted' };
     }
     return { success: false, message: 'Due not found' };
   } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
@@ -21253,6 +21287,7 @@ function getArrearsOverview(currentUser, currentRole) {
     var dsh = _ensureFeeDuesSheet();
     var data = dsh.getDataRange().getValues();
     var students = getStudentsLite();
+    var fmapArr = getFeeStructuresLite(); // orphaned (deleted fee item) dues never count as arrears
 
     var activeTerm = 'term1', academicYear = '';
     try {
@@ -21262,6 +21297,7 @@ function getArrearsOverview(currentUser, currentRole) {
 
     var byStudent = {};
     for (var i = 1; i < data.length; i++) {
+      if (!fmapArr[data[i][2]]) continue; // orphaned — fee item deleted, waive don't chase
       var status = String(data[i][6] || 'pending').toLowerCase();
       if (status === 'paid' || status === 'carried_forward' || status === 'waived') continue;
       if (!_isPastBillingPeriod(data[i][3], activeTerm, academicYear)) continue;
@@ -21306,8 +21342,10 @@ function getAllTermBills(term, academicYear, currentUser, currentRole) {
     var fsh = getSheet(FEE_STRUCTURE_SHEET);
     var fsdata = fsh ? fsh.getDataRange().getValues() : [];
     var feesByClass = {}; // classId -> [{ID, Category, Amount}] active termly fee items for this year
+    var validFsidSet = {}; // every fee item that still exists (not soft-deleted) — any year/frequency/active-state
     for (var f = 1; f < fsdata.length; f++) {
-      if (String(fsdata[f][9]) === '1') continue; // deleted
+      if (String(fsdata[f][9]) === '1') continue; // deleted — NOT valid, excludes its dues from arrears below
+      validFsidSet[fsdata[f][0]] = true;
       if (String(fsdata[f][8]) !== '1') continue; // inactive
       if (String(fsdata[f][4] || '').toLowerCase() !== 'termly') continue;
       if (String(fsdata[f][5] || '').trim() !== ay) continue;
@@ -21337,10 +21375,13 @@ function getAllTermBills(term, academicYear, currentUser, currentRole) {
         return { Category: fee.Category, Label: TERM_LABELS[t] + ' Fee', Amount: known != null ? known : fee.Amount };
       });
 
-      // arrears preview: unpaid termly dues this academic year, strictly before the target term
+      // arrears preview: unpaid termly dues this academic year, strictly before the target term.
+      // Excludes any due whose fee item has since been deleted (orphaned — see getStudentMonthlyDues'
+      // IsOrphaned) so a stale/garbage due from a removed fee type can never inflate a bill.
       var arrears = 0;
       for (var d2 = 1; d2 < ddata.length; d2++) {
         if (parseInt(ddata[d2][1], 10) !== sid) continue;
+        if (!validFsidSet[ddata[d2][2]]) continue;
         var m = String(ddata[d2][3] || '').match(/^(term[123])-(.+)$/);
         if (!m || m[2] !== ay) continue;
         if ((_TERM_ORDER[m[1]] || 0) >= (_TERM_ORDER[t] || 0)) continue;

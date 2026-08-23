@@ -3159,9 +3159,13 @@
       body.print-target .report-card, body.print-target .report-card *,
       body.print-target .tt-wrap, body.print-target .tt-wrap * { visibility: visible !important; }
       body.print-target .fee-bill-bulk-wrap, body.print-target .fee-bill-bulk-wrap * { visibility: visible !important; }
-      body.print-target .fee-bill-bulk-wrap { position: static !important; width: 100% !important; }
+      body.print-target .fee-bill-bulk-wrap { display: block !important; position: static !important; width: 100% !important; }
       body.print-target .fee-bill-card { page-break-after: always; width: 100% !important; box-sizing: border-box; }
       body.print-target .fee-bill-card:last-child { page-break-after: avoid; }
+      /* 2-per-page layout: pair cards up, break only after every 2nd one */
+      body.print-target .fee-bill-bulk-wrap.fee-bill-pair-2 .fee-bill-card { page-break-after: avoid; border-bottom: 1px dashed #999; }
+      body.print-target .fee-bill-bulk-wrap.fee-bill-pair-2 .fee-bill-card:nth-child(2n) { page-break-after: always; border-bottom: none; }
+      body.print-target .fee-bill-bulk-wrap.fee-bill-pair-2 .fee-bill-card:last-child { page-break-after: avoid; }
       /* explicit opt-out for controls nested INSIDE a visible .report-card/.tt-wrap (e.g. inline
          edit/delete icons on the Admission Requirements print view) that shouldn't print */
       body.print-target .no-print { display: none !important; }
@@ -12836,6 +12840,29 @@
         });
       };
 
+      // admin cleanup tool for a bad due row (garbage from an old bug, a duplicate, wrong amount
+      // typed at generation, etc) — only offered while nothing has been collected against it yet;
+      // once money's been paid, Waive is the right action (keeps the payment on record).
+      const [deletingDue, setDeletingDue] = useState(null);
+      const handleDeleteDue = (due) => {
+        Swal.fire({
+          icon: 'warning', title: 'Delete this due permanently?',
+          text: due.BillingMonthLabel + ' — ' + due.FeeCategory + ' (GH₵' + Number(due.Amount || 0).toFixed(2) + ') will be removed. This cannot be undone.',
+          showCancelButton: true, confirmButtonText: 'Delete', confirmButtonColor: '#ea4335'
+        }).then((r) => {
+          if (!r.isConfirmed) return;
+          setDeletingDue(due.ID);
+          google.script.run
+            .withSuccessHandler((res) => {
+              setDeletingDue(null);
+              if (res.success) { Swal.fire({ icon: 'success', text: res.message, timer: 1800, showConfirmButton: false }); loadDues(); }
+              else Swal.fire({ icon: 'error', text: res.message });
+            })
+            .withFailureHandler((err) => { setDeletingDue(null); Swal.fire({ icon: 'error', text: (err && err.message) || 'Failed' }); })
+            .deleteFeeDue(due.ID, currentUser, role);
+        });
+      };
+
       const handlePay = () => {
         if (selectedIds.length === 0) { Swal.fire({ icon: 'warning', text: 'Select at least one month' }); return; }
         setPaying(true);
@@ -13093,6 +13120,14 @@
                               disabled={waiving === d.ID}
                               onClick={(e) => { e.stopPropagation(); handleWaive(d); }}>
                               {waiving === d.ID ? <><i className="fas fa-spinner fa-spin"></i> Waiving…</> : <><i className="fas fa-eraser"></i> Waive</>}
+                            </button>
+                          )}
+                          {isAdmin && !isPaid && (parseFloat(d.PaidAmount) || 0) === 0 && (
+                            <button type="button" className="btn btn-secondary btn-sm" style={{marginTop:'6px',width:'100%',fontSize:'11px',padding:'4px 6px',color:'#ea4335',borderColor:'#ea4335'}}
+                              disabled={deletingDue === d.ID}
+                              onClick={(e) => { e.stopPropagation(); handleDeleteDue(d); }}
+                              title="Only available while nothing has been collected against this due">
+                              {deletingDue === d.ID ? <><i className="fas fa-spinner fa-spin"></i> Deleting…</> : <><i className="fas fa-trash"></i> Delete</>}
                             </button>
                           )}
                         </div>
@@ -19527,10 +19562,13 @@
               },
               {
                 data: 'AmountPaid', title: 'Paid',
-                render: (d, t, row) => {
-                  let html = `<span style="font-weight:600;color:#34a853">GH₵${parseFloat(d || 0).toFixed(2)}</span>`;
-                  if (row.AmountDue > 0) html += `<div style="font-size:11px;color:#ea4335">Due: GH₵${parseFloat(row.AmountDue).toFixed(2)}</div>`;
-                  return html;
+                render: (d) => `<span style="font-weight:600;color:#34a853">GH₵${parseFloat(d || 0).toFixed(2)}</span>`
+              },
+              {
+                data: 'AmountDue', title: 'Outstanding',
+                render: (d) => {
+                  const v = parseFloat(d || 0);
+                  return v > 0 ? `<span style="font-weight:600;color:#ea4335">GH₵${v.toFixed(2)}</span>` : `<span style="color:#bbb">GH₵0.00</span>`;
                 }
               },
               {
@@ -19607,9 +19645,9 @@
       const applyFilters = () => {
         if (!tableInstanceRef.current) return;
         tableInstanceRef.current.columns().search('').draw();
-        // cols: 0=Rcp, 1=Date, 2=Student, 3=Fee, 4=Paid, 5=Status, 6=Mode, 7=Actions
-        if (filters.status) tableInstanceRef.current.column(5).search(filters.status, false, false).draw(false);
-        if (filters.mode) tableInstanceRef.current.column(6).search(filters.mode.replace('_', ' '), false, false).draw(false);
+        // cols: 0=Rcp, 1=Date, 2=Student, 3=Fee, 4=Paid, 5=Outstanding, 6=Status, 7=Mode, 8=Actions
+        if (filters.status) tableInstanceRef.current.column(6).search(filters.status, false, false).draw(false);
+        if (filters.mode) tableInstanceRef.current.column(7).search(filters.mode.replace('_', ' '), false, false).draw(false);
         if (filters.search) tableInstanceRef.current.search(filters.search).draw(false);
         tableInstanceRef.current.draw();
       };
@@ -20175,12 +20213,23 @@
     // student summary + running fee history — the "easy for collector/admin to see the whole
     // picture" side panel next to the Record Payment form, so nobody has to close this modal and
     // open StudentFeesModal separately just to check what's already been paid.
+    const _FEE_TERM_ORDER = { term1: 1, term2: 2, term3: 3 };
     function FeeStudentSidePanel({ student, allDues, duesLoading, netPayable, payingNow, balanceDue }) {
       if (!student) return null;
       const initials = (student.FullName || '?').charAt(0).toUpperCase();
+      const curTerm = (window.SMS_SCHOOL && window.SMS_SCHOOL.ActiveTerm) || 'term1';
+      const curYear = (window.SMS_SCHOOL && window.SMS_SCHOOL.AcademicYear) || '';
       // dues whose fee type has since been deleted can't be collected against and are excluded here
-      // entirely (they're only reachable, with a Waive action, from Students → Fees)
-      const visibleDues = allDues.filter(d => !d.IsOrphaned);
+      // entirely (they're only reachable, with a Waive action, from Students → Fees). Terms not yet
+      // reached (pre-generated for the whole year upfront) aren't "history" yet either, so they're
+      // held back until the school actually gets there — that's what Fee Bills is for previewing.
+      const visibleDues = allDues.filter(d => {
+        if (d.IsOrphaned) return false;
+        const m = String(d.BillingMonth || '').match(/^(term[123])-(.+)$/);
+        if (!m) return true; // monthly/arrears entries are never pre-generated ahead of time
+        if (m[2] !== curYear) return String(m[2]) < String(curYear);
+        return (_FEE_TERM_ORDER[m[1]] || 0) <= (_FEE_TERM_ORDER[curTerm] || 1);
+      });
       const billed = visibleDues.reduce((s, d) => s + (Number(d.Amount) || 0), 0);
       const collected = visibleDues.reduce((s, d) => s + (Number(d.PaidAmount) || 0), 0);
       const outstanding = Math.max(0, billed - collected);
@@ -21000,6 +21049,7 @@
       const [sendingSms, setSendingSms] = useState(false);
       const [sendingEmail, setSendingEmail] = useState(false);
       const [showWaModal, setShowWaModal] = useState(false);
+      const [printLayout, setPrintLayout] = useState('1up'); // '1up' | '2up' — 2up cuts paper cost, admin can slice each printed sheet in half
 
       const cacheKey = 'getAllTermBills:' + selectedTerm + ':' + selectedYear;
       const { data: billsData, error: loadError, isLoading: loading, isValidating: syncing, mutate: refresh } =
@@ -21134,6 +21184,14 @@
                   {sendingEmail ? <><i className="fas fa-spinner fa-spin"></i> Sending…</> : <><i className="fas fa-envelope"></i> Send All (Email)</>}
                 </button>
               )}
+              <div style={{display:'flex',border:'1px solid #ccc',borderRadius:'4px',overflow:'hidden'}}>
+                <button className="btn btn-sm" title="One bill per A4 sheet"
+                  style={{border:'none',borderRadius:0,background: printLayout === '1up' ? 'var(--navy-primary)' : '#fff',color: printLayout === '1up' ? '#fff' : 'var(--navy-primary)'}}
+                  onClick={() => setPrintLayout('1up')}>1 / Page</button>
+                <button className="btn btn-sm" title="Two bills per A4 sheet — cut the printout in half to save paper"
+                  style={{border:'none',borderRadius:0,background: printLayout === '2up' ? 'var(--navy-primary)' : '#fff',color: printLayout === '2up' ? '#fff' : 'var(--navy-primary)'}}
+                  onClick={() => setPrintLayout('2up')}>2 / Page</button>
+              </div>
               <button className="btn btn-secondary btn-sm" onClick={handlePrint}>
                 <i className="fas fa-print"></i> Print All
               </button>
@@ -21195,10 +21253,12 @@
             </div>
           )}
 
-          {/* hidden bulk-print layout — visible only under body.print-target */}
-          <div className="fee-bill-bulk-wrap no-print" style={{position:'fixed',left:'-9999px',top:0}}>
+          {/* hidden bulk-print layout — display:none normally, forced visible+block only under
+              body.print-target (never marked no-print, or the print rule would hide the very thing
+              we're trying to print) */}
+          <div className={'fee-bill-bulk-wrap' + (printLayout === '2up' ? ' fee-bill-pair-2' : '')} style={{display:'none'}}>
             {visible.map(b => (
-              <div key={b.StudentID} className="fee-bill-card" style={{padding:'24px',fontFamily:'Arial,sans-serif'}}>
+              <div key={b.StudentID} className="fee-bill-card" style={{padding: printLayout === '2up' ? '14px' : '24px',fontFamily:'Arial,sans-serif'}}>
                 <h2 style={{color:'#001f3f',borderBottom:'2px solid #001f3f',paddingBottom:'8px'}}>{schoolName}</h2>
                 <h3 style={{margin:'6px 0'}}>{termLabel} {selectedYear} — Fees Bill</h3>
                 <p><strong>{b.FullName}</strong> ({b.AdmissionNumber}) — {b.ClassLabel}</p>
