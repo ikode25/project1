@@ -4504,7 +4504,7 @@
     //  - student: timetable + attendance + marks + notices first
     //  - parent: notices + child's attendance/marks/fees first
     const MENU_PRIORITY = {
-      admin: ['dashboard','ownerPortal','reports','admissions','admissionReqs','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','questionBank','onlineLinks','hallTickets','feePayments','feeBills','accounts','feeStructure','pos','stockTransactions','vendors','payroll','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','recruitment','trash','account','settings','about'],
+      admin: ['dashboard','ownerPortal','reports','admissions','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','questionBank','onlineLinks','hallTickets','feePayments','feeBills','accounts','feeStructure','pos','stockTransactions','vendors','payroll','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','trash','account','settings','about'],
       // headteacher (internal role id stays 'supervisor' — see ROLE_DISPLAY_LABEL) — system-wide
       // oversight: academic operations plus Owner Portal's financial/activity monitoring
       supervisor: ['dashboard','ownerPortal','reports','attendance','substitutes','marks','hallTickets','exams','notices','ptm','calendar','discipline','conduct','helpdesk','complaints','lessonPlans','logbook','activities','students','parents','classes','subjects','assignments','documents','timetable','account','about'],
@@ -4568,7 +4568,7 @@
       const b = badges || {};
       const schoolName = (schoolSettings && schoolSettings.SchoolName) || 'Dashboard';
       const schoolShort = (schoolSettings && schoolSettings.SchoolShortName) || (schoolName.split(/\s+/).map(w => w[0]).join('').slice(0, 3).toUpperCase());
-      const schoolLogo = (schoolSettings && schoolSettings.SchoolLogo) || '';
+      const schoolLogo = (schoolSettings && schoolSettings.SchoolLogo) || DEFAULT_LOGO;
       // group items in declared priority order (preserves first-occurrence of each group)
       const grouped = [];
       const seenGroups = new Set();
@@ -4601,9 +4601,7 @@
 
             <div className="sidebar-header">
               <div className="sidebar-title">
-                {schoolLogo
-                  ? <img src={schoolLogo} alt="" style={{width:'28px',height:'28px',borderRadius:'50%',objectFit:'cover',border:'2px solid rgba(255,255,255,0.3)'}} onError={(e) => e.currentTarget.style.display = 'none'} />
-                  : <i className="fas fa-school"></i>}
+                <img src={schoolLogo} alt="" style={{width:'28px',height:'28px',borderRadius:'50%',objectFit:'cover',border:'2px solid rgba(255,255,255,0.3)'}} onError={(e) => { if (e.currentTarget.src !== DEFAULT_LOGO) e.currentTarget.src = DEFAULT_LOGO; }} />
                 <span title={schoolName}>{collapsed ? schoolShort : schoolName}</span>
               </div>
               <button className="collapse-btn" onClick={() => setCollapsed(!collapsed)}>
@@ -4935,6 +4933,8 @@
         useSWR(isMenuHidden('sms') ? null : 'getSmsDashboardStats', () => swrFetcher('getSmsDashboardStats', currentUser, role));
       const { data: onlineStats, refresh: refreshOnline } =
         useSWR('getOnlineUsersCount', () => swrFetcher('getOnlineUsersCount', currentUser, role));
+      const { data: admStats } =
+        useSWR('getActiveTermAdmissionStats', () => swrFetcher('getActiveTermAdmissionStats', currentUser, role));
       // live-ish — re-poll every 45s so the "Users Online" count doesn't need a manual refresh
       useEffect(() => {
         const iv = setInterval(() => refreshOnline(), 45000);
@@ -5027,6 +5027,7 @@
 
             <DashKpi icon="money-bill-wave" label="Today's Collection" value={fmt(extras?.todayCollection || 0)} sub={`${fmt(stats.totalCollected)} all-time`} color="green" onClick={() => goto('feePayments')} />
             <DashKpi icon="exclamation-circle" label="Outstanding" value={fmt(stats.totalPending)} sub={`${stats.totalPayments} payments`} color="red" onClick={() => goto('feePayments')} />
+            <DashKpi icon="user-plus" label="Admitted This Term" value={admStats ? fmt(admStats.admittedCount) : '…'} sub={admStats ? `GH₵${fmtAmt(admStats.admissionFeeTotal)} admission fees` : 'loading…'} color="teal" onClick={() => goto('admissions')} />
             <DashKpi icon="calendar-check" label="Today Attendance" value={(extras?.todayAttPct || 0) + '%'} sub={`${stats.todayMarked} records`} color="orange" onClick={() => goto('attendance')} />
             <DashKpi icon="graduation-cap" label="Active Exams" value={stats.totalExams} sub={`${stats.publishedExams} published`} color="amber" onClick={() => goto('exams')} />
             <DashKpi icon="gavel" label="Open Incidents" value={stats.openIncidents} sub={`${stats.criticalIncidents} critical`} color="red" onClick={() => goto('discipline')} />
@@ -5685,6 +5686,8 @@
         useSWR('getClerkDashboardData', () => swrFetcher('getClerkDashboardData', currentUser, role));
       const { data: assets } = useSWR('getAllAssets', () => swrFetcher('getAllAssets', {}, currentUser, role));
       const { data: stock } = useSWR('getAllStockItems', () => swrFetcher('getAllStockItems', {}, currentUser, role));
+      const { data: admStats } =
+        useSWR('getActiveTermAdmissionStats', () => swrFetcher('getActiveTermAdmissionStats', currentUser, role));
 
       const collChartRef = useRef(null);
       const collData = data && {
@@ -5711,6 +5714,7 @@
           <div className="dash-kpi-grid">
             <DashKpi icon="money-bill-wave" label="Today's Collection" value={fmt(k.todayCollection)} sub={`${k.todayReceipts} receipts`} color="green" onClick={() => goto('feePayments')} />
             <DashKpi icon="exclamation-circle" label="Outstanding" value={fmt(k.totalOutstanding)} sub="total due" color="red" onClick={() => goto('feePayments')} />
+            <DashKpi icon="user-plus" label="Admitted This Term" value={admStats ? fmt(admStats.admittedCount) : '…'} sub={admStats ? `GH₵${fmt(admStats.admissionFeeTotal)} admission fees` : 'loading…'} color="teal" onClick={() => goto('feePayments')} />
             <DashKpi icon="undo" label="Refunds Today" value={fmt(k.refundsToday)} sub={`${k.refundsTodayCount} refund(s)`} color="amber" onClick={() => goto('feePayments')} />
             <DashKpi icon="list-alt" label="Active Fee Items" value={k.activeFeeItems} sub="fee structures" color="purple" onClick={() => goto('feeStructure')} />
             <DashKpi icon="desktop" label="Assets on File" value={assetCount} color="navy" onClick={() => goto('assets')} />
@@ -8812,6 +8816,7 @@
               {
                 data: 'Section',
                 title: 'Section',
+                visible: false, // single-stream classes don't carry a meaningful section (Basic 1, not Basic 1A) — kept as a hidden column so the Section filter above the table still works
                 render: (d) => `<span class="role-badge role-teacher">${d || ''}</span>`
               },
               {
@@ -9836,13 +9841,9 @@
         label: t.FullName + (t.Specialization ? ` (${t.Specialization})` : '')
       }));
 
-      // auto-suggest code placeholder
-      const codeHint = (() => {
-        const g = parseInt(formData.GradeLevel, 10);
-        const sec = (formData.Section || '').trim();
-        if (g > 0 && sec) return `Y${g}${sec}`;
-        return 'auto = ClassName+Section';
-      })();
+      // auto-suggest code placeholder — mirrors the backend's own abbreviation when left blank
+      // (e.g. 'Basic 1' -> 'BS1'; the section letter is only appended for multi-stream classes)
+      const codeHint = 'auto = e.g. BS1';
 
       return (
         <div className="modal-overlay" onClick={onClose}>
@@ -18854,7 +18855,16 @@
         DueDay: '10', LateFeePerDay: '0', InstallmentsAllowed: '0', InstallmentCount: '1',
         TaxPercent: '0', Description: ''
       });
-      const setM = (k, v) => setMeta({ ...meta, [k]: v });
+      // Ghana basic schools bill Tuition and Exam fees per term, never any other cycle — that
+      // mismatch (Quarterly/One-Time picked instead of Termly) is exactly what silently produced a
+      // missing "Due to Pay" list before. Locking it here instead of just recommending it stops that
+      // misconfiguration from happening again.
+      const TERMLY_ONLY_CATEGORIES = ['tuition', 'exam'];
+      const setM = (k, v) => {
+        if (k === 'FeeCategory' && TERMLY_ONLY_CATEGORIES.includes(v)) { setMeta({ ...meta, FeeCategory: v, Frequency: 'termly' }); return; }
+        setMeta({ ...meta, [k]: v });
+      };
+      const freqLocked = TERMLY_ONLY_CATEGORIES.includes(meta.FeeCategory);
 
       useEffect(() => {
         google.script.run.withSuccessHandler((res) => { if (res.success) setClasses(res.data || []); }).getAllClasses(currentUser, role);
@@ -18886,16 +18896,25 @@
                   <SearchableDropdown label="Fee Category" icon="fas fa-tag"
                     options={((window.SMS_SCHOOL && window.SMS_SCHOOL.FeeCategories) || []).map(o => ({ value: o.v, label: o.l }))}
                     value={meta.FeeCategory} onChange={(v) => setM('FeeCategory', v)} placeholder="Select... (or Manage Categories to add one)" />
-                  <SearchableDropdown label="Frequency" icon="fas fa-redo"
-                    options={[
-                      { value: 'termly', label: 'Termly (per term — recommended)' },
-                      { value: 'monthly', label: 'Monthly' },
-                      { value: 'quarterly', label: 'Quarterly' },
-                      { value: 'half_yearly', label: 'Half Yearly' },
-                      { value: 'annual', label: 'Annual' },
-                      { value: 'one_time', label: 'One-Time' }
-                    ]}
-                    value={meta.Frequency} onChange={(v) => setM('Frequency', v)} placeholder="Select..." />
+                  {freqLocked ? (
+                    <div className="form-group">
+                      <label><i className="fas fa-redo"></i> Frequency</label>
+                      <div style={{padding:'9px 12px',border:'1px solid #ddd',borderRadius:'4px',background:'#f8f9fa',fontSize:'13px',color:'#555'}}>
+                        <i className="fas fa-lock" style={{marginRight:'6px',color:'#888'}}></i>Termly (required for {meta.FeeCategory === 'tuition' ? 'Tuition' : 'Exam'} fees in Ghana)
+                      </div>
+                    </div>
+                  ) : (
+                    <SearchableDropdown label="Frequency" icon="fas fa-redo"
+                      options={[
+                        { value: 'termly', label: 'Termly (per term — recommended)' },
+                        { value: 'monthly', label: 'Monthly' },
+                        { value: 'quarterly', label: 'Quarterly' },
+                        { value: 'half_yearly', label: 'Half Yearly' },
+                        { value: 'annual', label: 'Annual' },
+                        { value: 'one_time', label: 'One-Time' }
+                      ]}
+                      value={meta.Frequency} onChange={(v) => setM('Frequency', v)} placeholder="Select..." />
+                  )}
                   <div className="form-group"><label>Academic Year</label><input type="text" value={meta.AcademicYear} onChange={(e) => setM('AcademicYear', e.target.value)} placeholder="2026-2027" /></div>
                   <div className="form-group"><label>Due Day</label><input type="number" min="1" max="31" value={meta.DueDay} onChange={(e) => setM('DueDay', e.target.value)} /></div>
                   <div className="form-group"><label>Late Fee / Day</label><input type="number" min="0" step="0.01" value={meta.LateFeePerDay} onChange={(e) => setM('LateFeePerDay', e.target.value)} /></div>
@@ -18976,7 +18995,15 @@
       });
       const [classes, setClasses] = useState([]);
       const [saving, setSaving] = useState(false);
-      const set = (k, v) => setFormData({ ...formData, [k]: v });
+      // Ghana basic schools bill Tuition and Exam fees per term, never any other cycle — locking
+      // it here (rather than just recommending it) stops the exact misconfiguration that once
+      // silently produced a missing "Due to Pay" list for these categories.
+      const TERMLY_ONLY_CATEGORIES = ['tuition', 'exam'];
+      const set = (k, v) => {
+        if (k === 'FeeCategory' && TERMLY_ONLY_CATEGORIES.includes(v)) { setFormData({ ...formData, FeeCategory: v, Frequency: 'termly' }); return; }
+        setFormData({ ...formData, [k]: v });
+      };
+      const freqLocked = TERMLY_ONLY_CATEGORIES.includes(formData.FeeCategory);
 
       useEffect(() => {
         google.script.run
@@ -19034,21 +19061,30 @@
                       onChange={(e) => set('Amount', e.target.value)}
                       required min="0" step="0.01" />
                   </div>
-                  <SearchableDropdown
-                    label="Frequency" icon="fas fa-clock"
-                    options={[
-                      { value: 'termly', label: 'Termly (per term — recommended)' },
-                      { value: 'monthly', label: 'Monthly' },
-                      { value: 'quarterly', label: 'Quarterly' },
-                      { value: 'half_yearly', label: 'Half Yearly' },
-                      { value: 'annual', label: 'Annual' },
-                      { value: 'one_time', label: 'One Time' }
-                    ]}
-                    value={formData.Frequency}
-                    onChange={(v) => set('Frequency', v)}
-                    placeholder="Select frequency..."
-                    required={true}
-                  />
+                  {freqLocked ? (
+                    <div className="form-group">
+                      <label><i className="fas fa-clock"></i> Frequency</label>
+                      <div style={{padding:'9px 12px',border:'1px solid #ddd',borderRadius:'4px',background:'#f8f9fa',fontSize:'13px',color:'#555'}}>
+                        <i className="fas fa-lock" style={{marginRight:'6px',color:'#888'}}></i>Termly (required for {formData.FeeCategory === 'tuition' ? 'Tuition' : 'Exam'} fees in Ghana)
+                      </div>
+                    </div>
+                  ) : (
+                    <SearchableDropdown
+                      label="Frequency" icon="fas fa-clock"
+                      options={[
+                        { value: 'termly', label: 'Termly (per term — recommended)' },
+                        { value: 'monthly', label: 'Monthly' },
+                        { value: 'quarterly', label: 'Quarterly' },
+                        { value: 'half_yearly', label: 'Half Yearly' },
+                        { value: 'annual', label: 'Annual' },
+                        { value: 'one_time', label: 'One Time' }
+                      ]}
+                      value={formData.Frequency}
+                      onChange={(v) => set('Frequency', v)}
+                      placeholder="Select frequency..."
+                      required={true}
+                    />
+                  )}
                   <SearchableDropdown
                     label="Academic Year" icon="fas fa-calendar-alt"
                     options={yearOptions.map(y => ({ value: y, label: y }))}
@@ -19912,13 +19948,6 @@
       const totalCollected = items.reduce((sum, p) => sum + (parseFloat(p.AmountPaid) || 0), 0);
       const totalDue = outstandingTotal != null ? outstandingTotal : 0;
 
-      // per-term collected breakdown, so admin can see at a glance how much came in each term —
-      // BillingPeriod on a due-linked payment is 'term1-2026-2027' etc.
-      const termCollected = { term1: 0, term2: 0, term3: 0 };
-      items.forEach(p => {
-        const m = String(p.BillingPeriod || '').match(/^(term[123])-/);
-        if (m) termCollected[m[1]] += (parseFloat(p.AmountPaid) || 0);
-      });
       // today's daily register — how much came in and from how many receipts today specifically,
       // independent of the Today toggle below (this always reflects the whole loaded year's "today")
       const todaysPayments = items.filter(p => String(p.PaymentDate || '').slice(0, 10) === todayStr);
@@ -20051,16 +20080,10 @@
             </div>
           )}
 
-          {/* per-term breakdown + today's collections — "financial report easier, know who paid
-              today" per the admin's own description of how these schools actually collect fees */}
+          {/* today's collections — "financial report easier, know who paid today" per the
+              admin's own description of how these schools actually collect fees */}
           {!loading && items.length > 0 && (
             <div style={{display:'flex',gap:'10px',marginBottom:'15px',flexWrap:'wrap'}}>
-              {['term1','term2','term3'].map(t => (
-                <div key={t} style={{flex:1,minWidth:'150px',padding:'10px 14px',background:'#fff',border:'1px solid #e0e0e0',borderRadius:'6px',borderLeft:'4px solid #0074D9'}}>
-                  <div style={{fontSize:'11px',color:'#888',textTransform:'uppercase'}}>{TERM_LABELS[t]} Collected</div>
-                  <div style={{fontSize:'18px',fontWeight:700,color:'var(--navy-primary)'}}>GH₵{termCollected[t].toFixed(2)}</div>
-                </div>
-              ))}
               <div style={{flex:1,minWidth:'150px',padding:'10px 14px',background:'#fff',border:'1px solid #e0e0e0',borderRadius:'6px',borderLeft:'4px solid #fbbc04'}}>
                 <div style={{fontSize:'11px',color:'#888',textTransform:'uppercase'}}><i className="fas fa-calendar-day"></i> Collected Today</div>
                 <div style={{fontSize:'18px',fontWeight:700,color:'#8a6100'}}>GH₵{todayCollected.toFixed(2)} <span style={{fontSize:'11px',fontWeight:400,color:'#888'}}>({todaysPayments.length})</span></div>
@@ -29795,10 +29818,8 @@
                 </div>
                 <div className="form-group" style={{marginBottom:0}}>
                   <label style={{fontSize:'12px'}}>Reopening Date (begins)</label>
-                  <input type="date" value={termDates[t]?.reopening || ''} onChange={(e) => setTermDateField(t, 'reopening', e.target.value)}
-                    disabled={t === 'term1'} placeholder={t === 'term1' ? 'Set via a new academic year' : ''}
-                    style={t === 'term1' ? {background:'#f8f9fa',cursor:'not-allowed'} : {}} />
-                  {t === 'term1' && <div style={{fontSize:'10px',color:'#888',marginTop:'3px'}}>Term 1 starts a new academic year — set above, not auto-advanced.</div>}
+                  <input type="date" value={termDates[t]?.reopening || ''} onChange={(e) => setTermDateField(t, 'reopening', e.target.value)} />
+                  {t === 'term1' && <div style={{fontSize:'10px',color:'#888',marginTop:'3px'}}>For the record only — Term 1 begins a new academic year by admin action, not auto-advance.</div>}
                 </div>
               </div>
             ))}
@@ -30173,16 +30194,6 @@
           </div>
 
           <h3 style={{marginTop: '22px', marginBottom: '14px', color: 'var(--navy-primary)', fontSize: '15px', textTransform:'uppercase', letterSpacing:'0.5px'}}>
-            <i className="fas fa-info-circle"></i> About
-          </h3>
-          <div className="form-grid">
-            <div className="form-group" style={{gridColumn:'1 / -1'}}>
-              <label><i className="fas fa-align-left"></i> About Text (shown in About sections)</label>
-              <textarea value={data.AboutText} onChange={(e) => set('AboutText', e.target.value)} rows="4" maxLength="1000" />
-            </div>
-          </div>
-
-          <h3 style={{marginTop: '22px', marginBottom: '14px', color: 'var(--navy-primary)', fontSize: '15px', textTransform:'uppercase', letterSpacing:'0.5px'}}>
             <i className="fas fa-id-card"></i> Admissions
           </h3>
           <div className="form-grid">
@@ -30272,34 +30283,6 @@
             <PhotoPicker label="School Stamp" value={data.SchoolStampURL} onChange={(url) => set('SchoolStampURL', url)} currentUser={currentUser} shape="square" />
             <PhotoPicker label="Headteacher Signature" value={data.HeadteacherSignatureURL} onChange={(url) => set('HeadteacherSignatureURL', url)} currentUser={currentUser} shape="square" />
             <PhotoPicker label="Admin Signature" value={data.AdminSignatureURL} onChange={(url) => set('AdminSignatureURL', url)} currentUser={currentUser} shape="square" />
-          </div>
-
-          <h3 style={{marginTop: '22px', marginBottom: '6px', color: 'var(--navy-primary)', fontSize: '15px', textTransform:'uppercase', letterSpacing:'0.5px'}}>
-            <i className="fas fa-link"></i> Public Links
-          </h3>
-          <p style={{color:'#777', fontSize:'13px', marginBottom:'12px'}}>
-            The web address prospective parents use to reach this system (the "Copy Link" button on Admissions builds on this). Leave blank to always auto-use the current live deployment URL — safest choice unless you have a specific reason to pin it.
-          </p>
-          <div className="settings-info-message" style={{marginBottom:'10px', fontSize:'12px'}}>
-            <i className="fas fa-triangle-exclamation" style={{color:'#fb8c00'}}></i> If shared links suddenly stop working (redirect to the login page or show blank), this field is usually pinned to an <b>old deployment ID</b> — normally after re-deploying via "Deploy → New deployment" instead of "Manage deployments → Edit → New version" (the latter keeps the same /exec URL forever). Click "Detect Current URL" below, compare it to what's saved, and clear the field if they don't match.
-          </div>
-          <div className="form-grid" style={{marginBottom:'10px'}}>
-            <div className="form-group" style={{gridColumn:'1 / -1'}}>
-              <label>Public Web App URL</label>
-              <div style={{display:'flex',gap:'8px'}}>
-                <input type="text" value={data.PublicAppBaseURL} onChange={(e) => set('PublicAppBaseURL', e.target.value.trim())} placeholder="https://script.google.com/macros/s/XXXXX/exec" style={{flex:1}} />
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => {
-                  google.script.run
-                    .withSuccessHandler((res) => {
-                      if (res && res.success) Swal.fire({ icon: 'info', title: 'Current Live Deployment URL', html: `<div style="word-break:break-all;font-family:monospace;font-size:12px">${res.data}</div><div style="margin-top:10px;font-size:12px;color:#777">Click below to use it, or Cancel to leave the saved value as-is.</div>`, showCancelButton: true, confirmButtonText: 'Use This URL' })
-                        .then((rr) => { if (rr.isConfirmed) set('PublicAppBaseURL', res.data); });
-                      else Swal.fire({ icon: 'error', text: (res && res.message) || 'Failed to detect URL' });
-                    })
-                    .withFailureHandler((err) => Swal.fire({ icon: 'error', text: err.message }))
-                    .getLiveWebAppUrl(currentUser, role);
-                }}><i className="fas fa-satellite-dish"></i> Detect Current URL</button>
-              </div>
-            </div>
           </div>
 
           <h3 style={{marginTop: '22px', marginBottom: '6px', color: 'var(--navy-primary)', fontSize: '15px', textTransform:'uppercase', letterSpacing:'0.5px'}}>

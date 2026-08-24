@@ -3124,6 +3124,22 @@ function addClass(classData, currentUser, currentRole) {
     if (!v.ok) return { success: false, message: v.error };
     var n = v.normalized;
 
+    // manual add left Code blank — derive it the same way auto-generate does (e.g. 'Basic 1' ->
+    // 'BS1'), appending the section letter only when this ClassName+Year already has a sibling
+    // stream (single-stream classes never carry a section letter in their code either)
+    if (!n.classCode) {
+      var siblingExists = false;
+      try {
+        var allData = sh.getDataRange().getValues();
+        for (var ci = 1; ci < allData.length; ci++) {
+          if (String(allData[ci][6]) === '1') continue;
+          if (String(allData[ci][1]).trim().toLowerCase() === String(classData.ClassName).trim().toLowerCase() &&
+              String(allData[ci][3]).trim() === String(classData.AcademicYear).trim()) { siblingExists = true; break; }
+        }
+      } catch (e) {}
+      n.classCode = (_classCodeAbbr(classData.ClassName) + (siblingExists ? String(classData.Section).trim().toUpperCase() : '')).slice(0, 20);
+    }
+
     var ts = nowIso(), id = nextClassId(sh);
     var strength = parseInt(classData.TotalStrength, 10);
     if (isNaN(strength) || strength < 0) strength = 0;
@@ -3266,6 +3282,25 @@ function getGhanaClassLevels(currentUser, currentRole) {
 
 // Auto-generate classes for the standard Ghana levels. payload: { academicYear, levels: [{ name, grade, stage, streams }] }
 // streams=1 -> single class named e.g. "Basic 1" Section "A"; streams>1 -> "A","B","C"... sections, one row per stream.
+// Abbreviates a class/level name into a short code (e.g. 'Basic 1' -> 'BS1', 'Nursery 2' -> 'NR2',
+// 'JHS 3' -> 'JHS3', 'KG 1' -> 'KG1') — consistent, compact codes without a school-by-school naming
+// table to maintain. A name already typed as an all-caps acronym (JHS, SHS, KG…) is kept whole;
+// anything else is abbreviated by stripping vowels and keeping the first two consonants.
+function _classCodeAbbr(name) {
+  var n = String(name || '').trim();
+  var digits = (n.match(/\d+/) || [''])[0];
+  var lettersOnly = n.replace(/[^A-Za-z]/g, '');
+  var isAcronym = lettersOnly.length > 0 && lettersOnly.length <= 4 && lettersOnly === lettersOnly.toUpperCase();
+  var abbr;
+  if (isAcronym) {
+    abbr = lettersOnly;
+  } else {
+    var consonants = lettersOnly.replace(/[aeiouAEIOU]/g, '');
+    abbr = consonants.length >= 2 ? consonants.slice(0, 2) : lettersOnly.slice(0, 2);
+  }
+  return (abbr + digits).toUpperCase();
+}
+
 function autoGenerateClasses(payload, currentUser, currentRole) {
   try {
     if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
@@ -3296,7 +3331,7 @@ function autoGenerateClasses(payload, currentUser, currentRole) {
       for (var s = 0; s < streams; s++) {
         var section = letters[s];
         if (classExists(sh, name, section, academicYear)) { skipped++; continue; }
-        var classCode = (name.replace(/[^A-Za-z0-9]/g, '') + section).toUpperCase().slice(0, 20);
+        var classCode = (_classCodeAbbr(name) + (streams > 1 ? section : '')).slice(0, 20);
         rows.push([
           id++, name, section, academicYear, '', 0, '0', ts, ts,
           grade, classCode, stage, 'english', 'general', 30, '', 'Main', '', '1', 'full_day'
@@ -8709,6 +8744,11 @@ function feeStructureExists(sh, classId, category, frequency, academicYear, excl
   return false;
 }
 
+// Tuition and Exam are always billed per term in Ghana basic schools — enforced server-side (not
+// just recommended in the UI) since a fee configured any other way silently produces zero payable
+// dues for a whole class of students until someone notices the gap.
+var TERMLY_ONLY_FEE_CATEGORIES = ['tuition', 'exam'];
+
 function addFeeStructure(data, currentUser, currentRole) {
   try {
     if (!isFinanceStaff(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
@@ -8725,6 +8765,7 @@ function addFeeStructure(data, currentUser, currentRole) {
     var allowedFreq = ['monthly','termly','quarterly','half_yearly','annual','one_time'];
     var fr = String(data.Frequency).toLowerCase();
     if (allowedFreq.indexOf(fr) === -1) return { success: false, message: 'Invalid frequency' };
+    if (TERMLY_ONLY_FEE_CATEGORIES.indexOf(cat) !== -1) fr = 'termly'; // Ghana schools bill these per term, always
     if (!validAcademicYear(data.AcademicYear)) return { success: false, message: 'AcademicYear must be YYYY-YYYY' };
 
     var amt = parseFloat(data.Amount);
@@ -8785,6 +8826,7 @@ function addFeeTypeBulk(d, currentUser, currentRole) {
     var allowedFreq = ['monthly','termly','quarterly','half_yearly','annual','one_time'];
     var fr = String(d.Frequency || '').toLowerCase();
     if (allowedFreq.indexOf(fr) === -1) return { success: false, message: 'Invalid frequency' };
+    if (TERMLY_ONLY_FEE_CATEGORIES.indexOf(cat) !== -1) fr = 'termly'; // Ghana schools bill these per term, always
     if (!validAcademicYear(d.AcademicYear)) return { success: false, message: 'AcademicYear must be YYYY-YYYY' };
 
     var classAmounts = Array.isArray(d.ClassAmounts) ? d.ClassAmounts : [];
@@ -8845,6 +8887,7 @@ function updateFeeStructure(id, data, currentUser, currentRole) {
     var allowedFreq = ['monthly','termly','quarterly','half_yearly','annual','one_time'];
     var fr = String(data.Frequency).toLowerCase();
     if (allowedFreq.indexOf(fr) === -1) return { success: false, message: 'Invalid frequency' };
+    if (TERMLY_ONLY_FEE_CATEGORIES.indexOf(cat) !== -1) fr = 'termly'; // Ghana schools bill these per term, always
     if (!validAcademicYear(data.AcademicYear)) return { success: false, message: 'AcademicYear must be YYYY-YYYY' };
     var amt = parseFloat(data.Amount);
     if (isNaN(amt) || amt < 0) return { success: false, message: 'Amount must be non-negative' };
@@ -20912,7 +20955,7 @@ function generateStudentDues(studentId, currentUser) {
       // for the academic year. A fee genuinely meant to be billed per term should use Frequency
       // 'termly' instead — that's now offered wherever Frequency is picked.
       else if (freq === 'quarterly' || freq === 'half_yearly' || freq === 'annual' || freq === 'one_time') {
-        yearlyFees.push({ id: fsdata[f][0], amount: parseFloat(fsdata[f][3]) || 0, academicYear: fsdata[f][5], category: String(fsdata[f][2] || '') });
+        yearlyFees.push({ id: fsdata[f][0], amount: parseFloat(fsdata[f][3]) || 0, academicYear: fsdata[f][5], category: String(fsdata[f][2] || '').toLowerCase() });
       }
     }
     if (monthlyFees.length === 0 && termlyFees.length === 0 && yearlyFees.length === 0) {
@@ -20977,9 +21020,22 @@ function generateStudentDues(studentId, currentUser) {
         var settingsRes2 = getSchoolSettings();
         curYear2 = (settingsRes2.data && settingsRes2.data.AcademicYear) || '';
       } catch (e) {}
+      // Admission fee is only ever owed by students admitted fresh / by transfer / by re-admission
+      // — a continuing student promoted from the term/year before does not pay it again. Ghana
+      // schools bill this once, at the point of admission; AdmissionType defaults to 'fresh' when
+      // unset (same convention rowToStudent already uses), so a legacy record with no explicit type
+      // still bills — only an explicit 'continuing'-style promotion should skip it.
+      var admissionType = String(student[60] || 'fresh').toLowerCase();
+      var admissionFeeEligible = ['fresh', 'transfer', 're_admission'].indexOf(admissionType) !== -1;
       yearlyFees.forEach(function (fee) {
+        if (fee.category === 'admission' && !admissionFeeEligible) return;
         var ay = fee.academicYear || curYear2;
-        var key = 'annual-' + ay;
+        // Admission fee keys 'admission-<year>' — matching enrollAdmission's own due, which is
+        // created (and usually paid in full immediately) at enrollment time under that exact key.
+        // Using the same key here means this generator recognizes that due as already existing
+        // instead of creating a second, still-pending 'annual-<year>' due for the same fee — which
+        // is exactly what was producing a phantom "pending" balance for a fee already paid in full.
+        var key = (fee.category === 'admission' ? 'admission-' : 'annual-') + ay;
         if (existing[fee.id + '|' + key]) return;
         var label = (fee.category ? fee.category.charAt(0).toUpperCase() + fee.category.slice(1) + ' — ' : '') + ay;
         newRows.push([nextId++, sid, fee.id, key, label, fee.amount, 'pending', '', 0, '', ts, ts]);
@@ -20992,6 +21048,53 @@ function generateStudentDues(studentId, currentUser) {
       if (currentUser) addLog(currentUser, 'Dues Generated', newRows.length + ' due slot(s) for student #' + sid);
     }
     return { success: true, generated: newRows.length };
+  } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
+}
+
+// How many students were admitted since the active term began, and how much has been collected
+// from them in Admission fees so far — surfaced on the dashboard so admin/bursar can see admission
+// activity for the term at a glance without cross-referencing Admissions and Fees Collection.
+function getActiveTermAdmissionStats(currentUser, currentRole) {
+  try {
+    if (!isAdminOrBursar(currentRole) && !isOwnerOrAdmin(currentRole)) return { success: false, message: 'Forbidden — no access' };
+    var settingsRes = getSchoolSettings();
+    var s = settingsRes.data || defaultSchoolSettings();
+    var ay = s.AcademicYear || '';
+    var activeTerm = String(s.ActiveTerm || 'term1').toLowerCase();
+    var termDates = s.TermDates || {};
+    // window start: this term's own Reopening Date, falling back to the academic year's start for
+    // term1 (which never carries its own auto-advance Reopening Date — see updateTermDates)
+    var windowStart = (activeTerm !== 'term1' && termDates[activeTerm] && termDates[activeTerm].reopening)
+      ? termDates[activeTerm].reopening
+      : (s.AcademicYearStartDate ? String(s.AcademicYearStartDate).split('T')[0] : (ay.split('-')[0] + '-09-01'));
+
+    var ssh = getSheet(STUDENTS_SHEET);
+    var admittedCount = 0;
+    var admittedIds = {};
+    if (ssh) {
+      var sdata = ssh.getDataRange().getValues();
+      for (var i = 1; i < sdata.length; i++) {
+        if (String(sdata[i][36]) === '1') continue; // soft-deleted
+        var admDate = sdata[i][24] ? String(toIso(sdata[i][24])).split('T')[0] : '';
+        if (admDate && admDate >= windowStart) { admittedCount++; admittedIds[parseInt(sdata[i][0], 10)] = true; }
+      }
+    }
+
+    var admissionFeeTotal = 0;
+    var psh = getSheet(FEE_PAYMENTS_SHEET);
+    if (psh) {
+      var pdata = psh.getDataRange().getValues();
+      var fmap = getFeeStructuresLite();
+      for (var p = 1; p < pdata.length; p++) {
+        if (String(pdata[p][15]) === '1') continue; // soft-deleted
+        var fs = fmap[pdata[p][2]];
+        if (!fs || String(fs.category || '').toLowerCase() !== 'admission') continue;
+        if (ay && String(pdata[p][18] || '') !== ay) continue;
+        admissionFeeTotal += (parseFloat(pdata[p][3]) || 0);
+      }
+    }
+
+    return { success: true, data: { admittedCount: admittedCount, admissionFeeTotal: admissionFeeTotal, activeTerm: activeTerm, windowStart: windowStart } };
   } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
 }
 
@@ -21806,6 +21909,65 @@ function restoreTrashItem(entityType, id, currentUser, currentRole) {
   }
 }
 
+// Student is the one entity with a real web of dependent records scattered across other sheets
+// (fees, marks, discipline, conduct, activities, PTM bookings, documents, complaints/helpdesk,
+// the Users login mirror...). Soft-delete deliberately leaves all of that alone — Trash exists so
+// a wrongly-deleted student can be restored whole. Only PERMANENT purge (this function, one-way)
+// actually reaches into those other sheets and removes every row that references the student, so
+// "delete for good" really does mean nothing of theirs is left behind in the spreadsheet.
+var _STUDENT_CASCADE_TARGETS = [
+  { sheet: FEE_DUES_SHEET,           headers: FEE_DUE_HEADERS,           col: 'StudentID' },
+  { sheet: FEE_PAYMENTS_SHEET,       headers: FEE_PAYMENT_HEADERS,       col: 'StudentID' },
+  { sheet: MARKS_SHEET,              headers: MARK_HEADERS,              col: 'StudentID' },
+  { sheet: DISCIPLINE_SHEET,         headers: DISCIPLINE_HEADERS,        col: 'StudentID' },
+  { sheet: CONDUCT_SHEET,            headers: CONDUCT_HEADERS,           col: 'StudentID' },
+  { sheet: REPORT_REMARKS_SHEET,     headers: REPORT_REMARKS_HEADERS,    col: 'StudentID' },
+  { sheet: ACTIVITIES_SHEET,         headers: ACTIVITY_HEADERS,          col: 'StudentID' },
+  { sheet: PTM_BOOKINGS_SHEET,       headers: PTM_BOOKING_HEADERS,       col: 'StudentID' },
+  { sheet: PARENT_STUDENTS_SHEET,    headers: PARENT_STUDENT_HEADERS,    col: 'StudentID' },
+  { sheet: REPORT_SHARE_TOKENS_SHEET,headers: REPORT_SHARE_TOKEN_HEADERS,col: 'StudentID' },
+  { sheet: COMPLAINTS_SHEET,         headers: COMPLAINT_HEADERS,         col: 'RelatedStudentID' },
+  { sheet: HELPDESK_SHEET,           headers: HELPDESK_HEADERS,          col: 'RelatedStudentID' }
+];
+function _cascadeDeleteStudentRecords(studentId) {
+  var sid = parseInt(studentId, 10);
+  if (isNaN(sid)) return;
+  _STUDENT_CASCADE_TARGETS.forEach(function (t) {
+    try {
+      var sh = getSheet(t.sheet);
+      if (!sh) return;
+      var colIdx = t.headers.indexOf(t.col);
+      if (colIdx === -1) return;
+      var data = sh.getDataRange().getValues();
+      for (var i = data.length - 1; i >= 1; i--) {
+        if (parseInt(data[i][colIdx], 10) === sid) sh.deleteRow(i + 1);
+      }
+    } catch (e) { Logger.log('_cascadeDeleteStudentRecords ' + t.sheet + ' failed: ' + e.toString()); }
+  });
+  // Documents are keyed by (EntityType, EntityID) rather than a StudentID column of their own
+  try {
+    var dsh = getSheet(DOCUMENTS_SHEET);
+    if (dsh) {
+      var etCol = DOCUMENT_HEADERS.indexOf('EntityType'), eidCol = DOCUMENT_HEADERS.indexOf('EntityID');
+      var ddata = dsh.getDataRange().getValues();
+      for (var j = ddata.length - 1; j >= 1; j--) {
+        if (String(ddata[j][etCol] || '').toLowerCase() === 'student' && parseInt(ddata[j][eidCol], 10) === sid) dsh.deleteRow(j + 1);
+      }
+    }
+  } catch (e) { Logger.log('_cascadeDeleteStudentRecords documents failed: ' + e.toString()); }
+  // the student's login mirror in Users (employeeCode 'STU-<id>')
+  try {
+    var ush = getSheet(USERS_SHEET);
+    if (ush) {
+      var udata = ush.getDataRange().getValues();
+      for (var u = udata.length - 1; u >= 1; u--) {
+        if (String(udata[u][23] || '') === 'STU-' + sid) ush.deleteRow(u + 1);
+      }
+    }
+  } catch (e) { Logger.log('_cascadeDeleteStudentRecords users failed: ' + e.toString()); }
+  try { _invalidateRosterCache('roster_users_v1'); } catch (e) {}
+}
+
 // removes the row for good — cannot be undone. Same permission as deleting it in the first place.
 function purgeTrashItem(entityType, id, currentUser, currentRole) {
   try {
@@ -21816,9 +21978,10 @@ function purgeTrashItem(entityType, id, currentUser, currentRole) {
     if (!found) return { success: false, message: 'Record not found' };
     if (found.notInTrash) return { success: false, message: 'Record is not in Trash' };
     found.sh.deleteRow(found.rowIdx + 1);
+    if (entityType === 'students') _cascadeDeleteStudentRecords(id);
     if (TRASH_CACHE_KEYS[entityType]) _invalidateRosterCache(TRASH_CACHE_KEYS[entityType]);
-    addLog(currentUser, 'Record Permanently Deleted', reg.label + ' #' + id);
-    return { success: true, message: reg.label + ' permanently deleted' };
+    addLog(currentUser, 'Record Permanently Deleted', reg.label + ' #' + id + (entityType === 'students' ? ' (with all related records)' : ''));
+    return { success: true, message: reg.label + ' permanently deleted' + (entityType === 'students' ? ', including all related fee, academic and activity records' : '') };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
