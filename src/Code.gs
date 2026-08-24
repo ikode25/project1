@@ -20761,8 +20761,13 @@ function _ensureFeeDuesSheet() {
 // and with the Fee Dues panel itself (summing Fee_Payments.AmountDue instead, which is what the
 // dashboards did before this restructure, over-counts once a due has more than one payment against
 // it from daily/partial collection).
-function _feeDuesOutstandingMaps() {
+// yearFilter: '' (default/all callers) = every year, unfiltered. A specific 'YYYY-YYYY' restricts to
+// dues whose BillingMonth embeds that year (term1-2026-2027, annual-2026-2027) — used by
+// getOutstandingSummary() below to give the Fees Collection page a "current year" total that
+// actually matches the year-scoped payments table sitting next to it.
+function _feeDuesOutstandingMaps(yearFilter) {
   var byStudent = {}, total = 0;
+  var yf = String(yearFilter || '').trim();
   try {
     var dsh = getSheet(FEE_DUES_SHEET);
     if (dsh) {
@@ -20770,6 +20775,7 @@ function _feeDuesOutstandingMaps() {
       var fmapOut = getFeeStructuresLite(); // cached — orphaned (deleted fee item) dues never count as outstanding
       for (var i = 1; i < data.length; i++) {
         if (!fmapOut[data[i][2]]) continue; // orphaned
+        if (yf && String(data[i][3] || '').indexOf(yf) === -1) continue;
         var status = String(data[i][6] || '').toLowerCase();
         if (status === 'paid' || status === 'carried_forward' || status === 'waived') continue;
         var remaining = Math.max(0, (parseFloat(data[i][5]) || 0) - (parseFloat(data[i][8]) || 0));
@@ -20781,6 +20787,28 @@ function _feeDuesOutstandingMaps() {
     }
   } catch (e) { Logger.log('_feeDuesOutstandingMaps failed: ' + e.toString()); }
   return { byStudent: byStudent, total: total };
+}
+
+// public wrapper for the Fees Collection page's "Total Pending" card — reads the real current
+// balance straight from the Fee_Dues ledger (one number per due, however many partial payments
+// built up to it) instead of summing each individual payment ROW's own snapshot AmountDue, which
+// double/over-counts the moment a due has more than one payment against it (exactly the "daily
+// collection" case this whole system exists for) — that mismatch is what made the Fees Collection
+// totals look like they didn't tally with the records table.
+function getOutstandingSummary(yearFilter, currentUser, currentRole) {
+  try {
+    if (!canReadPayments(currentRole)) return { success: false, message: 'Forbidden — no access' };
+    var yf = String(yearFilter || '').trim();
+    // mirror getAllPayments' own default resolution so "Total Pending" always matches the same year
+    // scope as whatever the payments table next to it is currently showing
+    if (!yf) {
+      var settingsRes = getSchoolSettings();
+      yf = (settingsRes.data && settingsRes.data.AcademicYear) || '';
+    }
+    if (yf.toLowerCase() === 'all') yf = '';
+    var res = _feeDuesOutstandingMaps(yf);
+    return { success: true, data: res.total };
+  } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
 }
 
 // The ONE place a payment ever gets applied to a due — used by addPayment, addPaymentsBulk and
@@ -20870,7 +20898,7 @@ function generateStudentDues(studentId, currentUser) {
     var fsh = getSheet(FEE_STRUCTURE_SHEET);
     if (!fsh) return { success: false, message: 'Fee_Structure sheet not found' };
     var fsdata = fsh.getDataRange().getValues();
-    var monthlyFees = [], termlyFees = [];
+    var monthlyFees = [], termlyFees = [], yearlyFees = [];
     for (var f = 1; f < fsdata.length; f++) {
       if (String(fsdata[f][9]) === '1') continue;
       if (parseInt(fsdata[f][1], 10) !== classId) continue;
@@ -20878,8 +20906,18 @@ function generateStudentDues(studentId, currentUser) {
       var freq = String(fsdata[f][4] || '').toLowerCase();
       if (freq === 'monthly') monthlyFees.push({ id: fsdata[f][0], amount: parseFloat(fsdata[f][3]) || 0 });
       else if (freq === 'termly') termlyFees.push({ id: fsdata[f][0], amount: parseFloat(fsdata[f][3]) || 0, academicYear: fsdata[f][5] });
+      // quarterly/half_yearly/annual/one_time — none of these map to a Ghana termly billing cycle,
+      // so rather than silently generating NO due at all (which is what happened before, and is
+      // exactly how the "Due to Pay" list ended up missing a configured fee type), bill them once
+      // for the academic year. A fee genuinely meant to be billed per term should use Frequency
+      // 'termly' instead — that's now offered wherever Frequency is picked.
+      else if (freq === 'quarterly' || freq === 'half_yearly' || freq === 'annual' || freq === 'one_time') {
+        yearlyFees.push({ id: fsdata[f][0], amount: parseFloat(fsdata[f][3]) || 0, academicYear: fsdata[f][5], category: String(fsdata[f][2] || '') });
+      }
     }
-    if (monthlyFees.length === 0 && termlyFees.length === 0) return { success: true, generated: 0, message: 'No monthly or termly fees configured for this class' };
+    if (monthlyFees.length === 0 && termlyFees.length === 0 && yearlyFees.length === 0) {
+      return { success: true, generated: 0, message: 'No fees configured for this class' };
+    }
 
     var dsh = _ensureFeeDuesSheet();
     var ddata = dsh.getDataRange().getValues();
@@ -20926,6 +20964,25 @@ function generateStudentDues(studentId, currentUser) {
           var label = TERM_LABELS[term] + ' ' + ay;
           newRows.push([nextId++, sid, fee.id, key, label, fee.amount, 'pending', '', 0, '', ts, ts]);
         });
+      });
+    }
+
+    // quarterly/half_yearly/annual/one_time — one due for the whole academic year. Keyed
+    // 'annual-<year>' (never a term prefix) so it's generated exactly once regardless of which term
+    // happens to be active when this runs, and stays visible/payable in every term's due list until
+    // it's settled rather than being tied to whichever term it was first generated under.
+    if (yearlyFees.length) {
+      var curYear2 = '';
+      try {
+        var settingsRes2 = getSchoolSettings();
+        curYear2 = (settingsRes2.data && settingsRes2.data.AcademicYear) || '';
+      } catch (e) {}
+      yearlyFees.forEach(function (fee) {
+        var ay = fee.academicYear || curYear2;
+        var key = 'annual-' + ay;
+        if (existing[fee.id + '|' + key]) return;
+        var label = (fee.category ? fee.category.charAt(0).toUpperCase() + fee.category.slice(1) + ' — ' : '') + ay;
+        newRows.push([nextId++, sid, fee.id, key, label, fee.amount, 'pending', '', 0, '', ts, ts]);
       });
     }
 
@@ -21473,7 +21530,8 @@ function getAllTermBills(term, academicYear, currentUser, currentRole) {
 
       var lines = feeItems.map(function (fee) {
         var known = dueIndex[sid + '|' + fee.ID + '|' + t + '-' + ay];
-        return { Category: fee.Category, Label: TERM_LABELS[t] + ' Fee', Amount: known != null ? known : fee.Amount };
+        var catLabel = fee.Category ? fee.Category.charAt(0).toUpperCase() + fee.Category.slice(1) : 'Fee';
+        return { Category: fee.Category, Label: catLabel + ' (' + TERM_LABELS[t] + ')', Amount: known != null ? known : fee.Amount };
       });
 
       // arrears preview: unpaid termly dues this academic year, strictly before the target term.

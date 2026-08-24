@@ -18887,7 +18887,14 @@
                     options={((window.SMS_SCHOOL && window.SMS_SCHOOL.FeeCategories) || []).map(o => ({ value: o.v, label: o.l }))}
                     value={meta.FeeCategory} onChange={(v) => setM('FeeCategory', v)} placeholder="Select... (or Manage Categories to add one)" />
                   <SearchableDropdown label="Frequency" icon="fas fa-redo"
-                    options={['monthly','quarterly','half_yearly','annual','one_time'].map(v => ({ value: v, label: v.replace('_',' ').replace(/\b\w/g, c => c.toUpperCase()) }))}
+                    options={[
+                      { value: 'termly', label: 'Termly (per term — recommended)' },
+                      { value: 'monthly', label: 'Monthly' },
+                      { value: 'quarterly', label: 'Quarterly' },
+                      { value: 'half_yearly', label: 'Half Yearly' },
+                      { value: 'annual', label: 'Annual' },
+                      { value: 'one_time', label: 'One-Time' }
+                    ]}
                     value={meta.Frequency} onChange={(v) => setM('Frequency', v)} placeholder="Select..." />
                   <div className="form-group"><label>Academic Year</label><input type="text" value={meta.AcademicYear} onChange={(e) => setM('AcademicYear', e.target.value)} placeholder="2026-2027" /></div>
                   <div className="form-group"><label>Due Day</label><input type="number" min="1" max="31" value={meta.DueDay} onChange={(e) => setM('DueDay', e.target.value)} /></div>
@@ -19592,6 +19599,11 @@
       // ever recorded on every page load. "All Years" is an explicit, deliberate opt-in.
       const [yearFilter, setYearFilter] = useState('');
       const { data: paymentYears } = useSWR('getPaymentYears', () => swrFetcher('getPaymentYears', currentUser, role));
+      // real current balance from the Fee_Dues ledger (one figure per due, however many partial
+      // payments built up to it) — NOT summed from each payment row's own snapshot AmountDue, which
+      // over-counts once a due has more than one payment against it
+      const { data: outstandingTotal } =
+        useSWR('getOutstandingSummary:' + yearFilter, () => swrFetcher('getOutstandingSummary', yearFilter, currentUser, role));
 
       // SWR: cached payments render instantly; refetches silently in the background. Default
       // (yearFilter='') deliberately shares its cache key with other pages' unscoped getAllPayments
@@ -19607,7 +19619,7 @@
       const [viewMode, setViewMode] = useState('table');
       const tableInstanceRef = useRef(null);
 
-      const [filters, setFilters] = useState({ status: '', mode: '', search: '', dateScope: '' }); // dateScope: '' | 'today'
+      const [filters, setFilters] = useState({ status: '', mode: '', search: '', dateScope: '', dateFrom: '', dateTo: '' }); // dateScope: '' | 'today'
       const [arrearsStudent, setArrearsStudent] = useState(null);
       const [showAllArrears, setShowAllArrears] = useState(false);
 
@@ -19746,28 +19758,41 @@
       };
 
       const clearFilters = () => {
-        setFilters({ status: '', mode: '', search: '', dateScope: '' });
+        setFilters({ status: '', mode: '', search: '', dateScope: '', dateFrom: '', dateTo: '' });
         if (tableInstanceRef.current) tableInstanceRef.current.search('').columns().search('').draw();
       };
 
-      // "Today" scope so admin/bursar can see exactly who paid today, on top of whatever
-      // status/mode/text filters are also active — the daily collection register they asked for
-      const dateScopedRows = filters.dateScope === 'today'
-        ? (itemsData || []).filter(p => String(p.PaymentDate || '').slice(0, 10) === todayStr)
-        : (itemsData || []);
+      // "Today" scope, or a custom From/To range, so admin/bursar can see exactly who paid on a
+      // given day (or across a date range) on top of whatever status/mode/text filters are also
+      // active — the daily collection register they asked for. The two are mutually exclusive:
+      // picking a custom range clears Today and vice versa (set together in the handlers below).
+      const dateScopedRows = (() => {
+        let rows = itemsData || [];
+        if (filters.dateScope === 'today') {
+          rows = rows.filter(p => String(p.PaymentDate || '').slice(0, 10) === todayStr);
+        } else if (filters.dateFrom || filters.dateTo) {
+          rows = rows.filter(p => {
+            const d = String(p.PaymentDate || '').slice(0, 10);
+            if (filters.dateFrom && d < filters.dateFrom) return false;
+            if (filters.dateTo && d > filters.dateTo) return false;
+            return true;
+          });
+        }
+        return rows;
+      })();
 
       useEffect(() => {
         if (tableInstanceRef.current && items.length > 0) applyFilters();
       }, [filters]);
 
-      // SWR data landed (first load or silent background refresh), or the Today scope toggled →
+      // SWR data landed (first load or silent background refresh), or the date scope changed →
       // paint/repaint the table in place
       useEffect(() => {
         if (typeof itemsData === 'undefined') return;
         if (tableInstanceRef.current) {
           try { tableInstanceRef.current.clear().rows.add(dateScopedRows).draw(false); applyFilters(); } catch (e) { initTable(dateScopedRows); }
         } else { initTable(dateScopedRows); }
-      }, [itemsData, filters.dateScope]);
+      }, [itemsData, filters.dateScope, filters.dateFrom, filters.dateTo]);
 
       const handleSave = (data) => {
         // parent-mode bulk dispatch
@@ -19885,7 +19910,7 @@
 
       // running totals
       const totalCollected = items.reduce((sum, p) => sum + (parseFloat(p.AmountPaid) || 0), 0);
-      const totalDue = items.reduce((sum, p) => sum + (parseFloat(p.AmountDue) || 0), 0);
+      const totalDue = outstandingTotal != null ? outstandingTotal : 0;
 
       // per-term collected breakdown, so admin can see at a glance how much came in each term —
       // BillingPeriod on a due-linked payment is 'term1-2026-2027' etc.
@@ -19912,7 +19937,7 @@
               <ViewToggle mode={viewMode} onChange={setViewMode} />
               <button className={'btn btn-sm ' + (filters.dateScope === 'today' ? 'btn-primary' : 'btn-secondary')}
                 title="Show only payments recorded today"
-                onClick={() => setFilters({...filters, dateScope: filters.dateScope === 'today' ? '' : 'today'})}>
+                onClick={() => setFilters({...filters, dateScope: filters.dateScope === 'today' ? '' : 'today', dateFrom: '', dateTo: ''})}>
                 <i className="fas fa-calendar-day"></i> Today {todaysPayments.length > 0 ? `(${todaysPayments.length})` : ''}
               </button>
               {(isAdmin || isClerk) && (
@@ -20071,6 +20096,16 @@
                   <input type="text" value={filters.search}
                     onChange={(e) => setFilters({...filters, search: e.target.value})}
                     placeholder="Receipt, student, ref..." className="filter-input" />
+                </div>
+                <div className="filter-group">
+                  <label><i className="fas fa-calendar"></i> Paid From</label>
+                  <input type="date" value={filters.dateFrom} className="filter-input"
+                    onChange={(e) => setFilters({...filters, dateFrom: e.target.value, dateScope: ''})} />
+                </div>
+                <div className="filter-group">
+                  <label><i className="fas fa-calendar"></i> Paid To</label>
+                  <input type="date" value={filters.dateTo} className="filter-input"
+                    onChange={(e) => setFilters({...filters, dateTo: e.target.value, dateScope: ''})} />
                 </div>
                 <div className="filter-group">
                   <label><i className="fas fa-credit-card"></i> Mode</label>
@@ -20398,6 +20433,7 @@
                   <tr style={{background:'#001f3f', color:'#fff', position:'sticky', top:0}}>
                     <th style={{padding:'5px 6px', textAlign:'left'}}>Period</th>
                     <th style={{padding:'5px 6px', textAlign:'left'}}>Head</th>
+                    <th style={{padding:'5px 6px', textAlign:'right'}}>Amount</th>
                     <th style={{padding:'5px 6px', textAlign:'right'}}>Paid</th>
                     <th style={{padding:'5px 6px', textAlign:'right'}}>Due</th>
                     <th style={{padding:'5px 6px', textAlign:'center'}}>Status</th>
@@ -20410,6 +20446,7 @@
                       <tr key={d.ID} style={{borderBottom:'1px solid #f5f5f5'}} title={d.ReceiptNumber ? 'Receipt: ' + d.ReceiptNumber : ''}>
                         <td style={{padding:'5px 6px'}}>{d.BillingMonthLabel}</td>
                         <td style={{padding:'5px 6px', textTransform:'capitalize'}}>{d.FeeCategory}{d.IsArrears ? ' ⚠' : ''}</td>
+                        <td style={{padding:'5px 6px', textAlign:'right'}}>{Number(d.Amount || 0).toFixed(2)}</td>
                         <td style={{padding:'5px 6px', textAlign:'right'}}>{Number(d.PaidAmount || 0).toFixed(2)}</td>
                         <td style={{padding:'5px 6px', textAlign:'right', color: due > 0 ? '#ea4335' : 'inherit'}}>{due.toFixed(2)}</td>
                         <td style={{padding:'5px 6px', textAlign:'center'}}>
@@ -20809,8 +20846,12 @@
                     </div>
 
                     {/* live calc summary — this is the actual daily/partial collection math: whatever
-                        is already paid on the due stays paid, this transaction just tops it up */}
-                    {(isAddNew ? !!selectedDue : true) && (
+                        is already paid on the due stays paid, this transaction just tops it up.
+                        Only meaningful for a NEW payment against a real selected due — dues aren't
+                        reloaded for edit/view (see reloadDues), so selectedDue is never set there and
+                        showing this block would compute a bogus "0 remaining" and falsely flag any
+                        already-recorded amount as "exceeding the balance". */}
+                    {isAddNew && !!selectedDue && (
                       <div style={{margin:'14px 0',padding:'12px 15px',background: overpaying ? '#fdecea' : 'linear-gradient(135deg,#f8f9fa,#e9ecef)',border:'1px solid ' + (overpaying ? '#ea4335' : '#dee2e6'),display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))',gap:'10px',fontSize:'13px'}}>
                         {isAddNew && (
                           <>
