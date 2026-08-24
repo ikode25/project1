@@ -5505,6 +5505,48 @@ function deleteStockTransaction(id) {
   }
 }
 
+// Records an additional payment against a Partially Paid / Unpaid stock
+// transaction (e.g. a student or walk-in customer settling their balance
+// later) without touching inventory stock — only the payment fields change.
+function collectStockTransactionBalance(id, amount) {
+  try {
+    const pay = round2_(parseFloat(amount) || 0);
+    if (pay <= 0) return { success: false, message: 'Enter an amount greater than zero' };
+
+    const sheet = getOrCreateStockTransactionsSheet();
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0].map(h => String(h).trim().toLowerCase());
+    const idIdx = headers.indexOf('id');
+    const netIdx = headers.indexOf('nettotal');
+    const paidIdx = headers.indexOf('amountpaid');
+    const balIdx = headers.indexOf('balance');
+    const statusIdx = headers.indexOf('paymentstatus');
+
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][idIdx]) !== String(id)) continue;
+      const net = parseFloat(data[i][netIdx]) || 0;
+      const currentPaid = parseFloat(data[i][paidIdx]) || 0;
+      const currentBalance = Math.max(0, net - currentPaid);
+      if (pay > currentBalance + 0.009) {
+        return { success: false, message: 'Amount exceeds the outstanding balance of ' + currentBalance.toFixed(2) };
+      }
+      const newPaid = round2_(currentPaid + pay);
+      const newBalance = round2_(Math.max(0, net - newPaid));
+      const newStatus = newBalance <= 0.009 ? 'Paid' : (newPaid > 0 ? 'Partially Paid' : 'Unpaid');
+
+      sheet.getRange(i + 1, paidIdx + 1).setValue(newPaid);
+      sheet.getRange(i + 1, balIdx + 1).setValue(newBalance);
+      sheet.getRange(i + 1, statusIdx + 1).setValue(newStatus);
+      SpreadsheetApp.flush();
+      logActivity('Collected Stock Transaction Balance', id + ' - ' + pay.toFixed(2));
+      return { success: true, amountPaid: newPaid, balance: newBalance, paymentStatus: newStatus };
+    }
+    return { success: false, message: 'Transaction not found' };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
 // ── POS / SELL ──
 // Completes a point-of-sale checkout: one cart can contain several items,
 // each becomes its own "Sale" Stock Transaction row (sharing a saleId so
@@ -5627,6 +5669,286 @@ function getActiveStudentsList() {
     }
     students.sort((a, b) => String(a.name).localeCompare(String(b.name)));
     return { success: true, students: students };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+// ════════════════════════════════════════════════════════
+// SALARIES — Staff directory + monthly payroll for Teaching and
+// Non-Teaching Staff, with printable/emailable/WhatsApp-able payslips.
+// ════════════════════════════════════════════════════════
+const STAFF_SHEET = "Staff";
+const SALARY_PAYMENTS_SHEET = "Salary Payments";
+
+// ── STAFF DIRECTORY ──
+function getOrCreateStaffSheet() {
+  return getOrCreateSheet(STAFF_SHEET, [
+    "id", "name", "staffType", "position", "phone", "email",
+    "baseSalary", "bankName", "accountNumber", "isActive", "notes", "createdAt"
+  ]);
+}
+
+function getStaffList() {
+  try {
+    const sheet = getOrCreateStaffSheet();
+    if (sheet.getLastRow() <= 1) return { success: true, staff: [] };
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0].map(h => String(h).trim().toLowerCase());
+    const idx = {};
+    headers.forEach((h, i) => idx[h] = i);
+    const staff = [];
+    for (let i = 1; i < data.length; i++) {
+      if (!data[i][idx.id]) continue;
+      staff.push({
+        id: data[i][idx.id],
+        name: data[i][idx.name] || '',
+        staffType: data[i][idx.stafftype] || 'Teaching',
+        position: data[i][idx.position] || '',
+        phone: data[i][idx.phone] || '',
+        email: data[i][idx.email] || '',
+        baseSalary: parseFloat(data[i][idx.basesalary]) || 0,
+        bankName: data[i][idx.bankname] || '',
+        accountNumber: data[i][idx.accountnumber] || '',
+        isActive: data[i][idx.isactive] === '' || data[i][idx.isactive] === undefined ? true : isBoolTrue(data[i][idx.isactive]),
+        notes: data[i][idx.notes] || ''
+      });
+    }
+    staff.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    return { success: true, staff: staff };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+function saveStaffMember(person) {
+  try {
+    const sheet = getOrCreateStaffSheet();
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+    const now = new Date().toISOString();
+
+    if (!person.id || String(person.id).trim() === '') {
+      person.id = "STF-" + Utilities.getUuid().substring(0, 8).toUpperCase();
+      person.createdAt = now;
+    }
+    person.isActive = person.isActive === false ? false : true;
+    person.baseSalary = parseFloat(person.baseSalary) || 0;
+
+    const normalized = {};
+    Object.keys(person).forEach(k => normalized[String(k).trim().toLowerCase()] = person[k]);
+
+    let foundRow = -1;
+    const data = sheet.getDataRange().getValues();
+    const idIdx = headers.map(h => h.toLowerCase()).indexOf('id');
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][idIdx]) === String(person.id)) { foundRow = i + 1; break; }
+    }
+
+    const rowVal = headers.map(h => {
+      const normH = h.toLowerCase();
+      return normalized[normH] !== undefined ? normalized[normH] : '';
+    });
+
+    if (foundRow !== -1) {
+      sheet.getRange(foundRow, 1, 1, headers.length).setValues([rowVal]);
+      logActivity('Updated Staff Member', person.name);
+    } else {
+      sheet.appendRow(rowVal);
+      logActivity('Added Staff Member', person.name);
+    }
+    SpreadsheetApp.flush();
+    return { success: true, person: person };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+function deleteStaffMember(id) {
+  try {
+    const sheet = getOrCreateStaffSheet();
+    const data = sheet.getDataRange().getValues();
+    const idCol = data[0].map(h => String(h).trim().toLowerCase()).indexOf('id');
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][idCol]) === String(id)) {
+        sheet.deleteRow(i + 1);
+        SpreadsheetApp.flush();
+        logActivity('Deleted Staff Member', id);
+        return { success: true };
+      }
+    }
+    return { success: false, message: 'Staff member not found' };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+// ── MONTHLY SALARY PAYMENTS ──
+function getOrCreateSalaryPaymentsSheet() {
+  return getOrCreateSheet(SALARY_PAYMENTS_SHEET, [
+    "id", "staffId", "staffName", "staffType", "position", "month", "monthLabel",
+    "baseSalary", "allowances", "deductions", "netPay", "paymentStatus",
+    "paymentDate", "paymentMethod", "notes", "recordedBy", "createdAt"
+  ]);
+}
+
+function getSalaryPayments() {
+  try {
+    const sheet = getOrCreateSalaryPaymentsSheet();
+    if (sheet.getLastRow() <= 1) return { success: true, payments: [] };
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0].map(h => String(h).trim().toLowerCase());
+    const idx = {};
+    headers.forEach((h, i) => idx[h] = i);
+    const tz = Session.getScriptTimeZone();
+    const payments = [];
+    for (let i = 1; i < data.length; i++) {
+      if (!data[i][idx.id]) continue;
+      let payDate = data[i][idx.paymentdate];
+      if (payDate instanceof Date) payDate = Utilities.formatDate(payDate, tz, 'yyyy-MM-dd');
+      payments.push({
+        id: data[i][idx.id],
+        staffId: data[i][idx.staffid] || '',
+        staffName: data[i][idx.staffname] || '',
+        staffType: data[i][idx.stafftype] || '',
+        position: data[i][idx.position] || '',
+        month: data[i][idx.month] || '',
+        monthLabel: data[i][idx.monthlabel] || '',
+        baseSalary: parseFloat(data[i][idx.basesalary]) || 0,
+        allowances: parseFloat(data[i][idx.allowances]) || 0,
+        deductions: parseFloat(data[i][idx.deductions]) || 0,
+        netPay: parseFloat(data[i][idx.netpay]) || 0,
+        paymentStatus: data[i][idx.paymentstatus] || 'Pending',
+        paymentDate: payDate || '',
+        paymentMethod: data[i][idx.paymentmethod] || '',
+        notes: data[i][idx.notes] || '',
+        recordedBy: data[i][idx.recordedby] || ''
+      });
+    }
+    payments.reverse();
+    return { success: true, payments: payments };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+function saveSalaryPayment(payment) {
+  try {
+    const sheet = getOrCreateSalaryPaymentsSheet();
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+    const lowerHeaders = headers.map(h => h.toLowerCase());
+    const now = new Date().toISOString();
+    const user = Session.getActiveUser().getEmail() || 'Admin';
+
+    const base = parseFloat(payment.baseSalary) || 0;
+    const allow = parseFloat(payment.allowances) || 0;
+    const ded = parseFloat(payment.deductions) || 0;
+    payment.netPay = round2_(Math.max(0, base + allow - ded));
+    payment.recordedBy = user;
+    if (payment.paymentStatus === 'Paid' && !payment.paymentDate) {
+      payment.paymentDate = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    }
+
+    let foundRow = -1;
+    const data = sheet.getDataRange().getValues();
+    const idIdx = lowerHeaders.indexOf('id');
+    if (payment.id) {
+      for (let i = 1; i < data.length; i++) {
+        if (String(data[i][idIdx]) === String(payment.id)) { foundRow = i + 1; break; }
+      }
+    }
+    if (!payment.id) {
+      payment.id = "SAL-" + Utilities.getUuid().substring(0, 8).toUpperCase();
+      payment.createdAt = now;
+    }
+
+    const normalized = {};
+    Object.keys(payment).forEach(k => normalized[String(k).trim().toLowerCase()] = payment[k]);
+    const rowVal = headers.map(h => {
+      const nh = h.toLowerCase();
+      return normalized[nh] !== undefined ? normalized[nh] : '';
+    });
+
+    if (foundRow !== -1) {
+      sheet.getRange(foundRow, 1, 1, headers.length).setValues([rowVal]);
+      logActivity('Updated Salary Payment', payment.staffName + ' - ' + payment.monthLabel);
+    } else {
+      sheet.appendRow(rowVal);
+      logActivity('Recorded Salary Payment', payment.staffName + ' - ' + payment.monthLabel);
+    }
+    SpreadsheetApp.flush();
+    return { success: true, payment: payment };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+function deleteSalaryPayment(id) {
+  try {
+    const sheet = getOrCreateSalaryPaymentsSheet();
+    const data = sheet.getDataRange().getValues();
+    const idCol = data[0].map(h => String(h).trim().toLowerCase()).indexOf('id');
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][idCol]) === String(id)) {
+        sheet.deleteRow(i + 1);
+        SpreadsheetApp.flush();
+        logActivity('Deleted Salary Payment', id);
+        return { success: true };
+      }
+    }
+    return { success: false, message: 'Payment not found' };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+// Emails a payslip (HTML) to the staff member's own email address on file.
+function sendPayslipEmail(paymentId) {
+  try {
+    const res = getSalaryPayments();
+    if (!res.success) return { success: false, message: res.message };
+    const payment = res.payments.find(p => p.id === paymentId);
+    if (!payment) return { success: false, message: 'Payment not found' };
+
+    const staffRes = getStaffList();
+    const person = (staffRes.staff || []).find(s => s.id === payment.staffId);
+    const email = person && person.email ? String(person.email).trim() : '';
+    if (!email) return { success: false, message: 'This staff member has no email address on file' };
+
+    const settingsRes = getSettings();
+    const st = (settingsRes && settingsRes.settings) || {};
+    const schoolName = st.schoolName || 'School';
+    const currency = st.currency || 'GHC';
+
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+        <div style="background:linear-gradient(135deg,#1e1b4b,#312e81);color:#fff;padding:20px;text-align:center;">
+          <div style="font-size:17px;font-weight:700;">${schoolName}</div>
+          <div style="font-size:12px;opacity:0.85;margin-top:2px;">Payslip &mdash; ${payment.monthLabel}</div>
+        </div>
+        <div style="padding:20px;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <tr><td style="padding:5px 0;color:#64748b;">Staff Name</td><td style="padding:5px 0;text-align:right;font-weight:600;">${payment.staffName}</td></tr>
+            <tr><td style="padding:5px 0;color:#64748b;">Position</td><td style="padding:5px 0;text-align:right;">${payment.position || '-'}</td></tr>
+            <tr><td style="padding:5px 0;color:#64748b;">Staff Type</td><td style="padding:5px 0;text-align:right;">${payment.staffType}</td></tr>
+            <tr><td colspan="2" style="border-top:1px solid #e2e8f0;padding-top:8px;"></td></tr>
+            <tr><td style="padding:5px 0;color:#64748b;">Base Salary</td><td style="padding:5px 0;text-align:right;">${currency} ${payment.baseSalary.toFixed(2)}</td></tr>
+            <tr><td style="padding:5px 0;color:#64748b;">Allowances</td><td style="padding:5px 0;text-align:right;color:#059669;">+ ${currency} ${payment.allowances.toFixed(2)}</td></tr>
+            <tr><td style="padding:5px 0;color:#64748b;">Deductions</td><td style="padding:5px 0;text-align:right;color:#dc2626;">- ${currency} ${payment.deductions.toFixed(2)}</td></tr>
+            <tr><td colspan="2" style="border-top:1px solid #e2e8f0;padding-top:8px;"></td></tr>
+            <tr><td style="padding:6px 0;font-weight:700;font-size:15px;">Net Pay</td><td style="padding:6px 0;text-align:right;font-weight:700;font-size:15px;color:#1e1b4b;">${currency} ${payment.netPay.toFixed(2)}</td></tr>
+          </table>
+          <div style="margin-top:14px;font-size:11px;color:#94a3b8;">Payment Status: ${payment.paymentStatus}${payment.paymentDate ? ' &middot; ' + payment.paymentDate : ''}${payment.paymentMethod ? ' &middot; ' + payment.paymentMethod : ''}</div>
+        </div>
+        <div style="background:#f8fafc;padding:12px;text-align:center;font-size:10px;color:#94a3b8;">This payslip is auto-generated by ${schoolName}'s School Management System.</div>
+      </div>`;
+
+    MailApp.sendEmail({
+      to: email,
+      subject: schoolName + ' — Payslip for ' + payment.monthLabel,
+      htmlBody: html
+    });
+    logActivity('Emailed Payslip', payment.staffName + ' - ' + payment.monthLabel);
+    return { success: true };
   } catch (e) {
     return { success: false, message: e.message };
   }

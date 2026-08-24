@@ -1169,7 +1169,14 @@
             border-radius: 12px;
             padding: 25px;
             width: 100%;
-            max-width: 380px
+            max-width: 380px;
+            /* Taller forms (e.g. Inventory's icon picker) previously had no
+               way to scroll on a small screen — fields below the fold were
+               unreachable and inputs could appear unresponsive because they
+               were simply off-screen behind the keyboard. */
+            max-height: 90vh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
         /* Mobile */
@@ -2785,6 +2792,7 @@
                 </div>
                 <div class="nav-group-items admin-only" id="navGroupFinance">
                     <a class="nav-item" data-section="incomeExpenses"><i class="bi bi-wallet2"></i><span>Income &amp; Expenses</span></a>
+                    <a class="nav-item" data-section="salaries"><i class="bi bi-cash-coin"></i><span>Salaries</span></a>
                     <a class="nav-item" data-section="reports"><i class="bi bi-bar-chart-line"></i><span>Reports</span></a>
                     <a class="nav-item" data-section="paymentHistory"><i class="bi bi-calendar-check"></i><span>Payment History</span></a>
                     <a class="nav-item" data-section="promotionHistory"><i class="bi bi-person-up"></i><span>Promotion History</span></a>
@@ -3304,6 +3312,15 @@
                                     </tbody>
                                 </table>
                             </div>
+                        </div>
+
+                        <!-- Fee Type Report — Class/Session Tiles -->
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                            <h6 class="mb-0 text-muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;"><i class="bi bi-mortarboard me-2"></i>Class Lists — Fee Payment Status</h6>
+                            <div id="collectorClassTilesSummary"></div>
+                        </div>
+                        <div class="row g-3 mb-4" id="collectorClassTiles">
+                            <!-- Dynamically populated class tiles -->
                         </div>
                     </div> <!-- /collectorDashboardContainer -->
 
@@ -4989,7 +5006,7 @@
                     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-1">
                         <h5 class="mb-0"><button onclick="goHome()" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-house-door me-1"></i>Home</button><i class="bi bi-shop me-2"></i>Point of Sale</h5>
                         <div class="d-flex gap-2">
-                            <button class="btn btn-outline-secondary btn-sm" onclick="openRestockModal()"><i class="bi bi-arrow-counterclockwise me-1"></i>Return / Restock</button>
+                            <button class="btn btn-outline-secondary btn-sm" id="posRestockBtn" onclick="openRestockModal()"><i class="bi bi-arrow-counterclockwise me-1"></i>Return / Restock</button>
                         </div>
                     </div>
                     <p class="text-muted small mb-3">Select items to create one sales invoice.</p>
@@ -5064,7 +5081,7 @@
                 <div class="content-section admin-only collector-ok" id="inventorySection">
                     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-1">
                         <h5 class="mb-0"><button onclick="goHome()" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-house-door me-1"></i>Home</button><i class="bi bi-box-seam-fill me-2"></i>Inventory</h5>
-                        <button class="btn btn-primary btn-sm" onclick="openInventoryModal()"><i class="bi bi-plus-circle me-1"></i>Add Item</button>
+                        <button class="btn btn-primary btn-sm" id="invAddBtn" onclick="openInventoryModal()"><i class="bi bi-plus-circle me-1"></i>Add Item</button>
                     </div>
                     <p class="text-muted small mb-3">Manage stock items — uniforms, books, stationery, and other goods.</p>
 
@@ -5099,7 +5116,7 @@
                 <div class="content-section admin-only collector-ok" id="vendorsSection">
                     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-1">
                         <h5 class="mb-0"><button onclick="goHome()" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-house-door me-1"></i>Home</button><i class="bi bi-truck me-2"></i>Vendors</h5>
-                        <button class="btn btn-primary btn-sm" onclick="openVendorModal()"><i class="bi bi-plus-circle me-1"></i>Add Vendor</button>
+                        <button class="btn btn-primary btn-sm" id="vendorAddBtn" onclick="openVendorModal()"><i class="bi bi-plus-circle me-1"></i>Add Vendor</button>
                     </div>
                     <p class="text-muted small mb-3">Suppliers you purchase uniforms, books, stationery, and other stock from.</p>
 
@@ -5119,7 +5136,7 @@
                 <div class="content-section admin-only collector-ok" id="stockTransactionsSection">
                     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-1">
                         <h5 class="mb-0"><button onclick="goHome()" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-house-door me-1"></i>Home</button><i class="bi bi-arrow-left-right me-2"></i>Stock Transactions</h5>
-                        <button class="btn btn-primary btn-sm" onclick="openStockTxnModal()"><i class="bi bi-plus-circle me-1"></i>Add Transaction</button>
+                        <button class="btn btn-primary btn-sm" id="stxAddBtn" onclick="openStockTxnModal()"><i class="bi bi-plus-circle me-1"></i>Add Transaction</button>
                     </div>
                     <p class="text-muted small mb-3">Every sale, purchase, and stock adjustment — the full stock activity log.</p>
 
@@ -5157,9 +5174,9 @@
                         <div class="table-responsive">
                             <table class="table table-sm table-hover mb-0" style="font-size:12.5px;" id="stxTable">
                                 <thead><tr>
-                                    <th>Date</th><th>Type</th><th>Item</th><th class="text-end">Qty</th><th class="text-end">Unit Price</th><th class="text-end">Net Total</th><th>Party</th><th>Payment</th><th class="text-end">Actions</th>
+                                    <th>Date</th><th>Type</th><th>Item</th><th class="text-end">Qty</th><th class="text-end">Unit Price</th><th class="text-end">Net Total</th><th class="text-end">Balance</th><th>Party</th><th>Payment</th><th class="text-end">Actions</th>
                                 </tr></thead>
-                                <tbody id="stxTableBody"><tr><td colspan="9" class="text-center text-muted py-3">Loading…</td></tr></tbody>
+                                <tbody id="stxTableBody"><tr><td colspan="10" class="text-center text-muted py-3">Loading…</td></tr></tbody>
                             </table>
                         </div>
                     </div>
@@ -5291,71 +5308,25 @@
                                 </div>
                                 <!-- Roles & Permissions Matrix Card -->
                                 <div class="mt-4 text-start" style="border-top: 1px solid #e2e8f0; padding-top: 20px;">
-                                    <h6 class="fw-bold text-dark mb-3"><i class="bi bi-shield-lock me-2 text-primary"></i>Roles &amp; Permissions Matrix</h6>
+                                    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                                        <h6 class="fw-bold text-dark mb-0"><i class="bi bi-shield-lock me-2 text-primary"></i>Roles &amp; Permissions Matrix</h6>
+                                        <button type="button" class="btn btn-primary btn-sm" onclick="saveRolePermMatrix()"><i class="bi bi-save me-1"></i>Save Permissions</button>
+                                    </div>
                                     <div class="table-responsive">
                                         <table class="table table-sm table-bordered align-middle small text-center mb-0" style="font-size:11px;">
                                             <thead class="table-light">
                                                 <tr>
-                                                    <th class="text-start" style="width:200px;">Module / Feature</th>
+                                                    <th class="text-start" style="width:220px;">Module / Feature</th>
                                                     <th style="background:#f5e6ff; color:#6b21a8; font-weight:700;">Admin</th>
-                                                    <th style="background:#e0f2fe; color:#0369a1; font-weight:700;">Collector</th>
-                                                    <th style="background:#dcfce7; color:#15803d; font-weight:700;">Viewer</th>
+                                                    <th style="background:#e0f2fe; color:#0369a1; font-weight:700;">Collector<br><span style="font-weight:500;">V&nbsp;&nbsp;A&nbsp;&nbsp;E&nbsp;&nbsp;D</span></th>
+                                                    <th style="background:#dcfce7; color:#15803d; font-weight:700;">Viewer<br><span style="font-weight:500;">V&nbsp;&nbsp;A&nbsp;&nbsp;E&nbsp;&nbsp;D</span></th>
                                                 </tr>
                                             </thead>
-                                            <tbody>
-                                                <tr>
-                                                    <td class="text-start fw-bold">Dashboard &amp; Analytics</td>
-                                                    <td class="text-purple fw-semibold" style="color:#6b21a8;">V A E D</td>
-                                                    <td class="text-info fw-semibold" style="color:#0369a1;">V</td>
-                                                    <td class="text-success fw-semibold" style="color:#15803d;">V</td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="text-start fw-bold">Regular School Fees</td>
-                                                    <td class="text-purple fw-semibold" style="color:#6b21a8;">V A E D</td>
-                                                    <td class="text-info fw-semibold" style="color:#0369a1;">V A E</td>
-                                                    <td class="text-success fw-semibold" style="color:#15803d;">V</td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="text-start fw-bold">Custom Fee Types</td>
-                                                    <td class="text-purple fw-semibold" style="color:#6b21a8;">V A E D</td>
-                                                    <td class="text-info fw-semibold" style="color:#0369a1;">V A E</td>
-                                                    <td class="text-success fw-semibold" style="color:#15803d;">V</td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="text-start fw-bold">Uniform Sales</td>
-                                                    <td class="text-purple fw-semibold" style="color:#6b21a8;">V A E D</td>
-                                                    <td class="text-info fw-semibold" style="color:#0369a1;">V A E</td>
-                                                    <td class="text-success fw-semibold" style="color:#15803d;">V</td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="text-start fw-bold">Book Sales</td>
-                                                    <td class="text-purple fw-semibold" style="color:#6b21a8;">V A E D</td>
-                                                    <td class="text-info fw-semibold" style="color:#0369a1;">V A E</td>
-                                                    <td class="text-success fw-semibold" style="color:#15803d;">V</td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="text-start fw-bold">Outstanding Balances Log</td>
-                                                    <td class="text-purple fw-semibold" style="color:#6b21a8;">V A E D</td>
-                                                    <td class="text-info fw-semibold" style="color:#0369a1;">V</td>
-                                                    <td class="text-success fw-semibold" style="color:#15803d;">V</td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="text-start fw-bold">Settings &amp; Rates Configuration</td>
-                                                    <td class="text-purple fw-semibold" style="color:#6b21a8;">V A E D</td>
-                                                    <td class="text-muted">—</td>
-                                                    <td class="text-muted">—</td>
-                                                </tr>
-                                                <tr>
-                                                    <td class="text-start fw-bold">Activity Logs &amp; Audit Trail</td>
-                                                    <td class="text-purple fw-semibold" style="color:#6b21a8;">V A E D</td>
-                                                    <td class="text-muted">—</td>
-                                                    <td class="text-muted">—</td>
-                                                </tr>
-                                            </tbody>
+                                            <tbody id="rolePermMatrixBody"></tbody>
                                         </table>
                                     </div>
                                     <div class="mt-2 text-muted text-start" style="font-size:10px; line-height: 1.4;">
-                                        <strong>Legend:</strong> V = View · A = Add/Record · E = Edit/Collect · D = Delete. Admin has full system access, Collector has operational access, and Viewer has view-only access.
+                                        <strong>Legend:</strong> V = View · A = Add/Record · E = Edit/Collect · D = Delete. Admin always has full access. Collector/Viewer checkboxes control sidebar visibility for every module; Add/Edit/Delete are additionally enforced on the Inventory &amp; Sales modules (POS/Sell, Inventory, Stock Transactions, Vendors), Income &amp; Expenses, and Salaries.
                                     </div>
                                 </div>
                                 <hr>
@@ -5417,6 +5388,71 @@
                                 <thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Description</th><th>Amount</th><th>Action</th></tr></thead>
                                 <tbody id="ieBody"><tr><td colspan="6" class="text-center text-muted py-3">Loading…</td></tr></tbody>
                             </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SALARIES SECTION -->
+                <div class="content-section admin-only" id="salariesSection">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-1">
+                        <h5 class="mb-0"><button onclick="goHome()" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-house-door me-1"></i>Home</button><i class="bi bi-cash-coin me-2"></i>Salaries</h5>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-primary btn-sm" id="salStaffAddBtn" onclick="openStaffModal()"><i class="bi bi-person-plus me-1"></i>Add Staff</button>
+                        </div>
+                    </div>
+                    <p class="text-muted small mb-3">Pay Teaching and Non-Teaching Staff every month and send payslips by email or WhatsApp.</p>
+
+                    <ul class="nav nav-tabs mb-3" id="salariesTabs">
+                        <li class="nav-item"><a class="nav-link active" href="#" onclick="showSalariesTab('payroll',this);return false;"><i class="bi bi-cash-stack me-1"></i>Monthly Payroll</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" onclick="showSalariesTab('staff',this);return false;"><i class="bi bi-people me-1"></i>Staff Directory</a></li>
+                    </ul>
+
+                    <!-- Monthly Payroll tab -->
+                    <div id="salariesTab_payroll">
+                        <div class="filter-bar">
+                            <input type="month" class="form-control form-control-sm" id="salMonthPicker" style="max-width:160px;" onchange="loadSalaryPayroll()">
+                            <select class="form-select form-select-sm" id="salStaffTypeFilter" onchange="renderSalaryPayrollTable()">
+                                <option value="">All Staff Types</option>
+                                <option value="Teaching">Teaching Staff</option>
+                                <option value="Non-Teaching">Non-Teaching Staff</option>
+                            </select>
+                            <select class="form-select form-select-sm" id="salStatusFilter" onchange="renderSalaryPayrollTable()">
+                                <option value="">All Status</option>
+                                <option value="Paid">Paid</option>
+                                <option value="Pending">Pending</option>
+                            </select>
+                        </div>
+
+                        <div class="stat-mini-row">
+                            <div class="stat-card" style="border-left:4px solid var(--success)"><div class="stat-value" id="salTotalPaid">GHC 0.00</div><div class="stat-label">Paid This Month</div></div>
+                            <div class="stat-card" style="border-left:4px solid var(--warning)"><div class="stat-value" id="salTotalPending">GHC 0.00</div><div class="stat-label">Pending This Month</div></div>
+                            <div class="stat-card" style="border-left:4px solid var(--primary)"><div class="stat-value" id="salStaffCount">0</div><div class="stat-label">Active Staff</div></div>
+                        </div>
+
+                        <div class="form-card p-0">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover mb-0" style="font-size:12.5px;">
+                                    <thead><tr>
+                                        <th>Staff</th><th>Type</th><th>Position</th><th class="text-end">Base Salary</th><th class="text-end">Net Pay</th><th>Status</th><th class="text-end">Actions</th>
+                                    </tr></thead>
+                                    <tbody id="salPayrollBody"><tr><td colspan="7" class="text-center text-muted py-3">Select a month to load payroll…</td></tr></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Staff Directory tab -->
+                    <div id="salariesTab_staff" style="display:none;">
+                        <input type="text" class="form-control form-control-sm mb-3" style="max-width:260px;" id="staffSearchInput" placeholder="Search staff…" oninput="renderStaffTable()">
+                        <div class="form-card p-0">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover mb-0" style="font-size:12.5px;">
+                                    <thead><tr>
+                                        <th>Name</th><th>Type</th><th>Position</th><th>Phone</th><th>Email</th><th class="text-end">Base Salary</th><th>Status</th><th class="text-end">Actions</th>
+                                    </tr></thead>
+                                    <tbody id="staffTableBody"><tr><td colspan="8" class="text-center text-muted py-3">Loading…</td></tr></tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -6633,6 +6669,161 @@
             { id: 'activityLogs', label: 'Activity Audit Trail', section: 'activityLogs' },
             { id: 'auditTrail', label: 'Security Audit Trail', section: 'auditTrail' }
         ];
+
+        // ════════════════════════════════════════════════════════
+        // ROLES & PERMISSIONS MATRIX (About page) — lets Admin toggle
+        // View/Add/Edit/Delete access per module for Collector and Viewer.
+        // Stored as settings.rolePermissions (JSON), sparse — only cells the
+        // admin actually changes are saved; everything else falls back to
+        // ROLE_PERM_DEFAULTS below, which mirrors today's real behavior so
+        // an admin who never opens this screen sees no change at all.
+        // ════════════════════════════════════════════════════════
+        var ROLE_PERM_MODULES = [
+            { id: 'dashboard', label: 'Dashboard & Analytics', sections: ['dashboard'] },
+            { id: 'regularFees', label: 'Regular School Fees', sections: ['firstTerm', 'secondTerm', 'thirdTerm'] },
+            { id: 'historicalSearch', label: 'Historical Search', sections: ['historicalSearch'] },
+            { id: 'addRecord', label: 'Add Record', sections: ['addEdit'] },
+            { id: 'generateBills', label: 'Generate Bills', sections: ['generateBills'] },
+            { id: 'customFeeTypes', label: 'Custom Fee Types (pay/collect)', sections: [] },
+            { id: 'posSell', label: 'POS / Sell', sections: ['posSell'] },
+            { id: 'inventory', label: 'Inventory', sections: ['inventory'] },
+            { id: 'stockTransactions', label: 'Stock Transactions', sections: ['stockTransactions'] },
+            { id: 'vendors', label: 'Vendors', sections: ['vendors'] },
+            { id: 'salesReports', label: 'Sales Reports', sections: ['salesReports'] },
+            { id: 'incomeExpenses', label: 'Income & Expenses', sections: ['incomeExpenses'] },
+            { id: 'salaries', label: 'Salaries', sections: ['salaries'] },
+            { id: 'notifications', label: 'Notifications', sections: ['notifications'] },
+            { id: 'messages', label: 'Messages', sections: ['messages'] },
+            { id: 'bulkSms', label: 'Bulk SMS', sections: ['bulkSms'] },
+            { id: 'newStudents', label: 'New Students', sections: ['newStudents'] },
+            { id: 'parents', label: 'Parents Directory', sections: ['parents'] },
+            { id: 'classes', label: 'Classes', sections: ['classes'] },
+            { id: 'inactiveStudents', label: 'Inactive Students', sections: ['inactiveStudents'] },
+            { id: 'scholarships', label: 'Scholarships', sections: ['scholarships'] },
+            { id: 'reports', label: 'Finance Reports', sections: ['reports'] },
+            { id: 'paymentHistory', label: 'Payment History', sections: ['paymentHistory'] },
+            { id: 'promotionHistory', label: 'Promotion History', sections: ['promotionHistory'] },
+            { id: 'discountHistory', label: 'Discount History', sections: ['discountHistory'] },
+            { id: 'outstandingLog', label: 'Outstanding Balances Log', sections: ['outstandingLog'] },
+            { id: 'users', label: 'Users', sections: ['users'] },
+            { id: 'importExport', label: 'Import / Export', sections: ['importExport'] },
+            { id: 'settings', label: 'Settings & Rates Configuration', sections: ['settings'] },
+            { id: 'activityLogs', label: 'Activity Logs', sections: ['activityLogs'] },
+            { id: 'auditTrail', label: 'Security Audit Trail', sections: ['auditTrail'] }
+        ];
+        // Letters: v=View, a=Add/Record, e=Edit/Collect, d=Delete
+        var ROLE_PERM_DEFAULTS = {
+            dashboard:         { collector: 'v',   viewer: 'v' },
+            regularFees:       { collector: 'vae', viewer: 'v' },
+            historicalSearch:  { collector: 'v',   viewer: '' },
+            addRecord:         { collector: 'va',  viewer: '' },
+            generateBills:     { collector: 'v',   viewer: '' },
+            customFeeTypes:    { collector: 'vae', viewer: '' },
+            posSell:           { collector: 'vae', viewer: '' },
+            inventory:         { collector: 'vae', viewer: '' },
+            stockTransactions: { collector: 'vae', viewer: '' },
+            vendors:           { collector: 'v',   viewer: '' },
+            salesReports:      { collector: 'v',   viewer: '' },
+            incomeExpenses:    { collector: 'va',  viewer: '' },
+            notifications:     { collector: 'vae', viewer: '' },
+            outstandingLog:    { collector: 'v',   viewer: 'v' }
+            // Any module not listed here defaults to no Collector/Viewer access.
+        };
+
+        function getRolePermMatrix() {
+            try {
+                var raw = settings.rolePermissions;
+                if (!raw) return {};
+                return typeof raw === 'string' ? (JSON.parse(raw) || {}) : raw;
+            } catch (e) { return {}; }
+        }
+
+        // role: 'collector' | 'viewer'. letter: 'v' | 'a' | 'e' | 'd'
+        function moduleHasPerm(moduleId, role, letter) {
+            if (role === 'admin') return true;
+            var saved = getRolePermMatrix();
+            var cell = (saved[moduleId] && saved[moduleId][role] !== undefined)
+                ? saved[moduleId][role]
+                : ((ROLE_PERM_DEFAULTS[moduleId] && ROLE_PERM_DEFAULTS[moduleId][role]) || '');
+            return String(cell).indexOf(letter) !== -1;
+        }
+
+        // Convenience for gating Add/Edit/Delete controls in the modules
+        // that actually enforce the matrix (Inventory & Sales, Income &
+        // Expenses, Salaries) — true for every role except a Collector who
+        // hasn't been granted that letter; Admin/Owner are never affected
+        // here (Owner's mutation buttons are already hidden globally via
+        // body.owner-mode CSS).
+        function collectorCan(moduleId, letter) {
+            if (!currentUser || currentUser.role !== 'collector') return true;
+            return moduleHasPerm(moduleId, 'collector', letter);
+        }
+
+        // Applies the saved (or default) matrix to the sidebar for Collector
+        // and Viewer — re-shows whatever module sections they've been
+        // granted View access to (everything else was already blanket-hidden
+        // as .admin-only just before this runs), then collapses any sidebar
+        // group left with zero visible items.
+        function applyRolePermissionsToUI() {
+            var role = currentUser ? String(currentUser.role || 'viewer').trim().toLowerCase() : 'viewer';
+            if (role !== 'collector' && role !== 'viewer') return;
+
+            ROLE_PERM_MODULES.forEach(function (m) {
+                if (!m.sections.length) return;
+                var allowed = moduleHasPerm(m.id, role, 'v');
+                m.sections.forEach(function (sec) {
+                    document.querySelectorAll('.nav-item[data-section="' + sec + '"]').forEach(function (el) {
+                        el.style.display = allowed ? '' : 'none';
+                    });
+                    var contentEl = document.getElementById(sec + 'Section');
+                    if (contentEl && !allowed) contentEl.style.display = 'none';
+                });
+            });
+
+            document.querySelectorAll('.nav-group-items').forEach(function (group) {
+                var items = group.querySelectorAll('.nav-item');
+                var anyVisible = Array.prototype.some.call(items, function (el) { return el.style.display !== 'none'; });
+                var header = group.previousElementSibling;
+                group.style.display = anyVisible ? '' : 'none';
+                if (header && header.classList.contains('nav-group-header')) header.style.display = anyVisible ? '' : 'none';
+            });
+        }
+
+        function renderRolePermMatrix() {
+            var tbody = document.getElementById('rolePermMatrixBody');
+            if (!tbody) return;
+            var letters = ['v', 'a', 'e', 'd'];
+            tbody.innerHTML = ROLE_PERM_MODULES.map(function (m) {
+                var cells = ['collector', 'viewer'].map(function (role) {
+                    return '<td>' + letters.map(function (L) {
+                        var checked = moduleHasPerm(m.id, role, L) ? 'checked' : '';
+                        return '<input type="checkbox" class="form-check-input rp-check" data-module="' + m.id + '" data-role="' + role + '" data-letter="' + L + '" ' + checked + ' style="margin:0 3px;cursor:pointer;">';
+                    }).join('') + '</td>';
+                }).join('');
+                return '<tr><td class="text-start fw-bold">' + m.label + '</td><td class="fw-semibold" style="color:#6b21a8;">V A E D</td>' + cells + '</tr>';
+            }).join('');
+        }
+
+        function saveRolePermMatrix() {
+            var matrix = {};
+            document.querySelectorAll('.rp-check').forEach(function (chk) {
+                var mod = chk.dataset.module, role = chk.dataset.role, letter = chk.dataset.letter;
+                if (!matrix[mod]) matrix[mod] = { collector: '', viewer: '' };
+                if (chk.checked) matrix[mod][role] += letter;
+            });
+            showLoad('Saving permissions…');
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run.withSuccessHandler(function (r) {
+                    hideLoad();
+                    if (r.success) {
+                        settings.rolePermissions = JSON.stringify(matrix);
+                        lsSet('settings', settings);
+                        showToast('Permissions saved! They take effect next time Collector/Viewer log in.', 'success');
+                    } else showToast(r.message, 'error');
+                }).withFailureHandler(function (e) { hideLoad(); showToast(e.message, 'error'); }).saveSettings({ rolePermissions: JSON.stringify(matrix) });
+            } else { hideLoad(); showToast('Saved (demo)', 'info'); }
+        }
+
         var currentUser = null;
         var allRecords = [];
         var allCustomFeeRecords = [];
@@ -7310,16 +7501,17 @@
                 if (roleEl) roleEl.textContent = roleLabel;
 
                 // Hide/Show sidebar & main layout offset based on role.
-                // Collector gets a real, organized sidebar (Dashboard, Add
-                // Record, Generate Bills, plus Inventory & Sales below) —
-                // only Viewer/Owner stay on the simplified sidebar-free portal.
-                if (userRole === 'viewer' || userRole === 'owner') {
+                // Collector and Viewer both get a real, organized sidebar now
+                // — what they see in it is governed by the admin-configured
+                // Roles & Permissions Matrix (applyRolePermissionsToUI, below).
+                // Only Owner stays on the simplified sidebar-free portal.
+                if (userRole === 'owner') {
                     document.body.classList.add('no-sidebar');
                 } else {
                     document.body.classList.remove('no-sidebar');
                 }
 
-                // Viewers and Owners get a simplified, sidebar-free portal — no mobile bottom nav bar
+                // Owners get a simplified, sidebar-free portal — no mobile bottom nav bar
                 var mobileBottomNavEl = document.querySelector('.mobile-bottom-nav');
                 if (mobileBottomNavEl) mobileBottomNavEl.style.display = (userRole === 'viewer' || userRole === 'owner') ? 'none' : '';
                 // Owner mode: add class for CSS hiding of edit buttons
@@ -7351,16 +7543,13 @@
                 var colTermTitle = document.getElementById('collectorActiveTermTitle');
                 if (colTermTitle) colTermTitle.textContent = activeTerm + ' (' + activeYr + ')';
 
-                // Access control for sidebar tabs. Collector is otherwise
-                // treated like Viewer here (admin-only stays hidden), except
-                // for elements explicitly marked .collector-ok — currently
-                // the Inventory & Sales group (POS/Sell, Inventory, Stock
-                // Transactions, Vendors, Sales Reports), which a collector
-                // needs for day-to-day sales.
+                // Access control for sidebar tabs. Default: admin-only stays
+                // hidden for everyone else. applyRolePermissionsToUI() (see
+                // the Roles & Permissions Matrix module below) then
+                // selectively re-shows whatever Collector/Viewer have been
+                // granted access to per the admin-configured matrix.
                 if (userRole !== 'admin' && userRole !== 'owner') {
-                    document.querySelectorAll('.admin-only').forEach(function (el) {
-                        el.style.display = (userRole === 'collector' && el.classList.contains('collector-ok')) ? '' : 'none';
-                    });
+                    document.querySelectorAll('.admin-only').forEach(function (el) { el.style.display = 'none'; });
                     document.querySelectorAll('.admin-field').forEach(function (el) { el.style.display = 'none'; });
                 } else {
                     document.querySelectorAll('.admin-only').forEach(function (el) { el.style.display = ''; });
@@ -7374,10 +7563,12 @@
                         if (el) el.style.display = 'none';
                     });
                 }
-                
+
+                if (typeof applyRolePermissionsToUI === 'function') applyRolePermissionsToUI();
+
                 // Apply sidebar navigation visibility
                 if (typeof applySidebarVisibility === 'function') applySidebarVisibility();
-                
+
                 // Trigger onboarding system tour for first-time users
                 setTimeout(function() {
                     var username = currentUser ? (currentUser.username || currentUser.email || 'User') : 'User';
@@ -7428,8 +7619,11 @@
         }
 
         function renderViewerClassTiles() {
-            var container = document.getElementById('viewerClassTiles');
-            if (!container) return;
+            // Shared by the Viewer dashboard and the Collector dashboard's
+            // "Class Lists — Fee Payment Status" tiles — whichever
+            // container(s) exist on the page get populated.
+            var containers = ['viewerClassTiles', 'collectorClassTiles'].map(function (id) { return document.getElementById(id); }).filter(Boolean);
+            if (!containers.length) return;
             var list = (classesList && classesList.length) ? classesList : ["Creche", "Nursery 1", "Nursery 2", "KG 1", "KG 2", "Basic 1", "Basic 2", "Basic 3", "Basic 4", "Basic 5", "Basic 6", "JHS 1", "JHS 2", "JHS 3"];
             var activeYr = settings.academicYear || '2025/2026';
             var activeTerm = settings.activeTerm || 'First Term';
@@ -7472,14 +7666,15 @@
                     '</div>';
             });
 
-            var summaryEl = document.getElementById('viewerClassTilesSummary');
-            if (summaryEl) {
-                summaryEl.innerHTML = '<span class="badge bg-success-light text-success me-2"><i class="bi bi-check-circle me-1"></i>' + payingCount + ' class(es) fully paid</span>' +
-                    '<span class="badge bg-danger-light text-danger me-2"><i class="bi bi-exclamation-circle me-1"></i>' + owingCount + ' class(es) owing</span>' +
-                    (noBillCount ? '<span class="badge bg-secondary-light text-secondary"><i class="bi bi-dash-circle me-1"></i>' + noBillCount + ' not billed yet</span>' : '');
-            }
+            var summaryHtml = '<span class="badge bg-success-light text-success me-2"><i class="bi bi-check-circle me-1"></i>' + payingCount + ' class(es) fully paid</span>' +
+                '<span class="badge bg-danger-light text-danger me-2"><i class="bi bi-exclamation-circle me-1"></i>' + owingCount + ' class(es) owing</span>' +
+                (noBillCount ? '<span class="badge bg-secondary-light text-secondary"><i class="bi bi-dash-circle me-1"></i>' + noBillCount + ' not billed yet</span>' : '');
+            ['viewerClassTilesSummary', 'collectorClassTilesSummary'].forEach(function (id) {
+                var el = document.getElementById(id);
+                if (el) el.innerHTML = summaryHtml;
+            });
 
-            container.innerHTML = html;
+            containers.forEach(function (c) { c.innerHTML = html; });
         }
 
         function renderViewerStudentFeeStatus() {
@@ -8732,12 +8927,15 @@
                 return html;
             }
 
-            // Collector can only Edit, Thermal Print, and send SMS
+            // Collector: Edit, Next Bill, Thermal Print, plus Call/WhatsApp/SMS to parents
             if (currentUser && currentUser.role === 'collector') {
                 html += '<button class="act-btn btn btn-sm btn-outline-primary me-1" data-action="edit" data-id="' + r.id + '" data-session="' + session + '" title="Pay / Edit Fee"><i class="bi bi-credit-card"></i></button>';
                 html += '<button class="act-btn btn btn-sm btn-outline-warning me-1" data-action="nextbill" data-id="' + r.id + '" data-session="' + session + '" title="Generate Next Term Bill"><i class="bi bi-calendar-plus"></i></button>';
                 html += '<button class="act-btn btn btn-sm btn-outline-warning me-1" data-action="thermal" data-id="' + r.id + '" data-session="' + session + '" title="Thermal Print Receipt"><i class="bi bi-printer-fill"></i></button>';
                 if (phone) {
+                    var intlPhoneCol = phone.startsWith('0') ? '233' + phone.substring(1) : (phone.startsWith('233') ? phone : '233' + phone);
+                    html += '<a href="tel:+' + intlPhoneCol + '" class="btn btn-sm btn-outline-success me-1" title="Call Parent" style="padding:2px 7px;font-size:11px"><i class="bi bi-telephone"></i></a>';
+                    html += '<button class="act-btn btn btn-sm btn-whatsapp me-1" data-action="whatsapp" data-id="' + r.id + '" data-session="' + session + '" title="WhatsApp"><i class="bi bi-whatsapp"></i></button>';
                     html += '<button class="act-btn btn btn-sm btn-outline-secondary me-1" data-action="sms" data-id="' + r.id + '" data-session="' + session + '" title="Send SMS" style="font-size:11px;padding:2px 7px"><i class="bi bi-chat-dots"></i></button>';
                 }
                 return html;
@@ -16014,12 +16212,13 @@
             tbody.innerHTML = entries.map(function(e){
                 var typeBadge = e.type === 'Income' ? '<span class="status-badge status-paid">Income</span>' : '<span class="status-badge status-unpaid">Expense</span>';
                 return '<tr><td>'+e.date+'</td><td>'+typeBadge+'</td><td>'+e.category+'</td><td>'+e.description+'</td><td><strong>'+currency+' '+f2(parseFloat(e.amount)||0)+'</strong></td>'
-                    + '<td><button class="btn btn-xs btn-outline-danger" style="font-size:11px;padding:2px 8px" onclick="deleteIEEntry(\''+e.id+'\')"><i class="bi bi-trash"></i></button></td></tr>';
+                    + '<td>' + (collectorCan('incomeExpenses', 'd') ? '<button class="btn btn-xs btn-outline-danger" style="font-size:11px;padding:2px 8px" onclick="deleteIEEntry(\''+e.id+'\')"><i class="bi bi-trash"></i></button>' : '') + '</td></tr>';
             }).join('');
         }
 
         function saveIEEntry(ev) {
             ev.preventDefault();
+            if (!collectorCan('incomeExpenses', 'a')) { showToast("You don't have permission to add entries", 'warning'); return; }
             var entry = {
                 date: document.getElementById('ieDate').value,
                 type: document.getElementById('ieType').value,
@@ -16657,8 +16856,24 @@
                 });
                 phFeeType.innerHTML = html;
             }
-            
+
             runPaymentHistory();
+
+            // Extra/custom fee records are fetched as a second round-trip
+            // after the main student records, so they can still be empty at
+            // the moment this page loads — leaving an extra Fee Type search
+            // stuck showing 0 payments even though they exist. Refresh them
+            // in the background and re-run the search once they land.
+            if (typeof google !== 'undefined' && google.script && (!Array.isArray(allCustomFeeRecords) || !allCustomFeeRecords.length)) {
+                google.script.run.withSuccessHandler(function (cfRes) {
+                    if (cfRes && cfRes.success) {
+                        allCustomFeeRecords = cfRes.history || [];
+                        lsSet('customFeeRecords', allCustomFeeRecords);
+                        var sec = document.getElementById('paymentHistorySection');
+                        if (sec && (sec.classList.contains('active') || sec.classList.contains('active-section'))) runPaymentHistory();
+                    }
+                }).withFailureHandler(function () { }).getCustomStudentFees('all');
+            }
         }
 
         function runPaymentHistory() {
@@ -20400,6 +20615,8 @@
         function loadInventory() {
             var tbody = document.getElementById('invTableBody');
             if (tbody) tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3"><span class="spinner-border spinner-border-sm me-2"></span>Loading…</td></tr>';
+            var addBtn = document.getElementById('invAddBtn');
+            if (addBtn) addBtn.style.display = collectorCan('inventory', 'a') ? '' : 'none';
             if (typeof google !== 'undefined' && google.script) {
                 google.script.run.withSuccessHandler(function (r) {
                     if (r.success) { allInventoryItems = r.items || []; populateInventoryCategoryFilter(); renderInventoryTable(); }
@@ -20453,8 +20670,8 @@
                     '<td class="text-end">' + i.stock + ' ' + (i.unit || '') + '</td>' +
                     '<td>' + statusBadge + '</td>' +
                     '<td class="text-end">' +
-                    '<button class="btn btn-xs btn-outline-primary me-1" style="font-size:11px;padding:2px 8px" onclick="openInventoryModal(\'' + i.id + '\')"><i class="bi bi-pencil"></i></button>' +
-                    '<button class="btn btn-xs btn-outline-danger" style="font-size:11px;padding:2px 8px" onclick="deleteInventoryItemConfirm(\'' + i.id + '\')"><i class="bi bi-trash"></i></button>' +
+                    (collectorCan('inventory', 'e') ? '<button class="btn btn-xs btn-outline-primary me-1" style="font-size:11px;padding:2px 8px" onclick="openInventoryModal(\'' + i.id + '\')"><i class="bi bi-pencil"></i></button>' : '') +
+                    (collectorCan('inventory', 'd') ? '<button class="btn btn-xs btn-outline-danger" style="font-size:11px;padding:2px 8px" onclick="deleteInventoryItemConfirm(\'' + i.id + '\')"><i class="bi bi-trash"></i></button>' : '') +
                     '</td>' +
                     '</tr>';
             }).join('');
@@ -20552,6 +20769,8 @@
         function loadVendors() {
             var tbody = document.getElementById('vendorTableBody');
             if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3"><span class="spinner-border spinner-border-sm me-2"></span>Loading…</td></tr>';
+            var addBtn = document.getElementById('vendorAddBtn');
+            if (addBtn) addBtn.style.display = collectorCan('vendors', 'a') ? '' : 'none';
             if (typeof google !== 'undefined' && google.script) {
                 google.script.run.withSuccessHandler(function (r) {
                     if (r.success) { allVendors = r.vendors || []; renderVendorsTable(); }
@@ -20569,8 +20788,8 @@
             tbody.innerHTML = vendors.map(function (v) {
                 return '<tr><td><strong>' + v.name + '</strong></td><td>' + (v.contactPerson || '-') + '</td><td>' + (v.phone || '-') + '</td><td>' + (v.email || '-') + '</td><td>' + (v.notes || '-') + '</td>' +
                     '<td class="text-end">' +
-                    '<button class="btn btn-xs btn-outline-primary me-1" style="font-size:11px;padding:2px 8px" onclick="openVendorModal(\'' + v.id + '\')"><i class="bi bi-pencil"></i></button>' +
-                    '<button class="btn btn-xs btn-outline-danger" style="font-size:11px;padding:2px 8px" onclick="deleteVendorConfirm(\'' + v.id + '\')"><i class="bi bi-trash"></i></button>' +
+                    (collectorCan('vendors', 'e') ? '<button class="btn btn-xs btn-outline-primary me-1" style="font-size:11px;padding:2px 8px" onclick="openVendorModal(\'' + v.id + '\')"><i class="bi bi-pencil"></i></button>' : '') +
+                    (collectorCan('vendors', 'd') ? '<button class="btn btn-xs btn-outline-danger" style="font-size:11px;padding:2px 8px" onclick="deleteVendorConfirm(\'' + v.id + '\')"><i class="bi bi-trash"></i></button>' : '') +
                     '</td></tr>';
             }).join('');
         }
@@ -20628,7 +20847,9 @@
         // ── STOCK TRANSACTIONS ──
         function loadStockTransactions() {
             var tbody = document.getElementById('stxTableBody');
-            if (tbody) tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3"><span class="spinner-border spinner-border-sm me-2"></span>Loading…</td></tr>';
+            if (tbody) tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-3"><span class="spinner-border spinner-border-sm me-2"></span>Loading…</td></tr>';
+            var addBtn = document.getElementById('stxAddBtn');
+            if (addBtn) addBtn.style.display = collectorCan('stockTransactions', 'a') ? '' : 'none';
             if (!allInventoryItems.length) loadInventoryQuiet_();
             if (!activeStudentsForPos.length) loadActiveStudentsForPos();
             var currency = settings.currency || 'GHC';
@@ -20637,8 +20858,8 @@
             if (typeof google !== 'undefined' && google.script) {
                 google.script.run.withSuccessHandler(function (r) {
                     if (r.success) { allStockTxns = r.transactions || []; renderStockTxnTable(); }
-                    else if (tbody) tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger py-3">' + r.message + '</td></tr>';
-                }).withFailureHandler(function (e) { if (tbody) tbody.innerHTML = '<tr><td colspan="9" class="text-center text-danger py-3">' + e.message + '</td></tr>'; }).getStockTransactions();
+                    else if (tbody) tbody.innerHTML = '<tr><td colspan="10" class="text-center text-danger py-3">' + r.message + '</td></tr>';
+                }).withFailureHandler(function (e) { if (tbody) tbody.innerHTML = '<tr><td colspan="10" class="text-center text-danger py-3">' + e.message + '</td></tr>'; }).getStockTransactions();
             } else { allStockTxns = []; renderStockTxnTable(); }
         }
 
@@ -20672,15 +20893,18 @@
             if (!tbody) return;
             var currency = settings.currency || 'GHC';
             var list = _stxFilteredList().slice().sort(function (a, b) { return new Date(b.date) - new Date(a.date); });
-            if (!list.length) { tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No transactions found.</td></tr>'; return; }
+            if (!list.length) { tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">No transactions found.</td></tr>'; return; }
             tbody.innerHTML = list.map(function (t) {
                 var badge = '<span class="stx-type-badge stx-type-' + t.type + '">' + t.type + (isBoolTrue_(t.isReturn) ? ' ↩' : '') + '</span>';
                 var payBadge = t.paymentStatus === 'Paid' ? '<span class="status-badge status-paid">Paid</span>' : (t.paymentStatus === 'Unpaid' ? '<span class="status-badge status-unpaid">Unpaid</span>' : '<span class="status-badge status-partial">Partial</span>');
+                var balance = Math.max(0, parseFloat(t.balance) || 0);
+                var balDisp = balance > 0 ? '<strong class="text-danger">' + currency + ' ' + fmt(balance) + '</strong>' : '<span class="text-muted">—</span>';
                 return '<tr><td>' + (t.date || '-') + '</td><td>' + badge + '</td><td>' + t.itemName + '</td><td class="text-end">' + t.quantity + '</td><td class="text-end">' + currency + ' ' + fmt(t.unitPrice) + '</td>' +
-                    '<td class="text-end"><strong>' + currency + ' ' + fmt(t.netTotal) + '</strong></td><td>' + (t.party || '-') + '</td><td>' + payBadge + '</td>' +
+                    '<td class="text-end"><strong>' + currency + ' ' + fmt(t.netTotal) + '</strong></td><td class="text-end">' + balDisp + '</td><td>' + (t.party || '-') + '</td><td>' + payBadge + '</td>' +
                     '<td class="text-end">' +
-                    '<button class="btn btn-xs btn-outline-primary me-1" style="font-size:11px;padding:2px 8px" onclick="openStockTxnModal(\'' + t.id + '\')"><i class="bi bi-pencil"></i></button>' +
-                    '<button class="btn btn-xs btn-outline-danger" style="font-size:11px;padding:2px 8px" onclick="deleteStockTxnConfirm(\'' + t.id + '\')"><i class="bi bi-trash"></i></button>' +
+                    (balance > 0 && collectorCan('stockTransactions', 'e') ? '<button class="btn btn-xs btn-outline-success me-1" style="font-size:11px;padding:2px 8px" title="Collect balance" onclick="openCollectBalanceModal(\'' + t.id + '\')"><i class="bi bi-cash-coin"></i></button>' : '') +
+                    (collectorCan('stockTransactions', 'e') ? '<button class="btn btn-xs btn-outline-primary me-1" style="font-size:11px;padding:2px 8px" onclick="openStockTxnModal(\'' + t.id + '\')"><i class="bi bi-pencil"></i></button>' : '') +
+                    (collectorCan('stockTransactions', 'd') ? '<button class="btn btn-xs btn-outline-danger" style="font-size:11px;padding:2px 8px" onclick="deleteStockTxnConfirm(\'' + t.id + '\')"><i class="bi bi-trash"></i></button>' : '') +
                     '</td></tr>';
             }).join('');
         }
@@ -20800,12 +21024,51 @@
             } else { hideLoad(); allStockTxns = allStockTxns.filter(function (t) { return t.id !== id; }); renderStockTxnTable(); showToast('Deleted (demo)', 'info'); }
         }
 
+        function openCollectBalanceModal(id) {
+            var t = allStockTxns.find(function (x) { return x.id === id; });
+            if (!t) return;
+            var currency = settings.currency || 'GHC';
+            var balance = Math.max(0, parseFloat(t.balance) || 0);
+            document.getElementById('cbTxnId').value = t.id;
+            document.getElementById('cbSummary').innerHTML =
+                '<div class="d-flex justify-content-between"><span class="text-muted">Item</span><strong>' + t.itemName + '</strong></div>' +
+                '<div class="d-flex justify-content-between"><span class="text-muted">Party</span><strong>' + (t.party || '-') + '</strong></div>' +
+                '<div class="d-flex justify-content-between"><span class="text-muted">Net Total</span><strong>' + currency + ' ' + fmt(t.netTotal) + '</strong></div>' +
+                '<div class="d-flex justify-content-between"><span class="text-muted">Already Paid</span><strong>' + currency + ' ' + fmt(t.amountPaid) + '</strong></div>' +
+                '<div class="d-flex justify-content-between border-top mt-1 pt-1"><span class="text-muted">Balance Due</span><strong class="text-danger">' + currency + ' ' + fmt(balance) + '</strong></div>';
+            var amtInput = document.getElementById('cbAmount');
+            amtInput.max = balance;
+            amtInput.value = balance;
+            document.getElementById('collectBalanceModal').classList.add('show');
+        }
+        function closeCollectBalanceModal() { document.getElementById('collectBalanceModal').classList.remove('show'); }
+
+        function submitCollectBalance(ev) {
+            ev.preventDefault();
+            var id = document.getElementById('cbTxnId').value;
+            var amount = parseFloat(document.getElementById('cbAmount').value) || 0;
+            if (amount <= 0) { showToast('Enter an amount greater than zero', 'warning'); return; }
+            showLoad('Recording payment…');
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run.withSuccessHandler(function (r) {
+                    hideLoad();
+                    if (r.success) {
+                        var t = allStockTxns.find(function (x) { return x.id === id; });
+                        if (t) { t.amountPaid = r.amountPaid; t.balance = r.balance; t.paymentStatus = r.paymentStatus; }
+                        closeCollectBalanceModal();
+                        renderStockTxnTable();
+                        showToast('Payment recorded!', 'success');
+                    } else showToast(r.message, 'error');
+                }).withFailureHandler(function (e) { hideLoad(); showToast(e.message, 'error'); }).collectStockTransactionBalance(id, amount);
+            } else { hideLoad(); showToast('Recorded (demo)', 'info'); closeCollectBalanceModal(); }
+        }
+
         function exportStockTxnCsv() {
             var list = _stxFilteredList();
             if (!list.length) { showToast('Nothing to export', 'warning'); return; }
-            var rows = [['Date', 'Type', 'Item', 'Qty', 'Unit Price', 'Discount', 'Tax', 'Net Total', 'Party', 'Payment Status', 'Return/Refund']];
+            var rows = [['Date', 'Type', 'Item', 'Qty', 'Unit Price', 'Discount', 'Tax', 'Net Total', 'Amount Paid', 'Balance', 'Party', 'Payment Status', 'Return/Refund']];
             list.forEach(function (t) {
-                rows.push([t.date, t.type, t.itemName, t.quantity, t.unitPrice, t.discount, t.tax, t.netTotal, t.party, t.paymentStatus, isBoolTrue_(t.isReturn) ? 'Yes' : 'No']);
+                rows.push([t.date, t.type, t.itemName, t.quantity, t.unitPrice, t.discount, t.tax, t.netTotal, t.amountPaid, t.balance, t.party, t.paymentStatus, isBoolTrue_(t.isReturn) ? 'Yes' : 'No']);
             });
             if (typeof XLSX === 'undefined') { showToast('Export library not loaded', 'error'); return; }
             var ws = XLSX.utils.aoa_to_sheet(rows);
@@ -20823,9 +21086,10 @@
             w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Stock Transactions</title>');
             w.document.write('<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:12px;padding:15mm;color:#1e293b}.report-title{text-align:center;margin:10px 0;padding:8px;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;border-radius:6px;font-size:15px;font-weight:bold}table{width:100%;border-collapse:collapse;margin-top:10px}th{background:#4f46e5;color:#fff;padding:6px 8px;text-align:left;font-size:10.5px}td{padding:5px 8px;border-bottom:1px solid #f1f5f9;font-size:10.5px}tr:nth-child(even) td{background:#f8fafc}@media print{@page{margin:10mm;size:A4}}</style></head><body>');
             w.document.write('<div class="report-title">' + (settings.schoolName || 'School') + ' — Stock Transactions</div>');
-            w.document.write('<table><thead><tr><th>Date</th><th>Type</th><th>Item</th><th>Qty</th><th>Unit Price</th><th>Net Total</th><th>Party</th><th>Payment</th></tr></thead><tbody>');
+            w.document.write('<table><thead><tr><th>Date</th><th>Type</th><th>Item</th><th>Qty</th><th>Unit Price</th><th>Net Total</th><th>Balance</th><th>Party</th><th>Payment</th></tr></thead><tbody>');
             list.forEach(function (t) {
-                w.document.write('<tr><td>' + t.date + '</td><td>' + t.type + '</td><td>' + t.itemName + '</td><td>' + t.quantity + '</td><td>' + currency + ' ' + fmt(t.unitPrice) + '</td><td>' + currency + ' ' + fmt(t.netTotal) + '</td><td>' + (t.party || '-') + '</td><td>' + t.paymentStatus + '</td></tr>');
+                var bal = Math.max(0, parseFloat(t.balance) || 0);
+                w.document.write('<tr><td>' + t.date + '</td><td>' + t.type + '</td><td>' + t.itemName + '</td><td>' + t.quantity + '</td><td>' + currency + ' ' + fmt(t.unitPrice) + '</td><td>' + currency + ' ' + fmt(t.netTotal) + '</td><td>' + (bal > 0 ? currency + ' ' + fmt(bal) : '-') + '</td><td>' + (t.party || '-') + '</td><td>' + t.paymentStatus + '</td></tr>');
             });
             w.document.write('</tbody></table>');
             w.document.write('<div style="text-align:center;margin:15px 0"><button onclick="window.print()" style="padding:8px 24px;background:#4f46e5;color:#fff;border:none;border-radius:6px;cursor:pointer">🖨️ Print / Save as PDF</button></div>');
@@ -20846,6 +21110,7 @@
 
         function submitRestock(ev) {
             ev.preventDefault();
+            if (!collectorCan('posSell', 'e')) { showToast("You don't have permission for this", 'warning'); return; }
             var sel = document.getElementById('restockItem');
             var opt = sel.options[sel.selectedIndex];
             if (!sel.value) { showToast('Please choose an item', 'warning'); return; }
@@ -20891,6 +21156,8 @@
         function loadPosSell() {
             var grid = document.getElementById('posItemGrid');
             if (grid && !allInventoryItems.length) grid.innerHTML = '<div class="text-center text-muted py-4 w-100"><span class="spinner-border spinner-border-sm me-2"></span>Loading items…</div>';
+            var restockBtn = document.getElementById('posRestockBtn');
+            if (restockBtn) restockBtn.style.display = collectorCan('posSell', 'e') ? '' : 'none';
             updatePosCustomerLabel();
             renderCart();
             loadActiveStudentsForPos();
@@ -20981,6 +21248,7 @@
         }
 
         function addToCart(itemId) {
+            if (!collectorCan('posSell', 'a')) { showToast("You don't have permission to make sales — ask an admin", 'warning'); return; }
             var item = allInventoryItems.find(function (i) { return i.id === itemId; });
             if (!item) return;
             var line = posCart.find(function (c) { return c.itemId === itemId; });
@@ -21109,6 +21377,7 @@
         var _posSaleInFlight = false;
         function completeSalePOS() {
             if (_posSaleInFlight) return; // guards against a double-click firing two checkouts
+            if (!collectorCan('posSell', 'a')) { showToast("You don't have permission to make sales — ask an admin", 'warning'); return; }
             if (!posCart.length) { showToast('Cart is empty — tap an item to add it first', 'warning'); return; }
             var items = posCart.map(function (c) { return { itemId: c.itemId, itemName: c.itemName, qty: c.qty, unitPrice: c.unitPrice }; })
                 .filter(function (it) { return it.itemId && it.qty > 0; });
@@ -21291,6 +21560,324 @@
             w.document.close();
         }
 
+        // ── SALARIES — Staff directory + Monthly Payroll ──
+        var allStaff = [];
+        var allSalaryPayments = [];
+        var _salPayrollRows = []; // this month's per-staff rows, merging Staff + any saved Salary Payment
+
+        function monthInputToLabel_(monthStr) {
+            var parts = String(monthStr).split('-');
+            if (parts.length !== 2) return monthStr;
+            var names = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            var idx = parseInt(parts[1], 10) - 1;
+            return (names[idx] || parts[1]) + ' ' + parts[0];
+        }
+
+        function loadSalaries() {
+            var monthInput = document.getElementById('salMonthPicker');
+            if (monthInput && !monthInput.value) {
+                var now = new Date();
+                monthInput.value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+            }
+            var addBtn = document.getElementById('salStaffAddBtn');
+            if (addBtn) addBtn.style.display = collectorCan('salaries', 'a') ? '' : 'none';
+
+            var tbody = document.getElementById('staffTableBody');
+            if (tbody) tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3"><span class="spinner-border spinner-border-sm me-2"></span>Loading…</td></tr>';
+
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run.withSuccessHandler(function (r) {
+                    allStaff = (r && r.success) ? (r.staff || []) : [];
+                    renderStaffTable();
+                    google.script.run.withSuccessHandler(function (r2) {
+                        allSalaryPayments = (r2 && r2.success) ? (r2.payments || []) : [];
+                        loadSalaryPayroll();
+                    }).withFailureHandler(function () { allSalaryPayments = []; loadSalaryPayroll(); }).getSalaryPayments();
+                }).withFailureHandler(function () { allStaff = []; renderStaffTable(); }).getStaffList();
+            } else { allStaff = []; allSalaryPayments = []; renderStaffTable(); loadSalaryPayroll(); }
+        }
+
+        function showSalariesTab(tab, el) {
+            var payrollEl = document.getElementById('salariesTab_payroll');
+            var staffEl = document.getElementById('salariesTab_staff');
+            if (payrollEl) payrollEl.style.display = tab === 'payroll' ? '' : 'none';
+            if (staffEl) staffEl.style.display = tab === 'staff' ? '' : 'none';
+            if (el) {
+                document.querySelectorAll('#salariesTabs .nav-link').forEach(function (l) { l.classList.remove('active'); });
+                el.classList.add('active');
+            }
+        }
+
+        // ── Staff Directory ──
+        function renderStaffTable() {
+            var tbody = document.getElementById('staffTableBody');
+            if (!tbody) return;
+            var currency = settings.currency || 'GHC';
+            var searchEl = document.getElementById('staffSearchInput');
+            var q = (searchEl ? searchEl.value : '').toLowerCase();
+            var staff = allStaff.filter(function (s) {
+                return !q || (s.name + ' ' + s.position + ' ' + s.phone).toLowerCase().indexOf(q) !== -1;
+            });
+            if (!staff.length) { tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No staff found.</td></tr>'; return; }
+            var canEdit = collectorCan('salaries', 'e'), canDelete = collectorCan('salaries', 'd');
+            tbody.innerHTML = staff.map(function (s) {
+                var statusBadge = s.isActive !== false ? '<span class="status-badge status-paid">Active</span>' : '<span class="status-badge status-unpaid">Inactive</span>';
+                return '<tr><td><strong>' + s.name + '</strong></td><td>' + s.staffType + '</td><td>' + (s.position || '-') + '</td><td>' + (s.phone || '-') + '</td><td>' + (s.email || '-') + '</td>' +
+                    '<td class="text-end">' + currency + ' ' + fmt(s.baseSalary) + '</td><td>' + statusBadge + '</td>' +
+                    '<td class="text-end">' +
+                    (canEdit ? '<button class="btn btn-xs btn-outline-primary me-1" style="font-size:11px;padding:2px 8px" onclick="openStaffModal(\'' + s.id + '\')"><i class="bi bi-pencil"></i></button>' : '') +
+                    (canDelete ? '<button class="btn btn-xs btn-outline-danger" style="font-size:11px;padding:2px 8px" onclick="deleteStaffConfirm(\'' + s.id + '\')"><i class="bi bi-trash"></i></button>' : '') +
+                    '</td></tr>';
+            }).join('');
+        }
+
+        function openStaffModal(id) {
+            if (!collectorCan('salaries', id ? 'e' : 'a')) { showToast("You don't have permission for this", 'warning'); return; }
+            var person = id ? allStaff.find(function (s) { return s.id === id; }) : null;
+            document.getElementById('staffForm').reset();
+            document.getElementById('staffId').value = person ? person.id : '';
+            document.getElementById('staffModalTitle').innerHTML = person ? '<i class="bi bi-person-badge me-2 text-primary"></i>Edit Staff' : '<i class="bi bi-person-badge me-2 text-primary"></i>Add Staff';
+            document.getElementById('staffName').value = person ? person.name : '';
+            document.getElementById('staffType').value = person ? person.staffType : 'Teaching';
+            document.getElementById('staffPosition').value = person ? person.position : '';
+            document.getElementById('staffPhone').value = person ? person.phone : '';
+            document.getElementById('staffEmail').value = person ? person.email : '';
+            document.getElementById('staffBaseSalary').value = person ? person.baseSalary : '';
+            document.getElementById('staffBankName').value = person ? person.bankName : '';
+            document.getElementById('staffAccountNumber').value = person ? person.accountNumber : '';
+            document.getElementById('staffNotes').value = person ? person.notes : '';
+            document.getElementById('staffIsActive').checked = person ? person.isActive !== false : true;
+            document.getElementById('staffModal').classList.add('show');
+        }
+        function closeStaffModal() { document.getElementById('staffModal').classList.remove('show'); }
+
+        function saveStaffSubmit(ev) {
+            ev.preventDefault();
+            var isNew = !document.getElementById('staffId').value;
+            if (!collectorCan('salaries', isNew ? 'a' : 'e')) { showToast("You don't have permission for this", 'warning'); return; }
+            var person = {
+                id: document.getElementById('staffId').value || '',
+                name: document.getElementById('staffName').value.trim(),
+                staffType: document.getElementById('staffType').value,
+                position: document.getElementById('staffPosition').value.trim(),
+                phone: document.getElementById('staffPhone').value.trim(),
+                email: document.getElementById('staffEmail').value.trim(),
+                baseSalary: parseFloat(document.getElementById('staffBaseSalary').value) || 0,
+                bankName: document.getElementById('staffBankName').value.trim(),
+                accountNumber: document.getElementById('staffAccountNumber').value.trim(),
+                notes: document.getElementById('staffNotes').value.trim(),
+                isActive: document.getElementById('staffIsActive').checked
+            };
+            if (!person.name) { showToast('Staff name is required', 'warning'); return; }
+            showLoad('Saving…');
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run.withSuccessHandler(function (r) {
+                    hideLoad();
+                    if (r.success) { closeStaffModal(); showToast('Staff saved!', 'success'); loadSalaries(); }
+                    else showToast(r.message, 'error');
+                }).withFailureHandler(function (e) { hideLoad(); showToast(e.message, 'error'); }).saveStaffMember(person);
+            } else { hideLoad(); showToast('Saved (demo)', 'info'); closeStaffModal(); }
+        }
+
+        async function deleteStaffConfirm(id) {
+            if (!collectorCan('salaries', 'd')) { showToast("You don't have permission for this", 'warning'); return; }
+            var ok = await showConfirm('Delete this staff member? Their salary payment history will remain.', { title: 'Delete Staff?', icon: '🗑️', okLabel: 'Delete', okClass: 'danger' });
+            if (!ok) return;
+            showLoad('Deleting…');
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run.withSuccessHandler(function (r) {
+                    hideLoad();
+                    if (r.success) { allStaff = allStaff.filter(function (s) { return s.id !== id; }); renderStaffTable(); loadSalaryPayroll(); showToast('Staff deleted', 'success'); }
+                    else showToast(r.message, 'error');
+                }).withFailureHandler(function (e) { hideLoad(); showToast(e.message, 'error'); }).deleteStaffMember(id);
+            } else { hideLoad(); allStaff = allStaff.filter(function (s) { return s.id !== id; }); renderStaffTable(); showToast('Deleted (demo)', 'info'); }
+        }
+
+        // ── Monthly Payroll ──
+        function loadSalaryPayroll() {
+            var monthInput = document.getElementById('salMonthPicker');
+            if (!monthInput) return;
+            if (!monthInput.value) {
+                var now = new Date();
+                monthInput.value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+            }
+            var month = monthInput.value;
+            var monthLabel = monthInputToLabel_(month);
+
+            _salPayrollRows = allStaff.filter(function (s) { return s.isActive !== false; }).map(function (s) {
+                var existing = allSalaryPayments.find(function (p) { return p.staffId === s.id && p.month === month; });
+                if (existing) {
+                    return Object.assign({}, existing, { staffEmail: s.email, staffPhone: s.phone, position: existing.position || s.position });
+                }
+                return {
+                    id: '', staffId: s.id, staffName: s.name, staffType: s.staffType, position: s.position,
+                    month: month, monthLabel: monthLabel, baseSalary: s.baseSalary, allowances: 0, deductions: 0,
+                    netPay: s.baseSalary, paymentStatus: 'Pending', paymentDate: '', paymentMethod: '', notes: '',
+                    staffEmail: s.email, staffPhone: s.phone
+                };
+            });
+            renderSalaryPayrollTable();
+        }
+
+        function renderSalaryPayrollTable() {
+            var tbody = document.getElementById('salPayrollBody');
+            if (!tbody) return;
+            var currency = settings.currency || 'GHC';
+            var typeFilter = document.getElementById('salStaffTypeFilter') ? document.getElementById('salStaffTypeFilter').value : '';
+            var statusFilter = document.getElementById('salStatusFilter') ? document.getElementById('salStatusFilter').value : '';
+            var rows = _salPayrollRows.filter(function (r) {
+                if (typeFilter && r.staffType !== typeFilter) return false;
+                if (statusFilter && r.paymentStatus !== statusFilter) return false;
+                return true;
+            });
+
+            var paidTotal = 0, pendingTotal = 0;
+            _salPayrollRows.forEach(function (r) {
+                if (r.paymentStatus === 'Paid') paidTotal += r.netPay; else pendingTotal += r.netPay;
+            });
+            if (document.getElementById('salTotalPaid')) document.getElementById('salTotalPaid').textContent = currency + ' ' + fmt(paidTotal);
+            if (document.getElementById('salTotalPending')) document.getElementById('salTotalPending').textContent = currency + ' ' + fmt(pendingTotal);
+            if (document.getElementById('salStaffCount')) document.getElementById('salStaffCount').textContent = _salPayrollRows.length;
+
+            if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No active staff match this filter — add staff in the Staff Directory tab.</td></tr>'; return; }
+            var canEdit = collectorCan('salaries', 'e');
+            tbody.innerHTML = rows.map(function (r) {
+                var statusBadge = r.paymentStatus === 'Paid' ? '<span class="status-badge status-paid">Paid</span>' : '<span class="status-badge status-partial">Pending</span>';
+                var hasRecord = !!r.id;
+                var payBtn = canEdit ? '<button class="btn btn-xs btn-outline-primary me-1" style="font-size:11px;padding:2px 8px" onclick="openSalaryPaymentModal(\'' + r.staffId + '\')" title="Pay / Edit"><i class="bi bi-cash-coin"></i></button>' : '';
+                var payslipBtn = hasRecord ? '<button class="btn btn-xs btn-outline-secondary me-1" style="font-size:11px;padding:2px 8px" onclick="printPayslip(\'' + r.id + '\')" title="Print Payslip"><i class="bi bi-printer"></i></button>' : '';
+                var emailBtn = (hasRecord && r.staffEmail) ? '<button class="btn btn-xs btn-outline-info me-1" style="font-size:11px;padding:2px 8px" onclick="emailPayslip(\'' + r.id + '\')" title="Email Payslip"><i class="bi bi-envelope"></i></button>' : '';
+                var waBtn = (hasRecord && r.staffPhone) ? '<button class="btn btn-xs btn-whatsapp me-1" style="font-size:11px;padding:2px 8px" onclick="whatsappPayslip(\'' + r.id + '\')" title="WhatsApp Payslip"><i class="bi bi-whatsapp"></i></button>' : '';
+                return '<tr><td><strong>' + r.staffName + '</strong></td><td>' + r.staffType + '</td><td>' + (r.position || '-') + '</td>' +
+                    '<td class="text-end">' + currency + ' ' + fmt(r.baseSalary) + '</td><td class="text-end"><strong>' + currency + ' ' + fmt(r.netPay) + '</strong></td>' +
+                    '<td>' + statusBadge + '</td><td class="text-end">' + payBtn + payslipBtn + emailBtn + waBtn + '</td></tr>';
+            }).join('');
+        }
+
+        function openSalaryPaymentModal(staffId) {
+            if (!collectorCan('salaries', 'e')) { showToast("You don't have permission to run payroll", 'warning'); return; }
+            var row = _salPayrollRows.find(function (r) { return r.staffId === staffId; });
+            if (!row) return;
+            document.getElementById('salaryPaymentForm').reset();
+            document.getElementById('salPayId').value = row.id || '';
+            document.getElementById('salPayStaffId').value = row.staffId;
+            document.getElementById('salPayMonth').value = row.month;
+            document.getElementById('salPayMonthLabel').value = row.monthLabel;
+            document.getElementById('salPaymentModalTitle').innerHTML = '<i class="bi bi-cash-coin me-2 text-primary"></i>' + (row.id ? 'Edit' : 'Pay') + ' Salary — ' + row.monthLabel;
+            document.getElementById('salPaySummary').innerHTML =
+                '<div class="d-flex justify-content-between"><span class="text-muted">Staff</span><strong>' + row.staffName + '</strong></div>' +
+                '<div class="d-flex justify-content-between"><span class="text-muted">Position</span><strong>' + (row.position || '-') + '</strong></div>' +
+                '<div class="d-flex justify-content-between"><span class="text-muted">Month</span><strong>' + row.monthLabel + '</strong></div>';
+            document.getElementById('salPayBase').value = row.baseSalary;
+            document.getElementById('salPayAllowances').value = row.allowances || 0;
+            document.getElementById('salPayDeductions').value = row.deductions || 0;
+            document.getElementById('salPayStatus').value = row.paymentStatus || 'Pending';
+            document.getElementById('salPayMethod').value = row.paymentMethod || 'Bank Transfer';
+            document.getElementById('salPayNotes').value = row.notes || '';
+            calcSalaryNet();
+            document.getElementById('salaryPaymentModal').classList.add('show');
+        }
+        function closeSalaryPaymentModal() { document.getElementById('salaryPaymentModal').classList.remove('show'); }
+
+        function calcSalaryNet() {
+            var base = parseFloat(document.getElementById('salPayBase').value) || 0;
+            var allow = parseFloat(document.getElementById('salPayAllowances').value) || 0;
+            var ded = parseFloat(document.getElementById('salPayDeductions').value) || 0;
+            var net = Math.max(0, base + allow - ded);
+            var currency = settings.currency || 'GHC';
+            document.getElementById('salPayNet').value = currency + ' ' + fmt(net);
+        }
+
+        function saveSalaryPaymentSubmit(ev) {
+            ev.preventDefault();
+            if (!collectorCan('salaries', 'e')) { showToast("You don't have permission to run payroll", 'warning'); return; }
+            var staffId = document.getElementById('salPayStaffId').value;
+            var row = _salPayrollRows.find(function (r) { return r.staffId === staffId; });
+            var payment = {
+                id: document.getElementById('salPayId').value || '',
+                staffId: staffId,
+                staffName: row ? row.staffName : '',
+                staffType: row ? row.staffType : '',
+                position: row ? row.position : '',
+                month: document.getElementById('salPayMonth').value,
+                monthLabel: document.getElementById('salPayMonthLabel').value,
+                baseSalary: parseFloat(document.getElementById('salPayBase').value) || 0,
+                allowances: parseFloat(document.getElementById('salPayAllowances').value) || 0,
+                deductions: parseFloat(document.getElementById('salPayDeductions').value) || 0,
+                paymentStatus: document.getElementById('salPayStatus').value,
+                paymentMethod: document.getElementById('salPayMethod').value,
+                notes: document.getElementById('salPayNotes').value.trim()
+            };
+            showLoad('Saving…');
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run.withSuccessHandler(function (r) {
+                    hideLoad();
+                    if (r.success) {
+                        closeSalaryPaymentModal();
+                        var idx = allSalaryPayments.findIndex(function (p) { return p.id === r.payment.id; });
+                        if (idx !== -1) allSalaryPayments[idx] = r.payment; else allSalaryPayments.unshift(r.payment);
+                        loadSalaryPayroll();
+                        showToast('Salary payment saved!', 'success');
+                    } else showToast(r.message, 'error');
+                }).withFailureHandler(function (e) { hideLoad(); showToast(e.message, 'error'); }).saveSalaryPayment(payment);
+            } else { hideLoad(); showToast('Saved (demo)', 'info'); closeSalaryPaymentModal(); }
+        }
+
+        function printPayslip(paymentId) {
+            var p = allSalaryPayments.find(function (x) { return x.id === paymentId; });
+            if (!p) { showToast('Payment record not found', 'error'); return; }
+            var currency = settings.currency || 'GHC';
+            var w = window.open('', '_blank', 'width=420,height=650');
+            if (!w) return;
+            w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Payslip</title>');
+            w.document.write('<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:13px;padding:20px;color:#1e293b}h2{font-size:16px;text-align:center;margin-bottom:2px}.sub{text-align:center;font-size:11px;color:#64748b;margin-bottom:14px}table{width:100%;border-collapse:collapse;margin-top:8px}td{padding:6px 0;font-size:12.5px;border-bottom:1px solid #f1f5f9}.right{text-align:right}.tot{font-weight:bold;font-size:14px}@media print{@page{margin:12mm}}</style></head><body>');
+            w.document.write('<h2>' + (settings.schoolName || 'School') + '</h2>');
+            w.document.write('<div class="sub">Payslip &middot; ' + p.monthLabel + '</div>');
+            w.document.write('<table>');
+            w.document.write('<tr><td>Staff Name</td><td class="right"><strong>' + p.staffName + '</strong></td></tr>');
+            w.document.write('<tr><td>Position</td><td class="right">' + (p.position || '-') + '</td></tr>');
+            w.document.write('<tr><td>Staff Type</td><td class="right">' + p.staffType + '</td></tr>');
+            w.document.write('<tr><td>Base Salary</td><td class="right">' + currency + ' ' + fmt(p.baseSalary) + '</td></tr>');
+            w.document.write('<tr><td>Allowances</td><td class="right">+ ' + currency + ' ' + fmt(p.allowances) + '</td></tr>');
+            w.document.write('<tr><td>Deductions</td><td class="right">- ' + currency + ' ' + fmt(p.deductions) + '</td></tr>');
+            w.document.write('<tr class="tot"><td>Net Pay</td><td class="right">' + currency + ' ' + fmt(p.netPay) + '</td></tr>');
+            w.document.write('<tr><td>Status</td><td class="right">' + p.paymentStatus + (p.paymentDate ? ' (' + p.paymentDate + ')' : '') + '</td></tr>');
+            w.document.write('</table>');
+            w.document.write('<div style="text-align:center;margin-top:18px"><button onclick="window.print()" style="padding:8px 20px;background:#1e1b4b;color:#fff;border:none;border-radius:6px;cursor:pointer">🖨️ Print Payslip</button></div>');
+            w.document.write('</body></html>');
+            w.document.close();
+        }
+
+        function emailPayslip(paymentId) {
+            showLoad('Sending email…');
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run.withSuccessHandler(function (r) {
+                    hideLoad();
+                    if (r.success) showToast('Payslip emailed!', 'success');
+                    else showToast(r.message, 'error');
+                }).withFailureHandler(function (e) { hideLoad(); showToast(e.message, 'error'); }).sendPayslipEmail(paymentId);
+            } else { hideLoad(); showToast('Emailed (demo)', 'info'); }
+        }
+
+        function whatsappPayslip(paymentId) {
+            var p = allSalaryPayments.find(function (x) { return x.id === paymentId; });
+            if (!p) { showToast('Payment record not found', 'error'); return; }
+            var staff = allStaff.find(function (s) { return s.id === p.staffId; });
+            var phone = staff ? String(staff.phone || '').replace(/\D/g, '') : '';
+            if (!phone) { showToast('This staff member has no phone number on file', 'warning'); return; }
+            var intlPhone = phone.startsWith('0') ? '233' + phone.substring(1) : (phone.startsWith('233') ? phone : '233' + phone);
+            var currency = settings.currency || 'GHC';
+            var msg = 'Dear ' + p.staffName + ',\n\n'
+                + 'Your payslip from *' + (settings.schoolName || 'School') + '* for *' + p.monthLabel + '*:\n\n'
+                + '💰 Base Salary: ' + currency + ' ' + fmt(p.baseSalary) + '\n'
+                + '➕ Allowances: ' + currency + ' ' + fmt(p.allowances) + '\n'
+                + '➖ Deductions: ' + currency + ' ' + fmt(p.deductions) + '\n'
+                + '✅ Net Pay: ' + currency + ' ' + fmt(p.netPay) + '\n\n'
+                + 'Status: ' + p.paymentStatus + (p.paymentDate ? ' (' + p.paymentDate + ')' : '') + '\n\n'
+                + 'Thank you for your hard work!';
+            window.open('https://wa.me/' + intlPhone + '?text=' + encodeURIComponent(msg), '_blank');
+        }
+
         // Wires the new sidebar sections into the existing generic
         // .nav-item[data-section] show/hide handled by setupNav() — this
         // just adds each section's own data loader as an extra click
@@ -21302,7 +21889,9 @@
                 inventory: loadInventory,
                 stockTransactions: loadStockTransactions,
                 vendors: loadVendors,
-                salesReports: loadSalesReports
+                salesReports: loadSalesReports,
+                about: renderRolePermMatrix,
+                salaries: loadSalaries
             };
             Object.keys(loaders).forEach(function (sec) {
                 document.querySelectorAll('.nav-item[data-section="' + sec + '"]').forEach(function (item) {
@@ -21314,7 +21903,8 @@
                 { id: 'inventory', label: 'Inventory', section: 'inventory' },
                 { id: 'stockTransactions', label: 'Stock Transactions', section: 'stockTransactions' },
                 { id: 'vendors', label: 'Vendors', section: 'vendors' },
-                { id: 'salesReports', label: 'Sales Reports', section: 'salesReports' }
+                { id: 'salesReports', label: 'Sales Reports', section: 'salesReports' },
+                { id: 'salaries', label: 'Salaries', section: 'salaries' }
             );
         })();
     </script>
@@ -21911,6 +22501,151 @@
                 </div>
                 <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Save</button>
                 <button type="button" class="btn btn-outline-secondary btn-sm ms-1" onclick="closeRestockModal()">Cancel</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Collect Balance Modal (Stock Transactions — settle a partial payment) -->
+    <div class="modal-overlay" id="collectBalanceModal">
+        <div class="modal-box" style="max-width: 400px;">
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                <h6 class="mb-0"><i class="bi bi-cash-coin me-2 text-success"></i>Collect Balance</h6>
+                <button type="button" class="btn-close" onclick="closeCollectBalanceModal()"></button>
+            </div>
+            <form id="collectBalanceForm" onsubmit="submitCollectBalance(event)">
+                <input type="hidden" id="cbTxnId">
+                <div class="mb-3 small" id="cbSummary" style="background:#f8fafc;border-radius:10px;padding:10px 12px;"></div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Amount to Collect *</label>
+                    <input type="number" class="form-control form-control-sm" id="cbAmount" min="0.01" step="0.01" required>
+                </div>
+                <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-check-circle me-1"></i>Record Payment</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-1" onclick="closeCollectBalanceModal()">Cancel</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Staff Modal (Add/Edit) -->
+    <div class="modal-overlay" id="staffModal">
+        <div class="modal-box" style="max-width: 480px;">
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                <h6 class="mb-0" id="staffModalTitle"><i class="bi bi-person-badge me-2 text-primary"></i>Add Staff</h6>
+                <button type="button" class="btn-close" onclick="closeStaffModal()"></button>
+            </div>
+            <form id="staffForm" onsubmit="saveStaffSubmit(event)">
+                <input type="hidden" id="staffId">
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Full Name *</label>
+                    <input type="text" class="form-control form-control-sm" id="staffName" required>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Staff Type *</label>
+                        <select class="form-select form-select-sm" id="staffType" required>
+                            <option value="Teaching">Teaching Staff</option>
+                            <option value="Non-Teaching">Non-Teaching Staff</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Position</label>
+                        <input type="text" class="form-control form-control-sm" id="staffPosition" placeholder="e.g. Class Teacher, Accountant">
+                    </div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Phone</label>
+                        <input type="text" class="form-control form-control-sm" id="staffPhone">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Email</label>
+                        <input type="email" class="form-control form-control-sm" id="staffEmail" placeholder="for payslip email">
+                    </div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Base Monthly Salary *</label>
+                        <input type="number" class="form-control form-control-sm" id="staffBaseSalary" min="0" step="0.01" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Bank Name</label>
+                        <input type="text" class="form-control form-control-sm" id="staffBankName">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Account Number</label>
+                    <input type="text" class="form-control form-control-sm" id="staffAccountNumber">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Notes</label>
+                    <textarea class="form-control form-control-sm" id="staffNotes" rows="2"></textarea>
+                </div>
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" id="staffIsActive" checked>
+                    <label class="form-check-label small" for="staffIsActive">Active (included in payroll)</label>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Save Staff</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-1" onclick="closeStaffModal()">Cancel</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Salary Payment Modal (Pay / Edit) -->
+    <div class="modal-overlay" id="salaryPaymentModal">
+        <div class="modal-box" style="max-width: 460px;">
+            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                <h6 class="mb-0" id="salPaymentModalTitle"><i class="bi bi-cash-coin me-2 text-primary"></i>Pay Salary</h6>
+                <button type="button" class="btn-close" onclick="closeSalaryPaymentModal()"></button>
+            </div>
+            <form id="salaryPaymentForm" onsubmit="saveSalaryPaymentSubmit(event)">
+                <input type="hidden" id="salPayId">
+                <input type="hidden" id="salPayStaffId">
+                <input type="hidden" id="salPayMonth">
+                <input type="hidden" id="salPayMonthLabel">
+                <div class="mb-3 small" id="salPaySummary" style="background:#f8fafc;border-radius:10px;padding:10px 12px;"></div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Base Salary</label>
+                        <input type="number" class="form-control form-control-sm" id="salPayBase" min="0" step="0.01" oninput="calcSalaryNet()" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Net Pay</label>
+                        <input type="text" class="form-control form-control-sm" id="salPayNet" readonly style="background:#f1f5f9;">
+                    </div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Allowances</label>
+                        <input type="number" class="form-control form-control-sm" id="salPayAllowances" min="0" step="0.01" value="0" oninput="calcSalaryNet()">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Deductions</label>
+                        <input type="number" class="form-control form-control-sm" id="salPayDeductions" min="0" step="0.01" value="0" oninput="calcSalaryNet()">
+                    </div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Payment Status</label>
+                        <select class="form-select form-select-sm" id="salPayStatus">
+                            <option value="Pending">Pending</option>
+                            <option value="Paid">Paid</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Payment Method</label>
+                        <select class="form-select form-select-sm" id="salPayMethod">
+                            <option value="Bank Transfer">Bank Transfer</option>
+                            <option value="Cash">Cash</option>
+                            <option value="Mobile Money">Mobile Money</option>
+                            <option value="Cheque">Cheque</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Notes</label>
+                    <textarea class="form-control form-control-sm" id="salPayNotes" rows="2"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Save</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-1" onclick="closeSalaryPaymentModal()">Cancel</button>
             </form>
         </div>
     </div>

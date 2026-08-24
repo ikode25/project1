@@ -3334,7 +3334,12 @@
                 totalNextFees += arrears;
             }
             
-            // 2. ALL Custom Fee Arrears
+            // 2. Custom Fee Arrears — only for extra fee types the admin has
+            //    chosen to roll forward (Settings → "Rollover to next term as
+            //    arrears"); an empty list means roll all forward by default,
+            //    matching the admin app's own Generate Next Term Bill logic.
+            var rolledPortal = (schoolData && schoolData.rolloverCustomFees) ? (typeof schoolData.rolloverCustomFees === 'string' ? schoolData.rolloverCustomFees.split(',').filter(Boolean) : schoolData.rolloverCustomFees) : [];
+            var rollAllExtraFeesByDefaultPortal = rolledPortal.length === 0;
             var cFeesList = customFees || [];
             cFeesList.forEach(function(cf) {
                 if (cf) {
@@ -3342,8 +3347,9 @@
                     var cfSession = cf.academicSession || cf.academicsession || '';
                     if (String(cfStudentId).toLowerCase() === String(rec.id).toLowerCase()) {
                         var name = cf.feeTypeName || cf.feetypename || 'Custom Fee';
+                        var isRolled = rollAllExtraFeesByDefaultPortal || rolledPortal.some(function(r) { return r.toLowerCase().trim() === name.toLowerCase().trim(); });
                         var bal = parseFloat(cf.balance || 0);
-                        if (bal > 0) {
+                        if (isRolled && bal > 0) {
                             billItems.push({ name: name + ' Arrears (from ' + cfSession + ')', amount: bal });
                             totalNextFees += bal;
                         }
@@ -3427,11 +3433,15 @@
             if (parseFloat(rec.totalPaid) >= 0) totalPaid = parseFloat(rec.totalPaid);
             var arrears = Math.max(0, totalFees - totalPaid);
             
-            var rolled = (schoolData && schoolData.rolloverCustomFees) ? (typeof schoolData.rolloverCustomFees === 'string' ? schoolData.rolloverCustomFees.split(',') : schoolData.rolloverCustomFees) : [];
+            var rolled = (schoolData && schoolData.rolloverCustomFees) ? (typeof schoolData.rolloverCustomFees === 'string' ? schoolData.rolloverCustomFees.split(',').filter(Boolean) : schoolData.rolloverCustomFees) : [];
             rolled = rolled.map(function(r) { return r.trim().toLowerCase(); });
+            // An empty list means the admin hasn't restricted anything —
+            // roll all extra fee types' balances forward by default, same as
+            // the on-screen preview and the admin app's Generate Next Term Bill.
+            var rollAllByDefaultPdf = rolled.length === 0;
             var customArrears = 0;
             var customArrearsItems = [];
-            
+
             var cFeesList = customFees || [];
             cFeesList.forEach(function(cf) {
                 if (cf) {
@@ -3439,7 +3449,7 @@
                     var cfSession = cf.academicSession || cf.academicsession || '';
                     if (String(cfStudentId).toLowerCase() === String(rec.id).toLowerCase() && String(cfSession).toLowerCase() === String(rec.academicSession).toLowerCase()) {
                         var name = cf.feeTypeName || cf.feetypename || '';
-                        if (rolled.includes(name.trim().toLowerCase())) {
+                        if (rollAllByDefaultPdf || rolled.includes(name.trim().toLowerCase())) {
                             var bal = parseFloat(cf.balance || 0);
                             if (bal > 0) {
                                 customArrears += bal;
