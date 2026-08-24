@@ -2515,6 +2515,24 @@
         .cat-icon-stationery { background: #fef3c7; color: #92400e; }
         .cat-icon-other { background: #e2e8f0; color: #475569; }
 
+        .icon-picker { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 8px; }
+        .icon-picker-btn {
+            width: 44px; height: 44px; border-radius: 10px; border: 1.5px solid #e2e8f0; background: #f8fafc;
+            color: #475569; display: flex; align-items: center; justify-content: center; font-size: 17px;
+            cursor: pointer; transition: .15s;
+        }
+        .icon-picker-btn:hover { border-color: var(--primary); color: var(--primary); }
+        .icon-picker-btn.active { border-color: var(--primary); background: var(--primary); color: #fff; }
+
+        .pos-item-card { position: relative; }
+        .pos-item-card.in-cart { border: 2px solid var(--primary); background: #f5f4ff; }
+        .pos-cart-qty-badge {
+            position: absolute; bottom: 10px; right: 10px; background: var(--primary); color: #fff;
+            font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; display: none;
+        }
+        body.dark-mode .icon-picker-btn { background: #1e293b !important; border-color: #334155 !important; color: #cbd5e1 !important; }
+        body.dark-mode .pos-item-card.in-cart { background: rgba(99,102,241,.18) !important; }
+
         .stx-type-badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
         .stx-type-Sale { background: #e0e7ff; color: #3730a3; }
         .stx-type-Purchase { background: #dcfce7; color: #166534; }
@@ -2749,11 +2767,11 @@
                     <a class="nav-item" data-section="scholarships"><i class="bi bi-award-fill"></i><span>Scholarships</span></a>
                 </div>
 
-                <div class="nav-group-header admin-only" onclick="toggleNavGroup(this)">
+                <div class="nav-group-header admin-only collector-ok" onclick="toggleNavGroup(this)">
                     <i class="bi bi-shop nav-group-icon"></i><span>Inventory &amp; Sales</span>
                     <i class="bi bi-chevron-right nav-group-chevron"></i>
                 </div>
-                <div class="nav-group-items admin-only" id="navGroupInventory">
+                <div class="nav-group-items admin-only collector-ok" id="navGroupInventory">
                     <a class="nav-item" data-section="posSell"><i class="bi bi-cart-check-fill"></i><span>POS / Sell</span></a>
                     <a class="nav-item" data-section="inventory"><i class="bi bi-box-seam-fill"></i><span>Inventory</span></a>
                     <a class="nav-item" data-section="stockTransactions"><i class="bi bi-arrow-left-right"></i><span>Stock Transactions</span></a>
@@ -4967,7 +4985,7 @@
                 </div>
 
                 <!-- POS / SELL SECTION -->
-                <div class="content-section admin-only" id="posSellSection">
+                <div class="content-section admin-only collector-ok" id="posSellSection">
                     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-1">
                         <h5 class="mb-0"><button onclick="goHome()" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-house-door me-1"></i>Home</button><i class="bi bi-shop me-2"></i>Point of Sale</h5>
                         <div class="d-flex gap-2">
@@ -5043,7 +5061,7 @@
                 </div>
 
                 <!-- INVENTORY SECTION -->
-                <div class="content-section admin-only" id="inventorySection">
+                <div class="content-section admin-only collector-ok" id="inventorySection">
                     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-1">
                         <h5 class="mb-0"><button onclick="goHome()" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-house-door me-1"></i>Home</button><i class="bi bi-box-seam-fill me-2"></i>Inventory</h5>
                         <button class="btn btn-primary btn-sm" onclick="openInventoryModal()"><i class="bi bi-plus-circle me-1"></i>Add Item</button>
@@ -5078,7 +5096,7 @@
                 </div>
 
                 <!-- VENDORS SECTION -->
-                <div class="content-section admin-only" id="vendorsSection">
+                <div class="content-section admin-only collector-ok" id="vendorsSection">
                     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-1">
                         <h5 class="mb-0"><button onclick="goHome()" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-house-door me-1"></i>Home</button><i class="bi bi-truck me-2"></i>Vendors</h5>
                         <button class="btn btn-primary btn-sm" onclick="openVendorModal()"><i class="bi bi-plus-circle me-1"></i>Add Vendor</button>
@@ -5098,7 +5116,7 @@
                 </div>
 
                 <!-- STOCK TRANSACTIONS SECTION -->
-                <div class="content-section admin-only" id="stockTransactionsSection">
+                <div class="content-section admin-only collector-ok" id="stockTransactionsSection">
                     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-1">
                         <h5 class="mb-0"><button onclick="goHome()" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-house-door me-1"></i>Home</button><i class="bi bi-arrow-left-right me-2"></i>Stock Transactions</h5>
                         <button class="btn btn-primary btn-sm" onclick="openStockTxnModal()"><i class="bi bi-plus-circle me-1"></i>Add Transaction</button>
@@ -5148,7 +5166,7 @@
                 </div>
 
                 <!-- SALES REPORTS SECTION -->
-                <div class="content-section admin-only" id="salesReportsSection">
+                <div class="content-section admin-only collector-ok" id="salesReportsSection">
                     <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
                         <h5 class="mb-0"><button onclick="goHome()" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-house-door me-1"></i>Home</button><i class="bi bi-graph-up-arrow me-2"></i>Sales Reports</h5>
                         <button class="btn btn-outline-secondary btn-sm" onclick="printSalesReport()"><i class="bi bi-printer me-1"></i>Print Report</button>
@@ -7291,8 +7309,11 @@
                 var roleEl = document.getElementById('topbarUserRole');
                 if (roleEl) roleEl.textContent = roleLabel;
 
-                // Hide/Show sidebar & main layout offset based on role
-                if (userRole === 'collector' || userRole === 'viewer' || userRole === 'owner') {
+                // Hide/Show sidebar & main layout offset based on role.
+                // Collector gets a real, organized sidebar (Dashboard, Add
+                // Record, Generate Bills, plus Inventory & Sales below) —
+                // only Viewer/Owner stay on the simplified sidebar-free portal.
+                if (userRole === 'viewer' || userRole === 'owner') {
                     document.body.classList.add('no-sidebar');
                 } else {
                     document.body.classList.remove('no-sidebar');
@@ -7330,9 +7351,16 @@
                 var colTermTitle = document.getElementById('collectorActiveTermTitle');
                 if (colTermTitle) colTermTitle.textContent = activeTerm + ' (' + activeYr + ')';
 
-                // Access control for sidebar tabs
+                // Access control for sidebar tabs. Collector is otherwise
+                // treated like Viewer here (admin-only stays hidden), except
+                // for elements explicitly marked .collector-ok — currently
+                // the Inventory & Sales group (POS/Sell, Inventory, Stock
+                // Transactions, Vendors, Sales Reports), which a collector
+                // needs for day-to-day sales.
                 if (userRole !== 'admin' && userRole !== 'owner') {
-                    document.querySelectorAll('.admin-only').forEach(function (el) { el.style.display = 'none'; });
+                    document.querySelectorAll('.admin-only').forEach(function (el) {
+                        el.style.display = (userRole === 'collector' && el.classList.contains('collector-ok')) ? '' : 'none';
+                    });
                     document.querySelectorAll('.admin-field').forEach(function (el) { el.style.display = 'none'; });
                 } else {
                     document.querySelectorAll('.admin-only').forEach(function (el) { el.style.display = ''; });
@@ -20314,6 +20342,31 @@
             if (c.indexOf('station') !== -1 || c.indexOf('pen') !== -1 || c.indexOf('pencil') !== -1) return 'cat-icon-stationery';
             return 'cat-icon-other';
         }
+
+        // Curated icon set offered on the Inventory item form's icon picker
+        // — every item gets an explicit icon (auto-suggested from its
+        // category, but always changeable), so POS/Inventory never fall
+        // back to a generic guess once an admin has picked one.
+        var POS_ICON_CHOICES = [
+            { value: 'bi-bag-fill', label: 'Uniform' },
+            { value: 'bi-scissors', label: 'Tailoring' },
+            { value: 'bi-backpack2-fill', label: 'Bag' },
+            { value: 'bi-journal-bookmark-fill', label: 'Book' },
+            { value: 'bi-book-fill', label: 'Textbook' },
+            { value: 'bi-pencil-fill', label: 'Pencil' },
+            { value: 'bi-pen-fill', label: 'Pen' },
+            { value: 'bi-rulers', label: 'Ruler set' },
+            { value: 'bi-calculator-fill', label: 'Calculator' },
+            { value: 'bi-palette-fill', label: 'Art' },
+            { value: 'bi-cup-straw', label: 'Water bottle' },
+            { value: 'bi-umbrella-fill', label: 'Rainwear' },
+            { value: 'bi-award-fill', label: 'Badge / Tie' },
+            { value: 'bi-basket-fill', label: 'Basket' },
+            { value: 'bi-box-seam-fill', label: 'Other' }
+        ];
+
+        // Best-guess icon from free-text category — used only as the
+        // starting suggestion when an item has no explicit icon saved yet.
         function categoryIconGlyph(cat) {
             var c = String(cat || '').toLowerCase();
             if (c.indexOf('uniform') !== -1) return 'bi-bag-fill';
@@ -20322,6 +20375,12 @@
             if (c.indexOf('bag') !== -1) return 'bi-backpack2-fill';
             if (c.indexOf('water') !== -1 || c.indexOf('bottle') !== -1) return 'bi-cup-straw';
             return 'bi-box-seam-fill';
+        }
+
+        // Every inventory item resolves to a concrete icon: whatever the
+        // admin explicitly picked, or the category-based guess as a fallback.
+        function resolveItemIcon(item) {
+            return (item && item.icon) ? item.icon : categoryIconGlyph(item && item.category);
         }
 
         // Quietly (re)loads inventory in the background — used by pages that
@@ -20387,7 +20446,7 @@
             tbody.innerHTML = items.map(function (i) {
                 var statusBadge = i.stock <= 0 ? '<span class="status-badge status-unpaid">Out of Stock</span>' : (i.stock <= i.reorderLevel ? '<span class="status-badge status-partial">Low Stock</span>' : '<span class="status-badge status-paid">In Stock</span>');
                 return '<tr>' +
-                    '<td><div class="d-flex align-items-center gap-2"><span class="pos-item-icon ' + categoryIconClass(i.category) + '" style="width:30px;height:30px;font-size:13px;margin:0;"><i class="bi ' + categoryIconGlyph(i.category) + '"></i></span><strong>' + i.name + '</strong></div></td>' +
+                    '<td><div class="d-flex align-items-center gap-2"><span class="pos-item-icon ' + categoryIconClass(i.category) + '" style="width:30px;height:30px;font-size:13px;margin:0;"><i class="bi ' + resolveItemIcon(i) + '"></i></span><strong>' + i.name + '</strong></div></td>' +
                     '<td>' + (i.category || '-') + '</td>' +
                     '<td>' + (i.sku || '-') + '</td>' +
                     '<td class="text-end">' + currency + ' ' + fmt(i.price) + '</td>' +
@@ -20399,6 +20458,30 @@
                     '</td>' +
                     '</tr>';
             }).join('');
+        }
+
+        // Renders the icon-choice grid and marks `selected` active. Every
+        // item always has one of these chosen (auto-suggested from the
+        // category if the admin hasn't picked one), so POS/Inventory never
+        // show a bare/blank icon.
+        function renderIconPicker(selected) {
+            var box = document.getElementById('invIconPicker');
+            if (!box) return;
+            box.innerHTML = POS_ICON_CHOICES.map(function (opt) {
+                return '<button type="button" class="icon-picker-btn' + (opt.value === selected ? ' active' : '') + '" title="' + opt.label + '" onclick="pickInvIconManually(\'' + opt.value + '\')"><i class="bi ' + opt.value + '"></i></button>';
+            }).join('');
+        }
+        function selectInvIcon(value) {
+            document.getElementById('invIcon').value = value;
+            renderIconPicker(value);
+        }
+        function pickInvIconManually(value) { _invIconTouched = true; selectInvIcon(value); }
+        // Auto-suggests an icon as the category is typed, but only while the
+        // admin hasn't deliberately picked one for this item yet.
+        var _invIconTouched = false;
+        function onInvCategoryInput() {
+            if (_invIconTouched) return;
+            selectInvIcon(categoryIconGlyph(document.getElementById('invCategory').value));
         }
 
         function openInventoryModal(id) {
@@ -20417,6 +20500,10 @@
             document.getElementById('invReorderLevel').value = item ? item.reorderLevel : 5;
             document.getElementById('invNotes').value = item ? item.notes : '';
             document.getElementById('invIsActive').checked = item ? item.isActive !== false : true;
+            _invIconTouched = !!item; // editing an existing item: keep its saved icon as-is unless changed
+            var icon = resolveItemIcon(item || { category: document.getElementById('invCategory').value });
+            document.getElementById('invIcon').value = icon;
+            renderIconPicker(icon);
             document.getElementById('inventoryItemModal').classList.add('show');
         }
         function closeInventoryModal() { document.getElementById('inventoryItemModal').classList.remove('show'); }
@@ -20427,6 +20514,7 @@
                 id: document.getElementById('invId').value || '',
                 name: document.getElementById('invName').value.trim(),
                 category: document.getElementById('invCategory').value.trim() || 'Other',
+                icon: document.getElementById('invIcon').value || categoryIconGlyph(document.getElementById('invCategory').value),
                 sku: document.getElementById('invSku').value.trim(),
                 price: parseFloat(document.getElementById('invPrice').value) || 0,
                 cost: parseFloat(document.getElementById('invCost').value) || 0,
@@ -20796,25 +20884,55 @@
         }
 
         // ── POS / SELL ──
+        // Re-entering the POS page (clicking the nav item again, or coming
+        // back from another tab) must NOT wipe an in-progress sale — only a
+        // completed checkout clears the cart. We just refresh the item/stock
+        // data and reconcile the existing cart against it.
         function loadPosSell() {
             var grid = document.getElementById('posItemGrid');
-            if (grid) grid.innerHTML = '<div class="text-center text-muted py-4 w-100"><span class="spinner-border spinner-border-sm me-2"></span>Loading items…</div>';
-            posCart = [];
-            selectPosCustomer('walkin', '', '');
+            if (grid && !allInventoryItems.length) grid.innerHTML = '<div class="text-center text-muted py-4 w-100"><span class="spinner-border spinner-border-sm me-2"></span>Loading items…</div>';
+            updatePosCustomerLabel();
+            renderCart();
             loadActiveStudentsForPos();
             if (typeof google !== 'undefined' && google.script) {
                 google.script.run.withSuccessHandler(function (r) {
-                    if (r.success) { allInventoryItems = r.items || []; renderPosItemGrid(); }
-                    else if (grid) grid.innerHTML = '<div class="text-center text-danger py-4 w-100">' + r.message + '</div>';
+                    if (r.success) {
+                        allInventoryItems = r.items || [];
+                        reconcileCartWithInventory_();
+                        renderPosItemGrid();
+                        renderCart();
+                    } else if (grid) grid.innerHTML = '<div class="text-center text-danger py-4 w-100">' + r.message + '</div>';
                 }).withFailureHandler(function (e) { if (grid) grid.innerHTML = '<div class="text-center text-danger py-4 w-100">' + e.message + '</div>'; }).getInventoryItems();
             } else { allInventoryItems = []; renderPosItemGrid(); }
         }
 
+        // Drops cart lines for items that were deleted/deactivated since
+        // they were added, and clamps quantities down to current stock.
+        function reconcileCartWithInventory_() {
+            posCart = posCart.map(function (c) {
+                var item = allInventoryItems.find(function (i) { return i.id === c.itemId; });
+                if (!item || item.isActive === false) return null;
+                var qty = Math.min(c.qty, Math.max(0, item.stock));
+                if (qty <= 0) return null;
+                return { itemId: item.id, itemName: item.name, category: item.category, unitPrice: item.price, stock: item.stock, qty: qty };
+            }).filter(Boolean);
+        }
+
+        var _posStudentsLoaded = false;
         function loadActiveStudentsForPos() {
-            if (typeof google === 'undefined' || !google.script) { activeStudentsForPos = []; return; }
+            if (typeof google === 'undefined' || !google.script) { activeStudentsForPos = []; _posStudentsLoaded = true; return; }
+            _posStudentsLoaded = false;
             google.script.run.withSuccessHandler(function (r) {
                 activeStudentsForPos = (r && r.success) ? (r.students || []) : [];
-            }).withFailureHandler(function () { activeStudentsForPos = []; }).getActiveStudentsList();
+                _posStudentsLoaded = true;
+                // The customer combo may already be open and showing "no
+                // students yet" from before this round-trip landed — refresh
+                // it in place so the list doesn't stay stuck empty.
+                var list = document.getElementById('posCustomerList');
+                var input = document.getElementById('posCustomerSearch');
+                if (list && list.classList.contains('show') && input) renderPosCustomerList(input.value);
+                if (typeof populateStxPartyList === 'function') populateStxPartyList();
+            }).withFailureHandler(function () { activeStudentsForPos = []; _posStudentsLoaded = true; }).getActiveStudentsList();
         }
 
         function renderPosItemGrid() {
@@ -20832,15 +20950,34 @@
                 var stockCls = i.stock <= 0 ? 'out' : (i.stock <= i.reorderLevel ? 'low' : 'healthy');
                 var stockLabel = i.stock <= 0 ? 'Out of stock' : (i.stock + ' in stock');
                 var oos = i.stock <= 0;
-                return '<div class="pos-item-card' + (oos ? ' out-of-stock' : '') + '" ' + (oos ? '' : 'onclick="addToCart(\'' + i.id + '\')"') + '>' +
+                return '<div class="pos-item-card' + (oos ? ' out-of-stock' : '') + '" data-item-id="' + i.id + '" ' + (oos ? '' : 'onclick="addToCart(\'' + i.id + '\')"') + '>' +
                     '<span class="pos-stock-badge ' + stockCls + '">' + stockLabel + '</span>' +
-                    '<div class="pos-item-icon ' + categoryIconClass(i.category) + '"><i class="bi ' + categoryIconGlyph(i.category) + '"></i></div>' +
+                    '<div class="pos-item-icon ' + categoryIconClass(i.category) + '"><i class="bi ' + resolveItemIcon(i) + '"></i></div>' +
                     '<div class="pos-item-name">' + i.name + '</div>' +
                     '<div class="pos-item-cat">' + (i.category || 'Other') + '</div>' +
                     '<div class="pos-item-price">' + currency + ' ' + fmt(i.price) + '</div>' +
                     '<div class="pos-item-hint">' + (oos ? 'Unavailable' : 'Tap to add') + '</div>' +
+                    '<span class="pos-cart-qty-badge"></span>' +
                     '</div>';
             }).join('');
+            updatePosGridSelectionState();
+        }
+
+        // Marks each item card that's currently in the cart with a
+        // highlighted border and a "×qty" badge, so the cashier can see at a
+        // glance what's already been added — without a full grid re-render
+        // (keeps search-box focus/scroll intact).
+        function updatePosGridSelectionState() {
+            var grid = document.getElementById('posItemGrid');
+            if (!grid) return;
+            grid.querySelectorAll('.pos-item-card').forEach(function (card) {
+                var line = posCart.find(function (c) { return c.itemId === card.dataset.itemId; });
+                card.classList.toggle('in-cart', !!line);
+                var badge = card.querySelector('.pos-cart-qty-badge');
+                if (!badge) return;
+                if (line) { badge.textContent = '×' + line.qty; badge.style.display = ''; }
+                else { badge.style.display = 'none'; }
+            });
         }
 
         function addToCart(itemId) {
@@ -20890,6 +21027,7 @@
                 }).join('');
             }
             renderPosTotals();
+            updatePosGridSelectionState();
         }
 
         function renderPosTotals() {
@@ -20920,16 +21058,25 @@
             var list = document.getElementById('posCustomerList');
             if (!list) return;
             var q = (query || '').toLowerCase().trim();
-            var students = activeStudentsForPos.filter(function (s) {
-                return !q || (s.name + ' ' + s.id + ' ' + s.grade).toLowerCase().indexOf(q) !== -1;
-            }).slice(0, 30);
             var html = '<div class="pos-combo-item walkin-option" onclick="selectPosCustomer(\'walkin\',\'\',\'\')"><span><i class="bi bi-person-badge me-1"></i>Walk-in customer</span></div>';
-            if (students.length) {
-                html += students.map(function (s) {
-                    return '<div class="pos-combo-item" onclick=\'selectPosCustomer("student",' + JSON.stringify(String(s.id)) + ',' + JSON.stringify(String(s.name)) + ')\'><span>' + s.name + '</span><span class="badge-id">' + s.id + ' · ' + (s.grade || '') + '</span></div>';
-                }).join('');
-            } else if (q) {
-                html += '<div class="pos-combo-item text-muted">No matching students</div>';
+            if (!_posStudentsLoaded) {
+                // The student list round-trip may still be in flight (e.g. the
+                // combo box was opened right after the page loaded) — show a
+                // loading row instead of silently looking empty.
+                html += '<div class="pos-combo-item text-muted"><span class="spinner-border spinner-border-sm me-2" style="width:12px;height:12px;"></span>Loading students…</div>';
+            } else {
+                var students = activeStudentsForPos.filter(function (s) {
+                    return !q || (s.name + ' ' + s.id + ' ' + s.grade).toLowerCase().indexOf(q) !== -1;
+                }).slice(0, 30);
+                if (students.length) {
+                    html += students.map(function (s) {
+                        return '<div class="pos-combo-item" onclick=\'selectPosCustomer("student",' + JSON.stringify(String(s.id)) + ',' + JSON.stringify(String(s.name)) + ')\'><span>' + s.name + '</span><span class="badge-id">' + s.id + ' · ' + (s.grade || '') + '</span></div>';
+                    }).join('');
+                } else if (q) {
+                    html += '<div class="pos-combo-item text-muted">No matching students</div>';
+                } else if (!activeStudentsForPos.length) {
+                    html += '<div class="pos-combo-item text-muted">No enrolled students found for the active term</div>';
+                }
             }
             list.innerHTML = html;
             list.classList.add('show');
@@ -20959,11 +21106,16 @@
             }
         }
 
+        var _posSaleInFlight = false;
         function completeSalePOS() {
-            if (!posCart.length) { showToast('Cart is empty', 'warning'); return; }
+            if (_posSaleInFlight) return; // guards against a double-click firing two checkouts
+            if (!posCart.length) { showToast('Cart is empty — tap an item to add it first', 'warning'); return; }
+            var items = posCart.map(function (c) { return { itemId: c.itemId, itemName: c.itemName, qty: c.qty, unitPrice: c.unitPrice }; })
+                .filter(function (it) { return it.itemId && it.qty > 0; });
+            if (!items.length) { showToast('Cart items are missing required data — remove and re-add them', 'error'); return; }
             var paymentStatus = document.getElementById('posPaymentStatus').value;
             var sale = {
-                items: posCart.map(function (c) { return { itemId: c.itemId, itemName: c.itemName, qty: c.qty, unitPrice: c.unitPrice }; }),
+                items: items,
                 customerType: posSelectedCustomer.type,
                 studentId: posSelectedCustomer.id,
                 studentName: posSelectedCustomer.name,
@@ -20973,10 +21125,14 @@
                 discount: parseFloat(document.getElementById('posDiscount').value) || 0,
                 tax: parseFloat(document.getElementById('posTax').value) || 0
             };
+            _posSaleInFlight = true;
+            var btn = document.getElementById('posCompleteBtn');
+            if (btn) btn.disabled = true;
             showLoad('Processing sale…');
             if (typeof google !== 'undefined' && google.script) {
                 google.script.run.withSuccessHandler(function (r) {
                     hideLoad();
+                    _posSaleInFlight = false;
                     if (r.success) {
                         showToast('Sale completed!', 'success');
                         printPosReceipt(r);
@@ -20991,9 +21147,13 @@
                         renderCart();
                         loadInventoryQuiet_();
                         renderPosItemGrid();
-                    } else showToast(r.message, 'error');
-                }).withFailureHandler(function (e) { hideLoad(); showToast(e.message, 'error'); }).completeSale(sale);
-            } else { hideLoad(); showToast('Sale completed (demo)', 'info'); posCart = []; renderCart(); }
+                    } else { showToast(r.message, 'error'); if (btn) btn.disabled = posCart.length === 0; }
+                }).withFailureHandler(function (e) {
+                    hideLoad(); _posSaleInFlight = false;
+                    if (btn) btn.disabled = posCart.length === 0;
+                    showToast(e.message, 'error');
+                }).completeSale(sale);
+            } else { hideLoad(); _posSaleInFlight = false; showToast('Sale completed (demo)', 'info'); posCart = []; renderCart(); }
         }
 
         function printPosReceipt(sale) {
@@ -21619,7 +21779,7 @@
                 <div class="row g-2 mb-3">
                     <div class="col-md-6">
                         <label class="form-label small fw-semibold">Category *</label>
-                        <input type="text" class="form-control form-control-sm" id="invCategory" list="invCategoryList" placeholder="e.g. Uniform" required>
+                        <input type="text" class="form-control form-control-sm" id="invCategory" list="invCategoryList" placeholder="e.g. Uniform" oninput="onInvCategoryInput()" required>
                         <datalist id="invCategoryList">
                             <option value="Uniform"><option value="Books"><option value="Stationery"><option value="Other">
                         </datalist>
@@ -21628,6 +21788,11 @@
                         <label class="form-label small fw-semibold">SKU / Barcode</label>
                         <input type="text" class="form-control form-control-sm" id="invSku">
                     </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Icon</label>
+                    <input type="hidden" id="invIcon">
+                    <div class="icon-picker" id="invIconPicker"></div>
                 </div>
                 <div class="row g-2 mb-3">
                     <div class="col-md-4">

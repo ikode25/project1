@@ -5111,10 +5111,23 @@ function round2_(n) {
 
 // ── INVENTORY ──
 function getOrCreateInventorySheet() {
-  return getOrCreateSheet(INVENTORY_SHEET, [
-    "id", "name", "category", "sku", "unit", "price", "cost",
+  const sheet = getOrCreateSheet(INVENTORY_SHEET, [
+    "id", "name", "category", "icon", "sku", "unit", "price", "cost",
     "stock", "reorderLevel", "isActive", "notes", "createdAt", "updatedAt"
   ]);
+  // Migration: add the "icon" column to a sheet created before it existed.
+  try {
+    const existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+    if (existingHeaders.indexOf('icon') === -1) {
+      const lastCol = sheet.getLastColumn();
+      sheet.insertColumnAfter(lastCol);
+      sheet.getRange(1, lastCol + 1).setValue('icon')
+        .setBackground('#4285F4').setFontColor('white').setFontWeight('bold');
+    }
+  } catch (migErr) {
+    Logger.log('Inventory sheet icon migration info: ' + migErr.message);
+  }
+  return sheet;
 }
 
 function getInventoryItems() {
@@ -5132,6 +5145,7 @@ function getInventoryItems() {
         id: data[i][idx.id],
         name: data[i][idx.name] || '',
         category: data[i][idx.category] || 'Other',
+        icon: (idx.icon !== undefined ? data[i][idx.icon] : '') || '',
         sku: data[i][idx.sku] || '',
         unit: data[i][idx.unit] || 'pc',
         price: parseFloat(data[i][idx.price]) || 0,
