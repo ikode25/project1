@@ -6726,7 +6726,9 @@
             salesReports:      { collector: 'v',   viewer: '' },
             incomeExpenses:    { collector: 'va',  viewer: '' },
             notifications:     { collector: 'vae', viewer: '' },
-            outstandingLog:    { collector: 'v',   viewer: 'v' }
+            outstandingLog:    { collector: 'v',   viewer: 'v' },
+            newStudents:       { collector: 'va',  viewer: '' },
+            paymentHistory:    { collector: 'v',   viewer: '' }
             // Any module not listed here defaults to no Collector/Viewer access.
         };
 
@@ -6776,7 +6778,7 @@
                         el.style.display = allowed ? '' : 'none';
                     });
                     var contentEl = document.getElementById(sec + 'Section');
-                    if (contentEl && !allowed) contentEl.style.display = 'none';
+                    if (contentEl) contentEl.style.display = allowed ? '' : 'none';
                 });
             });
 
@@ -7564,10 +7566,14 @@
                     });
                 }
 
-                if (typeof applyRolePermissionsToUI === 'function') applyRolePermissionsToUI();
-
-                // Apply sidebar navigation visibility
+                // Apply sidebar navigation visibility (admin's global
+                // "hide this menu item for everyone" list) BEFORE the role
+                // permissions matrix — applySidebarVisibility blindly resets
+                // display:'' on anything not in that list, so it must run
+                // first or it silently undoes Collector/Viewer's hiding.
                 if (typeof applySidebarVisibility === 'function') applySidebarVisibility();
+
+                if (typeof applyRolePermissionsToUI === 'function') applyRolePermissionsToUI();
 
                 // Trigger onboarding system tour for first-time users
                 setTimeout(function() {
