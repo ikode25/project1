@@ -5341,6 +5341,111 @@ function deleteVendor(id) {
   }
 }
 
+// ════════════════════════════════════════════════════════
+// PARENTS — dedicated parent/guardian records (name, phone,
+// email, occupation, status), each optionally linked to one
+// or more students (wards) by student ID.
+// ════════════════════════════════════════════════════════
+const PARENTS_SHEET = "Parents";
+
+function getOrCreateParentsSheet() {
+  return getOrCreateSheet(PARENTS_SHEET, [
+    "id", "name", "phone", "email", "occupation", "status", "linkedStudentIds", "notes", "createdAt"
+  ]);
+}
+
+function getParents() {
+  try {
+    const sheet = getOrCreateParentsSheet();
+    if (sheet.getLastRow() <= 1) return { success: true, parents: [] };
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0].map(h => String(h).trim().toLowerCase());
+    const idx = {};
+    headers.forEach((h, i) => idx[h] = i);
+    const parents = [];
+    for (let i = 1; i < data.length; i++) {
+      if (!data[i][idx.id]) continue;
+      const rawLinked = data[i][idx.linkedstudentids] || '';
+      parents.push({
+        id: data[i][idx.id],
+        name: data[i][idx.name] || '',
+        phone: data[i][idx.phone] || '',
+        email: data[i][idx.email] || '',
+        occupation: data[i][idx.occupation] || '',
+        status: data[i][idx.status] || 'Active',
+        linkedStudentIds: String(rawLinked).split(',').map(s => s.trim()).filter(Boolean),
+        notes: data[i][idx.notes] || ''
+      });
+    }
+    parents.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    return { success: true, parents: parents };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+function saveParent(parent) {
+  try {
+    const sheet = getOrCreateParentsSheet();
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+    const now = new Date().toISOString();
+
+    if (!parent.id || String(parent.id).trim() === '') {
+      parent.id = "PAR-" + Utilities.getUuid().substring(0, 8).toUpperCase();
+      parent.createdAt = now;
+    }
+    if (Array.isArray(parent.linkedStudentIds)) {
+      parent.linkedStudentIds = parent.linkedStudentIds.filter(Boolean).join(',');
+    }
+
+    const normalized = {};
+    Object.keys(parent).forEach(k => normalized[String(k).trim().toLowerCase()] = parent[k]);
+
+    let foundRow = -1;
+    const data = sheet.getDataRange().getValues();
+    const idIdx = headers.map(h => h.toLowerCase()).indexOf('id');
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][idIdx]) === String(parent.id)) { foundRow = i + 1; break; }
+    }
+
+    const rowVal = headers.map(h => {
+      const normH = h.toLowerCase();
+      return normalized[normH] !== undefined ? normalized[normH] : '';
+    });
+
+    if (foundRow !== -1) {
+      sheet.getRange(foundRow, 1, 1, headers.length).setValues([rowVal]);
+      logActivity('Updated Parent', parent.name);
+    } else {
+      sheet.appendRow(rowVal);
+      logActivity('Added Parent', parent.name);
+    }
+    SpreadsheetApp.flush();
+    return { success: true, parent: parent };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+function deleteParent(id) {
+  try {
+    const sheet = getOrCreateParentsSheet();
+    const data = sheet.getDataRange().getValues();
+    const idCol = data[0].map(h => String(h).trim().toLowerCase()).indexOf('id');
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][idCol]) === String(id)) {
+        sheet.deleteRow(i + 1);
+        SpreadsheetApp.flush();
+        logActivity('Deleted Parent', id);
+        return { success: true };
+      }
+    }
+    return { success: false, message: 'Parent not found' };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
 // ── STOCK TRANSACTIONS ──
 function getOrCreateStockTransactionsSheet() {
   return getOrCreateSheet(STOCK_TXN_SHEET, [

@@ -5897,16 +5897,21 @@
                             <button onclick="goHome()" class="btn btn-sm btn-outline-light me-1"><i class="bi bi-house-door me-1"></i>Home</button>
                             <h5 class="section-banner-title mb-0">Parent Management <span id="parentsBannerCount" style="font-weight:600;opacity:.85;font-size:15px;">(0/0)</span></h5>
                         </div>
-                        <button class="btn btn-sm btn-outline-light" onclick="loadParentsSection()" title="Refresh"><i class="bi bi-arrow-clockwise"></i></button>
+                        <button class="btn btn-sm btn-outline-light" onclick="openAddParentModal()"><i class="bi bi-plus-circle me-1"></i>Add Parent</button>
                     </div>
                     <div class="form-card mb-3">
                         <div class="row g-2 align-items-end">
                             <div class="col-md-8">
                                 <label class="form-label small fw-semibold">Search Parents</label>
-                                <input type="text" class="form-control form-control-sm" id="parentSearch" placeholder="Search by parent contact or child's name..." oninput="filterParentsTable()">
+                                <input type="text" class="form-control form-control-sm" id="parentSearch" placeholder="Search by name, phone, or email..." oninput="filterParentsTable()">
                             </div>
                             <div class="col-md-4">
-                                <div class="small text-muted">Parent contacts are grouped automatically from student phone numbers on file.</div>
+                                <label class="form-label small fw-semibold">Filter by Status</label>
+                                <select class="form-select form-select-sm" id="parentStatusFilter" onchange="filterParentsTable()">
+                                    <option value="">All Statuses</option>
+                                    <option value="Active">Active</option>
+                                    <option value="Inactive">Inactive</option>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -5915,15 +5920,19 @@
                             <table class="table mb-0">
                                 <thead>
                                     <tr>
-                                        <th>Parent Reference</th>
-                                        <th>Contact Phone Number</th>
+                                        <th>Parent ID</th>
+                                        <th>Name</th>
+                                        <th>Phone</th>
+                                        <th>Email</th>
+                                        <th>Occupation</th>
                                         <th>Wards (Linked Students)</th>
-                                        <th style="text-align:right">Total Outstanding Balance</th>
+                                        <th style="text-align:right">Outstanding Balance</th>
+                                        <th style="text-align:center">Status</th>
                                         <th style="text-align:center">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody id="parentsTableBody">
-                                    <tr><td colspan="5" class="text-center text-muted py-4">Loading parent groups...</td></tr>
+                                    <tr><td colspan="9" class="text-center text-muted py-4">Loading parents...</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -6166,6 +6175,68 @@
             </form>
         </div>
     </div>
+    <!-- Add / Edit Parent Modal -->
+    <div class="modal-overlay" id="parentModal">
+        <div class="modal-box" style="max-width: 460px;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0 fw-bold" id="parentModalTitle"><i class="bi bi-person-plus me-2 text-primary"></i>Add Parent</h6>
+                <button type="button" class="btn-close" onclick="closeParentModal()" aria-label="Close"></button>
+            </div>
+            <form onsubmit="saveParentForm(event)">
+                <input type="hidden" id="pmParentId">
+                <div class="mb-2">
+                    <label class="form-label small fw-semibold">Full Name</label>
+                    <input type="text" class="form-control form-control-sm" id="pmName" required>
+                </div>
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Phone</label>
+                        <input type="tel" class="form-control form-control-sm" id="pmPhone">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Email</label>
+                        <input type="email" class="form-control form-control-sm" id="pmEmail">
+                    </div>
+                </div>
+                <div class="row g-2 mt-1">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Occupation</label>
+                        <input type="text" class="form-control form-control-sm" id="pmOccupation">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Status</label>
+                        <select class="form-select form-select-sm" id="pmStatus">
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mb-3 mt-2">
+                    <label class="form-label small fw-semibold">Notes</label>
+                    <textarea class="form-control form-control-sm" id="pmNotes" rows="2"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm w-100"><i class="bi bi-save me-1"></i>Save Parent</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Link Children (Wards) Modal -->
+    <div class="modal-overlay" id="linkChildrenModal">
+        <div class="modal-box" style="max-width: 460px; max-height: 80vh; overflow-y: auto;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-people me-2 text-primary"></i>Link Children to <span id="lcParentName"></span></h6>
+                <button type="button" class="btn-close" onclick="closeLinkChildrenModal()" aria-label="Close"></button>
+            </div>
+            <form onsubmit="saveLinkChildren(event)">
+                <input type="hidden" id="lcParentId">
+                <input type="text" class="form-control form-control-sm mb-2" id="lcStudentSearch" placeholder="Search students..." oninput="renderLinkChildrenList()">
+                <div id="lcStudentList" style="border:1px solid #e2e8f0;border-radius:8px;padding:8px;max-height:280px;overflow-y:auto;background:#f8fafc;">
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm w-100 mt-3"><i class="bi bi-save me-1"></i>Save Wards</button>
+            </form>
+        </div>
+    </div>
+
     <!-- Quick Collect Fee Payment Modal -->
     <div class="modal-overlay" id="quickFeeModal">
         <div class="modal-box" style="max-width: 520px; max-height: 90vh; overflow-y: auto;">
@@ -18893,154 +18964,82 @@
         }
 
         // ── PARENTS DIRECTORY MODULE ──
+        // Parents are now dedicated records (name, phone, email,
+        // occupation, status) saved to their own Parents sheet and
+        // explicitly linked to one or more students (wards) via
+        // "Link Children" — rather than being inferred from matching
+        // phone numbers on student records.
         function loadParentsSection() {
-            // If allRecords is empty, try to load from cache or trigger a fresh fetch
-            if (!Array.isArray(allRecords) || allRecords.length === 0) {
-                var cached = lsGet('records');
-                if (Array.isArray(cached) && cached.length > 0) {
-                    allRecords = cached;
-                    _buildParentMap();
-                } else {
-                    // Show loading state while data fetches
-                    var tbody = document.getElementById('parentsTableBody');
-                    if (tbody) {
-                        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading parent records…</td></tr>';
-                    }
-                    loadAllData(true, function() {
-                        _buildParentMap();
-                    });
-                    return;
-                }
-            }
-            _buildParentMap();
-        }
-
-        function _buildParentMap() {
-            var parentMap = {};
-            if (Array.isArray(allRecords)) {
-                allRecords.forEach(function(r) {
-                    if (!r) return; // Safety check
-                    var rawPhone = String(r.phoneNumber || '').trim();
-                    var cleanPhone = rawPhone.replace(/\D/g, '');
-                    if (!cleanPhone) return;
-                    if (!parentMap[cleanPhone]) {
-                        parentMap[cleanPhone] = {
-                            phoneNumber: rawPhone,
-                            cleanPhone: cleanPhone,
-                            studentName: r.studentName,
-                            wards: []
-                        };
-                    }
-                    parentMap[cleanPhone].wards.push(r);
-                });
-            }
-            cachedParents = Object.values(parentMap);
-            filterParentsTable();
-        }
-
-        function filterParentsTable() {
-            var query = (document.getElementById('parentSearch').value || '').toLowerCase().trim();
             var tbody = document.getElementById('parentsTableBody');
-            if (!tbody) return;
-            
-            var searchEl = document.getElementById('parentSearch');
-            var query = (searchEl ? searchEl.value : '') || '';
-            query = query.toLowerCase().trim();
-            
-            var filtered = cachedParents.filter(function(p) {
-                var matchPhone = String(p.phoneNumber || '').toLowerCase().includes(query);
-                var matchWards = p.wards.some(function(w) {
-                    return String(w.studentName || '').toLowerCase().includes(query) || 
-                           String(w.id || '').toLowerCase().includes(query);
-                });
-                return matchPhone || matchWards;
-            });
-            
-            if (document.getElementById('parentsBannerCount')) document.getElementById('parentsBannerCount').textContent = '(' + filtered.length + '/' + cachedParents.length + ')';
+            if (tbody) tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Loading parents…</td></tr>';
 
-            if (!filtered.length) {
-                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No parents found</td></tr>';
-                return;
+            function afterLoad() {
+                if (!Array.isArray(allRecords) || !allRecords.length) {
+                    var cached = lsGet('records');
+                    if (Array.isArray(cached) && cached.length) allRecords = cached;
+                }
+                filterParentsTable();
             }
 
-            var cur = settings.currency || 'GHC';
-            tbody.innerHTML = filtered.map(function(p) {
-                var wardsListStr = p.wards.map(function(w) {
-                    return '<span class="badge bg-light text-dark border me-1">' + (w.studentName || 'Student') + ' (' + (w.grade || 'Class') + ')</span>';
-                }).join('');
-                
-                var totalBal = 0;
-                var wardIdsForBal = p.wards.map(function(w) { return String(w.id); });
-                p.wards.forEach(function(w) {
-                    var tot = safeTotals(w);
-                    if (tot && typeof tot.balance === 'number') {
-                        totalBal += Math.max(0, tot.balance);
-                    }
-                });
-                if (Array.isArray(allCustomFeeRecords)) {
-                    allCustomFeeRecords.forEach(function(cf) {
-                        if (cf && wardIdsForBal.indexOf(String(cf.studentId)) !== -1) {
-                            totalBal += Math.max(0, parseFloat(cf.balance) || 0);
-                        }
-                    });
-                }
-
-                var actBtn = '<button class="btn btn-sm btn-outline-primary" onclick="viewParentDetails(\'' + p.cleanPhone + '\')"><i class="bi bi-eye me-1"></i>View Details</button>';
-                
-                return '<tr>' +
-                    '<td><strong>Parent of ' + p.wards[0].studentName + '</strong></td>' +
-                    '<td>' + p.phoneNumber + '</td>' +
-                    '<td>' + wardsListStr + '</td>' +
-                    '<td style="text-align:right; font-weight:bold;" class="' + (totalBal > 0 ? 'text-danger' : 'text-success') + '">' + cur + ' ' + totalBal.toFixed(2) + '</td>' +
-                    '<td style="text-align:center;">' + actBtn + '</td>' +
-                    '</tr>';
-            }).join('');
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run
+                    .withSuccessHandler(function (r) {
+                        cachedParents = (r && r.success && Array.isArray(r.parents)) ? r.parents : [];
+                        afterLoad();
+                    })
+                    .withFailureHandler(function (err) {
+                        showToast('Failed to load parents: ' + err.message, 'error');
+                        cachedParents = [];
+                        afterLoad();
+                    })
+                    .getParents();
+            } else {
+                cachedParents = lsGet('parents') || [];
+                afterLoad();
+            }
         }
 
-        function viewParentDetails(cleanPhone) {
-            var parent = cachedParents.find(function(p) { return p.cleanPhone === cleanPhone; });
+        function _parentWardRecords(parent) {
+            var ids = (parent.linkedStudentIds || []).map(String);
+            if (!ids.length || !Array.isArray(allRecords)) return [];
+            var seen = {}, wards = [];
+            allRecords.forEach(function (r) {
+                if (r && ids.indexOf(String(r.id)) !== -1 && !seen[r.id]) { seen[r.id] = true; wards.push(r); }
+            });
+            return wards;
+        }
+
+        function viewParentDetails(id) {
+            var parent = (cachedParents || []).find(function (p) { return String(p.id) === String(id); });
             if (!parent) return;
-            
-            document.getElementById('parentWardsTitle').innerHTML = '<span class="d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-circle me-2" style="width:26px;height:26px;"><i class="bi bi-people-fill" style="font-size:13px;"></i></span>Parent of ' + parent.wards[0].studentName + ' & Siblings';
-            
+            var wards = _parentWardRecords(parent);
             var cur = settings.currency || 'GHC';
-            var wardIds = parent.wards.map(function(w) { return String(w.id); });
-            var customRecs = Array.isArray(allCustomFeeRecords) ? allCustomFeeRecords.filter(function(cf) {
-                return cf && wardIds.indexOf(String(cf.studentId)) !== -1;
-            }) : [];
+
+            document.getElementById('parentWardsTitle').innerHTML = '<span class="d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-circle me-2" style="width:26px;height:26px;"><i class="bi bi-people-fill" style="font-size:13px;"></i></span>' + (parent.name || 'Parent') + ' — Linked Children';
 
             var wBody = document.getElementById('parentWardsTableBody');
-            var wardRowsHtml = parent.wards.map(function(w) {
-                var t = safeTotals(w);
-                var scholarshipBadge = (parseFloat(w.discount) > 0 || w.scholarshipScheme) ?
-                    ' <span class="badge bg-warning text-dark" style="font-size:9px;"><i class="bi bi-award"></i> Scholarship</span>' : '';
-                var rows = '<tr>' +
-                    '<td><strong>' + w.id + '</strong></td>' +
-                    '<td>' + w.studentName + scholarshipBadge + '</td>' +
-                    '<td>' + w.grade + '</td>' +
-                    '<td><span class="badge bg-primary-light text-primary">Regular School Fees</span></td>' +
-                    '<td style="text-align:right">' + cur + ' ' + t.totalFees.toFixed(2) + '</td>' +
-                    '<td style="text-align:right">' + cur + ' ' + t.totalPaid.toFixed(2) + '</td>' +
-                    '<td style="text-align:right; font-weight:bold;">' + cur + ' ' + t.balance.toFixed(2) + '</td>' +
-                    '</tr>';
-                customRecs.filter(function(cf) { return String(cf.studentId) === String(w.id); }).forEach(function(cf) {
-                    rows += '<tr>' +
+            if (!wards.length) {
+                wBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-3">No children linked yet — use "Link Children" to connect this parent to their wards.</td></tr>';
+            } else {
+                wBody.innerHTML = wards.map(function (w) {
+                    var t = safeTotals(w);
+                    var scholarshipBadge = (parseFloat(w.discount) > 0 || w.scholarshipScheme) ?
+                        ' <span class="badge bg-warning text-dark" style="font-size:9px;"><i class="bi bi-award"></i> Scholarship</span>' : '';
+                    return '<tr>' +
                         '<td><strong>' + w.id + '</strong></td>' +
-                        '<td>' + w.studentName + '</td>' +
+                        '<td>' + w.studentName + scholarshipBadge + '</td>' +
                         '<td>' + w.grade + '</td>' +
-                        '<td><span class="badge bg-info-light text-info"><i class="bi bi-plus-circle"></i> ' + cf.feeTypeName + '</span></td>' +
-                        '<td style="text-align:right">' + cur + ' ' + (parseFloat(cf.amount) || 0).toFixed(2) + '</td>' +
-                        '<td style="text-align:right">' + cur + ' ' + (parseFloat(cf.totalPaid) || 0).toFixed(2) + '</td>' +
-                        '<td style="text-align:right; font-weight:bold;">' + cur + ' ' + (parseFloat(cf.balance) || 0).toFixed(2) + '</td>' +
+                        '<td><span class="badge bg-primary-light text-primary">Regular School Fees</span></td>' +
+                        '<td style="text-align:right">' + cur + ' ' + t.totalFees.toFixed(2) + '</td>' +
+                        '<td style="text-align:right">' + cur + ' ' + t.totalPaid.toFixed(2) + '</td>' +
+                        '<td style="text-align:right; font-weight:bold;">' + cur + ' ' + t.balance.toFixed(2) + '</td>' +
                         '</tr>';
-                });
-                return rows;
-            }).join('');
-            wBody.innerHTML = wardRowsHtml;
+                }).join('');
+            }
 
             var pBody = document.getElementById('parentWardsPaymentsTableBody');
             var payments = [];
-            parent.wards.forEach(function(w) {
+            wards.forEach(function (w) {
                 for (var i = 1; i <= 6; i++) {
                     var amt = parseFloat(w['inst' + i]) || 0;
                     if (amt > 0) {
@@ -19055,30 +19054,12 @@
                     }
                 }
             });
-            customRecs.forEach(function(cf) {
-                for (var i = 1; i <= 6; i++) {
-                    var amt = parseFloat(cf['inst' + i]) || 0;
-                    if (amt > 0) {
-                        payments.push({
-                            date: cf['inst' + i + 'Date'] || '-',
-                            wardName: cf.studentName,
-                            feeType: cf.feeTypeName,
-                            ref: 'Installment ' + i,
-                            method: cf['inst' + i + 'Mode'] || 'Cash',
-                            amount: amt
-                        });
-                    }
-                }
-            });
-
-            payments.sort(function(a, b) {
-                return new Date(b.date) - new Date(a.date);
-            });
+            payments.sort(function (a, b) { return new Date(b.date) - new Date(a.date); });
 
             if (!payments.length) {
                 pBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-2">No payment logs found</td></tr>';
             } else {
-                pBody.innerHTML = payments.map(function(pm) {
+                pBody.innerHTML = payments.map(function (pm) {
                     return '<tr>' +
                         '<td>' + pm.date + '</td>' +
                         '<td>' + pm.wardName + '</td>' +
@@ -19092,6 +19073,225 @@
 
             var modal = new bootstrap.Modal(document.getElementById('parentWardsModal'));
             modal.show();
+        }
+
+        function filterParentsTable() {
+            var tbody = document.getElementById('parentsTableBody');
+            if (!tbody) return;
+            var searchEl = document.getElementById('parentSearch');
+            var query = ((searchEl ? searchEl.value : '') || '').toLowerCase().trim();
+            var statusEl = document.getElementById('parentStatusFilter');
+            var statusFilter = statusEl ? statusEl.value : '';
+
+            var filtered = (cachedParents || []).filter(function (p) {
+                var matchQ = !query ||
+                    String(p.name || '').toLowerCase().includes(query) ||
+                    String(p.phone || '').toLowerCase().includes(query) ||
+                    String(p.email || '').toLowerCase().includes(query);
+                var matchStatus = !statusFilter || (p.status || 'Active') === statusFilter;
+                return matchQ && matchStatus;
+            });
+
+            if (document.getElementById('parentsBannerCount')) document.getElementById('parentsBannerCount').textContent = '(' + filtered.length + '/' + (cachedParents || []).length + ')';
+
+            if (!filtered.length) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-3">No parents found</td></tr>';
+                return;
+            }
+
+            var cur = settings.currency || 'GHC';
+            tbody.innerHTML = filtered.map(function (p) {
+                var wards = _parentWardRecords(p);
+                var wardsListStr = wards.length
+                    ? wards.map(function (w) { return '<span class="badge bg-light text-dark border me-1">' + (w.studentName || 'Student') + ' (' + (w.grade || 'Class') + ')</span>'; }).join('')
+                    : '<span class="text-muted small">No children linked</span>';
+                var totalBal = 0;
+                wards.forEach(function (w) {
+                    var t = safeTotals(w);
+                    if (t && typeof t.balance === 'number') totalBal += Math.max(0, t.balance);
+                });
+                var statusBadge = (p.status || 'Active') === 'Active'
+                    ? '<span class="status-badge status-paid">Active</span>'
+                    : '<span class="status-badge status-unpaid">Inactive</span>';
+                var actBtns = '<button class="btn btn-sm btn-outline-info me-1" title="View Details" onclick="viewParentDetails(\'' + p.id + '\')"><i class="bi bi-eye"></i></button>' +
+                    '<button class="btn btn-sm btn-outline-secondary me-1" title="Link Children" onclick="openLinkChildrenModal(\'' + p.id + '\')"><i class="bi bi-people"></i></button>' +
+                    '<button class="btn btn-sm btn-outline-primary me-1" title="Edit" onclick="editParent(\'' + p.id + '\')"><i class="bi bi-pencil"></i></button>' +
+                    '<button class="btn btn-sm btn-outline-danger" title="Delete" onclick="deleteParentConfirm(\'' + p.id + '\')"><i class="bi bi-trash"></i></button>';
+
+                return '<tr>' +
+                    '<td><span class="badge bg-light text-dark border">' + p.id + '</span></td>' +
+                    '<td><strong>' + (p.name || '') + '</strong></td>' +
+                    '<td>' + (p.phone || '-') + '</td>' +
+                    '<td>' + (p.email || '-') + '</td>' +
+                    '<td>' + (p.occupation || '-') + '</td>' +
+                    '<td>' + wardsListStr + '</td>' +
+                    '<td style="text-align:right; font-weight:bold;" class="' + (totalBal > 0 ? 'text-danger' : 'text-success') + '">' + cur + ' ' + totalBal.toFixed(2) + '</td>' +
+                    '<td style="text-align:center;">' + statusBadge + '</td>' +
+                    '<td style="text-align:center;">' + actBtns + '</td>' +
+                    '</tr>';
+            }).join('');
+        }
+
+        function openAddParentModal() {
+            document.getElementById('pmParentId').value = '';
+            document.getElementById('pmName').value = '';
+            document.getElementById('pmPhone').value = '';
+            document.getElementById('pmEmail').value = '';
+            document.getElementById('pmOccupation').value = '';
+            document.getElementById('pmStatus').value = 'Active';
+            document.getElementById('pmNotes').value = '';
+            document.getElementById('parentModalTitle').innerHTML = '<i class="bi bi-person-plus me-2 text-primary"></i>Add Parent';
+            document.getElementById('parentModal').classList.add('show');
+        }
+
+        function editParent(id) {
+            var p = (cachedParents || []).find(function (x) { return String(x.id) === String(id); });
+            if (!p) return;
+            document.getElementById('pmParentId').value = p.id;
+            document.getElementById('pmName').value = p.name || '';
+            document.getElementById('pmPhone').value = p.phone || '';
+            document.getElementById('pmEmail').value = p.email || '';
+            document.getElementById('pmOccupation').value = p.occupation || '';
+            document.getElementById('pmStatus').value = p.status || 'Active';
+            document.getElementById('pmNotes').value = p.notes || '';
+            document.getElementById('parentModalTitle').innerHTML = '<i class="bi bi-pencil me-2 text-primary"></i>Edit Parent';
+            document.getElementById('parentModal').classList.add('show');
+        }
+
+        function closeParentModal() {
+            document.getElementById('parentModal').classList.remove('show');
+        }
+
+        function saveParentForm(e) {
+            e.preventDefault();
+            var id = document.getElementById('pmParentId').value;
+            var existing = id ? (cachedParents || []).find(function (x) { return String(x.id) === String(id); }) : null;
+            var parent = {
+                id: id || null,
+                name: document.getElementById('pmName').value.trim(),
+                phone: document.getElementById('pmPhone').value.trim(),
+                email: document.getElementById('pmEmail').value.trim(),
+                occupation: document.getElementById('pmOccupation').value.trim(),
+                status: document.getElementById('pmStatus').value,
+                linkedStudentIds: existing ? existing.linkedStudentIds : [],
+                notes: document.getElementById('pmNotes').value.trim()
+            };
+            if (!parent.name) { showToast('Please enter the parent\'s name', 'warning'); return; }
+
+            function applyLocally(saved) {
+                if (existing) {
+                    Object.assign(existing, saved);
+                } else {
+                    cachedParents.push(saved);
+                }
+                lsSet('parents', cachedParents);
+                filterParentsTable();
+                closeParentModal();
+                showToast('Parent saved!', 'success');
+            }
+
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run
+                    .withSuccessHandler(function (r) {
+                        if (r && r.success) applyLocally(r.parent);
+                        else showToast('Save failed: ' + (r ? r.message : 'Unknown error'), 'error');
+                    })
+                    .withFailureHandler(function (err) { showToast('Save failed: ' + err.message, 'error'); })
+                    .saveParent(parent);
+            } else {
+                parent.id = parent.id || ('PAR-' + Date.now());
+                applyLocally(parent);
+            }
+        }
+
+        function deleteParentConfirm(id) {
+            if (!confirm('Delete this parent record? Linked students are not affected.')) return;
+            function applyLocally() {
+                cachedParents = (cachedParents || []).filter(function (x) { return String(x.id) !== String(id); });
+                lsSet('parents', cachedParents);
+                filterParentsTable();
+                showToast('Parent deleted.', 'info');
+            }
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run
+                    .withSuccessHandler(function (r) { if (r && r.success) applyLocally(); else showToast('Delete failed: ' + (r ? r.message : ''), 'error'); })
+                    .withFailureHandler(function (err) { showToast('Delete failed: ' + err.message, 'error'); })
+                    .deleteParent(id);
+            } else {
+                applyLocally();
+            }
+        }
+
+        var _lcCurrentParent = null;
+        function openLinkChildrenModal(id) {
+            var p = (cachedParents || []).find(function (x) { return String(x.id) === String(id); });
+            if (!p) return;
+            _lcCurrentParent = p;
+            document.getElementById('lcParentId').value = p.id;
+            document.getElementById('lcParentName').textContent = p.name || '';
+            document.getElementById('lcStudentSearch').value = '';
+            renderLinkChildrenList();
+            document.getElementById('linkChildrenModal').classList.add('show');
+        }
+
+        function closeLinkChildrenModal() {
+            document.getElementById('linkChildrenModal').classList.remove('show');
+        }
+
+        function renderLinkChildrenList() {
+            var box = document.getElementById('lcStudentList');
+            if (!box || !_lcCurrentParent) return;
+            var q = (document.getElementById('lcStudentSearch').value || '').toLowerCase().trim();
+            var linked = (_lcCurrentParent.linkedStudentIds || []).map(String);
+
+            var seen = {}, students = [];
+            (allRecords || []).forEach(function (r) {
+                if (r && r.id && !seen[r.id]) {
+                    seen[r.id] = true;
+                    students.push({ id: r.id, name: r.studentName, grade: r.grade });
+                }
+            });
+            students.sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
+            if (q) {
+                students = students.filter(function (s) {
+                    return String(s.name).toLowerCase().includes(q) || String(s.id).toLowerCase().includes(q);
+                });
+            }
+
+            if (!students.length) { box.innerHTML = '<div class="text-muted small text-center py-2">No students found</div>'; return; }
+            box.innerHTML = students.map(function (s) {
+                var checked = linked.indexOf(String(s.id)) !== -1 ? 'checked' : '';
+                return '<div class="form-check">' +
+                    '<input class="form-check-input lc-student-cb" type="checkbox" value="' + s.id + '" id="lc_' + s.id + '" ' + checked + '>' +
+                    '<label class="form-check-label small" for="lc_' + s.id + '">' + s.name + ' <span class="text-muted">(' + s.id + (s.grade ? ' &middot; ' + s.grade : '') + ')</span></label>' +
+                    '</div>';
+            }).join('');
+        }
+
+        function saveLinkChildren(e) {
+            e.preventDefault();
+            var id = document.getElementById('lcParentId').value;
+            var p = (cachedParents || []).find(function (x) { return String(x.id) === String(id); });
+            if (!p) return;
+            var checked = Array.from(document.querySelectorAll('.lc-student-cb:checked')).map(function (cb) { return cb.value; });
+            var updated = Object.assign({}, p, { linkedStudentIds: checked });
+
+            function applyLocally(saved) {
+                Object.assign(p, saved);
+                lsSet('parents', cachedParents);
+                filterParentsTable();
+                closeLinkChildrenModal();
+                showToast('Linked children updated!', 'success');
+            }
+
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run
+                    .withSuccessHandler(function (r) { if (r && r.success) applyLocally(r.parent); else showToast('Save failed: ' + (r ? r.message : ''), 'error'); })
+                    .withFailureHandler(function (err) { showToast('Save failed: ' + err.message, 'error'); })
+                    .saveParent(updated);
+            } else {
+                applyLocally(updated);
+            }
         }
 
         // ── BULK NEXT TERM BILLS PRINT ──
