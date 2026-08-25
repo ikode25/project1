@@ -2892,20 +2892,7 @@
                 </div>
                 <div class="nav-group-items admin-only" id="navGroupFeeSetup">
                     <a class="nav-item" data-section="feeComponents"><i class="bi bi-tags"></i><span>Fee Components</span></a>
-                    <a class="nav-item" data-section="extraFees"><i class="bi bi-cash-stack"></i><span>Extra Fee</span></a>
                     <a class="nav-item" data-section="scholarships"><i class="bi bi-award-fill"></i><span>Scholarships</span></a>
-                </div>
-
-                <div class="nav-group-header admin-only collector-ok" onclick="toggleNavGroup(this)">
-                    <i class="bi bi-shop nav-group-icon"></i><span>Inventory &amp; Sales</span>
-                    <i class="bi bi-chevron-right nav-group-chevron"></i>
-                </div>
-                <div class="nav-group-items admin-only collector-ok" id="navGroupInventory">
-                    <a class="nav-item" data-section="posSell"><i class="bi bi-cart-check-fill"></i><span>POS / Sell</span></a>
-                    <a class="nav-item" data-section="inventory"><i class="bi bi-box-seam-fill"></i><span>Inventory</span></a>
-                    <a class="nav-item" data-section="stockTransactions"><i class="bi bi-arrow-left-right"></i><span>Stock Transactions</span></a>
-                    <a class="nav-item" data-section="vendors"><i class="bi bi-truck"></i><span>Vendors</span></a>
-                    <a class="nav-item" data-section="salesReports"><i class="bi bi-graph-up-arrow"></i><span>Sales Reports</span></a>
                 </div>
 
                 <div class="nav-group-header admin-only" onclick="toggleNavGroup(this)">
@@ -2914,7 +2901,6 @@
                 </div>
                 <div class="nav-group-items admin-only" id="navGroupFinance">
                     <a class="nav-item" data-section="incomeExpenses"><i class="bi bi-wallet2"></i><span>Income &amp; Expenses</span></a>
-                    <a class="nav-item" data-section="salaries"><i class="bi bi-cash-coin"></i><span>Salaries</span></a>
                     <a class="nav-item" data-section="reports"><i class="bi bi-bar-chart-line"></i><span>Reports</span></a>
                     <a class="nav-item" data-section="paymentHistory"><i class="bi bi-calendar-check"></i><span>Payment History</span></a>
                     <a class="nav-item" data-section="promotionHistory"><i class="bi bi-person-up"></i><span>Promotion History</span></a>
@@ -5191,233 +5177,6 @@
                     </div>
                 </div>
 
-                <!-- POS / SELL SECTION -->
-                <div class="content-section admin-only collector-ok" id="posSellSection">
-                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-1">
-                        <h5 class="mb-0"><button onclick="goHome()" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-house-door me-1"></i>Home</button><i class="bi bi-shop me-2"></i>Point of Sale</h5>
-                        <div class="d-flex gap-2">
-                            <button class="btn btn-outline-secondary btn-sm" id="posRestockBtn" onclick="openRestockModal()"><i class="bi bi-arrow-counterclockwise me-1"></i>Return / Restock</button>
-                        </div>
-                    </div>
-                    <p class="text-muted small mb-3">Select items to create one sales invoice.</p>
-
-                    <div class="pos-wrap">
-                        <div>
-                            <div class="pos-search-wrap">
-                                <i class="bi bi-search"></i>
-                                <input type="text" class="form-control" id="posSearchInput" placeholder="Search item, category, SKU, or barcode" oninput="renderPosItemGrid()">
-                            </div>
-                            <div class="pos-item-grid" id="posItemGrid">
-                                <div class="text-center text-muted py-4 w-100"><span class="spinner-border spinner-border-sm me-2"></span>Loading items…</div>
-                            </div>
-                        </div>
-
-                        <div class="pos-panel">
-                            <div class="pos-panel-customer"><i class="bi bi-person-fill me-1"></i> <span id="posCustomerLabel">Walk-in customer</span></div>
-                            <div style="padding:14px 16px;">
-                                <label class="form-label small fw-semibold">Customer</label>
-                                <div class="pos-combo mb-2">
-                                    <input type="text" class="form-control form-control-sm" id="posCustomerSearch" placeholder="Walk-in customer, or search student…" autocomplete="off"
-                                        oninput="renderPosCustomerList(this.value)" onfocus="renderPosCustomerList(this.value)">
-                                    <div class="pos-combo-list" id="posCustomerList"></div>
-                                </div>
-                                <div id="posWalkinNameWrap">
-                                    <label class="form-label small fw-semibold">Walk-in name</label>
-                                    <input type="text" class="form-control form-control-sm mb-2" id="posWalkinName" placeholder="Optional customer name">
-                                </div>
-
-                                <label class="form-label small fw-semibold">Payment</label>
-                                <select class="form-select form-select-sm mb-2" id="posPaymentStatus" onchange="onPosPaymentStatusChange()">
-                                    <option value="Paid">Paid</option>
-                                    <option value="Partially Paid">Partially Paid</option>
-                                    <option value="Unpaid">Unpaid / Pay Later</option>
-                                </select>
-                                <div class="row g-2 mb-1" id="posAmountPaidWrap" style="display:none;">
-                                    <div class="col-12">
-                                        <label class="form-label small fw-semibold">Amount Paid Now</label>
-                                        <input type="number" class="form-control form-control-sm" id="posAmountPaid" min="0" step="0.01" value="0" oninput="renderPosTotals()">
-                                    </div>
-                                </div>
-                                <div class="row g-2">
-                                    <div class="col-6">
-                                        <label class="form-label small fw-semibold">Discount</label>
-                                        <input type="number" class="form-control form-control-sm" id="posDiscount" min="0" step="0.01" value="0" oninput="renderPosTotals()">
-                                    </div>
-                                    <div class="col-6">
-                                        <label class="form-label small fw-semibold">Tax</label>
-                                        <input type="number" class="form-control form-control-sm" id="posTax" min="0" step="0.01" value="0" oninput="renderPosTotals()">
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="pos-cart-list" id="posCartList">
-                                <div class="pos-cart-empty"><i class="bi bi-cart-x" style="font-size:26px;display:block;margin-bottom:6px;"></i>Cart is empty</div>
-                            </div>
-
-                            <div class="pos-totals">
-                                <div class="pos-totals-row"><span>Subtotal</span><span id="posSubtotalDisp">GHC 0.00</span></div>
-                                <div class="pos-totals-row"><span>Discount</span><span id="posDiscountDisp">- GHC 0.00</span></div>
-                                <div class="pos-totals-row"><span>Tax</span><span id="posTaxDisp">+ GHC 0.00</span></div>
-                                <div class="pos-totals-row grand"><span>Total</span><span id="posGrandTotalDisp">GHC 0.00</span></div>
-                            </div>
-                            <button class="pos-complete-btn" id="posCompleteBtn" onclick="completeSalePOS()" disabled>
-                                <i class="bi bi-check-circle me-1"></i> Complete Sale · <span id="posCompleteBtnTotal">GHC 0.00</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- INVENTORY SECTION -->
-                <div class="content-section admin-only collector-ok" id="inventorySection">
-                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-1">
-                        <h5 class="mb-0"><button onclick="goHome()" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-house-door me-1"></i>Home</button><i class="bi bi-box-seam-fill me-2"></i>Inventory</h5>
-                        <button class="btn btn-primary btn-sm" id="invAddBtn" onclick="openInventoryModal()"><i class="bi bi-plus-circle me-1"></i>Add Item</button>
-                    </div>
-                    <p class="text-muted small mb-3">Manage stock items — uniforms, books, stationery, and other goods.</p>
-
-                    <div class="stat-mini-row">
-                        <div class="stat-card"><div class="stat-value" id="invStatTotal">0</div><div class="stat-label">Total Items</div></div>
-                        <div class="stat-card" style="border-left:4px solid var(--warning)"><div class="stat-value" id="invStatLow">0</div><div class="stat-label">Low Stock</div></div>
-                        <div class="stat-card" style="border-left:4px solid var(--danger)"><div class="stat-value" id="invStatOut">0</div><div class="stat-label">Out of Stock</div></div>
-                        <div class="stat-card" style="border-left:4px solid var(--success)"><div class="stat-value" id="invStatValue">GHC 0.00</div><div class="stat-label">Stock Value</div></div>
-                    </div>
-
-                    <div class="filter-bar">
-                        <input type="text" class="form-control form-control-sm" id="invSearchInput" placeholder="Search items…" oninput="renderInventoryTable()">
-                        <select class="form-select form-select-sm" id="invCategoryFilter" onchange="renderInventoryTable()">
-                            <option value="">All Categories</option>
-                        </select>
-                        <label class="d-flex align-items-center gap-1 small"><input type="checkbox" id="invLowStockOnly" onchange="renderInventoryTable()"> Low stock only</label>
-                    </div>
-
-                    <div class="form-card p-0">
-                        <div class="table-responsive">
-                            <table class="table table-sm table-hover mb-0" style="font-size:13px;">
-                                <thead><tr>
-                                    <th>Item</th><th>Category</th><th>SKU</th><th class="text-end">Price</th><th class="text-end">Stock</th><th>Status</th><th class="text-end">Actions</th>
-                                </tr></thead>
-                                <tbody id="invTableBody"><tr><td colspan="7" class="text-center text-muted py-3">Loading…</td></tr></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- VENDORS SECTION -->
-                <div class="content-section admin-only collector-ok" id="vendorsSection">
-                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-1">
-                        <h5 class="mb-0"><button onclick="goHome()" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-house-door me-1"></i>Home</button><i class="bi bi-truck me-2"></i>Vendors</h5>
-                        <button class="btn btn-primary btn-sm" id="vendorAddBtn" onclick="openVendorModal()"><i class="bi bi-plus-circle me-1"></i>Add Vendor</button>
-                    </div>
-                    <p class="text-muted small mb-3">Suppliers you purchase uniforms, books, stationery, and other stock from.</p>
-
-                    <input type="text" class="form-control form-control-sm mb-3" style="max-width:260px;" id="vendorSearchInput" placeholder="Search vendors…" oninput="renderVendorsTable()">
-
-                    <div class="form-card p-0">
-                        <div class="table-responsive">
-                            <table class="table table-sm table-hover mb-0" style="font-size:13px;">
-                                <thead><tr><th>Vendor</th><th>Contact Person</th><th>Phone</th><th>Email</th><th>Notes</th><th class="text-end">Actions</th></tr></thead>
-                                <tbody id="vendorTableBody"><tr><td colspan="6" class="text-center text-muted py-3">Loading…</td></tr></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- STOCK TRANSACTIONS SECTION -->
-                <div class="content-section admin-only collector-ok" id="stockTransactionsSection">
-                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-1">
-                        <h5 class="mb-0"><button onclick="goHome()" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-house-door me-1"></i>Home</button><i class="bi bi-arrow-left-right me-2"></i>Stock Transactions</h5>
-                        <button class="btn btn-primary btn-sm" id="stxAddBtn" onclick="openStockTxnModal()"><i class="bi bi-plus-circle me-1"></i>Add Transaction</button>
-                    </div>
-                    <p class="text-muted small mb-3">Every sale, purchase, and stock adjustment — the full stock activity log.</p>
-
-                    <div class="form-card mb-3">
-                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                            <h6 class="mb-0 fw-bold small text-uppercase text-muted"><i class="bi bi-funnel me-1"></i>Filters</h6>
-                            <button class="btn btn-outline-secondary btn-xs" style="font-size:11px;padding:3px 10px;" onclick="clearStockTxnFilters()"><i class="bi bi-x-circle me-1"></i>Clear</button>
-                        </div>
-                        <div class="filter-bar mb-0">
-                            <input type="text" class="form-control form-control-sm" id="stxSearchInput" placeholder="Search transactions…" oninput="renderStockTxnTable()">
-                            <select class="form-select form-select-sm" id="stxTypeFilter" onchange="renderStockTxnTable()">
-                                <option value="">All Types</option>
-                                <option value="Sale">Sale</option>
-                                <option value="Purchase">Purchase</option>
-                                <option value="Adjustment">Adjustment</option>
-                            </select>
-                            <select class="form-select form-select-sm" id="stxPaymentFilter" onchange="renderStockTxnTable()">
-                                <option value="">All Payment Status</option>
-                                <option value="Paid">Paid</option>
-                                <option value="Partially Paid">Partially Paid</option>
-                                <option value="Unpaid">Unpaid</option>
-                            </select>
-                            <input type="date" class="form-control form-control-sm" id="stxDateFrom" onchange="renderStockTxnTable()">
-                            <input type="date" class="form-control form-control-sm" id="stxDateTo" onchange="renderStockTxnTable()">
-                        </div>
-                    </div>
-
-                    <div class="d-flex flex-wrap gap-2 mb-2">
-                        <button class="btn btn-outline-secondary btn-sm" onclick="exportStockTxnCsv()"><i class="bi bi-filetype-csv me-1"></i>CSV</button>
-                        <button class="btn btn-outline-secondary btn-sm" onclick="exportStockTxnPdf()"><i class="bi bi-file-earmark-pdf me-1"></i>PDF</button>
-                        <button class="btn btn-outline-secondary btn-sm" onclick="printStockTxnTable()"><i class="bi bi-printer me-1"></i>Print</button>
-                    </div>
-
-                    <div class="form-card p-0">
-                        <div class="table-responsive">
-                            <table class="table table-sm table-hover mb-0" style="font-size:12.5px;" id="stxTable">
-                                <thead><tr>
-                                    <th>Date</th><th>Type</th><th>Item</th><th class="text-end">Qty</th><th class="text-end">Unit Price</th><th class="text-end">Net Total</th><th class="text-end">Balance</th><th>Party</th><th>Payment</th><th class="text-end">Actions</th>
-                                </tr></thead>
-                                <tbody id="stxTableBody"><tr><td colspan="10" class="text-center text-muted py-3">Loading…</td></tr></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- SALES REPORTS SECTION -->
-                <div class="content-section admin-only collector-ok" id="salesReportsSection">
-                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
-                        <h5 class="mb-0"><button onclick="goHome()" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-house-door me-1"></i>Home</button><i class="bi bi-graph-up-arrow me-2"></i>Sales Reports</h5>
-                        <button class="btn btn-outline-secondary btn-sm" onclick="printSalesReport()"><i class="bi bi-printer me-1"></i>Print Report</button>
-                    </div>
-
-                    <ul class="nav nav-tabs mb-3" id="salesReportTabs">
-                        <li class="nav-item"><a class="nav-link active" href="#" onclick="showSalesReportTab('today',this);return false;">Daily</a></li>
-                        <li class="nav-item"><a class="nav-link" href="#" onclick="showSalesReportTab('week',this);return false;">Weekly</a></li>
-                        <li class="nav-item"><a class="nav-link" href="#" onclick="showSalesReportTab('month',this);return false;">Monthly</a></li>
-                        <li class="nav-item"><a class="nav-link" href="#" onclick="showSalesReportTab('term',this);return false;">Termly</a></li>
-                    </ul>
-
-                    <div class="stat-mini-row">
-                        <div class="stat-card" style="border-left:4px solid var(--success)"><div class="stat-value" id="srTotalSales">GHC 0.00</div><div class="stat-label">Total Sales Revenue</div></div>
-                        <div class="stat-card" style="border-left:4px solid var(--primary)"><div class="stat-value" id="srTxnCount">0</div><div class="stat-label">Transactions</div></div>
-                        <div class="stat-card" style="border-left:4px solid #0ea5e9"><div class="stat-value" id="srItemsSold">0</div><div class="stat-label">Items Sold</div></div>
-                        <div class="stat-card" style="border-left:4px solid var(--danger)"><div class="stat-value" id="srOutstanding">GHC 0.00</div><div class="stat-label">Outstanding Balance</div></div>
-                    </div>
-
-                    <div class="row g-3">
-                        <div class="col-lg-5">
-                            <div class="form-card h-100">
-                                <h6 class="fw-bold mb-3 small text-uppercase text-muted"><i class="bi bi-star me-1"></i>Top Selling Items</h6>
-                                <div class="table-responsive">
-                                    <table class="table table-sm mb-0" style="font-size:12.5px;">
-                                        <thead><tr><th>Item</th><th class="text-end">Qty</th><th class="text-end">Revenue</th></tr></thead>
-                                        <tbody id="srTopItemsBody"></tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-lg-7">
-                            <div class="form-card h-100">
-                                <h6 class="fw-bold mb-3 small text-uppercase text-muted"><i class="bi bi-receipt me-1"></i>Sale Transactions</h6>
-                                <div class="table-responsive" style="max-height:340px;overflow-y:auto;">
-                                    <table class="table table-sm mb-0" style="font-size:12.5px;">
-                                        <thead><tr><th>Date</th><th>Item</th><th>Customer</th><th class="text-end">Amount</th></tr></thead>
-                                        <tbody id="srTxnBody"></tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- ABOUT SECTION -->
                 <div class="content-section admin-only" id="aboutSection">
@@ -5516,7 +5275,7 @@
                                         </table>
                                     </div>
                                     <div class="mt-2 text-muted text-start" style="font-size:10px; line-height: 1.4;">
-                                        <strong>Legend:</strong> V = View · A = Add/Record · E = Edit/Collect · D = Delete. Admin always has full access. Collector/Viewer checkboxes control sidebar visibility for every module; Add/Edit/Delete are additionally enforced on the Inventory &amp; Sales modules (POS/Sell, Inventory, Stock Transactions, Vendors), Income &amp; Expenses, and Salaries.
+                                        <strong>Legend:</strong> V = View · A = Add/Record · E = Edit/Collect · D = Delete. Admin always has full access. Collector/Viewer checkboxes control sidebar visibility for every module; Add/Edit/Delete are additionally enforced on Income &amp; Expenses.
                                     </div>
                                 </div>
                                 <hr>
@@ -5583,69 +5342,6 @@
                 </div>
 
                 <!-- SALARIES SECTION -->
-                <div class="content-section admin-only" id="salariesSection">
-                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-1">
-                        <h5 class="mb-0"><button onclick="goHome()" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-house-door me-1"></i>Home</button><i class="bi bi-cash-coin me-2"></i>Salaries</h5>
-                        <div class="d-flex gap-2">
-                            <button class="btn btn-primary btn-sm" id="salStaffAddBtn" onclick="openStaffModal()"><i class="bi bi-person-plus me-1"></i>Add Staff</button>
-                        </div>
-                    </div>
-                    <p class="text-muted small mb-3">Pay Teaching and Non-Teaching Staff every month and send payslips by email or WhatsApp.</p>
-
-                    <ul class="nav nav-tabs mb-3" id="salariesTabs">
-                        <li class="nav-item"><a class="nav-link active" href="#" onclick="showSalariesTab('payroll',this);return false;"><i class="bi bi-cash-stack me-1"></i>Monthly Payroll</a></li>
-                        <li class="nav-item"><a class="nav-link" href="#" onclick="showSalariesTab('staff',this);return false;"><i class="bi bi-people me-1"></i>Staff Directory</a></li>
-                    </ul>
-
-                    <!-- Monthly Payroll tab -->
-                    <div id="salariesTab_payroll">
-                        <div class="filter-bar">
-                            <input type="month" class="form-control form-control-sm" id="salMonthPicker" style="max-width:160px;" onchange="loadSalaryPayroll()">
-                            <select class="form-select form-select-sm" id="salStaffTypeFilter" onchange="renderSalaryPayrollTable()">
-                                <option value="">All Staff Types</option>
-                                <option value="Teaching">Teaching Staff</option>
-                                <option value="Non-Teaching">Non-Teaching Staff</option>
-                            </select>
-                            <select class="form-select form-select-sm" id="salStatusFilter" onchange="renderSalaryPayrollTable()">
-                                <option value="">All Status</option>
-                                <option value="Paid">Paid</option>
-                                <option value="Pending">Pending</option>
-                            </select>
-                        </div>
-
-                        <div class="stat-mini-row">
-                            <div class="stat-card" style="border-left:4px solid var(--success)"><div class="stat-value" id="salTotalPaid">GHC 0.00</div><div class="stat-label">Paid This Month</div></div>
-                            <div class="stat-card" style="border-left:4px solid var(--warning)"><div class="stat-value" id="salTotalPending">GHC 0.00</div><div class="stat-label">Pending This Month</div></div>
-                            <div class="stat-card" style="border-left:4px solid var(--primary)"><div class="stat-value" id="salStaffCount">0</div><div class="stat-label">Active Staff</div></div>
-                        </div>
-
-                        <div class="form-card p-0">
-                            <div class="table-responsive">
-                                <table class="table table-sm table-hover mb-0" style="font-size:12.5px;">
-                                    <thead><tr>
-                                        <th>Staff</th><th>Type</th><th>Position</th><th class="text-end">Base Salary</th><th class="text-end">Net Pay</th><th>Status</th><th class="text-end">Actions</th>
-                                    </tr></thead>
-                                    <tbody id="salPayrollBody"><tr><td colspan="7" class="text-center text-muted py-3">Select a month to load payroll…</td></tr></tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Staff Directory tab -->
-                    <div id="salariesTab_staff" style="display:none;">
-                        <input type="text" class="form-control form-control-sm mb-3" style="max-width:260px;" id="staffSearchInput" placeholder="Search staff…" oninput="renderStaffTable()">
-                        <div class="form-card p-0">
-                            <div class="table-responsive">
-                                <table class="table table-sm table-hover mb-0" style="font-size:12.5px;">
-                                    <thead><tr>
-                                        <th>Name</th><th>Type</th><th>Position</th><th>Phone</th><th>Email</th><th class="text-end">Base Salary</th><th>Status</th><th class="text-end">Actions</th>
-                                    </tr></thead>
-                                    <tbody id="staffTableBody"><tr><td colspan="8" class="text-center text-muted py-3">Loading…</td></tr></tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- REPORTS SECTION -->
                 <div class="content-section admin-only" id="reportsSection">
@@ -6099,34 +5795,6 @@
                     </div>
                 </div>
 
-                <!-- EXTRA FEE MODULE SECTION -->
-                <div class="content-section admin-only" id="extraFeesSection">
-                    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-                        <h5 class="mb-0"><button onclick="goHome()" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-house-door me-1"></i>Home</button><i class="bi bi-cash-stack me-2 text-primary"></i>Extra Fee Types</h5>
-                        <button class="btn btn-sm btn-primary" onclick="openExtraFeeModal()"><i class="bi bi-plus-circle me-1"></i>Add Extra Fee Type</button>
-                    </div>
-                    <div class="form-card mb-3">
-                        <div class="small text-muted">Configure standalone extra fee types (Bus Fee, PTA, Excursion, Maintenance, Graduation) with default amounts and term applicability.</div>
-                    </div>
-                    <div class="data-table">
-                        <div class="table-responsive">
-                            <table class="table mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Extra Fee Name</th>
-                                        <th style="text-align:right">Default Amount</th>
-                                        <th>Applicable Term</th>
-                                        <th>Status</th>
-                                        <th style="text-align:center">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="extraFeesTableBody">
-                                    <tr><td colspan="5" class="text-center text-muted py-3">Loading extra fees...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
 
                 <!-- STANDALONE CLASSES MODULE SECTION -->
                 <div class="content-section admin-only" id="classesSection">
@@ -6892,14 +6560,7 @@
             { id: 'historicalSearch', label: 'Historical Search', sections: ['historicalSearch'] },
             { id: 'addRecord', label: 'Add Record', sections: ['addEdit'] },
             { id: 'generateBills', label: 'Generate Bills', sections: ['generateBills'] },
-            { id: 'customFeeTypes', label: 'Custom Fee Types (pay/collect)', sections: [] },
-            { id: 'posSell', label: 'POS / Sell', sections: ['posSell'] },
-            { id: 'inventory', label: 'Inventory', sections: ['inventory'] },
-            { id: 'stockTransactions', label: 'Stock Transactions', sections: ['stockTransactions'] },
-            { id: 'vendors', label: 'Vendors', sections: ['vendors'] },
-            { id: 'salesReports', label: 'Sales Reports', sections: ['salesReports'] },
             { id: 'incomeExpenses', label: 'Income & Expenses', sections: ['incomeExpenses'] },
-            { id: 'salaries', label: 'Salaries', sections: ['salaries'] },
             { id: 'notifications', label: 'Notifications', sections: ['notifications'] },
             { id: 'messages', label: 'Messages', sections: ['messages'] },
             { id: 'bulkSms', label: 'Bulk SMS', sections: ['bulkSms'] },
@@ -6926,12 +6587,6 @@
             historicalSearch:  { collector: 'v',   viewer: '' },
             addRecord:         { collector: 'va',  viewer: '' },
             generateBills:     { collector: 'v',   viewer: '' },
-            customFeeTypes:    { collector: 'vae', viewer: '' },
-            posSell:           { collector: 'vae', viewer: '' },
-            inventory:         { collector: 'vae', viewer: '' },
-            stockTransactions: { collector: 'vae', viewer: '' },
-            vendors:           { collector: 'v',   viewer: '' },
-            salesReports:      { collector: 'v',   viewer: '' },
             incomeExpenses:    { collector: 'va',  viewer: '' },
             notifications:     { collector: 'vae', viewer: '' },
             outstandingLog:    { collector: 'v',   viewer: 'v' },
@@ -22331,27 +21986,13 @@
         // show/hide-item settings feature.
         (function () {
             var loaders = {
-                posSell: loadPosSell,
-                inventory: loadInventory,
-                stockTransactions: loadStockTransactions,
-                vendors: loadVendors,
-                salesReports: loadSalesReports,
-                about: renderRolePermMatrix,
-                salaries: loadSalaries
+                about: renderRolePermMatrix
             };
             Object.keys(loaders).forEach(function (sec) {
                 document.querySelectorAll('.nav-item[data-section="' + sec + '"]').forEach(function (item) {
                     item.addEventListener('click', function () { loaders[sec](); });
                 });
             });
-            toggleableSidebarItems.push(
-                { id: 'posSell', label: 'POS / Sell', section: 'posSell' },
-                { id: 'inventory', label: 'Inventory', section: 'inventory' },
-                { id: 'stockTransactions', label: 'Stock Transactions', section: 'stockTransactions' },
-                { id: 'vendors', label: 'Vendors', section: 'vendors' },
-                { id: 'salesReports', label: 'Sales Reports', section: 'salesReports' },
-                { id: 'salaries', label: 'Salaries', section: 'salaries' }
-            );
         })();
     </script>
 
