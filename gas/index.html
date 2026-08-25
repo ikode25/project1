@@ -21637,14 +21637,19 @@
             document.getElementById('staffForm').reset();
             document.getElementById('staffId').value = person ? person.id : '';
             document.getElementById('staffModalTitle').innerHTML = person ? '<i class="bi bi-person-badge me-2 text-primary"></i>Edit Staff' : '<i class="bi bi-person-badge me-2 text-primary"></i>Add Staff';
+            document.getElementById('staffEmployeeId').value = person ? person.employeeId : '';
             document.getElementById('staffName').value = person ? person.name : '';
             document.getElementById('staffType').value = person ? person.staffType : 'Teaching';
             document.getElementById('staffPosition').value = person ? person.position : '';
+            document.getElementById('staffDepartment').value = person ? person.department : '';
             document.getElementById('staffPhone').value = person ? person.phone : '';
             document.getElementById('staffEmail').value = person ? person.email : '';
             document.getElementById('staffBaseSalary').value = person ? person.baseSalary : '';
             document.getElementById('staffBankName').value = person ? person.bankName : '';
+            document.getElementById('staffBankBranch').value = person ? person.bankBranch : '';
             document.getElementById('staffAccountNumber').value = person ? person.accountNumber : '';
+            document.getElementById('staffSsnitNumber').value = person ? person.ssnitNumber : '';
+            document.getElementById('staffGhanaCardNo').value = person ? person.ghanaCardNo : '';
             document.getElementById('staffNotes').value = person ? person.notes : '';
             document.getElementById('staffIsActive').checked = person ? person.isActive !== false : true;
             document.getElementById('staffModal').classList.add('show');
@@ -21657,14 +21662,19 @@
             if (!collectorCan('salaries', isNew ? 'a' : 'e')) { showToast("You don't have permission for this", 'warning'); return; }
             var person = {
                 id: document.getElementById('staffId').value || '',
+                employeeId: document.getElementById('staffEmployeeId').value.trim(),
                 name: document.getElementById('staffName').value.trim(),
                 staffType: document.getElementById('staffType').value,
                 position: document.getElementById('staffPosition').value.trim(),
+                department: document.getElementById('staffDepartment').value.trim(),
                 phone: document.getElementById('staffPhone').value.trim(),
                 email: document.getElementById('staffEmail').value.trim(),
                 baseSalary: parseFloat(document.getElementById('staffBaseSalary').value) || 0,
                 bankName: document.getElementById('staffBankName').value.trim(),
+                bankBranch: document.getElementById('staffBankBranch').value.trim(),
                 accountNumber: document.getElementById('staffAccountNumber').value.trim(),
+                ssnitNumber: document.getElementById('staffSsnitNumber').value.trim(),
+                ghanaCardNo: document.getElementById('staffGhanaCardNo').value.trim(),
                 notes: document.getElementById('staffNotes').value.trim(),
                 isActive: document.getElementById('staffIsActive').checked
             };
@@ -21694,6 +21704,11 @@
         }
 
         // ── Monthly Payroll ──
+        // Ghana SSNIT Tier-1 employee contribution is conventionally 5.5% of
+        // basic salary — used only as a starting suggestion; admin can edit
+        // or remove the auto-added SSNIT line for any given month.
+        var SSNIT_EMPLOYEE_RATE = 0.055;
+
         function loadSalaryPayroll() {
             var monthInput = document.getElementById('salMonthPicker');
             if (!monthInput) return;
@@ -21707,17 +21722,24 @@
             _salPayrollRows = allStaff.filter(function (s) { return s.isActive !== false; }).map(function (s) {
                 var existing = allSalaryPayments.find(function (p) { return p.staffId === s.id && p.month === month; });
                 if (existing) {
-                    return Object.assign({}, existing, { staffEmail: s.email, staffPhone: s.phone, position: existing.position || s.position });
+                    return Object.assign({}, existing, { staffEmail: s.email, staffPhone: s.phone, position: existing.position || s.position, department: existing.department || s.department });
                 }
+                var draftDeductions = s.ssnitNumber ? [{ name: 'SSNIT', amount: round2(s.baseSalary * SSNIT_EMPLOYEE_RATE) }] : [];
+                var draftEarnings = [{ name: 'Basic Pay', amount: s.baseSalary }];
                 return {
-                    id: '', staffId: s.id, staffName: s.name, staffType: s.staffType, position: s.position,
-                    month: month, monthLabel: monthLabel, baseSalary: s.baseSalary, allowances: 0, deductions: 0,
-                    netPay: s.baseSalary, paymentStatus: 'Pending', paymentDate: '', paymentMethod: '', notes: '',
+                    id: '', staffId: s.id, staffName: s.name, staffType: s.staffType, position: s.position, department: s.department,
+                    month: month, monthLabel: monthLabel, daysWorked: 0, daysAbsent: 0, weekdayOtHours: 0, holidayOtHours: 0,
+                    baseSalary: s.baseSalary, earnings: draftEarnings, deductions: draftDeductions,
+                    totalEarnings: s.baseSalary, totalDeductions: draftDeductions.reduce(function (t, l) { return t + l.amount; }, 0),
+                    netPay: s.baseSalary - draftDeductions.reduce(function (t, l) { return t + l.amount; }, 0),
+                    paymentStatus: 'Pending', paymentDate: '', paymentMethod: '', notes: '',
                     staffEmail: s.email, staffPhone: s.phone
                 };
             });
             renderSalaryPayrollTable();
         }
+
+        function round2(n) { return Math.round((parseFloat(n) || 0) * 100) / 100; }
 
         function renderSalaryPayrollTable() {
             var tbody = document.getElementById('salPayrollBody');
@@ -21754,6 +21776,38 @@
             }).join('');
         }
 
+        // ── Itemized earnings/deductions rows (dynamic add/remove) ──
+        function salaryLineRowHtml(kind, name, amount) {
+            return '<div class="d-flex gap-2 align-items-center mb-1 sal-line-row" data-kind="' + kind + '">' +
+                '<input type="text" class="form-control form-control-sm sal-line-name" placeholder="' + (kind === 'earnings' ? 'e.g. House Rent Allowance' : 'e.g. Income Tax') + '" value="' + (name || '').replace(/"/g, '&quot;') + '" oninput="calcSalaryNet()" style="flex:2;">' +
+                '<input type="number" class="form-control form-control-sm sal-line-amount text-end" placeholder="Amount" value="' + (amount || 0) + '" min="0" step="0.01" oninput="calcSalaryNet()" style="flex:1;">' +
+                '<button type="button" class="btn btn-outline-danger btn-xs" style="padding:3px 7px;" onclick="this.closest(\'.sal-line-row\').remove(); calcSalaryNet();"><i class="bi bi-x"></i></button>' +
+                '</div>';
+        }
+        function renderSalaryLineRows(kind, lines) {
+            var container = document.getElementById(kind === 'earnings' ? 'salEarningsRows' : 'salDeductionsRows');
+            if (!container) return;
+            container.innerHTML = (lines && lines.length ? lines : []).map(function (l) { return salaryLineRowHtml(kind, l.name, l.amount); }).join('');
+        }
+        function addSalaryLineRow(kind) {
+            var container = document.getElementById(kind === 'earnings' ? 'salEarningsRows' : 'salDeductionsRows');
+            if (!container) return;
+            container.insertAdjacentHTML('beforeend', salaryLineRowHtml(kind, '', 0));
+            var rows = container.querySelectorAll('.sal-line-name');
+            if (rows.length) rows[rows.length - 1].focus();
+        }
+        function collectSalaryLineRows(kind) {
+            var container = document.getElementById(kind === 'earnings' ? 'salEarningsRows' : 'salDeductionsRows');
+            if (!container) return [];
+            var rows = [];
+            container.querySelectorAll('.sal-line-row').forEach(function (row) {
+                var name = row.querySelector('.sal-line-name').value.trim();
+                var amount = parseFloat(row.querySelector('.sal-line-amount').value) || 0;
+                if (name) rows.push({ name: name, amount: amount });
+            });
+            return rows;
+        }
+
         function openSalaryPaymentModal(staffId) {
             if (!collectorCan('salaries', 'e')) { showToast("You don't have permission to run payroll", 'warning'); return; }
             var row = _salPayrollRows.find(function (r) { return r.staffId === staffId; });
@@ -21768,9 +21822,12 @@
                 '<div class="d-flex justify-content-between"><span class="text-muted">Staff</span><strong>' + row.staffName + '</strong></div>' +
                 '<div class="d-flex justify-content-between"><span class="text-muted">Position</span><strong>' + (row.position || '-') + '</strong></div>' +
                 '<div class="d-flex justify-content-between"><span class="text-muted">Month</span><strong>' + row.monthLabel + '</strong></div>';
-            document.getElementById('salPayBase').value = row.baseSalary;
-            document.getElementById('salPayAllowances').value = row.allowances || 0;
-            document.getElementById('salPayDeductions').value = row.deductions || 0;
+            document.getElementById('salPayDaysWorked').value = row.daysWorked || 0;
+            document.getElementById('salPayDaysAbsent').value = row.daysAbsent || 0;
+            document.getElementById('salPayWeekdayOt').value = row.weekdayOtHours || 0;
+            document.getElementById('salPayHolidayOt').value = row.holidayOtHours || 0;
+            renderSalaryLineRows('earnings', row.earnings);
+            renderSalaryLineRows('deductions', row.deductions);
             document.getElementById('salPayStatus').value = row.paymentStatus || 'Pending';
             document.getElementById('salPayMethod').value = row.paymentMethod || 'Bank Transfer';
             document.getElementById('salPayNotes').value = row.notes || '';
@@ -21780,12 +21837,13 @@
         function closeSalaryPaymentModal() { document.getElementById('salaryPaymentModal').classList.remove('show'); }
 
         function calcSalaryNet() {
-            var base = parseFloat(document.getElementById('salPayBase').value) || 0;
-            var allow = parseFloat(document.getElementById('salPayAllowances').value) || 0;
-            var ded = parseFloat(document.getElementById('salPayDeductions').value) || 0;
-            var net = Math.max(0, base + allow - ded);
             var currency = settings.currency || 'GHC';
-            document.getElementById('salPayNet').value = currency + ' ' + fmt(net);
+            var totalEarnings = collectSalaryLineRows('earnings').reduce(function (s, l) { return s + l.amount; }, 0);
+            var totalDeductions = collectSalaryLineRows('deductions').reduce(function (s, l) { return s + l.amount; }, 0);
+            var net = Math.max(0, totalEarnings - totalDeductions);
+            if (document.getElementById('salPayTotalEarnings')) document.getElementById('salPayTotalEarnings').textContent = currency + ' ' + fmt(totalEarnings);
+            if (document.getElementById('salPayTotalDeductions')) document.getElementById('salPayTotalDeductions').textContent = currency + ' ' + fmt(totalDeductions);
+            if (document.getElementById('salPayNet')) document.getElementById('salPayNet').textContent = currency + ' ' + fmt(net);
         }
 
         function saveSalaryPaymentSubmit(ev) {
@@ -21793,17 +21851,26 @@
             if (!collectorCan('salaries', 'e')) { showToast("You don't have permission to run payroll", 'warning'); return; }
             var staffId = document.getElementById('salPayStaffId').value;
             var row = _salPayrollRows.find(function (r) { return r.staffId === staffId; });
+            var earnings = collectSalaryLineRows('earnings');
+            var deductions = collectSalaryLineRows('deductions');
+            if (!earnings.length) { showToast('Add at least one earning (e.g. Basic Pay)', 'warning'); return; }
+            var basicPayLine = earnings.find(function (l) { return l.name.toLowerCase() === 'basic pay'; });
             var payment = {
                 id: document.getElementById('salPayId').value || '',
                 staffId: staffId,
                 staffName: row ? row.staffName : '',
                 staffType: row ? row.staffType : '',
                 position: row ? row.position : '',
+                department: row ? row.department : '',
                 month: document.getElementById('salPayMonth').value,
                 monthLabel: document.getElementById('salPayMonthLabel').value,
-                baseSalary: parseFloat(document.getElementById('salPayBase').value) || 0,
-                allowances: parseFloat(document.getElementById('salPayAllowances').value) || 0,
-                deductions: parseFloat(document.getElementById('salPayDeductions').value) || 0,
+                daysWorked: parseFloat(document.getElementById('salPayDaysWorked').value) || 0,
+                daysAbsent: parseFloat(document.getElementById('salPayDaysAbsent').value) || 0,
+                weekdayOtHours: parseFloat(document.getElementById('salPayWeekdayOt').value) || 0,
+                holidayOtHours: parseFloat(document.getElementById('salPayHolidayOt').value) || 0,
+                baseSalary: basicPayLine ? basicPayLine.amount : (row ? row.baseSalary : 0),
+                earnings: earnings,
+                deductions: deductions,
                 paymentStatus: document.getElementById('salPayStatus').value,
                 paymentMethod: document.getElementById('salPayMethod').value,
                 notes: document.getElementById('salPayNotes').value.trim()
@@ -21823,27 +21890,92 @@
             } else { hideLoad(); showToast('Saved (demo)', 'info'); closeSalaryPaymentModal(); }
         }
 
+        // Matches the classic payslip layout: bordered box, centered title,
+        // two-column employee details, side-by-side itemized
+        // Earnings/Deductions tables, totals, net pay, signature lines —
+        // no school logo or flag.
         function printPayslip(paymentId) {
             var p = allSalaryPayments.find(function (x) { return x.id === paymentId; });
             if (!p) { showToast('Payment record not found', 'error'); return; }
+            var staff = allStaff.find(function (s) { return s.id === p.staffId; });
             var currency = settings.currency || 'GHC';
-            var w = window.open('', '_blank', 'width=420,height=650');
+            var currencyName = currency === 'GHC' ? 'Ghana Cedis' : currency;
+            var f2 = function (n) { return fmt(n); };
+            var bankLine = [staff && staff.bankName, staff && staff.bankBranch].filter(Boolean).join(', ');
+
+            function infoRow(label, value) {
+                return '<tr><td style="padding:3px 8px 3px 0;white-space:nowrap;">' + label + '</td><td style="padding:3px 0;">: ' + (value || '-') + '</td></tr>';
+            }
+            function lineRows(lines) {
+                if (!lines || !lines.length) return '<tr><td colspan="2" style="padding:5px 8px;color:#94a3b8;">&mdash;</td></tr>';
+                return lines.map(function (l) {
+                    return '<tr><td style="padding:5px 8px;">' + l.name + '</td><td style="padding:5px 8px;text-align:right;">' + f2(l.amount) + '</td></tr>';
+                }).join('');
+            }
+
+            var w = window.open('', '_blank', 'width=520,height=720');
             if (!w) return;
-            w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Payslip</title>');
-            w.document.write('<style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:13px;padding:20px;color:#1e293b}h2{font-size:16px;text-align:center;margin-bottom:2px}.sub{text-align:center;font-size:11px;color:#64748b;margin-bottom:14px}table{width:100%;border-collapse:collapse;margin-top:8px}td{padding:6px 0;font-size:12.5px;border-bottom:1px solid #f1f5f9}.right{text-align:right}.tot{font-weight:bold;font-size:14px}@media print{@page{margin:12mm}}</style></head><body>');
-            w.document.write('<h2>' + (settings.schoolName || 'School') + '</h2>');
-            w.document.write('<div class="sub">Payslip &middot; ' + p.monthLabel + '</div>');
-            w.document.write('<table>');
-            w.document.write('<tr><td>Staff Name</td><td class="right"><strong>' + p.staffName + '</strong></td></tr>');
-            w.document.write('<tr><td>Position</td><td class="right">' + (p.position || '-') + '</td></tr>');
-            w.document.write('<tr><td>Staff Type</td><td class="right">' + p.staffType + '</td></tr>');
-            w.document.write('<tr><td>Base Salary</td><td class="right">' + currency + ' ' + fmt(p.baseSalary) + '</td></tr>');
-            w.document.write('<tr><td>Allowances</td><td class="right">+ ' + currency + ' ' + fmt(p.allowances) + '</td></tr>');
-            w.document.write('<tr><td>Deductions</td><td class="right">- ' + currency + ' ' + fmt(p.deductions) + '</td></tr>');
-            w.document.write('<tr class="tot"><td>Net Pay</td><td class="right">' + currency + ' ' + fmt(p.netPay) + '</td></tr>');
-            w.document.write('<tr><td>Status</td><td class="right">' + p.paymentStatus + (p.paymentDate ? ' (' + p.paymentDate + ')' : '') + '</td></tr>');
-            w.document.write('</table>');
-            w.document.write('<div style="text-align:center;margin-top:18px"><button onclick="window.print()" style="padding:8px 20px;background:#1e1b4b;color:#fff;border:none;border-radius:6px;cursor:pointer">🖨️ Print Payslip</button></div>');
+            w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Payslip - ' + p.staffName + '</title>');
+            w.document.write('<style>' +
+                '*{box-sizing:border-box}body{font-family:"Times New Roman",Times,serif;padding:24px;color:#1e1b4b;max-width:680px;margin:0 auto;}' +
+                '.slip{border:2px solid #1e1b4b;padding:18px 22px;}' +
+                '.school{text-align:center;font-size:20px;font-weight:700;}' +
+                '.addr{text-align:center;font-size:12px;margin-top:2px;}' +
+                '.title{text-align:center;font-weight:700;font-size:14px;margin:14px 0;}' +
+                '.info-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:12px;}' +
+                '.info-table td{vertical-align:top;width:50%;}' +
+                '.info-table table{border-collapse:collapse;}' +
+                '.pay-table{width:100%;border-collapse:collapse;border-top:1.5px solid #1e1b4b;border-bottom:1.5px solid #1e1b4b;font-size:12.5px;}' +
+                '.pay-table>tbody>tr>td{width:50%;vertical-align:top;}' +
+                '.pay-table>tbody>tr>td:first-child{border-right:1px solid #cbd5e1;}' +
+                '.pay-table table{width:100%;border-collapse:collapse;}' +
+                '.pay-hdr{padding:5px 8px;font-weight:700;}' +
+                '.totals-table{width:100%;border-collapse:collapse;font-size:12.5px;border-bottom:1.5px solid #1e1b4b;}' +
+                '.totals-table td{padding:6px 8px;font-weight:700;}' +
+                '.totals-table td:nth-child(1),.totals-table td:nth-child(2){border-right:1px solid #cbd5e1;}' +
+                '.net-table{width:100%;border-collapse:collapse;font-size:14px;}' +
+                '.net-table td{padding:9px 8px;font-weight:700;}' +
+                '.currency-note{text-align:center;font-size:11.5px;font-style:italic;margin:12px 0;}' +
+                '.sig-table{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:26px;}' +
+                '.sig-table td{width:45%;border-top:1px solid #1e1b4b;text-align:center;padding-top:4px;}' +
+                '.right{text-align:right}' +
+                '@media print{@page{margin:12mm}.no-print{display:none}}' +
+                '</style></head><body>');
+            w.document.write('<div class="slip">');
+            w.document.write('<div class="school">' + (settings.schoolName || 'School') + '</div>');
+            if (settings.schoolAddress) w.document.write('<div class="addr">' + settings.schoolAddress + '</div>');
+            w.document.write('<div class="title">Payslip for the period of ' + p.monthLabel + '</div>');
+            w.document.write('<table class="info-table"><tr>');
+            w.document.write('<td><table>' +
+                infoRow('Employee Id', (staff && staff.employeeId) || p.staffId) +
+                infoRow('Department', p.department) +
+                infoRow('Days Worked', f2(p.daysWorked)) +
+                infoRow('Bank Name, Branch', bankLine) +
+                infoRow('Weekday OT Hours', f2(p.weekdayOtHours)) +
+                infoRow('SSNIT Number', staff && staff.ssnitNumber) +
+                '</table></td>');
+            w.document.write('<td><table>' +
+                infoRow('Name', p.staffName) +
+                infoRow('Designation', p.position) +
+                infoRow('Days Absent', f2(p.daysAbsent)) +
+                infoRow('Bank Acct/Cheque Number', staff && staff.accountNumber) +
+                infoRow('Holiday OT Hours', f2(p.holidayOtHours)) +
+                infoRow('Ghana Card No', staff && staff.ghanaCardNo) +
+                '</table></td>');
+            w.document.write('</tr></table>');
+            w.document.write('<table class="pay-table"><tbody><tr>' +
+                '<td><table><tr><td class="pay-hdr">Earnings</td><td class="pay-hdr right">Amount</td></tr>' + lineRows(p.earnings) + '</table></td>' +
+                '<td><table><tr><td class="pay-hdr">Deductions</td><td class="pay-hdr right">Amount</td></tr>' + lineRows(p.deductions) + '</table></td>' +
+                '</tr></tbody></table>');
+            w.document.write('<table class="totals-table"><tr>' +
+                '<td>Total Earnings (Rounded)</td><td class="right">' + f2(p.totalEarnings) + '</td>' +
+                '<td>Total Deductions (Rounded)</td><td class="right">' + f2(p.totalDeductions) + '</td>' +
+                '</tr></table>');
+            w.document.write('<table class="net-table"><tr><td>Net Pay (Rounded)</td><td class="right">' + f2(p.netPay) + '</td></tr></table>');
+            w.document.write('<div class="currency-note">(All figures in ' + currencyName + ')</div>');
+            w.document.write('<table class="sig-table"><tr><td>Employer\'s Signature</td><td style="border-top:none;width:10%;"></td><td>Employee\'s Signature</td></tr></table>');
+            w.document.write('</div>');
+            w.document.write('<div class="no-print" style="text-align:center;margin-top:18px"><button onclick="window.print()" style="padding:8px 24px;background:#1e1b4b;color:#fff;border:none;border-radius:6px;cursor:pointer;font-family:Arial,sans-serif;">🖨️ Print Payslip</button></div>');
             w.document.write('</body></html>');
             w.document.close();
         }
@@ -21867,12 +21999,13 @@
             if (!phone) { showToast('This staff member has no phone number on file', 'warning'); return; }
             var intlPhone = phone.startsWith('0') ? '233' + phone.substring(1) : (phone.startsWith('233') ? phone : '233' + phone);
             var currency = settings.currency || 'GHC';
+            var earningsLines = (p.earnings || []).map(function (l) { return '  ' + l.name + ': ' + currency + ' ' + fmt(l.amount); }).join('\n');
+            var deductionLines = (p.deductions || []).map(function (l) { return '  ' + l.name + ': ' + currency + ' ' + fmt(l.amount); }).join('\n');
             var msg = 'Dear ' + p.staffName + ',\n\n'
                 + 'Your payslip from *' + (settings.schoolName || 'School') + '* for *' + p.monthLabel + '*:\n\n'
-                + '💰 Base Salary: ' + currency + ' ' + fmt(p.baseSalary) + '\n'
-                + '➕ Allowances: ' + currency + ' ' + fmt(p.allowances) + '\n'
-                + '➖ Deductions: ' + currency + ' ' + fmt(p.deductions) + '\n'
-                + '✅ Net Pay: ' + currency + ' ' + fmt(p.netPay) + '\n\n'
+                + '💰 *Earnings*\n' + (earningsLines || '  —') + '\n\n'
+                + '➖ *Deductions*\n' + (deductionLines || '  —') + '\n\n'
+                + '✅ *Net Pay: ' + currency + ' ' + fmt(p.netPay) + '*\n\n'
                 + 'Status: ' + p.paymentStatus + (p.paymentDate ? ' (' + p.paymentDate + ')' : '') + '\n\n'
                 + 'Thank you for your hard work!';
             window.open('https://wa.me/' + intlPhone + '?text=' + encodeURIComponent(msg), '_blank');
@@ -22534,9 +22667,15 @@
             </div>
             <form id="staffForm" onsubmit="saveStaffSubmit(event)">
                 <input type="hidden" id="staffId">
-                <div class="mb-3">
-                    <label class="form-label small fw-semibold">Full Name *</label>
-                    <input type="text" class="form-control form-control-sm" id="staffName" required>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-8">
+                        <label class="form-label small fw-semibold">Full Name *</label>
+                        <input type="text" class="form-control form-control-sm" id="staffName" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-semibold">Employee Id</label>
+                        <input type="text" class="form-control form-control-sm" id="staffEmployeeId" placeholder="optional">
+                    </div>
                 </div>
                 <div class="row g-2 mb-3">
                     <div class="col-md-6">
@@ -22547,9 +22686,13 @@
                         </select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label small fw-semibold">Position</label>
+                        <label class="form-label small fw-semibold">Designation / Position</label>
                         <input type="text" class="form-control form-control-sm" id="staffPosition" placeholder="e.g. Class Teacher, Accountant">
                     </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Department</label>
+                    <input type="text" class="form-control form-control-sm" id="staffDepartment" placeholder="e.g. Academics, Operations">
                 </div>
                 <div class="row g-2 mb-3">
                     <div class="col-md-6">
@@ -22561,20 +22704,35 @@
                         <input type="email" class="form-control form-control-sm" id="staffEmail" placeholder="for payslip email">
                     </div>
                 </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Base Monthly Salary *</label>
+                    <input type="number" class="form-control form-control-sm" id="staffBaseSalary" min="0" step="0.01" required>
+                </div>
                 <div class="row g-2 mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label small fw-semibold">Base Monthly Salary *</label>
-                        <input type="number" class="form-control form-control-sm" id="staffBaseSalary" min="0" step="0.01" required>
-                    </div>
                     <div class="col-md-6">
                         <label class="form-label small fw-semibold">Bank Name</label>
                         <input type="text" class="form-control form-control-sm" id="staffBankName">
                     </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Bank Branch</label>
+                        <input type="text" class="form-control form-control-sm" id="staffBankBranch">
+                    </div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label small fw-semibold">Account Number</label>
+                    <label class="form-label small fw-semibold">Bank Acct / Cheque Number</label>
                     <input type="text" class="form-control form-control-sm" id="staffAccountNumber">
                 </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">SSNIT Number</label>
+                        <input type="text" class="form-control form-control-sm" id="staffSsnitNumber" placeholder="leave blank if not on SSNIT">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Ghana Card No</label>
+                        <input type="text" class="form-control form-control-sm" id="staffGhanaCardNo">
+                    </div>
+                </div>
+                <div class="form-text mb-3" style="font-size:11px;" id="staffSsnitHint"><i class="bi bi-info-circle me-1"></i>Staff with an SSNIT number get a SSNIT deduction auto-suggested each time they're paid.</div>
                 <div class="mb-3">
                     <label class="form-label small fw-semibold">Notes</label>
                     <textarea class="form-control form-control-sm" id="staffNotes" rows="2"></textarea>
@@ -22591,7 +22749,7 @@
 
     <!-- Salary Payment Modal (Pay / Edit) -->
     <div class="modal-overlay" id="salaryPaymentModal">
-        <div class="modal-box" style="max-width: 460px;">
+        <div class="modal-box" style="max-width: 560px;">
             <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
                 <h6 class="mb-0" id="salPaymentModalTitle"><i class="bi bi-cash-coin me-2 text-primary"></i>Pay Salary</h6>
                 <button type="button" class="btn-close" onclick="closeSalaryPaymentModal()"></button>
@@ -22602,26 +22760,45 @@
                 <input type="hidden" id="salPayMonth">
                 <input type="hidden" id="salPayMonthLabel">
                 <div class="mb-3 small" id="salPaySummary" style="background:#f8fafc;border-radius:10px;padding:10px 12px;"></div>
+
                 <div class="row g-2 mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label small fw-semibold">Base Salary</label>
-                        <input type="number" class="form-control form-control-sm" id="salPayBase" min="0" step="0.01" oninput="calcSalaryNet()" required>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small fw-semibold">Days Worked</label>
+                        <input type="number" class="form-control form-control-sm" id="salPayDaysWorked" min="0" step="0.5" value="0">
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label small fw-semibold">Net Pay</label>
-                        <input type="text" class="form-control form-control-sm" id="salPayNet" readonly style="background:#f1f5f9;">
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small fw-semibold">Days Absent</label>
+                        <input type="number" class="form-control form-control-sm" id="salPayDaysAbsent" min="0" step="0.5" value="0">
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small fw-semibold">Weekday OT Hrs</label>
+                        <input type="number" class="form-control form-control-sm" id="salPayWeekdayOt" min="0" step="0.5" value="0">
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label small fw-semibold">Holiday OT Hrs</label>
+                        <input type="number" class="form-control form-control-sm" id="salPayHolidayOt" min="0" step="0.5" value="0">
                     </div>
                 </div>
-                <div class="row g-2 mb-3">
-                    <div class="col-md-6">
-                        <label class="form-label small fw-semibold">Allowances</label>
-                        <input type="number" class="form-control form-control-sm" id="salPayAllowances" min="0" step="0.01" value="0" oninput="calcSalaryNet()">
+
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label small fw-semibold mb-0">Earnings</label>
+                        <button type="button" class="btn btn-outline-primary btn-xs" style="font-size:10px;padding:1px 8px;" onclick="addSalaryLineRow('earnings')"><i class="bi bi-plus-circle me-1"></i>Add Earning</button>
                     </div>
-                    <div class="col-md-6">
-                        <label class="form-label small fw-semibold">Deductions</label>
-                        <input type="number" class="form-control form-control-sm" id="salPayDeductions" min="0" step="0.01" value="0" oninput="calcSalaryNet()">
-                    </div>
+                    <div id="salEarningsRows"></div>
                 </div>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label small fw-semibold mb-0">Deductions</label>
+                        <button type="button" class="btn btn-outline-primary btn-xs" style="font-size:10px;padding:1px 8px;" onclick="addSalaryLineRow('deductions')"><i class="bi bi-plus-circle me-1"></i>Add Deduction</button>
+                    </div>
+                    <div id="salDeductionsRows"></div>
+                </div>
+
+                <div class="d-flex justify-content-between small mb-1"><span class="text-muted">Total Earnings</span><strong id="salPayTotalEarnings">GHC 0.00</strong></div>
+                <div class="d-flex justify-content-between small mb-2"><span class="text-muted">Total Deductions</span><strong id="salPayTotalDeductions">GHC 0.00</strong></div>
+                <div class="d-flex justify-content-between mb-3" style="font-size:15px;"><strong>Net Pay</strong><strong id="salPayNet">GHC 0.00</strong></div>
+
                 <div class="row g-2 mb-3">
                     <div class="col-md-6">
                         <label class="form-label small fw-semibold">Payment Status</label>

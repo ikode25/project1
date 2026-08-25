@@ -5683,10 +5683,28 @@ const SALARY_PAYMENTS_SHEET = "Salary Payments";
 
 // ── STAFF DIRECTORY ──
 function getOrCreateStaffSheet() {
-  return getOrCreateSheet(STAFF_SHEET, [
-    "id", "name", "staffType", "position", "phone", "email",
-    "baseSalary", "bankName", "accountNumber", "isActive", "notes", "createdAt"
+  const sheet = getOrCreateSheet(STAFF_SHEET, [
+    "id", "name", "staffType", "position", "department", "phone", "email",
+    "baseSalary", "bankName", "bankBranch", "accountNumber", "ssnitNumber",
+    "ghanaCardNo", "employeeId", "isActive", "notes", "createdAt"
   ]);
+  // Migration: add columns introduced after the sheet was first created.
+  try {
+    const newCols = ["department", "bankBranch", "ssnitNumber", "ghanaCardNo", "employeeId"];
+    let existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+    newCols.forEach(col => {
+      if (existingHeaders.indexOf(col) === -1) {
+        const lastCol = sheet.getLastColumn();
+        sheet.insertColumnAfter(lastCol);
+        sheet.getRange(1, lastCol + 1).setValue(col)
+          .setBackground('#4285F4').setFontColor('white').setFontWeight('bold');
+        existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+      }
+    });
+  } catch (migErr) {
+    Logger.log('Staff sheet migration info: ' + migErr.message);
+  }
+  return sheet;
 }
 
 function getStaffList() {
@@ -5702,14 +5720,19 @@ function getStaffList() {
       if (!data[i][idx.id]) continue;
       staff.push({
         id: data[i][idx.id],
+        employeeId: (idx.employeeid !== undefined ? data[i][idx.employeeid] : '') || '',
         name: data[i][idx.name] || '',
         staffType: data[i][idx.stafftype] || 'Teaching',
         position: data[i][idx.position] || '',
+        department: (idx.department !== undefined ? data[i][idx.department] : '') || '',
         phone: data[i][idx.phone] || '',
         email: data[i][idx.email] || '',
         baseSalary: parseFloat(data[i][idx.basesalary]) || 0,
         bankName: data[i][idx.bankname] || '',
+        bankBranch: (idx.bankbranch !== undefined ? data[i][idx.bankbranch] : '') || '',
         accountNumber: data[i][idx.accountnumber] || '',
+        ssnitNumber: (idx.ssnitnumber !== undefined ? data[i][idx.ssnitnumber] : '') || '',
+        ghanaCardNo: (idx.ghanacardno !== undefined ? data[i][idx.ghanacardno] : '') || '',
         isActive: data[i][idx.isactive] === '' || data[i][idx.isactive] === undefined ? true : isBoolTrue(data[i][idx.isactive]),
         notes: data[i][idx.notes] || ''
       });
@@ -5783,12 +5806,49 @@ function deleteStaffMember(id) {
 }
 
 // ── MONTHLY SALARY PAYMENTS ──
+// Earnings and deductions are each an itemized list of {name, amount} —
+// e.g. Basic Pay / House Rent Allowance on the earnings side, SSNIT /
+// Income Tax / Union Dues on the deductions side — stored as JSON so a
+// payslip can show named line items instead of one lump sum.
 function getOrCreateSalaryPaymentsSheet() {
-  return getOrCreateSheet(SALARY_PAYMENTS_SHEET, [
-    "id", "staffId", "staffName", "staffType", "position", "month", "monthLabel",
-    "baseSalary", "allowances", "deductions", "netPay", "paymentStatus",
-    "paymentDate", "paymentMethod", "notes", "recordedBy", "createdAt"
+  const sheet = getOrCreateSheet(SALARY_PAYMENTS_SHEET, [
+    "id", "staffId", "staffName", "staffType", "position", "department",
+    "month", "monthLabel", "daysWorked", "daysAbsent", "weekdayOtHours", "holidayOtHours",
+    "baseSalary", "earningsJson", "deductionsJson", "totalEarnings", "totalDeductions", "netPay",
+    "paymentStatus", "paymentDate", "paymentMethod", "notes", "recordedBy", "createdAt"
   ]);
+  // Migration: add columns introduced after the sheet was first created —
+  // and drop the old flat allowances/deductions numbers in favor of the
+  // itemized JSON columns above (their data isn't recoverable as named
+  // lines, so existing rows simply show no line items until re-saved).
+  try {
+    const newCols = ["department", "daysWorked", "daysAbsent", "weekdayOtHours", "holidayOtHours", "earningsJson", "deductionsJson", "totalEarnings", "totalDeductions"];
+    let existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+    newCols.forEach(col => {
+      if (existingHeaders.indexOf(col) === -1) {
+        const lastCol = sheet.getLastColumn();
+        sheet.insertColumnAfter(lastCol);
+        sheet.getRange(1, lastCol + 1).setValue(col)
+          .setBackground('#4285F4').setFontColor('white').setFontWeight('bold');
+        existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+      }
+    });
+  } catch (migErr) {
+    Logger.log('Salary Payments sheet migration info: ' + migErr.message);
+  }
+  return sheet;
+}
+
+// Parses a stored line-items JSON cell back into an array, tolerating
+// blank/legacy/corrupt values.
+function parseSalaryLines_(raw) {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.map(l => ({ name: String(l.name || ''), amount: parseFloat(l.amount) || 0 })) : [];
+  } catch (e) {
+    return [];
+  }
 }
 
 function getSalaryPayments() {
@@ -5805,17 +5865,26 @@ function getSalaryPayments() {
       if (!data[i][idx.id]) continue;
       let payDate = data[i][idx.paymentdate];
       if (payDate instanceof Date) payDate = Utilities.formatDate(payDate, tz, 'yyyy-MM-dd');
+      const earnings = parseSalaryLines_(data[i][idx.earningsjson]);
+      const deductions = parseSalaryLines_(data[i][idx.deductionsjson]);
       payments.push({
         id: data[i][idx.id],
         staffId: data[i][idx.staffid] || '',
         staffName: data[i][idx.staffname] || '',
         staffType: data[i][idx.stafftype] || '',
         position: data[i][idx.position] || '',
+        department: (idx.department !== undefined ? data[i][idx.department] : '') || '',
         month: data[i][idx.month] || '',
         monthLabel: data[i][idx.monthlabel] || '',
+        daysWorked: parseFloat(data[i][idx.daysworked]) || 0,
+        daysAbsent: parseFloat(data[i][idx.daysabsent]) || 0,
+        weekdayOtHours: parseFloat(data[i][idx.weekdayothours]) || 0,
+        holidayOtHours: parseFloat(data[i][idx.holidayothours]) || 0,
         baseSalary: parseFloat(data[i][idx.basesalary]) || 0,
-        allowances: parseFloat(data[i][idx.allowances]) || 0,
-        deductions: parseFloat(data[i][idx.deductions]) || 0,
+        earnings: earnings,
+        deductions: deductions,
+        totalEarnings: parseFloat(data[i][idx.totalearnings]) || 0,
+        totalDeductions: parseFloat(data[i][idx.totaldeductions]) || 0,
         netPay: parseFloat(data[i][idx.netpay]) || 0,
         paymentStatus: data[i][idx.paymentstatus] || 'Pending',
         paymentDate: payDate || '',
@@ -5839,10 +5908,20 @@ function saveSalaryPayment(payment) {
     const now = new Date().toISOString();
     const user = Session.getActiveUser().getEmail() || 'Admin';
 
-    const base = parseFloat(payment.baseSalary) || 0;
-    const allow = parseFloat(payment.allowances) || 0;
-    const ded = parseFloat(payment.deductions) || 0;
-    payment.netPay = round2_(Math.max(0, base + allow - ded));
+    const earnings = Array.isArray(payment.earnings) ? payment.earnings
+      .map(l => ({ name: String(l.name || '').trim(), amount: parseFloat(l.amount) || 0 }))
+      .filter(l => l.name) : [];
+    const deductions = Array.isArray(payment.deductions) ? payment.deductions
+      .map(l => ({ name: String(l.name || '').trim(), amount: parseFloat(l.amount) || 0 }))
+      .filter(l => l.name) : [];
+    const totalEarnings = round2_(earnings.reduce((s, l) => s + l.amount, 0));
+    const totalDeductions = round2_(deductions.reduce((s, l) => s + l.amount, 0));
+
+    payment.earningsJson = JSON.stringify(earnings);
+    payment.deductionsJson = JSON.stringify(deductions);
+    payment.totalEarnings = totalEarnings;
+    payment.totalDeductions = totalDeductions;
+    payment.netPay = round2_(Math.max(0, totalEarnings - totalDeductions));
     payment.recordedBy = user;
     if (payment.paymentStatus === 'Paid' && !payment.paymentDate) {
       payment.paymentDate = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
@@ -5876,6 +5955,10 @@ function saveSalaryPayment(payment) {
       logActivity('Recorded Salary Payment', payment.staffName + ' - ' + payment.monthLabel);
     }
     SpreadsheetApp.flush();
+    // Return the fully-parsed shape (earnings/deductions as arrays, not
+    // JSON strings) so the client can use the response directly.
+    payment.earnings = earnings;
+    payment.deductions = deductions;
     return { success: true, payment: payment };
   } catch (e) {
     return { success: false, message: e.message };
@@ -5901,7 +5984,9 @@ function deleteSalaryPayment(id) {
   }
 }
 
-// Emails a payslip (HTML) to the staff member's own email address on file.
+// Emails a payslip (HTML, styled like the printed/on-screen one — bordered
+// box, two-column employee details, itemized Earnings/Deductions tables,
+// no logo) to the staff member's own email address on file.
 function sendPayslipEmail(paymentId) {
   try {
     const res = getSalaryPayments();
@@ -5917,29 +6002,79 @@ function sendPayslipEmail(paymentId) {
     const settingsRes = getSettings();
     const st = (settingsRes && settingsRes.settings) || {};
     const schoolName = st.schoolName || 'School';
+    const schoolAddress = st.schoolAddress || '';
     const currency = st.currency || 'GHC';
+    const currencyName = currency === 'GHC' ? 'Ghana Cedis' : currency;
+    const f2 = n => (parseFloat(n) || 0).toFixed(2);
+    const bankLine = [person && person.bankName, person && person.bankBranch].filter(Boolean).join(', ');
+
+    const infoRow = (label, value) => `<tr><td style="padding:3px 6px 3px 0;color:#1e1b4b;white-space:nowrap;">${label}</td><td style="padding:3px 0;color:#1e1b4b;">: ${value || '-'}</td></tr>`;
+    const lineRows = (lines) => lines.length
+      ? lines.map(l => `<tr><td style="padding:4px 6px;color:#1e1b4b;">${l.name}</td><td style="padding:4px 6px;text-align:right;color:#1e1b4b;">${f2(l.amount)}</td></tr>`).join('')
+      : `<tr><td colspan="2" style="padding:4px 6px;color:#94a3b8;">&mdash;</td></tr>`;
 
     const html = `
-      <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
-        <div style="background:linear-gradient(135deg,#1e1b4b,#312e81);color:#fff;padding:20px;text-align:center;">
-          <div style="font-size:17px;font-weight:700;">${schoolName}</div>
-          <div style="font-size:12px;opacity:0.85;margin-top:2px;">Payslip &mdash; ${payment.monthLabel}</div>
+      <div style="font-family:'Times New Roman',Times,serif;max-width:640px;margin:0 auto;border:2px solid #1e1b4b;padding:18px 22px;color:#1e1b4b;">
+        <div style="text-align:center;margin-bottom:10px;">
+          <div style="font-size:20px;font-weight:700;">${schoolName}</div>
+          ${schoolAddress ? `<div style="font-size:12px;">${schoolAddress}</div>` : ''}
         </div>
-        <div style="padding:20px;">
-          <table style="width:100%;border-collapse:collapse;font-size:13px;">
-            <tr><td style="padding:5px 0;color:#64748b;">Staff Name</td><td style="padding:5px 0;text-align:right;font-weight:600;">${payment.staffName}</td></tr>
-            <tr><td style="padding:5px 0;color:#64748b;">Position</td><td style="padding:5px 0;text-align:right;">${payment.position || '-'}</td></tr>
-            <tr><td style="padding:5px 0;color:#64748b;">Staff Type</td><td style="padding:5px 0;text-align:right;">${payment.staffType}</td></tr>
-            <tr><td colspan="2" style="border-top:1px solid #e2e8f0;padding-top:8px;"></td></tr>
-            <tr><td style="padding:5px 0;color:#64748b;">Base Salary</td><td style="padding:5px 0;text-align:right;">${currency} ${payment.baseSalary.toFixed(2)}</td></tr>
-            <tr><td style="padding:5px 0;color:#64748b;">Allowances</td><td style="padding:5px 0;text-align:right;color:#059669;">+ ${currency} ${payment.allowances.toFixed(2)}</td></tr>
-            <tr><td style="padding:5px 0;color:#64748b;">Deductions</td><td style="padding:5px 0;text-align:right;color:#dc2626;">- ${currency} ${payment.deductions.toFixed(2)}</td></tr>
-            <tr><td colspan="2" style="border-top:1px solid #e2e8f0;padding-top:8px;"></td></tr>
-            <tr><td style="padding:6px 0;font-weight:700;font-size:15px;">Net Pay</td><td style="padding:6px 0;text-align:right;font-weight:700;font-size:15px;color:#1e1b4b;">${currency} ${payment.netPay.toFixed(2)}</td></tr>
-          </table>
-          <div style="margin-top:14px;font-size:11px;color:#94a3b8;">Payment Status: ${payment.paymentStatus}${payment.paymentDate ? ' &middot; ' + payment.paymentDate : ''}${payment.paymentMethod ? ' &middot; ' + payment.paymentMethod : ''}</div>
-        </div>
-        <div style="background:#f8fafc;padding:12px;text-align:center;font-size:10px;color:#94a3b8;">This payslip is auto-generated by ${schoolName}'s School Management System.</div>
+        <div style="text-align:center;font-weight:700;font-size:14px;margin-bottom:14px;">Payslip for the period of ${payment.monthLabel}</div>
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:12px;">
+          <tr>
+            <td style="vertical-align:top;width:50%;"><table style="border-collapse:collapse;">
+              ${infoRow('Employee Id', person && person.employeeId ? person.employeeId : payment.staffId)}
+              ${infoRow('Department', payment.department)}
+              ${infoRow('Days Worked', f2(payment.daysWorked))}
+              ${infoRow('Bank Name, Branch', bankLine)}
+              ${infoRow('Weekday OT Hours', f2(payment.weekdayOtHours))}
+              ${infoRow('SSNIT Number', person ? person.ssnitNumber : '')}
+            </table></td>
+            <td style="vertical-align:top;width:50%;"><table style="border-collapse:collapse;">
+              ${infoRow('Name', payment.staffName)}
+              ${infoRow('Designation', payment.position)}
+              ${infoRow('Days Absent', f2(payment.daysAbsent))}
+              ${infoRow('Bank Acct/Cheque Number', person ? person.accountNumber : '')}
+              ${infoRow('Holiday OT Hours', f2(payment.holidayOtHours))}
+              ${infoRow('Ghana Card No', person ? person.ghanaCardNo : '')}
+            </table></td>
+          </tr>
+        </table>
+        <table style="width:100%;border-collapse:collapse;border-top:1.5px solid #1e1b4b;border-bottom:1.5px solid #1e1b4b;font-size:12.5px;">
+          <tr>
+            <td style="width:50%;vertical-align:top;border-right:1px solid #cbd5e1;">
+              <table style="width:100%;border-collapse:collapse;">
+                <tr><td style="padding:5px 6px;font-weight:700;">Earnings</td><td style="padding:5px 6px;text-align:right;font-weight:700;">Amount</td></tr>
+                ${lineRows(payment.earnings)}
+              </table>
+            </td>
+            <td style="width:50%;vertical-align:top;">
+              <table style="width:100%;border-collapse:collapse;">
+                <tr><td style="padding:5px 6px;font-weight:700;">Deductions</td><td style="padding:5px 6px;text-align:right;font-weight:700;">Amount</td></tr>
+                ${lineRows(payment.deductions)}
+              </table>
+            </td>
+          </tr>
+        </table>
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px;border-bottom:1.5px solid #1e1b4b;">
+          <tr>
+            <td style="width:50%;padding:5px 6px;font-weight:700;border-right:1px solid #cbd5e1;">Total Earnings (Rounded)</td>
+            <td style="width:auto;padding:5px 6px;text-align:right;font-weight:700;border-right:1px solid #cbd5e1;">${f2(payment.totalEarnings)}</td>
+            <td style="width:50%;padding:5px 6px;font-weight:700;">Total Deductions (Rounded)</td>
+            <td style="padding:5px 6px;text-align:right;font-weight:700;">${f2(payment.totalDeductions)}</td>
+          </tr>
+        </table>
+        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+          <tr><td style="padding:8px 6px;font-weight:700;">Net Pay (Rounded)</td><td style="padding:8px 6px;text-align:right;font-weight:700;">${f2(payment.netPay)}</td></tr>
+        </table>
+        <div style="text-align:center;font-size:11.5px;font-style:italic;margin:10px 0;">(All figures in ${currencyName})</div>
+        <table style="width:100%;border-collapse:collapse;font-size:11.5px;margin-top:20px;">
+          <tr>
+            <td style="width:45%;border-top:1px solid #1e1b4b;text-align:center;padding-top:4px;">Employer's Signature</td>
+            <td style="width:10%;"></td>
+            <td style="width:45%;border-top:1px solid #1e1b4b;text-align:center;padding-top:4px;">Employee's Signature</td>
+          </tr>
+        </table>
       </div>`;
 
     MailApp.sendEmail({
