@@ -20096,8 +20096,10 @@
                 } else {
                     schemeTbody.innerHTML = schemes.map(function(sch, idx) {
                         var valDisp = sch.discountType === 'percentage' ? sch.discountValue + '%' : currency + ' ' + fmt(sch.discountValue);
-                        return '<tr>' +
-                            '<td><strong class="text-dark"><i class="bi bi-award text-warning me-2"></i>' + sch.name + '</strong></td>' +
+                        var sponsorLine = sch.sponsor ? '<div class="text-muted" style="font-size:10.5px;"><i class="bi bi-building me-1"></i>' + sch.sponsor + '</div>' : '';
+                        var notesTitle = sch.notes ? ' title="' + String(sch.notes).replace(/"/g, '&quot;') + '"' : '';
+                        return '<tr' + notesTitle + '>' +
+                            '<td><strong class="text-dark"><i class="bi bi-award text-warning me-2"></i>' + sch.name + '</strong>' + sponsorLine + '</td>' +
                             '<td><span class="badge bg-info text-dark">' + (sch.discountType === 'percentage' ? 'Percentage' : 'Fixed Amount') + '</span></td>' +
                             '<td class="fw-bold text-success">' + valDisp + '</td>' +
                             '<td class="text-end">' +
@@ -20176,6 +20178,8 @@
         function openAddScholarshipSchemeModal() {
             document.getElementById('scholSchemeName').value = '';
             document.getElementById('scholDiscountVal').value = '';
+            if (document.getElementById('scholSponsor')) document.getElementById('scholSponsor').value = '';
+            if (document.getElementById('scholNotes')) document.getElementById('scholNotes').value = '';
             document.getElementById('scholarshipSchemeModal').classList.add('show');
         }
 
@@ -20188,6 +20192,8 @@
             var name = document.getElementById('scholSchemeName').value.trim();
             var type = document.getElementById('scholDiscountType').value;
             var val = parseFloat(document.getElementById('scholDiscountVal').value) || 0;
+            var sponsor = document.getElementById('scholSponsor') ? document.getElementById('scholSponsor').value.trim() : '';
+            var notes = document.getElementById('scholNotes') ? document.getElementById('scholNotes').value.trim() : '';
 
             if (!name) { showToast('Please enter scheme name', 'warning'); return; }
 
@@ -20200,7 +20206,9 @@
                 id: 'sch_' + Date.now(),
                 name: name,
                 discountType: type,
-                discountValue: val
+                discountValue: val,
+                sponsor: sponsor,
+                notes: notes
             });
 
             settings.scholarshipSchemes = schemes;
@@ -22279,9 +22287,17 @@
                         <option value="fixed">Fixed Amount (GHC)</option>
                     </select>
                 </div>
-                <div class="mb-3">
+                <div class="mb-2">
                     <label class="form-label small fw-semibold">Discount Value</label>
                     <input type="number" class="form-control form-control-sm" id="scholDiscountVal" min="0" step="0.01" placeholder="e.g. 50 or 200" required>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small fw-semibold">Sponsor <span class="text-muted fw-normal">(optional)</span></label>
+                    <input type="text" class="form-control form-control-sm" id="scholSponsor" placeholder="e.g. Headmaster's Fund, Alumni Association">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Notes <span class="text-muted fw-normal">(optional)</span></label>
+                    <textarea class="form-control form-control-sm" id="scholNotes" rows="2" placeholder="Any additional detail about this scholarship"></textarea>
                 </div>
                 <button type="submit" class="btn btn-primary btn-sm w-100"><i class="bi bi-save me-1"></i>Save Scheme</button>
             </form>
@@ -22319,9 +22335,8 @@
                     <label class="form-label small fw-semibold">Applies To</label>
                     <select class="form-select form-select-sm" id="assignScholAppliesTo">
                         <option value="regular">Regular School Fees Only</option>
-                        <option value="all">All Fees (Regular + Every Extra Fee)</option>
+                        <option value="all">All Fees</option>
                     </select>
-                    <small class="text-muted">Specific extra fee types (Uniform, Printing, etc.) also appear above once configured.</small>
                 </div>
                 <button type="submit" class="btn btn-primary btn-sm w-100"><i class="bi bi-check-circle me-1"></i>Assign Scholarship</button>
             </form>
