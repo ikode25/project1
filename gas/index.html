@@ -3819,6 +3819,8 @@
                                         <select class="form-select form-select-sm" id="studentStatus" onchange="onStudentStatusChange()">
                                             <option value="Active">Active</option>
                                             <option value="New">New Student</option>
+                                            <option value="Transferred">Transferred Student</option>
+                                            <option value="Readmitted">Readmitted Student</option>
                                             <option value="Stopped">Inactive Student</option>
                                         </select>
                                         <input type="checkbox" id="isNewStudent" style="display:none">
@@ -4264,21 +4266,6 @@
                                                  </div>
                                                  <div class="form-text" style="font-size:10px;">Only changes the display name — permissions still work the same way.</div>
                                              </div>
-                                             <div class="mb-2">
-                                                 <label class="form-label small text-muted mb-1" style="font-size:11px;font-weight:600;display:block;">Custom Fee Arrears in Next Term Bill</label>
-                                                 <small class="text-muted d-block mb-1" style="font-size:10px;">Unpaid balances for these extra fees roll forward as "Arrears" on the next term bill.</small>
-                                                 <div id="rolloverFeeCheckboxes" style="border:1px solid #cbd5e1;border-radius:8px;padding:10px;max-height:110px;overflow-y:auto;background:#f8fafc;text-align:left;margin-bottom:8px;">
-                                                     <!-- Dynamic checkboxes populated here -->
-                                                 </div>
-                                            </div>
-                                            <div class="mb-2">
-                                                 <label class="form-label small text-muted mb-1" style="font-size:11px;font-weight:600;display:block;">Fold Extra Fees Into Next Term's Regular Bill</label>
-                                                 <small class="text-muted d-block mb-1" style="font-size:10px;">For vacation bills — bakes the full next-term amount for these extra fees straight into the regular bill (e.g. Excursion Fee), so parents pay one consolidated bill instead of a separate extra-fee bill.</small>
-                                                 <div id="nextTermIncludeExtraFeesCheckboxes" style="border:1px solid #cbd5e1;border-radius:8px;padding:10px;max-height:110px;overflow-y:auto;background:#f8fafc;text-align:left;margin-bottom:8px;">
-                                                     <!-- Dynamic checkboxes populated here -->
-                                                 </div>
-                                                 <small class="text-muted d-block" style="font-size:9px;">Saved together with the "Save Info" button below.</small>
-                                            </div>
                                             <div class="mb-2 border rounded-3 p-3 bg-light text-start shadow-xs">
                                                 <div class="form-check form-switch mb-1">
                                                     <input class="form-check-input" type="checkbox" id="setAutoDailyEmail">
@@ -4650,94 +4637,6 @@
                             </div>
                         </div>
 
-                        <!-- Custom Fee Types Panel -->
-                        <div class="tab-pane fade" id="panel-feetypes-settings" role="tabpanel">
-                            <div class="row g-3">
-                                <div class="col-md-5">
-                                    <div class="settings-card">
-                                        <h6>Add / Edit Fee Type</h6>
-                                        <form id="feeTypeForm" onsubmit="saveFeeTypeConfig(event)">
-                                            <input type="hidden" id="feeTypeIndex">
-                                            <div class="mb-2">
-                                                <label class="form-label small">Fee Type Name</label>
-                                                <input type="text" class="form-control form-control-sm" id="feeTypeNameInput" placeholder="e.g. Graduation, Excursion" required>
-                                            </div>
-                                            <div class="mb-2">
-                                                <label class="form-label small">Default Amount (GHC)</label>
-                                                <input type="number" class="form-control form-control-sm" id="feeTypeAmountInput" min="0" step="0.01" required>
-                                            </div>
-                                            <div class="mb-2">
-                                                <label class="form-label small">Term Applicable</label>
-                                                <select class="form-select form-select-sm" id="feeTypeTermInput">
-                                                    <option value="All Terms">All Terms</option>
-                                                    <option value="First Term">First Term</option>
-                                                    <option value="Second Term">Second Term</option>
-                                                    <option value="Third Term">Third Term</option>
-                                                </select>
-                                            </div>
-                                            <div class="mb-2">
-                                                <label class="form-label small">Academic Year Applicable</label>
-                                                <select class="form-select form-select-sm" id="feeTypeYearInput">
-                                                    <option value="All Years">All Years</option>
-                                                    <option value="2024/2025">2024/2025</option>
-                                                    <option value="2025/2026">2025/2026</option>
-                                                    <option value="2026/2027">2026/2027</option>
-                                                    <option value="2027/2028">2027/2028</option>
-                                                    <option value="2028/2029">2028/2029</option>
-                                                    <option value="2029/2030">2029/2030</option>
-                                                </select>
-                                            </div>
-                                            <div class="mb-2">
-                                                <div class="form-check form-switch mt-2">
-                                                    <input class="form-check-input" type="checkbox" id="feeTypeInstallmentInput" onchange="toggleInstallmentConfigFields()">
-                                                    <label class="form-check-label small">Allow Installment Plan</label>
-                                                </div>
-                                            </div>
-                                            <div class="mb-3" id="feeTypeNumInstWrapper" style="display:none">
-                                                <label class="form-label small">Number of Installments Required</label>
-                                                <input type="number" class="form-control form-control-sm" id="feeTypeNumInstInput" min="1" max="6" value="1">
-                                            </div>
-                                            <div class="mb-2">
-                                                <div class="form-check form-switch mt-2">
-                                                    <input class="form-check-input" type="checkbox" id="feeTypeCustomizeClassInput" onchange="toggleCustomizeClassFields()">
-                                                    <label class="form-check-label small">Customize Amount per Class</label>
-                                                </div>
-                                            </div>
-                                            <div class="mb-3" id="feeTypeClassAmountsWrapper" style="display:none">
-                                                <label class="form-label small fw-bold">Amounts by Class (GHC)</label>
-                                                <div id="feeTypeClassAmountsGrid" style="border:1px solid #cbd5e1;border-radius:8px;padding:10px;max-height:220px;overflow-y:auto;background:#f8fafc;">
-                                                    <!-- Dynamic class amounts generated here -->
-                                                </div>
-                                            </div>
-                                            <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-plus-circle me-1"></i>Save Fee Type</button>
-                                            <button type="button" class="btn btn-outline-secondary btn-sm ms-1" onclick="clearFeeTypeForm()">Cancel</button>
-                                        </form>
-                                    </div>
-                                </div>
-                                <div class="col-md-7">
-                                    <div class="settings-card">
-                                        <h6>Active Custom Fee Configurations</h6>
-                                        <div class="table-responsive">
-                                            <table class="table table-sm table-bordered table-striped" id="feeTypesTable">
-                                                <thead class="table-light">
-                                                    <tr>
-                                                        <th>Name</th>
-                                                        <th>Amount</th>
-                                                        <th>Term</th>
-                                                        <th>Year</th>
-                                                        <th>Inst</th>
-                                                        <th>Action</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody id="feeTypesTableBody">
-                                                    <tr><td colspan="6" class="text-center text-muted">No fee types configured yet.</td></tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
@@ -5290,13 +5189,12 @@
                     <h5 class="mb-3"><button onclick="goHome()" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-house-door me-1"></i>Home</button><i class="bi bi-wallet2 me-2"></i>Income &amp; Expenses</h5>
                     <div class="row g-3 mb-3" id="ieStatsRow">
                         <div class="col-6 col-md-2"><div class="stat-card" style="border-left:3px solid var(--success)"><div class="d-flex align-items-center gap-2"><div class="stat-icon success"><i class="bi bi-arrow-down-circle"></i></div><div><div class="stat-value" id="ieTotalIncome">0.00</div><div class="stat-label">Total Income (All Sources)</div></div></div></div></div>
-                        <div class="col-6 col-md-2"><div class="stat-card" style="border-left:3px solid #22c55e"><div class="d-flex align-items-center gap-2"><div class="stat-icon" style="background:#dcfce7;color:#22c55e"><i class="bi bi-mortarboard"></i></div><div><div class="stat-value" id="ieRegularFeesCollected">0.00</div><div class="stat-label">Regular Fees Collected</div></div></div></div></div>
-                        <div class="col-6 col-md-2"><div class="stat-card" style="border-left:3px solid #0ea5e9"><div class="d-flex align-items-center gap-2"><div class="stat-icon" style="background:#e0f2fe;color:#0ea5e9"><i class="bi bi-cash-stack"></i></div><div><div class="stat-value" id="ieExtraFeesCollected">0.00</div><div class="stat-label">Extra Fees Collected</div></div></div></div></div>
-                        <div class="col-6 col-md-2"><div class="stat-card" style="border-left:3px solid #a855f7"><div class="d-flex align-items-center gap-2"><div class="stat-icon" style="background:#f3e8ff;color:#a855f7"><i class="bi bi-journal-text"></i></div><div><div class="stat-value" id="ieManualLedgerIncome">0.00</div><div class="stat-label">Manual Ledger Income</div></div></div></div></div>
-                        <div class="col-6 col-md-2"><div class="stat-card" style="border-left:3px solid var(--danger)"><div class="d-flex align-items-center gap-2"><div class="stat-icon danger"><i class="bi bi-arrow-up-circle"></i></div><div><div class="stat-value" id="ieTotalExpense">0.00</div><div class="stat-label">Total Expenses</div></div></div></div></div>
-                        <div class="col-6 col-md-2"><div class="stat-card" style="border-left:3px solid var(--primary)"><div class="d-flex align-items-center gap-2"><div class="stat-icon primary"><i class="bi bi-graph-up-arrow"></i></div><div><div class="stat-value" id="ieNetBalance">0.00</div><div class="stat-label">Net Balance</div></div></div></div></div>
+                        <div class="col-6 col-md-3"><div class="stat-card" style="border-left:3px solid #22c55e"><div class="d-flex align-items-center gap-2"><div class="stat-icon" style="background:#dcfce7;color:#22c55e"><i class="bi bi-mortarboard"></i></div><div><div class="stat-value" id="ieRegularFeesCollected">0.00</div><div class="stat-label">Regular Fees Collected</div></div></div></div></div>
+                        <div class="col-6 col-md-3"><div class="stat-card" style="border-left:3px solid #a855f7"><div class="d-flex align-items-center gap-2"><div class="stat-icon" style="background:#f3e8ff;color:#a855f7"><i class="bi bi-journal-text"></i></div><div><div class="stat-value" id="ieManualLedgerIncome">0.00</div><div class="stat-label">Manual Ledger Income</div></div></div></div></div>
+                        <div class="col-6 col-md-3"><div class="stat-card" style="border-left:3px solid var(--danger)"><div class="d-flex align-items-center gap-2"><div class="stat-icon danger"><i class="bi bi-arrow-up-circle"></i></div><div><div class="stat-value" id="ieTotalExpense">0.00</div><div class="stat-label">Total Expenses</div></div></div></div></div>
+                        <div class="col-6 col-md-3"><div class="stat-card" style="border-left:3px solid var(--primary)"><div class="d-flex align-items-center gap-2"><div class="stat-icon primary"><i class="bi bi-graph-up-arrow"></i></div><div><div class="stat-value" id="ieNetBalance">0.00</div><div class="stat-label">Net Balance</div></div></div></div></div>
                     </div>
-                    <div class="form-text mb-3" style="font-size:11px;"><i class="bi bi-info-circle me-1"></i>"Total Income" automatically combines Regular Fees Collected (Tuition etc.), Extra Fees Collected (Uniforms, Books, Excursion, Graduation, etc.) and any Manual Ledger Income entries added below.</div>
+                    <div class="form-text mb-3" style="font-size:11px;"><i class="bi bi-info-circle me-1"></i>"Total Income" automatically combines Regular Fees Collected (Tuition etc.) and any Manual Ledger Income entries added below.</div>
                     <div class="form-card mb-3">
                         <h6 class="mb-3"><i class="bi bi-plus-circle me-2 text-primary"></i>Add Entry</h6>
                         <form id="ieForm" onsubmit="saveIEEntry(event)">
@@ -5387,9 +5285,9 @@
                         </div>
                     </div>
 
-                    <!-- Fee & Extra Fee Tile Cards Section -->
+                    <!-- Fee Tile Cards Section -->
                     <div class="form-card mb-3">
-                        <h6 class="fw-bold mb-2"><i class="bi bi-grid-3x3-gap-fill me-2 text-primary"></i>Fee &amp; Extra Fee Tile Reports</h6>
+                        <h6 class="fw-bold mb-2"><i class="bi bi-grid-3x3-gap-fill me-2 text-primary"></i>Fee Tile Reports</h6>
                         <p class="text-muted small mb-3">Click on any fee tile card below to view detailed breakdown, total collections, and student payment roster for that specific fee component.</p>
                         <div class="row g-3" id="feeTileCardsGrid">
                             <!-- Dynamic Fee Cards Rendered Here -->
@@ -7792,10 +7690,9 @@
                 updateDash();
                 if (!silent) notifyChatNewData && notifyChatNewData();
             }
-            var cfCached = lsGet('customFeeRecords');
-            if (Array.isArray(cfCached)) {
-                allCustomFeeRecords = cfCached;
-            }
+            // Extra/custom fee records have been removed from the system —
+            // allCustomFeeRecords stays permanently empty (see applySettings)
+            // so no historical extra-fee data resurfaces anywhere.
 
             // Then fetch fresh data in background (or foreground if no cache)
             if (dataFetching) return;
@@ -7815,17 +7712,10 @@
                             lsSet('recordsTs', dataLastFetched);
                             updateDash();
                             
-                            // Fetch Custom Fee Records too
-                            google.script.run.withSuccessHandler(function(cfRes) {
-                                if (cfRes && cfRes.success) {
-                                    allCustomFeeRecords = cfRes.history || [];
-                                    lsSet('customFeeRecords', allCustomFeeRecords);
-                                    var visibleTerm = getVisibleTermSection();
-                                    if (visibleTerm) renderTerm(visibleTerm.key, visibleTerm.name, visibleTerm.page || 1);
-                                }
-                            }).getCustomStudentFees('all');
-                             
-                             // Fetch Class Fee Rates
+                            // Extra/custom fee records have been removed from
+                            // the system — no longer fetched (see applySettings).
+
+                            // Fetch Class Fee Rates
                              google.script.run.withSuccessHandler(function(ratesRes) {
                                  if (ratesRes && ratesRes.success) {
                                      cachedClassRates = ratesRes.rates || [];
@@ -8959,7 +8849,10 @@
 
         function onStudentStatusChange() {
             var status = document.getElementById('studentStatus').value;
-            document.getElementById('isNewStudent').checked = (status === 'New');
+            // Admission-type fees (e.g. Admission Fees) unlock for New,
+            // Transferred, and Readmitted students alike — not continuing
+            // Active students.
+            document.getElementById('isNewStudent').checked = (status === 'New' || status === 'Transferred' || status === 'Readmitted');
             document.getElementById('isStopped').checked = (status === 'Stopped');
             onNewStudentToggle();
         }
@@ -11868,6 +11761,15 @@
 
         function applySettings(s) {
             settings = Object.assign(settings, s);
+            // Extra/custom fee types have been removed from the system —
+            // force these empty regardless of what's stored on the backend
+            // (e.g. from before this change), since every extra-fee UI
+            // element in the app (student fee-type tiles, dashboard tiles,
+            // reports, income & expenses stats, next-term rollover toggles,
+            // scholarship "applies to" options) is generated by iterating
+            // over these two lists.
+            settings.customFeeTypes = [];
+            settings.extraFeeTypes = [];
             if (s.schoolName) {
                 var el = document.getElementById('loginSchoolName'); if (el) el.textContent = s.schoolName;
                 var el2 = document.getElementById('sidebarName'); if (el2) el2.textContent = s.schoolName;
@@ -16820,21 +16722,8 @@
 
             runPaymentHistory();
 
-            // Extra/custom fee records are fetched as a second round-trip
-            // after the main student records, so they can still be empty at
-            // the moment this page loads — leaving an extra Fee Type search
-            // stuck showing 0 payments even though they exist. Refresh them
-            // in the background and re-run the search once they land.
-            if (typeof google !== 'undefined' && google.script && (!Array.isArray(allCustomFeeRecords) || !allCustomFeeRecords.length)) {
-                google.script.run.withSuccessHandler(function (cfRes) {
-                    if (cfRes && cfRes.success) {
-                        allCustomFeeRecords = cfRes.history || [];
-                        lsSet('customFeeRecords', allCustomFeeRecords);
-                        var sec = document.getElementById('paymentHistorySection');
-                        if (sec && (sec.classList.contains('active') || sec.classList.contains('active-section'))) runPaymentHistory();
-                    }
-                }).withFailureHandler(function () { }).getCustomStudentFees('all');
-            }
+            // Extra/custom fee records have been removed from the system —
+            // no longer fetched (see applySettings).
         }
 
         function runPaymentHistory() {
