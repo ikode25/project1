@@ -886,6 +886,128 @@
             color: #64748b
         }
 
+        .gauge-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, .1);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            height: 100%;
+        }
+
+        .gauge-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .gauge-card-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #334155;
+        }
+
+        .gauge-card-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            flex-shrink: 0;
+        }
+
+        .gauge-ring {
+            width: 92px;
+            height: 92px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            margin: 2px auto 8px;
+            background: conic-gradient(#e2e8f0 0%, #e2e8f0 100%);
+            transition: background 0.4s ease;
+        }
+
+        .gauge-ring::before {
+            content: '';
+            position: absolute;
+            inset: 8px;
+            background: #fff;
+            border-radius: 50%;
+        }
+
+        .gauge-ring-value {
+            position: relative;
+            z-index: 1;
+            font-size: 18px;
+            font-weight: 800;
+            color: #1e293b;
+        }
+
+        .gauge-sub {
+            font-size: 11px;
+            color: #64748b;
+        }
+
+        .section-banner {
+            border-radius: 12px;
+            padding: 16px 22px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 16px;
+            color: #fff;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, .08);
+        }
+
+        .section-banner.banner-blue {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+        }
+
+        .section-banner.banner-green {
+            background: linear-gradient(135deg, #16a34a, #15803d);
+        }
+
+        .section-banner-title {
+            font-size: 20px;
+            font-weight: 800;
+            margin: 0;
+            color: #fff;
+        }
+
+        .section-banner .btn-banner-action {
+            background: rgba(255, 255, 255, .95);
+            color: #1d4ed8;
+            font-weight: 700;
+            border: none;
+            padding: 7px 16px;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .section-banner .btn-banner-action:hover {
+            background: #fff;
+            color: #1d4ed8;
+        }
+
+        .section-banner.banner-green .btn-banner-action {
+            color: #15803d;
+        }
+
+        .section-banner.banner-green .btn-banner-action:hover {
+            color: #15803d;
+        }
+
         .form-card {
             background: #fff;
             border-radius: 12px;
@@ -2887,6 +3009,55 @@
                 <div class="content-section active" id="dashboardSection">
                     <h5 class="mb-3"><i class="bi bi-speedometer2 me-2"></i>Dashboard</h5>
                     <div id="adminDashboardContainer" class="role-container">
+
+                    <!-- OVERVIEW STAT CARDS -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-6 col-md-3">
+                            <div class="stat-card"><div class="d-flex align-items-center gap-2"><div class="stat-icon primary"><i class="bi bi-people-fill"></i></div><div><div class="stat-value" id="dashStatStudents">0</div><div class="stat-label">Total Students</div><div class="text-muted" style="font-size:10px;">Active registrations</div></div></div></div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="stat-card"><div class="d-flex align-items-center gap-2"><div class="stat-icon success"><i class="bi bi-cash-stack"></i></div><div><div class="stat-value" id="dashStatRevenue">0.00</div><div class="stat-label">Total Revenue</div><div class="text-muted" style="font-size:10px;">Total fee amount</div></div></div></div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="stat-card"><div class="d-flex align-items-center gap-2"><div class="stat-icon" style="background:rgba(6,182,212,.1);color:#0891b2;"><i class="bi bi-check-circle-fill"></i></div><div><div class="stat-value" id="dashStatCollected">0.00</div><div class="stat-label">Collected</div><div class="text-muted" style="font-size:10px;" id="dashStatCollectedSub">0 payments</div></div></div></div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="stat-card"><div class="d-flex align-items-center gap-2"><div class="stat-icon warning"><i class="bi bi-clock-history"></i></div><div><div class="stat-value" id="dashStatPending">0.00</div><div class="stat-label">Pending</div><div class="text-muted" style="font-size:10px;" id="dashStatPendingSub">0 pending</div></div></div></div>
+                        </div>
+                    </div>
+
+                    <!-- COLLECTION HEALTH GAUGES -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-6 col-md-3">
+                            <div class="gauge-card">
+                                <div class="gauge-card-header"><span class="gauge-card-title">Collection Rate</span><span class="gauge-card-icon" style="background:rgba(124,58,237,.12);color:#7c3aed;"><i class="bi bi-percent"></i></span></div>
+                                <div class="gauge-ring" id="gaugeCollectionRate" data-color="#7c3aed"><span class="gauge-ring-value" id="gaugeCollectionRateVal">0%</span></div>
+                                <div class="gauge-sub">Collection</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="gauge-card">
+                                <div class="gauge-card-header"><span class="gauge-card-title">Active Students</span><span class="gauge-card-icon" style="background:rgba(6,182,212,.12);color:#0891b2;"><i class="bi bi-people-fill"></i></span></div>
+                                <div class="gauge-ring" id="gaugeActiveStudents" data-color="#0891b2"><span class="gauge-ring-value" id="gaugeActiveStudentsVal">0%</span></div>
+                                <div class="gauge-sub" id="gaugeActiveStudentsSub">of enrolled</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="gauge-card">
+                                <div class="gauge-card-header"><span class="gauge-card-title">Scholarship</span><span class="gauge-card-icon" style="background:rgba(236,72,153,.12);color:#db2777;"><i class="bi bi-award-fill"></i></span></div>
+                                <div class="gauge-ring" id="gaugeScholarship" data-color="#db2777"><span class="gauge-ring-value" id="gaugeScholarshipVal">0%</span></div>
+                                <div class="gauge-sub">Coverage</div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <div class="gauge-card">
+                                <div class="gauge-card-header"><span class="gauge-card-title">Risk (Inactive)</span><span class="gauge-card-icon" style="background:rgba(249,115,22,.12);color:#ea580c;"><i class="bi bi-exclamation-triangle-fill"></i></span></div>
+                                <div class="gauge-ring" id="gaugeInactive" data-color="#ea580c"><span class="gauge-ring-value" id="gaugeInactiveVal">0%</span></div>
+                                <div class="gauge-sub">Inactive rate</div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="annual-summary">
                         <h6><i class="bi bi-calendar-check me-2"></i>Annual Summary</h6>
                         <div class="annual-grid">
@@ -5848,15 +6019,32 @@
 
                 <!-- ⑪ NEW STUDENTS SECTION -->
                 <div class="content-section" id="newStudentsSection">
-                    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-                        <h5 class="mb-0"><button onclick="goHome()" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-house-door me-1"></i>Home</button><i class="bi bi-person-plus-fill me-2 text-primary"></i>New Student Admissions</h5>
-                        <button class="btn btn-sm btn-outline-primary" onclick="loadNewStudentsSection()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+                    <!-- STUDENTS BANNER -->
+                    <div class="section-banner banner-blue">
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <button onclick="goHome()" class="btn btn-sm btn-outline-light me-1"><i class="bi bi-house-door me-1"></i>Home</button>
+                            <h5 class="section-banner-title mb-0">Students <span id="nsBannerCount" style="font-weight:600;opacity:.85;font-size:15px;">(0/0)</span></h5>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-banner-action" onclick="openAdd(settings.activeTerm || 'First Term')"><i class="bi bi-plus-circle me-1"></i>Add Student</button>
+                            <button class="btn btn-sm btn-outline-light" onclick="loadNewStudentsSection()" title="Refresh"><i class="bi bi-arrow-clockwise"></i></button>
+                        </div>
                     </div>
                     <!-- Filters -->
                     <div class="form-card mb-3">
                         <div class="row g-2 align-items-end">
                             <div class="col-md-3">
-                                <label class="form-label small">Term</label>
+                                <label class="form-label small fw-semibold">Search Students</label>
+                                <input type="text" class="form-control form-control-sm" id="nsSearch" placeholder="Search by name, ID, class…" oninput="renderNewStudents()">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small fw-semibold">Filter by Class</label>
+                                <select class="form-select form-select-sm" id="nsFilterGrade">
+                                    <option value="all">All Classes</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small fw-semibold">Term</label>
                                 <select class="form-select form-select-sm" id="nsFilterTerm">
                                     <option value="all">All Terms</option>
                                     <option value="First Term">First Term</option>
@@ -5864,19 +6052,13 @@
                                     <option value="Third Term">Third Term</option>
                                 </select>
                             </div>
-                            <div class="col-md-3">
-                                <label class="form-label small">Academic Year</label>
+                            <div class="col-md-2">
+                                <label class="form-label small fw-semibold">Academic Year</label>
                                 <select class="form-select form-select-sm" id="nsFilterYear">
                                     <option value="all">All Years</option>
                                 </select>
                             </div>
-                            <div class="col-md-3">
-                                <label class="form-label small">Grade</label>
-                                <select class="form-select form-select-sm" id="nsFilterGrade">
-                                    <option value="all">All Grades</option>
-                                </select>
-                            </div>
-                            <div class="col-md-3">
+                            <div class="col-md-2">
                                 <button class="btn btn-primary btn-sm w-100" onclick="renderNewStudents()"><i class="bi bi-search me-1"></i>Filter</button>
                             </div>
                         </div>
@@ -5893,7 +6075,6 @@
                         <div class="table-header">
                             <h6 class="mb-0">New Admissions <small class="text-muted fw-normal" id="nsCountLabel"></small></h6>
                             <div class="d-flex gap-2">
-                                <input type="text" class="form-control form-control-sm" id="nsSearch" style="width:160px" placeholder="Search…" oninput="renderNewStudents()">
                                 <button class="btn btn-sm btn-outline-success" onclick="exportNewStudents()"><i class="bi bi-download me-1"></i>Export</button>
                             </div>
                         </div>
@@ -5901,8 +6082,9 @@
                             <table class="table mb-0" id="nsTable">
                                 <thead><tr>
                                     <th class="sortable-th" data-col="id">ID<i class="sort-icon"></i></th>
+                                    <th>Picture</th>
                                     <th class="sortable-th" data-col="studentName">Name<i class="sort-icon"></i></th>
-                                    <th class="sortable-th" data-col="grade">Grade<i class="sort-icon"></i></th>
+                                    <th class="sortable-th" data-col="grade">Class<i class="sort-icon"></i></th>
                                     <th class="sortable-th" data-col="academicSession">Session<i class="sort-icon"></i></th>
                                     <th class="sortable-th" data-col="phoneNumber">Phone<i class="sort-icon"></i></th>
                                     <th class="sortable-th" data-col="_fees">Fees<i class="sort-icon"></i></th>
@@ -5911,7 +6093,7 @@
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr></thead>
-                                <tbody id="nsBody"><tr><td colspan="10" class="text-center text-muted py-4"><i class="bi bi-person-plus me-2"></i>Select filters and click Filter to view new admissions.</td></tr></tbody>
+                                <tbody id="nsBody"><tr><td colspan="11" class="text-center text-muted py-4"><i class="bi bi-person-plus me-2"></i>Select filters and click Filter to view new admissions.</td></tr></tbody>
                             </table>
                         </div>
                     </div>
@@ -6143,15 +6325,22 @@
 
                 <!-- ⑪C PARENTS DIRECTORY SECTION -->
                 <div class="content-section admin-only" id="parentsSection">
-                    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-                        <h5 class="mb-0"><button onclick="goHome()" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-house-door me-1"></i>Home</button><span class="d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-circle me-2" style="width:28px;height:28px;"><i class="bi bi-people-fill" style="font-size:14px;"></i></span>Parents Directory</h5>
-                        <button class="btn btn-sm btn-outline-primary" onclick="loadParentsSection()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+                    <!-- PARENT MANAGEMENT BANNER -->
+                    <div class="section-banner banner-blue">
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <button onclick="goHome()" class="btn btn-sm btn-outline-light me-1"><i class="bi bi-house-door me-1"></i>Home</button>
+                            <h5 class="section-banner-title mb-0">Parent Management <span id="parentsBannerCount" style="font-weight:600;opacity:.85;font-size:15px;">(0/0)</span></h5>
+                        </div>
+                        <button class="btn btn-sm btn-outline-light" onclick="loadParentsSection()" title="Refresh"><i class="bi bi-arrow-clockwise"></i></button>
                     </div>
                     <div class="form-card mb-3">
-                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                            <div class="small text-muted">Manage linked family groups and sibling records dynamically grouped by phone number contact details.</div>
-                            <div style="width:250px;">
-                                <input type="text" class="form-control form-control-sm" id="parentSearch" placeholder="Search parent contact or kid's name..." oninput="filterParentsTable()">
+                        <div class="row g-2 align-items-end">
+                            <div class="col-md-8">
+                                <label class="form-label small fw-semibold">Search Parents</label>
+                                <input type="text" class="form-control form-control-sm" id="parentSearch" placeholder="Search by parent contact or child's name..." oninput="filterParentsTable()">
+                            </div>
+                            <div class="col-md-4">
+                                <div class="small text-muted">Parent contacts are grouped automatically from student phone numbers on file.</div>
                             </div>
                         </div>
                     </div>
@@ -8152,6 +8341,16 @@
         }
 
 
+        function setGauge(elId, pct) {
+            var el = document.getElementById(elId);
+            if (!el) return;
+            pct = Math.max(0, Math.min(100, Math.round(parseFloat(pct) || 0)));
+            var color = el.getAttribute('data-color') || '#4f46e5';
+            el.style.background = 'conic-gradient(' + color + ' 0%, ' + color + ' ' + pct + '%, #e2e8f0 ' + pct + '%, #e2e8f0 100%)';
+            var valEl = document.getElementById(elId + 'Val');
+            if (valEl) valEl.textContent = pct + '%';
+        }
+
         function updateDash() {
             try {
                 populatePortalUrl();
@@ -8202,6 +8401,30 @@
                 
                 var elCollectionRate = document.getElementById('annualCollectionRate');
                 if (elCollectionRate) elCollectionRate.textContent = collectionRate + '%';
+
+                // ── New overview stat cards + gauges ──
+                var elDsStudents = document.getElementById('dashStatStudents');
+                if (elDsStudents) elDsStudents.textContent = totalStudents;
+                var elDsRevenue = document.getElementById('dashStatRevenue');
+                if (elDsRevenue) elDsRevenue.textContent = currency + ' ' + fmt(totalRevenue);
+                var elDsCollected = document.getElementById('dashStatCollected');
+                if (elDsCollected) elDsCollected.textContent = currency + ' ' + fmt(collected);
+                var elDsCollectedSub = document.getElementById('dashStatCollectedSub');
+                if (elDsCollectedSub) elDsCollectedSub.textContent = Object.keys(unique).length + ' students billed';
+                var elDsPending = document.getElementById('dashStatPending');
+                if (elDsPending) elDsPending.textContent = currency + ' ' + fmt(outstanding);
+                var elDsPendingSub = document.getElementById('dashStatPendingSub');
+                var owingCount = 0;
+                allRecords.forEach(function (r) { if (safeTotals(r).balance > 0) owingCount++; });
+                if (elDsPendingSub) elDsPendingSub.textContent = owingCount + ' owing';
+
+                setGauge('gaugeCollectionRate', collectionRate);
+                var activePct = totalStudents > 0 ? Math.round((activeStudents / totalStudents) * 100) : 0;
+                setGauge('gaugeActiveStudents', activePct);
+                var gaugeActiveSub = document.getElementById('gaugeActiveStudentsSub');
+                if (gaugeActiveSub) gaugeActiveSub.textContent = activeStudents + ' of ' + totalStudents + ' enrolled';
+                var inactivePct = totalStudents > 0 ? Math.round((stoppedCount / totalStudents) * 100) : 0;
+                setGauge('gaugeInactive', inactivePct);
 
                 // Payment Method Breakdown
                 var modeStats = {};
@@ -8285,10 +8508,16 @@
             var elScholar = document.getElementById('annualScholarshipCount');
             if (elScholar && Array.isArray(allRecords)) {
                 var scholarIds = {};
+                var allStudentIds = {};
                 allRecords.forEach(function (r) {
-                    if (r && ((parseFloat(r.discount) || 0) > 0 || r.scholarshipScheme)) scholarIds[r.id] = true;
+                    if (!r) return;
+                    if (r.id) allStudentIds[r.id] = true;
+                    if ((parseFloat(r.discount) || 0) > 0 || r.scholarshipScheme) scholarIds[r.id] = true;
                 });
                 elScholar.textContent = Object.keys(scholarIds).length;
+                var totalForScholar = Object.keys(allStudentIds).length;
+                var scholarPct = totalForScholar > 0 ? Math.round((Object.keys(scholarIds).length / totalForScholar) * 100) : 0;
+                setGauge('gaugeScholarship', scholarPct);
             }
 
             var elNotif = document.getElementById('annualPendingNotifs');
@@ -8544,7 +8773,15 @@
                 var iconNum = termKey.includes('first') ? '1' : termKey.includes('second') ? '2' : '3';
 
                 var html = '';
-                html += '<h5 class="mb-3"><button onclick="goHome()" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-house-door me-1"></i>Home</button><i class="bi bi-' + iconNum + '-circle me-2"></i>' + termName + '<span class="refresh-indicator" id="' + termKey + 'RefreshIndicator">Refreshing</span>' + '<span class="last-updated" id="' + termKey + 'LastUpdated"></span></h5>';
+                html += '<div class="section-banner banner-green">';
+                html += '  <div class="d-flex align-items-center gap-2 flex-wrap">';
+                html += '    <button onclick="goHome()" class="btn btn-sm btn-outline-light me-1"><i class="bi bi-house-door me-1"></i>Home</button>';
+                html += '    <h5 class="section-banner-title mb-0">Fees Management &mdash; ' + termName + ' <span style="font-weight:600;opacity:.85;font-size:15px;">(' + allTermRecs.length + '/' + allTermRecs.length + ')</span>' + '<span class="refresh-indicator" id="' + termKey + 'RefreshIndicator">Refreshing</span>' + '<span class="last-updated" id="' + termKey + 'LastUpdated" style="color:#fff;opacity:.85;"></span></h5>';
+                html += '  </div>';
+                if (currentUser.role === 'admin') {
+                    html += '  <button class="btn btn-sm btn-banner-action" onclick="openAdd(\'' + termName + '\')"><i class="bi bi-plus-circle me-1"></i>Add Fee</button>';
+                }
+                html += '</div>';
                 html += '<div class="row g-2 mb-3">';
                 html += '<div class="col-6 col-md-2"><div class="stat-card"><div class="d-flex align-items-center gap-2"><div class="stat-icon primary"><i class="bi bi-people"></i></div><div><div class="stat-value">' + allTermRecs.length + '</div><div class="stat-label">Students</div></div></div></div></div>';
                 html += '<div class="col-6 col-md-2"><div class="stat-card" style="border-left:3px solid #10b981"><div class="d-flex align-items-center gap-2"><div class="stat-icon" style="background:#d1fae5;color:#065f46"><i class="bi bi-graph-up-arrow"></i></div><div><div class="stat-value">' + currency + ' ' + fmt(coll + out) + '</div><div class="stat-label">Total Revenue</div></div></div></div></div>';
@@ -17129,11 +17366,12 @@
             if (document.getElementById('nsPaidTotal')) document.getElementById('nsPaidTotal').textContent = currency+' '+fmt(totPaid);
             if (document.getElementById('nsBalTotal'))  document.getElementById('nsBalTotal').textContent  = currency+' '+fmt(totBal);
             if (document.getElementById('nsCountLabel')) document.getElementById('nsCountLabel').textContent = '('+recs.length+' students)';
+            if (document.getElementById('nsBannerCount')) document.getElementById('nsBannerCount').textContent = '('+recs.length+'/'+allRecords.filter(function(r){return r.isNewStudent===true || String(r.isNewStudent).toUpperCase()==='TRUE';}).length+')';
 
             var tbody = document.getElementById('nsBody');
             if (!tbody) return;
             if (!recs.length) {
-                tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4"><i class="bi bi-person-plus me-2"></i>No new students found for selected filters.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-4"><i class="bi bi-person-plus me-2"></i>No new students found for selected filters.</td></tr>';
                 return;
             }
             var isAdmin = currentUser && currentUser.role === 'admin';
@@ -17142,8 +17380,12 @@
                 var st='Unpaid', cl='status-unpaid';
                 if (t.totalPaid>=t.totalFees && t.totalFees>0){st='Paid';cl='status-paid';}
                 else if (t.totalPaid>0){st='Partial';cl='status-partial';}
+                var pic = r.studentPhoto ?
+                    '<img src="'+r.studentPhoto+'" style="width:32px;height:32px;border-radius:50%;object-fit:cover;">' :
+                    '<div style="width:32px;height:32px;border-radius:50%;background:#e0e7ff;color:#4338ca;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;">'+(String(r.studentName||'?').trim()[0]||'?').toUpperCase()+'</div>';
                 return '<tr>'+
                     '<td><small>'+r.id+'</small></td>'+
+                    '<td>'+pic+'</td>'+
                     '<td><strong>'+r.studentName+'</strong></td>'+
                     '<td>'+r.grade+'</td>'+
                     '<td><small>'+r.academicSession+'</small></td>'+
@@ -18842,11 +19084,13 @@
                 return matchPhone || matchWards;
             });
             
+            if (document.getElementById('parentsBannerCount')) document.getElementById('parentsBannerCount').textContent = '(' + filtered.length + '/' + cachedParents.length + ')';
+
             if (!filtered.length) {
                 tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No parents found</td></tr>';
                 return;
             }
-            
+
             var cur = settings.currency || 'GHC';
             tbody.innerHTML = filtered.map(function(p) {
                 var wardsListStr = p.wards.map(function(w) {
