@@ -6166,6 +6166,133 @@
             </form>
         </div>
     </div>
+    <!-- Quick Collect Fee Payment Modal -->
+    <div class="modal-overlay" id="quickFeeModal">
+        <div class="modal-box" style="max-width: 520px; max-height: 90vh; overflow-y: auto;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-cash-coin me-2 text-primary"></i>Collect Fee Payment</h6>
+                <button type="button" class="btn-close" onclick="closeQuickFeeModal()" aria-label="Close"></button>
+            </div>
+            <form id="quickFeeForm" onsubmit="submitQuickFee(event)">
+                <input type="hidden" id="qfTermName">
+                <input type="hidden" id="qfAcademicSession">
+
+                <div class="form-card-sub section-profile mb-2" style="padding:12px;">
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold">Student</label>
+                        <select class="form-select form-select-sm" id="qfStudentSelect" onchange="onQuickFeeStudentChange()" required>
+                            <option value="">-- New Student (Create New ID) --</option>
+                        </select>
+                    </div>
+                    <div class="row g-2 mb-2" id="qfNewStudentFields" style="display:none">
+                        <div class="col-md-8">
+                            <label class="form-label small fw-semibold">Full Name</label>
+                            <input type="text" class="form-control form-control-sm" id="qfNewName" placeholder="Student's full name">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-semibold">Phone</label>
+                            <input type="tel" class="form-control form-control-sm" id="qfNewPhone" placeholder="Parent phone">
+                        </div>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Student Status</label>
+                            <select class="form-select form-select-sm" id="qfStatus" onchange="onQuickFeeTypeChange()">
+                                <option value="Active">Active</option>
+                                <option value="New">New Student</option>
+                                <option value="Transferred">Transferred Student</option>
+                                <option value="Readmitted">Readmitted Student</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Class</label>
+                            <select class="form-select form-select-sm" id="qfGrade" onchange="onQuickFeeTypeChange()" required>
+                                <option value="">Select class</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-card-sub section-fees mb-2" style="padding:12px;">
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold">Fee Type</label>
+                        <select class="form-select form-select-sm" id="qfFeeType" onchange="onQuickFeeTypeChange()" required></select>
+                    </div>
+                    <div class="p-2 rounded-3 mb-2" style="background:#f8fafc;border:1px solid #e2e8f0;">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-muted small">Billing Amount for this Fee Type</span>
+                            <strong id="qfBillingAmountDisplay">GHC 0.00</strong>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-1" id="qfExistingBillRow" style="display:none">
+                            <span class="text-muted small">Current Balance</span>
+                            <span id="qfExistingBillDisplay" class="small">GHC 0.00</span>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold">Amount to Bill (GHC)</label>
+                        <input type="number" class="form-control form-control-sm" id="qfAmountToBill" min="0" step="0.01" oninput="onQuickFeeAmountChange()" required>
+                        <div class="form-text" style="font-size:10px;">Pre-filled from the class rate for this fee type — adjust if this student's amount differs.</div>
+                    </div>
+                </div>
+
+                <div class="form-card-sub section-installments mb-2" style="padding:12px;">
+                    <label class="form-label small fw-semibold d-block mb-1">Payment Plan</label>
+                    <div class="btn-group w-100 mb-2" role="group">
+                        <input type="radio" class="btn-check" name="qfPlan" id="qfPlanFull" value="full" checked autocomplete="off" onchange="onQuickFeePlanChange()">
+                        <label class="btn btn-outline-primary btn-sm" for="qfPlanFull"><i class="bi bi-check-circle me-1"></i>Pay in Full</label>
+                        <input type="radio" class="btn-check" name="qfPlan" id="qfPlanInstallments" value="installments" autocomplete="off" onchange="onQuickFeePlanChange()">
+                        <label class="btn btn-outline-primary btn-sm" for="qfPlanInstallments"><i class="bi bi-calendar-event me-1"></i>Installments</label>
+                    </div>
+                    <div id="qfFullFields">
+                        <label class="form-label small fw-semibold">Amount Paid Now (GHC)</label>
+                        <input type="number" class="form-control form-control-sm" id="qfFullAmountNow" min="0" step="0.01">
+                    </div>
+                    <div id="qfInstallmentFields" style="display:none">
+                        <div class="row g-2">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold">Number of Installments</label>
+                                <select class="form-select form-select-sm" id="qfNumInst" onchange="onQuickFeeAmountChange()">
+                                    <option value="2">2</option>
+                                    <option value="3">3</option>
+                                    <option value="4">4</option>
+                                    <option value="5">5</option>
+                                    <option value="6">6</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-semibold">Amount Due Now (Inst. 1)</label>
+                                <input type="number" class="form-control form-control-sm" id="qfInstAmountNow" min="0" step="0.01">
+                            </div>
+                        </div>
+                        <div class="form-text" style="font-size:10px;">Remaining installments are collected on future visits — reopen this fee type for this student to record each one.</div>
+                    </div>
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Mode of Payment</label>
+                        <select class="form-select form-select-sm" id="qfPaymentMode">
+                            <option value="">-- Select Mode --</option>
+                            <option value="Cash">Cash</option>
+                            <option value="Mobile Money">Mobile Money</option>
+                            <option value="Credit Card">Credit Card</option>
+                            <option value="Bank">Bank</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-semibold">Payment Date</label>
+                        <input type="date" class="form-control form-control-sm" id="qfPaymentDate">
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 pt-2 border-top">
+                    <button type="button" class="btn btn-outline-secondary btn-sm px-3" onclick="closeQuickFeeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm px-4"><i class="bi bi-save me-1"></i>Collect Payment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Custom Fee Modal -->
     <div class="modal-overlay" id="customFeeModal">
         <div class="modal-box" style="max-width: 500px;">
@@ -8324,7 +8451,7 @@
                 html += '    <h5 class="section-banner-title mb-0">Fees Management &mdash; ' + termName + ' <span style="font-weight:600;opacity:.85;font-size:15px;">(' + allTermRecs.length + '/' + allTermRecs.length + ')</span>' + '<span class="refresh-indicator" id="' + termKey + 'RefreshIndicator">Refreshing</span>' + '<span class="last-updated" id="' + termKey + 'LastUpdated" style="color:#fff;opacity:.85;"></span></h5>';
                 html += '  </div>';
                 if (currentUser.role === 'admin') {
-                    html += '  <button class="btn btn-sm btn-banner-action" onclick="openAdd(\'' + termName + '\')"><i class="bi bi-plus-circle me-1"></i>Add Fee</button>';
+                    html += '  <button class="btn btn-sm btn-banner-action" onclick="openQuickFeeModal(\'' + termName + '\')"><i class="bi bi-plus-circle me-1"></i>Add Fee</button>';
                 }
                 html += '</div>';
                 html += '<div class="row g-2 mb-3">';
@@ -8540,7 +8667,7 @@
 
                 // Wire up event listeners (NO inline JS to avoid quote escaping bugs)
                 var addBtn = document.getElementById(termKey + 'AddBtn');
-                if (addBtn) addBtn.addEventListener('click', function () { openAdd(termName); });
+                if (addBtn) addBtn.addEventListener('click', function () { openQuickFeeModal(termName); });
 
                 // View mode toggle bindings
                 var viewTableBtn = document.getElementById(termKey + 'ViewTableBtn');
@@ -8970,6 +9097,206 @@
             
             // Show ID preview
             showIdPreview(termName);
+        }
+
+        // ════════════════════════════════════════════════════════
+        // QUICK COLLECT FEE PAYMENT — a guided, one-fee-type-at-a-time
+        // way to record a payment: pick a student, pick a class, pick
+        // ONE fee type, see its billing amount, decide full vs
+        // installments. This is now the primary "+ Add Fee" flow.
+        // It still writes into the same combined per-term record
+        // proceedSaveRecord() already saves — the term's other fee
+        // components and their previously-recorded payments are left
+        // untouched, only the selected fee type's billed amount and
+        // the next open installment slot are updated.
+        // ════════════════════════════════════════════════════════
+        function openQuickFeeModal(termName) {
+            document.getElementById('quickFeeForm').reset();
+            document.getElementById('qfTermName').value = termName;
+            var yr = settings.academicYear || '2025/2026';
+            document.getElementById('qfAcademicSession').value = yr + ' ' + termName;
+            document.getElementById('qfPaymentDate').value = todayStr();
+            document.getElementById('qfNewStudentFields').style.display = 'none';
+            document.getElementById('qfPlanFull').checked = true;
+
+            var select = document.getElementById('qfStudentSelect');
+            select.innerHTML = '<option value="">-- New Student (Create New ID) --</option>';
+            var seen = {}, students = [];
+            allRecords.forEach(function (r) {
+                if (r.id && !seen[r.id]) { seen[r.id] = true; students.push({ id: r.id, name: r.studentName }); }
+            });
+            students.sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
+            students.forEach(function (st) {
+                select.innerHTML += '<option value="' + st.id + '">' + st.name + ' (' + st.id + ')</option>';
+            });
+
+            onQuickFeeStudentChange();
+            document.getElementById('quickFeeModal').classList.add('show');
+        }
+
+        function closeQuickFeeModal() {
+            document.getElementById('quickFeeModal').classList.remove('show');
+        }
+
+        function getQuickFeeCurrentRecord() {
+            var studentId = document.getElementById('qfStudentSelect').value;
+            if (!studentId) return null;
+            var session = document.getElementById('qfAcademicSession').value;
+            return allRecords.find(function (r) { return String(r.id) === String(studentId) && String(r.academicSession) === String(session); }) || null;
+        }
+
+        function getQuickFeeAnyRecord() {
+            var studentId = document.getElementById('qfStudentSelect').value;
+            if (!studentId) return null;
+            return allRecords.find(function (r) { return String(r.id) === String(studentId); }) || null;
+        }
+
+        function onQuickFeeStudentChange() {
+            var studentId = document.getElementById('qfStudentSelect').value;
+            var newFields = document.getElementById('qfNewStudentFields');
+            var statusSel = document.getElementById('qfStatus');
+            var gradeSel = document.getElementById('qfGrade');
+
+            if (!studentId) {
+                newFields.style.display = 'flex';
+                document.getElementById('qfNewName').value = '';
+                document.getElementById('qfNewPhone').value = '';
+                statusSel.value = 'New';
+            } else {
+                newFields.style.display = 'none';
+                var curRec = getQuickFeeCurrentRecord();
+                var anyRec = curRec || getQuickFeeAnyRecord();
+                if (anyRec) gradeSel.value = anyRec.grade || '';
+                statusSel.value = (curRec && isBoolTrue(curRec.isNewStudent)) ? 'New' : 'Active';
+            }
+            onQuickFeeTypeChange();
+        }
+
+        function populateQuickFeeTypeOptions() {
+            var sel = document.getElementById('qfFeeType');
+            var current = sel.value;
+            var status = document.getElementById('qfStatus').value;
+            var isNew = (status === 'New' || status === 'Transferred' || status === 'Readmitted');
+            var active = comps().filter(function (c) { return c.isActive && (!c.isForNewStudentsOnly || isNew); });
+            sel.innerHTML = active.map(function (c) { return '<option value="' + c.id + '">' + c.name + '</option>'; }).join('');
+            if (active.some(function (c) { return c.id === current; })) sel.value = current;
+        }
+
+        function onQuickFeeTypeChange() {
+            populateQuickFeeTypeOptions();
+            var feeTypeId = document.getElementById('qfFeeType').value;
+            var grade = document.getElementById('qfGrade').value;
+            var curRec = getQuickFeeCurrentRecord();
+            var currency = settings.currency || 'GHC';
+
+            var billingAmt = 0;
+            if (curRec && parseFloat(curRec[feeTypeId]) > 0) {
+                billingAmt = parseFloat(curRec[feeTypeId]) || 0;
+            } else if (grade && Array.isArray(cachedClassRates)) {
+                var rate = cachedClassRates.find(function (r) { return r.grade === grade && r.componentId === feeTypeId; });
+                if (rate) billingAmt = parseFloat(rate.amount) || 0;
+            }
+            document.getElementById('qfBillingAmountDisplay').textContent = currency + ' ' + fmt(billingAmt);
+            document.getElementById('qfAmountToBill').value = billingAmt.toFixed(2);
+
+            var existingRow = document.getElementById('qfExistingBillRow');
+            if (curRec) {
+                var t = safeTotals(curRec);
+                existingRow.style.display = 'flex';
+                document.getElementById('qfExistingBillDisplay').textContent = currency + ' ' + fmt(t.balance) + ' (all fee types)';
+            } else {
+                existingRow.style.display = 'none';
+            }
+
+            onQuickFeeAmountChange();
+        }
+
+        function onQuickFeeAmountChange() {
+            var amountToBill = parseFloat(document.getElementById('qfAmountToBill').value) || 0;
+            var plan = document.querySelector('input[name="qfPlan"]:checked').value;
+            if (plan === 'full') {
+                document.getElementById('qfFullAmountNow').value = amountToBill.toFixed(2);
+            } else {
+                var n = parseInt(document.getElementById('qfNumInst').value) || 1;
+                var perInst = n > 0 ? (amountToBill / n) : amountToBill;
+                document.getElementById('qfInstAmountNow').value = perInst.toFixed(2);
+            }
+        }
+
+        function onQuickFeePlanChange() {
+            var plan = document.querySelector('input[name="qfPlan"]:checked').value;
+            document.getElementById('qfFullFields').style.display = plan === 'full' ? 'block' : 'none';
+            document.getElementById('qfInstallmentFields').style.display = plan === 'installments' ? 'block' : 'none';
+            onQuickFeeAmountChange();
+        }
+
+        function submitQuickFee(e) {
+            e.preventDefault();
+            var studentId = document.getElementById('qfStudentSelect').value;
+            var feeTypeId = document.getElementById('qfFeeType').value;
+            var grade = document.getElementById('qfGrade').value;
+            var status = document.getElementById('qfStatus').value;
+            var session = document.getElementById('qfAcademicSession').value;
+            var amountToBill = parseFloat(document.getElementById('qfAmountToBill').value) || 0;
+            var plan = document.querySelector('input[name="qfPlan"]:checked').value;
+            var paymentMode = document.getElementById('qfPaymentMode').value;
+            var paymentDate = document.getElementById('qfPaymentDate').value || todayStr();
+
+            if (!feeTypeId) { showToast('Please select a fee type', 'warning'); return; }
+            if (!grade) { showToast('Please select the class', 'warning'); return; }
+
+            var newName, newPhone;
+            if (!studentId) {
+                newName = document.getElementById('qfNewName').value.trim();
+                newPhone = document.getElementById('qfNewPhone').value.trim();
+                if (!newName) { showToast("Please enter the new student's name", 'warning'); return; }
+            }
+
+            var curRec = getQuickFeeCurrentRecord();
+            var rec;
+            if (curRec) {
+                rec = Object.assign({}, curRec);
+            } else {
+                var anyRec = studentId ? getQuickFeeAnyRecord() : null;
+                rec = {
+                    id: studentId || null,
+                    studentName: studentId ? (anyRec ? anyRec.studentName : '') : newName,
+                    phoneNumber: studentId ? String(anyRec ? (anyRec.phoneNumber || '') : '') : newPhone,
+                    grade: grade,
+                    academicSession: session,
+                    isStopped: false,
+                    discount: 0,
+                    paymentMode: '',
+                    recordedBy: currentUser ? currentUser.username : ''
+                };
+                comps().forEach(function (c) { rec[c.id] = 0; });
+                for (var i = 1; i <= 6; i++) { rec['inst' + i] = 0; rec['inst' + i + 'Date'] = ''; }
+            }
+
+            rec.grade = grade;
+            rec.isNewStudent = (status === 'New' || status === 'Transferred' || status === 'Readmitted');
+            rec[feeTypeId] = amountToBill;
+            if (paymentMode) rec.paymentMode = paymentMode;
+            if (!rec.recordedBy) rec.recordedBy = currentUser ? currentUser.username : '';
+
+            var nextSlot = -1;
+            for (var j = 1; j <= 6; j++) { if (!(parseFloat(rec['inst' + j]) > 0)) { nextSlot = j; break; } }
+
+            var amountNow = plan === 'full'
+                ? (parseFloat(document.getElementById('qfFullAmountNow').value) || 0)
+                : (parseFloat(document.getElementById('qfInstAmountNow').value) || 0);
+
+            if (amountNow > 0) {
+                if (nextSlot === -1) {
+                    showToast("This student's installment plan is full (6/6) — open their full record to add more.", 'warning');
+                    return;
+                }
+                rec['inst' + nextSlot] = amountNow;
+                rec['inst' + nextSlot + 'Date'] = paymentDate;
+            }
+
+            closeQuickFeeModal();
+            proceedSaveRecord(rec);
         }
 
         function showIdPreview(termName) {
@@ -12607,7 +12934,8 @@
                 { id: '#billGrade',      empty: '<option value="">All Classes</option>' },
                 { id: '#smsFilterGrade', empty: '<option value="all">All Classes</option>' },
                 { id: '#nsFilterGrade',  empty: '<option value="all">All Grades</option>' },
-                { id: '#discHistGrade',  empty: '<option value="">All Grades</option>' }
+                { id: '#discHistGrade',  empty: '<option value="">All Grades</option>' },
+                { id: '#qfGrade',        empty: '<option value="">Select class</option>' }
             ];
             selDefs.forEach(function(s) {
                 var el = document.querySelector(s.id);
