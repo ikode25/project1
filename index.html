@@ -325,14 +325,28 @@
   #adminLoginLink:hover { opacity: .85; }
 
   /* ---------- LOADING / TOAST ---------- */
+  /* A continuous indeterminate progress bar (the YouTube/GitHub style) —
+     there's no real "percent done" to report for an Apps Script round
+     trip, so rather than faking a width that eases toward some number,
+     two segments perpetually slide left-to-right across the full track
+     for as long as anything is loading, and simply fade away when it
+     isn't. Two overlapping segments (a longer leader, a shorter
+     follower) read as one continuous flowing motion instead of one bar
+     visibly restarting every lap. */
   #loadingBar {
-    position: fixed; top: 0; left: 0; height: 3px; width: 0; z-index: 9999; opacity: 0;
-    background: linear-gradient(90deg, var(--clr-accent), #e8c65a, var(--clr-accent));
-    background-size: 200% 100%; box-shadow: 0 0 8px rgba(201,162,39,.7);
-    transition: width .25s ease, opacity .3s ease;
+    position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 9999;
+    overflow: hidden; opacity: 0; pointer-events: none; transition: opacity .25s ease;
   }
-  #loadingBar.active { animation: loadingBarShimmer 1.2s linear infinite; }
-  @keyframes loadingBarShimmer { to { background-position: -200% 0; } }
+  #loadingBar.active { opacity: 1; }
+  #loadingBar .bar-seg {
+    position: absolute; top: 0; height: 100%; border-radius: 2px;
+    background: linear-gradient(90deg, var(--clr-accent), #e8c65a, var(--clr-accent));
+    box-shadow: 0 0 8px rgba(201,162,39,.7);
+  }
+  #loadingBar .bar-seg.seg1 { width: 40%; animation: loadingBarRun1 1.3s ease-in-out infinite; }
+  #loadingBar .bar-seg.seg2 { width: 22%; opacity: .7; animation: loadingBarRun2 1.3s ease-in-out infinite; animation-delay: .3s; }
+  @keyframes loadingBarRun1 { 0% { left: -40%; } 100% { left: 100%; } }
+  @keyframes loadingBarRun2 { 0% { left: -22%; } 100% { left: 100%; } }
   .spinner-loading { display: flex; align-items: center; gap: 10px; color: #888; padding: 22px 4px; font-size: .9rem; }
   .spinner-ring {
     width: 17px; height: 17px; border-radius: 50%; flex-shrink: 0;
@@ -800,7 +814,7 @@
   .record-card .row-actions { margin-top: 10px; }
 </style>
 
-<div id="loadingBar"></div>
+<div id="loadingBar"><div class="bar-seg seg1"></div><div class="bar-seg seg2"></div></div>
 <div id="toastHost"></div>
 
 <!-- ============================================================ PUBLIC SITE ============================================================ -->
@@ -1239,33 +1253,17 @@ function revalidateInBackground_(fnName, args, cacheKey) {
   }).catch(function () { delete SWR_REVALIDATING[cacheKey]; });
 }
 
-var loadingBarResetTimer = null;
 /**
- * A believable progress feel with no real progress to report: the bar
- * eases toward 90% over a few seconds while a request is in flight (most
- * requests finish well before it gets there), then snaps to 100% the
- * instant the response actually lands and fades out — rather than the
- * flat, static-width bar this used to be.
+ * There's no real "percent done" to report for an Apps Script round trip,
+ * so rather than faking a width that eases toward some number, this just
+ * toggles the continuous indeterminate bar (see #loadingBar's CSS) on and
+ * off — it keeps sliding for as long as anything is loading, and fades
+ * out the instant nothing is.
  */
 function setLoading(on) {
   STATE.loadingCount += on ? 1 : -1;
   if (STATE.loadingCount < 0) STATE.loadingCount = 0;
-  var bar = document.getElementById('loadingBar');
-  clearTimeout(loadingBarResetTimer);
-  if (STATE.loadingCount > 0) {
-    bar.classList.add('active');
-    bar.style.transition = 'width 4s cubic-bezier(.1,.6,.3,1), opacity .2s ease';
-    bar.style.opacity = '1';
-    bar.style.width = '90%';
-  } else {
-    bar.classList.remove('active');
-    bar.style.transition = 'width .2s ease, opacity .4s ease .15s';
-    bar.style.width = '100%';
-    loadingBarResetTimer = setTimeout(function () {
-      bar.style.opacity = '0';
-      loadingBarResetTimer = setTimeout(function () { bar.style.width = '0%'; }, 300);
-    }, 120);
-  }
+  document.getElementById('loadingBar').classList.toggle('active', STATE.loadingCount > 0);
 }
 
 /** A small spinner + label, used everywhere a panel/table is waiting on a fetch — replaces plain "Loading…" text. */
