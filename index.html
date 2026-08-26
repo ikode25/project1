@@ -86,7 +86,7 @@
     padding: 4px 10px 4px 8px; border-radius: 4px; text-transform: uppercase; white-space: nowrap; line-height: 1.5;
     box-shadow: inset 0 0 0 1px rgba(0,0,0,.06), 0 3px 6px rgba(0,0,0,.2);
     margin-top: 9px; transform-origin: top center;
-    animation: signSwing 3.4s ease-in-out infinite;
+    animation: signSwing 1.6s ease-in-out infinite;
   }
   .shop-status-badge::after {
     content: ''; position: absolute; top: -8px; left: 50%; transform: translateX(-50%);
@@ -94,11 +94,8 @@
     background: linear-gradient(to bottom, rgba(130,130,130,.9), rgba(130,130,130,.35));
   }
   @keyframes signSwing {
-    0%, 100% { transform: rotate(-6deg); }
-    50% { transform: rotate(6deg); }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .shop-status-badge { animation: none; }
+    0%, 100% { transform: rotate(-8deg); }
+    50% { transform: rotate(8deg); }
   }
   .shop-status-badge .dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
   .shop-status-badge.open { background: #e3f9ea; color: #178a41; }
@@ -1879,17 +1876,59 @@ function renderVideos(videos) {
   bindYoutubeFacades_(host);
 }
 
-/** Swaps a .yt-facade (thumbnail + play button) for the real YouTube iframe on click/Enter/Space — the actual embed, and its heavy player JS, only ever loads once a visitor deliberately asks to watch. */
+/**
+ * Warms up a connection to YouTube's domains the moment a visitor shows
+ * real intent to watch (hovering on desktop, the touchstart that precedes
+ * a tap on mobile) rather than only once they've actually clicked — so
+ * the DNS/TLS handshake is already done by the time the iframe actually
+ * starts loading, shaving a real chunk off the wait between tap and play.
+ * Fired once per page (further hovers/taps are a no-op).
+ */
+var YT_PRECONNECTED = false;
+function preconnectYoutube_() {
+  if (YT_PRECONNECTED) return;
+  YT_PRECONNECTED = true;
+  ['https://www.youtube.com', 'https://www.youtube-nocookie.com', 'https://i.ytimg.com', 'https://s.ytimg.com'].forEach(function (href) {
+    var link = document.createElement('link');
+    link.rel = 'preconnect';
+    link.href = href;
+    link.crossOrigin = 'anonymous';
+    document.head.appendChild(link);
+  });
+}
+
+/**
+ * Swaps a .yt-facade (thumbnail + play button) for the real YouTube
+ * iframe on click/Enter/Space — the actual embed, and its heavy player
+ * JS, only ever loads once a visitor deliberately asks to watch.
+ *
+ * The iframe is inserted BEHIND the still-visible thumbnail (not swapped
+ * in immediately) and the thumbnail is only removed once the iframe
+ * actually fires its own `load` event — YouTube's page (any cross-origin
+ * page) still reliably fires `load` once its document finishes loading,
+ * even though its content itself is off-limits to this page's JS. Without
+ * this, replacing the thumbnail with the iframe the instant it's created
+ * left a plain empty/black box on screen for however long YouTube's own
+ * page took to actually paint anything — reported as "the video reloads
+ * to blank before playing." Keeping the thumbnail up the whole time means
+ * there's never a blank frame, just thumbnail → (a brief natural pause) →
+ * playing video, with no jarring empty gap in between.
+ */
 function bindYoutubeFacades_(host) {
   host.querySelectorAll('.yt-facade').forEach(function (el) {
+    el.addEventListener('mouseenter', preconnectYoutube_);
+    el.addEventListener('touchstart', preconnectYoutube_, { passive: true });
     function activate() {
+      if (el.dataset.activated) return; // a held Enter key or a double-tap shouldn't insert a second iframe
+      el.dataset.activated = '1';
       var src = el.dataset.embed;
       var iframe = document.createElement('iframe');
       iframe.src = src + (src.indexOf('?') > -1 ? '&' : '?') + 'autoplay=1&rel=0';
       iframe.title = el.getAttribute('aria-label') || 'Video';
       iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
       iframe.allowFullscreen = true;
-      el.replaceWith(iframe);
+      el.parentNode.insertBefore(iframe, el);
+      iframe.addEventListener('load', function () { el.remove(); });
     }
     el.addEventListener('click', activate);
     el.addEventListener('keydown', function (e) {
