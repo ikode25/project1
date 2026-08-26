@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html>
 <head>
-<base target="_top">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Advance Tailor — Bespoke Fashion House</title>
@@ -98,12 +97,18 @@
 
   /* ---------- PUBLIC NAV ---------- */
   #publicNav { position: sticky; top: 0; z-index: 50; background: var(--clr-primary); color: #fff; box-shadow: 0 2px 20px rgba(0,0,0,.2); }
-  #publicNav .bar { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; }
-  #publicNav .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.25rem; font-family: var(--font-display); letter-spacing: -.01em; }
-  #publicNav .brand img { height: 38px; width: 38px; border-radius: 9px; object-fit: cover; }
-  #publicNav nav { display: flex; align-items: center; gap: 26px; }
-  #publicNav nav a { font-weight: 600; font-size: .92rem; opacity: .88; }
-  #publicNav nav a:hover { opacity: 1; }
+  #publicNav .bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; gap: 20px; }
+  #publicNav .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.2rem; font-family: var(--font-display); letter-spacing: -.01em; flex-shrink: 0; }
+  #publicNav .brand img { height: 36px; width: 36px; border-radius: 9px; object-fit: cover; }
+  #publicNav nav { display: flex; align-items: center; justify-content: flex-end; flex: 1; gap: 28px; }
+  #publicNav .navLinks { display: flex; align-items: center; gap: 22px; }
+  #publicNav .navLinks a { font-weight: 600; font-size: .88rem; opacity: .82; white-space: nowrap; }
+  #publicNav .navLinks a:hover { opacity: 1; }
+  #publicNav .navActions { display: flex; align-items: center; gap: 14px; padding-left: 20px; border-left: 1px solid rgba(255,255,255,.16); }
+  #publicNav .cartLink { position: relative; display: flex; opacity: .88; cursor: pointer; }
+  #publicNav .cartLink:hover { opacity: 1; }
+  #publicNav .loginLink { font-weight: 600; font-size: .85rem; opacity: .75; white-space: nowrap; }
+  #publicNav .loginLink:hover { opacity: 1; text-decoration: underline; }
   #publicNav .navBtns { display: flex; align-items: center; gap: 10px; }
   #navToggle { display: none; background: none; border: none; color: #fff; font-size: 1.6rem; cursor: pointer; }
   .shopStatusBadge { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
@@ -112,8 +117,12 @@
   .shopStatusBadge .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
   @media (max-width: 860px) {
     #navToggle { display: block; }
-    #publicNav nav { position: fixed; top: 68px; left: 0; right: 0; bottom: 0; background: var(--clr-primary); flex-direction: column; align-items: flex-start; padding: 24px; gap: 18px; transform: translateX(-100%); transition: transform .2s ease; overflow-y: auto; }
+    #publicNav nav { position: fixed; top: 66px; left: 0; right: 0; bottom: 0; background: var(--clr-primary); flex-direction: column; align-items: flex-start; justify-content: flex-start; padding: 24px; gap: 24px; transform: translateX(-100%); transition: transform .2s ease; overflow-y: auto; }
     #publicNav nav.open { transform: translateX(0); }
+    #publicNav .navLinks, #publicNav .navActions { flex-direction: column; align-items: flex-start; gap: 18px; width: 100%; }
+    #publicNav .navActions { border-left: none; padding-left: 0; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.16); }
+    #publicNav .navBtns { flex-direction: column; align-items: stretch; width: 100%; gap: 10px; }
+    #publicNav .navBtns .btn { width: 100%; }
   }
 
   /* ---------- HERO ---------- */
@@ -606,14 +615,20 @@ function renderPublicNav(d) {
   var s = d.settings;
   return '<header id="publicNav"><div class="bar container">' +
     '<div class="brand">' + (s.LogoURL ? '<img src="' + s.LogoURL + '">' : '') + esc(s.BusinessName || 'Advance Tailor') + '</div>' +
-    '<button id="navToggle">&#9776;</button>' +
+    '<button id="navToggle" aria-label="Menu">&#9776;</button>' +
     '<nav id="pubNavLinks">' +
-      '<a href="#services">Services</a><a href="#shop">Shop</a><a href="#staff">Our Team</a><a href="#gallery">Portfolio</a><a href="#reviews">Reviews</a>' +
-      '<a href="#track">Track Order</a><a href="#contact">Contact</a>' +
-      '<span id="navCartBtn" onclick="openShopCart()" style="position:relative;cursor:pointer;">' + ICONS.cart(18) + '<span id="navCartCount" class="hidden" style="position:absolute;top:-8px;right:-10px;background:var(--clr-secondary);color:#1a1a1a;border-radius:999px;font-size:.65rem;font-weight:800;padding:1px 5px;"></span></span>' +
-      '<span class="shopStatusBadge ' + (d.shopStatus.open ? 'open' : 'closed') + '"><span class="dot"></span>' + (d.shopStatus.open ? 'Open now' : 'Closed now') + '</span>' +
-      '<a href="#booking" class="btn btn-accent btn-sm">Book a Fitting</a>' +
-      '<a onclick="location.hash=\'#admin\'" class="btn btn-outline-light btn-sm">Staff Login</a>' +
+      '<div class="navLinks">' +
+        '<a href="#services">Services</a><a href="#shop">Shop</a><a href="#staff">Our Team</a><a href="#gallery">Portfolio</a><a href="#reviews">Reviews</a><a href="#contact">Contact</a>' +
+      '</div>' +
+      '<div class="navActions">' +
+        '<span class="shopStatusBadge ' + (d.shopStatus.open ? 'open' : 'closed') + '"><span class="dot"></span>' + (d.shopStatus.open ? 'Open now' : 'Closed now') + '</span>' +
+        '<a href="#track" class="loginLink">Track Order</a>' +
+        '<span class="cartLink" onclick="openShopCart()" title="Cart">' + ICONS.cart(19) + '<span id="navCartCount" class="hidden" style="position:absolute;top:-8px;right:-10px;background:var(--clr-secondary);color:#1a1a1a;border-radius:999px;font-size:.65rem;font-weight:800;padding:1px 5px;"></span></span>' +
+        '<div class="navBtns">' +
+          '<a href="#booking" class="btn btn-accent btn-sm">Book a Fitting</a>' +
+          '<a onclick="location.hash=\'#admin\'" class="loginLink">Staff Login</a>' +
+        '</div>' +
+      '</div>' +
     '</nav></div></header>';
 }
 function bindPublicNavEvents() {
@@ -897,7 +912,7 @@ function renderWizardStep(stepKey) {
     var minDate = todayStr();
     host.innerHTML = '<h3>Choose date &amp; time</h3>' +
       '<div class="field"><label>Date</label><input type="date" id="wizDate" min="' + minDate + '" value="' + (w.date || '') + '"></div>' +
-      '<div id="wizSlots" class="slotGrid" style="margin-top:10px;"></div>' + wizardNav(true, false);
+      '<div id="wizSlots" class="slotGrid" style="margin-top:10px;"></div>' + wizardNav(true, true);
     document.getElementById('wizDate').addEventListener('change', wizLoadSlots);
     if (w.date) wizLoadSlots();
   } else if (stepKey === 'details') {
