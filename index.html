@@ -1238,19 +1238,45 @@ var STATE = {
  * with a silent background refetch (revalidateInBackground_()) that never
  * touches the loading bar; if the result actually differs and the admin
  * is still on the page that asked for it, the page is quietly repainted
- * with the fresh data. Any write (save/delete/checkout/toggle/…) still
- * clears the whole cache the moment it succeeds, so the very next read
- * anywhere is a genuinely cold, guaranteed-fresh fetch rather than ever
- * risking stale data right after a change. Two functions are deliberately
- * excluded and always fetch live: getNotificationBell (its whole purpose
- * is near-real-time polling) and getPublicData (which already has its
- * own, more deliberate stale-while-revalidate localStorage cache for the
- * public site — layering this one on top would fight it).
+ * with the fresh data. Any write (save/delete/checkout/toggle/…) marks
+ * every cached read stale rather than throwing the cache away entirely
+ * (staleAllApiCache_()) — real admin work interleaves saves with normal
+ * navigation constantly, and hard-clearing on every single one of them
+ * meant the very next page visited kept forcing a real loading spinner
+ * right back up, defeating caching almost completely in practice. Marking
+ * stale instead still guarantees eventual freshness (the same silent
+ * background revalidate-and-repaint above handles it) while never once
+ * forcing a visible reload for a page already visited this session. Two
+ * functions are deliberately excluded and always fetch live:
+ * getNotificationBell (its whole purpose is near-real-time polling) and
+ * getPublicData (which already has its own, more deliberate
+ * stale-while-revalidate localStorage cache for the public site —
+ * layering this one on top would fight it).
  */
 var API_CACHE = {};
 var API_CACHE_TTL_MS = 3 * 60 * 1000; // below this age a cache hit is "fresh enough" — no background revalidation triggered
 var API_CACHE_NEVER = { getNotificationBell: true, getPublicData: true };
 function clearApiCache_() { API_CACHE = {}; }
+/**
+ * A write doesn't THROW the cache away — it just marks every entry stale
+ * (as if its TTL had already passed) rather than deleting it outright.
+ * Genuine SWR doesn't need an empty cache to guarantee freshness: the very
+ * next read anywhere still resolves instantly from this same (now-stale)
+ * data, exactly like any other stale hit, and still kicks off the same
+ * silent background revalidation that quietly repaints if anything
+ * actually changed. Hard-clearing on every write (the previous behavior)
+ * meant real admin usage — where a save/checkout/toggle is interleaved
+ * with normal navigation — kept forcing a real loading spinner right back
+ * up on the very next page visited, defeating the entire point of caching
+ * pages the admin had already been to. clearApiCache_() (a real, total
+ * wipe) is kept for the two cases that specifically want a guaranteed-cold
+ * fetch: the manual reload button, and logout (so a different user
+ * logging in on a shared device never sees a flash of the previous
+ * session's stale cached data before it revalidates).
+ */
+function staleAllApiCache_() {
+  Object.keys(API_CACHE).forEach(function (k) { API_CACHE[k].time = 0; });
+}
 
 function api(fnName) {
   var args = Array.prototype.slice.call(arguments, 1);
@@ -1278,7 +1304,7 @@ function liveApiCall_(fnName, args, cacheKey, showLoading) {
       .withSuccessHandler(function (res) {
         if (showLoading) setLoading(false);
         if (cacheKey) API_CACHE[cacheKey] = { data: res, time: Date.now() };
-        else clearApiCache_(); // a write just happened — every cached read is a candidate to now be stale
+        else staleAllApiCache_(); // a write just happened — mark every cached read stale (not gone), see staleAllApiCache_()
         resolve(res);
       })
       .withFailureHandler(function (err) { if (showLoading) setLoading(false); reject(err); })[fnName].apply(null, args);
