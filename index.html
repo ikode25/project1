@@ -1112,16 +1112,32 @@
 
 <div id="modalHost"></div>
 
+<!--
+  BOOT DATA — a small "above the fold" snapshot (branding, theme, first
+  hero slide) that doGet() embeds directly into this page's own HTML
+  response server-side (see getBootData_() in Code.gs), so opening the
+  URL for the very first time doesn't need an extra live round trip just
+  to stop looking blank — see applyBootPreview_() further down.
+
+  Deliberately printed into an inert application/json script tag and
+  parsed with JSON.parse() below, rather than spliced straight into a JS
+  object literal the way an earlier version of this did. JSON.stringify()
+  does not escape the U+2028/U+2029 line/paragraph-separator characters —
+  valid inside a JSON string, but a raw line terminator if a business
+  name/tagline/caption containing one were dropped directly into JS
+  source, which silently breaks the string literal and throws a
+  SyntaxError that fails this ENTIRE inline script (nothing on the page
+  works at all, exactly what happened here) rather than just this one
+  variable. JSON.parse() has no such gotcha — it treats the text as pure
+  data, never as code.
+-->
+<script type="application/json" id="bootDataJson"><?!= bootData ?></script>
 <script>
-/* =====================================================================
- * BOOT DATA — a small "above the fold" snapshot (branding, theme, first
- * hero slide) that doGet() embeds directly into this page's own HTML
- * response server-side (see getBootData_() in Code.gs), so opening the
- * URL for the very first time doesn't need an extra live round trip just
- * to stop looking blank — see applyBootPreview_() further down.
- * ===================================================================*/
 var BOOT_DATA = null;
-try { BOOT_DATA = (<?!= bootData ?>); } catch (bootErr) { BOOT_DATA = null; }
+try {
+  var bootDataEl = document.getElementById('bootDataJson');
+  BOOT_DATA = bootDataEl ? JSON.parse(bootDataEl.textContent) : null;
+} catch (bootErr) { BOOT_DATA = null; }
 
 /* =====================================================================
  * ICONS — small inline-SVG line-icon set (no external assets/fonts)
