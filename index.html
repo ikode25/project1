@@ -248,7 +248,17 @@
   .modalBox.wide { max-width: 860px; }
   .modalHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
   .modalClose { background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #999; }
-  #loadBar { position: fixed; top: 0; left: 0; height: 3px; background: var(--clr-secondary); z-index: 999; width: 0; transition: width .3s ease; }
+  #loadBar { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 999; overflow: hidden; background: transparent; opacity: 0; transition: opacity .2s ease; pointer-events: none; }
+  #loadBar.active { opacity: 1; }
+  #loadBar::before { content: ''; position: absolute; top: 0; left: 0; height: 100%; width: 40%; background: linear-gradient(90deg, transparent, var(--clr-secondary), transparent); animation: loadBarSlide 1.1s ease-in-out infinite; }
+  @keyframes loadBarSlide { 0% { left: -40%; } 100% { left: 100%; } }
+  @keyframes skeletonShine { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  /* Static boot skeleton — pure HTML/CSS, painted before the app's own
+     script has run or any network round trip has completed, so opening
+     the URL never shows a blank white screen while data loads. */
+  #bootSkeleton { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--clr-bg); flex-direction: column; gap: 14px; }
+  #bootSkeleton svg { color: var(--clr-primary); animation: bootPulse 1.3s ease-in-out infinite; }
+  @keyframes bootPulse { 0%, 100% { opacity: .35; transform: scale(.94); } 50% { opacity: 1; transform: scale(1); } }
 
   /* ---------- ADMIN SHELL ---------- */
   #adminShell { display: flex; min-height: 100vh; background: #f1f1ef; }
@@ -356,7 +366,7 @@
 <div id="loadBar"></div>
 <div id="toastHost"></div>
 <div id="modalHost"></div>
-<div id="app"></div>
+<div id="app"><div id="bootSkeleton"><svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/><line x1="20" y1="4" x2="7.8" y2="16.2"/><line x1="7.8" y1="7.8" x2="20" y2="20"/></svg></div></div>
 
 <script>window.__initialPage = '<?= initialPage ?>';</script>
 <script>
@@ -370,7 +380,45 @@ var state = {
   settings: null,
   adminPage: 'overview',
   cart: [],
+  shopCart: JSON.parse(localStorage.getItem('at_shopcart') || '[]'),
   wizard: { step: 'service', serviceId: null, staffId: null, date: null, timeSlot: null, name: '', phone: '', email: '', notes: '', paymentMethod: 'Cash', paymentProofUrl: '' }
+};
+
+/* ============================================================================
+ * ICON SET — inline SVG (no emoji, no external icon font/library)
+ * ==========================================================================*/
+function svgIcon(inner, size, strokeWidth) {
+  size = size || 20;
+  return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + (strokeWidth || 1.8) + '" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;flex-shrink:0;">' + inner + '</svg>';
+}
+var ICONS = {
+  dashboard: function (s) { return svgIcon('<rect x="3" y="3" width="7" height="8" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="10" width="7" height="11" rx="1.5"/><rect x="3" y="13" width="7" height="8" rx="1.5"/>', s); },
+  scissors: function (s) { return svgIcon('<circle cx="6" cy="6" r="2.4"/><circle cx="6" cy="18" r="2.4"/><line x1="20" y1="4" x2="7.8" y2="16.2"/><line x1="7.8" y1="7.8" x2="20" y2="20"/>', s); },
+  calendar: function (s) { return svgIcon('<rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/>', s); },
+  clock: function (s) { return svgIcon('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>', s); },
+  cart: function (s) { return svgIcon('<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2 3h2.4l2.2 12.2a2 2 0 0 0 2 1.6h8.9a2 2 0 0 0 2-1.6L21 7H6"/>', s); },
+  user: function (s) { return svgIcon('<circle cx="12" cy="8" r="3.6"/><path d="M4.5 20.2c1.4-3.7 4.3-5.6 7.5-5.6s6.1 1.9 7.5 5.6"/>', s); },
+  team: function (s) { return svgIcon('<circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.6 6.6 0 0 1 13 0"/><circle cx="17.5" cy="9" r="2.6"/><path d="M15.3 14.2A5.4 5.4 0 0 1 21.5 19"/>', s); },
+  spool: function (s) { return svgIcon('<path d="M6 4h12v3.4c0 1-4 1.8-6 1.8s-6-.8-6-1.8V4z"/><path d="M6 20h12v-3.4c0-1-4-1.8-6-1.8s-6 .8-6 1.8V20z"/><line x1="7" y1="9" x2="7" y2="15"/><line x1="17" y1="9" x2="17" y2="15"/>', s); },
+  cash: function (s) { return svgIcon('<rect x="2.5" y="6" width="19" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><line x1="6" y1="10" x2="6" y2="10.01"/><line x1="18" y1="14" x2="18" y2="14.01"/>', s); },
+  chart: function (s) { return svgIcon('<line x1="5" y1="21" x2="5" y2="11"/><line x1="12" y1="21" x2="12" y2="6"/><line x1="19" y1="21" x2="19" y2="14"/>', s); },
+  image: function (s) { return svgIcon('<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5.5-5.5a2 2 0 0 0-2.8 0L3 20"/>', s); },
+  film: function (s) { return svgIcon('<rect x="3" y="4" width="18" height="16" rx="2"/><line x1="8" y1="4" x2="8" y2="20"/><line x1="16" y1="4" x2="16" y2="20"/><line x1="3" y1="9" x2="8" y2="9"/><line x1="3" y1="15" x2="8" y2="15"/><line x1="16" y1="9" x2="21" y2="9"/><line x1="16" y1="15" x2="21" y2="15"/>', s); },
+  video: function (s) { return svgIcon('<rect x="2.5" y="6" width="14" height="12" rx="2"/><path d="M16.5 10.5L21 8v8l-4.5-2.5"/>', s); },
+  star: function (s) { return svgIcon('<path d="M12 3.2l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 3.1 1-6.1-4.4-4.3 6.1-.9z"/>', s); },
+  trash: function (s) { return svgIcon('<line x1="4" y1="7" x2="20" y2="7"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>', s); },
+  chat: function (s) { return svgIcon('<path d="M4 5h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H9l-5 4V6a1 1 0 0 1 1-1z"/>', s); },
+  lock: function (s) { return svgIcon('<rect x="4.5" y="10.5" width="15" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/>', s); },
+  settings: function (s) { return svgIcon('<circle cx="12" cy="12" r="3"/><path d="M19.4 13.5a7.6 7.6 0 0 0 0-3l2-1.5-2-3.4-2.3.9a7.7 7.7 0 0 0-2.6-1.5L14 2.5h-4l-.5 2.5a7.7 7.7 0 0 0-2.6 1.5l-2.3-.9-2 3.4 2 1.5a7.6 7.6 0 0 0 0 3l-2 1.5 2 3.4 2.3-.9c.8.65 1.65 1.15 2.6 1.5l.5 2.5h4l.5-2.5a7.7 7.7 0 0 0 2.6-1.5l2.3.9 2-3.4z"/>', s); },
+  wave: function (s) { return svgIcon('<circle cx="12" cy="8" r="3.6"/><path d="M4.5 20.2c1.4-3.7 4.3-5.6 7.5-5.6s6.1 1.9 7.5 5.6"/>', s); },
+  pin: function (s) { return svgIcon('<path d="M12 21s7-6.5 7-11.5a7 7 0 0 0-14 0C5 14.5 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.4"/>', s); },
+  phone: function (s) { return svgIcon('<path d="M5.5 3.5h3.2l1.4 4.6-2 1.6a13 13 0 0 0 6.2 6.2l1.6-2 4.6 1.4v3.2c0 1-.9 1.8-1.9 1.6C10.4 19 5 13.6 3.9 5.4 3.7 4.4 4.5 3.5 5.5 3.5z"/>', s); },
+  mail: function (s) { return svgIcon('<rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M3 6.5l9 6.5 9-6.5"/>', s); },
+  check: function (s) { return svgIcon('<circle cx="12" cy="12" r="9.5"/><path d="M7.5 12.5l3 3 6-6.5"/>', s); },
+  bell: function (s) { return svgIcon('<path d="M6 9.5a6 6 0 0 1 12 0c0 4.2 1.5 5.6 2 6.5H4c.5-.9 2-2.3 2-6.5z"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0"/>', s); },
+  search: function (s) { return svgIcon('<circle cx="10.5" cy="10.5" r="6.5"/><line x1="19.5" y1="19.5" x2="15.3" y2="15.3"/>', s); },
+  shirt: function (s) { return svgIcon('<path d="M8 3l4 2 4-2 4 4-3 3v11H7V10L4 7z"/>', s); },
+  box: function (s) { return svgIcon('<path d="M3.5 8l8.5-4.5L20.5 8 12 12.5 3.5 8z"/><path d="M3.5 8v9L12 21.5 20.5 17V8"/><line x1="12" y1="12.5" x2="12" y2="21.5"/>', s); }
 };
 
 /* ============================================================================
@@ -380,7 +428,8 @@ var pendingCalls = 0;
 function setLoading(on) {
   pendingCalls = Math.max(0, pendingCalls + (on ? 1 : -1));
   var bar = document.getElementById('loadBar');
-  if (pendingCalls > 0) { bar.style.width = '70%'; } else { bar.style.width = '100%'; setTimeout(function () { bar.style.width = '0'; }, 250); }
+  if (!bar) return;
+  bar.classList.toggle('active', pendingCalls > 0);
 }
 
 function api(fnName) {
@@ -432,25 +481,51 @@ function todayStr() { var d = new Date(); return d.getFullYear() + '-' + String(
 window.addEventListener('hashchange', route);
 document.addEventListener('DOMContentLoaded', init);
 
+/**
+ * Zero-delay startup: getPublicData() (and the logged-in user, if any) are
+ * cached in localStorage from the previous visit. On every load after the
+ * first, that cache is read and painted synchronously — before any network
+ * round trip — so the site/dashboard appears instantly instead of behind a
+ * blank screen. The real data is then fetched in the background and only
+ * triggers a re-render if something actually changed (classic SWR).
+ */
+function cachePublicData(d) { try { localStorage.setItem('at_publicdata', JSON.stringify(d)); } catch (e) { /* private-mode storage can throw — just skip caching */ } }
+function readCachedPublicData() { try { var raw = localStorage.getItem('at_publicdata'); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
+function cacheUser(u) { try { if (u) localStorage.setItem('at_user', JSON.stringify(u)); else localStorage.removeItem('at_user'); } catch (e) { /* ignore */ } }
+function readCachedUser() { try { var raw = localStorage.getItem('at_user'); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
+
 function init() {
   var visitorKey = localStorage.getItem('at_visitor') || (Date.now() + '-' + Math.random().toString(36).slice(2));
   localStorage.setItem('at_visitor', visitorKey);
+
+  var cachedPublicData = readCachedPublicData();
+  if (cachedPublicData) {
+    state.publicData = cachedPublicData;
+    state.settings = cachedPublicData.settings;
+    applyTheme(cachedPublicData.settings);
+    if (state.token) state.user = readCachedUser();
+    route(); // paints instantly from cache — no spinner, no blank screen
+  }
+
   api('trackVisit', visitorKey).catch(function () {});
 
   api('getPublicData').then(function (data) {
+    var changed = !cachedPublicData || JSON.stringify(cachedPublicData) !== JSON.stringify(data);
     state.publicData = data;
     state.settings = data.settings;
+    cachePublicData(data);
     applyTheme(data.settings);
     if (state.token) {
       api('getCurrentUser', state.token).then(function (user) {
         state.user = user;
-        route();
-      }).catch(function () { state.token = null; localStorage.removeItem('at_token'); route(); });
-    } else {
+        cacheUser(user);
+        if (changed || !cachedPublicData) route();
+      }).catch(function () { state.token = null; state.user = null; localStorage.removeItem('at_token'); cacheUser(null); route(); });
+    } else if (changed || !cachedPublicData) {
       route();
     }
   }).catch(function (err) {
-    document.getElementById('app').innerHTML = '<div style="padding:60px;text-align:center;">Unable to load. ' + esc(err.message) + '</div>';
+    if (!cachedPublicData) document.getElementById('app').innerHTML = '<div style="padding:60px;text-align:center;">Unable to load. ' + esc(err.message) + '</div>';
   });
 }
 
@@ -501,6 +576,7 @@ function renderPublicSite() {
     renderHero(d.heroSlides, s) +
     renderAbout(d, s) +
     renderServicesSection(d) +
+    (d.shopProducts && d.shopProducts.length ? renderShopSection(d) : '') +
     (String(s.ShowTeamSection).toUpperCase() === 'Y' ? renderStaffSection(d.staff) : '') +
     renderGallerySection(d.gallery) +
     (d.videos && d.videos.length ? renderVideosSection(d.videos) : '') +
@@ -514,6 +590,8 @@ function renderPublicSite() {
   bindPublicNavEvents();
   startHeroRotation(d.heroSlides.length);
   bindReviewForm();
+  renderWizard();
+  updateNavCartBadge();
 }
 
 function waNumber(s) { return (s.WhatsAppNumber || '').replace(/[^\d]/g, ''); }
@@ -530,8 +608,9 @@ function renderPublicNav(d) {
     '<div class="brand">' + (s.LogoURL ? '<img src="' + s.LogoURL + '">' : '') + esc(s.BusinessName || 'Advance Tailor') + '</div>' +
     '<button id="navToggle">&#9776;</button>' +
     '<nav id="pubNavLinks">' +
-      '<a href="#services">Services</a><a href="#staff">Our Team</a><a href="#gallery">Portfolio</a><a href="#reviews">Reviews</a>' +
+      '<a href="#services">Services</a><a href="#shop">Shop</a><a href="#staff">Our Team</a><a href="#gallery">Portfolio</a><a href="#reviews">Reviews</a>' +
       '<a href="#track">Track Order</a><a href="#contact">Contact</a>' +
+      '<span id="navCartBtn" onclick="openShopCart()" style="position:relative;cursor:pointer;">' + ICONS.cart(18) + '<span id="navCartCount" class="hidden" style="position:absolute;top:-8px;right:-10px;background:var(--clr-secondary);color:#1a1a1a;border-radius:999px;font-size:.65rem;font-weight:800;padding:1px 5px;"></span></span>' +
       '<span class="shopStatusBadge ' + (d.shopStatus.open ? 'open' : 'closed') + '"><span class="dot"></span>' + (d.shopStatus.open ? 'Open now' : 'Closed now') + '</span>' +
       '<a href="#booking" class="btn btn-accent btn-sm">Book a Fitting</a>' +
       '<a onclick="location.hash=\'#admin\'" class="btn btn-outline-light btn-sm">Staff Login</a>' +
@@ -611,6 +690,119 @@ function renderStaffSection(staff) {
       return '<div class="card staffCard"><img class="photo" src="' + (s.PhotoURL || '') + '" onerror="this.style.background=\'#eee\'">' +
         '<h3 style="font-size:1rem;">' + esc(s.Name) + '</h3><div class="role">' + esc(s.Role) + '</div><div class="spec">' + esc(s.Specialties || '') + '</div></div>';
     }).join('') + '</div></div></section>';
+}
+
+/* ============================================================================
+ * PUBLIC SHOP — ready-to-wear items sold straight from the website,
+ * checked out with mobile money (or pay-on-pickup Cash), then trackable
+ * through the same Track My Order flow as a bespoke garment order.
+ * ==========================================================================*/
+function renderShopSection(d) {
+  return '<section class="pubSection" id="shop"><div class="container">' +
+    '<div class="sectionHead"><span class="eyebrow">Ready to Wear</span><h2>Shop Our Pieces</h2><p class="muted">Buy off-the-rack favourites online — pay by mobile money and pick up, or we deliver.</p></div>' +
+    '<div class="grid grid-4">' + d.shopProducts.map(renderShopProductCard).join('') + '</div>' +
+    '</div></section>';
+}
+function renderShopProductCard(p) {
+  var out = Number(p.QuantityInStock) <= 0;
+  return '<div class="card svcCard"><div class="thumb" style="background-image:url(\'' + (p.ImageURL || '') + '\')"></div>' +
+    '<div class="body"><span class="catTag">' + esc(p.Category) + '</span><h3 style="font-size:1.05rem;">' + esc(p.Name) + '</h3>' +
+    '<div class="priceRow"><span class="price">' + fmtMoney(p.SellingPrice) + '</span><span class="muted">' + (out ? 'Out of stock' : p.QuantityInStock + ' in stock') + '</span></div>' +
+    '<button class="btn btn-block btn-sm" style="margin-top:12px;" ' + (out ? 'disabled' : 'onclick="addToShopCart(\'' + p.ProductID + '\')"') + '>' + (out ? 'Out of Stock' : 'Add to Cart') + '</button></div></div>';
+}
+function addToShopCart(productId) {
+  var product = (state.publicData.shopProducts || []).find(function (p) { return p.ProductID === productId; });
+  if (!product) return;
+  var line = state.shopCart.find(function (l) { return l.productId === productId; });
+  var currentQty = line ? line.qty : 0;
+  if (currentQty + 1 > Number(product.QuantityInStock)) { toast('No more stock available for ' + product.Name + '.', 'error'); return; }
+  if (line) line.qty += 1; else state.shopCart.push({ productId: productId, qty: 1 });
+  persistShopCart();
+  updateNavCartBadge();
+  toast(product.Name + ' added to cart.', 'success');
+}
+function persistShopCart() { try { localStorage.setItem('at_shopcart', JSON.stringify(state.shopCart)); } catch (e) { /* private-mode storage can throw — cart just won't survive a reload */ } }
+function updateNavCartBadge() {
+  var el = document.getElementById('navCartCount');
+  if (!el) return;
+  var count = state.shopCart.reduce(function (sum, l) { return sum + l.qty; }, 0);
+  if (count > 0) { el.textContent = count; el.classList.remove('hidden'); } else { el.classList.add('hidden'); }
+}
+function shopCartTotal() {
+  var products = keyByJs(state.publicData.shopProducts || [], 'ProductID');
+  return state.shopCart.reduce(function (sum, l) { var p = products[l.productId]; return sum + (p ? Number(p.SellingPrice) * l.qty : 0); }, 0);
+}
+function openShopCart() {
+  if (!state.shopCart.length) { toast('Your cart is empty. Add something from the Shop section first.', 'error'); document.getElementById('shop') && document.getElementById('shop').scrollIntoView({ behavior: 'smooth' }); return; }
+  var products = keyByJs(state.publicData.shopProducts || [], 'ProductID');
+  var settings = state.settings;
+  var methods = String(settings.ActivePaymentMethods || '').split(',').map(function (m) { return m.trim(); }).filter(Boolean);
+  var linesHtml = state.shopCart.map(function (l) {
+    var p = products[l.productId];
+    if (!p) return '';
+    return '<div class="cartLine"><span>' + esc(p.Name) + '</span><div class="qtyCtrl"><button onclick="changeShopCartQty(\'' + l.productId + '\',-1)">−</button><span>' + l.qty + '</span><button onclick="changeShopCartQty(\'' + l.productId + '\',1)">+</button></div><span>' + fmtMoney(p.SellingPrice * l.qty) + '</span></div>';
+  }).join('');
+  openModal('<div class="modalHead"><h3>Your Cart</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
+    '<div id="shopCartLines">' + linesHtml + '</div>' +
+    '<div class="cartTotals"><div class="row grand"><span>Total</span><span id="shopCartTotal">' + fmtMoney(shopCartTotal()) + '</span></div></div>' +
+    '<h4 style="margin-top:18px;">Your details</h4>' +
+    '<div class="form-row"><div class="field"><label>Full Name</label><input type="text" id="shopName" required></div>' +
+    '<div class="field"><label>Phone</label><input type="tel" id="shopPhone" required placeholder="024XXXXXXX"></div></div>' +
+    '<div class="field"><label>Email (optional, for receipt)</label><input type="email" id="shopEmail"></div>' +
+    '<h4 style="margin-top:14px;">Payment</h4>' +
+    '<div class="paymentMethodGrid">' + methods.map(function (m) {
+      return '<div class="optionCard' + (m === 'Cash' ? ' selected' : '') + '" data-method="' + esc(m) + '" onclick="pickShopPayment(\'' + m + '\')"><div class="oc-title">' + esc(m) + '</div></div>';
+    }).join('') + '</div>' +
+    '<div id="shopPayDetail">' + paymentDetailHtml('Cash', settings) + '</div>' +
+    '<div class="field hidden" id="shopProofField" style="margin-top:12px;"><label>Upload payment screenshot (optional)</label><input type="file" id="shopProof" accept="image/*"></div>' +
+    '<button class="btn btn-block btn-accent" style="margin-top:16px;" onclick="submitShopCheckout()">Place Order</button>', { wide: true });
+  window.__shopPaymentMethod = 'Cash';
+}
+function pickShopPayment(m) {
+  window.__shopPaymentMethod = m;
+  document.querySelectorAll('#modalHost .optionCard[data-method]').forEach(function (el) { el.classList.toggle('selected', el.dataset.method === m); });
+  document.getElementById('shopPayDetail').innerHTML = paymentDetailHtml(m, state.settings);
+  document.getElementById('shopProofField').classList.toggle('hidden', m === 'Cash');
+}
+function changeShopCartQty(productId, delta) {
+  var line = state.shopCart.find(function (l) { return l.productId === productId; });
+  if (!line) return;
+  var product = (state.publicData.shopProducts || []).find(function (p) { return p.ProductID === productId; });
+  if (delta > 0 && product && line.qty + 1 > Number(product.QuantityInStock)) { toast('No more stock available.', 'error'); return; }
+  line.qty += delta;
+  if (line.qty <= 0) state.shopCart = state.shopCart.filter(function (l) { return l.productId !== productId; });
+  persistShopCart();
+  updateNavCartBadge();
+  if (!state.shopCart.length) { closeModal(); return; }
+  openShopCart();
+}
+function submitShopCheckout() {
+  var name = document.getElementById('shopName').value.trim();
+  var phone = document.getElementById('shopPhone').value.trim();
+  var email = document.getElementById('shopEmail').value.trim();
+  if (!name || !phone) { toast('Please enter your name and phone number.', 'error'); return; }
+  var proofInput = document.getElementById('shopProof');
+  var proceed = function (proofUrl) {
+    api('createPublicSale', {
+      items: state.shopCart, customerName: name, customerPhone: phone, customerEmail: email,
+      paymentMethod: window.__shopPaymentMethod || 'Cash', paymentProofUrl: proofUrl || ''
+    }).then(function (res) {
+      state.shopCart = [];
+      persistShopCart();
+      updateNavCartBadge();
+      openModal('<div class="successBox"><div style="color:#1c7c3c;">' + ICONS.check(52) + '</div><h3>Order Placed!</h3>' +
+        '<p class="muted">' + (res.sale.PaymentStatus === 'Awaiting Verification' ? 'We\'ll confirm your payment shortly.' : 'Please pay on pickup.') + '</p>' +
+        '<div class="refCode">' + esc(res.reference) + '</div>' +
+        '<p class="muted">Save this reference to track your order.</p>' +
+        '<button class="btn btn-accent" onclick="closeModal()">Done</button></div>');
+      api('getShopProducts').then(function (products) { state.publicData.shopProducts = products; });
+    }).catch(toastError);
+  };
+  if (proofInput && proofInput.files[0]) {
+    var reader = new FileReader();
+    reader.onload = function () { api('uploadPaymentProof', reader.result, proofInput.files[0].name, proofInput.files[0].type).then(function (r) { proceed(r.url); }).catch(function (e) { toastError(e); proceed(''); }); };
+    reader.readAsDataURL(proofInput.files[0]);
+  } else { proceed(''); }
 }
 
 function renderGallerySection(gallery) {
@@ -805,7 +997,7 @@ function submitBooking() {
   } else { proceed(''); }
 }
 function renderBookingSuccess(res) {
-  return '<div class="successBox"><div style="font-size:3rem;">✅</div><h3>Booking Received!</h3>' +
+  return '<div class="successBox"><div style="color:#1c7c3c;">' + ICONS.check(52) + '</div><h3>Booking Received!</h3>' +
     '<p class="muted">We\'ll confirm your appointment shortly by SMS/Email.</p>' +
     '<div class="refCode">' + esc(res.reference || '') + '</div>' +
     '<p class="muted">Save this reference to track or manage your booking.</p>' +
@@ -833,19 +1025,22 @@ function doTrackLookup() {
   host.innerHTML = '<p class="muted">Searching…</p>';
   if (/^\d[\d\s+-]{6,}$/.test(val)) {
     api('lookupMyOrders', val).then(function (orders) {
-      if (!orders.length) { host.innerHTML = '<div class="emptyState">No orders found for that phone number.</div>'; return; }
+      if (!orders.length) { host.innerHTML = '<div class="emptyState">No orders or purchases found for that phone number.</div>'; return; }
       host.innerHTML = orders.map(renderOrderTrackCard).join('');
     }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
   } else {
     api('lookupOrderByReference', val).then(function (o) { host.innerHTML = renderOrderTrackCard(o); })
       .catch(function () {
-        api('lookupBookingByReference', val).then(function (b) { host.innerHTML = renderBookingTrackCard(b); })
-          .catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+        api('lookupSaleByReference', val).then(function (o) { host.innerHTML = renderOrderTrackCard(o); })
+          .catch(function () {
+            api('lookupBookingByReference', val).then(function (b) { host.innerHTML = renderBookingTrackCard(b); })
+              .catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+          });
       });
   }
 }
 function renderOrderTrackCard(o) {
-  var stages = ['Order Received', 'Measuring', 'Cutting', 'Sewing', 'Fitting', 'Finishing', 'Ready for Pickup', 'Delivered'];
+  var stages = o.Stages || ['Order Received', 'Measuring', 'Cutting', 'Sewing', 'Fitting', 'Finishing', 'Ready for Pickup', 'Delivered'];
   var idx = o.StageIndex >= 0 ? o.StageIndex : 0;
   var isCancelled = o.Status === 'Cancelled';
   return '<div class="trackResultCard"><div style="display:flex;justify-content:space-between;align-items:center;">' +
@@ -879,10 +1074,10 @@ function renderContactSection(d, s) {
   return '<section class="pubSection" id="contact"><div class="container">' +
     '<div class="sectionHead"><span class="eyebrow">Get In Touch</span><h2>Visit or Contact Us</h2></div>' +
     '<div class="contactGrid"><div>' +
-    '<div class="contactInfoRow"><div class="ic">📍</div><div><strong>Location</strong><div class="muted">' + esc(d.branch.Location || '') + '</div></div></div>' +
-    '<div class="contactInfoRow"><div class="ic">📞</div><div><strong>Phone</strong><div class="muted">' + esc(s.ContactPhone || '') + '</div></div></div>' +
-    '<div class="contactInfoRow"><div class="ic">✉️</div><div><strong>Email</strong><div class="muted">' + esc(s.ContactEmail || '') + '</div></div></div>' +
-    '<div class="contactInfoRow"><div class="ic">🕑</div><div><strong>Hours</strong><table class="hoursTable">' + status.weekLabels.map(function (w) { return '<tr><td>' + w.day + '</td><td>' + esc(w.label) + '</td></tr>'; }).join('') + '</table></div></div>' +
+    '<div class="contactInfoRow"><div class="ic">' + ICONS.pin(18) + '</div><div><strong>Location</strong><div class="muted">' + esc(d.branch.Location || '') + '</div></div></div>' +
+    '<div class="contactInfoRow"><div class="ic">' + ICONS.phone(18) + '</div><div><strong>Phone</strong><div class="muted">' + esc(s.ContactPhone || '') + '</div></div></div>' +
+    '<div class="contactInfoRow"><div class="ic">' + ICONS.mail(18) + '</div><div><strong>Email</strong><div class="muted">' + esc(s.ContactEmail || '') + '</div></div></div>' +
+    '<div class="contactInfoRow"><div class="ic">' + ICONS.clock(18) + '</div><div><strong>Hours</strong><table class="hoursTable">' + status.weekLabels.map(function (w) { return '<tr><td>' + w.day + '</td><td>' + esc(w.label) + '</td></tr>'; }).join('') + '</table></div></div>' +
     renderSocialRow(s) +
     (s.MapEmbedURL ? '<div class="mapEmbed"><iframe src="' + s.MapEmbedURL + '" loading="lazy"></iframe></div>' : '') +
     '</div><div class="card" style="padding:26px;"><h3>Send us a message</h3>' +
@@ -892,7 +1087,7 @@ function renderContactSection(d, s) {
     '<button class="btn btn-block" type="submit">Send Message</button></form></div></div></div></section>';
 }
 function renderSocialRow(s) {
-  var links = [['SocialFacebook', 'f'], ['SocialInstagram', '◎'], ['SocialTwitter', '𝕏'], ['SocialTiktok', '♪'], ['SocialYoutube', '▶']];
+  var links = [['SocialFacebook', 'f'], ['SocialInstagram', '◎'], ['SocialTwitter', '𝕏'], ['SocialTiktok', '♪'], ['SocialYoutube', svgIcon('<path d="M8 6l10 6-10 6z"/>', 14, 1.4)]];
   var html = links.filter(function (l) { return s[l[0]]; }).map(function (l) { return '<a href="' + esc(s[l[0]]) + '" target="_blank">' + l[1] + '</a>'; }).join('');
   return html ? '<div class="socialRow">' + html + '</div>' : '';
 }
@@ -920,7 +1115,7 @@ var authTab = 'login';
 function renderLogin() {
   var s = state.settings || {};
   document.getElementById('app').innerHTML = '<div class="loginWrap"><div class="loginBox">' +
-    '<div class="logoRow">' + (s.LogoURL ? '<img src="' + s.LogoURL + '">' : '✂️') + '</div>' +
+    '<div class="logoRow">' + (s.LogoURL ? '<img src="' + s.LogoURL + '">' : ICONS.scissors(40)) + '</div>' +
     '<h2>' + esc(s.BusinessName || 'Advance Tailor') + '</h2>' +
     '<div class="authTabs"><button id="tabLogin" class="active" onclick="setAuthTab(\'login\')">Login</button><button id="tabRegister" onclick="setAuthTab(\'register\')">Register</button></div>' +
     '<div id="authForms"></div>' +
@@ -947,6 +1142,7 @@ function renderAuthForm() {
       api('login', fd.get('username'), fd.get('password')).then(function (res) {
         state.token = res.token; state.user = res.user;
         localStorage.setItem('at_token', res.token);
+        cacheUser(res.user);
         toast('Welcome back, ' + (res.user.fullName || res.user.username) + '!', 'success');
         state.adminPage = 'overview';
         renderAdminShell();
@@ -972,6 +1168,8 @@ function logoutUser() {
   api('logout', state.token).finally(function () {
     state.token = null; state.user = null;
     localStorage.removeItem('at_token');
+    cacheUser(null);
+    pageDataCache = {};
     location.hash = '#home';
     route();
   });
@@ -981,33 +1179,34 @@ function logoutUser() {
  * ADMIN SHELL
  * ==========================================================================*/
 var SIDEBAR_SECTIONS = [
-  { label: 'Overview', items: [{ key: 'overview', label: 'Dashboard', icon: '📊' }] },
+  { label: 'Overview', items: [{ key: 'overview', label: 'Dashboard', icon: ICONS.dashboard(18) }] },
   { label: 'Operations', items: [
-    { key: 'orders', label: 'Orders', icon: '🧵' },
-    { key: 'appointments', label: 'Appointments', icon: '📅' },
-    { key: 'slots', label: 'Availability', icon: '🕑' },
-    { key: 'pos', label: 'Point of Sale', icon: '🛒' }
+    { key: 'orders', label: 'Orders', icon: ICONS.scissors(18) },
+    { key: 'appointments', label: 'Appointments', icon: ICONS.calendar(18) },
+    { key: 'slots', label: 'Availability', icon: ICONS.clock(18) },
+    { key: 'pos', label: 'Point of Sale', icon: ICONS.cart(18) },
+    { key: 'onlineorders', label: 'Online Orders', icon: ICONS.box(18) }
   ]},
-  { label: 'Customers', items: [{ key: 'customers', label: 'Customers & Measurements', icon: '👤' }] },
+  { label: 'Customers', items: [{ key: 'customers', label: 'Customers & Measurements', icon: ICONS.user(18) }] },
   { label: 'Business', items: [
-    { key: 'services', label: 'Services', icon: '✂️' },
-    { key: 'staff', label: 'Staff', icon: '🧑‍🔧' },
-    { key: 'inventory', label: 'Inventory', icon: '🧶' },
-    { key: 'expenses', label: 'Expenses', icon: '💵' },
-    { key: 'reports', label: 'Reports', icon: '📈' }
+    { key: 'services', label: 'Services', icon: ICONS.scissors(18) },
+    { key: 'staff', label: 'Staff', icon: ICONS.team(18) },
+    { key: 'inventory', label: 'Inventory', icon: ICONS.spool(18) },
+    { key: 'expenses', label: 'Expenses', icon: ICONS.cash(18) },
+    { key: 'reports', label: 'Reports', icon: ICONS.chart(18) }
   ]},
   { label: 'Website', items: [
-    { key: 'gallery', label: 'Portfolio', icon: '🖼️' },
-    { key: 'hero', label: 'Hero Slides', icon: '🎞️' },
-    { key: 'videos', label: 'Videos', icon: '🎬' },
-    { key: 'reviews', label: 'Reviews', icon: '⭐' }
+    { key: 'gallery', label: 'Portfolio', icon: ICONS.image(18) },
+    { key: 'hero', label: 'Hero Slides', icon: ICONS.film(18) },
+    { key: 'videos', label: 'Videos', icon: ICONS.video(18) },
+    { key: 'reviews', label: 'Reviews', icon: ICONS.star(18) }
   ]},
   { label: 'System', items: [
-    { key: 'trash', label: 'Trash', icon: '🗑️' },
-    { key: 'sms', label: 'SMS Log', icon: '💬' },
-    { key: 'users', label: 'Users', icon: '🔐', roles: ['Owner', 'Manager'] },
-    { key: 'settings', label: 'Settings', icon: '⚙️', roles: ['Owner', 'Manager'] },
-    { key: 'account', label: 'My Account', icon: '🙋' }
+    { key: 'trash', label: 'Trash', icon: ICONS.trash(18) },
+    { key: 'sms', label: 'SMS Log', icon: ICONS.chat(18) },
+    { key: 'users', label: 'Users', icon: ICONS.lock(18), roles: ['Owner', 'Manager'] },
+    { key: 'settings', label: 'Settings', icon: ICONS.settings(18), roles: ['Owner', 'Manager'] },
+    { key: 'account', label: 'My Account', icon: ICONS.wave(18) }
   ]}
 ];
 var PAGE_TITLES = {};
@@ -1023,7 +1222,7 @@ function renderAdminShell() {
     '<div style="display:flex;align-items:center;gap:12px;"><button id="sidebarToggle" class="btn-icon" onclick="document.getElementById(\'adminSidebar\').classList.toggle(\'open\')">&#9776;</button>' +
     '<div class="pageTitle" id="pageTitleEl">' + esc(PAGE_TITLES[state.adminPage] || '') + '</div></div>' +
     '<div style="display:flex;align-items:center;gap:14px;">' +
-    '<div id="notifBell" style="position:relative;cursor:pointer;font-size:1.3rem;" onclick="openNotifPanel()">🔔<span id="notifCount" class="badge badge-cancelled" style="position:absolute;top:-8px;right:-10px;display:none;padding:1px 6px;"></span></div>' +
+    '<div id="notifBell" style="position:relative;cursor:pointer;" onclick="openNotifPanel()">' + ICONS.bell(20) + '<span id="notifCount" class="badge badge-cancelled" style="position:absolute;top:-8px;right:-10px;display:none;padding:1px 6px;"></span></div>' +
     '<a onclick="location.hash=\'#home\'" class="muted" style="font-size:.85rem;text-decoration:underline;">View Website</a>' +
     '<div class="avatarCircle">' + esc((user.fullName || user.username || '?').charAt(0).toUpperCase()) + '</div>' +
     '</div></div>' +
@@ -1035,7 +1234,7 @@ function renderAdminShell() {
 function renderSidebar() {
   var user = state.user;
   var s = state.settings || {};
-  var html = '<div class="sbBrand">' + (s.LogoURL ? '<img src="' + s.LogoURL + '">' : '✂️') + esc(s.BusinessName || 'Advance Tailor') + '</div><div class="sbNav">';
+  var html = '<div class="sbBrand">' + (s.LogoURL ? '<img src="' + s.LogoURL + '">' : ICONS.scissors(24)) + esc(s.BusinessName || 'Advance Tailor') + '</div><div class="sbNav">';
   SIDEBAR_SECTIONS.forEach(function (sec) {
     var items = sec.items.filter(function (it) { return !it.roles || it.roles.indexOf(user.role) > -1; });
     if (!items.length) return;
@@ -1060,9 +1259,9 @@ function loadNotifBell() {
 function openNotifPanel() {
   var n = window.__lastNotif || { pendingAppointments: 0, dueSoon: 0, lowStock: 0 };
   openModal('<div class="modalHead"><h3>Notifications</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
-    '<div class="panel" style="box-shadow:none;padding:0;"><p>🕑 <strong>' + n.pendingAppointments + '</strong> pending appointments awaiting confirmation</p>' +
-    '<p>🧵 <strong>' + n.dueSoon + '</strong> orders due within 2 days</p>' +
-    '<p>🧶 <strong>' + n.lowStock + '</strong> items low on stock</p></div>');
+    '<div class="panel" style="box-shadow:none;padding:0;"><p>' + ICONS.clock(16) + ' <strong>' + n.pendingAppointments + '</strong> pending appointments awaiting confirmation</p>' +
+    '<p>' + ICONS.scissors(16) + ' <strong>' + n.dueSoon + '</strong> orders due within 2 days</p>' +
+    '<p>' + ICONS.spool(16) + ' <strong>' + n.lowStock + '</strong> items low on stock</p></div>');
 }
 
 function renderAdminPage() {
@@ -1077,17 +1276,62 @@ function renderAdminPage() {
   var page = state.adminPage;
   var renderers = {
     overview: renderOverview, orders: renderOrdersPage, appointments: renderAppointmentsPage, slots: renderSlotsAdmin,
-    pos: renderPOS, customers: renderCustomers, services: renderServicesAdmin, staff: renderStaffAdmin,
+    pos: renderPOS, onlineorders: renderOnlineOrdersAdmin, customers: renderCustomers, services: renderServicesAdmin, staff: renderStaffAdmin,
     inventory: renderInventory, expenses: renderExpenses, reports: renderReports, gallery: renderGalleryAdmin,
     hero: renderHeroAdmin, videos: renderVideosAdmin, reviews: renderReviewsAdmin, trash: renderTrashAdmin,
     sms: renderSmsAdmin, users: renderUsersAdmin, settings: renderSettingsAdmin, account: renderAccount
   };
   var fn = renderers[page] || renderOverview;
-  host.innerHTML = '<div class="emptyState">Loading…</div>';
   fn(host);
 }
 
 /* ---- Shared table/pagination helper ---- */
+/* ============================================================================
+ * SWR (stale-while-revalidate) PAGE CACHE
+ *
+ * Every admin page keeps its last-fetched data in `pageDataCache`, which
+ * lives for the whole browser session (this is a single-page app — nothing
+ * ever full-reloads between admin pages, so an in-memory object is enough).
+ * Navigating to a page that's already cached paints instantly from that
+ * cache with NO loading state, then quietly re-fetches in the background
+ * and only re-draws if the data actually changed. A page with no cache yet
+ * shows a lightweight shimmer instead of a blank "Loading…" screen.
+ * ==========================================================================*/
+var pageDataCache = {};
+function withPageCache(pageKey, fetcher, drawFn, host) {
+  var cached = pageDataCache[pageKey];
+  if (cached) {
+    drawFn(host, cached);
+  } else {
+    host.innerHTML = skeletonHtml();
+  }
+  fetcher().then(function (fresh) {
+    // The admin nav may have moved on to a different page while this
+    // in-flight request was still running — don't paint stale data over
+    // whatever the user is looking at now.
+    if (state.adminPage !== pageKey.split(':')[0]) return;
+    var changed = !cached || JSON.stringify(cached) !== JSON.stringify(fresh);
+    pageDataCache[pageKey] = fresh;
+    if (changed) drawFn(host, fresh);
+  }).catch(function (err) {
+    if (!cached) host.innerHTML = '<div class="emptyState">' + esc(err.message) + '</div>';
+    else toastError(err);
+  });
+}
+/** Call after any save/delete/update so the next visit (or the re-render right after the mutation) fetches fresh instead of showing stale cached data. */
+function invalidatePageCache() {
+  Array.prototype.slice.call(arguments).forEach(function (prefix) {
+    Object.keys(pageDataCache).forEach(function (k) { if (k === prefix || k.indexOf(prefix + ':') === 0) delete pageDataCache[k]; });
+  });
+}
+function skeletonBar(width, height) {
+  return '<div style="height:' + (height || 14) + 'px;width:' + (width || '100%') + ';border-radius:6px;background:linear-gradient(90deg,#eee,#f5f5f3,#eee);background-size:200% 100%;animation:skeletonShine 1.2s ease-in-out infinite;margin-bottom:10px;"></div>';
+}
+function skeletonHtml() {
+  return '<div class="panel">' + skeletonBar('35%', 20) + skeletonBar('100%') + skeletonBar('90%') + skeletonBar('60%') + '</div>' +
+    '<div class="panel">' + skeletonBar('45%') + skeletonBar('80%') + skeletonBar('70%') + '</div>';
+}
+
 var tableState = {};
 function renderTable(headers, rows, pageKey, pageSize) {
   pageSize = pageSize || 10;
@@ -1114,7 +1358,9 @@ function renderTable(headers, rows, pageKey, pageSize) {
  * DASHBOARD OVERVIEW
  * ==========================================================================*/
 function renderOverview(host) {
-  Promise.all([api('getDashboardOverview', state.token), api('getOrderStatuses')]).then(function (r) {
+  withPageCache('overview', function () { return Promise.all([api('getDashboardOverview', state.token), api('getOrderStatuses')]); }, drawOverview, host);
+}
+function drawOverview(host, r) {
     var d = r[0], statuses = r[1];
     host.innerHTML =
       '<div class="statGrid">' +
@@ -1147,7 +1393,6 @@ function renderOverview(host) {
         return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0ee;font-size:.85rem;"><span>' + esc(p.Name) + '</span><span style="color:#c0392b;font-weight:700;">' + p.QuantityInStock + ' ' + esc(p.Unit || '') + '</span></div>';
       }).join('') : '<div class="emptyState">Stock levels are healthy.</div>') + '</div>' +
       '</div></div>';
-  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
 }
 function statCard(label, val, sub) {
   return '<div class="statCard"><div class="lbl">' + label + '</div><div class="val">' + val + '</div>' + (sub ? '<div class="sub">' + sub + '</div>' : '') + '</div>';
@@ -1159,11 +1404,12 @@ function statCard(label, val, sub) {
 var ordersView = 'kanban';
 var ordersCache = { rows: [], services: [], staff: [], customers: [], statuses: [] };
 function renderOrdersPage(host) {
-  Promise.all([api('getOrders', state.token, {}), api('getServices', state.token), api('getStaff', state.token), api('getCustomers', state.token), api('getOrderStatuses')])
-    .then(function (r) {
-      ordersCache = { rows: r[0], services: r[1], staff: r[2], customers: r[3], statuses: r[4] };
-      drawOrders(host);
-    }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+  withPageCache('orders', function () {
+    return Promise.all([api('getOrders', state.token, {}), api('getServices', state.token), api('getStaff', state.token), api('getCustomers', state.token), api('getOrderStatuses')]);
+  }, function (host, r) {
+    ordersCache = { rows: r[0], services: r[1], staff: r[2], customers: r[3], statuses: r[4] };
+    drawOrders(host);
+  }, host);
 }
 function drawOrders(host) {
   var rows = ordersCache.rows;
@@ -1245,7 +1491,7 @@ function openOrderForm(existing) {
     var fileInput = document.getElementById('orderDesignFile');
     var save = function (designUrl) {
       if (designUrl) payload.DesignImageURL = designUrl;
-      api('saveOrder', state.token, payload).then(function () { toast('Order saved.', 'success'); closeModal(); renderOrdersPage(document.getElementById('adminContent')); }).catch(toastError);
+      api('saveOrder', state.token, payload).then(function () { toast('Order saved.', 'success'); closeModal(); invalidatePageCache('orders', 'overview'); renderOrdersPage(document.getElementById('adminContent')); }).catch(toastError);
     };
     if (fileInput.files[0]) {
       var reader = new FileReader();
@@ -1285,17 +1531,17 @@ function renderMeasurementBlock(m) {
 }
 function advanceOrderStatus(orderId) {
   var status = document.getElementById('orderStatusSelect').value;
-  api('updateOrderStatus', state.token, orderId, status).then(function () { toast('Order status updated.', 'success'); closeModal(); renderOrdersPage(document.getElementById('adminContent')); loadNotifBell(); }).catch(toastError);
+  api('updateOrderStatus', state.token, orderId, status).then(function () { toast('Order status updated.', 'success'); closeModal(); invalidatePageCache('orders', 'overview'); renderOrdersPage(document.getElementById('adminContent')); loadNotifBell(); }).catch(toastError);
 }
 function recordOrderPaymentUi(orderId) {
   var amt = document.getElementById('payAmountInput').value;
   var method = document.getElementById('payMethodInput').value;
   if (!amt || Number(amt) <= 0) { toast('Enter a valid amount.', 'error'); return; }
-  api('recordOrderPayment', state.token, orderId, amt, method).then(function () { toast('Payment recorded.', 'success'); closeModal(); renderOrdersPage(document.getElementById('adminContent')); }).catch(toastError);
+  api('recordOrderPayment', state.token, orderId, amt, method).then(function () { toast('Payment recorded.', 'success'); closeModal(); invalidatePageCache('orders', 'overview'); renderOrdersPage(document.getElementById('adminContent')); }).catch(toastError);
 }
 function clearOneOrder(orderId) {
   if (!confirm('Move this order to Trash? It can be restored later.')) return;
-  api('clearOrders', state.token, [orderId]).then(function () { toast('Order moved to Trash.', 'success'); closeModal(); renderOrdersPage(document.getElementById('adminContent')); }).catch(toastError);
+  api('clearOrders', state.token, [orderId]).then(function () { toast('Order moved to Trash.', 'success'); closeModal(); invalidatePageCache('orders', 'overview', 'trash'); renderOrdersPage(document.getElementById('adminContent')); }).catch(toastError);
 }
 function exportCsv(fnName, args) {
   var params = args || {};
@@ -1313,9 +1559,9 @@ function exportCsv(fnName, args) {
 var apptsView = 'table';
 var apptsCache = { rows: [], services: [], staff: [], customers: [] };
 function renderAppointmentsPage(host) {
-  Promise.all([api('getAppointments', state.token, {}), api('getServices', state.token), api('getStaff', state.token), api('getCustomers', state.token)])
-    .then(function (r) { apptsCache = { rows: r[0], services: r[1], staff: r[2], customers: r[3] }; drawAppointments(host); })
-    .catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+  withPageCache('appointments', function () {
+    return Promise.all([api('getAppointments', state.token, {}), api('getServices', state.token), api('getStaff', state.token), api('getCustomers', state.token)]);
+  }, function (host, r) { apptsCache = { rows: r[0], services: r[1], staff: r[2], customers: r[3] }; drawAppointments(host); }, host);
 }
 function drawAppointments(host) {
   host.innerHTML = '<div class="toolbar"><div class="left">' +
@@ -1355,7 +1601,7 @@ function apptStatusButtons(a) {
   return '<select onchange="setApptStatus(\'' + a.AppointmentID + '\', this.value)">' + opts + '</select>';
 }
 function setApptStatus(id, status) {
-  api('updateAppointmentStatus', state.token, id, status).then(function () { toast('Status updated.', 'success'); renderAppointmentsPage(document.getElementById('adminContent')); loadNotifBell(); }).catch(toastError);
+  api('updateAppointmentStatus', state.token, id, status).then(function () { toast('Status updated.', 'success'); invalidatePageCache('appointments', 'overview'); renderAppointmentsPage(document.getElementById('adminContent')); loadNotifBell(); }).catch(toastError);
 }
 function renderApptsKanban(rows) {
   return '<div class="kanban">' + APPT_STATUSES.map(function (status) {
@@ -1382,7 +1628,7 @@ function openApptForm() {
   document.getElementById('apptForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var payload = Object.fromEntries(new FormData(e.target).entries());
-    api('createAppointmentAdmin', state.token, payload).then(function () { toast('Appointment created.', 'success'); closeModal(); renderAppointmentsPage(document.getElementById('adminContent')); }).catch(toastError);
+    api('createAppointmentAdmin', state.token, payload).then(function () { toast('Appointment created.', 'success'); closeModal(); invalidatePageCache('appointments', 'overview'); renderAppointmentsPage(document.getElementById('adminContent')); }).catch(toastError);
   });
 }
 
@@ -1420,7 +1666,14 @@ function toggleSlot(branchId, date, slot) {
  * CUSTOMERS / CRM / MEASUREMENTS
  * ==========================================================================*/
 function renderCustomers(host) {
-  api('getCustomers', state.token, window.__custSearch || '').then(function (rows) {
+  var q = window.__custSearch || '';
+  if (q) {
+    api('getCustomers', state.token, q).then(function (rows) { drawCustomers(host, rows, true); }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+  } else {
+    withPageCache('customers', function () { return api('getCustomers', state.token, ''); }, drawCustomers, host);
+  }
+}
+function drawCustomers(host, rows, keepFocus) {
     host.innerHTML = '<div class="toolbar"><div class="left"><div class="searchBox"><input type="text" id="custSearch" placeholder="Search customers…" value="' + (window.__custSearch || '') + '"></div></div>' +
       '<button class="btn btn-accent" onclick="openCustomerForm()">+ New Customer</button></div>' +
       renderTable([
@@ -1431,8 +1684,7 @@ function renderCustomers(host) {
       ], rows, 'customers-table');
     var s = document.getElementById('custSearch');
     s.addEventListener('input', debounce(function (e) { window.__custSearch = e.target.value; renderCustomers(host); }, 300));
-    s.focus(); s.setSelectionRange(s.value.length, s.value.length);
-  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+    if (keepFocus) { s.focus(); s.setSelectionRange(s.value.length, s.value.length); }
 }
 function openCustomerForm(existing) {
   openModal('<div class="modalHead"><h3>' + (existing ? 'Edit Customer' : 'New Customer') + '</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
@@ -1445,7 +1697,7 @@ function openCustomerForm(existing) {
   document.getElementById('customerForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var payload = Object.fromEntries(new FormData(e.target).entries());
-    api('saveCustomer', state.token, payload).then(function () { toast('Customer saved.', 'success'); closeModal(); renderCustomers(document.getElementById('adminContent')); }).catch(toastError);
+    api('saveCustomer', state.token, payload).then(function () { toast('Customer saved.', 'success'); closeModal(); invalidatePageCache('customers'); renderCustomers(document.getElementById('adminContent')); }).catch(toastError);
   });
 }
 function openCustomerProfile(customerId) {
@@ -1516,7 +1768,9 @@ function deleteMeasurementUi(id, customerId) {
  * ==========================================================================*/
 var posProducts = [];
 function renderPOS(host) {
-  api('getProducts', state.token).then(function (products) {
+  withPageCache('pos', function () { return api('getProducts', state.token); }, drawPOS, host);
+}
+function drawPOS(host, products) {
     posProducts = products;
     host.innerHTML = '<div class="posLayout"><div>' +
       '<div class="searchBox" style="margin-bottom:14px;"><input type="text" id="posSearch" placeholder="Search fabric, accessories…" style="width:100%;"></div>' +
@@ -1530,7 +1784,6 @@ function renderPOS(host) {
     renderPosItems();
     renderCart();
     document.getElementById('posSearch').addEventListener('input', debounce(renderPosItems, 200));
-  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
 }
 function renderPosItems() {
   var q = (document.getElementById('posSearch').value || '').toLowerCase();
@@ -1588,36 +1841,60 @@ function checkoutSale() {
   api('createSale', state.token, payload).then(function (res) {
     toast('Sale completed — ' + fmtMoney(res.sale.Total) + (res.pointsEarned ? ' · +' + res.pointsEarned + ' pts' : ''), 'success');
     state.cart = [];
+    invalidatePageCache('pos', 'inventory', 'overview');
     renderPOS(document.getElementById('adminContent'));
   }).catch(toastError);
 }
 
 /* ============================================================================
+ * ONLINE ORDERS ADMIN — checkout-via-mobile-money purchases from the public Shop
+ * ==========================================================================*/
+var SALE_FULFILLMENT_STATUSES_JS = ['Processing', 'Ready for Pickup', 'Out for Delivery', 'Delivered'];
+function renderOnlineOrdersAdmin(host) {
+  withPageCache('onlineorders', function () { return api('getOnlineSales', state.token, {}); }, drawOnlineOrdersAdmin, host);
+}
+function drawOnlineOrdersAdmin(host, rows) {
+    host.innerHTML = renderTable([
+      { label: 'Ref', key: 'Reference' }, { label: 'Customer', key: 'CustomerName' }, { label: 'Phone', key: 'CustomerPhone' },
+      { label: 'Items', render: function (s) { return s.ItemsParsed.map(function (it) { return it.name + ' ×' + it.qty; }).join(', '); } },
+      { label: 'Total', render: function (s) { return fmtMoney(s.Total); } },
+      { label: 'Payment', render: function (s) { return '<span class="' + badgeClass(s.PaymentStatus) + '">' + s.PaymentStatus + '</span>' + (s.PaymentStatus === 'Awaiting Verification' ? ' <button class="btn-sm btn-outline" onclick="verifySaleUi(\'' + s.SaleID + '\')">Verify</button>' : ''); } },
+      { label: 'Fulfillment', render: function (s) { return fulfillmentSelect(s); } }
+    ], rows, 'onlineorders-table');
+}
+function fulfillmentSelect(s) {
+  var opts = SALE_FULFILLMENT_STATUSES_JS.map(function (st) { return '<option' + (st === s.FulfillmentStatus ? ' selected' : '') + '>' + st + '</option>'; }).join('');
+  return '<select onchange="setSaleFulfillment(\'' + s.SaleID + '\', this.value)">' + opts + '</select>';
+}
+function verifySaleUi(saleId) {
+  api('verifySalePayment', state.token, saleId).then(function () { toast('Payment verified.', 'success'); invalidatePageCache('onlineorders'); renderOnlineOrdersAdmin(document.getElementById('adminContent')); }).catch(toastError);
+}
+function setSaleFulfillment(saleId, status) {
+  api('updateSaleFulfillment', state.token, saleId, status).then(function () { toast('Order updated.', 'success'); invalidatePageCache('onlineorders'); renderOnlineOrdersAdmin(document.getElementById('adminContent')); }).catch(toastError);
+}
+
+/* ============================================================================
  * SERVICES ADMIN
  * ==========================================================================*/
+var SERVICE_TABLE_COLS = [
+  { label: '', render: function (s) { return s.ImageURL ? '<img src="' + s.ImageURL + '" style="width:40px;height:40px;object-fit:cover;border-radius:6px;">' : ''; } },
+  { label: 'Name', key: 'Name' }, { label: 'Category', key: 'Category' }, { label: 'Price', render: function (s) { return fmtMoney(s.Price); } },
+  { label: 'Turnaround', render: function (s) { return s.TurnaroundDays + ' days'; } },
+  { label: 'Active', render: function (s) { return '<span class="' + (s.Active === 'Y' ? 'badge badge-completed' : 'badge badge-cancelled') + '">' + (s.Active === 'Y' ? 'Active' : 'Hidden') + '</span>'; } },
+  { label: '', render: function (s) { return '<div class="rowActions"><button class="btn-sm btn-outline" onclick=\'openServiceForm(' + JSON.stringify(s).replace(/'/g, "&apos;") + ')\'>Edit</button><button class="btn-sm btn-danger" onclick="deleteServiceUi(\'' + s.ServiceID + '\')">Delete</button></div>'; } }
+];
 function renderServicesAdmin(host) {
-  api('getServices', state.token).then(function (rows) {
+  withPageCache('services', function () { return api('getServices', state.token); }, drawServicesAdmin, host);
+}
+function drawServicesAdmin(host, rows) {
     host.innerHTML = '<div class="toolbar"><div class="left"><div class="searchBox"><input type="text" id="svcSearch" placeholder="Search services…"></div></div>' +
       '<button class="btn btn-accent" onclick="openServiceForm()">+ New Service</button></div>' +
-      renderTable([
-        { label: '', render: function (s) { return s.ImageURL ? '<img src="' + s.ImageURL + '" style="width:40px;height:40px;object-fit:cover;border-radius:6px;">' : ''; } },
-        { label: 'Name', key: 'Name' }, { label: 'Category', key: 'Category' }, { label: 'Price', render: function (s) { return fmtMoney(s.Price); } },
-        { label: 'Turnaround', render: function (s) { return s.TurnaroundDays + ' days'; } },
-        { label: 'Active', render: function (s) { return '<span class="' + (s.Active === 'Y' ? 'badge badge-completed' : 'badge badge-cancelled') + '">' + (s.Active === 'Y' ? 'Active' : 'Hidden') + '</span>'; } },
-        { label: '', render: function (s) { return '<div class="rowActions"><button class="btn-sm btn-outline" onclick=\'openServiceForm(' + JSON.stringify(s).replace(/'/g, "&apos;") + ')\'>Edit</button><button class="btn-sm btn-danger" onclick="deleteServiceUi(\'' + s.ServiceID + '\')">Delete</button></div>'; } }
-      ], rows, 'services-table');
+      renderTable(SERVICE_TABLE_COLS, rows, 'services-table');
     document.getElementById('svcSearch').addEventListener('input', debounce(function (e) {
       var q = e.target.value.toLowerCase();
       var filtered = rows.filter(function (s) { return s.Name.toLowerCase().indexOf(q) > -1; });
-      document.querySelector('#adminContent .tableWrap').outerHTML = renderTable([
-        { label: '', render: function (s) { return s.ImageURL ? '<img src="' + s.ImageURL + '" style="width:40px;height:40px;object-fit:cover;border-radius:6px;">' : ''; } },
-        { label: 'Name', key: 'Name' }, { label: 'Category', key: 'Category' }, { label: 'Price', render: function (s) { return fmtMoney(s.Price); } },
-        { label: 'Turnaround', render: function (s) { return s.TurnaroundDays + ' days'; } },
-        { label: 'Active', render: function (s) { return '<span class="' + (s.Active === 'Y' ? 'badge badge-completed' : 'badge badge-cancelled') + '">' + (s.Active === 'Y' ? 'Active' : 'Hidden') + '</span>'; } },
-        { label: '', render: function (s) { return '<div class="rowActions"><button class="btn-sm btn-outline" onclick=\'openServiceForm(' + JSON.stringify(s).replace(/'/g, "&apos;") + ')\'>Edit</button><button class="btn-sm btn-danger" onclick="deleteServiceUi(\'' + s.ServiceID + '\')">Delete</button></div>'; } }
-      ], filtered, 'services-table');
+      document.querySelector('#adminContent .tableWrap').outerHTML = renderTable(SERVICE_TABLE_COLS, filtered, 'services-table');
     }, 250));
-  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
 }
 function openServiceForm(existing) {
   var cats = String(state.settings.ServiceCategories || '').split(',').map(function (c) { return c.trim(); }).filter(Boolean);
@@ -1639,7 +1916,7 @@ function openServiceForm(existing) {
     var fileInput = document.getElementById('svcImageFile');
     var save = function (url) {
       if (url) payload.ImageURL = url;
-      api('saveService', state.token, payload).then(function () { toast('Service saved.', 'success'); closeModal(); renderServicesAdmin(document.getElementById('adminContent')); }).catch(toastError);
+      api('saveService', state.token, payload).then(function () { toast('Service saved.', 'success'); closeModal(); invalidatePageCache('services'); renderServicesAdmin(document.getElementById('adminContent')); }).catch(toastError);
     };
     if (fileInput.files[0]) {
       var reader = new FileReader();
@@ -1650,14 +1927,16 @@ function openServiceForm(existing) {
 }
 function deleteServiceUi(id) {
   if (!confirm('Delete this service?')) return;
-  api('deleteService', state.token, id).then(function () { toast('Deleted.', 'success'); renderServicesAdmin(document.getElementById('adminContent')); }).catch(toastError);
+  api('deleteService', state.token, id).then(function () { toast('Deleted.', 'success'); invalidatePageCache('services'); renderServicesAdmin(document.getElementById('adminContent')); }).catch(toastError);
 }
 
 /* ============================================================================
  * STAFF ADMIN
  * ==========================================================================*/
 function renderStaffAdmin(host) {
-  api('getStaff', state.token).then(function (rows) {
+  withPageCache('staff', function () { return api('getStaff', state.token); }, drawStaffAdmin, host);
+}
+function drawStaffAdmin(host, rows) {
     host.innerHTML = '<div class="toolbar"><div></div><button class="btn btn-accent" onclick="openStaffForm()">+ New Staff Member</button></div>' +
       '<div class="grid grid-4">' + rows.map(function (s) {
         return '<div class="card staffCard"><img class="photo" src="' + (s.PhotoURL || '') + '"><h3 style="font-size:1rem;">' + esc(s.Name) + '</h3>' +
@@ -1666,7 +1945,6 @@ function renderStaffAdmin(host) {
           '<div style="margin-top:10px;display:flex;gap:6px;justify-content:center;"><button class="btn-sm btn-outline" onclick=\'openStaffForm(' + JSON.stringify(s).replace(/'/g, "&apos;") + ')\'>Edit</button>' +
           '<button class="btn-sm btn-outline" onclick="openLeaveManager(\'' + s.StaffID + '\',\'' + esc(s.Name).replace(/'/g, "\\'") + '\')">Leave</button></div></div>';
       }).join('') + '</div>';
-  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
 }
 function openStaffForm(existing) {
   openModal('<div class="modalHead"><h3>' + (existing ? 'Edit Staff' : 'New Staff Member') + '</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
@@ -1692,7 +1970,7 @@ function openStaffForm(existing) {
     var fileInput = document.getElementById('staffPhotoFile');
     var save = function (url) {
       if (url) payload.PhotoURL = url;
-      api('saveStaff', state.token, payload).then(function () { toast('Staff saved.', 'success'); closeModal(); renderStaffAdmin(document.getElementById('adminContent')); }).catch(toastError);
+      api('saveStaff', state.token, payload).then(function () { toast('Staff saved.', 'success'); closeModal(); invalidatePageCache('staff'); renderStaffAdmin(document.getElementById('adminContent')); }).catch(toastError);
     };
     if (fileInput.files[0]) {
       var reader = new FileReader();
@@ -1722,16 +2000,18 @@ function removeLeaveUi(leaveId, staffId, name) {
  * INVENTORY (fabrics & accessories)
  * ==========================================================================*/
 function renderInventory(host) {
-  api('getProducts', state.token).then(function (rows) {
+  withPageCache('inventory', function () { return api('getProducts', state.token); }, drawInventory, host);
+}
+function drawInventory(host, rows) {
     host.innerHTML = '<div class="toolbar"><div></div><button class="btn btn-accent" onclick="openProductForm()">+ New Item</button></div>' +
       renderTable([
         { label: '', render: function (p) { return p.ImageURL ? '<img src="' + p.ImageURL + '" style="width:36px;height:36px;object-fit:cover;border-radius:6px;">' : ''; } },
         { label: 'Name', key: 'Name' }, { label: 'Category', key: 'Category' },
         { label: 'Stock', render: function (p) { return '<span style="' + (Number(p.QuantityInStock) <= Number(p.ReorderLevel) ? 'color:#c0392b;font-weight:700;' : '') + '">' + p.QuantityInStock + ' ' + esc(p.Unit || '') + '</span>'; } },
         { label: 'Cost', render: function (p) { return fmtMoney(p.CostPrice); } }, { label: 'Sell', render: function (p) { return fmtMoney(p.SellingPrice); } },
+        { label: 'On Website', render: function (p) { return p.ShowOnWebsite === 'Y' ? '<span class="badge badge-completed">Shop</span>' : '<span class="muted">—</span>'; } },
         { label: '', render: function (p) { return '<div class="rowActions"><button class="btn-sm btn-outline" onclick="restockUi(\'' + p.ProductID + '\')">Restock</button><button class="btn-sm btn-outline" onclick=\'openProductForm(' + JSON.stringify(p).replace(/'/g, "&apos;") + ')\'>Edit</button><button class="btn-sm btn-danger" onclick="deleteProductUi(\'' + p.ProductID + '\')">Delete</button></div>'; } }
       ], rows, 'inventory-table');
-  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
 }
 function openProductForm(existing) {
   openModal('<div class="modalHead"><h3>' + (existing ? 'Edit Item' : 'New Item') + '</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
@@ -1742,17 +2022,19 @@ function openProductForm(existing) {
     '<div class="form-row"><div class="field"><label>Cost Price</label><input type="number" step="0.01" name="CostPrice" required value="' + (existing ? existing.CostPrice : '') + '"></div>' +
     '<div class="field"><label>Selling Price</label><input type="number" step="0.01" name="SellingPrice" required value="' + (existing ? existing.SellingPrice : '') + '"></div></div>' +
     '<div class="field"><label>Quantity In Stock</label><input type="number" name="QuantityInStock" required value="' + (existing ? existing.QuantityInStock : 0) + '"></div>' +
-    '<div class="field"><label>Photo</label><input type="file" id="prodImageFile" accept="image/*"></div>' +
+    '<div class="field"><label>Photo</label><input type="file" id="prodImageFile" accept="image/*">' + (existing && existing.ImageURL ? '<img src="' + existing.ImageURL + '" style="max-width:80px;margin-top:8px;border-radius:8px;">' : '') + '</div>' +
+    '<div class="check-row"><input type="checkbox" name="ShowOnWebsite" id="prodShowOnWebsite" value="Y"' + (existing && existing.ShowOnWebsite === 'Y' ? ' checked' : '') + '><label for="prodShowOnWebsite" style="margin:0;">Sell on the public website (Shop)</label></div>' +
     '<input type="hidden" name="ProductID" value="' + (existing ? existing.ProductID : '') + '">' +
     '<button class="btn btn-block btn-accent" type="submit">Save</button></form>');
   document.getElementById('productForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var fd = new FormData(e.target);
     var payload = Object.fromEntries(fd.entries());
+    payload.ShowOnWebsite = fd.get('ShowOnWebsite') ? 'Y' : 'N';
     var fileInput = document.getElementById('prodImageFile');
     var save = function (url) {
       if (url) payload.ImageURL = url;
-      api('saveProduct', state.token, payload).then(function () { toast('Item saved.', 'success'); closeModal(); renderInventory(document.getElementById('adminContent')); }).catch(toastError);
+      api('saveProduct', state.token, payload).then(function () { toast('Item saved.', 'success'); closeModal(); invalidatePageCache('inventory', 'pos'); renderInventory(document.getElementById('adminContent')); }).catch(toastError);
     };
     if (fileInput.files[0]) {
       var reader = new FileReader();
@@ -1764,18 +2046,20 @@ function openProductForm(existing) {
 function restockUi(productId) {
   var qty = prompt('Add how many units to stock?');
   if (!qty || isNaN(Number(qty))) return;
-  api('restockProduct', state.token, productId, Number(qty)).then(function () { toast('Stock updated.', 'success'); renderInventory(document.getElementById('adminContent')); }).catch(toastError);
+  api('restockProduct', state.token, productId, Number(qty)).then(function () { toast('Stock updated.', 'success'); invalidatePageCache('inventory', 'pos'); renderInventory(document.getElementById('adminContent')); }).catch(toastError);
 }
 function deleteProductUi(id) {
   if (!confirm('Delete this item?')) return;
-  api('deleteProduct', state.token, id).then(function () { toast('Deleted.', 'success'); renderInventory(document.getElementById('adminContent')); }).catch(toastError);
+  api('deleteProduct', state.token, id).then(function () { toast('Deleted.', 'success'); invalidatePageCache('inventory', 'pos'); renderInventory(document.getElementById('adminContent')); }).catch(toastError);
 }
 
 /* ============================================================================
  * EXPENSES
  * ==========================================================================*/
 function renderExpenses(host) {
-  api('getExpenses', state.token, {}).then(function (rows) {
+  withPageCache('expenses', function () { return api('getExpenses', state.token, {}); }, drawExpenses, host);
+}
+function drawExpenses(host, rows) {
     var total = rows.reduce(function (sum, e) { return sum + Number(e.Amount); }, 0);
     host.innerHTML = '<div class="statGrid" style="grid-template-columns:repeat(2,1fr);"><div class="statCard"><div class="lbl">Total Expenses</div><div class="val">' + fmtMoney(total) + '</div></div>' +
       '<div class="statCard"><div class="lbl">Records</div><div class="val">' + rows.length + '</div></div></div>' +
@@ -1785,7 +2069,6 @@ function renderExpenses(host) {
         { label: 'Description', key: 'Description' }, { label: 'Amount', render: function (e) { return fmtMoney(e.Amount); } },
         { label: '', render: function (e) { return '<div class="rowActions"><button class="btn-sm btn-outline" onclick=\'openExpenseForm(' + JSON.stringify(e).replace(/'/g, "&apos;") + ')\'>Edit</button><button class="btn-sm btn-danger" onclick="deleteExpenseUi(\'' + e.ExpenseID + '\')">Delete</button></div>'; } }
       ], rows, 'expenses-table');
-  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
 }
 function openExpenseForm(existing) {
   openModal('<div class="modalHead"><h3>' + (existing ? 'Edit Expense' : 'New Expense') + '</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
@@ -1798,12 +2081,12 @@ function openExpenseForm(existing) {
   document.getElementById('expForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var payload = Object.fromEntries(new FormData(e.target).entries());
-    api('saveExpense', state.token, payload).then(function () { toast('Expense saved.', 'success'); closeModal(); renderExpenses(document.getElementById('adminContent')); }).catch(toastError);
+    api('saveExpense', state.token, payload).then(function () { toast('Expense saved.', 'success'); closeModal(); invalidatePageCache('expenses', 'overview'); renderExpenses(document.getElementById('adminContent')); }).catch(toastError);
   });
 }
 function deleteExpenseUi(id) {
   if (!confirm('Delete this expense?')) return;
-  api('deleteExpense', state.token, id).then(function () { toast('Deleted.', 'success'); renderExpenses(document.getElementById('adminContent')); }).catch(toastError);
+  api('deleteExpense', state.token, id).then(function () { toast('Deleted.', 'success'); invalidatePageCache('expenses', 'overview'); renderExpenses(document.getElementById('adminContent')); }).catch(toastError);
 }
 
 /* ============================================================================
@@ -1892,8 +2175,11 @@ function Utilities_addDays(dateStr, days) { var d = new Date(dateStr + 'T12:00:0
 function loadReports() {
   window.__repFrom = document.getElementById('repFrom').value;
   window.__repTo = document.getElementById('repTo').value;
-  api('getReports', state.token, { dateFrom: window.__repFrom, dateTo: window.__repTo }).then(function (r) {
-    document.getElementById('reportsBody').innerHTML =
+  var host = document.getElementById('reportsBody');
+  withPageCache('reports:' + window.__repFrom + ':' + window.__repTo, function () { return api('getReports', state.token, { dateFrom: window.__repFrom, dateTo: window.__repTo }); }, drawReportsBody, host);
+}
+function drawReportsBody(host, r) {
+    host.innerHTML =
       '<div class="statGrid">' + statCard('Sales Revenue', fmtMoney(r.totalSalesRevenue)) + statCard('Orders Value', fmtMoney(r.totalOrdersValue)) +
       statCard('Orders Collected', fmtMoney(r.totalOrdersCollected)) + statCard('Expenses', fmtMoney(r.totalExpenses)) + '</div>' +
       '<div class="panel"><h3>Revenue Over Time</h3><div class="chartWrap"><canvas class="chartCanvas" id="chartRevenue" style="height:220px;"></canvas></div></div>' +
@@ -1906,7 +2192,6 @@ function loadReports() {
       renderDonutChart('chartPayment', r.paymentBreakdown.map(function (p) { return { amount: p.amount }; }));
       renderBarChart('chartByStaff', r.revenueByStaff);
     }, 30);
-  }).catch(function (e) { document.getElementById('reportsBody').innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
 }
 function exportReportPdfUi() {
   api('exportReportPdf', state.token, { dateFrom: window.__repFrom, dateTo: window.__repTo }).then(function (res) {
@@ -1923,30 +2208,32 @@ function exportReportPdfUi() {
  * REVIEWS ADMIN
  * ==========================================================================*/
 function renderReviewsAdmin(host) {
-  api('getReviews', state.token).then(function (rows) {
+  withPageCache('reviews', function () { return api('getReviews', state.token); }, drawReviewsAdmin, host);
+}
+function drawReviewsAdmin(host, rows) {
     host.innerHTML = renderTable([
       { label: 'Date', render: function (r) { return fmtDateShort(r.Date); } }, { label: 'Customer', key: 'CustomerName' }, { label: 'Tailor', key: 'StaffName' },
       { label: 'Rating', render: function (r) { return '★'.repeat(Number(r.Rating)); } }, { label: 'Comment', key: 'Comment' },
       { label: '', render: function (r) { return '<button class="btn-sm btn-danger" onclick="deleteReviewUi(\'' + r.ReviewID + '\')">Delete</button>'; } }
     ], rows, 'reviews-table');
-  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
 }
 function deleteReviewUi(id) {
   if (!confirm('Delete this review?')) return;
-  api('deleteReview', state.token, id).then(function () { toast('Deleted.', 'success'); renderReviewsAdmin(document.getElementById('adminContent')); }).catch(toastError);
+  api('deleteReview', state.token, id).then(function () { toast('Deleted.', 'success'); invalidatePageCache('reviews'); renderReviewsAdmin(document.getElementById('adminContent')); }).catch(toastError);
 }
 
 /* ============================================================================
  * GALLERY (PORTFOLIO) ADMIN
  * ==========================================================================*/
 function renderGalleryAdmin(host) {
-  api('getGallery', state.token).then(function (rows) {
+  withPageCache('gallery', function () { return api('getGallery', state.token); }, drawGalleryAdmin, host);
+}
+function drawGalleryAdmin(host, rows) {
     host.innerHTML = '<div class="toolbar"><div></div><button class="btn btn-accent" onclick="openGalleryForm()">+ Add Photo</button></div>' +
       '<div class="grid grid-4">' + rows.map(function (g) {
         return '<div class="card"><img src="' + g.ImageURL + '" style="height:140px;width:100%;object-fit:cover;"><div style="padding:10px;"><strong style="font-size:.85rem;">' + esc(g.Caption) + '</strong><div class="muted">' + esc(g.Category) + '</div>' +
           '<div style="margin-top:8px;display:flex;gap:6px;"><button class="btn-sm btn-outline" onclick=\'openGalleryForm(' + JSON.stringify(g).replace(/'/g, "&apos;") + ')\'>Edit</button><button class="btn-sm btn-danger" onclick="deleteGalleryUi(\'' + g.GalleryID + '\')">Delete</button></div></div></div>';
       }).join('') + '</div>';
-  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
 }
 function openGalleryForm(existing) {
   var cats = String(state.settings.ServiceCategories || '').split(',').map(function (c) { return c.trim(); }).concat(['Our Shop']);
@@ -1964,7 +2251,7 @@ function openGalleryForm(existing) {
     var fileInput = document.getElementById('galImageFile');
     var save = function (url) {
       if (url) payload.ImageURL = url;
-      api('saveGalleryItem', state.token, payload).then(function () { toast('Saved.', 'success'); closeModal(); renderGalleryAdmin(document.getElementById('adminContent')); }).catch(toastError);
+      api('saveGalleryItem', state.token, payload).then(function () { toast('Saved.', 'success'); closeModal(); invalidatePageCache('gallery'); renderGalleryAdmin(document.getElementById('adminContent')); }).catch(toastError);
     };
     if (fileInput.files[0]) {
       var reader = new FileReader();
@@ -1975,21 +2262,22 @@ function openGalleryForm(existing) {
 }
 function deleteGalleryUi(id) {
   if (!confirm('Delete this photo?')) return;
-  api('deleteGalleryItem', state.token, id).then(function () { toast('Deleted.', 'success'); renderGalleryAdmin(document.getElementById('adminContent')); }).catch(toastError);
+  api('deleteGalleryItem', state.token, id).then(function () { toast('Deleted.', 'success'); invalidatePageCache('gallery'); renderGalleryAdmin(document.getElementById('adminContent')); }).catch(toastError);
 }
 
 /* ============================================================================
  * HERO SLIDES ADMIN
  * ==========================================================================*/
 function renderHeroAdmin(host) {
-  api('getHeroSlides', state.token).then(function (rows) {
+  withPageCache('hero', function () { return api('getHeroSlides', state.token); }, drawHeroAdmin, host);
+}
+function drawHeroAdmin(host, rows) {
     host.innerHTML = '<div class="toolbar"><div></div><button class="btn btn-accent" onclick="openHeroForm()">+ Add Slide</button></div>' +
       '<div class="grid grid-3">' + rows.map(function (h) {
         return '<div class="card"><div style="height:140px;background-size:cover;background-position:center;background-image:url(\'' + h.ImageURL + '\')"></div><div style="padding:10px;">' +
           '<strong style="font-size:.85rem;">' + esc(h.Title) + '</strong><div class="muted">' + esc(h.Subtitle) + '</div>' +
           '<div style="margin-top:8px;display:flex;gap:6px;"><button class="btn-sm btn-outline" onclick=\'openHeroForm(' + JSON.stringify(h).replace(/'/g, "&apos;") + ')\'>Edit</button><button class="btn-sm btn-danger" onclick="deleteHeroUi(\'' + h.SlideID + '\')">Delete</button></div></div></div>';
       }).join('') + '</div>';
-  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
 }
 function openHeroForm(existing) {
   openModal('<div class="modalHead"><h3>' + (existing ? 'Edit Slide' : 'Add Slide') + '</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
@@ -2010,7 +2298,7 @@ function openHeroForm(existing) {
     var fileInput = document.getElementById('heroImageFile');
     var save = function (url) {
       if (url) payload.ImageURL = url;
-      api('saveHeroSlide', state.token, payload).then(function () { toast('Saved.', 'success'); closeModal(); renderHeroAdmin(document.getElementById('adminContent')); }).catch(toastError);
+      api('saveHeroSlide', state.token, payload).then(function () { toast('Saved.', 'success'); closeModal(); invalidatePageCache('hero'); renderHeroAdmin(document.getElementById('adminContent')); }).catch(toastError);
     };
     if (fileInput.files[0]) {
       var reader = new FileReader();
@@ -2021,20 +2309,21 @@ function openHeroForm(existing) {
 }
 function deleteHeroUi(id) {
   if (!confirm('Delete this slide?')) return;
-  api('deleteHeroSlide', state.token, id).then(function () { toast('Deleted.', 'success'); renderHeroAdmin(document.getElementById('adminContent')); }).catch(toastError);
+  api('deleteHeroSlide', state.token, id).then(function () { toast('Deleted.', 'success'); invalidatePageCache('hero'); renderHeroAdmin(document.getElementById('adminContent')); }).catch(toastError);
 }
 
 /* ============================================================================
  * VIDEOS ADMIN
  * ==========================================================================*/
 function renderVideosAdmin(host) {
-  api('getVideos', state.token).then(function (rows) {
+  withPageCache('videos', function () { return api('getVideos', state.token); }, drawVideosAdmin, host);
+}
+function drawVideosAdmin(host, rows) {
     host.innerHTML = '<div class="toolbar"><div></div><button class="btn btn-accent" onclick="openVideoForm()">+ Add Video</button></div>' +
       '<div class="grid grid-3">' + rows.map(function (v) {
         return '<div class="card"><div style="padding:10px;"><strong style="font-size:.85rem;">' + esc(v.Title) + '</strong><div class="muted">' + esc(v.Caption || '') + '</div>' +
           '<div style="margin-top:8px;display:flex;gap:6px;"><button class="btn-sm btn-outline" onclick=\'openVideoForm(' + JSON.stringify(v).replace(/'/g, "&apos;") + ')\'>Edit</button><button class="btn-sm btn-danger" onclick="deleteVideoUi(\'' + v.VideoID + '\')">Delete</button></div></div></div>';
       }).join('') + '</div>';
-  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
 }
 function openVideoForm(existing) {
   openModal('<div class="modalHead"><h3>' + (existing ? 'Edit Video' : 'Add Video') + '</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
@@ -2046,12 +2335,12 @@ function openVideoForm(existing) {
   document.getElementById('videoForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var payload = Object.fromEntries(new FormData(e.target).entries());
-    api('saveVideo', state.token, payload).then(function () { toast('Saved.', 'success'); closeModal(); renderVideosAdmin(document.getElementById('adminContent')); }).catch(toastError);
+    api('saveVideo', state.token, payload).then(function () { toast('Saved.', 'success'); closeModal(); invalidatePageCache('videos'); renderVideosAdmin(document.getElementById('adminContent')); }).catch(toastError);
   });
 }
 function deleteVideoUi(id) {
   if (!confirm('Delete this video?')) return;
-  api('deleteVideo', state.token, id).then(function () { toast('Deleted.', 'success'); renderVideosAdmin(document.getElementById('adminContent')); }).catch(toastError);
+  api('deleteVideo', state.token, id).then(function () { toast('Deleted.', 'success'); invalidatePageCache('videos'); renderVideosAdmin(document.getElementById('adminContent')); }).catch(toastError);
 }
 
 /* ============================================================================
@@ -2059,7 +2348,10 @@ function deleteVideoUi(id) {
  * ==========================================================================*/
 function renderTrashAdmin(host) {
   var type = window.__trashType || '';
-  api('getTrash', state.token, type).then(function (rows) {
+  withPageCache('trash:' + type, function () { return api('getTrash', state.token, type); }, drawTrashAdmin, host);
+}
+function drawTrashAdmin(host, rows) {
+    var type = window.__trashType || '';
     host.innerHTML = '<div class="toolbar"><div class="left"><select id="trashType"><option value="">All types</option><option value="Customers"' + (type === 'Customers' ? ' selected' : '') + '>Customers</option><option value="Orders"' + (type === 'Orders' ? ' selected' : '') + '>Orders</option></select></div>' +
       '<button class="btn btn-danger" onclick="emptyTrashUi()">Empty Trash</button></div>' +
       renderTable([
@@ -2068,25 +2360,26 @@ function renderTrashAdmin(host) {
         { label: '', render: function (t) { return '<div class="rowActions"><button class="btn-sm btn-outline" onclick="restoreTrashUi(\'' + t.TrashID + '\')">Restore</button><button class="btn-sm btn-danger" onclick="permaDeleteTrashUi(\'' + t.TrashID + '\')">Delete Forever</button></div>'; } }
       ], rows, 'trash-table');
     document.getElementById('trashType').addEventListener('change', function (e) { window.__trashType = e.target.value; renderTrashAdmin(host); });
-  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
 }
 function restoreTrashUi(id) {
-  api('restoreTrashItems', state.token, [id]).then(function () { toast('Restored.', 'success'); renderTrashAdmin(document.getElementById('adminContent')); }).catch(toastError);
+  api('restoreTrashItems', state.token, [id]).then(function () { toast('Restored.', 'success'); invalidatePageCache('trash', 'customers', 'orders'); renderTrashAdmin(document.getElementById('adminContent')); }).catch(toastError);
 }
 function permaDeleteTrashUi(id) {
   if (!confirm('Permanently delete this record? This cannot be undone.')) return;
-  api('permanentlyDeleteTrash', state.token, [id]).then(function () { toast('Deleted permanently.', 'success'); renderTrashAdmin(document.getElementById('adminContent')); }).catch(toastError);
+  api('permanentlyDeleteTrash', state.token, [id]).then(function () { toast('Deleted permanently.', 'success'); invalidatePageCache('trash'); renderTrashAdmin(document.getElementById('adminContent')); }).catch(toastError);
 }
 function emptyTrashUi() {
   if (!confirm('Permanently delete everything in Trash? This cannot be undone.')) return;
-  api('emptyTrash', state.token, window.__trashType || '').then(function () { toast('Trash emptied.', 'success'); renderTrashAdmin(document.getElementById('adminContent')); }).catch(toastError);
+  api('emptyTrash', state.token, window.__trashType || '').then(function () { toast('Trash emptied.', 'success'); invalidatePageCache('trash'); renderTrashAdmin(document.getElementById('adminContent')); }).catch(toastError);
 }
 
 /* ============================================================================
  * SMS LOG ADMIN
  * ==========================================================================*/
 function renderSmsAdmin(host) {
-  api('getSmsStats', state.token).then(function (s) {
+  withPageCache('sms', function () { return api('getSmsStats', state.token); }, drawSmsAdmin, host);
+}
+function drawSmsAdmin(host, s) {
     host.innerHTML = '<div class="statGrid" style="grid-template-columns:repeat(3,1fr);">' + statCard('Sent', s.sent) + statCard('Failed', s.failed) + statCard('Provider Balance', s.balance === null ? '—' : s.balance) + '</div>' +
       '<div class="panel"><div class="panelHead"><h3>Send Bulk SMS to Staff</h3></div>' +
       '<div class="field"><textarea id="bulkSmsMsg" placeholder="Message to send…"></textarea></div>' +
@@ -2094,7 +2387,6 @@ function renderSmsAdmin(host) {
       '<div class="panel"><h3>Recent Messages</h3>' + renderTable([
         { label: 'Date', render: function (n) { return fmtDateShort(n.Date); } }, { label: 'To', key: 'Recipient' }, { label: 'Message', key: 'Message' }, { label: 'Status', key: 'Status' }
       ], s.recent, 'sms-table') + '</div>';
-  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
 }
 function sendBulkSms() {
   var msg = document.getElementById('bulkSmsMsg').value.trim();
@@ -2102,14 +2394,16 @@ function sendBulkSms() {
   api('getStaff', state.token).then(function (staff) {
     var ids = staff.filter(function (s) { return s.Active === 'Y'; }).map(function (s) { return s.StaffID; });
     return api('sendStaffSms', state.token, ids, msg);
-  }).then(function (res) { toast('Sent to ' + res.sent + ' staff.', 'success'); renderSmsAdmin(document.getElementById('adminContent')); }).catch(toastError);
+  }).then(function (res) { toast('Sent to ' + res.sent + ' staff.', 'success'); invalidatePageCache('sms'); renderSmsAdmin(document.getElementById('adminContent')); }).catch(toastError);
 }
 
 /* ============================================================================
  * USERS ADMIN
  * ==========================================================================*/
 function renderUsersAdmin(host) {
-  Promise.all([api('getUsers', state.token), api('getStaff', state.token)]).then(function (r) {
+  withPageCache('users', function () { return Promise.all([api('getUsers', state.token), api('getStaff', state.token)]); }, drawUsersAdmin, host);
+}
+function drawUsersAdmin(host, r) {
     var users = r[0], staff = r[1];
     host.innerHTML = '<div class="toolbar"><div></div><button class="btn btn-accent" onclick="openUserForm(null, ' + JSON.stringify(staff).replace(/"/g, '&quot;') + ')">+ New User</button></div>' +
       renderTable([
@@ -2117,7 +2411,6 @@ function renderUsersAdmin(host) {
         { label: 'Active', render: function (u) { return '<span class="' + (u.Active === 'Y' ? 'badge badge-completed' : 'badge badge-cancelled') + '">' + (u.Active === 'Y' ? 'Active' : 'Inactive') + '</span>'; } },
         { label: '', render: function (u) { return '<div class="rowActions"><button class="btn-sm btn-outline" onclick=\'openUserForm(' + JSON.stringify(u).replace(/'/g, "&apos;") + ', ' + JSON.stringify(staff).replace(/'/g, "&apos;") + ')\'>Edit</button><button class="btn-sm btn-danger" onclick="deleteUserUi(\'' + u.Username + '\')">Delete</button></div>'; } }
       ], users, 'users-table');
-  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
 }
 function openUserForm(existing, staff) {
   var staffOptions = staff.map(function (s) { return '<option value="' + s.StaffID + '"' + (existing && existing.StaffID === s.StaffID ? ' selected' : '') + '>' + esc(s.Name) + '</option>'; }).join('');
@@ -2136,19 +2429,21 @@ function openUserForm(existing, staff) {
     var fd = new FormData(e.target);
     var payload = Object.fromEntries(fd.entries());
     payload.Active = fd.get('Active') ? 'Y' : 'N';
-    api('saveUser', state.token, payload).then(function () { toast('User saved.', 'success'); closeModal(); renderUsersAdmin(document.getElementById('adminContent')); }).catch(toastError);
+    api('saveUser', state.token, payload).then(function () { toast('User saved.', 'success'); closeModal(); invalidatePageCache('users'); renderUsersAdmin(document.getElementById('adminContent')); }).catch(toastError);
   });
 }
 function deleteUserUi(username) {
   if (!confirm('Delete this user account?')) return;
-  api('deleteUser', state.token, username).then(function () { toast('Deleted.', 'success'); renderUsersAdmin(document.getElementById('adminContent')); }).catch(toastError);
+  api('deleteUser', state.token, username).then(function () { toast('Deleted.', 'success'); invalidatePageCache('users'); renderUsersAdmin(document.getElementById('adminContent')); }).catch(toastError);
 }
 
 /* ============================================================================
  * SETTINGS ADMIN
  * ==========================================================================*/
 function renderSettingsAdmin(host) {
-  api('getSettings', state.token).then(function (s) {
+  withPageCache('settings', function () { return api('getSettings', state.token); }, drawSettingsAdmin, host);
+}
+function drawSettingsAdmin(host, s) {
     host.innerHTML = '<div class="panel"><h3>Branding</h3>' +
       '<div class="form-row"><div class="field"><label>Business Name</label><input type="text" id="s_BusinessName" value="' + esc(s.BusinessName) + '"></div>' +
       '<div class="field"><label>Tagline</label><input type="text" id="s_Tagline" value="' + esc(s.Tagline) + '"></div></div>' +
@@ -2190,7 +2485,6 @@ function renderSettingsAdmin(host) {
       '<div class="panel" style="margin-top:20px;"><h3>Public Booking QR Code</h3><div class="qrBox" id="qrBox"></div></div>';
     renderShopInfoEditor();
     renderQrCard();
-  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
 }
 function renderShopInfoEditor() {
   api('getShopInfo', state.token).then(function (info) {
@@ -2236,7 +2530,8 @@ function saveAllSettings() {
     if (url) payload.LogoURL = url;
     api('updateSettings', state.token, payload).then(function (s) {
       state.settings = s; applyTheme(s); toast('Settings saved.', 'success');
-      api('getPublicData').then(function (d) { state.publicData = d; });
+      invalidatePageCache('settings');
+      api('getPublicData').then(function (d) { state.publicData = d; cachePublicData(d); });
     }).catch(toastError);
   };
   if (fileInput.files[0]) {

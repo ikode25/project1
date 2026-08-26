@@ -13,10 +13,14 @@ management system, re-modeled end-to-end for a tailoring house.
   gallery, videos, testimonials
 - Online booking wizard for fittings/consultations (service → tailor →
   date/time → details → optional mobile-money deposit → confirmation)
+- **Shop** — ready-to-wear pieces the Owner marks "sell on website" go
+  live in a public storefront; customers add to cart and check out with
+  Ghana mobile money (or pay-on-pickup Cash), no login required
 - **Track My Order** — customers look up a bespoke garment order's live
   production stage (Order Received → Measuring → Cutting → Sewing →
-  Fitting → Finishing → Ready for Pickup → Delivered) by reference or
-  phone number, with no login required
+  Fitting → Finishing → Ready for Pickup → Delivered) *or* a Shop
+  purchase's fulfillment stage (Processing → Ready for Pickup/Out for
+  Delivery → Delivered), by reference or phone number
 - Booking lookup/cancel by reference or phone, contact form, WhatsApp
   click-to-chat, Google Maps embed
 
@@ -34,7 +38,12 @@ management system, re-modeled end-to-end for a tailoring house.
   slot blocking calendar
 - **Point of Sale** — over-the-counter sales of fabric (by the yard),
   accessories and ready-to-wear pieces, with receipts and loyalty points
-- **Inventory** — fabric & accessories stock with reorder alerts
+- **Online Orders** — Shop checkouts from mobile money/bank need a
+  manual "Verify Payment" once the money actually lands (checked against
+  the shop's own momo/bank statement), then move through fulfillment
+  stages; Cash orders are marked pay-on-pickup and skip verification
+- **Inventory** — fabric & accessories stock with reorder alerts, plus a
+  per-item "Sell on the public website" toggle that feeds the Shop
 - **Staff, Expenses, Reviews, Portfolio Gallery, Hero Slides, Videos,
   Users, Reports (with charts & CSV/PDF export), SMS log, Trash/recovery**
 - Full branding & payments settings (colors, logo, Ghana mobile money
@@ -86,6 +95,25 @@ for testing without a paid SMS account. Switch to **Arkesel** or
 To send customers a reminder SMS the day before their fitting, open
 **Triggers** in the Apps Script editor and add a time-driven trigger
 for `sendUpcomingAppointmentReminders`, running daily.
+
+## Performance
+
+- **Instant navigation.** The admin dashboard caches each page's data in
+  memory for the session (stale-while-revalidate): switching from
+  Dashboard to Appointments and back repaints instantly from cache with
+  no loading spinner, while a fresh copy is quietly fetched behind the
+  scenes and only triggers a re-render if something actually changed.
+  Any save/delete/update invalidates just the affected page(s).
+- **Near-zero perceived load time.** The public site's data is cached in
+  the browser's `localStorage`; every visit after the first paints
+  immediately from that cache (no blank screen, no spinner) while the
+  real data refreshes in the background. A lightweight animated
+  placeholder (not a blank white page) shows for the very first visit,
+  before any network response has arrived.
+- The topbar's loading indicator is a continuous indeterminate bar (like
+  a browser's own page-loading bar) rather than a jumpy progress meter —
+  it simply shows/hides around any in-flight request.
+- All icons are inline SVG (no emoji, no icon font, no external asset).
 
 ## Notes
 

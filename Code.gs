@@ -45,7 +45,7 @@ var TIMEZONE = 'Africa/Accra';
 var CURRENCY_SYMBOL = 'GH₵';
 var SESSION_TTL_SECONDS = 6 * 60 * 60; // 6 hours
 var UPLOAD_FOLDER_NAME = 'AdvanceTailor_Uploads';
-var SETUP_VERSION = 1;
+var SETUP_VERSION = 2;
 
 // Column schema for every tab. Order matters — it defines the sheet column order.
 var SCHEMA = {
@@ -56,8 +56,11 @@ var SCHEMA = {
   Measurements:  ['MeasurementID', 'CustomerID', 'ProfileName', 'Garment', 'Gender', 'Fields', 'DateTaken', 'TakenBy', 'Notes', 'Active'],
   Appointments:  ['AppointmentID', 'Reference', 'CustomerID', 'StaffID', 'ServiceID', 'BranchID', 'Date', 'TimeSlot', 'Type', 'Status', 'CreatedAt', 'Notes', 'PaymentMethod', 'PaymentStatus', 'PaymentProofURL'],
   Orders:        ['OrderID', 'Reference', 'CustomerID', 'StaffID', 'ServiceID', 'BranchID', 'MeasurementID', 'OrderDate', 'DueDate', 'Status', 'FabricSource', 'FabricDetails', 'Quantity', 'Price', 'DepositAmount', 'AmountPaid', 'PaymentMethod', 'PaymentStatus', 'DesignImageURL', 'Notes', 'DeliveredAt', 'CreatedAt'],
-  Sales:         ['SaleID', 'Date', 'BranchID', 'CustomerID', 'StaffID', 'Items', 'Subtotal', 'Discount', 'Tax', 'Total', 'PaymentMethod', 'PaymentStatus'],
-  Products:      ['ProductID', 'Name', 'Category', 'Unit', 'CostPrice', 'SellingPrice', 'QuantityInStock', 'ReorderLevel', 'BranchID', 'ImageURL'],
+  // Reference/PaymentProofURL/Source/FulfillmentStatus are appended at the
+  // end (not interleaved) so a sheet from before online shop orders existed
+  // keeps reading its existing columns correctly by position.
+  Sales:         ['SaleID', 'Date', 'BranchID', 'CustomerID', 'StaffID', 'Items', 'Subtotal', 'Discount', 'Tax', 'Total', 'PaymentMethod', 'PaymentStatus', 'Reference', 'PaymentProofURL', 'Source', 'FulfillmentStatus'],
+  Products:      ['ProductID', 'Name', 'Category', 'Unit', 'CostPrice', 'SellingPrice', 'QuantityInStock', 'ReorderLevel', 'BranchID', 'ImageURL', 'ShowOnWebsite'],
   Expenses:      ['ExpenseID', 'Date', 'BranchID', 'Category', 'Amount', 'Description'],
   Users:         ['Username', 'PasswordHash', 'Salt', 'Role', 'BranchID', 'Active', 'StaffID', 'Email', 'Phone', 'FullName'],
   Reviews:       ['ReviewID', 'CustomerID', 'StaffID', 'Rating', 'Comment', 'Date'],
@@ -90,6 +93,8 @@ var ROLES = ['Owner', 'Manager', 'Staff', 'Receptionist'];
 var ORDER_STATUSES = ['Order Received', 'Measuring', 'Cutting', 'Sewing', 'Fitting', 'Finishing', 'Ready for Pickup', 'Delivered', 'Cancelled'];
 var APPOINTMENT_STATUSES = ['Pending', 'Confirmed', 'Completed', 'Cancelled', 'No-Show'];
 var APPOINTMENT_TYPES = ['Consultation', 'Measurement Session', 'Fitting', 'Delivery/Pickup'];
+// Fulfillment stages for a ready-to-wear item bought straight from the public Shop (as opposed to a bespoke Order).
+var SALE_FULFILLMENT_STATUSES = ['Processing', 'Ready for Pickup', 'Out for Delivery', 'Delivered'];
 
 // Common measurement fields offered per garment type, purely to speed up
 // data entry in the admin UI (a quick-fill button) — the Measurements sheet
@@ -489,21 +494,25 @@ function seedIfEmpty_() {
     });
   }
 
-  // Products — fabrics & accessories inventory
+  // Products — fabrics & accessories inventory. Ready-to-Wear items default
+  // to ShowOnWebsite='Y' so the public Shop isn't empty on first launch;
+  // raw fabric/notions default to 'N' since those aren't sold as-is online.
   if (readAll_('Products').length === 0) {
     var prod = [
-      ['Kente Cloth', 'Fabric', 'Yard', 60, 120, 40, 8, 'https://images.unsplash.com/photo-1590736969955-71cc94901144?q=80&w=800&auto=format&fit=crop'],
-      ['Ankara Print', 'Fabric', 'Yard', 20, 40, 80, 15, 'https://images.unsplash.com/photo-1596466596120-2a8e4b5d1b3a?q=80&w=800&auto=format&fit=crop'],
-      ['Suit Lining', 'Fabric', 'Yard', 10, 20, 50, 10, ''],
-      ['Wax Print (GTP)', 'Fabric', 'Yard', 25, 50, 60, 12, ''],
-      ['Buttons (Set)', 'Accessories', 'Set', 3, 8, 100, 20, ''],
-      ['Zipper', 'Notions', 'Piece', 2, 5, 150, 30, ''],
-      ['Ready-made Kids Shirt', 'Ready-to-Wear', 'Piece', 25, 45, 20, 5, '']
+      ['Kente Cloth', 'Fabric', 'Yard', 60, 120, 40, 8, 'https://images.unsplash.com/photo-1590736969955-71cc94901144?q=80&w=800&auto=format&fit=crop', 'N'],
+      ['Ankara Print', 'Fabric', 'Yard', 20, 40, 80, 15, 'https://images.unsplash.com/photo-1596466596120-2a8e4b5d1b3a?q=80&w=800&auto=format&fit=crop', 'N'],
+      ['Suit Lining', 'Fabric', 'Yard', 10, 20, 50, 10, '', 'N'],
+      ['Wax Print (GTP)', 'Fabric', 'Yard', 25, 50, 60, 12, '', 'N'],
+      ['Buttons (Set)', 'Accessories', 'Set', 3, 8, 100, 20, '', 'N'],
+      ['Zipper', 'Notions', 'Piece', 2, 5, 150, 30, '', 'N'],
+      ['Ready-made Kids Shirt', 'Ready-to-Wear', 'Piece', 25, 45, 20, 5, 'https://images.unsplash.com/photo-1622290291468-a28f7a7dc6a8?q=80&w=800&auto=format&fit=crop', 'Y'],
+      ['Ready-made Ankara Dress', 'Ready-to-Wear', 'Piece', 60, 120, 15, 4, 'https://images.unsplash.com/photo-1544441893-675973e31985?q=80&w=800&auto=format&fit=crop', 'Y'],
+      ['Ready-made Men\'s Shirt', 'Ready-to-Wear', 'Piece', 40, 85, 18, 5, 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?q=80&w=800&auto=format&fit=crop', 'Y']
     ];
     prod.forEach(function (p, i) {
       appendRow_('Products', {
         ProductID: 'PR-' + String(i + 1).padStart(4, '0'), Name: p[0], Category: p[1], Unit: p[2], CostPrice: p[3],
-        SellingPrice: p[4], QuantityInStock: p[5], ReorderLevel: p[6], BranchID: 'BR-0001', ImageURL: p[7]
+        SellingPrice: p[4], QuantityInStock: p[5], ReorderLevel: p[6], BranchID: 'BR-0001', ImageURL: p[7], ShowOnWebsite: p[8]
       });
     });
   }
@@ -820,6 +829,9 @@ function getPublicData() {
 
   settings.LogoURL = imageUrlToDataUri_(settings.LogoURL);
 
+  var shopProducts = readAll_('Products').filter(function (p) { return String(p.ShowOnWebsite).toUpperCase() === 'Y'; });
+  withImageDataUris_(shopProducts, 'ImageURL');
+
   return {
     settings: settings,
     branch: { BranchID: branch.BranchID, Name: branch.Name, Location: branch.Location, Phone: branch.Phone },
@@ -830,6 +842,7 @@ function getPublicData() {
     videos: videos,
     heroSlides: heroSlides,
     reviews: reviews,
+    shopProducts: shopProducts,
     serviceCategories: String(settings.ServiceCategories || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean)
   };
 }
@@ -979,16 +992,16 @@ function isSlotAvailable_(branchId, staffId, date, timeSlot) {
 }
 
 /** Public order-status lookup by phone number — the "Track My Order" feature. */
+/** Public: a customer's bespoke garment Orders AND online Shop purchases, merged and sorted, by phone. */
 function lookupMyOrders(phone) {
   var normalized = normalizeGhanaPhone_(phone);
   if (!normalized) throw new Error('Please enter a valid phone number.');
   var customer = readAll_('Customers').find(function (c) { return c.Phone === normalized; });
   if (!customer) return [];
   var services = keyBy_(readAll_('Services'), 'ServiceID');
-  return readAll_('Orders')
-    .filter(function (o) { return o.CustomerID === customer.CustomerID; })
-    .sort(function (a, b) { return new Date(b.CreatedAt) - new Date(a.CreatedAt); })
-    .map(function (o) { return orderSummary_(o, services); });
+  var orders = readAll_('Orders').filter(function (o) { return o.CustomerID === customer.CustomerID; }).map(function (o) { return orderSummary_(o, services); });
+  var purchases = readAll_('Sales').filter(function (s) { return s.CustomerID === customer.CustomerID && s.Source === 'Online'; }).map(saleSummary_);
+  return orders.concat(purchases).sort(function (a, b) { return new Date(b.OrderDate) - new Date(a.OrderDate); });
 }
 
 function lookupOrderByReference(reference) {
@@ -998,13 +1011,35 @@ function lookupOrderByReference(reference) {
   return orderSummary_(order, services);
 }
 
+/** Public: look up a single online Shop purchase (as opposed to a bespoke Order) by its SHP reference. */
+function lookupSaleByReference(reference) {
+  var sale = readAll_('Sales').find(function (s) { return s.Source === 'Online' && String(s.Reference).toUpperCase() === String(reference || '').trim().toUpperCase(); });
+  if (!sale) throw new Error('No order found with that reference.');
+  return saleSummary_(sale);
+}
+
 function orderSummary_(o, services) {
   var svc = services[o.ServiceID] || {};
   var stageIndex = ORDER_STATUSES.indexOf(o.Status);
   return {
-    Reference: o.Reference, Status: o.Status, ServiceName: svc.Name || '', OrderDate: o.OrderDate, DueDate: o.DueDate,
+    Type: 'Order', Reference: o.Reference, Status: o.Status, ServiceName: svc.Name || '', OrderDate: o.OrderDate, DueDate: o.DueDate,
     Price: o.Price, DepositAmount: o.DepositAmount, AmountPaid: o.AmountPaid, PaymentStatus: o.PaymentStatus,
-    StageIndex: stageIndex, TotalStages: ORDER_STATUSES.length - 1, DeliveredAt: o.DeliveredAt
+    StageIndex: stageIndex, TotalStages: ORDER_STATUSES.length - 1, DeliveredAt: o.DeliveredAt,
+    Stages: ORDER_STATUSES.filter(function (s) { return s !== 'Cancelled'; })
+  };
+}
+
+/** Same shape as orderSummary_ so the public tracker can render either with one card component. */
+function saleSummary_(s) {
+  var items;
+  try { items = JSON.parse(s.Items || '[]'); } catch (e) { items = []; }
+  var itemsLabel = items.map(function (it) { return it.name + ' ×' + it.qty; }).join(', ');
+  var stageIndex = SALE_FULFILLMENT_STATUSES.indexOf(s.FulfillmentStatus);
+  return {
+    Type: 'Purchase', Reference: s.Reference, Status: s.FulfillmentStatus || 'Processing', ServiceName: itemsLabel,
+    OrderDate: String(s.Date).slice(0, 10), DueDate: '', Price: s.Total, DepositAmount: 0, AmountPaid: s.PaymentStatus === 'Paid' ? s.Total : 0,
+    PaymentStatus: s.PaymentStatus, StageIndex: stageIndex < 0 ? 0 : stageIndex, TotalStages: SALE_FULFILLMENT_STATUSES.length - 1, DeliveredAt: '',
+    Stages: SALE_FULFILLMENT_STATUSES
   };
 }
 
@@ -1498,9 +1533,16 @@ function recordOrderPayment(token, orderId, amount, method) {
  * fabric sold by the yard, accessories, notions, or ready-to-wear pieces.
  * ==========================================================================*/
 
-function createSale(token, sale) {
-  var user = requireAuth_(token);
-  sale = sale || {};
+/**
+ * Shared core behind both the admin POS (createSale) and the public online
+ * Shop checkout (createPublicSale): validates stock, computes totals,
+ * writes the Sales row, decrements inventory, and awards loyalty points.
+ * `opts.source` is 'POS' or 'Online'; `opts.staffId`/`opts.paymentStatus`/
+ * `opts.fulfillmentStatus`/`opts.reference` let each caller fill in the
+ * fields only it knows about.
+ */
+function createSale_(sale, opts) {
+  sale = sale || {}; opts = opts || {};
   var items = sale.items || [];
   if (!items.length) throw new Error('Cart is empty.');
   var branch = readAll_('Branches')[0];
@@ -1509,7 +1551,7 @@ function createSale(token, sale) {
   var subtotal = 0;
   items.forEach(function (item) {
     var product = products[item.productId];
-    if (!product) throw new Error('Product not found: ' + item.productId);
+    if (!product) throw new Error('Item not found: ' + item.productId);
     var stock = Number(product.QuantityInStock || 0);
     if (stock < item.qty) throw new Error('Not enough stock for ' + product.Name + ' (only ' + stock + ' left).');
     subtotal += Number(product.SellingPrice) * Number(item.qty);
@@ -1531,10 +1573,12 @@ function createSale(token, sale) {
 
   var record = {
     SaleID: nextId_('Sales', 'SaleID'), Date: nowIso_(), BranchID: branch.BranchID,
-    CustomerID: customer ? customer.CustomerID : '', StaffID: sale.staffId || user.staffId || '',
+    CustomerID: customer ? customer.CustomerID : '', StaffID: opts.staffId || '',
     Items: JSON.stringify(items.map(function (item) { var p = products[item.productId]; return { productId: item.productId, name: p.Name, qty: item.qty, price: Number(p.SellingPrice) }; })),
     Subtotal: round2_(subtotal), Discount: discount, Tax: tax, Total: total,
-    PaymentMethod: sale.paymentMethod || 'Cash', PaymentStatus: 'Paid'
+    PaymentMethod: sale.paymentMethod || 'Cash', PaymentStatus: opts.paymentStatus || 'Paid',
+    Reference: opts.reference || '', PaymentProofURL: sale.paymentProofUrl || '',
+    Source: opts.source || 'POS', FulfillmentStatus: opts.fulfillmentStatus || ''
   };
   appendRow_('Sales', record);
 
@@ -1544,13 +1588,42 @@ function createSale(token, sale) {
   });
 
   var pointsEarned = 0;
-  if (customer) {
+  if (customer && record.PaymentStatus === 'Paid') {
     pointsEarned = Math.round(total * (Number(settings.LoyaltyPointsPerCedi) || 0));
     if (pointsEarned) updateById_('Customers', 'CustomerID', customer.CustomerID, { LoyaltyPoints: Number(customer.LoyaltyPoints || 0) + pointsEarned });
-    sendSaleReceipt_(record, customer, JSON.parse(record.Items), pointsEarned);
   }
 
-  return { sale: record, pointsEarned: pointsEarned };
+  return { record: record, customer: customer, pointsEarned: pointsEarned, itemsParsed: JSON.parse(record.Items) };
+}
+
+/** Admin/staff POS checkout — paid in full immediately, at the counter. */
+function createSale(token, sale) {
+  var user = requireAuth_(token);
+  var result = createSale_(sale, { source: 'POS', staffId: sale.staffId || user.staffId || '', paymentStatus: 'Paid' });
+  if (result.customer) sendSaleReceipt_(result.record, result.customer, result.itemsParsed, result.pointsEarned);
+  return { sale: result.record, pointsEarned: result.pointsEarned };
+}
+
+/**
+ * Public online Shop checkout — no login required. Cash orders are marked
+ * payable on pickup; mobile money/bank orders start "Awaiting Verification"
+ * until staff confirm the payment actually landed (see verifySalePayment),
+ * at which point loyalty points are awarded and a receipt is sent.
+ */
+function createPublicSale(sale) {
+  sale = sale || {};
+  var name = String(sale.customerName || '').trim();
+  var phone = normalizeGhanaPhone_(sale.customerPhone);
+  if (!name) throw new Error('Please enter your name.');
+  if (!phone) throw new Error('Please enter a valid Ghana phone number.');
+  var customer = findOrCreateCustomerByPhone_(name, phone, sale.customerEmail);
+  sale.customerId = customer.CustomerID;
+
+  var reference = 'SHP' + Utilities.formatDate(new Date(), TIMEZONE, 'yyMMdd') + '-' + Math.floor(1000 + Math.random() * 9000);
+  var paymentStatus = (sale.paymentMethod && sale.paymentMethod !== 'Cash') ? 'Awaiting Verification' : 'Pay on Pickup';
+  var result = createSale_(sale, { source: 'Online', paymentStatus: paymentStatus, fulfillmentStatus: 'Processing', reference: reference });
+  sendShopOrderConfirmation_(result.record, result.customer, result.itemsParsed);
+  return { reference: reference, sale: result.record };
 }
 
 function getSales(token, filters) {
@@ -1559,10 +1632,47 @@ function getSales(token, filters) {
   var rows = readAll_('Sales').map(withParsedItems_);
   if (filters.dateFrom) rows = rows.filter(function (s) { return s.Date >= filters.dateFrom; });
   if (filters.dateTo) rows = rows.filter(function (s) { return s.Date <= filters.dateTo + 'T23:59:59'; });
+  if (filters.source) rows = rows.filter(function (s) { return s.Source === filters.source; });
   var customers = keyBy_(readAll_('Customers'), 'CustomerID');
   var staffMap = keyBy_(readAll_('Staff'), 'StaffID');
-  rows.forEach(function (s) { s.CustomerName = (customers[s.CustomerID] || {}).Name || 'Walk-in'; s.StaffName = (staffMap[s.StaffID] || {}).Name || ''; });
+  rows.forEach(function (s) { s.CustomerName = (customers[s.CustomerID] || {}).Name || 'Walk-in'; s.CustomerPhone = (customers[s.CustomerID] || {}).Phone || ''; s.StaffName = (staffMap[s.StaffID] || {}).Name || ''; });
   return rows.sort(function (a, b) { return new Date(b.Date) - new Date(a.Date); });
+}
+
+/** Admin listing of online Shop orders specifically (as opposed to over-the-counter POS sales). */
+function getOnlineSales(token, filters) {
+  filters = Object.assign({}, filters || {}, { source: 'Online' });
+  return getSales(token, filters);
+}
+
+/** Staff confirm a mobile money/bank payment actually arrived (checked manually against the shop's own momo/bank statement). Awards loyalty points and sends the receipt, same as an instantly-paid sale. */
+function verifySalePayment(token, saleId) {
+  var user = requireAuth_(token);
+  requireRole_(user, ['Owner', 'Manager', 'Receptionist']);
+  var sale = readAll_('Sales').find(function (s) { return s.SaleID === saleId; });
+  if (!sale) throw new Error('Order not found.');
+  var updated = updateById_('Sales', 'SaleID', saleId, { PaymentStatus: 'Paid' });
+  var customer = sale.CustomerID ? readAll_('Customers').find(function (c) { return c.CustomerID === sale.CustomerID; }) : null;
+  var pointsEarned = 0;
+  if (customer) {
+    var settings = getSettingsMap_();
+    pointsEarned = Math.round(Number(sale.Total || 0) * (Number(settings.LoyaltyPointsPerCedi) || 0));
+    if (pointsEarned) updateById_('Customers', 'CustomerID', customer.CustomerID, { LoyaltyPoints: Number(customer.LoyaltyPoints || 0) + pointsEarned });
+    sendSaleReceipt_(updated, customer, JSON.parse(updated.Items || '[]'), pointsEarned);
+  }
+  return updated;
+}
+
+/** Advances a Shop order's fulfillment stage and notifies the customer. */
+function updateSaleFulfillment(token, saleId, status) {
+  var user = requireAuth_(token);
+  if (SALE_FULFILLMENT_STATUSES.indexOf(status) === -1) throw new Error('Invalid status.');
+  var sale = updateById_('Sales', 'SaleID', saleId, { FulfillmentStatus: status });
+  if (sale.CustomerID) {
+    var customer = readAll_('Customers').find(function (c) { return c.CustomerID === sale.CustomerID; });
+    if (customer) sendShopOrderStatusUpdate_(sale, customer, status);
+  }
+  return sale;
 }
 
 function withParsedItems_(saleRow) {
@@ -1588,6 +1698,7 @@ function saveProduct(token, product) {
   if (!product.Name) throw new Error('Please enter a product name.');
   var branch = readAll_('Branches')[0];
   product.BranchID = branch.BranchID;
+  product.ShowOnWebsite = product.ShowOnWebsite === 'Y' ? 'Y' : 'N';
   if (product.ProductID) {
     return updateById_('Products', 'ProductID', product.ProductID, product);
   }
@@ -1612,6 +1723,13 @@ function restockProduct(token, productId, qty) {
 function getLowStockProducts(token, branchId) {
   var user = requireAuth_(token);
   return readAll_('Products').filter(function (p) { return Number(p.QuantityInStock) <= Number(p.ReorderLevel); });
+}
+
+/** Public: ready-to-wear items the Owner has chosen to sell straight from the website (Products.ShowOnWebsite = 'Y'), in stock. */
+function getShopProducts() {
+  var rows = readAll_('Products').filter(function (p) { return String(p.ShowOnWebsite).toUpperCase() === 'Y'; });
+  withImageDataUris_(rows, 'ImageURL');
+  return rows;
 }
 
 /* ============================================================================
@@ -2226,6 +2344,28 @@ function sendSaleReceipt_(sale, customer, lineItems, pointsEarned) {
   rows.push(['Total', CURRENCY_SYMBOL + sale.Total]);
   if (pointsEarned) rows.push(['Loyalty points earned', String(pointsEarned)]);
   sendEmail_(customer.Email, 'Receipt — ' + settings.BusinessName, 'Thank you for your purchase.', buildEmailHtml_('Receipt', '<p>Hi ' + esc_(customer.Name) + ', thank you for your purchase!</p>' + emailDetailTable_(rows), '', ''));
+}
+
+/** Confirms a public online Shop order was received, and — for a mobile money/bank payment — that it's pending manual verification against the shop's own statement. */
+function sendShopOrderConfirmation_(sale, customer, lineItems) {
+  var settings = getSettingsMap_();
+  var itemsLabel = lineItems.map(function (it) { return it.name + ' ×' + it.qty; }).join(', ');
+  var pendingPayment = sale.PaymentStatus === 'Awaiting Verification';
+  var smsText = settings.BusinessName + ': Order ' + sale.Reference + ' received (' + itemsLabel + '), total ' + formatCurrency_(sale.Total) + '.' +
+    (pendingPayment ? ' We will confirm your payment shortly.' : ' Please pay on pickup.');
+  if (customer.Phone) sendSms_(customer.Phone, smsText);
+  if (customer.Email) {
+    var rows = [['Reference', sale.Reference], ['Items', itemsLabel], ['Total', formatCurrency_(sale.Total)], ['Payment', sale.PaymentStatus]];
+    sendEmail_(customer.Email, 'Order received — ' + sale.Reference, smsText, buildEmailHtml_('Order Received', '<p>Hi ' + esc_(customer.Name) + ', thanks for shopping with us!</p>' + emailDetailTable_(rows), 'Track My Order', getWebAppUrl_() + '#track'));
+  }
+}
+
+/** Notifies a customer of a Shop order's fulfillment-stage change (Processing → Ready for Pickup / Out for Delivery → Delivered). */
+function sendShopOrderStatusUpdate_(sale, customer, status) {
+  var settings = getSettingsMap_();
+  var smsText = settings.BusinessName + ': Order ' + sale.Reference + ' is now ' + status + '.';
+  if (customer.Phone) sendSms_(customer.Phone, smsText);
+  if (customer.Email) sendEmail_(customer.Email, 'Order update — ' + sale.Reference, smsText, buildEmailHtml_('Order Update', '<p>Hi ' + esc_(customer.Name) + ', order <strong>' + esc_(sale.Reference) + '</strong> is now <strong>' + esc_(status) + '</strong>.</p>', 'Track My Order', getWebAppUrl_() + '#track'));
 }
 
 /** Time-driven trigger (set up manually via Triggers > Add Trigger > sendUpcomingAppointmentReminders, daily). Reminds customers of tomorrow's fitting/consultation. */
