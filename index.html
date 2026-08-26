@@ -202,6 +202,23 @@
   .video-frame iframe, .video-frame video { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
   .video-card-body { padding: 12px 16px; }
   .video-card-body b { display: block; }
+  /* Click-to-play facade for YouTube embeds — a thumbnail + play button
+     stands in for the real iframe until clicked, so the page never pays
+     YouTube's own heavy embed-player load cost unless a visitor actually
+     wants to watch. */
+  .yt-facade {
+    position: absolute; inset: 0; background-size: cover; background-position: center;
+    background-color: #111; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+  .yt-facade::after { content: ''; position: absolute; inset: 0; background: rgba(0,0,0,.28); transition: background .2s ease; }
+  .yt-facade:hover::after, .yt-facade:focus-visible::after { background: rgba(0,0,0,.42); }
+  .yt-play-btn {
+    position: relative; z-index: 1; width: 58px; height: 58px; border-radius: 50%;
+    background: rgba(255,255,255,.94); color: #1a1a1a; display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 18px rgba(0,0,0,.35); transition: transform .2s ease;
+  }
+  .yt-play-btn svg { margin-left: 3px; fill: currentColor; } /* solid triangle, optically centered */
+  .yt-facade:hover .yt-play-btn, .yt-facade:focus-visible .yt-play-btn { transform: scale(1.08); }
   .gallery-item { position: relative; border-radius: var(--radius); overflow: hidden; cursor: pointer; box-shadow: var(--shadow); aspect-ratio: 4/3; }
   .gallery-item img { width: 100%; height: 100%; object-fit: cover; transition: transform .3s ease; }
   .gallery-item:hover img { transform: scale(1.06); }
@@ -1763,7 +1780,12 @@ function openImageLightbox(url, caption) {
 function videoEmbedInfo_(url) {
   url = String(url || '');
   var yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{6,})/);
-  if (yt) return { kind: 'iframe', src: 'https://www.youtube.com/embed/' + yt[1] };
+  // YouTube gets its own 'youtube' kind (id + src, not just src) rather
+  // than the generic 'iframe' kind every other embed uses — see
+  // renderVideos()'s click-to-play facade just below, which needs the
+  // bare video id to build a thumbnail URL and is the actual fix for
+  // "the YouTube video delays to load".
+  if (yt) return { kind: 'youtube', id: yt[1], src: 'https://www.youtube.com/embed/' + yt[1] };
   var vimeo = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
   if (vimeo) return { kind: 'iframe', src: 'https://player.vimeo.com/video/' + vimeo[1] };
   // A TikTok video page URL (https://www.tiktok.com/@user/video/123...) is
@@ -1793,13 +1815,45 @@ function renderVideos(videos) {
   }
   host.innerHTML = videos.map(function (v) {
     var info = videoEmbedInfo_(v.VideoURL);
-    var player = info.kind === 'iframe'
-      ? '<iframe src="' + esc(info.src) + '" title="' + esc(v.Title || 'Video') + '" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>'
-      : '<video src="' + esc(info.src) + '" controls preload="metadata"></video>';
+    var player;
+    if (info.kind === 'youtube') {
+      // Click-to-play facade: a static thumbnail + play button instead of
+      // the real YouTube iframe. Even with loading="lazy", an actual
+      // YouTube embed pulls in YouTube's own heavy player JS the moment
+      // its iframe is created — that's what was making "the video" feel
+      // slow, not this site's own load. Swapping in the real iframe only
+      // once a visitor actually clicks "play" means that cost is never
+      // paid at all unless they want to watch.
+      player = '<div class="yt-facade" data-embed="' + esc(info.src) + '" style="background-image:url(\'https://img.youtube.com/vi/' + esc(info.id) + '/hqdefault.jpg\')" role="button" tabindex="0" aria-label="Play ' + esc(v.Title || 'video') + '"><span class="yt-play-btn">' + icon('play', 26) + '</span></div>';
+    } else if (info.kind === 'iframe') {
+      player = '<iframe src="' + esc(info.src) + '" title="' + esc(v.Title || 'Video') + '" loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>';
+    } else {
+      player = '<video src="' + esc(info.src) + '" controls preload="metadata"></video>';
+    }
     return '<div class="video-card"><div class="video-frame">' + player + '</div>' +
       (v.Title || v.Caption ? '<div class="video-card-body">' + (v.Title ? '<b>' + esc(v.Title) + '</b>' : '') + (v.Caption ? '<span class="muted">' + esc(v.Caption) + '</span>' : '') + '</div>' : '') +
       '</div>';
   }).join('');
+  bindYoutubeFacades_(host);
+}
+
+/** Swaps a .yt-facade (thumbnail + play button) for the real YouTube iframe on click/Enter/Space — the actual embed, and its heavy player JS, only ever loads once a visitor deliberately asks to watch. */
+function bindYoutubeFacades_(host) {
+  host.querySelectorAll('.yt-facade').forEach(function (el) {
+    function activate() {
+      var src = el.dataset.embed;
+      var iframe = document.createElement('iframe');
+      iframe.src = src + (src.indexOf('?') > -1 ? '&' : '?') + 'autoplay=1&rel=0';
+      iframe.title = el.getAttribute('aria-label') || 'Video';
+      iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+      iframe.allowFullscreen = true;
+      el.replaceWith(iframe);
+    }
+    el.addEventListener('click', activate);
+    el.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); activate(); }
+    });
+  });
 }
 
 function renderReviews(reviews) {
