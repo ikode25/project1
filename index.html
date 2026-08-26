@@ -107,14 +107,20 @@
   #publicNav .navActions { display: flex; align-items: center; gap: 14px; padding-left: 20px; border-left: 1px solid rgba(255,255,255,.16); }
   #publicNav .cartLink { position: relative; display: flex; opacity: .88; cursor: pointer; }
   #publicNav .cartLink:hover { opacity: 1; }
-  #publicNav .loginLink { font-weight: 600; font-size: .85rem; opacity: .75; white-space: nowrap; }
+  #publicNav .loginLink { display: inline-flex; align-items: center; font-weight: 600; font-size: .85rem; opacity: .75; white-space: nowrap; cursor: pointer; }
   #publicNav .loginLink:hover { opacity: 1; text-decoration: underline; }
   #publicNav .navBtns { display: flex; align-items: center; gap: 10px; }
   #navToggle { display: none; background: none; border: none; color: #fff; font-size: 1.6rem; cursor: pointer; }
-  .shopStatusBadge { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
-  .shopStatusBadge.open { background: #1c7c3c33; color: #a8f0c0; }
-  .shopStatusBadge.closed { background: #c0392b33; color: #ffb3ac; }
-  .shopStatusBadge .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  /* A little hanging shop sign — pegged at the top, swinging gently side
+     to side, in both mobile and desktop nav. */
+  .shopStatusBadge { position: relative; display: inline-flex; align-items: center; gap: 6px; font-size: .76rem; font-weight: 800; padding: 5px 12px 5px 10px; border-radius: 6px; margin-top: 10px; transform-origin: top center; animation: shopSignSwing 3.6s ease-in-out infinite; box-shadow: 0 3px 8px rgba(0,0,0,.18); border: 1px solid rgba(255,255,255,.25); }
+  .shopStatusBadge::before { content: ''; position: absolute; top: -9px; left: 50%; transform: translateX(-50%); width: 2px; height: 9px; background: rgba(255,255,255,.5); }
+  .shopStatusBadge::after { content: ''; position: absolute; top: -11px; left: 50%; transform: translateX(-50%); width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,.6); }
+  .shopStatusBadge.open { background: #1c7c3c; color: #eafff0; }
+  .shopStatusBadge.closed { background: #a53232; color: #ffe9e6; }
+  .shopStatusBadge .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px rgba(255,255,255,.18); }
+  @keyframes shopSignSwing { 0%, 100% { transform: rotate(-4.5deg); } 50% { transform: rotate(4.5deg); } }
+  @media (prefers-reduced-motion: reduce) { .shopStatusBadge { animation: none; } }
   @media (max-width: 860px) {
     #navToggle { display: block; }
     #publicNav nav { position: fixed; top: 66px; left: 0; right: 0; bottom: 0; background: var(--clr-primary); flex-direction: column; align-items: flex-start; justify-content: flex-start; padding: 24px; gap: 24px; transform: translateX(-100%); transition: transform .2s ease; overflow-y: auto; }
@@ -212,6 +218,16 @@
   .payDetailBox { background: #f7f5f0; border-radius: 8px; padding: 14px; margin-top: 12px; font-size: .88rem; }
   .successBox { text-align: center; padding: 20px 0; }
   .successBox .refCode { display: inline-block; background: #f2f0ea; padding: 10px 22px; border-radius: 8px; font-weight: 800; font-size: 1.2rem; letter-spacing: .04em; margin: 14px 0; }
+  .refCopyRow { display: inline-flex; align-items: center; gap: 8px; }
+  .refCopyRow.big { margin: 14px 0; }
+  .refCopyRow .refCode.inline { display: inline-block; background: #f2f0ea; padding: 6px 14px; border-radius: 8px; font-weight: 800; letter-spacing: .03em; }
+  .refCopyRow .copyBtn { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 7px; border: 1.5px solid #ddd; background: #fff; color: #555; cursor: pointer; flex-shrink: 0; }
+  .refCopyRow .copyBtn:hover { border-color: var(--clr-secondary); color: var(--clr-primary); }
+  .trackResultCard .refCopyRow .copyBtn { border-color: #e5e3dc; }
+  .photoPicker { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .photoPickerBtn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 16px; border-radius: 8px; border: 1.5px solid #ddd; background: #fff; cursor: pointer; font-weight: 600; font-size: .85rem; color: #444; }
+  .photoPickerBtn:hover { border-color: var(--clr-secondary); }
+  .photoPreview { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 1px solid #eee; }
 
   /* Track order */
   #track .trackResultCard { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px; margin-top: 20px; }
@@ -427,7 +443,10 @@ var ICONS = {
   bell: function (s) { return svgIcon('<path d="M6 9.5a6 6 0 0 1 12 0c0 4.2 1.5 5.6 2 6.5H4c.5-.9 2-2.3 2-6.5z"/><path d="M9.5 19a2.5 2.5 0 0 0 5 0"/>', s); },
   search: function (s) { return svgIcon('<circle cx="10.5" cy="10.5" r="6.5"/><line x1="19.5" y1="19.5" x2="15.3" y2="15.3"/>', s); },
   shirt: function (s) { return svgIcon('<path d="M8 3l4 2 4-2 4 4-3 3v11H7V10L4 7z"/>', s); },
-  box: function (s) { return svgIcon('<path d="M3.5 8l8.5-4.5L20.5 8 12 12.5 3.5 8z"/><path d="M3.5 8v9L12 21.5 20.5 17V8"/><line x1="12" y1="12.5" x2="12" y2="21.5"/>', s); }
+  box: function (s) { return svgIcon('<path d="M3.5 8l8.5-4.5L20.5 8 12 12.5 3.5 8z"/><path d="M3.5 8v9L12 21.5 20.5 17V8"/><line x1="12" y1="12.5" x2="12" y2="21.5"/>', s); },
+  copy: function (s) { return svgIcon('<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>', s); },
+  login: function (s) { return svgIcon('<path d="M11 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h6"/><path d="M15 8l4 4-4 4"/><line x1="19" y1="12" x2="9" y2="12"/>', s); },
+  camera: function (s) { return svgIcon('<path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="14" r="3.5"/>', s); }
 };
 
 /* ============================================================================
@@ -476,6 +495,56 @@ function openModal(innerHtml, opts) {
 function closeModal() { document.getElementById('modalHost').innerHTML = ''; }
 
 function esc(s) { var d = document.createElement('div'); d.textContent = (s === undefined || s === null) ? '' : String(s); return d.innerHTML; }
+
+/** A reference code with a small inline copy button — used anywhere a booking/order/purchase reference is shown to a customer. */
+function refWithCopy(ref, big) {
+  var safe = String(ref || '').replace(/'/g, "\\'");
+  return '<span class="refCopyRow' + (big ? ' big' : '') + '"><span class="refCode' + (big ? '' : ' inline') + '">' + esc(ref) + '</span>' +
+    '<button type="button" class="copyBtn" onclick="copyToClipboard(\'' + safe + '\', this)" title="Copy">' + ICONS.copy(15) + '</button></span>';
+}
+function copyToClipboard(text, btnEl) {
+  var onDone = function () {
+    toast('Copied ' + text, 'success');
+    if (btnEl) {
+      var orig = btnEl.innerHTML;
+      btnEl.innerHTML = ICONS.check(15);
+      setTimeout(function () { btnEl.innerHTML = orig; }, 1200);
+    }
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(onDone).catch(function () { fallbackCopy(text); onDone(); });
+  } else {
+    fallbackCopy(text); onDone();
+  }
+}
+function fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.focus(); ta.select();
+  try { document.execCommand('copy'); } catch (e) { /* clipboard unavailable — nothing more we can do */ }
+  document.body.removeChild(ta);
+}
+
+/** Wires a file input to show an instant local preview of the chosen image before it's uploaded, and reveals an existing image (when editing a record) up front. */
+function bindPhotoPreview(inputId, previewId, existingUrl) {
+  var input = document.getElementById(inputId);
+  var preview = document.getElementById(previewId);
+  if (!input || !preview) return;
+  if (existingUrl) { preview.src = existingUrl; preview.classList.remove('hidden'); }
+  input.addEventListener('change', function () {
+    if (!input.files[0]) return;
+    var reader = new FileReader();
+    reader.onload = function () { preview.src = reader.result; preview.classList.remove('hidden'); };
+    reader.readAsDataURL(input.files[0]);
+  });
+}
+/** Markup for a file input + its preview image, sharing one field wrapper — pair with bindPhotoPreview(inputId, previewId, existingUrl) right after the form is inserted into the DOM. */
+function photoPickerHtml(inputId, previewId, label) {
+  return '<div class="field"><label>' + esc(label || 'Photo') + '</label>' +
+    '<div class="photoPicker"><label class="photoPickerBtn" for="' + inputId + '">' + ICONS.camera(16) + ' Choose Photo</label>' +
+    '<input type="file" id="' + inputId + '" accept="image/*" style="display:none;">' +
+    '<img id="' + previewId + '" class="photoPreview hidden"></div></div>';
+}
 function fmtMoney(n) { var sym = (state.settings && state.settings.Currency) || 'GH₵'; return sym + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function fmtDateNice(dateStr) { if (!dateStr) return ''; try { var d = new Date(dateStr + 'T12:00:00'); return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) { return dateStr; } }
 function fmtDateShort(dateStr) { if (!dateStr) return ''; try { var d = new Date(dateStr.slice(0, 10) + 'T12:00:00'); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); } catch (e) { return dateStr; } }
@@ -552,6 +621,11 @@ function route() {
   var hash = location.hash || '#home';
   if (hash.indexOf('#admin') === 0) {
     if (!state.user) { renderLogin(); return; }
+    // The active module lives in the URL itself (#admin/orders, etc.) so a
+    // page reload, a bookmark, or the browser's back/forward button lands
+    // back on the same module instead of always resetting to the Dashboard.
+    var parts = hash.split('/');
+    if (parts.length > 1 && PAGE_TITLES[parts[1]]) state.adminPage = parts[1];
     renderAdminShell();
   } else {
     renderPublicSite();
@@ -566,7 +640,8 @@ function route() {
 
 function goAdmin(page) {
   state.adminPage = page;
-  location.hash = '#admin';
+  var target = '#admin/' + page;
+  if (location.hash !== target) location.hash = target; // keeps the URL (and reload/back-forward) in sync with the visible module
   renderAdminShell();
 }
 
@@ -618,7 +693,7 @@ function renderPublicNav(d) {
     '<button id="navToggle" aria-label="Menu">&#9776;</button>' +
     '<nav id="pubNavLinks">' +
       '<div class="navLinks">' +
-        '<a href="#services">Services</a><a href="#shop">Shop</a><a href="#staff">Our Team</a><a href="#gallery">Portfolio</a><a href="#reviews">Reviews</a><a href="#contact">Contact</a>' +
+        '<a href="#services">Services</a>' + (d.shopProducts && d.shopProducts.length ? '<a href="#shop">Shop</a>' : '') + '<a href="#staff">Our Team</a><a href="#gallery">Portfolio</a><a href="#reviews">Reviews</a><a href="#contact">Contact</a>' +
       '</div>' +
       '<div class="navActions">' +
         '<span class="shopStatusBadge ' + (d.shopStatus.open ? 'open' : 'closed') + '"><span class="dot"></span>' + (d.shopStatus.open ? 'Open now' : 'Closed now') + '</span>' +
@@ -626,7 +701,7 @@ function renderPublicNav(d) {
         '<span class="cartLink" onclick="openShopCart()" title="Cart">' + ICONS.cart(19) + '<span id="navCartCount" class="hidden" style="position:absolute;top:-8px;right:-10px;background:var(--clr-secondary);color:#1a1a1a;border-radius:999px;font-size:.65rem;font-weight:800;padding:1px 5px;"></span></span>' +
         '<div class="navBtns">' +
           '<a href="#booking" class="btn btn-accent btn-sm">Book a Fitting</a>' +
-          '<a onclick="location.hash=\'#admin\'" class="loginLink">Staff Login</a>' +
+          '<a onclick="location.hash=\'#admin\'" class="loginLink" title="Staff Login">' + ICONS.login(19) + '</a>' +
         '</div>' +
       '</div>' +
     '</nav></div></header>';
@@ -769,8 +844,9 @@ function openShopCart() {
       return '<div class="optionCard' + (m === 'Cash' ? ' selected' : '') + '" data-method="' + esc(m) + '" onclick="pickShopPayment(\'' + m + '\')"><div class="oc-title">' + esc(m) + '</div></div>';
     }).join('') + '</div>' +
     '<div id="shopPayDetail">' + paymentDetailHtml('Cash', settings) + '</div>' +
-    '<div class="field hidden" id="shopProofField" style="margin-top:12px;"><label>Upload payment screenshot (optional)</label><input type="file" id="shopProof" accept="image/*"></div>' +
+    '<div class="field hidden" id="shopProofField" style="margin-top:12px;">' + photoPickerHtml('shopProof', 'shopProofPreview', 'Upload payment screenshot (optional)') + '</div>' +
     '<button class="btn btn-block btn-accent" style="margin-top:16px;" onclick="submitShopCheckout()">Place Order</button>', { wide: true });
+  bindPhotoPreview('shopProof', 'shopProofPreview');
   window.__shopPaymentMethod = 'Cash';
 }
 function pickShopPayment(m) {
@@ -807,7 +883,7 @@ function submitShopCheckout() {
       updateNavCartBadge();
       openModal('<div class="successBox"><div style="color:#1c7c3c;">' + ICONS.check(52) + '</div><h3>Order Placed!</h3>' +
         '<p class="muted">' + (res.sale.PaymentStatus === 'Awaiting Verification' ? 'We\'ll confirm your payment shortly.' : 'Please pay on pickup.') + '</p>' +
-        '<div class="refCode">' + esc(res.reference) + '</div>' +
+        refWithCopy(res.reference, true) +
         '<p class="muted">Save this reference to track your order.</p>' +
         '<button class="btn btn-accent" onclick="closeModal()">Done</button></div>');
       api('getShopProducts').then(function (products) { state.publicData.shopProducts = products; });
@@ -905,9 +981,11 @@ function renderWizardStep(stepKey) {
     }).join('') + '</div>';
   } else if (stepKey === 'staff') {
     var eligible = d.staff;
-    host.innerHTML = '<h3>Choose your tailor</h3><div class="optionGrid">' + eligible.map(function (s) {
-      return '<div class="optionCard' + (w.staffId === s.StaffID ? ' selected' : '') + '" onclick="wizPickStaff(\'' + s.StaffID + '\')"><div class="oc-title">' + esc(s.Name) + '</div><div class="oc-sub">' + esc(s.Role) + ' · ' + esc(s.Specialties || '') + '</div></div>';
-    }).join('') + '</div>' + wizardNav(true, false);
+    host.innerHTML = '<h3>Choose your tailor</h3><div class="optionGrid">' +
+      '<div class="optionCard' + (w.staffId === 'ANY' ? ' selected' : '') + '" onclick="wizPickStaff(\'ANY\')"><div class="oc-title">Any Available Tailor</div><div class="oc-sub">We\'ll assign whoever\'s free first</div></div>' +
+      eligible.map(function (s) {
+        return '<div class="optionCard' + (w.staffId === s.StaffID ? ' selected' : '') + '" onclick="wizPickStaff(\'' + s.StaffID + '\')"><div class="oc-title">' + esc(s.Name) + '</div><div class="oc-sub">' + esc(s.Role) + ' · ' + esc(s.Specialties || '') + '</div></div>';
+      }).join('') + '</div>' + wizardNav(true, false);
   } else if (stepKey === 'slot') {
     var minDate = todayStr();
     host.innerHTML = '<h3>Choose date &amp; time</h3>' +
@@ -932,9 +1010,10 @@ function renderWizardStep(stepKey) {
         return '<div class="optionCard' + (w.paymentMethod === m ? ' selected' : '') + '" onclick="wizPickPayment(\'' + m + '\')"><div class="oc-title">' + esc(m) + '</div></div>';
       }).join('') + '</div>' +
       '<div id="wizPayDetail">' + paymentDetailHtml(w.paymentMethod, d.settings) + '</div>' +
-      (w.paymentMethod !== 'Cash' ? '<div class="field" style="margin-top:14px;"><label>Upload payment screenshot (optional)</label><input type="file" id="wizProof" accept="image/*"></div>' : '') +
+      (w.paymentMethod !== 'Cash' ? '<div class="field" style="margin-top:14px;">' + photoPickerHtml('wizProof', 'wizProofPreview', 'Upload payment screenshot (optional)') + '</div>' : '') +
       '<div class="panel" style="margin-top:16px;background:#f7f5f0;box-shadow:none;"><strong>' + esc(svc ? svc.Name : '') + '</strong><div class="muted">' + fmtDateNice(w.date) + ' at ' + esc(w.timeSlot || '') + '</div></div>' +
       wizardNav(true, true, 'Confirm Booking');
+    if (w.paymentMethod !== 'Cash') bindPhotoPreview('wizProof', 'wizProofPreview');
   } else if (stepKey === 'done') {
     host.innerHTML = renderBookingSuccess(w.result || {});
   }
@@ -1014,9 +1093,11 @@ function submitBooking() {
 function renderBookingSuccess(res) {
   return '<div class="successBox"><div style="color:#1c7c3c;">' + ICONS.check(52) + '</div><h3>Booking Received!</h3>' +
     '<p class="muted">We\'ll confirm your appointment shortly by SMS/Email.</p>' +
-    '<div class="refCode">' + esc(res.reference || '') + '</div>' +
+    refWithCopy(res.reference || '', true) +
     '<p class="muted">Save this reference to track or manage your booking.</p>' +
-    '<button class="btn btn-accent" onclick="resetWizard()">Book Another</button></div>';
+    '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">' +
+    '<button class="btn btn-accent" onclick="resetWizard()">Book Another</button>' +
+    '<button class="btn btn-outline" onclick="openReviewModal()">Leave a Review</button></div></div>';
 }
 function resetWizard() {
   state.wizard = { step: 'service', serviceId: null, staffId: null, date: null, timeSlot: null, name: '', phone: '', email: '', notes: '', paymentMethod: 'Cash', paymentProofUrl: '' };
@@ -1058,19 +1139,20 @@ function renderOrderTrackCard(o) {
   var stages = o.Stages || ['Order Received', 'Measuring', 'Cutting', 'Sewing', 'Fitting', 'Finishing', 'Ready for Pickup', 'Delivered'];
   var idx = o.StageIndex >= 0 ? o.StageIndex : 0;
   var isCancelled = o.Status === 'Cancelled';
-  return '<div class="trackResultCard"><div style="display:flex;justify-content:space-between;align-items:center;">' +
-    '<div><strong>' + esc(o.Reference) + '</strong><div class="muted">' + esc(o.ServiceName) + '</div></div>' +
+  return '<div class="trackResultCard"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">' +
+    '<div>' + refWithCopy(o.Reference) + '<div class="muted" style="margin-top:6px;">' + esc(o.Type === 'Purchase' ? 'Purchase' : 'Order') + ' · ' + esc(o.ServiceName) + '</div></div>' +
     '<span class="' + badgeClass(o.Status) + '">' + esc(o.Status) + '</span></div>' +
     (isCancelled ? '' : '<div class="stageTrack">' + stages.map(function (st, i) {
       return (i > 0 ? '<div class="stageLine' + (i <= idx ? ' done' : '') + '"></div>' : '') + '<div class="stageDot' + (i <= idx ? ' done' : '') + '"></div>';
     }).join('') + '</div><div class="stageLabels">' + stages.map(function (st) { return '<span>' + st + '</span>'; }).join('') + '</div>') +
-    '<div class="form-row" style="margin-top:16px;"><div><div class="muted">Order Date</div><strong>' + fmtDateShort(o.OrderDate) + '</strong></div>' +
-    '<div><div class="muted">Due Date</div><strong>' + fmtDateShort(o.DueDate) + '</strong></div>' +
+    '<div class="form-row" style="margin-top:16px;"><div><div class="muted">' + (o.Type === 'Purchase' ? 'Order Date' : 'Order Date') + '</div><strong>' + fmtDateShort(o.OrderDate) + '</strong></div>' +
+    (o.DueDate ? '<div><div class="muted">Due Date</div><strong>' + fmtDateShort(o.DueDate) + '</strong></div>' : '') +
+    '<div><div class="muted">Payment</div><span class="' + badgeClass(o.PaymentStatus) + '">' + esc(o.PaymentStatus) + '</span></div>' +
     '<div><div class="muted">Balance Due</div><strong>' + fmtMoney(Number(o.Price || 0) - Number(o.AmountPaid || 0)) + '</strong></div></div></div>';
 }
 function renderBookingTrackCard(b) {
-  return '<div class="trackResultCard"><div style="display:flex;justify-content:space-between;align-items:center;">' +
-    '<div><strong>' + esc(b.Reference) + '</strong><div class="muted">' + esc(b.ServiceName) + ' with ' + esc(b.StaffName) + '</div></div>' +
+  return '<div class="trackResultCard"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">' +
+    '<div>' + refWithCopy(b.Reference) + '<div class="muted" style="margin-top:6px;">' + esc(b.ServiceName) + ' with ' + esc(b.StaffName) + '</div></div>' +
     '<span class="' + badgeClass(b.Status) + '">' + esc(b.Status) + '</span></div>' +
     '<div class="form-row" style="margin-top:16px;"><div><div class="muted">Date</div><strong>' + fmtDateShort(b.Date) + '</strong></div><div><div class="muted">Time</div><strong>' + esc(b.TimeSlot) + '</strong></div></div>' +
     (b.Status !== 'Completed' && b.Status !== 'Cancelled' ? '<button class="btn btn-outline btn-sm" style="margin-top:14px;" onclick="cancelTrackedBooking(\'' + b.Reference + '\')">Cancel Booking</button>' : '') +
@@ -1149,8 +1231,7 @@ function renderAuthForm() {
   if (authTab === 'login') {
     host.innerHTML = '<form id="loginForm"><div class="field"><label>Username</label><input type="text" name="username" required autofocus></div>' +
       '<div class="field"><label>Password</label><input type="password" name="password" required></div>' +
-      '<button class="btn btn-block" type="submit">Log In</button></form>' +
-      '<p class="muted" style="text-align:center;margin-top:12px;">Demo: admin / admin123</p>';
+      '<button class="btn btn-block" type="submit">Log In</button></form>';
     document.getElementById('loginForm').addEventListener('submit', function (e) {
       e.preventDefault();
       var fd = new FormData(e.target);
@@ -1159,8 +1240,7 @@ function renderAuthForm() {
         localStorage.setItem('at_token', res.token);
         cacheUser(res.user);
         toast('Welcome back, ' + (res.user.fullName || res.user.username) + '!', 'success');
-        state.adminPage = 'overview';
-        renderAdminShell();
+        goAdmin('overview');
       }).catch(toastError);
     });
   } else {
@@ -1490,11 +1570,12 @@ function openOrderForm(existing) {
     '<div class="form-row"><div class="field"><label>Price (' + (state.settings.Currency || 'GH₵') + ')</label><input type="number" step="0.01" name="Price" id="orderPriceInput" required value="' + (existing ? existing.Price : '') + '"></div>' +
     '<div class="field"><label>Deposit Paid Now</label><input type="number" step="0.01" name="AmountPaid" value="' + (existing ? existing.AmountPaid : '') + '"></div></div>' +
     '<div class="field"><label>Payment Method</label><select name="PaymentMethod">' + PAYMENT_METHODS_JS.map(function (m) { return '<option' + (existing && existing.PaymentMethod === m ? ' selected' : '') + '>' + m + '</option>'; }).join('') + '</select></div>' +
-    '<div class="field"><label>Design reference photo (optional)</label><input type="file" id="orderDesignFile" accept="image/*">' + (existing && existing.DesignImageURL ? '<img src="' + existing.DesignImageURL + '" style="max-width:120px;margin-top:8px;border-radius:8px;">' : '') + '</div>' +
+    photoPickerHtml('orderDesignFile', 'orderDesignPreview', 'Design reference photo (optional)') +
     '<div class="field"><label>Notes</label><textarea name="Notes">' + (existing ? esc(existing.Notes) : '') + '</textarea></div>' +
     '<input type="hidden" name="OrderID" value="' + (existing ? existing.OrderID : '') + '">' +
     '<button class="btn btn-block btn-accent" type="submit">' + (existing ? 'Save Changes' : 'Create Order') + '</button>' +
     '</form>', { wide: true });
+  bindPhotoPreview('orderDesignFile', 'orderDesignPreview', existing && existing.DesignImageURL);
   document.getElementById('orderServiceSelect').addEventListener('change', function (e) {
     var svc = ordersCache.services.find(function (s) { return s.ServiceID === e.target.value; });
     if (svc && !existing) document.getElementById('orderPriceInput').value = svc.Price;
@@ -1654,7 +1735,10 @@ function renderSlotsAdmin(host) {
   var date = window.__slotsDate || todayStr();
   host.innerHTML = '<div class="panel"><div class="field" style="max-width:220px;"><label>Date</label><input type="date" id="slotsDateInput" value="' + date + '"></div>' +
     '<p class="muted">Click a slot to block/unblock it for online booking. Slots already booked can\'t be blocked.</p>' +
-    '<div id="slotsGrid" class="slotGrid" style="max-height:none;"></div></div>';
+    '<div class="legendRow" style="margin-bottom:14px;"><div class="lg"><span class="sw" style="background:#fff;border:1.5px solid #ddd;"></span>Available</div>' +
+    '<div class="lg"><span class="sw" style="background:var(--clr-primary);"></span>Blocked</div>' +
+    '<div class="lg"><span class="sw" style="background:#eee;"></span>Booked</div></div>' +
+    '<div id="slotsGrid" class="slotGrid" style="max-height:none;"><div class="emptyState">Loading…</div></div></div>';
   document.getElementById('slotsDateInput').addEventListener('change', function (e) { window.__slotsDate = e.target.value; loadSlotsGrid(); });
   loadSlotsGrid();
 }
@@ -1669,12 +1753,29 @@ function loadSlotsGrid() {
       var isTaken = !!takenSlots[sl];
       var cls = isTaken ? 'slotBtn' : (isBlocked ? 'slotBtn selected' : 'slotBtn');
       var style = isTaken ? 'background:#eee;color:#999;cursor:not-allowed;' : '';
-      return '<div class="' + cls + '" style="' + style + '" ' + (isTaken ? '' : 'onclick="toggleSlot(\'' + branchId + '\',\'' + date + '\',\'' + sl + '\')"') + ' title="' + (isTaken ? 'Booked' : (isBlocked ? 'Blocked' : 'Available')) + '">' + sl + '</div>';
+      return '<div class="' + cls + '" style="' + style + '" ' + (isTaken ? '' : 'onclick="toggleSlot(this,\'' + branchId + '\',\'' + date + '\',\'' + sl + '\')"') + ' title="' + (isTaken ? 'Booked' : (isBlocked ? 'Blocked — click to unblock' : 'Available — click to block')) + '">' + sl + '</div>';
     }).join('') || '<div class="emptyState">Shop closed this day.</div>';
   }).catch(toastError);
 }
-function toggleSlot(branchId, date, slot) {
-  api('toggleBlockedSlot', state.token, branchId, date, slot).then(function () { loadSlotsGrid(); }).catch(toastError);
+/**
+ * Toggles the clicked slot's look immediately (Apps Script round trips can
+ * take a second or two, and waiting on a full grid refetch before showing
+ * anything made a click feel like it did nothing) — the server call runs
+ * in the background and only reverts the button if it actually fails.
+ */
+function toggleSlot(el, branchId, date, slot) {
+  el.classList.toggle('selected');
+  var nowBlocked = el.classList.contains('selected');
+  el.title = nowBlocked ? 'Blocked — click to unblock' : 'Available — click to block';
+  el.style.opacity = '.6';
+  api('toggleBlockedSlot', state.token, branchId, date, slot).then(function () {
+    el.style.opacity = '1';
+  }).catch(function (e) {
+    el.classList.toggle('selected');
+    el.title = nowBlocked ? 'Available — click to block' : 'Blocked — click to unblock';
+    el.style.opacity = '1';
+    toastError(e);
+  });
 }
 
 /* ============================================================================
@@ -1919,10 +2020,11 @@ function openServiceForm(existing) {
     '<div class="field"><label>Price (' + (state.settings.Currency || 'GH₵') + ')</label><input type="number" step="0.01" name="Price" required value="' + (existing ? existing.Price : '') + '"></div></div>' +
     '<div class="field"><label>Typical Turnaround (days)</label><input type="number" name="TurnaroundDays" required value="' + (existing ? existing.TurnaroundDays : 7) + '"></div>' +
     '<div class="field"><label>Description</label><textarea name="Description">' + (existing ? esc(existing.Description) : '') + '</textarea></div>' +
-    '<div class="field"><label>Photo</label><input type="file" id="svcImageFile" accept="image/*">' + (existing && existing.ImageURL ? '<img src="' + existing.ImageURL + '" style="max-width:100px;margin-top:8px;border-radius:8px;">' : '') + '</div>' +
+    photoPickerHtml('svcImageFile', 'svcImagePreview', 'Photo') +
     '<div class="check-row"><input type="checkbox" name="Active" id="svcActive" value="Y"' + (!existing || existing.Active === 'Y' ? ' checked' : '') + '><label for="svcActive" style="margin:0;">Visible on website</label></div>' +
     '<input type="hidden" name="ServiceID" value="' + (existing ? existing.ServiceID : '') + '">' +
     '<button class="btn btn-block btn-accent" type="submit">Save</button></form>');
+  bindPhotoPreview('svcImageFile', 'svcImagePreview', existing && existing.ImageURL);
   document.getElementById('svcForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var fd = new FormData(e.target);
@@ -1972,10 +2074,11 @@ function openStaffForm(existing) {
       var checked = existing ? String(existing.WorkDays || '').split(',').indexOf(d) > -1 : d !== 'Sun';
       return '<label style="display:flex;align-items:center;gap:4px;font-weight:400;"><input type="checkbox" class="workDayCk" value="' + d + '"' + (checked ? ' checked' : '') + '>' + d + '</label>';
     }).join('') + '</div></div>' +
-    '<div class="field"><label>Photo</label><input type="file" id="staffPhotoFile" accept="image/*">' + (existing && existing.PhotoURL ? '<img src="' + existing.PhotoURL + '" style="max-width:80px;margin-top:8px;border-radius:50%;">' : '') + '</div>' +
+    photoPickerHtml('staffPhotoFile', 'staffPhotoPreview', 'Photo') +
     '<div class="check-row"><input type="checkbox" name="Active" id="staffActive" value="Y"' + (!existing || existing.Active === 'Y' ? ' checked' : '') + '><label for="staffActive" style="margin:0;">Active</label></div>' +
     '<input type="hidden" name="StaffID" value="' + (existing ? existing.StaffID : '') + '">' +
     '<button class="btn btn-block btn-accent" type="submit">Save</button></form>');
+  bindPhotoPreview('staffPhotoFile', 'staffPhotoPreview', existing && existing.PhotoURL);
   document.getElementById('staffForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var fd = new FormData(e.target);
@@ -2037,10 +2140,11 @@ function openProductForm(existing) {
     '<div class="form-row"><div class="field"><label>Cost Price</label><input type="number" step="0.01" name="CostPrice" required value="' + (existing ? existing.CostPrice : '') + '"></div>' +
     '<div class="field"><label>Selling Price</label><input type="number" step="0.01" name="SellingPrice" required value="' + (existing ? existing.SellingPrice : '') + '"></div></div>' +
     '<div class="field"><label>Quantity In Stock</label><input type="number" name="QuantityInStock" required value="' + (existing ? existing.QuantityInStock : 0) + '"></div>' +
-    '<div class="field"><label>Photo</label><input type="file" id="prodImageFile" accept="image/*">' + (existing && existing.ImageURL ? '<img src="' + existing.ImageURL + '" style="max-width:80px;margin-top:8px;border-radius:8px;">' : '') + '</div>' +
+    photoPickerHtml('prodImageFile', 'prodImagePreview', 'Photo') +
     '<div class="check-row"><input type="checkbox" name="ShowOnWebsite" id="prodShowOnWebsite" value="Y"' + (existing && existing.ShowOnWebsite === 'Y' ? ' checked' : '') + '><label for="prodShowOnWebsite" style="margin:0;">Sell on the public website (Shop)</label></div>' +
     '<input type="hidden" name="ProductID" value="' + (existing ? existing.ProductID : '') + '">' +
     '<button class="btn btn-block btn-accent" type="submit">Save</button></form>');
+  bindPhotoPreview('prodImageFile', 'prodImagePreview', existing && existing.ImageURL);
   document.getElementById('productForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var fd = new FormData(e.target);
@@ -2253,17 +2357,19 @@ function drawGalleryAdmin(host, rows) {
 function openGalleryForm(existing) {
   var cats = String(state.settings.ServiceCategories || '').split(',').map(function (c) { return c.trim(); }).concat(['Our Shop']);
   openModal('<div class="modalHead"><h3>' + (existing ? 'Edit Photo' : 'Add Photo') + '</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
-    '<form id="galForm"><div class="field"><label>Photo</label><input type="file" id="galImageFile" accept="image/*"' + (existing ? '' : ' required') + '>' + (existing ? '<img src="' + existing.ImageURL + '" style="max-width:120px;margin-top:8px;border-radius:8px;">' : '') + '</div>' +
+    '<form id="galForm">' + photoPickerHtml('galImageFile', 'galImagePreview', 'Photo') +
     '<div class="field"><label>Caption</label><input type="text" name="Caption" required value="' + (existing ? esc(existing.Caption) : '') + '"></div>' +
     '<div class="field"><label>Category</label><select name="Category">' + cats.map(function (c) { return '<option' + (existing && existing.Category === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select></div>' +
     '<input type="hidden" name="GalleryID" value="' + (existing ? existing.GalleryID : '') + '">' +
     '<input type="hidden" name="ImageURL" value="' + (existing ? esc(existing.ImageURL) : '') + '">' +
     '<button class="btn btn-block btn-accent" type="submit">Save</button></form>');
+  bindPhotoPreview('galImageFile', 'galImagePreview', existing && existing.ImageURL);
   document.getElementById('galForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var fd = new FormData(e.target);
     var payload = Object.fromEntries(fd.entries());
     var fileInput = document.getElementById('galImageFile');
+    if (!fileInput.files[0] && !payload.ImageURL) { toast('Please choose a photo.', 'error'); return; }
     var save = function (url) {
       if (url) payload.ImageURL = url;
       api('saveGalleryItem', state.token, payload).then(function () { toast('Saved.', 'success'); closeModal(); invalidatePageCache('gallery'); renderGalleryAdmin(document.getElementById('adminContent')); }).catch(toastError);
@@ -2296,7 +2402,7 @@ function drawHeroAdmin(host, rows) {
 }
 function openHeroForm(existing) {
   openModal('<div class="modalHead"><h3>' + (existing ? 'Edit Slide' : 'Add Slide') + '</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
-    '<form id="heroForm"><div class="field"><label>Photo</label><input type="file" id="heroImageFile" accept="image/*"' + (existing ? '' : ' required') + '>' + (existing ? '<img src="' + existing.ImageURL + '" style="max-width:140px;margin-top:8px;border-radius:8px;">' : '') + '</div>' +
+    '<form id="heroForm">' + photoPickerHtml('heroImageFile', 'heroImagePreview', 'Photo') +
     '<div class="field"><label>Title</label><input type="text" name="Title" required value="' + (existing ? esc(existing.Title) : '') + '"></div>' +
     '<div class="field"><label>Subtitle</label><input type="text" name="Subtitle" value="' + (existing ? esc(existing.Subtitle) : '') + '"></div>' +
     '<div class="form-row"><div class="field"><label>Button Text</label><input type="text" name="ButtonText" value="' + (existing ? esc(existing.ButtonText) : 'Book Now') + '"></div>' +
@@ -2305,12 +2411,14 @@ function openHeroForm(existing) {
     '<div class="check-row"><input type="checkbox" name="Active" id="heroActive" value="Y"' + (!existing || existing.Active === 'Y' ? ' checked' : '') + '><label for="heroActive" style="margin:0;">Active</label></div>' +
     '<input type="hidden" name="SlideID" value="' + (existing ? existing.SlideID : '') + '">' +
     '<button class="btn btn-block btn-accent" type="submit">Save</button></form>');
+  bindPhotoPreview('heroImageFile', 'heroImagePreview', existing && existing.ImageURL);
   document.getElementById('heroForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var fd = new FormData(e.target);
     var payload = Object.fromEntries(fd.entries());
     payload.Active = fd.get('Active') ? 'Y' : 'N';
     var fileInput = document.getElementById('heroImageFile');
+    if (!fileInput.files[0] && !(existing && existing.ImageURL)) { toast('Please choose a photo.', 'error'); return; }
     var save = function (url) {
       if (url) payload.ImageURL = url;
       api('saveHeroSlide', state.token, payload).then(function () { toast('Saved.', 'success'); closeModal(); invalidatePageCache('hero'); renderHeroAdmin(document.getElementById('adminContent')); }).catch(toastError);
@@ -2462,7 +2570,7 @@ function drawSettingsAdmin(host, s) {
     host.innerHTML = '<div class="panel"><h3>Branding</h3>' +
       '<div class="form-row"><div class="field"><label>Business Name</label><input type="text" id="s_BusinessName" value="' + esc(s.BusinessName) + '"></div>' +
       '<div class="field"><label>Tagline</label><input type="text" id="s_Tagline" value="' + esc(s.Tagline) + '"></div></div>' +
-      '<div class="field"><label>Logo</label><input type="file" id="s_LogoFile" accept="image/*">' + (s.LogoURL ? '<img src="' + s.LogoURL + '" style="max-width:80px;margin-top:8px;border-radius:8px;">' : '') + '</div>' +
+      photoPickerHtml('s_LogoFile', 's_LogoPreview', 'Logo') +
       '<div class="form-row"><div class="field"><label>Primary Color</label><input type="color" id="s_PrimaryColor" value="' + (s.PrimaryColor || '#16213e') + '"></div>' +
       '<div class="field"><label>Accent/Secondary Color</label><input type="color" id="s_SecondaryColor" value="' + (s.SecondaryColor || '#c9a227') + '"></div></div>' +
       '</div>' +
@@ -2498,6 +2606,7 @@ function drawSettingsAdmin(host, s) {
       '<div class="field"><label>API Key</label><input type="text" id="s_SmsApiKey" value="' + esc(s.SmsApiKey) + '"></div></div>' +
       '<button class="btn btn-accent btn-block" onclick="saveAllSettings()">Save Settings</button>' +
       '<div class="panel" style="margin-top:20px;"><h3>Public Booking QR Code</h3><div class="qrBox" id="qrBox"></div></div>';
+    bindPhotoPreview('s_LogoFile', 's_LogoPreview', s.LogoURL);
     renderShopInfoEditor();
     renderQrCard();
 }

@@ -45,7 +45,7 @@ var TIMEZONE = 'Africa/Accra';
 var CURRENCY_SYMBOL = 'GH₵';
 var SESSION_TTL_SECONDS = 6 * 60 * 60; // 6 hours
 var UPLOAD_FOLDER_NAME = 'AdvanceTailor_Uploads';
-var SETUP_VERSION = 2;
+var SETUP_VERSION = 3;
 
 // Column schema for every tab. Order matters — it defines the sheet column order.
 var SCHEMA = {
@@ -408,8 +408,40 @@ function setupSheets() {
 
   getOrCreateUploadFolder_();
   seedIfEmpty_();
+  repairShowOnWebsiteDefaults_();
   return 'Setup complete';
 }
+
+/**
+ * One-time data repair for deployments created before the public Shop
+ * existed: ShowOnWebsite is a brand-new column, so every Products row that
+ * already existed reads back blank rather than 'Y' or 'N' — leaving the
+ * Shop section with nothing to show even though the Owner never chose to
+ * hide anything. Any row whose ShowOnWebsite cell is still genuinely empty
+ * gets a sensible default (Ready-to-Wear items default to shown; raw
+ * fabric/notions default to hidden) so the Shop isn't empty on the first
+ * load after upgrading. Idempotent — a row already explicitly set to 'Y'
+ * or 'N' (including by an Owner turning it off) is never touched again.
+ */
+function repairShowOnWebsiteDefaults_() {
+  var sheet = ss_().getSheetByName('Products');
+  if (!sheet) return;
+  var col = SCHEMA.Products.indexOf('ShowOnWebsite') + 1;
+  var catCol = SCHEMA.Products.indexOf('Category') + 1;
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+  var values = sheet.getRange(2, 1, lastRow - 1, SCHEMA.Products.length).getValues();
+  var changed = false;
+  values.forEach(function (row) {
+    if (row[col - 1] === '' || row[col - 1] === null || row[col - 1] === undefined) {
+      row[col - 1] = row[catCol - 1] === 'Ready-to-Wear' ? 'Y' : 'N';
+      changed = true;
+    }
+  });
+  if (changed) sheet.getRange(2, 1, values.length, SCHEMA.Products.length).setValues(values);
+}
+
+function ss_() { return SpreadsheetApp.getActiveSpreadsheet(); }
 
 /**
  * Self-healing check, cached for an hour so most requests take the fast
@@ -855,12 +887,16 @@ function createAppointment(data) {
   if (!name) throw new Error('Please enter your name.');
   if (!phone) throw new Error('Please enter a valid Ghana phone number.');
   if (!data.serviceId) throw new Error('Please choose a service.');
-  if (!data.staffId) throw new Error('Please choose a tailor.');
   if (!data.date || !data.timeSlot) throw new Error('Please choose a date and time.');
 
   var branch = readAll_('Branches')[0];
   if (!branch) throw new Error('Shop not configured yet.');
-  if (!isSlotAvailable_(branch.BranchID, data.staffId, data.date, data.timeSlot)) {
+
+  var staffId = data.staffId;
+  if (!staffId || staffId === 'ANY') {
+    staffId = pickAnyAvailableStaff_(branch.BranchID, data.date, data.timeSlot);
+    if (!staffId) throw new Error('Sorry, no tailors are available at that time. Please choose another slot.');
+  } else if (!isSlotAvailable_(branch.BranchID, staffId, data.date, data.timeSlot)) {
     throw new Error('That time slot is no longer available. Please choose another.');
   }
 
@@ -871,7 +907,7 @@ function createAppointment(data) {
     AppointmentID: nextId_('Appointments', 'AppointmentID'),
     Reference: reference,
     CustomerID: customer.CustomerID,
-    StaffID: data.staffId,
+    StaffID: staffId,
     ServiceID: data.serviceId,
     BranchID: branch.BranchID,
     Date: data.date,
@@ -917,7 +953,22 @@ function getEffectiveWeeklyHours_(branchId) {
 }
 
 /** Available time slots for a given staff member/date, honoring shop hours, work days, existing appointments, and admin-blocked slots. */
+/** Public: 'ANY' (or blank) staffId means "any available tailor" — the union of every active tailor's open slots that day. A specific staffId returns just that tailor's own open slots. */
 function getAvailableSlots(branchId, staffId, date) {
+  if (!staffId || staffId === 'ANY') return getAvailableSlotsAnyStaff_(branchId, date);
+  return getAvailableSlotsForStaff_(branchId, staffId, date);
+}
+
+function getAvailableSlotsAnyStaff_(branchId, date) {
+  var activeStaff = readAll_('Staff').filter(function (s) { return String(s.Active).toUpperCase() === 'Y'; });
+  var slotSet = {};
+  activeStaff.forEach(function (s) {
+    getAvailableSlotsForStaff_(branchId, s.StaffID, date).forEach(function (sl) { slotSet[sl] = true; });
+  });
+  return Object.keys(slotSet).sort();
+}
+
+function getAvailableSlotsForStaff_(branchId, staffId, date) {
   var settings = getSettingsMap_();
   var interval = Number(settings.SlotIntervalMinutes) || 30;
   var weeklyHours = getEffectiveWeeklyHours_(branchId);
@@ -946,6 +997,18 @@ function getAvailableSlots(branchId, staffId, date) {
     if (!takenSlots[slot]) slots.push(slot);
   }
   return slots;
+}
+
+/** Resolves 'ANY' to a concrete tailor who is actually free at that exact date/time — picking the first active staff member (in Staff-sheet order) who works that weekday and has no conflicting appointment or blocked slot. */
+function pickAnyAvailableStaff_(branchId, date, timeSlot) {
+  var weekday = Utilities.formatDate(new Date(date + 'T12:00:00'), TIMEZONE, 'EEE');
+  var activeStaff = readAll_('Staff').filter(function (s) { return String(s.Active).toUpperCase() === 'Y'; });
+  for (var i = 0; i < activeStaff.length; i++) {
+    var s = activeStaff[i];
+    if (!worksOnDay_(s, weekday)) continue;
+    if (isSlotAvailable_(branchId, s.StaffID, date, timeSlot)) return s.StaffID;
+  }
+  return null;
 }
 
 function getSlotsForAdmin(token, branchId, date) {
