@@ -1,26 +1,2280 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>MySchool</title>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Advance Tailor — Bespoke Fashion House</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!--
+  ============================================================================
+  ADVANCE TAILOR MANAGEMENT SYSTEM (Ghana)
+  Front-end — index.html
+  Public marketing/booking site + secured admin/staff dashboard, in one file.
+  Routing: '#admin' switches to the dashboard. Everything else is public.
+  ============================================================================
+-->
+<style>
+  :root {
+    --clr-primary: #16213e;
+    --clr-secondary: #c9a227;
+    --clr-accent: #c9a227;
+    --clr-bg: #f7f5f0;
+    --clr-text: #1a1a1a;
+    --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-display: 'Playfair Display', Georgia, serif;
+    --radius: 10px;
+    --shadow: 0 2px 14px rgba(0,0,0,.08);
+    --shadow-lift: 0 14px 34px rgba(0,0,0,.12);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: var(--font);
+    background: var(--clr-bg);
+    color: var(--clr-text);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  img { max-width: 100%; display: block; }
+  a { color: inherit; text-decoration: none; }
+  h1, h2, h3, h4 { margin: 0 0 .4em; line-height: 1.15; font-weight: 700; font-family: var(--font-display); letter-spacing: -.01em; }
+  h1 { font-size: 2.6rem; }
+  h2 { font-size: 2rem; }
+  h3 { font-size: 1.3rem; }
+  p { margin: 0 0 1em; }
+  button, input, select, textarea { font-family: inherit; font-size: 1rem; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+  .hidden { display: none !important; }
+  .muted { color: #777; font-size: .9em; }
+  .icon { flex-shrink: 0; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+    padding: 13px 26px; border-radius: 999px; border: none;
+    background: var(--clr-primary); color: #fff; cursor: pointer; font-weight: 700; letter-spacing: .01em;
+    transition: opacity .15s ease, transform .15s ease, box-shadow .15s ease;
+  }
+  .btn:hover { opacity: .9; transform: translateY(-1px); box-shadow: 0 8px 20px rgba(0,0,0,.16); }
+  .btn:active { transform: scale(.97) translateY(0); }
+  .btn-accent { background: var(--clr-accent); color: #1a1a1a; }
+  .btn-outline { background: transparent; border: 2px solid var(--clr-primary); color: var(--clr-primary); }
+  .btn-outline-light { background: transparent; border: 2px solid #fff; color: #fff; }
+  .btn-sm { padding: 7px 14px; font-size: .85rem; border-radius: 6px; }
+  .btn-danger { background: #c0392b; color: #fff; }
+  .btn-block { width: 100%; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-icon { padding: 8px 10px; border-radius: 8px; background: #eee; color: #333; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .75rem; font-weight: 700; white-space: nowrap; }
+  .badge-pending, .badge-order-received { background: #fff4d6; color: #8a6d00; }
+  .badge-confirmed, .badge-measuring { background: #dbeeff; color: #0b5da3; }
+  .badge-completed, .badge-delivered, .badge-paid { background: #dcf5e3; color: #1c7c3c; }
+  .badge-cancelled, .badge-no-show, .badge-unpaid { background: #fbe0e0; color: #b32424; }
+  .badge-cutting, .badge-sewing { background: #f0e4ff; color: #6b21a8; }
+  .badge-fitting, .badge-finishing { background: #ffe8d6; color: #a34a06; }
+  .badge-ready-for-pickup { background: #d6f5f0; color: #0d7d6f; }
+  .badge-partially-paid { background: #fff4d6; color: #8a6d00; }
+  .warn-line { display: flex; align-items: center; gap: 8px; color: #8a6d00; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 6px; }
+
+  /* ---------- FORMS ---------- */
+  label { display: block; font-weight: 600; font-size: .85rem; margin-bottom: 5px; color: #444; }
+  .field { margin-bottom: 16px; }
+  input[type="text"], input[type="tel"], input[type="email"], input[type="password"], input[type="number"],
+  input[type="date"], input[type="time"], select, textarea {
+    width: 100%; padding: 11px 13px; border: 1.5px solid #ddd; border-radius: 8px; background: #fff; color: #1a1a1a;
+    transition: border-color .15s ease;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--clr-secondary); }
+  textarea { resize: vertical; min-height: 80px; }
+  .form-row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .form-row .field { flex: 1; min-width: 180px; }
+  .check-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .check-row input { width: auto; }
+  .field-error { color: #c0392b; font-size: .8rem; margin-top: 4px; }
+
+  /* ---------- PUBLIC NAV ---------- */
+  #publicNav { position: sticky; top: 0; z-index: 50; background: var(--clr-primary); color: #fff; box-shadow: 0 2px 20px rgba(0,0,0,.2); }
+  #publicNav .bar { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; }
+  #publicNav .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.25rem; font-family: var(--font-display); letter-spacing: -.01em; }
+  #publicNav .brand img { height: 38px; width: 38px; border-radius: 9px; object-fit: cover; }
+  #publicNav nav { display: flex; align-items: center; gap: 26px; }
+  #publicNav nav a { font-weight: 600; font-size: .92rem; opacity: .88; }
+  #publicNav nav a:hover { opacity: 1; }
+  #publicNav .navBtns { display: flex; align-items: center; gap: 10px; }
+  #navToggle { display: none; background: none; border: none; color: #fff; font-size: 1.6rem; cursor: pointer; }
+  .shopStatusBadge { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; }
+  .shopStatusBadge.open { background: #1c7c3c33; color: #a8f0c0; }
+  .shopStatusBadge.closed { background: #c0392b33; color: #ffb3ac; }
+  .shopStatusBadge .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  @media (max-width: 860px) {
+    #navToggle { display: block; }
+    #publicNav nav { position: fixed; top: 68px; left: 0; right: 0; bottom: 0; background: var(--clr-primary); flex-direction: column; align-items: flex-start; padding: 24px; gap: 18px; transform: translateX(-100%); transition: transform .2s ease; overflow-y: auto; }
+    #publicNav nav.open { transform: translateX(0); }
+  }
+
+  /* ---------- HERO ---------- */
+  #hero { position: relative; overflow: hidden; min-height: 560px; display: flex; align-items: center; color: #fff; }
+  #hero .slide { position: absolute; inset: 0; background-size: cover; background-position: center; opacity: 0; transition: opacity .8s ease; }
+  #hero .slide.active { opacity: 1; }
+  #hero .slide::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(22,33,62,.55), rgba(22,33,62,.82)); }
+  #hero .heroContent { position: relative; z-index: 2; max-width: 700px; padding: 90px 24px 100px; }
+  #hero .heroContent h1 { font-size: 3rem; margin-bottom: .3em; }
+  #hero .heroContent p { font-size: 1.15rem; opacity: .92; margin-bottom: 1.6em; }
+  #hero .heroBtns { display: flex; gap: 14px; flex-wrap: wrap; }
+  #hero .dots { position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%); z-index: 3; display: flex; gap: 8px; }
+  #hero .dots span { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,.4); cursor: pointer; }
+  #hero .dots span.active { background: #fff; }
+  @media (max-width: 640px) { #hero .heroContent h1 { font-size: 2.1rem; } }
+
+  /* ---------- GREETING BANNER ---------- */
+  #greetingBanner { background: var(--clr-secondary); color: #1a1a1a; text-align: center; padding: 10px 16px; font-weight: 700; font-size: .88rem; }
+
+  /* ---------- SECTIONS ---------- */
+  section.pubSection { padding: 72px 0; }
+  section.pubSection.alt { background: #fff; }
+  .sectionHead { text-align: center; max-width: 640px; margin: 0 auto 44px; }
+  .sectionHead .eyebrow { color: var(--clr-secondary); font-weight: 800; letter-spacing: .08em; text-transform: uppercase; font-size: .78rem; margin-bottom: 10px; display: block; }
+  .card { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; transition: transform .18s ease, box-shadow .18s ease; }
+  .card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lift); }
+
+  /* Services */
+  .grid { display: grid; gap: 24px; }
+  .grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .grid-4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 980px) { .grid-3, .grid-4 { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 620px) { .grid-3, .grid-4 { grid-template-columns: 1fr; } }
+  .svcCard .thumb { height: 180px; background-size: cover; background-position: center; background-color: #eee; }
+  .svcCard .body { padding: 18px 20px; }
+  .svcCard .catTag { display: inline-block; font-size: .72rem; font-weight: 700; color: var(--clr-secondary); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 6px; }
+  .svcCard .priceRow { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+  .svcCard .price { font-weight: 800; font-size: 1.15rem; color: var(--clr-primary); }
+  .svcFilterRow { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-bottom: 32px; }
+  .chip { padding: 7px 16px; border-radius: 999px; border: 1.5px solid #ddd; background: #fff; cursor: pointer; font-weight: 600; font-size: .85rem; }
+  .chip.active { background: var(--clr-primary); border-color: var(--clr-primary); color: #fff; }
+
+  /* Team */
+  .staffCard { text-align: center; padding: 20px; }
+  .staffCard .photo { width: 110px; height: 110px; border-radius: 50%; object-fit: cover; margin: 0 auto 14px; background: #eee; border: 4px solid var(--clr-secondary); }
+  .staffCard .role { color: var(--clr-secondary); font-weight: 700; font-size: .82rem; text-transform: uppercase; letter-spacing: .04em; }
+  .staffCard .spec { color: #777; font-size: .85rem; margin-top: 6px; }
+
+  /* Gallery */
+  .galleryGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  @media (max-width: 900px) { .galleryGrid { grid-template-columns: repeat(2, 1fr); } }
+  .galleryItem { position: relative; border-radius: var(--radius); overflow: hidden; aspect-ratio: 1; cursor: pointer; }
+  .galleryItem img { width: 100%; height: 100%; object-fit: cover; transition: transform .3s ease; }
+  .galleryItem:hover img { transform: scale(1.08); }
+  .galleryItem .cap { position: absolute; inset: auto 0 0 0; padding: 10px 12px; background: linear-gradient(0deg, rgba(0,0,0,.7), transparent); color: #fff; font-size: .8rem; font-weight: 600; }
+
+  /* Reviews */
+  .reviewCard { padding: 22px; }
+  .reviewCard .stars { color: var(--clr-secondary); font-size: 1.05rem; margin-bottom: 8px; letter-spacing: 2px; }
+  .reviewCard .who { display: flex; justify-content: space-between; margin-top: 12px; font-weight: 700; font-size: .85rem; color: #555; }
+  .reviewScroller { display: flex; gap: 20px; overflow-x: auto; padding-bottom: 12px; scroll-snap-type: x mandatory; }
+  .reviewScroller .reviewCard { min-width: 320px; scroll-snap-align: start; }
+
+  /* Booking wizard */
+  #booking { background: var(--clr-primary); color: #fff; }
+  #booking .sectionHead h2, #booking .sectionHead .eyebrow { color: #fff; }
+  .wizardBox { background: #fff; color: var(--clr-text); border-radius: 16px; box-shadow: var(--shadow-lift); max-width: 760px; margin: 0 auto; overflow: hidden; }
+  .wizardSteps { display: flex; background: #f2f0ea; padding: 18px 24px; gap: 6px; }
+  .wizardSteps .step { flex: 1; text-align: center; font-size: .74rem; font-weight: 700; color: #999; position: relative; padding-bottom: 8px; border-bottom: 3px solid #ddd; }
+  .wizardSteps .step.active { color: var(--clr-primary); border-color: var(--clr-secondary); }
+  .wizardSteps .step.done { color: var(--clr-secondary); border-color: var(--clr-secondary); }
+  .wizardBody { padding: 30px 28px; }
+  .optionGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  @media (max-width: 560px) { .optionGrid { grid-template-columns: 1fr; } }
+  .optionCard { border: 2px solid #e5e3dc; border-radius: 10px; padding: 14px; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+  .optionCard:hover { border-color: var(--clr-secondary); }
+  .optionCard.selected { border-color: var(--clr-secondary); background: #fdf7e6; }
+  .optionCard .oc-title { font-weight: 700; }
+  .optionCard .oc-sub { color: #777; font-size: .82rem; }
+  .slotGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; max-height: 260px; overflow-y: auto; }
+  @media (max-width: 560px) { .slotGrid { grid-template-columns: repeat(3, 1fr); } }
+  .slotBtn { padding: 9px 4px; border-radius: 7px; border: 1.5px solid #ddd; background: #fff; cursor: pointer; font-weight: 600; font-size: .82rem; text-align: center; }
+  .slotBtn:hover { border-color: var(--clr-secondary); }
+  .slotBtn.selected { background: var(--clr-primary); border-color: var(--clr-primary); color: #fff; }
+  .wizardNav { display: flex; justify-content: space-between; margin-top: 26px; }
+  .paymentMethodGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .payDetailBox { background: #f7f5f0; border-radius: 8px; padding: 14px; margin-top: 12px; font-size: .88rem; }
+  .successBox { text-align: center; padding: 20px 0; }
+  .successBox .refCode { display: inline-block; background: #f2f0ea; padding: 10px 22px; border-radius: 8px; font-weight: 800; font-size: 1.2rem; letter-spacing: .04em; margin: 14px 0; }
+
+  /* Track order */
+  #track .trackResultCard { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 22px; margin-top: 20px; }
+  .stageTrack { display: flex; align-items: center; margin: 22px 0; }
+  .stageTrack .stageDot { width: 22px; height: 22px; border-radius: 50%; background: #ddd; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .stageTrack .stageDot.done { background: var(--clr-secondary); }
+  .stageTrack .stageLine { flex: 1; height: 3px; background: #ddd; }
+  .stageTrack .stageLine.done { background: var(--clr-secondary); }
+  .stageLabels { display: flex; justify-content: space-between; font-size: .68rem; color: #777; margin-top: 6px; }
+  .stageLabels span { flex: 1; text-align: center; }
+
+  /* Contact */
+  .contactGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; align-items: start; }
+  @media (max-width: 860px) { .contactGrid { grid-template-columns: 1fr; } }
+  .contactInfoRow { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 18px; }
+  .contactInfoRow .ic { width: 38px; height: 38px; border-radius: 10px; background: var(--clr-primary); color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .mapEmbed { border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); margin-top: 20px; }
+  .mapEmbed iframe { width: 100%; height: 260px; border: 0; display: block; }
+  .socialRow { display: flex; gap: 10px; margin-top: 18px; }
+  .socialRow a { width: 38px; height: 38px; border-radius: 50%; background: var(--clr-primary); color: #fff; display: flex; align-items: center; justify-content: center; }
+  .hoursTable { width: 100%; border-collapse: collapse; margin-top: 10px; }
+  .hoursTable td { padding: 5px 0; font-size: .88rem; }
+  .hoursTable td:last-child { text-align: right; font-weight: 600; }
+
+  /* Footer */
+  footer#pubFooter { background: #0e1526; color: #ccc; padding: 50px 0 24px; }
+  footer#pubFooter .fgrid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 40px; }
+  @media (max-width: 760px) { footer#pubFooter .fgrid { grid-template-columns: 1fr; } }
+  footer#pubFooter h4 { color: #fff; font-size: .95rem; }
+  footer#pubFooter a { color: #aab; font-size: .88rem; display: block; margin-bottom: 8px; }
+  footer#pubFooter .fbottom { text-align: center; font-size: .78rem; color: #778; margin-top: 40px; border-top: 1px solid #223; padding-top: 20px; }
+  .whatsappFab { position: fixed; bottom: 22px; right: 22px; width: 58px; height: 58px; border-radius: 50%; background: #25D366; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 24px rgba(0,0,0,.3); z-index: 60; }
+  .whatsappFab svg { width: 30px; height: 30px; }
+
+  /* ---------- TOAST / MODAL ---------- */
+  #toastHost { position: fixed; top: 20px; right: 20px; z-index: 999; display: flex; flex-direction: column; gap: 10px; }
+  .toast { background: #1a1a1a; color: #fff; padding: 13px 18px; border-radius: 8px; box-shadow: var(--shadow-lift); font-size: .88rem; font-weight: 600; max-width: 320px; animation: toastIn .2s ease; }
+  .toast.error { background: #c0392b; }
+  .toast.success { background: #1c7c3c; }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+  .modalOverlay { position: fixed; inset: 0; background: rgba(10,12,20,.55); z-index: 200; display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; }
+  .modalBox { background: #fff; border-radius: 14px; max-width: 600px; width: 100%; padding: 28px; box-shadow: var(--shadow-lift); }
+  .modalBox.wide { max-width: 860px; }
+  .modalHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+  .modalClose { background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #999; }
+  #loadBar { position: fixed; top: 0; left: 0; height: 3px; background: var(--clr-secondary); z-index: 999; width: 0; transition: width .3s ease; }
+
+  /* ---------- ADMIN SHELL ---------- */
+  #adminShell { display: flex; min-height: 100vh; background: #f1f1ef; }
+  #adminSidebar { width: 232px; background: var(--clr-primary); color: #fff; flex-shrink: 0; display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+  #adminSidebar .sbBrand { padding: 20px 20px 14px; font-weight: 800; font-family: var(--font-display); font-size: 1.15rem; display: flex; align-items: center; gap: 10px; }
+  #adminSidebar .sbBrand img { width: 32px; height: 32px; border-radius: 8px; object-fit: cover; }
+  #adminSidebar .sbNav { flex: 1; padding: 6px 10px; }
+  #adminSidebar .sbLink { display: flex; align-items: center; gap: 11px; padding: 10px 12px; border-radius: 8px; color: #cdd3e0; font-weight: 600; font-size: .88rem; cursor: pointer; margin-bottom: 2px; }
+  #adminSidebar .sbLink:hover { background: rgba(255,255,255,.06); color: #fff; }
+  #adminSidebar .sbLink.active { background: var(--clr-secondary); color: #1a1a1a; }
+  #adminSidebar .sbGroupLabel { padding: 16px 12px 6px; font-size: .68rem; text-transform: uppercase; letter-spacing: .07em; color: #7c85a0; font-weight: 800; }
+  #adminSidebar .sbFooter { padding: 14px; border-top: 1px solid rgba(255,255,255,.1); font-size: .8rem; }
+  #adminMain { flex: 1; min-width: 0; }
+  #adminTopbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 26px; background: #fff; box-shadow: 0 1px 8px rgba(0,0,0,.06); position: sticky; top: 0; z-index: 30; }
+  #adminTopbar .pageTitle { font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; }
+  #adminContent { padding: 24px 26px 60px; }
+  #sidebarToggle { display: none; }
+  @media (max-width: 900px) {
+    #adminSidebar { position: fixed; left: 0; top: 0; z-index: 100; transform: translateX(-100%); transition: transform .2s ease; }
+    #adminSidebar.open { transform: translateX(0); }
+    #sidebarToggle { display: inline-flex; }
+  }
+
+  .statGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  @media (max-width: 980px) { .statGrid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .statGrid { grid-template-columns: 1fr; } }
+  .statCard { background: #fff; border-radius: 12px; padding: 18px 20px; box-shadow: var(--shadow); }
+  .statCard .lbl { color: #888; font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+  .statCard .val { font-size: 1.7rem; font-weight: 800; margin-top: 6px; font-family: var(--font-display); }
+  .statCard .sub { font-size: .78rem; color: #999; margin-top: 4px; }
+  .panel { background: #fff; border-radius: 12px; box-shadow: var(--shadow); padding: 20px 22px; margin-bottom: 20px; }
+  .panel .panelHead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .panel .panelHead h3 { margin: 0; }
+  .twoCol { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+  @media (max-width: 980px) { .twoCol { grid-template-columns: 1fr; } }
+
+  .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; justify-content: space-between; }
+  .toolbar .left { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .searchBox { position: relative; }
+  .searchBox input { padding-left: 34px; min-width: 220px; }
+
+  table.dataTable { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  table.dataTable th { text-align: left; padding: 10px 12px; background: #f6f6f4; font-weight: 700; color: #555; border-bottom: 2px solid #eee; white-space: nowrap; }
+  table.dataTable td { padding: 10px 12px; border-bottom: 1px solid #f0f0ee; vertical-align: middle; }
+  table.dataTable tr:hover td { background: #fafaf8; }
+  .tableWrap { overflow-x: auto; }
+  .rowActions { display: flex; gap: 6px; }
+  .pager { display: flex; justify-content: center; gap: 6px; margin-top: 14px; }
+  .pager button { padding: 6px 12px; border-radius: 6px; border: 1px solid #ddd; background: #fff; cursor: pointer; font-size: .82rem; }
+  .pager button.active { background: var(--clr-primary); color: #fff; border-color: var(--clr-primary); }
+  .emptyState { text-align: center; padding: 40px 20px; color: #999; }
+
+  /* Kanban */
+  .kanban { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 10px; }
+  .kanbanCol { min-width: 260px; background: #f4f4f2; border-radius: 10px; padding: 12px; flex-shrink: 0; }
+  .kanbanCol h4 { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: #666; display: flex; justify-content: space-between; }
+  .kanbanCard { background: #fff; border-radius: 8px; padding: 12px; margin-top: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.08); cursor: pointer; }
+  .kanbanCard .kc-ref { font-weight: 800; font-size: .82rem; }
+  .kanbanCard .kc-sub { color: #777; font-size: .78rem; margin-top: 4px; }
+  .kanbanCard .kc-due { margin-top: 8px; font-size: .74rem; font-weight: 700; }
+  .kanbanCard .kc-due.overdue { color: #c0392b; }
+
+  /* POS */
+  .posLayout { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+  @media (max-width: 980px) { .posLayout { grid-template-columns: 1fr; } }
+  .posItemGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  @media (max-width: 700px) { .posItemGrid { grid-template-columns: repeat(2, 1fr); } }
+  .posItem { background: #fff; border-radius: 10px; padding: 12px; box-shadow: var(--shadow); cursor: pointer; text-align: center; }
+  .posItem .thumb { height: 80px; background-size: cover; background-position: center; border-radius: 8px; background-color: #f0f0ee; margin-bottom: 8px; }
+  .posItem .nm { font-weight: 700; font-size: .84rem; }
+  .posItem .pr { color: var(--clr-secondary); font-weight: 800; font-size: .82rem; }
+  .posItem.outOfStock { opacity: .45; cursor: not-allowed; }
+  .cartBox { background: #fff; border-radius: 12px; padding: 16px; box-shadow: var(--shadow); position: sticky; top: 80px; }
+  .cartLine { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f0f0ee; font-size: .85rem; }
+  .cartLine .qtyCtrl { display: flex; align-items: center; gap: 6px; }
+  .cartLine .qtyCtrl button { width: 22px; height: 22px; border-radius: 5px; border: 1px solid #ddd; background: #fff; cursor: pointer; }
+  .cartTotals { margin-top: 12px; font-size: .88rem; }
+  .cartTotals .row { display: flex; justify-content: space-between; padding: 4px 0; }
+  .cartTotals .row.grand { font-weight: 800; font-size: 1.1rem; border-top: 2px solid #eee; margin-top: 8px; padding-top: 10px; }
+
+  /* Charts (canvas) */
+  .chartWrap { position: relative; }
+  canvas.chartCanvas { width: 100%; }
+  .legendRow { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; font-size: .8rem; }
+  .legendRow .lg { display: flex; align-items: center; gap: 6px; }
+  .legendRow .sw { width: 10px; height: 10px; border-radius: 3px; }
+
+  .measureFieldRow { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .measureFieldRow input { flex: 1; }
+
+  .avatarCircle { width: 34px; height: 34px; border-radius: 50%; background: var(--clr-primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .8rem; flex-shrink: 0; }
+  .qrBox { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+
+  .loginWrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, var(--clr-primary), #0e1526); padding: 20px; }
+  .loginBox { background: #fff; border-radius: 16px; padding: 36px; max-width: 400px; width: 100%; box-shadow: var(--shadow-lift); }
+  .loginBox h2 { text-align: center; }
+  .loginBox .logoRow { text-align: center; margin-bottom: 18px; }
+  .loginBox .logoRow img { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; margin: 0 auto; }
+  .authTabs { display: flex; gap: 6px; margin-bottom: 20px; background: #f2f0ea; border-radius: 8px; padding: 4px; }
+  .authTabs button { flex: 1; padding: 8px; border-radius: 6px; border: none; background: transparent; cursor: pointer; font-weight: 700; font-size: .84rem; }
+  .authTabs button.active { background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+</style>
 </head>
 <body>
-  <iframe 
-    src="https://script.google.com/macros/s/AKfycbweB2UbaMxFiRbdJ9s71xnKL1C_Ak15HqS9bdLskkxrZzf4YWR5fcX-uOt4mUD8Va8/exec"
-    width="100%"
-    height="100%"
-    allowfullscreen="true"
-    style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; border: none;">
-  </iframe>
+<div id="loadBar"></div>
+<div id="toastHost"></div>
+<div id="modalHost"></div>
+<div id="app"></div>
 
-  <script>
-    window.onload = function() {
-      document.querySelector('iframe')
-        .requestFullscreen()
-        .catch((err) => {
-          console.error('Error attempting to enable full-screen mode:', err.message);
-        });
+<script>window.__initialPage = '<?= initialPage ?>';</script>
+<script>
+/* ============================================================================
+ * STATE
+ * ==========================================================================*/
+var state = {
+  token: localStorage.getItem('at_token') || null,
+  user: null,
+  publicData: null,
+  settings: null,
+  adminPage: 'overview',
+  cart: [],
+  wizard: { step: 'service', serviceId: null, staffId: null, date: null, timeSlot: null, name: '', phone: '', email: '', notes: '', paymentMethod: 'Cash', paymentProofUrl: '' }
+};
+
+/* ============================================================================
+ * API WRAPPER — google.script.run with loading + error handling
+ * ==========================================================================*/
+var pendingCalls = 0;
+function setLoading(on) {
+  pendingCalls = Math.max(0, pendingCalls + (on ? 1 : -1));
+  var bar = document.getElementById('loadBar');
+  if (pendingCalls > 0) { bar.style.width = '70%'; } else { bar.style.width = '100%'; setTimeout(function () { bar.style.width = '0'; }, 250); }
+}
+
+function api(fnName) {
+  var args = Array.prototype.slice.call(arguments, 1);
+  var showLoading = true;
+  return new Promise(function (resolve, reject) {
+    if (typeof google === 'undefined' || !google.script || !google.script.run) {
+      reject(new Error('This app must be opened as a deployed Google Apps Script web app.'));
+      return;
+    }
+    if (showLoading) setLoading(true);
+    google.script.run
+      .withSuccessHandler(function (result) { if (showLoading) setLoading(false); resolve(result); })
+      .withFailureHandler(function (err) { if (showLoading) setLoading(false); reject(err); })
+      [fnName].apply(null, args);
+  });
+}
+
+function toast(message, type) {
+  var host = document.getElementById('toastHost');
+  var el = document.createElement('div');
+  el.className = 'toast' + (type ? ' ' + type : '');
+  el.textContent = message;
+  host.appendChild(el);
+  setTimeout(function () { el.remove(); }, 4200);
+}
+function toastError(err) { toast(err && err.message ? err.message : String(err), 'error'); }
+
+function openModal(innerHtml, opts) {
+  opts = opts || {};
+  var host = document.getElementById('modalHost');
+  host.innerHTML = '<div class="modalOverlay" id="__modalOverlay"><div class="modalBox' + (opts.wide ? ' wide' : '') + '">' + innerHtml + '</div></div>';
+  document.getElementById('__modalOverlay').addEventListener('click', function (e) { if (e.target.id === '__modalOverlay' && !opts.persistent) closeModal(); });
+}
+function closeModal() { document.getElementById('modalHost').innerHTML = ''; }
+
+function esc(s) { var d = document.createElement('div'); d.textContent = (s === undefined || s === null) ? '' : String(s); return d.innerHTML; }
+function fmtMoney(n) { var sym = (state.settings && state.settings.Currency) || 'GH₵'; return sym + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function fmtDateNice(dateStr) { if (!dateStr) return ''; try { var d = new Date(dateStr + 'T12:00:00'); return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }); } catch (e) { return dateStr; } }
+function fmtDateShort(dateStr) { if (!dateStr) return ''; try { var d = new Date(dateStr.slice(0, 10) + 'T12:00:00'); return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }); } catch (e) { return dateStr; } }
+function slugify(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-'); }
+function badgeClass(status) { return 'badge badge-' + slugify(status); }
+function debounce(fn, ms) { var t; return function () { var args = arguments, ctx = this; clearTimeout(t); t = setTimeout(function () { fn.apply(ctx, args); }, ms); }; }
+function todayStr() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+
+/* ============================================================================
+ * INIT / ROUTER
+ * ==========================================================================*/
+window.addEventListener('hashchange', route);
+document.addEventListener('DOMContentLoaded', init);
+
+function init() {
+  var visitorKey = localStorage.getItem('at_visitor') || (Date.now() + '-' + Math.random().toString(36).slice(2));
+  localStorage.setItem('at_visitor', visitorKey);
+  api('trackVisit', visitorKey).catch(function () {});
+
+  api('getPublicData').then(function (data) {
+    state.publicData = data;
+    state.settings = data.settings;
+    applyTheme(data.settings);
+    if (state.token) {
+      api('getCurrentUser', state.token).then(function (user) {
+        state.user = user;
+        route();
+      }).catch(function () { state.token = null; localStorage.removeItem('at_token'); route(); });
+    } else {
+      route();
+    }
+  }).catch(function (err) {
+    document.getElementById('app').innerHTML = '<div style="padding:60px;text-align:center;">Unable to load. ' + esc(err.message) + '</div>';
+  });
+}
+
+function applyTheme(s) {
+  var root = document.documentElement.style;
+  root.setProperty('--clr-primary', s.PrimaryColor || '#16213e');
+  root.setProperty('--clr-secondary', s.SecondaryColor || '#c9a227');
+  root.setProperty('--clr-accent', s.AccentColor || '#c9a227');
+  root.setProperty('--clr-bg', s.BackgroundColor || '#f7f5f0');
+  root.setProperty('--clr-text', s.TextColor || '#1a1a1a');
+  document.title = (s.BusinessName || 'Advance Tailor') + ' — Bespoke Fashion House';
+}
+
+function route() {
+  var hash = location.hash || '#home';
+  if (hash.indexOf('#admin') === 0) {
+    if (!state.user) { renderLogin(); return; }
+    renderAdminShell();
+  } else {
+    renderPublicSite();
+    setTimeout(function () {
+      if (hash && hash !== '#home' && hash !== '#') {
+        var target = document.querySelector(hash);
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
+      } else { window.scrollTo(0, 0); }
+    }, 30);
+  }
+}
+
+function goAdmin(page) {
+  state.adminPage = page;
+  location.hash = '#admin';
+  renderAdminShell();
+}
+
+/* ============================================================================
+ * PUBLIC SITE
+ * ==========================================================================*/
+var svcFilter = 'All';
+
+function renderPublicSite() {
+  var d = state.publicData;
+  if (!d) return;
+  var s = d.settings;
+  document.getElementById('app').innerHTML =
+    renderPublicNav(d) +
+    (String(s.ShowGreetingBanner).toUpperCase() === 'Y' ? '<div id="greetingBanner">' + esc(s.Tagline || '') + ' &nbsp;•&nbsp; ' + waLink(s, 'Chat with us on WhatsApp') + '</div>' : '') +
+    renderHero(d.heroSlides, s) +
+    renderAbout(d, s) +
+    renderServicesSection(d) +
+    (String(s.ShowTeamSection).toUpperCase() === 'Y' ? renderStaffSection(d.staff) : '') +
+    renderGallerySection(d.gallery) +
+    (d.videos && d.videos.length ? renderVideosSection(d.videos) : '') +
+    renderReviewsSection(d.reviews) +
+    renderBookingSection(d) +
+    renderTrackSection() +
+    renderContactSection(d, s) +
+    renderPublicFooter(d, s) +
+    waFab(s);
+
+  bindPublicNavEvents();
+  startHeroRotation(d.heroSlides.length);
+  bindReviewForm();
+}
+
+function waNumber(s) { return (s.WhatsAppNumber || '').replace(/[^\d]/g, ''); }
+function waLink(s, label) { return '<a href="https://wa.me/' + waNumber(s) + '" target="_blank" style="text-decoration:underline;">' + esc(label) + '</a>'; }
+function waFab(s) {
+  if (!s.WhatsAppNumber) return '';
+  return '<a class="whatsappFab" href="https://wa.me/' + waNumber(s) + '" target="_blank" title="Chat on WhatsApp">' +
+    '<svg viewBox="0 0 24 24" fill="#fff"><path d="M17.5 14.4c-.3-.1-1.7-.9-2-1-.3-.1-.5-.1-.7.1-.2.3-.8 1-.9 1.2-.2.2-.3.2-.6.1-.3-.1-1.3-.5-2.4-1.5-.9-.8-1.5-1.8-1.7-2.1-.2-.3 0-.5.1-.6.1-.1.3-.3.4-.5.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5C10 9 9.5 7.8 9.3 7.3c-.2-.5-.4-.4-.5-.4h-.5c-.2 0-.5.1-.7.3-.2.3-.9.9-.9 2.2s1 2.6 1.1 2.7c.1.2 2 3 4.7 4.2.7.3 1.2.5 1.6.6.7.2 1.3.2 1.8.1.5-.1 1.7-.7 1.9-1.3.2-.7.2-1.2.2-1.3-.1-.2-.3-.2-.6-.4z"/><path d="M12 2C6.5 2 2 6.5 2 12c0 1.9.5 3.6 1.5 5.2L2 22l4.9-1.3C8.5 21.6 10.2 22 12 22c5.5 0 10-4.5 10-10S17.5 2 12 2zm0 18.2c-1.6 0-3.1-.4-4.5-1.2l-.3-.2-3 .8.8-2.9-.2-.3C4 15 3.4 13.5 3.4 12c0-4.7 3.9-8.6 8.6-8.6s8.6 3.9 8.6 8.6-3.9 8.6-8.6 8.6z"/></svg></a>';
+}
+
+function renderPublicNav(d) {
+  var s = d.settings;
+  return '<header id="publicNav"><div class="bar container">' +
+    '<div class="brand">' + (s.LogoURL ? '<img src="' + s.LogoURL + '">' : '') + esc(s.BusinessName || 'Advance Tailor') + '</div>' +
+    '<button id="navToggle">&#9776;</button>' +
+    '<nav id="pubNavLinks">' +
+      '<a href="#services">Services</a><a href="#staff">Our Team</a><a href="#gallery">Portfolio</a><a href="#reviews">Reviews</a>' +
+      '<a href="#track">Track Order</a><a href="#contact">Contact</a>' +
+      '<span class="shopStatusBadge ' + (d.shopStatus.open ? 'open' : 'closed') + '"><span class="dot"></span>' + (d.shopStatus.open ? 'Open now' : 'Closed now') + '</span>' +
+      '<a href="#booking" class="btn btn-accent btn-sm">Book a Fitting</a>' +
+      '<a onclick="location.hash=\'#admin\'" class="btn btn-outline-light btn-sm">Staff Login</a>' +
+    '</nav></div></header>';
+}
+function bindPublicNavEvents() {
+  var toggle = document.getElementById('navToggle');
+  if (toggle) toggle.addEventListener('click', function () { document.getElementById('pubNavLinks').classList.toggle('open'); });
+  document.querySelectorAll('#pubNavLinks a').forEach(function (a) { a.addEventListener('click', function () { document.getElementById('pubNavLinks').classList.remove('open'); }); });
+}
+
+var heroTimer = null, heroIdx = 0;
+function renderHero(slides, s) {
+  if (!slides || !slides.length) {
+    return '<section id="hero" style="background:linear-gradient(135deg,var(--clr-primary),#0e1526);"><div class="heroContent"><h1>' + esc(s.BusinessName) + '</h1><p>' + esc(s.Tagline) + '</p><div class="heroBtns"><a href="#booking" class="btn btn-accent">Book a Fitting</a></div></div></section>';
+  }
+  return '<section id="hero">' +
+    slides.map(function (sl, i) { return '<div class="slide' + (i === 0 ? ' active' : '') + '" data-i="' + i + '" style="background-image:url(\'' + sl.ImageURL + '\')"></div>'; }).join('') +
+    '<div class="heroContent"><h1 id="heroTitle">' + esc(slides[0].Title) + '</h1><p id="heroSub">' + esc(slides[0].Subtitle) + '</p>' +
+    '<div class="heroBtns"><a href="' + esc(slides[0].ButtonLink || '#booking') + '" id="heroBtn" class="btn btn-accent">' + esc(slides[0].ButtonText || 'Book Now') + '</a><a href="#services" class="btn btn-outline-light">View Services</a></div></div>' +
+    '<div class="dots">' + slides.map(function (sl, i) { return '<span data-i="' + i + '" class="' + (i === 0 ? 'active' : '') + '" onclick="setHeroSlide(' + i + ')"></span>'; }).join('') + '</div>' +
+    '</section>';
+}
+function startHeroRotation(count) {
+  clearInterval(heroTimer); heroIdx = 0;
+  if (count <= 1) return;
+  heroTimer = setInterval(function () { setHeroSlide((heroIdx + 1) % count); }, 6000);
+}
+function setHeroSlide(i) {
+  heroIdx = i;
+  var slides = state.publicData.heroSlides;
+  document.querySelectorAll('#hero .slide').forEach(function (el) { el.classList.toggle('active', Number(el.dataset.i) === i); });
+  document.querySelectorAll('#hero .dots span').forEach(function (el) { el.classList.toggle('active', Number(el.dataset.i) === i); });
+  var sl = slides[i];
+  var titleEl = document.getElementById('heroTitle'), subEl = document.getElementById('heroSub'), btnEl = document.getElementById('heroBtn');
+  if (titleEl) titleEl.textContent = sl.Title;
+  if (subEl) subEl.textContent = sl.Subtitle;
+  if (btnEl) { btnEl.textContent = sl.ButtonText || 'Book Now'; btnEl.setAttribute('href', sl.ButtonLink || '#booking'); }
+}
+
+function renderAbout(d, s) {
+  return '<section class="pubSection" id="about"><div class="container" style="display:flex;gap:40px;flex-wrap:wrap;align-items:center;">' +
+    '<div style="flex:1;min-width:280px;"><span class="eyebrow" style="color:var(--clr-secondary);font-weight:800;text-transform:uppercase;font-size:.78rem;">About Us</span>' +
+    '<h2>Ghana\'s Trusted Made-to-Measure Tailoring House</h2>' +
+    '<p>' + esc(s.BusinessName) + ' brings together master tailors and seamstresses to craft suits, traditional wear, bridal gowns and everyday garments — cut and sewn to your exact measurements, from consultation to delivery.</p>' +
+    '<div style="display:flex;gap:28px;margin-top:20px;flex-wrap:wrap;">' +
+    '<div><div style="font-size:1.8rem;font-weight:800;color:var(--clr-primary);font-family:var(--font-display);">' + (d.services.length) + '+</div><div class="muted">Garment services</div></div>' +
+    '<div><div style="font-size:1.8rem;font-weight:800;color:var(--clr-primary);font-family:var(--font-display);">' + (d.staff.length) + '</div><div class="muted">Skilled tailors</div></div>' +
+    '<div><div style="font-size:1.8rem;font-weight:800;color:var(--clr-primary);font-family:var(--font-display);">' + (d.reviews.length ? (d.reviews.reduce(function (sum, r) { return sum + Number(r.Rating); }, 0) / d.reviews.length).toFixed(1) : '5.0') + '★</div><div class="muted">Customer rating</div></div>' +
+    '</div></div></div></section>';
+}
+
+function renderServicesSection(d) {
+  var cats = ['All'].concat(d.serviceCategories);
+  var filtered = svcFilter === 'All' ? d.services : d.services.filter(function (s) { return s.Category === svcFilter; });
+  return '<section class="pubSection alt" id="services"><div class="container">' +
+    '<div class="sectionHead"><span class="eyebrow">What We Offer</span><h2>Our Tailoring Services</h2><p class="muted">Every piece is cut, fitted and finished by hand.</p></div>' +
+    '<div class="svcFilterRow">' + cats.map(function (c) { return '<button class="chip' + (c === svcFilter ? ' active' : '') + '" onclick="setSvcFilter(\'' + esc(c).replace(/'/g, "\\'") + '\')">' + esc(c) + '</button>'; }).join('') + '</div>' +
+    '<div class="grid grid-4">' + filtered.map(renderServiceCard).join('') + '</div>' +
+    (!filtered.length ? '<div class="emptyState">No services in this category yet.</div>' : '') +
+    '</div></section>';
+}
+function setSvcFilter(c) { svcFilter = c; renderPublicSite(); location.hash = '#services'; }
+function renderServiceCard(s) {
+  return '<div class="card svcCard"><div class="thumb" style="background-image:url(\'' + (s.ImageURL || '') + '\')"></div>' +
+    '<div class="body"><span class="catTag">' + esc(s.Category) + '</span><h3 style="font-size:1.05rem;">' + esc(s.Name) + '</h3>' +
+    '<p class="muted" style="font-size:.85rem;">' + esc(s.Description || '') + '</p>' +
+    '<div class="priceRow"><span class="price">' + fmtMoney(s.Price) + '</span><span class="muted">~' + esc(s.TurnaroundDays) + ' days</span></div>' +
+    '<a href="#booking" class="btn btn-block btn-sm" style="margin-top:12px;" onclick="preselectService(\'' + s.ServiceID + '\')">Book This</a></div></div>';
+}
+function preselectService(id) { state.wizard.serviceId = id; }
+
+function renderStaffSection(staff) {
+  return '<section class="pubSection" id="staff"><div class="container">' +
+    '<div class="sectionHead"><span class="eyebrow">Meet The Makers</span><h2>Our Tailors &amp; Seamstresses</h2></div>' +
+    '<div class="grid grid-4">' + staff.map(function (s) {
+      return '<div class="card staffCard"><img class="photo" src="' + (s.PhotoURL || '') + '" onerror="this.style.background=\'#eee\'">' +
+        '<h3 style="font-size:1rem;">' + esc(s.Name) + '</h3><div class="role">' + esc(s.Role) + '</div><div class="spec">' + esc(s.Specialties || '') + '</div></div>';
+    }).join('') + '</div></div></section>';
+}
+
+function renderGallerySection(gallery) {
+  return '<section class="pubSection alt" id="gallery"><div class="container">' +
+    '<div class="sectionHead"><span class="eyebrow">Our Work</span><h2>Portfolio</h2></div>' +
+    '<div class="galleryGrid">' + gallery.slice(0, 12).map(function (g) {
+      return '<div class="galleryItem"><img src="' + g.ImageURL + '"><div class="cap">' + esc(g.Caption) + '</div></div>';
+    }).join('') + '</div></div></section>';
+}
+
+function renderVideosSection(videos) {
+  return '<section class="pubSection" id="videos"><div class="container">' +
+    '<div class="sectionHead"><span class="eyebrow">In Motion</span><h2>Behind The Scenes</h2></div>' +
+    '<div class="grid grid-3">' + videos.map(function (v) {
+      return '<div class="card"><video src="' + v.VideoURL + '" controls style="width:100%;display:block;"></video><div style="padding:12px;"><strong>' + esc(v.Title) + '</strong><p class="muted" style="margin:4px 0 0;">' + esc(v.Caption || '') + '</p></div></div>';
+    }).join('') + '</div></div></section>';
+}
+
+function renderReviewsSection(reviews) {
+  return '<section class="pubSection alt" id="reviews"><div class="container">' +
+    '<div class="sectionHead"><span class="eyebrow">Testimonials</span><h2>What Our Customers Say</h2></div>' +
+    '<div class="reviewScroller">' + reviews.map(function (r) {
+      return '<div class="card reviewCard"><div class="stars">' + '★'.repeat(Number(r.Rating)) + '☆'.repeat(5 - Number(r.Rating)) + '</div><p>&ldquo;' + esc(r.Comment) + '&rdquo;</p>' +
+        '<div class="who"><span>' + esc(r.CustomerName) + '</span><span class="muted">' + esc(r.StaffName || '') + '</span></div></div>';
+    }).join('') + '</div>' +
+    '<div style="text-align:center;margin-top:26px;"><button class="btn btn-outline" onclick="openReviewModal()">Leave a Review</button></div>' +
+    '</div></section>';
+}
+function openReviewModal() {
+  var staffOptions = state.publicData.staff.map(function (s) { return '<option value="' + s.StaffID + '">' + esc(s.Name) + '</option>'; }).join('');
+  openModal('<div class="modalHead"><h3>Leave a Review</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
+    '<form id="reviewForm">' +
+    '<div class="field"><label>Your Name</label><input type="text" name="name" required></div>' +
+    '<div class="field"><label>Phone</label><input type="tel" name="phone" required placeholder="024XXXXXXX"></div>' +
+    '<div class="field"><label>Which tailor served you? (optional)</label><select name="staffId"><option value="">—</option>' + staffOptions + '</select></div>' +
+    '<div class="field"><label>Rating</label><select name="rating" required><option value="5">★★★★★ Excellent</option><option value="4">★★★★ Good</option><option value="3">★★★ Okay</option><option value="2">★★ Poor</option><option value="1">★ Bad</option></select></div>' +
+    '<div class="field"><label>Comment</label><textarea name="comment" required></textarea></div>' +
+    '<button class="btn btn-block" type="submit">Submit Review</button></form>');
+  bindReviewForm();
+}
+function bindReviewForm() {
+  var f = document.getElementById('reviewForm');
+  if (!f) return;
+  f.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var fd = new FormData(f);
+    api('submitReview', { name: fd.get('name'), phone: fd.get('phone'), staffId: fd.get('staffId'), rating: fd.get('rating'), comment: fd.get('comment') })
+      .then(function (res) { toast(res.message, 'success'); closeModal(); })
+      .catch(toastError);
+  });
+}
+
+/* ============================================================================
+ * BOOKING WIZARD (public fitting/consultation booking)
+ * ==========================================================================*/
+var WIZ_STEPS = ['service', 'staff', 'slot', 'details', 'payment', 'done'];
+var WIZ_LABELS = { service: 'Service', staff: 'Tailor', slot: 'Date & Time', details: 'Your Details', payment: 'Payment', done: 'Done' };
+
+function renderBookingSection(d) {
+  return '<section class="pubSection" id="booking"><div class="container">' +
+    '<div class="sectionHead"><span class="eyebrow">Book Online</span><h2>Book a Fitting or Consultation</h2><p class="muted" style="opacity:.8;">Pick a service, choose your tailor, and lock in a time — in under a minute.</p></div>' +
+    '<div class="wizardBox" id="wizardBox"></div>' +
+    '</div></section>';
+}
+function renderWizard() {
+  var box = document.getElementById('wizardBox');
+  if (!box) return;
+  var w = state.wizard;
+  var stepsHtml = WIZ_STEPS.map(function (s, i) {
+    var curIdx = WIZ_STEPS.indexOf(w.step);
+    var cls = s === w.step ? 'active' : (i < curIdx ? 'done' : '');
+    return '<div class="step ' + cls + '">' + (i + 1) + '. ' + WIZ_LABELS[s] + '</div>';
+  }).join('');
+  box.innerHTML = '<div class="wizardSteps">' + stepsHtml + '</div><div class="wizardBody" id="wizardStepBody"></div>';
+  renderWizardStep(w.step);
+}
+function wizGoto(step) { state.wizard.step = step; renderWizard(); }
+
+function renderWizardStep(stepKey) {
+  var host = document.getElementById('wizardStepBody');
+  var d = state.publicData, w = state.wizard;
+  if (stepKey === 'service') {
+    host.innerHTML = '<h3>Choose a service</h3><div class="optionGrid">' + d.services.map(function (s) {
+      return '<div class="optionCard' + (w.serviceId === s.ServiceID ? ' selected' : '') + '" onclick="wizPickService(\'' + s.ServiceID + '\')"><div class="oc-title">' + esc(s.Name) + '</div><div class="oc-sub">' + fmtMoney(s.Price) + ' · ~' + s.TurnaroundDays + ' days</div></div>';
+    }).join('') + '</div>';
+  } else if (stepKey === 'staff') {
+    var eligible = d.staff;
+    host.innerHTML = '<h3>Choose your tailor</h3><div class="optionGrid">' + eligible.map(function (s) {
+      return '<div class="optionCard' + (w.staffId === s.StaffID ? ' selected' : '') + '" onclick="wizPickStaff(\'' + s.StaffID + '\')"><div class="oc-title">' + esc(s.Name) + '</div><div class="oc-sub">' + esc(s.Role) + ' · ' + esc(s.Specialties || '') + '</div></div>';
+    }).join('') + '</div>' + wizardNav(true, false);
+  } else if (stepKey === 'slot') {
+    var minDate = todayStr();
+    host.innerHTML = '<h3>Choose date &amp; time</h3>' +
+      '<div class="field"><label>Date</label><input type="date" id="wizDate" min="' + minDate + '" value="' + (w.date || '') + '"></div>' +
+      '<div id="wizSlots" class="slotGrid" style="margin-top:10px;"></div>' + wizardNav(true, false);
+    document.getElementById('wizDate').addEventListener('change', wizLoadSlots);
+    if (w.date) wizLoadSlots();
+  } else if (stepKey === 'details') {
+    host.innerHTML = '<h3>Your details</h3>' +
+      '<div class="form-row"><div class="field"><label>Full Name</label><input type="text" id="wizName" value="' + esc(w.name) + '"></div>' +
+      '<div class="field"><label>Phone</label><input type="tel" id="wizPhone" value="' + esc(w.phone) + '" placeholder="024XXXXXXX"></div></div>' +
+      '<div class="form-row"><div class="field"><label>Email (optional)</label><input type="email" id="wizEmail" value="' + esc(w.email) + '"></div>' +
+      '<div class="field"><label>Appointment type</label><select id="wizType">' + ['Consultation', 'Measurement Session', 'Fitting'].map(function (t) { return '<option' + (w.type === t ? ' selected' : '') + '>' + t + '</option>'; }).join('') + '</select></div></div>' +
+      '<div class="field"><label>Notes (optional)</label><textarea id="wizNotes">' + esc(w.notes) + '</textarea></div>' +
+      wizardNav(true, true);
+  } else if (stepKey === 'payment') {
+    var svc = d.services.find(function (s) { return s.ServiceID === w.serviceId; });
+    var methods = String(d.settings.ActivePaymentMethods || '').split(',').map(function (m) { return m.trim(); }).filter(Boolean);
+    host.innerHTML = '<h3>Confirm &amp; pay deposit (optional)</h3>' +
+      '<p class="muted">You may pay a deposit now via mobile money, or simply pay Cash at the shop.</p>' +
+      '<div class="paymentMethodGrid">' + methods.map(function (m) {
+        return '<div class="optionCard' + (w.paymentMethod === m ? ' selected' : '') + '" onclick="wizPickPayment(\'' + m + '\')"><div class="oc-title">' + esc(m) + '</div></div>';
+      }).join('') + '</div>' +
+      '<div id="wizPayDetail">' + paymentDetailHtml(w.paymentMethod, d.settings) + '</div>' +
+      (w.paymentMethod !== 'Cash' ? '<div class="field" style="margin-top:14px;"><label>Upload payment screenshot (optional)</label><input type="file" id="wizProof" accept="image/*"></div>' : '') +
+      '<div class="panel" style="margin-top:16px;background:#f7f5f0;box-shadow:none;"><strong>' + esc(svc ? svc.Name : '') + '</strong><div class="muted">' + fmtDateNice(w.date) + ' at ' + esc(w.timeSlot || '') + '</div></div>' +
+      wizardNav(true, true, 'Confirm Booking');
+  } else if (stepKey === 'done') {
+    host.innerHTML = renderBookingSuccess(w.result || {});
+  }
+}
+function wizardNav(showBack, showNext, nextLabel) {
+  return '<div class="wizardNav">' +
+    (showBack ? '<button class="btn btn-outline" onclick="wizBack()">Back</button>' : '<span></span>') +
+    (showNext ? '<button class="btn btn-accent" onclick="wizNext()">' + (nextLabel || 'Continue') + '</button>' : '<span></span>') +
+    '</div>';
+}
+function wizPickService(id) { state.wizard.serviceId = id; wizGoto('staff'); }
+function wizPickStaff(id) { state.wizard.staffId = id; wizGoto('slot'); }
+function wizPickPayment(m) { state.wizard.paymentMethod = m; document.getElementById('wizPayDetail').innerHTML = paymentDetailHtml(m, state.publicData.settings); renderWizardStep('payment'); }
+function paymentDetailHtml(method, s) {
+  if (method === 'Cash' || !method) return '';
+  var map = {
+    'MTN MoMo': [s.MomoName, s.MomoNumber], 'Vodafone Cash': [s.VodafoneCashName, s.VodafoneCashNumber],
+    'Telecel Cash': [s.TelecelCashName, s.TelecelCashNumber], 'AirtelTigo Money': [s.AirtelTigoMoneyName, s.AirtelTigoMoneyNumber],
+    'Bank Transfer': [s.BankAccountName, s.BankAccountNumber, s.BankName]
+  };
+  var info = map[method];
+  if (!info || !info[1]) return '<div class="payDetailBox">Payment details for ' + esc(method) + ' have not been set up yet — you can pay Cash at the shop instead.</div>';
+  return '<div class="payDetailBox">Send to <strong>' + esc(info[0] || '') + '</strong><br>' + (method === 'Bank Transfer' ? esc(info[2] || '') + ' — ' : '') + 'Account/Number: <strong>' + esc(info[1]) + '</strong></div>';
+}
+function wizLoadSlots() {
+  var date = document.getElementById('wizDate').value;
+  state.wizard.date = date;
+  if (!date) return;
+  var branchId = state.publicData.branch.BranchID;
+  api('getAvailableSlots', branchId, state.wizard.staffId, date).then(function (slots) {
+    var host = document.getElementById('wizSlots');
+    if (!slots.length) { host.innerHTML = '<div class="emptyState" style="grid-column:1/-1;">No slots available this day. Try another date.</div>'; return; }
+    host.innerHTML = slots.map(function (sl) { return '<div class="slotBtn' + (state.wizard.timeSlot === sl ? ' selected' : '') + '" onclick="wizPickSlot(\'' + sl + '\')">' + sl + '</div>'; }).join('');
+  }).catch(toastError);
+}
+function wizPickSlot(sl) {
+  state.wizard.timeSlot = sl;
+  document.querySelectorAll('#wizSlots .slotBtn').forEach(function (el) { el.classList.toggle('selected', el.textContent === sl); });
+}
+function wizBack() {
+  var idx = WIZ_STEPS.indexOf(state.wizard.step);
+  if (idx > 0) wizGoto(WIZ_STEPS[idx - 1]);
+}
+function wizNext() {
+  var w = state.wizard;
+  if (w.step === 'staff') { if (!w.staffId) { toast('Please choose a tailor.', 'error'); return; } wizGoto('slot'); }
+  else if (w.step === 'slot') { if (!w.date || !w.timeSlot) { toast('Please choose a date and time.', 'error'); return; } wizGoto('details'); }
+  else if (w.step === 'details') {
+    w.name = document.getElementById('wizName').value.trim();
+    w.phone = document.getElementById('wizPhone').value.trim();
+    w.email = document.getElementById('wizEmail').value.trim();
+    w.type = document.getElementById('wizType').value;
+    w.notes = document.getElementById('wizNotes').value.trim();
+    if (!w.name || !w.phone) { toast('Please enter your name and phone number.', 'error'); return; }
+    wizGoto('payment');
+  } else if (w.step === 'payment') {
+    submitBooking();
+  }
+}
+function submitBooking() {
+  var w = state.wizard;
+  var fileInput = document.getElementById('wizProof');
+  var proceed = function (proofUrl) {
+    w.paymentProofUrl = proofUrl || '';
+    api('createAppointment', { name: w.name, phone: w.phone, email: w.email, serviceId: w.serviceId, staffId: w.staffId, date: w.date, timeSlot: w.timeSlot, type: w.type, notes: w.notes, paymentMethod: w.paymentMethod, paymentProofUrl: w.paymentProofUrl })
+      .then(function (res) { w.result = res; wizGoto('done'); })
+      .catch(toastError);
+  };
+  if (fileInput && fileInput.files[0]) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      api('uploadPaymentProof', reader.result, fileInput.files[0].name, fileInput.files[0].type).then(function (r) { proceed(r.url); }).catch(function (e) { toastError(e); proceed(''); });
     };
-  </script>
+    reader.readAsDataURL(fileInput.files[0]);
+  } else { proceed(''); }
+}
+function renderBookingSuccess(res) {
+  return '<div class="successBox"><div style="font-size:3rem;">✅</div><h3>Booking Received!</h3>' +
+    '<p class="muted">We\'ll confirm your appointment shortly by SMS/Email.</p>' +
+    '<div class="refCode">' + esc(res.reference || '') + '</div>' +
+    '<p class="muted">Save this reference to track or manage your booking.</p>' +
+    '<button class="btn btn-accent" onclick="resetWizard()">Book Another</button></div>';
+}
+function resetWizard() {
+  state.wizard = { step: 'service', serviceId: null, staffId: null, date: null, timeSlot: null, name: '', phone: '', email: '', notes: '', paymentMethod: 'Cash', paymentProofUrl: '' };
+  renderWizard();
+}
+
+/* ============================================================================
+ * TRACK MY ORDER / BOOKING (public)
+ * ==========================================================================*/
+function renderTrackSection() {
+  return '<section class="pubSection alt" id="track"><div class="container" style="max-width:640px;">' +
+    '<div class="sectionHead"><span class="eyebrow">Order Status</span><h2>Track My Order</h2><p class="muted">Enter your order reference or phone number to see progress.</p></div>' +
+    '<div class="form-row"><div class="field" style="flex:2;"><input type="text" id="trackInput" placeholder="Order reference (e.g. ORD250101-1234) or phone number"></div>' +
+    '<div class="field" style="flex:0 0 auto;"><button class="btn btn-accent" onclick="doTrackLookup()">Track</button></div></div>' +
+    '<div id="trackResults"></div></div></section>';
+}
+function doTrackLookup() {
+  var val = document.getElementById('trackInput').value.trim();
+  var host = document.getElementById('trackResults');
+  if (!val) { toast('Please enter a reference or phone number.', 'error'); return; }
+  host.innerHTML = '<p class="muted">Searching…</p>';
+  if (/^\d[\d\s+-]{6,}$/.test(val)) {
+    api('lookupMyOrders', val).then(function (orders) {
+      if (!orders.length) { host.innerHTML = '<div class="emptyState">No orders found for that phone number.</div>'; return; }
+      host.innerHTML = orders.map(renderOrderTrackCard).join('');
+    }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+  } else {
+    api('lookupOrderByReference', val).then(function (o) { host.innerHTML = renderOrderTrackCard(o); })
+      .catch(function () {
+        api('lookupBookingByReference', val).then(function (b) { host.innerHTML = renderBookingTrackCard(b); })
+          .catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+      });
+  }
+}
+function renderOrderTrackCard(o) {
+  var stages = ['Order Received', 'Measuring', 'Cutting', 'Sewing', 'Fitting', 'Finishing', 'Ready for Pickup', 'Delivered'];
+  var idx = o.StageIndex >= 0 ? o.StageIndex : 0;
+  var isCancelled = o.Status === 'Cancelled';
+  return '<div class="trackResultCard"><div style="display:flex;justify-content:space-between;align-items:center;">' +
+    '<div><strong>' + esc(o.Reference) + '</strong><div class="muted">' + esc(o.ServiceName) + '</div></div>' +
+    '<span class="' + badgeClass(o.Status) + '">' + esc(o.Status) + '</span></div>' +
+    (isCancelled ? '' : '<div class="stageTrack">' + stages.map(function (st, i) {
+      return (i > 0 ? '<div class="stageLine' + (i <= idx ? ' done' : '') + '"></div>' : '') + '<div class="stageDot' + (i <= idx ? ' done' : '') + '"></div>';
+    }).join('') + '</div><div class="stageLabels">' + stages.map(function (st) { return '<span>' + st + '</span>'; }).join('') + '</div>') +
+    '<div class="form-row" style="margin-top:16px;"><div><div class="muted">Order Date</div><strong>' + fmtDateShort(o.OrderDate) + '</strong></div>' +
+    '<div><div class="muted">Due Date</div><strong>' + fmtDateShort(o.DueDate) + '</strong></div>' +
+    '<div><div class="muted">Balance Due</div><strong>' + fmtMoney(Number(o.Price || 0) - Number(o.AmountPaid || 0)) + '</strong></div></div></div>';
+}
+function renderBookingTrackCard(b) {
+  return '<div class="trackResultCard"><div style="display:flex;justify-content:space-between;align-items:center;">' +
+    '<div><strong>' + esc(b.Reference) + '</strong><div class="muted">' + esc(b.ServiceName) + ' with ' + esc(b.StaffName) + '</div></div>' +
+    '<span class="' + badgeClass(b.Status) + '">' + esc(b.Status) + '</span></div>' +
+    '<div class="form-row" style="margin-top:16px;"><div><div class="muted">Date</div><strong>' + fmtDateShort(b.Date) + '</strong></div><div><div class="muted">Time</div><strong>' + esc(b.TimeSlot) + '</strong></div></div>' +
+    (b.Status !== 'Completed' && b.Status !== 'Cancelled' ? '<button class="btn btn-outline btn-sm" style="margin-top:14px;" onclick="cancelTrackedBooking(\'' + b.Reference + '\')">Cancel Booking</button>' : '') +
+    '</div>';
+}
+function cancelTrackedBooking(ref) {
+  if (!confirm('Cancel this booking?')) return;
+  api('cancelBookingByReference', ref).then(function () { toast('Booking cancelled.', 'success'); doTrackLookup(); }).catch(toastError);
+}
+
+/* ============================================================================
+ * CONTACT + FOOTER
+ * ==========================================================================*/
+function renderContactSection(d, s) {
+  var status = d.shopStatus;
+  return '<section class="pubSection" id="contact"><div class="container">' +
+    '<div class="sectionHead"><span class="eyebrow">Get In Touch</span><h2>Visit or Contact Us</h2></div>' +
+    '<div class="contactGrid"><div>' +
+    '<div class="contactInfoRow"><div class="ic">📍</div><div><strong>Location</strong><div class="muted">' + esc(d.branch.Location || '') + '</div></div></div>' +
+    '<div class="contactInfoRow"><div class="ic">📞</div><div><strong>Phone</strong><div class="muted">' + esc(s.ContactPhone || '') + '</div></div></div>' +
+    '<div class="contactInfoRow"><div class="ic">✉️</div><div><strong>Email</strong><div class="muted">' + esc(s.ContactEmail || '') + '</div></div></div>' +
+    '<div class="contactInfoRow"><div class="ic">🕑</div><div><strong>Hours</strong><table class="hoursTable">' + status.weekLabels.map(function (w) { return '<tr><td>' + w.day + '</td><td>' + esc(w.label) + '</td></tr>'; }).join('') + '</table></div></div>' +
+    renderSocialRow(s) +
+    (s.MapEmbedURL ? '<div class="mapEmbed"><iframe src="' + s.MapEmbedURL + '" loading="lazy"></iframe></div>' : '') +
+    '</div><div class="card" style="padding:26px;"><h3>Send us a message</h3>' +
+    '<form id="contactForm"><div class="field"><label>Name</label><input type="text" name="name" required></div>' +
+    '<div class="field"><label>Phone or Email</label><input type="text" name="phone" required></div>' +
+    '<div class="field"><label>Message</label><textarea name="message" required></textarea></div>' +
+    '<button class="btn btn-block" type="submit">Send Message</button></form></div></div></div></section>';
+}
+function renderSocialRow(s) {
+  var links = [['SocialFacebook', 'f'], ['SocialInstagram', '◎'], ['SocialTwitter', '𝕏'], ['SocialTiktok', '♪'], ['SocialYoutube', '▶']];
+  var html = links.filter(function (l) { return s[l[0]]; }).map(function (l) { return '<a href="' + esc(s[l[0]]) + '" target="_blank">' + l[1] + '</a>'; }).join('');
+  return html ? '<div class="socialRow">' + html + '</div>' : '';
+}
+document.addEventListener('submit', function (e) {
+  if (e.target && e.target.id === 'contactForm') {
+    e.preventDefault();
+    var fd = new FormData(e.target);
+    api('sendContactMessage', { name: fd.get('name'), phone: fd.get('phone'), message: fd.get('message') })
+      .then(function (res) { toast(res.message, 'success'); e.target.reset(); }).catch(toastError);
+  }
+});
+
+function renderPublicFooter(d, s) {
+  return '<footer id="pubFooter"><div class="container fgrid">' +
+    '<div><h4 style="font-family:var(--font-display);font-size:1.2rem;">' + esc(s.BusinessName) + '</h4><p style="max-width:320px;color:#99a;">' + esc(s.Tagline) + '</p>' + renderSocialRow(s) + '</div>' +
+    '<div><h4>Quick Links</h4><a href="#services">Services</a><a href="#staff">Our Team</a><a href="#gallery">Portfolio</a><a href="#booking">Book a Fitting</a><a href="#track">Track Order</a></div>' +
+    '<div><h4>Contact</h4><a href="tel:' + esc(s.ContactPhone) + '">' + esc(s.ContactPhone) + '</a><a href="mailto:' + esc(s.ContactEmail) + '">' + esc(s.ContactEmail) + '</a><a onclick="location.hash=\'#admin\'">Staff Login</a></div>' +
+    '</div><div class="fbottom">© ' + new Date().getFullYear() + ' ' + esc(s.BusinessName) + '. All rights reserved.</div></footer>';
+}
+
+/* ============================================================================
+ * LOGIN / REGISTER
+ * ==========================================================================*/
+var authTab = 'login';
+function renderLogin() {
+  var s = state.settings || {};
+  document.getElementById('app').innerHTML = '<div class="loginWrap"><div class="loginBox">' +
+    '<div class="logoRow">' + (s.LogoURL ? '<img src="' + s.LogoURL + '">' : '✂️') + '</div>' +
+    '<h2>' + esc(s.BusinessName || 'Advance Tailor') + '</h2>' +
+    '<div class="authTabs"><button id="tabLogin" class="active" onclick="setAuthTab(\'login\')">Login</button><button id="tabRegister" onclick="setAuthTab(\'register\')">Register</button></div>' +
+    '<div id="authForms"></div>' +
+    '<p style="text-align:center;margin-top:14px;"><a onclick="location.hash=\'#home\'" style="text-decoration:underline;font-size:.85rem;">&larr; Back to website</a></p>' +
+    '</div></div>';
+  renderAuthForm();
+}
+function setAuthTab(tab) {
+  authTab = tab;
+  document.getElementById('tabLogin').classList.toggle('active', tab === 'login');
+  document.getElementById('tabRegister').classList.toggle('active', tab === 'register');
+  renderAuthForm();
+}
+function renderAuthForm() {
+  var host = document.getElementById('authForms');
+  if (authTab === 'login') {
+    host.innerHTML = '<form id="loginForm"><div class="field"><label>Username</label><input type="text" name="username" required autofocus></div>' +
+      '<div class="field"><label>Password</label><input type="password" name="password" required></div>' +
+      '<button class="btn btn-block" type="submit">Log In</button></form>' +
+      '<p class="muted" style="text-align:center;margin-top:12px;">Demo: admin / admin123</p>';
+    document.getElementById('loginForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var fd = new FormData(e.target);
+      api('login', fd.get('username'), fd.get('password')).then(function (res) {
+        state.token = res.token; state.user = res.user;
+        localStorage.setItem('at_token', res.token);
+        toast('Welcome back, ' + (res.user.fullName || res.user.username) + '!', 'success');
+        state.adminPage = 'overview';
+        renderAdminShell();
+      }).catch(toastError);
+    });
+  } else {
+    host.innerHTML = '<form id="registerForm"><div class="field"><label>Full Name</label><input type="text" name="name" required></div>' +
+      '<div class="field"><label>Username</label><input type="text" name="username" required></div>' +
+      '<div class="field"><label>Phone</label><input type="tel" name="phone" placeholder="024XXXXXXX"></div>' +
+      '<div class="field"><label>Email</label><input type="email" name="email"></div>' +
+      '<div class="field"><label>Password</label><input type="password" name="password" required></div>' +
+      '<button class="btn btn-block" type="submit">Create Account</button></form>' +
+      '<p class="muted" style="text-align:center;margin-top:12px;">Your account will need admin approval before you can log in.</p>';
+    document.getElementById('registerForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var fd = new FormData(e.target);
+      api('registerAccount', { name: fd.get('name'), username: fd.get('username'), phone: fd.get('phone'), email: fd.get('email'), password: fd.get('password') })
+        .then(function (res) { toast(res.message, 'success'); setAuthTab('login'); }).catch(toastError);
+    });
+  }
+}
+function logoutUser() {
+  api('logout', state.token).finally(function () {
+    state.token = null; state.user = null;
+    localStorage.removeItem('at_token');
+    location.hash = '#home';
+    route();
+  });
+}
+
+/* ============================================================================
+ * ADMIN SHELL
+ * ==========================================================================*/
+var SIDEBAR_SECTIONS = [
+  { label: 'Overview', items: [{ key: 'overview', label: 'Dashboard', icon: '📊' }] },
+  { label: 'Operations', items: [
+    { key: 'orders', label: 'Orders', icon: '🧵' },
+    { key: 'appointments', label: 'Appointments', icon: '📅' },
+    { key: 'slots', label: 'Availability', icon: '🕑' },
+    { key: 'pos', label: 'Point of Sale', icon: '🛒' }
+  ]},
+  { label: 'Customers', items: [{ key: 'customers', label: 'Customers & Measurements', icon: '👤' }] },
+  { label: 'Business', items: [
+    { key: 'services', label: 'Services', icon: '✂️' },
+    { key: 'staff', label: 'Staff', icon: '🧑‍🔧' },
+    { key: 'inventory', label: 'Inventory', icon: '🧶' },
+    { key: 'expenses', label: 'Expenses', icon: '💵' },
+    { key: 'reports', label: 'Reports', icon: '📈' }
+  ]},
+  { label: 'Website', items: [
+    { key: 'gallery', label: 'Portfolio', icon: '🖼️' },
+    { key: 'hero', label: 'Hero Slides', icon: '🎞️' },
+    { key: 'videos', label: 'Videos', icon: '🎬' },
+    { key: 'reviews', label: 'Reviews', icon: '⭐' }
+  ]},
+  { label: 'System', items: [
+    { key: 'trash', label: 'Trash', icon: '🗑️' },
+    { key: 'sms', label: 'SMS Log', icon: '💬' },
+    { key: 'users', label: 'Users', icon: '🔐', roles: ['Owner', 'Manager'] },
+    { key: 'settings', label: 'Settings', icon: '⚙️', roles: ['Owner', 'Manager'] },
+    { key: 'account', label: 'My Account', icon: '🙋' }
+  ]}
+];
+var PAGE_TITLES = {};
+SIDEBAR_SECTIONS.forEach(function (sec) { sec.items.forEach(function (it) { PAGE_TITLES[it.key] = it.label; }); });
+
+function renderAdminShell() {
+  var user = state.user;
+  var s = state.settings || {};
+  document.getElementById('app').innerHTML =
+    '<div id="adminShell">' +
+    '<div id="adminSidebar">' + renderSidebar() + '</div>' +
+    '<div id="adminMain"><div id="adminTopbar">' +
+    '<div style="display:flex;align-items:center;gap:12px;"><button id="sidebarToggle" class="btn-icon" onclick="document.getElementById(\'adminSidebar\').classList.toggle(\'open\')">&#9776;</button>' +
+    '<div class="pageTitle" id="pageTitleEl">' + esc(PAGE_TITLES[state.adminPage] || '') + '</div></div>' +
+    '<div style="display:flex;align-items:center;gap:14px;">' +
+    '<div id="notifBell" style="position:relative;cursor:pointer;font-size:1.3rem;" onclick="openNotifPanel()">🔔<span id="notifCount" class="badge badge-cancelled" style="position:absolute;top:-8px;right:-10px;display:none;padding:1px 6px;"></span></div>' +
+    '<a onclick="location.hash=\'#home\'" class="muted" style="font-size:.85rem;text-decoration:underline;">View Website</a>' +
+    '<div class="avatarCircle">' + esc((user.fullName || user.username || '?').charAt(0).toUpperCase()) + '</div>' +
+    '</div></div>' +
+    '<div id="adminContent"></div></div></div>';
+  loadNotifBell();
+  renderAdminPage();
+}
+
+function renderSidebar() {
+  var user = state.user;
+  var s = state.settings || {};
+  var html = '<div class="sbBrand">' + (s.LogoURL ? '<img src="' + s.LogoURL + '">' : '✂️') + esc(s.BusinessName || 'Advance Tailor') + '</div><div class="sbNav">';
+  SIDEBAR_SECTIONS.forEach(function (sec) {
+    var items = sec.items.filter(function (it) { return !it.roles || it.roles.indexOf(user.role) > -1; });
+    if (!items.length) return;
+    html += '<div class="sbGroupLabel">' + sec.label + '</div>';
+    items.forEach(function (it) {
+      html += '<div class="sbLink' + (state.adminPage === it.key ? ' active' : '') + '" onclick="goAdmin(\'' + it.key + '\')"><span>' + it.icon + '</span><span>' + it.label + '</span></div>';
+    });
+  });
+  html += '</div><div class="sbFooter">' + esc(user.fullName || user.username) + '<br><span style="opacity:.6;">' + esc(user.role) + '</span><br>' +
+    '<a onclick="logoutUser()" style="text-decoration:underline;cursor:pointer;">Log out</a></div>';
+  return html;
+}
+
+function loadNotifBell() {
+  api('getNotificationBell', state.token, state.publicData.branch.BranchID).then(function (n) {
+    var el = document.getElementById('notifCount');
+    if (!el) return;
+    if (n.total > 0) { el.textContent = n.total; el.style.display = 'inline-block'; } else { el.style.display = 'none'; }
+    window.__lastNotif = n;
+  }).catch(function () {});
+}
+function openNotifPanel() {
+  var n = window.__lastNotif || { pendingAppointments: 0, dueSoon: 0, lowStock: 0 };
+  openModal('<div class="modalHead"><h3>Notifications</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
+    '<div class="panel" style="box-shadow:none;padding:0;"><p>🕑 <strong>' + n.pendingAppointments + '</strong> pending appointments awaiting confirmation</p>' +
+    '<p>🧵 <strong>' + n.dueSoon + '</strong> orders due within 2 days</p>' +
+    '<p>🧶 <strong>' + n.lowStock + '</strong> items low on stock</p></div>');
+}
+
+function renderAdminPage() {
+  var host = document.getElementById('adminContent');
+  var title = document.getElementById('pageTitleEl');
+  if (title) title.textContent = PAGE_TITLES[state.adminPage] || '';
+  document.querySelectorAll('.sbLink').forEach(function (el, i) {});
+  // refresh sidebar active state
+  var sb = document.getElementById('adminSidebar');
+  if (sb) sb.innerHTML = renderSidebar();
+
+  var page = state.adminPage;
+  var renderers = {
+    overview: renderOverview, orders: renderOrdersPage, appointments: renderAppointmentsPage, slots: renderSlotsAdmin,
+    pos: renderPOS, customers: renderCustomers, services: renderServicesAdmin, staff: renderStaffAdmin,
+    inventory: renderInventory, expenses: renderExpenses, reports: renderReports, gallery: renderGalleryAdmin,
+    hero: renderHeroAdmin, videos: renderVideosAdmin, reviews: renderReviewsAdmin, trash: renderTrashAdmin,
+    sms: renderSmsAdmin, users: renderUsersAdmin, settings: renderSettingsAdmin, account: renderAccount
+  };
+  var fn = renderers[page] || renderOverview;
+  host.innerHTML = '<div class="emptyState">Loading…</div>';
+  fn(host);
+}
+
+/* ---- Shared table/pagination helper ---- */
+var tableState = {};
+function renderTable(headers, rows, pageKey, pageSize) {
+  pageSize = pageSize || 10;
+  if (!tableState[pageKey]) tableState[pageKey] = 1;
+  var page = tableState[pageKey];
+  var totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  if (page > totalPages) page = totalPages;
+  var pageRows = rows.slice((page - 1) * pageSize, page * pageSize);
+  var thead = '<tr>' + headers.map(function (h) { return '<th>' + h.label + '</th>'; }).join('') + '</tr>';
+  var tbody = pageRows.map(function (row) {
+    return '<tr>' + headers.map(function (h) { return '<td>' + (h.render ? h.render(row) : esc(row[h.key])) + '</td>'; }).join('') + '</tr>';
+  }).join('');
+  var pager = '';
+  if (totalPages > 1) {
+    pager = '<div class="pager">';
+    for (var i = 1; i <= totalPages; i++) pager += '<button class="' + (i === page ? 'active' : '') + '" onclick="tableState[\'' + pageKey + '\']=' + i + ';renderAdminPage()">' + i + '</button>';
+    pager += '</div>';
+  }
+  return '<div class="tableWrap"><table class="dataTable"><thead>' + thead + '</thead><tbody>' + (tbody || '') + '</tbody></table></div>' +
+    (!rows.length ? '<div class="emptyState">No records found.</div>' : '') + pager;
+}
+
+/* ============================================================================
+ * DASHBOARD OVERVIEW
+ * ==========================================================================*/
+function renderOverview(host) {
+  Promise.all([api('getDashboardOverview', state.token), api('getOrderStatuses')]).then(function (r) {
+    var d = r[0], statuses = r[1];
+    host.innerHTML =
+      '<div class="statGrid">' +
+      statCard('Revenue Today', fmtMoney(d.revenueToday)) +
+      statCard('Revenue This Week', fmtMoney(d.revenueWeek)) +
+      statCard('Active Orders', d.activeOrders, d.totalOrders + ' total') +
+      statCard('Total Customers', d.totalCustomers) +
+      '</div>' +
+      '<div class="twoCol">' +
+      '<div>' +
+      '<div class="panel"><div class="panelHead"><h3>Orders by Stage</h3><a onclick="goAdmin(\'orders\')" style="text-decoration:underline;font-size:.82rem;cursor:pointer;">View all</a></div>' +
+      '<div class="kanban">' + statuses.filter(function (s) { return s !== 'Cancelled'; }).map(function (s) {
+        return '<div class="kanbanCol" style="min-width:140px;padding:14px;text-align:center;"><div style="font-size:1.6rem;font-weight:800;font-family:var(--font-display);">' + (d.ordersByStatus[s] || 0) + '</div><div class="muted" style="font-size:.76rem;">' + s + '</div></div>';
+      }).join('') + '</div></div>' +
+      '<div class="panel"><div class="panelHead"><h3>Recent Orders</h3></div>' +
+      renderTable([
+        { label: 'Ref', key: 'Reference' }, { label: 'Customer', key: 'CustomerName' }, { label: 'Service', key: 'ServiceName' },
+        { label: 'Status', render: function (o) { return '<span class="' + badgeClass(o.Status) + '">' + o.Status + '</span>'; } },
+        { label: 'Due', render: function (o) { return fmtDateShort(o.DueDate); } }
+      ], d.recentOrders, 'ov-recent', 6) + '</div>' +
+      '</div>' +
+      '<div>' +
+      '<div class="panel"><h3>Today\'s Appointments</h3>' + (d.todaysAppointments.length ? d.todaysAppointments.map(function (a) {
+        return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0ee;font-size:.85rem;"><div><strong>' + esc(a.TimeSlot) + '</strong> ' + esc(a.ServiceName) + '<div class="muted">' + esc(a.CustomerName) + ' · ' + esc(a.StaffName) + '</div></div><span class="' + badgeClass(a.Status) + '">' + a.Status + '</span></div>';
+      }).join('') : '<div class="emptyState">No appointments today.</div>') + '</div>' +
+      '<div class="panel"><h3>Due Soon</h3>' + (d.dueSoon.length ? d.dueSoon.map(function (o) {
+        return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0ee;font-size:.85rem;"><div><strong>' + esc(o.Reference) + '</strong><div class="muted">' + esc(o.ServiceName) + '</div></div><span>' + fmtDateShort(o.DueDate) + '</span></div>';
+      }).join('') : '<div class="emptyState">Nothing due soon.</div>') + '</div>' +
+      '<div class="panel"><h3>Low Stock</h3>' + (d.lowStock.length ? d.lowStock.map(function (p) {
+        return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0ee;font-size:.85rem;"><span>' + esc(p.Name) + '</span><span style="color:#c0392b;font-weight:700;">' + p.QuantityInStock + ' ' + esc(p.Unit || '') + '</span></div>';
+      }).join('') : '<div class="emptyState">Stock levels are healthy.</div>') + '</div>' +
+      '</div></div>';
+  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+}
+function statCard(label, val, sub) {
+  return '<div class="statCard"><div class="lbl">' + label + '</div><div class="val">' + val + '</div>' + (sub ? '<div class="sub">' + sub + '</div>' : '') + '</div>';
+}
+
+/* ============================================================================
+ * ORDERS (bespoke garment production)
+ * ==========================================================================*/
+var ordersView = 'kanban';
+var ordersCache = { rows: [], services: [], staff: [], customers: [], statuses: [] };
+function renderOrdersPage(host) {
+  Promise.all([api('getOrders', state.token, {}), api('getServices', state.token), api('getStaff', state.token), api('getCustomers', state.token), api('getOrderStatuses')])
+    .then(function (r) {
+      ordersCache = { rows: r[0], services: r[1], staff: r[2], customers: r[3], statuses: r[4] };
+      drawOrders(host);
+    }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+}
+function drawOrders(host) {
+  var rows = ordersCache.rows;
+  host.innerHTML = '<div class="toolbar"><div class="left">' +
+    '<div class="searchBox"><input type="text" id="orderSearch" placeholder="Search orders…" value="' + (window.__orderSearch || '') + '"></div>' +
+    '<select id="orderStatusFilter"><option value="">All statuses</option>' + ordersCache.statuses.map(function (s) { return '<option' + (window.__orderStatusFilter === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select>' +
+    '<button class="chip' + (ordersView === 'kanban' ? ' active' : '') + '" onclick="ordersView=\'kanban\';drawOrders(document.getElementById(\'adminContent\'))">Kanban</button>' +
+    '<button class="chip' + (ordersView === 'table' ? ' active' : '') + '" onclick="ordersView=\'table\';drawOrders(document.getElementById(\'adminContent\'))">Table</button>' +
+    '</div><div><button class="btn" onclick="exportCsv(\'exportOrdersCsv\',{})">Export CSV</button> <button class="btn btn-accent" onclick="openOrderForm()">+ New Order</button></div></div>' +
+    '<div id="ordersBody"></div>';
+  document.getElementById('orderSearch').addEventListener('input', debounce(function (e) { window.__orderSearch = e.target.value; filterAndDrawOrders(); }, 250));
+  document.getElementById('orderStatusFilter').addEventListener('change', function (e) { window.__orderStatusFilter = e.target.value; filterAndDrawOrders(); });
+  filterAndDrawOrders();
+}
+function filterAndDrawOrders() {
+  var q = (window.__orderSearch || '').toLowerCase();
+  var statusF = window.__orderStatusFilter || '';
+  var rows = ordersCache.rows.filter(function (o) {
+    if (statusF && o.Status !== statusF) return false;
+    if (!q) return true;
+    return (o.CustomerName || '').toLowerCase().indexOf(q) > -1 || (o.Reference || '').toLowerCase().indexOf(q) > -1 || (o.ServiceName || '').toLowerCase().indexOf(q) > -1;
+  });
+  var body = document.getElementById('ordersBody');
+  if (ordersView === 'kanban') { body.innerHTML = renderOrdersKanban(rows); } else { body.innerHTML = renderOrdersTable(rows); }
+}
+function renderOrdersKanban(rows) {
+  var cols = ordersCache.statuses.filter(function (s) { return s !== 'Cancelled'; });
+  return '<div class="kanban">' + cols.map(function (status) {
+    var items = rows.filter(function (o) { return o.Status === status; });
+    return '<div class="kanbanCol"><h4>' + status + '<span>' + items.length + '</span></h4>' +
+      items.map(function (o) {
+        var overdue = o.DueDate && o.DueDate < todayStr();
+        return '<div class="kanbanCard" onclick="openOrderDetail(\'' + o.OrderID + '\')"><div class="kc-ref">' + esc(o.Reference) + '</div>' +
+          '<div class="kc-sub">' + esc(o.CustomerName) + '<br>' + esc(o.ServiceName) + '</div>' +
+          '<div class="kc-due' + (overdue ? ' overdue' : '') + '">Due ' + fmtDateShort(o.DueDate) + '</div></div>';
+      }).join('') + '</div>';
+  }).join('') + '</div>';
+}
+function renderOrdersTable(rows) {
+  return renderTable([
+    { label: 'Ref', key: 'Reference' }, { label: 'Customer', key: 'CustomerName' }, { label: 'Service', key: 'ServiceName' }, { label: 'Tailor', key: 'StaffName' },
+    { label: 'Due', render: function (o) { return fmtDateShort(o.DueDate); } },
+    { label: 'Status', render: function (o) { return '<span class="' + badgeClass(o.Status) + '">' + o.Status + '</span>'; } },
+    { label: 'Price', render: function (o) { return fmtMoney(o.Price); } },
+    { label: 'Balance', render: function (o) { return fmtMoney(o.Balance); } },
+    { label: 'Payment', render: function (o) { return '<span class="' + badgeClass(o.PaymentStatus) + '">' + o.PaymentStatus + '</span>'; } },
+    { label: '', render: function (o) { return '<div class="rowActions"><button class="btn-sm btn-outline" onclick="openOrderDetail(\'' + o.OrderID + '\')">Open</button></div>'; } }
+  ], rows, 'orders-table');
+}
+
+function openOrderForm(existing) {
+  var svcOptions = ordersCache.services.map(function (s) { return '<option value="' + s.ServiceID + '"' + (existing && existing.ServiceID === s.ServiceID ? ' selected' : '') + '>' + esc(s.Name) + ' — ' + fmtMoney(s.Price) + '</option>'; }).join('');
+  var staffOptions = ordersCache.staff.map(function (s) { return '<option value="' + s.StaffID + '"' + (existing && existing.StaffID === s.StaffID ? ' selected' : '') + '>' + esc(s.Name) + '</option>'; }).join('');
+  var custOptions = ordersCache.customers.map(function (c) { return '<option value="' + c.CustomerID + '"' + (existing && existing.CustomerID === c.CustomerID ? ' selected' : '') + '>' + esc(c.Name) + ' (' + esc(c.Phone) + ')</option>'; }).join('');
+  openModal('<div class="modalHead"><h3>' + (existing ? 'Edit Order' : 'New Order') + '</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
+    '<form id="orderForm">' +
+    '<div class="form-row"><div class="field"><label>Customer</label><select name="CustomerID" required><option value="">Choose…</option>' + custOptions + '</select></div>' +
+    '<div class="field"><label>Garment / Service</label><select name="ServiceID" required id="orderServiceSelect"><option value="">Choose…</option>' + svcOptions + '</select></div></div>' +
+    '<div class="form-row"><div class="field"><label>Assigned Tailor</label><select name="StaffID"><option value="">Unassigned</option>' + staffOptions + '</select></div>' +
+    '<div class="field"><label>Due Date</label><input type="date" name="DueDate" required value="' + (existing ? existing.DueDate : '') + '"></div></div>' +
+    '<div class="form-row"><div class="field"><label>Fabric Source</label><select name="FabricSource"><option>Shop-provided</option><option>Customer-provided</option></select></div>' +
+    '<div class="field"><label>Fabric Details</label><input type="text" name="FabricDetails" placeholder="e.g. Navy kente, 6 yards" value="' + (existing ? esc(existing.FabricDetails) : '') + '"></div></div>' +
+    '<div class="form-row"><div class="field"><label>Price (' + (state.settings.Currency || 'GH₵') + ')</label><input type="number" step="0.01" name="Price" id="orderPriceInput" required value="' + (existing ? existing.Price : '') + '"></div>' +
+    '<div class="field"><label>Deposit Paid Now</label><input type="number" step="0.01" name="AmountPaid" value="' + (existing ? existing.AmountPaid : '') + '"></div></div>' +
+    '<div class="field"><label>Payment Method</label><select name="PaymentMethod">' + PAYMENT_METHODS_JS.map(function (m) { return '<option' + (existing && existing.PaymentMethod === m ? ' selected' : '') + '>' + m + '</option>'; }).join('') + '</select></div>' +
+    '<div class="field"><label>Design reference photo (optional)</label><input type="file" id="orderDesignFile" accept="image/*">' + (existing && existing.DesignImageURL ? '<img src="' + existing.DesignImageURL + '" style="max-width:120px;margin-top:8px;border-radius:8px;">' : '') + '</div>' +
+    '<div class="field"><label>Notes</label><textarea name="Notes">' + (existing ? esc(existing.Notes) : '') + '</textarea></div>' +
+    '<input type="hidden" name="OrderID" value="' + (existing ? existing.OrderID : '') + '">' +
+    '<button class="btn btn-block btn-accent" type="submit">' + (existing ? 'Save Changes' : 'Create Order') + '</button>' +
+    '</form>', { wide: true });
+  document.getElementById('orderServiceSelect').addEventListener('change', function (e) {
+    var svc = ordersCache.services.find(function (s) { return s.ServiceID === e.target.value; });
+    if (svc && !existing) document.getElementById('orderPriceInput').value = svc.Price;
+  });
+  document.getElementById('orderForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var fd = new FormData(e.target);
+    var payload = Object.fromEntries(fd.entries());
+    var fileInput = document.getElementById('orderDesignFile');
+    var save = function (designUrl) {
+      if (designUrl) payload.DesignImageURL = designUrl;
+      api('saveOrder', state.token, payload).then(function () { toast('Order saved.', 'success'); closeModal(); renderOrdersPage(document.getElementById('adminContent')); }).catch(toastError);
+    };
+    if (fileInput.files[0]) {
+      var reader = new FileReader();
+      reader.onload = function () { api('uploadImage', state.token, reader.result, fileInput.files[0].name, fileInput.files[0].type).then(function (r) { save(r.url); }).catch(function (err) { toastError(err); save(''); }); };
+      reader.readAsDataURL(fileInput.files[0]);
+    } else { save(''); }
+  });
+}
+var PAYMENT_METHODS_JS = ['Cash', 'MTN MoMo', 'Vodafone Cash', 'Telecel Cash', 'AirtelTigo Money', 'Bank Transfer'];
+
+function openOrderDetail(orderId) {
+  api('getOrder', state.token, orderId).then(function (res) {
+    var o = res.order;
+    var measurementHtml = res.measurement ? renderMeasurementBlock(res.measurement) : '<p class="muted">No measurement profile linked.</p>';
+    openModal('<div class="modalHead"><h3>' + esc(o.Reference) + '</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
+      '<div class="form-row"><div><div class="muted">Status</div><span class="' + badgeClass(o.Status) + '">' + o.Status + '</span></div>' +
+      '<div><div class="muted">Payment</div><span class="' + badgeClass(o.PaymentStatus) + '">' + o.PaymentStatus + '</span></div>' +
+      '<div><div class="muted">Due</div><strong>' + fmtDateShort(o.DueDate) + '</strong></div></div>' +
+      '<div class="field" style="margin-top:16px;"><label>Advance Status</label><select id="orderStatusSelect">' + ordersCache.statuses.map(function (s) { return '<option' + (s === o.Status ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select>' +
+      '<button class="btn btn-sm btn-accent" style="margin-top:8px;" onclick="advanceOrderStatus(\'' + o.OrderID + '\')">Update Status</button></div>' +
+      '<div class="panel" style="background:#f7f5f0;box-shadow:none;margin-top:14px;"><strong>Fabric:</strong> ' + esc(o.FabricSource) + (o.FabricDetails ? ' — ' + esc(o.FabricDetails) : '') + '<br>' +
+      '<strong>Price:</strong> ' + fmtMoney(o.Price) + ' &nbsp; <strong>Paid:</strong> ' + fmtMoney(o.AmountPaid) + ' &nbsp; <strong>Balance:</strong> ' + fmtMoney(Number(o.Price) - Number(o.AmountPaid)) + '</div>' +
+      (Number(o.Price) - Number(o.AmountPaid) > 0 ? '<div class="form-row" style="margin-top:12px;"><div class="field"><label>Record Payment</label><input type="number" step="0.01" id="payAmountInput" placeholder="Amount"></div>' +
+      '<div class="field"><label>Method</label><select id="payMethodInput">' + PAYMENT_METHODS_JS.map(function (m) { return '<option>' + m + '</option>'; }).join('') + '</select></div>' +
+      '<div class="field" style="flex:0 0 auto;align-self:flex-end;"><button class="btn btn-sm" onclick="recordOrderPaymentUi(\'' + o.OrderID + '\')">Add Payment</button></div></div>' : '') +
+      (o.Notes ? '<p style="margin-top:10px;"><strong>Notes:</strong> ' + esc(o.Notes) + '</p>' : '') +
+      (o.DesignImageURL ? '<img src="' + o.DesignImageURL + '" style="max-width:180px;border-radius:8px;margin-top:10px;">' : '') +
+      '<h4 style="margin-top:20px;">Measurements</h4>' + measurementHtml +
+      '<div style="margin-top:18px;display:flex;gap:8px;"><button class="btn btn-outline btn-sm" onclick="closeModal();openOrderForm(ordersCache.rows.find(function(r){return r.OrderID===\'' + o.OrderID + '\';}))">Edit Order</button>' +
+      '<button class="btn btn-danger btn-sm" onclick="clearOneOrder(\'' + o.OrderID + '\')">Move to Trash</button></div>', { wide: true });
+  }).catch(toastError);
+}
+function renderMeasurementBlock(m) {
+  var fields = m.FieldsParsed || {};
+  var rows = Object.keys(fields).map(function (k) { return '<tr><td class="muted">' + esc(k) + '</td><td style="text-align:right;font-weight:700;">' + esc(fields[k]) + '</td></tr>'; }).join('');
+  return '<div class="panel" style="box-shadow:none;background:#f7f5f0;"><strong>' + esc(m.ProfileName) + '</strong> <span class="muted">(' + esc(m.DateTaken) + ')</span><table class="hoursTable" style="margin-top:8px;">' + rows + '</table></div>';
+}
+function advanceOrderStatus(orderId) {
+  var status = document.getElementById('orderStatusSelect').value;
+  api('updateOrderStatus', state.token, orderId, status).then(function () { toast('Order status updated.', 'success'); closeModal(); renderOrdersPage(document.getElementById('adminContent')); loadNotifBell(); }).catch(toastError);
+}
+function recordOrderPaymentUi(orderId) {
+  var amt = document.getElementById('payAmountInput').value;
+  var method = document.getElementById('payMethodInput').value;
+  if (!amt || Number(amt) <= 0) { toast('Enter a valid amount.', 'error'); return; }
+  api('recordOrderPayment', state.token, orderId, amt, method).then(function () { toast('Payment recorded.', 'success'); closeModal(); renderOrdersPage(document.getElementById('adminContent')); }).catch(toastError);
+}
+function clearOneOrder(orderId) {
+  if (!confirm('Move this order to Trash? It can be restored later.')) return;
+  api('clearOrders', state.token, [orderId]).then(function () { toast('Order moved to Trash.', 'success'); closeModal(); renderOrdersPage(document.getElementById('adminContent')); }).catch(toastError);
+}
+function exportCsv(fnName, args) {
+  var params = args || {};
+  var callArgs = fnName === 'exportExpensesCsv' ? [state.token, params] : [state.token, params];
+  api.apply(null, [fnName].concat(callArgs)).then(function (csv) {
+    var blob = new Blob([csv], { type: 'text/csv' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a'); a.href = url; a.download = fnName + '_' + todayStr() + '.csv'; document.body.appendChild(a); a.click(); a.remove();
+  }).catch(toastError);
+}
+
+/* ============================================================================
+ * APPOINTMENTS (fittings & consultations)
+ * ==========================================================================*/
+var apptsView = 'table';
+var apptsCache = { rows: [], services: [], staff: [], customers: [] };
+function renderAppointmentsPage(host) {
+  Promise.all([api('getAppointments', state.token, {}), api('getServices', state.token), api('getStaff', state.token), api('getCustomers', state.token)])
+    .then(function (r) { apptsCache = { rows: r[0], services: r[1], staff: r[2], customers: r[3] }; drawAppointments(host); })
+    .catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+}
+function drawAppointments(host) {
+  host.innerHTML = '<div class="toolbar"><div class="left">' +
+    '<div class="searchBox"><input type="text" id="apptSearch" placeholder="Search appointments…"></div>' +
+    '<select id="apptStatusFilter"><option value="">All statuses</option>' + APPT_STATUSES.map(function (s) { return '<option>' + s + '</option>'; }).join('') + '</select>' +
+    '<button class="chip' + (apptsView === 'table' ? ' active' : '') + '" onclick="apptsView=\'table\';drawAppointments(document.getElementById(\'adminContent\'))">Table</button>' +
+    '<button class="chip' + (apptsView === 'kanban' ? ' active' : '') + '" onclick="apptsView=\'kanban\';drawAppointments(document.getElementById(\'adminContent\'))">Kanban</button>' +
+    '</div><button class="btn btn-accent" onclick="openApptForm()">+ New Appointment</button></div>' +
+    '<div id="apptsBody"></div>';
+  document.getElementById('apptSearch').addEventListener('input', debounce(function (e) { window.__apptSearch = e.target.value; filterAndDrawAppts(); }, 250));
+  document.getElementById('apptStatusFilter').addEventListener('change', function (e) { window.__apptStatusFilter = e.target.value; filterAndDrawAppts(); });
+  filterAndDrawAppts();
+}
+var APPT_STATUSES = ['Pending', 'Confirmed', 'Completed', 'Cancelled', 'No-Show'];
+var APPT_TYPES_JS = ['Consultation', 'Measurement Session', 'Fitting', 'Delivery/Pickup'];
+function filterAndDrawAppts() {
+  var q = (window.__apptSearch || '').toLowerCase();
+  var statusF = window.__apptStatusFilter || '';
+  var rows = apptsCache.rows.filter(function (a) {
+    if (statusF && a.Status !== statusF) return false;
+    if (!q) return true;
+    return (a.CustomerName || '').toLowerCase().indexOf(q) > -1 || (a.Reference || '').toLowerCase().indexOf(q) > -1;
+  });
+  var body = document.getElementById('apptsBody');
+  body.innerHTML = apptsView === 'table' ? renderApptsTable(rows) : renderApptsKanban(rows);
+}
+function renderApptsTable(rows) {
+  return renderTable([
+    { label: 'Ref', key: 'Reference' }, { label: 'Customer', key: 'CustomerName' }, { label: 'Service', key: 'ServiceName' }, { label: 'Tailor', key: 'StaffName' },
+    { label: 'Date', render: function (a) { return fmtDateShort(a.Date) + ' ' + a.TimeSlot; } }, { label: 'Type', key: 'Type' },
+    { label: 'Status', render: function (a) { return '<span class="' + badgeClass(a.Status) + '">' + a.Status + '</span>'; } },
+    { label: '', render: function (a) { return '<div class="rowActions">' + apptStatusButtons(a) + '</div>'; } }
+  ], rows, 'appts-table');
+}
+function apptStatusButtons(a) {
+  var opts = APPT_STATUSES.map(function (s) { return '<option' + (s === a.Status ? ' selected' : '') + '>' + s + '</option>'; }).join('');
+  return '<select onchange="setApptStatus(\'' + a.AppointmentID + '\', this.value)">' + opts + '</select>';
+}
+function setApptStatus(id, status) {
+  api('updateAppointmentStatus', state.token, id, status).then(function () { toast('Status updated.', 'success'); renderAppointmentsPage(document.getElementById('adminContent')); loadNotifBell(); }).catch(toastError);
+}
+function renderApptsKanban(rows) {
+  return '<div class="kanban">' + APPT_STATUSES.map(function (status) {
+    var items = rows.filter(function (a) { return a.Status === status; });
+    return '<div class="kanbanCol"><h4>' + status + '<span>' + items.length + '</span></h4>' +
+      items.map(function (a) { return '<div class="kanbanCard"><div class="kc-ref">' + esc(a.Reference) + '</div><div class="kc-sub">' + esc(a.CustomerName) + '<br>' + esc(a.ServiceName) + '</div><div class="kc-due">' + fmtDateShort(a.Date) + ' ' + a.TimeSlot + '</div>' + apptStatusButtons(a) + '</div>'; }).join('') +
+      '</div>';
+  }).join('') + '</div>';
+}
+function openApptForm() {
+  var svcOptions = apptsCache.services.map(function (s) { return '<option value="' + s.ServiceID + '">' + esc(s.Name) + '</option>'; }).join('');
+  var staffOptions = apptsCache.staff.map(function (s) { return '<option value="' + s.StaffID + '">' + esc(s.Name) + '</option>'; }).join('');
+  var custOptions = apptsCache.customers.map(function (c) { return '<option value="' + c.CustomerID + '">' + esc(c.Name) + ' (' + esc(c.Phone) + ')</option>'; }).join('');
+  openModal('<div class="modalHead"><h3>New Appointment</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
+    '<form id="apptForm">' +
+    '<div class="field"><label>Customer</label><select name="customerId" required><option value="">Choose…</option>' + custOptions + '</select></div>' +
+    '<div class="form-row"><div class="field"><label>Service</label><select name="serviceId" required>' + svcOptions + '</select></div>' +
+    '<div class="field"><label>Tailor</label><select name="staffId" required>' + staffOptions + '</select></div></div>' +
+    '<div class="form-row"><div class="field"><label>Date</label><input type="date" name="date" required></div>' +
+    '<div class="field"><label>Time</label><input type="time" name="timeSlot" required></div></div>' +
+    '<div class="field"><label>Type</label><select name="type">' + APPT_TYPES_JS.map(function (t) { return '<option>' + t + '</option>'; }).join('') + '</select></div>' +
+    '<div class="field"><label>Notes</label><textarea name="notes"></textarea></div>' +
+    '<button class="btn btn-block btn-accent" type="submit">Create Appointment</button></form>');
+  document.getElementById('apptForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var payload = Object.fromEntries(new FormData(e.target).entries());
+    api('createAppointmentAdmin', state.token, payload).then(function () { toast('Appointment created.', 'success'); closeModal(); renderAppointmentsPage(document.getElementById('adminContent')); }).catch(toastError);
+  });
+}
+
+/* ============================================================================
+ * AVAILABILITY / SLOT BLOCKING
+ * ==========================================================================*/
+function renderSlotsAdmin(host) {
+  var date = window.__slotsDate || todayStr();
+  host.innerHTML = '<div class="panel"><div class="field" style="max-width:220px;"><label>Date</label><input type="date" id="slotsDateInput" value="' + date + '"></div>' +
+    '<p class="muted">Click a slot to block/unblock it for online booking. Slots already booked can\'t be blocked.</p>' +
+    '<div id="slotsGrid" class="slotGrid" style="max-height:none;"></div></div>';
+  document.getElementById('slotsDateInput').addEventListener('change', function (e) { window.__slotsDate = e.target.value; loadSlotsGrid(); });
+  loadSlotsGrid();
+}
+function loadSlotsGrid() {
+  var date = window.__slotsDate || todayStr();
+  var branchId = state.publicData.branch.BranchID;
+  api('getSlotsForAdmin', state.token, branchId, date).then(function (res) {
+    var takenSlots = {};
+    res.appointments.forEach(function (a) { takenSlots[a.TimeSlot] = a; });
+    document.getElementById('slotsGrid').innerHTML = res.slots.map(function (sl) {
+      var isBlocked = res.blocked.indexOf(sl) > -1;
+      var isTaken = !!takenSlots[sl];
+      var cls = isTaken ? 'slotBtn' : (isBlocked ? 'slotBtn selected' : 'slotBtn');
+      var style = isTaken ? 'background:#eee;color:#999;cursor:not-allowed;' : '';
+      return '<div class="' + cls + '" style="' + style + '" ' + (isTaken ? '' : 'onclick="toggleSlot(\'' + branchId + '\',\'' + date + '\',\'' + sl + '\')"') + ' title="' + (isTaken ? 'Booked' : (isBlocked ? 'Blocked' : 'Available')) + '">' + sl + '</div>';
+    }).join('') || '<div class="emptyState">Shop closed this day.</div>';
+  }).catch(toastError);
+}
+function toggleSlot(branchId, date, slot) {
+  api('toggleBlockedSlot', state.token, branchId, date, slot).then(function () { loadSlotsGrid(); }).catch(toastError);
+}
+
+/* ============================================================================
+ * CUSTOMERS / CRM / MEASUREMENTS
+ * ==========================================================================*/
+function renderCustomers(host) {
+  api('getCustomers', state.token, window.__custSearch || '').then(function (rows) {
+    host.innerHTML = '<div class="toolbar"><div class="left"><div class="searchBox"><input type="text" id="custSearch" placeholder="Search customers…" value="' + (window.__custSearch || '') + '"></div></div>' +
+      '<button class="btn btn-accent" onclick="openCustomerForm()">+ New Customer</button></div>' +
+      renderTable([
+        { label: 'Name', render: function (c) { return '<a onclick="openCustomerProfile(\'' + c.CustomerID + '\')" style="text-decoration:underline;cursor:pointer;font-weight:700;">' + esc(c.Name) + '</a>' + (c.IsRegular ? ' <span class="badge badge-completed">Regular</span>' : ''); } },
+        { label: 'Phone', key: 'Phone' }, { label: 'Email', key: 'Email' },
+        { label: 'Loyalty Pts', key: 'LoyaltyPoints' }, { label: 'Joined', render: function (c) { return fmtDateShort(c.DateJoined); } },
+        { label: '', render: function (c) { return '<button class="btn-sm btn-outline" onclick="openCustomerProfile(\'' + c.CustomerID + '\')">View</button>'; } }
+      ], rows, 'customers-table');
+    var s = document.getElementById('custSearch');
+    s.addEventListener('input', debounce(function (e) { window.__custSearch = e.target.value; renderCustomers(host); }, 300));
+    s.focus(); s.setSelectionRange(s.value.length, s.value.length);
+  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+}
+function openCustomerForm(existing) {
+  openModal('<div class="modalHead"><h3>' + (existing ? 'Edit Customer' : 'New Customer') + '</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
+    '<form id="customerForm"><div class="field"><label>Name</label><input type="text" name="Name" required value="' + (existing ? esc(existing.Name) : '') + '"></div>' +
+    '<div class="form-row"><div class="field"><label>Phone</label><input type="tel" name="Phone" value="' + (existing ? esc(existing.Phone) : '') + '"></div>' +
+    '<div class="field"><label>Email</label><input type="email" name="Email" value="' + (existing ? esc(existing.Email) : '') + '"></div></div>' +
+    '<div class="field"><label>Notes</label><textarea name="Notes">' + (existing ? esc(existing.Notes) : '') + '</textarea></div>' +
+    '<input type="hidden" name="CustomerID" value="' + (existing ? existing.CustomerID : '') + '">' +
+    '<button class="btn btn-block btn-accent" type="submit">Save</button></form>');
+  document.getElementById('customerForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var payload = Object.fromEntries(new FormData(e.target).entries());
+    api('saveCustomer', state.token, payload).then(function () { toast('Customer saved.', 'success'); closeModal(); renderCustomers(document.getElementById('adminContent')); }).catch(toastError);
+  });
+}
+function openCustomerProfile(customerId) {
+  api('getCustomerProfile', state.token, customerId).then(function (p) {
+    var c = p.customer;
+    openModal('<div class="modalHead"><h3>' + esc(c.Name) + '</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
+      '<div class="form-row"><div><div class="muted">Phone</div><strong>' + esc(c.Phone) + '</strong></div><div><div class="muted">Loyalty Points</div><strong>' + c.LoyaltyPoints + '</strong></div>' +
+      '<div><div class="muted">Customer Since</div><strong>' + fmtDateShort(c.DateJoined) + '</strong></div></div>' +
+      '<div style="margin-top:8px;"><button class="btn btn-sm btn-outline" onclick="closeModal();openCustomerForm(' + JSON.stringify(c).replace(/"/g, '&quot;') + ')">Edit Details</button></div>' +
+      '<div class="panelHead" style="margin-top:22px;"><h4 style="margin:0;">Measurement Profiles</h4><button class="btn btn-sm" onclick="openMeasurementForm(\'' + customerId + '\')">+ Add Profile</button></div>' +
+      (p.measurements.length ? p.measurements.map(function (m) { return renderMeasurementBlock(m) + '<div style="margin:-8px 0 12px;"><button class="btn-sm btn-outline" onclick="openMeasurementForm(\'' + customerId + '\', ' + JSON.stringify(m).replace(/"/g, '&quot;') + ')">Edit</button> <button class="btn-sm btn-danger" onclick="deleteMeasurementUi(\'' + m.MeasurementID + '\',\'' + customerId + '\')">Delete</button></div>'; }).join('') : '<p class="muted">No measurement profiles yet.</p>') +
+      '<h4 style="margin-top:22px;">Order History</h4>' + (p.orders.length ? p.orders.map(function (o) { return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0ee;font-size:.85rem;"><span>' + esc(o.Reference) + ' — ' + esc(o.ServiceName) + '</span><span class="' + badgeClass(o.Status) + '">' + o.Status + '</span></div>'; }).join('') : '<p class="muted">No orders yet.</p>') +
+      '<h4 style="margin-top:22px;">Appointment History</h4>' + (p.appointments.length ? p.appointments.map(function (a) { return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0ee;font-size:.85rem;"><span>' + fmtDateShort(a.Date) + ' — ' + esc(a.Type) + '</span><span class="' + badgeClass(a.Status) + '">' + a.Status + '</span></div>'; }).join('') : '<p class="muted">No appointments yet.</p>')
+      , { wide: true });
+  }).catch(toastError);
+}
+function openMeasurementForm(customerId, existing) {
+  api('getMeasurementTemplates').then(function (templates) {
+    var fields = existing ? existing.FieldsParsed : {};
+    openModal('<div class="modalHead"><h3>' + (existing ? 'Edit' : 'Add') + ' Measurement Profile</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
+      '<form id="measureForm">' +
+      '<div class="form-row"><div class="field"><label>Profile Name</label><input type="text" name="ProfileName" required placeholder="e.g. Wedding Suit" value="' + (existing ? esc(existing.ProfileName) : '') + '"></div>' +
+      '<div class="field"><label>Garment Template</label><select id="garmentTemplate"><option value="">Custom / blank</option>' + Object.keys(templates).map(function (g) { return '<option value="' + esc(g) + '"' + (existing && existing.Garment === g ? ' selected' : '') + '>' + esc(g) + '</option>'; }).join('') + '</select></div></div>' +
+      '<div class="field"><label>Gender</label><select name="Gender"><option value="">—</option><option' + (existing && existing.Gender === 'Male' ? ' selected' : '') + '>Male</option><option' + (existing && existing.Gender === 'Female' ? ' selected' : '') + '>Female</option><option' + (existing && existing.Gender === 'Kids' ? ' selected' : '') + '>Kids</option></select></div>' +
+      '<label>Measurements (' + (state.settings.MeasurementUnit || 'inches') + ')</label><div id="measureFields">' + Object.keys(fields).map(function (k) { return measureFieldRow(k, fields[k]); }).join('') + '</div>' +
+      '<button type="button" class="btn-sm btn-outline" onclick="addMeasureFieldRow()">+ Add measurement field</button>' +
+      '<div class="field" style="margin-top:14px;"><label>Notes</label><textarea name="Notes">' + (existing ? esc(existing.Notes) : '') + '</textarea></div>' +
+      '<input type="hidden" name="MeasurementID" value="' + (existing ? existing.MeasurementID : '') + '">' +
+      '<input type="hidden" name="CustomerID" value="' + customerId + '">' +
+      '<button class="btn btn-block btn-accent" type="submit" style="margin-top:10px;">Save Measurements</button></form>', { wide: true });
+    function fillFromTemplate() {
+      var g = document.getElementById('garmentTemplate').value;
+      if (!g || !templates[g] || !templates[g].length) return;
+      document.getElementById('measureFields').innerHTML = templates[g].map(function (k) { return measureFieldRow(k, ''); }).join('');
+    }
+    document.getElementById('garmentTemplate').addEventListener('change', fillFromTemplate);
+    document.getElementById('measureForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var fd = new FormData(e.target);
+      var payload = Object.fromEntries(fd.entries());
+      var fieldsObj = {};
+      document.querySelectorAll('#measureFields .measureFieldRow').forEach(function (row) {
+        var k = row.querySelector('.mf-key').value.trim();
+        var v = row.querySelector('.mf-val').value.trim();
+        if (k) fieldsObj[k] = v;
+      });
+      payload.Fields = JSON.stringify(fieldsObj);
+      payload.Garment = document.getElementById('garmentTemplate').value;
+      api('saveMeasurement', state.token, payload).then(function () { toast('Measurements saved.', 'success'); closeModal(); openCustomerProfile(customerId); }).catch(toastError);
+    });
+  }).catch(toastError);
+}
+function measureFieldRow(key, val) {
+  return '<div class="measureFieldRow"><input class="mf-key" placeholder="Field (e.g. Chest)" value="' + esc(key || '') + '">' +
+    '<input class="mf-val" placeholder="Value" value="' + esc(val || '') + '">' +
+    '<button type="button" class="btn-icon" onclick="this.parentElement.remove()">✕</button></div>';
+}
+function addMeasureFieldRow() {
+  document.getElementById('measureFields').insertAdjacentHTML('beforeend', measureFieldRow('', ''));
+}
+function deleteMeasurementUi(id, customerId) {
+  if (!confirm('Delete this measurement profile?')) return;
+  api('deleteMeasurement', state.token, id).then(function () { toast('Deleted.', 'success'); openCustomerProfile(customerId); }).catch(toastError);
+}
+
+/* ============================================================================
+ * POINT OF SALE
+ * ==========================================================================*/
+var posProducts = [];
+function renderPOS(host) {
+  api('getProducts', state.token).then(function (products) {
+    posProducts = products;
+    host.innerHTML = '<div class="posLayout"><div>' +
+      '<div class="searchBox" style="margin-bottom:14px;"><input type="text" id="posSearch" placeholder="Search fabric, accessories…" style="width:100%;"></div>' +
+      '<div class="posItemGrid" id="posItemGrid"></div></div>' +
+      '<div class="cartBox"><h3>Cart</h3><div id="cartLines"></div><div id="cartCustomer"></div><div class="cartTotals" id="cartTotals"></div>' +
+      '<div class="field" style="margin-top:12px;"><label>Payment Method</label><select id="posPaymentMethod">' + PAYMENT_METHODS_JS.map(function (m) { return '<option>' + m + '</option>'; }).join('') + '</select></div>' +
+      '<div class="field"><label>Discount (' + (state.settings.Currency || 'GH₵') + ')</label><input type="number" id="posDiscount" value="0" step="0.01"></div>' +
+      '<div class="field"><label>Customer phone (optional, for receipt &amp; points)</label><input type="tel" id="posCustPhone" placeholder="024XXXXXXX"></div>' +
+      '<div class="field"><label>Customer name (if new)</label><input type="text" id="posCustName" placeholder="Walk-in customer"></div>' +
+      '<button class="btn btn-block btn-accent" onclick="checkoutSale()">Complete Sale</button></div></div>';
+    renderPosItems();
+    renderCart();
+    document.getElementById('posSearch').addEventListener('input', debounce(renderPosItems, 200));
+  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+}
+function renderPosItems() {
+  var q = (document.getElementById('posSearch').value || '').toLowerCase();
+  var filtered = posProducts.filter(function (p) { return !q || p.Name.toLowerCase().indexOf(q) > -1 || p.Category.toLowerCase().indexOf(q) > -1; });
+  document.getElementById('posItemGrid').innerHTML = filtered.map(function (p) {
+    var out = Number(p.QuantityInStock) <= 0;
+    return '<div class="posItem' + (out ? ' outOfStock' : '') + '" onclick="' + (out ? '' : 'addToCart(\'' + p.ProductID + '\')') + '"><div class="thumb" style="background-image:url(\'' + (p.ImageURL || '') + '\')"></div>' +
+      '<div class="nm">' + esc(p.Name) + '</div><div class="pr">' + fmtMoney(p.SellingPrice) + ' / ' + esc(p.Unit) + '</div>' +
+      '<div class="muted" style="font-size:.72rem;">' + (out ? 'Out of stock' : p.QuantityInStock + ' in stock') + '</div></div>';
+  }).join('') || '<div class="emptyState">No items found.</div>';
+}
+function addToCart(productId) {
+  var existing = state.cart.find(function (c) { return c.productId === productId; });
+  if (existing) existing.qty += 1; else state.cart.push({ productId: productId, qty: 1 });
+  renderCart();
+}
+function renderCart() {
+  var products = keyByJs(posProducts, 'ProductID');
+  document.getElementById('cartLines').innerHTML = state.cart.length ? state.cart.map(function (line) {
+    var p = products[line.productId];
+    if (!p) return '';
+    return '<div class="cartLine"><span>' + esc(p.Name) + '</span><div class="qtyCtrl"><button onclick="changeQty(\'' + line.productId + '\',-1)">−</button><span>' + line.qty + '</span><button onclick="changeQty(\'' + line.productId + '\',1)">+</button></div><span>' + fmtMoney(p.SellingPrice * line.qty) + '</span></div>';
+  }).join('') : '<div class="emptyState" style="padding:20px 0;">Cart is empty</div>';
+  updateCartTotals();
+}
+function changeQty(productId, delta) {
+  var line = state.cart.find(function (c) { return c.productId === productId; });
+  if (!line) return;
+  line.qty += delta;
+  if (line.qty <= 0) state.cart = state.cart.filter(function (c) { return c.productId !== productId; });
+  renderCart();
+}
+function keyByJs(rows, field) { var m = {}; rows.forEach(function (r) { m[r[field]] = r; }); return m; }
+function updateCartTotals() {
+  var products = keyByJs(posProducts, 'ProductID');
+  var subtotal = state.cart.reduce(function (sum, l) { var p = products[l.productId]; return sum + (p ? p.SellingPrice * l.qty : 0); }, 0);
+  var discount = Number((document.getElementById('posDiscount') || {}).value || 0);
+  var taxRate = Number(state.settings.TaxRatePercent) || 0;
+  var taxable = Math.max(0, subtotal - discount);
+  var tax = taxable * taxRate / 100;
+  var total = taxable + tax;
+  var el = document.getElementById('cartTotals');
+  if (el) el.innerHTML = '<div class="row"><span>Subtotal</span><span>' + fmtMoney(subtotal) + '</span></div>' +
+    '<div class="row"><span>Discount</span><span>-' + fmtMoney(discount) + '</span></div>' +
+    (taxRate ? '<div class="row"><span>Tax (' + taxRate + '%)</span><span>' + fmtMoney(tax) + '</span></div>' : '') +
+    '<div class="row grand"><span>Total</span><span>' + fmtMoney(total) + '</span></div>';
+}
+document.addEventListener('input', function (e) { if (e.target && e.target.id === 'posDiscount') updateCartTotals(); });
+function checkoutSale() {
+  if (!state.cart.length) { toast('Cart is empty.', 'error'); return; }
+  var payload = {
+    items: state.cart, discount: document.getElementById('posDiscount').value, paymentMethod: document.getElementById('posPaymentMethod').value,
+    customerPhone: document.getElementById('posCustPhone').value, customerName: document.getElementById('posCustName').value
+  };
+  api('createSale', state.token, payload).then(function (res) {
+    toast('Sale completed — ' + fmtMoney(res.sale.Total) + (res.pointsEarned ? ' · +' + res.pointsEarned + ' pts' : ''), 'success');
+    state.cart = [];
+    renderPOS(document.getElementById('adminContent'));
+  }).catch(toastError);
+}
+
+/* ============================================================================
+ * SERVICES ADMIN
+ * ==========================================================================*/
+function renderServicesAdmin(host) {
+  api('getServices', state.token).then(function (rows) {
+    host.innerHTML = '<div class="toolbar"><div class="left"><div class="searchBox"><input type="text" id="svcSearch" placeholder="Search services…"></div></div>' +
+      '<button class="btn btn-accent" onclick="openServiceForm()">+ New Service</button></div>' +
+      renderTable([
+        { label: '', render: function (s) { return s.ImageURL ? '<img src="' + s.ImageURL + '" style="width:40px;height:40px;object-fit:cover;border-radius:6px;">' : ''; } },
+        { label: 'Name', key: 'Name' }, { label: 'Category', key: 'Category' }, { label: 'Price', render: function (s) { return fmtMoney(s.Price); } },
+        { label: 'Turnaround', render: function (s) { return s.TurnaroundDays + ' days'; } },
+        { label: 'Active', render: function (s) { return '<span class="' + (s.Active === 'Y' ? 'badge badge-completed' : 'badge badge-cancelled') + '">' + (s.Active === 'Y' ? 'Active' : 'Hidden') + '</span>'; } },
+        { label: '', render: function (s) { return '<div class="rowActions"><button class="btn-sm btn-outline" onclick=\'openServiceForm(' + JSON.stringify(s).replace(/'/g, "&apos;") + ')\'>Edit</button><button class="btn-sm btn-danger" onclick="deleteServiceUi(\'' + s.ServiceID + '\')">Delete</button></div>'; } }
+      ], rows, 'services-table');
+    document.getElementById('svcSearch').addEventListener('input', debounce(function (e) {
+      var q = e.target.value.toLowerCase();
+      var filtered = rows.filter(function (s) { return s.Name.toLowerCase().indexOf(q) > -1; });
+      document.querySelector('#adminContent .tableWrap').outerHTML = renderTable([
+        { label: '', render: function (s) { return s.ImageURL ? '<img src="' + s.ImageURL + '" style="width:40px;height:40px;object-fit:cover;border-radius:6px;">' : ''; } },
+        { label: 'Name', key: 'Name' }, { label: 'Category', key: 'Category' }, { label: 'Price', render: function (s) { return fmtMoney(s.Price); } },
+        { label: 'Turnaround', render: function (s) { return s.TurnaroundDays + ' days'; } },
+        { label: 'Active', render: function (s) { return '<span class="' + (s.Active === 'Y' ? 'badge badge-completed' : 'badge badge-cancelled') + '">' + (s.Active === 'Y' ? 'Active' : 'Hidden') + '</span>'; } },
+        { label: '', render: function (s) { return '<div class="rowActions"><button class="btn-sm btn-outline" onclick=\'openServiceForm(' + JSON.stringify(s).replace(/'/g, "&apos;") + ')\'>Edit</button><button class="btn-sm btn-danger" onclick="deleteServiceUi(\'' + s.ServiceID + '\')">Delete</button></div>'; } }
+      ], filtered, 'services-table');
+    }, 250));
+  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+}
+function openServiceForm(existing) {
+  var cats = String(state.settings.ServiceCategories || '').split(',').map(function (c) { return c.trim(); }).filter(Boolean);
+  openModal('<div class="modalHead"><h3>' + (existing ? 'Edit Service' : 'New Service') + '</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
+    '<form id="svcForm"><div class="field"><label>Name</label><input type="text" name="Name" required value="' + (existing ? esc(existing.Name) : '') + '"></div>' +
+    '<div class="form-row"><div class="field"><label>Category</label><select name="Category">' + cats.map(function (c) { return '<option' + (existing && existing.Category === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select></div>' +
+    '<div class="field"><label>Price (' + (state.settings.Currency || 'GH₵') + ')</label><input type="number" step="0.01" name="Price" required value="' + (existing ? existing.Price : '') + '"></div></div>' +
+    '<div class="field"><label>Typical Turnaround (days)</label><input type="number" name="TurnaroundDays" required value="' + (existing ? existing.TurnaroundDays : 7) + '"></div>' +
+    '<div class="field"><label>Description</label><textarea name="Description">' + (existing ? esc(existing.Description) : '') + '</textarea></div>' +
+    '<div class="field"><label>Photo</label><input type="file" id="svcImageFile" accept="image/*">' + (existing && existing.ImageURL ? '<img src="' + existing.ImageURL + '" style="max-width:100px;margin-top:8px;border-radius:8px;">' : '') + '</div>' +
+    '<div class="check-row"><input type="checkbox" name="Active" id="svcActive" value="Y"' + (!existing || existing.Active === 'Y' ? ' checked' : '') + '><label for="svcActive" style="margin:0;">Visible on website</label></div>' +
+    '<input type="hidden" name="ServiceID" value="' + (existing ? existing.ServiceID : '') + '">' +
+    '<button class="btn btn-block btn-accent" type="submit">Save</button></form>');
+  document.getElementById('svcForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var fd = new FormData(e.target);
+    var payload = Object.fromEntries(fd.entries());
+    payload.Active = fd.get('Active') ? 'Y' : 'N';
+    var fileInput = document.getElementById('svcImageFile');
+    var save = function (url) {
+      if (url) payload.ImageURL = url;
+      api('saveService', state.token, payload).then(function () { toast('Service saved.', 'success'); closeModal(); renderServicesAdmin(document.getElementById('adminContent')); }).catch(toastError);
+    };
+    if (fileInput.files[0]) {
+      var reader = new FileReader();
+      reader.onload = function () { api('uploadImage', state.token, reader.result, fileInput.files[0].name, fileInput.files[0].type).then(function (r) { save(r.url); }).catch(function (err) { toastError(err); save(''); }); };
+      reader.readAsDataURL(fileInput.files[0]);
+    } else { save(''); }
+  });
+}
+function deleteServiceUi(id) {
+  if (!confirm('Delete this service?')) return;
+  api('deleteService', state.token, id).then(function () { toast('Deleted.', 'success'); renderServicesAdmin(document.getElementById('adminContent')); }).catch(toastError);
+}
+
+/* ============================================================================
+ * STAFF ADMIN
+ * ==========================================================================*/
+function renderStaffAdmin(host) {
+  api('getStaff', state.token).then(function (rows) {
+    host.innerHTML = '<div class="toolbar"><div></div><button class="btn btn-accent" onclick="openStaffForm()">+ New Staff Member</button></div>' +
+      '<div class="grid grid-4">' + rows.map(function (s) {
+        return '<div class="card staffCard"><img class="photo" src="' + (s.PhotoURL || '') + '"><h3 style="font-size:1rem;">' + esc(s.Name) + '</h3>' +
+          '<div class="role">' + esc(s.Role) + '</div><div class="spec">' + esc(s.Specialties || '') + '</div>' +
+          '<div class="muted" style="margin-top:6px;">' + esc(s.Phone || '') + '</div>' +
+          '<div style="margin-top:10px;display:flex;gap:6px;justify-content:center;"><button class="btn-sm btn-outline" onclick=\'openStaffForm(' + JSON.stringify(s).replace(/'/g, "&apos;") + ')\'>Edit</button>' +
+          '<button class="btn-sm btn-outline" onclick="openLeaveManager(\'' + s.StaffID + '\',\'' + esc(s.Name).replace(/'/g, "\\'") + '\')">Leave</button></div></div>';
+      }).join('') + '</div>';
+  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+}
+function openStaffForm(existing) {
+  openModal('<div class="modalHead"><h3>' + (existing ? 'Edit Staff' : 'New Staff Member') + '</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
+    '<form id="staffForm"><div class="form-row"><div class="field"><label>Name</label><input type="text" name="Name" required value="' + (existing ? esc(existing.Name) : '') + '"></div>' +
+    '<div class="field"><label>Role</label><select name="Role">' + ['Master Tailor', 'Tailor', 'Seamstress', 'Cutter', 'Apprentice', 'Manager', 'Receptionist'].map(function (r) { return '<option' + (existing && existing.Role === r ? ' selected' : '') + '>' + r + '</option>'; }).join('') + '</select></div></div>' +
+    '<div class="form-row"><div class="field"><label>Phone</label><input type="tel" name="Phone" value="' + (existing ? esc(existing.Phone) : '') + '"></div>' +
+    '<div class="field"><label>Commission Rate (%)</label><input type="number" name="CommissionRate" value="' + (existing ? existing.CommissionRate : 10) + '"></div></div>' +
+    '<div class="field"><label>Specialties</label><input type="text" name="Specialties" placeholder="e.g. Suits, Agbada" value="' + (existing ? esc(existing.Specialties) : '') + '"></div>' +
+    '<div class="field"><label>Work Days</label><div style="display:flex;gap:8px;flex-wrap:wrap;">' + ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(function (d) {
+      var checked = existing ? String(existing.WorkDays || '').split(',').indexOf(d) > -1 : d !== 'Sun';
+      return '<label style="display:flex;align-items:center;gap:4px;font-weight:400;"><input type="checkbox" class="workDayCk" value="' + d + '"' + (checked ? ' checked' : '') + '>' + d + '</label>';
+    }).join('') + '</div></div>' +
+    '<div class="field"><label>Photo</label><input type="file" id="staffPhotoFile" accept="image/*">' + (existing && existing.PhotoURL ? '<img src="' + existing.PhotoURL + '" style="max-width:80px;margin-top:8px;border-radius:50%;">' : '') + '</div>' +
+    '<div class="check-row"><input type="checkbox" name="Active" id="staffActive" value="Y"' + (!existing || existing.Active === 'Y' ? ' checked' : '') + '><label for="staffActive" style="margin:0;">Active</label></div>' +
+    '<input type="hidden" name="StaffID" value="' + (existing ? existing.StaffID : '') + '">' +
+    '<button class="btn btn-block btn-accent" type="submit">Save</button></form>');
+  document.getElementById('staffForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var fd = new FormData(e.target);
+    var payload = Object.fromEntries(fd.entries());
+    payload.Active = fd.get('Active') ? 'Y' : 'N';
+    payload.WorkDays = Array.from(document.querySelectorAll('.workDayCk:checked')).map(function (c) { return c.value; }).join(',');
+    var fileInput = document.getElementById('staffPhotoFile');
+    var save = function (url) {
+      if (url) payload.PhotoURL = url;
+      api('saveStaff', state.token, payload).then(function () { toast('Staff saved.', 'success'); closeModal(); renderStaffAdmin(document.getElementById('adminContent')); }).catch(toastError);
+    };
+    if (fileInput.files[0]) {
+      var reader = new FileReader();
+      reader.onload = function () { api('uploadImage', state.token, reader.result, fileInput.files[0].name, fileInput.files[0].type).then(function (r) { save(r.url); }).catch(function (err) { toastError(err); save(''); }); };
+      reader.readAsDataURL(fileInput.files[0]);
+    } else { save(''); }
+  });
+}
+function openLeaveManager(staffId, name) {
+  api('getStaffLeave', state.token, staffId).then(function (rows) {
+    openModal('<div class="modalHead"><h3>Leave — ' + esc(name) + '</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
+      '<div class="form-row"><div class="field"><input type="date" id="leaveDate"></div><div class="field"><input type="text" id="leaveReason" placeholder="Reason"></div>' +
+      '<div class="field" style="flex:0 0 auto;"><button class="btn btn-sm" onclick="addLeaveUi(\'' + staffId + '\',\'' + esc(name).replace(/'/g, "\\'") + '\')">Add</button></div></div>' +
+      '<div>' + rows.map(function (l) { return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f0f0ee;"><span>' + fmtDateShort(l.Date) + ' — ' + esc(l.Reason || '') + '</span><button class="btn-sm btn-danger" onclick="removeLeaveUi(\'' + l.LeaveID + '\',\'' + staffId + '\',\'' + esc(name).replace(/'/g, "\\'") + '\')">✕</button></div>'; }).join('') + '</div>');
+  }).catch(toastError);
+}
+function addLeaveUi(staffId, name) {
+  var date = document.getElementById('leaveDate').value, reason = document.getElementById('leaveReason').value;
+  if (!date) { toast('Pick a date.', 'error'); return; }
+  api('addStaffLeave', state.token, staffId, date, reason).then(function () { openLeaveManager(staffId, name); }).catch(toastError);
+}
+function removeLeaveUi(leaveId, staffId, name) {
+  api('removeStaffLeave', state.token, leaveId).then(function () { openLeaveManager(staffId, name); }).catch(toastError);
+}
+
+/* ============================================================================
+ * INVENTORY (fabrics & accessories)
+ * ==========================================================================*/
+function renderInventory(host) {
+  api('getProducts', state.token).then(function (rows) {
+    host.innerHTML = '<div class="toolbar"><div></div><button class="btn btn-accent" onclick="openProductForm()">+ New Item</button></div>' +
+      renderTable([
+        { label: '', render: function (p) { return p.ImageURL ? '<img src="' + p.ImageURL + '" style="width:36px;height:36px;object-fit:cover;border-radius:6px;">' : ''; } },
+        { label: 'Name', key: 'Name' }, { label: 'Category', key: 'Category' },
+        { label: 'Stock', render: function (p) { return '<span style="' + (Number(p.QuantityInStock) <= Number(p.ReorderLevel) ? 'color:#c0392b;font-weight:700;' : '') + '">' + p.QuantityInStock + ' ' + esc(p.Unit || '') + '</span>'; } },
+        { label: 'Cost', render: function (p) { return fmtMoney(p.CostPrice); } }, { label: 'Sell', render: function (p) { return fmtMoney(p.SellingPrice); } },
+        { label: '', render: function (p) { return '<div class="rowActions"><button class="btn-sm btn-outline" onclick="restockUi(\'' + p.ProductID + '\')">Restock</button><button class="btn-sm btn-outline" onclick=\'openProductForm(' + JSON.stringify(p).replace(/'/g, "&apos;") + ')\'>Edit</button><button class="btn-sm btn-danger" onclick="deleteProductUi(\'' + p.ProductID + '\')">Delete</button></div>'; } }
+      ], rows, 'inventory-table');
+  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+}
+function openProductForm(existing) {
+  openModal('<div class="modalHead"><h3>' + (existing ? 'Edit Item' : 'New Item') + '</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
+    '<form id="productForm"><div class="form-row"><div class="field"><label>Name</label><input type="text" name="Name" required value="' + (existing ? esc(existing.Name) : '') + '"></div>' +
+    '<div class="field"><label>Category</label><select name="Category">' + ['Fabric', 'Accessories', 'Notions', 'Ready-to-Wear'].map(function (c) { return '<option' + (existing && existing.Category === c ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select></div></div>' +
+    '<div class="form-row"><div class="field"><label>Unit</label><select name="Unit">' + ['Yard', 'Piece', 'Set', 'Meter'].map(function (u) { return '<option' + (existing && existing.Unit === u ? ' selected' : '') + '>' + u + '</option>'; }).join('') + '</select></div>' +
+    '<div class="field"><label>Reorder Level</label><input type="number" name="ReorderLevel" value="' + (existing ? existing.ReorderLevel : 5) + '"></div></div>' +
+    '<div class="form-row"><div class="field"><label>Cost Price</label><input type="number" step="0.01" name="CostPrice" required value="' + (existing ? existing.CostPrice : '') + '"></div>' +
+    '<div class="field"><label>Selling Price</label><input type="number" step="0.01" name="SellingPrice" required value="' + (existing ? existing.SellingPrice : '') + '"></div></div>' +
+    '<div class="field"><label>Quantity In Stock</label><input type="number" name="QuantityInStock" required value="' + (existing ? existing.QuantityInStock : 0) + '"></div>' +
+    '<div class="field"><label>Photo</label><input type="file" id="prodImageFile" accept="image/*"></div>' +
+    '<input type="hidden" name="ProductID" value="' + (existing ? existing.ProductID : '') + '">' +
+    '<button class="btn btn-block btn-accent" type="submit">Save</button></form>');
+  document.getElementById('productForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var fd = new FormData(e.target);
+    var payload = Object.fromEntries(fd.entries());
+    var fileInput = document.getElementById('prodImageFile');
+    var save = function (url) {
+      if (url) payload.ImageURL = url;
+      api('saveProduct', state.token, payload).then(function () { toast('Item saved.', 'success'); closeModal(); renderInventory(document.getElementById('adminContent')); }).catch(toastError);
+    };
+    if (fileInput.files[0]) {
+      var reader = new FileReader();
+      reader.onload = function () { api('uploadImage', state.token, reader.result, fileInput.files[0].name, fileInput.files[0].type).then(function (r) { save(r.url); }).catch(function (err) { toastError(err); save(''); }); };
+      reader.readAsDataURL(fileInput.files[0]);
+    } else { save(''); }
+  });
+}
+function restockUi(productId) {
+  var qty = prompt('Add how many units to stock?');
+  if (!qty || isNaN(Number(qty))) return;
+  api('restockProduct', state.token, productId, Number(qty)).then(function () { toast('Stock updated.', 'success'); renderInventory(document.getElementById('adminContent')); }).catch(toastError);
+}
+function deleteProductUi(id) {
+  if (!confirm('Delete this item?')) return;
+  api('deleteProduct', state.token, id).then(function () { toast('Deleted.', 'success'); renderInventory(document.getElementById('adminContent')); }).catch(toastError);
+}
+
+/* ============================================================================
+ * EXPENSES
+ * ==========================================================================*/
+function renderExpenses(host) {
+  api('getExpenses', state.token, {}).then(function (rows) {
+    var total = rows.reduce(function (sum, e) { return sum + Number(e.Amount); }, 0);
+    host.innerHTML = '<div class="statGrid" style="grid-template-columns:repeat(2,1fr);"><div class="statCard"><div class="lbl">Total Expenses</div><div class="val">' + fmtMoney(total) + '</div></div>' +
+      '<div class="statCard"><div class="lbl">Records</div><div class="val">' + rows.length + '</div></div></div>' +
+      '<div class="toolbar"><div></div><div><button class="btn" onclick="exportCsv(\'exportExpensesCsv\',{})">Export CSV</button> <button class="btn btn-accent" onclick="openExpenseForm()">+ New Expense</button></div></div>' +
+      renderTable([
+        { label: 'Date', render: function (e) { return fmtDateShort(e.Date); } }, { label: 'Category', key: 'Category' },
+        { label: 'Description', key: 'Description' }, { label: 'Amount', render: function (e) { return fmtMoney(e.Amount); } },
+        { label: '', render: function (e) { return '<div class="rowActions"><button class="btn-sm btn-outline" onclick=\'openExpenseForm(' + JSON.stringify(e).replace(/'/g, "&apos;") + ')\'>Edit</button><button class="btn-sm btn-danger" onclick="deleteExpenseUi(\'' + e.ExpenseID + '\')">Delete</button></div>'; } }
+      ], rows, 'expenses-table');
+  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+}
+function openExpenseForm(existing) {
+  openModal('<div class="modalHead"><h3>' + (existing ? 'Edit Expense' : 'New Expense') + '</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
+    '<form id="expForm"><div class="form-row"><div class="field"><label>Date</label><input type="date" name="Date" value="' + (existing ? existing.Date : todayStr()) + '"></div>' +
+    '<div class="field"><label>Category</label><select name="Category">' + ['Rent', 'Utilities', 'Wages', 'Fabric Purchase', 'Transport', 'Marketing', 'Equipment', 'Other'].map(function (c) { return '<option' + (existing && existing.Category === c ? ' selected' : '') + '>' + c + '</option>'; }).join('') + '</select></div></div>' +
+    '<div class="field"><label>Amount</label><input type="number" step="0.01" name="Amount" required value="' + (existing ? existing.Amount : '') + '"></div>' +
+    '<div class="field"><label>Description</label><textarea name="Description">' + (existing ? esc(existing.Description) : '') + '</textarea></div>' +
+    '<input type="hidden" name="ExpenseID" value="' + (existing ? existing.ExpenseID : '') + '">' +
+    '<button class="btn btn-block btn-accent" type="submit">Save</button></form>');
+  document.getElementById('expForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var payload = Object.fromEntries(new FormData(e.target).entries());
+    api('saveExpense', state.token, payload).then(function () { toast('Expense saved.', 'success'); closeModal(); renderExpenses(document.getElementById('adminContent')); }).catch(toastError);
+  });
+}
+function deleteExpenseUi(id) {
+  if (!confirm('Delete this expense?')) return;
+  api('deleteExpense', state.token, id).then(function () { toast('Deleted.', 'success'); renderExpenses(document.getElementById('adminContent')); }).catch(toastError);
+}
+
+/* ============================================================================
+ * CHARTS (lightweight canvas — no external libraries)
+ * ==========================================================================*/
+var CHART_COLORS = ['#16213e', '#c9a227', '#0b5da3', '#1c7c3c', '#a34a06', '#6b21a8', '#c0392b', '#0d7d6f'];
+function renderLineChart(canvasId, data) {
+  var canvas = document.getElementById(canvasId);
+  if (!canvas || !data.length) return;
+  var dpr = window.devicePixelRatio || 1;
+  var w = canvas.clientWidth, h = canvas.clientHeight || 220;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  var ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
+  var pad = 34;
+  var max = Math.max.apply(null, data.map(function (d) { return d.amount; }).concat([1]));
+  ctx.clearRect(0, 0, w, h);
+  ctx.strokeStyle = '#eee'; ctx.lineWidth = 1;
+  for (var g = 0; g <= 4; g++) { var y = pad + (h - pad * 2) * g / 4; ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(w - 10, y); ctx.stroke(); }
+  ctx.beginPath(); ctx.strokeStyle = '#c9a227'; ctx.lineWidth = 2.4;
+  data.forEach(function (d, i) {
+    var x = pad + (w - pad - 20) * (data.length === 1 ? 0 : i / (data.length - 1));
+    var y = h - pad - (h - pad * 2) * (d.amount / max);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  ctx.fillStyle = '#c9a227';
+  data.forEach(function (d, i) {
+    var x = pad + (w - pad - 20) * (data.length === 1 ? 0 : i / (data.length - 1));
+    var y = h - pad - (h - pad * 2) * (d.amount / max);
+    ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+  });
+}
+function renderDonutChart(canvasId, slices) {
+  var canvas = document.getElementById(canvasId);
+  if (!canvas || !slices.length) return;
+  var dpr = window.devicePixelRatio || 1;
+  var size = Math.min(canvas.clientWidth, 220);
+  canvas.width = size * dpr; canvas.height = size * dpr;
+  var ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
+  var total = slices.reduce(function (s, x) { return s + x.amount; }, 0) || 1;
+  var cx = size / 2, cy = size / 2, r = size / 2 - 8, start = -Math.PI / 2;
+  slices.forEach(function (s, i) {
+    var angle = (s.amount / total) * Math.PI * 2;
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, r, start, start + angle); ctx.closePath();
+    ctx.fillStyle = CHART_COLORS[i % CHART_COLORS.length]; ctx.fill();
+    start += angle;
+  });
+  ctx.beginPath(); ctx.arc(cx, cy, r * 0.55, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill();
+}
+function renderBarChart(canvasId, data) {
+  var canvas = document.getElementById(canvasId);
+  if (!canvas || !data.length) return;
+  var dpr = window.devicePixelRatio || 1;
+  var w = canvas.clientWidth, h = canvas.clientHeight || 220;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  var ctx = canvas.getContext('2d'); ctx.scale(dpr, dpr);
+  var pad = 30;
+  var max = Math.max.apply(null, data.map(function (d) { return d.amount; }).concat([1]));
+  var barW = (w - pad * 2) / data.length * 0.6;
+  ctx.clearRect(0, 0, w, h);
+  data.forEach(function (d, i) {
+    var slot = (w - pad * 2) / data.length;
+    var x = pad + slot * i + (slot - barW) / 2;
+    var barH = (h - pad * 2) * (d.amount / max);
+    ctx.fillStyle = CHART_COLORS[i % CHART_COLORS.length];
+    ctx.fillRect(x, h - pad - barH, barW, barH);
+  });
+}
+function legendRow(items) {
+  return '<div class="legendRow">' + items.map(function (it, i) { return '<div class="lg"><span class="sw" style="background:' + CHART_COLORS[i % CHART_COLORS.length] + '"></span>' + esc(it.name || it.method) + ' — ' + fmtMoney(it.amount) + '</div>'; }).join('') + '</div>';
+}
+
+/* ============================================================================
+ * REPORTS
+ * ==========================================================================*/
+function renderReports(host) {
+  var dateFrom = window.__repFrom || Utilities_addDays(todayStr(), -30);
+  var dateTo = window.__repTo || todayStr();
+  host.innerHTML = '<div class="toolbar"><div class="left"><div class="field" style="margin:0;"><input type="date" id="repFrom" value="' + dateFrom + '"></div>' +
+    '<div class="field" style="margin:0;"><input type="date" id="repTo" value="' + dateTo + '"></div>' +
+    '<button class="btn btn-sm" onclick="loadReports()">Apply</button></div>' +
+    '<button class="btn" onclick="exportReportPdfUi()">Export PDF</button></div><div id="reportsBody"></div>';
+  loadReports();
+}
+function Utilities_addDays(dateStr, days) { var d = new Date(dateStr + 'T12:00:00'); d.setDate(d.getDate() + days); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function loadReports() {
+  window.__repFrom = document.getElementById('repFrom').value;
+  window.__repTo = document.getElementById('repTo').value;
+  api('getReports', state.token, { dateFrom: window.__repFrom, dateTo: window.__repTo }).then(function (r) {
+    document.getElementById('reportsBody').innerHTML =
+      '<div class="statGrid">' + statCard('Sales Revenue', fmtMoney(r.totalSalesRevenue)) + statCard('Orders Value', fmtMoney(r.totalOrdersValue)) +
+      statCard('Orders Collected', fmtMoney(r.totalOrdersCollected)) + statCard('Expenses', fmtMoney(r.totalExpenses)) + '</div>' +
+      '<div class="panel"><h3>Revenue Over Time</h3><div class="chartWrap"><canvas class="chartCanvas" id="chartRevenue" style="height:220px;"></canvas></div></div>' +
+      '<div class="twoCol"><div class="panel"><h3>Revenue by Service</h3><div class="chartWrap"><canvas class="chartCanvas" id="chartByService" style="height:200px;"></canvas></div>' + legendRow(r.revenueByService) + '</div>' +
+      '<div class="panel"><h3>Payment Methods</h3><div class="chartWrap" style="display:flex;justify-content:center;"><canvas class="chartCanvas" id="chartPayment" style="height:200px;width:200px;"></canvas></div>' + legendRow(r.paymentBreakdown) + '</div></div>' +
+      '<div class="panel"><h3>Revenue by Tailor</h3><div class="chartWrap"><canvas class="chartCanvas" id="chartByStaff" style="height:200px;"></canvas></div>' + legendRow(r.revenueByStaff) + '</div>';
+    setTimeout(function () {
+      renderLineChart('chartRevenue', r.revenueByDay);
+      renderBarChart('chartByService', r.revenueByService);
+      renderDonutChart('chartPayment', r.paymentBreakdown.map(function (p) { return { amount: p.amount }; }));
+      renderBarChart('chartByStaff', r.revenueByStaff);
+    }, 30);
+  }).catch(function (e) { document.getElementById('reportsBody').innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+}
+function exportReportPdfUi() {
+  api('exportReportPdf', state.token, { dateFrom: window.__repFrom, dateTo: window.__repTo }).then(function (res) {
+    var byteChars = atob(res.base64);
+    var byteNumbers = new Array(byteChars.length);
+    for (var i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+    var blob = new Blob([new Uint8Array(byteNumbers)], { type: 'application/pdf' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a'); a.href = url; a.download = res.filename; document.body.appendChild(a); a.click(); a.remove();
+  }).catch(toastError);
+}
+
+/* ============================================================================
+ * REVIEWS ADMIN
+ * ==========================================================================*/
+function renderReviewsAdmin(host) {
+  api('getReviews', state.token).then(function (rows) {
+    host.innerHTML = renderTable([
+      { label: 'Date', render: function (r) { return fmtDateShort(r.Date); } }, { label: 'Customer', key: 'CustomerName' }, { label: 'Tailor', key: 'StaffName' },
+      { label: 'Rating', render: function (r) { return '★'.repeat(Number(r.Rating)); } }, { label: 'Comment', key: 'Comment' },
+      { label: '', render: function (r) { return '<button class="btn-sm btn-danger" onclick="deleteReviewUi(\'' + r.ReviewID + '\')">Delete</button>'; } }
+    ], rows, 'reviews-table');
+  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+}
+function deleteReviewUi(id) {
+  if (!confirm('Delete this review?')) return;
+  api('deleteReview', state.token, id).then(function () { toast('Deleted.', 'success'); renderReviewsAdmin(document.getElementById('adminContent')); }).catch(toastError);
+}
+
+/* ============================================================================
+ * GALLERY (PORTFOLIO) ADMIN
+ * ==========================================================================*/
+function renderGalleryAdmin(host) {
+  api('getGallery', state.token).then(function (rows) {
+    host.innerHTML = '<div class="toolbar"><div></div><button class="btn btn-accent" onclick="openGalleryForm()">+ Add Photo</button></div>' +
+      '<div class="grid grid-4">' + rows.map(function (g) {
+        return '<div class="card"><img src="' + g.ImageURL + '" style="height:140px;width:100%;object-fit:cover;"><div style="padding:10px;"><strong style="font-size:.85rem;">' + esc(g.Caption) + '</strong><div class="muted">' + esc(g.Category) + '</div>' +
+          '<div style="margin-top:8px;display:flex;gap:6px;"><button class="btn-sm btn-outline" onclick=\'openGalleryForm(' + JSON.stringify(g).replace(/'/g, "&apos;") + ')\'>Edit</button><button class="btn-sm btn-danger" onclick="deleteGalleryUi(\'' + g.GalleryID + '\')">Delete</button></div></div></div>';
+      }).join('') + '</div>';
+  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+}
+function openGalleryForm(existing) {
+  var cats = String(state.settings.ServiceCategories || '').split(',').map(function (c) { return c.trim(); }).concat(['Our Shop']);
+  openModal('<div class="modalHead"><h3>' + (existing ? 'Edit Photo' : 'Add Photo') + '</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
+    '<form id="galForm"><div class="field"><label>Photo</label><input type="file" id="galImageFile" accept="image/*"' + (existing ? '' : ' required') + '>' + (existing ? '<img src="' + existing.ImageURL + '" style="max-width:120px;margin-top:8px;border-radius:8px;">' : '') + '</div>' +
+    '<div class="field"><label>Caption</label><input type="text" name="Caption" required value="' + (existing ? esc(existing.Caption) : '') + '"></div>' +
+    '<div class="field"><label>Category</label><select name="Category">' + cats.map(function (c) { return '<option' + (existing && existing.Category === c ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '</select></div>' +
+    '<input type="hidden" name="GalleryID" value="' + (existing ? existing.GalleryID : '') + '">' +
+    '<input type="hidden" name="ImageURL" value="' + (existing ? esc(existing.ImageURL) : '') + '">' +
+    '<button class="btn btn-block btn-accent" type="submit">Save</button></form>');
+  document.getElementById('galForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var fd = new FormData(e.target);
+    var payload = Object.fromEntries(fd.entries());
+    var fileInput = document.getElementById('galImageFile');
+    var save = function (url) {
+      if (url) payload.ImageURL = url;
+      api('saveGalleryItem', state.token, payload).then(function () { toast('Saved.', 'success'); closeModal(); renderGalleryAdmin(document.getElementById('adminContent')); }).catch(toastError);
+    };
+    if (fileInput.files[0]) {
+      var reader = new FileReader();
+      reader.onload = function () { api('uploadImage', state.token, reader.result, fileInput.files[0].name, fileInput.files[0].type).then(function (r) { save(r.url); }).catch(function (err) { toastError(err); }); };
+      reader.readAsDataURL(fileInput.files[0]);
+    } else { save(''); }
+  });
+}
+function deleteGalleryUi(id) {
+  if (!confirm('Delete this photo?')) return;
+  api('deleteGalleryItem', state.token, id).then(function () { toast('Deleted.', 'success'); renderGalleryAdmin(document.getElementById('adminContent')); }).catch(toastError);
+}
+
+/* ============================================================================
+ * HERO SLIDES ADMIN
+ * ==========================================================================*/
+function renderHeroAdmin(host) {
+  api('getHeroSlides', state.token).then(function (rows) {
+    host.innerHTML = '<div class="toolbar"><div></div><button class="btn btn-accent" onclick="openHeroForm()">+ Add Slide</button></div>' +
+      '<div class="grid grid-3">' + rows.map(function (h) {
+        return '<div class="card"><div style="height:140px;background-size:cover;background-position:center;background-image:url(\'' + h.ImageURL + '\')"></div><div style="padding:10px;">' +
+          '<strong style="font-size:.85rem;">' + esc(h.Title) + '</strong><div class="muted">' + esc(h.Subtitle) + '</div>' +
+          '<div style="margin-top:8px;display:flex;gap:6px;"><button class="btn-sm btn-outline" onclick=\'openHeroForm(' + JSON.stringify(h).replace(/'/g, "&apos;") + ')\'>Edit</button><button class="btn-sm btn-danger" onclick="deleteHeroUi(\'' + h.SlideID + '\')">Delete</button></div></div></div>';
+      }).join('') + '</div>';
+  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+}
+function openHeroForm(existing) {
+  openModal('<div class="modalHead"><h3>' + (existing ? 'Edit Slide' : 'Add Slide') + '</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
+    '<form id="heroForm"><div class="field"><label>Photo</label><input type="file" id="heroImageFile" accept="image/*"' + (existing ? '' : ' required') + '>' + (existing ? '<img src="' + existing.ImageURL + '" style="max-width:140px;margin-top:8px;border-radius:8px;">' : '') + '</div>' +
+    '<div class="field"><label>Title</label><input type="text" name="Title" required value="' + (existing ? esc(existing.Title) : '') + '"></div>' +
+    '<div class="field"><label>Subtitle</label><input type="text" name="Subtitle" value="' + (existing ? esc(existing.Subtitle) : '') + '"></div>' +
+    '<div class="form-row"><div class="field"><label>Button Text</label><input type="text" name="ButtonText" value="' + (existing ? esc(existing.ButtonText) : 'Book Now') + '"></div>' +
+    '<div class="field"><label>Button Link</label><input type="text" name="ButtonLink" value="' + (existing ? esc(existing.ButtonLink) : '#booking') + '"></div></div>' +
+    '<div class="field"><label>Sort Order</label><input type="number" name="SortOrder" value="' + (existing ? existing.SortOrder : 1) + '"></div>' +
+    '<div class="check-row"><input type="checkbox" name="Active" id="heroActive" value="Y"' + (!existing || existing.Active === 'Y' ? ' checked' : '') + '><label for="heroActive" style="margin:0;">Active</label></div>' +
+    '<input type="hidden" name="SlideID" value="' + (existing ? existing.SlideID : '') + '">' +
+    '<button class="btn btn-block btn-accent" type="submit">Save</button></form>');
+  document.getElementById('heroForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var fd = new FormData(e.target);
+    var payload = Object.fromEntries(fd.entries());
+    payload.Active = fd.get('Active') ? 'Y' : 'N';
+    var fileInput = document.getElementById('heroImageFile');
+    var save = function (url) {
+      if (url) payload.ImageURL = url;
+      api('saveHeroSlide', state.token, payload).then(function () { toast('Saved.', 'success'); closeModal(); renderHeroAdmin(document.getElementById('adminContent')); }).catch(toastError);
+    };
+    if (fileInput.files[0]) {
+      var reader = new FileReader();
+      reader.onload = function () { api('uploadImage', state.token, reader.result, fileInput.files[0].name, fileInput.files[0].type).then(function (r) { save(r.url); }).catch(function (err) { toastError(err); }); };
+      reader.readAsDataURL(fileInput.files[0]);
+    } else { save(''); }
+  });
+}
+function deleteHeroUi(id) {
+  if (!confirm('Delete this slide?')) return;
+  api('deleteHeroSlide', state.token, id).then(function () { toast('Deleted.', 'success'); renderHeroAdmin(document.getElementById('adminContent')); }).catch(toastError);
+}
+
+/* ============================================================================
+ * VIDEOS ADMIN
+ * ==========================================================================*/
+function renderVideosAdmin(host) {
+  api('getVideos', state.token).then(function (rows) {
+    host.innerHTML = '<div class="toolbar"><div></div><button class="btn btn-accent" onclick="openVideoForm()">+ Add Video</button></div>' +
+      '<div class="grid grid-3">' + rows.map(function (v) {
+        return '<div class="card"><div style="padding:10px;"><strong style="font-size:.85rem;">' + esc(v.Title) + '</strong><div class="muted">' + esc(v.Caption || '') + '</div>' +
+          '<div style="margin-top:8px;display:flex;gap:6px;"><button class="btn-sm btn-outline" onclick=\'openVideoForm(' + JSON.stringify(v).replace(/'/g, "&apos;") + ')\'>Edit</button><button class="btn-sm btn-danger" onclick="deleteVideoUi(\'' + v.VideoID + '\')">Delete</button></div></div></div>';
+      }).join('') + '</div>';
+  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+}
+function openVideoForm(existing) {
+  openModal('<div class="modalHead"><h3>' + (existing ? 'Edit Video' : 'Add Video') + '</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
+    '<form id="videoForm"><div class="field"><label>Video URL (direct .mp4 link)</label><input type="text" name="VideoURL" required value="' + (existing ? esc(existing.VideoURL) : '') + '"></div>' +
+    '<div class="field"><label>Title</label><input type="text" name="Title" required value="' + (existing ? esc(existing.Title) : '') + '"></div>' +
+    '<div class="field"><label>Caption</label><input type="text" name="Caption" value="' + (existing ? esc(existing.Caption) : '') + '"></div>' +
+    '<input type="hidden" name="VideoID" value="' + (existing ? existing.VideoID : '') + '">' +
+    '<button class="btn btn-block btn-accent" type="submit">Save</button></form>');
+  document.getElementById('videoForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var payload = Object.fromEntries(new FormData(e.target).entries());
+    api('saveVideo', state.token, payload).then(function () { toast('Saved.', 'success'); closeModal(); renderVideosAdmin(document.getElementById('adminContent')); }).catch(toastError);
+  });
+}
+function deleteVideoUi(id) {
+  if (!confirm('Delete this video?')) return;
+  api('deleteVideo', state.token, id).then(function () { toast('Deleted.', 'success'); renderVideosAdmin(document.getElementById('adminContent')); }).catch(toastError);
+}
+
+/* ============================================================================
+ * TRASH ADMIN
+ * ==========================================================================*/
+function renderTrashAdmin(host) {
+  var type = window.__trashType || '';
+  api('getTrash', state.token, type).then(function (rows) {
+    host.innerHTML = '<div class="toolbar"><div class="left"><select id="trashType"><option value="">All types</option><option value="Customers"' + (type === 'Customers' ? ' selected' : '') + '>Customers</option><option value="Orders"' + (type === 'Orders' ? ' selected' : '') + '>Orders</option></select></div>' +
+      '<button class="btn btn-danger" onclick="emptyTrashUi()">Empty Trash</button></div>' +
+      renderTable([
+        { label: 'Type', key: 'RecordType' }, { label: 'Record', render: function (t) { return esc(t.DataParsed.Name || t.DataParsed.Reference || t.RecordID); } },
+        { label: 'Deleted At', render: function (t) { return fmtDateShort(t.DeletedAt); } }, { label: 'Deleted By', key: 'DeletedBy' },
+        { label: '', render: function (t) { return '<div class="rowActions"><button class="btn-sm btn-outline" onclick="restoreTrashUi(\'' + t.TrashID + '\')">Restore</button><button class="btn-sm btn-danger" onclick="permaDeleteTrashUi(\'' + t.TrashID + '\')">Delete Forever</button></div>'; } }
+      ], rows, 'trash-table');
+    document.getElementById('trashType').addEventListener('change', function (e) { window.__trashType = e.target.value; renderTrashAdmin(host); });
+  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+}
+function restoreTrashUi(id) {
+  api('restoreTrashItems', state.token, [id]).then(function () { toast('Restored.', 'success'); renderTrashAdmin(document.getElementById('adminContent')); }).catch(toastError);
+}
+function permaDeleteTrashUi(id) {
+  if (!confirm('Permanently delete this record? This cannot be undone.')) return;
+  api('permanentlyDeleteTrash', state.token, [id]).then(function () { toast('Deleted permanently.', 'success'); renderTrashAdmin(document.getElementById('adminContent')); }).catch(toastError);
+}
+function emptyTrashUi() {
+  if (!confirm('Permanently delete everything in Trash? This cannot be undone.')) return;
+  api('emptyTrash', state.token, window.__trashType || '').then(function () { toast('Trash emptied.', 'success'); renderTrashAdmin(document.getElementById('adminContent')); }).catch(toastError);
+}
+
+/* ============================================================================
+ * SMS LOG ADMIN
+ * ==========================================================================*/
+function renderSmsAdmin(host) {
+  api('getSmsStats', state.token).then(function (s) {
+    host.innerHTML = '<div class="statGrid" style="grid-template-columns:repeat(3,1fr);">' + statCard('Sent', s.sent) + statCard('Failed', s.failed) + statCard('Provider Balance', s.balance === null ? '—' : s.balance) + '</div>' +
+      '<div class="panel"><div class="panelHead"><h3>Send Bulk SMS to Staff</h3></div>' +
+      '<div class="field"><textarea id="bulkSmsMsg" placeholder="Message to send…"></textarea></div>' +
+      '<button class="btn btn-accent" onclick="sendBulkSms()">Send to All Active Staff</button></div>' +
+      '<div class="panel"><h3>Recent Messages</h3>' + renderTable([
+        { label: 'Date', render: function (n) { return fmtDateShort(n.Date); } }, { label: 'To', key: 'Recipient' }, { label: 'Message', key: 'Message' }, { label: 'Status', key: 'Status' }
+      ], s.recent, 'sms-table') + '</div>';
+  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+}
+function sendBulkSms() {
+  var msg = document.getElementById('bulkSmsMsg').value.trim();
+  if (!msg) { toast('Enter a message.', 'error'); return; }
+  api('getStaff', state.token).then(function (staff) {
+    var ids = staff.filter(function (s) { return s.Active === 'Y'; }).map(function (s) { return s.StaffID; });
+    return api('sendStaffSms', state.token, ids, msg);
+  }).then(function (res) { toast('Sent to ' + res.sent + ' staff.', 'success'); renderSmsAdmin(document.getElementById('adminContent')); }).catch(toastError);
+}
+
+/* ============================================================================
+ * USERS ADMIN
+ * ==========================================================================*/
+function renderUsersAdmin(host) {
+  Promise.all([api('getUsers', state.token), api('getStaff', state.token)]).then(function (r) {
+    var users = r[0], staff = r[1];
+    host.innerHTML = '<div class="toolbar"><div></div><button class="btn btn-accent" onclick="openUserForm(null, ' + JSON.stringify(staff).replace(/"/g, '&quot;') + ')">+ New User</button></div>' +
+      renderTable([
+        { label: 'Username', key: 'Username' }, { label: 'Name', key: 'FullName' }, { label: 'Role', key: 'Role' }, { label: 'Email', key: 'Email' },
+        { label: 'Active', render: function (u) { return '<span class="' + (u.Active === 'Y' ? 'badge badge-completed' : 'badge badge-cancelled') + '">' + (u.Active === 'Y' ? 'Active' : 'Inactive') + '</span>'; } },
+        { label: '', render: function (u) { return '<div class="rowActions"><button class="btn-sm btn-outline" onclick=\'openUserForm(' + JSON.stringify(u).replace(/'/g, "&apos;") + ', ' + JSON.stringify(staff).replace(/'/g, "&apos;") + ')\'>Edit</button><button class="btn-sm btn-danger" onclick="deleteUserUi(\'' + u.Username + '\')">Delete</button></div>'; } }
+      ], users, 'users-table');
+  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+}
+function openUserForm(existing, staff) {
+  var staffOptions = staff.map(function (s) { return '<option value="' + s.StaffID + '"' + (existing && existing.StaffID === s.StaffID ? ' selected' : '') + '>' + esc(s.Name) + '</option>'; }).join('');
+  openModal('<div class="modalHead"><h3>' + (existing ? 'Edit User' : 'New User') + '</h3><button class="modalClose" onclick="closeModal()">&times;</button></div>' +
+    '<form id="userForm"><div class="form-row"><div class="field"><label>Username</label><input type="text" name="Username" required' + (existing ? ' readonly' : '') + ' value="' + (existing ? esc(existing.Username) : '') + '"></div>' +
+    '<div class="field"><label>Full Name</label><input type="text" name="FullName" value="' + (existing ? esc(existing.FullName) : '') + '"></div></div>' +
+    '<div class="form-row"><div class="field"><label>Role</label><select name="Role">' + ['Owner', 'Manager', 'Staff', 'Receptionist'].map(function (r) { return '<option' + (existing && existing.Role === r ? ' selected' : '') + '>' + r + '</option>'; }).join('') + '</select></div>' +
+    '<div class="field"><label>Linked Staff Member (optional)</label><select name="StaffID"><option value="">—</option>' + staffOptions + '</select></div></div>' +
+    '<div class="form-row"><div class="field"><label>Email</label><input type="email" name="Email" value="' + (existing ? esc(existing.Email) : '') + '"></div>' +
+    '<div class="field"><label>Phone</label><input type="tel" name="Phone" value="' + (existing ? esc(existing.Phone) : '') + '"></div></div>' +
+    '<div class="field"><label>' + (existing ? 'New Password (leave blank to keep current)' : 'Password') + '</label><input type="password" name="newPassword"' + (existing ? '' : ' required') + '></div>' +
+    '<div class="check-row"><input type="checkbox" name="Active" id="userActive" value="Y"' + (!existing || existing.Active === 'Y' ? ' checked' : '') + '><label for="userActive" style="margin:0;">Active</label></div>' +
+    '<button class="btn btn-block btn-accent" type="submit">Save</button></form>');
+  document.getElementById('userForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var fd = new FormData(e.target);
+    var payload = Object.fromEntries(fd.entries());
+    payload.Active = fd.get('Active') ? 'Y' : 'N';
+    api('saveUser', state.token, payload).then(function () { toast('User saved.', 'success'); closeModal(); renderUsersAdmin(document.getElementById('adminContent')); }).catch(toastError);
+  });
+}
+function deleteUserUi(username) {
+  if (!confirm('Delete this user account?')) return;
+  api('deleteUser', state.token, username).then(function () { toast('Deleted.', 'success'); renderUsersAdmin(document.getElementById('adminContent')); }).catch(toastError);
+}
+
+/* ============================================================================
+ * SETTINGS ADMIN
+ * ==========================================================================*/
+function renderSettingsAdmin(host) {
+  api('getSettings', state.token).then(function (s) {
+    host.innerHTML = '<div class="panel"><h3>Branding</h3>' +
+      '<div class="form-row"><div class="field"><label>Business Name</label><input type="text" id="s_BusinessName" value="' + esc(s.BusinessName) + '"></div>' +
+      '<div class="field"><label>Tagline</label><input type="text" id="s_Tagline" value="' + esc(s.Tagline) + '"></div></div>' +
+      '<div class="field"><label>Logo</label><input type="file" id="s_LogoFile" accept="image/*">' + (s.LogoURL ? '<img src="' + s.LogoURL + '" style="max-width:80px;margin-top:8px;border-radius:8px;">' : '') + '</div>' +
+      '<div class="form-row"><div class="field"><label>Primary Color</label><input type="color" id="s_PrimaryColor" value="' + (s.PrimaryColor || '#16213e') + '"></div>' +
+      '<div class="field"><label>Accent/Secondary Color</label><input type="color" id="s_SecondaryColor" value="' + (s.SecondaryColor || '#c9a227') + '"></div></div>' +
+      '</div>' +
+      '<div class="panel"><h3>Contact &amp; Location</h3><div class="form-row">' +
+      '<div class="field"><label>Phone</label><input type="text" id="s_ContactPhone" value="' + esc(s.ContactPhone) + '"></div>' +
+      '<div class="field"><label>Email</label><input type="text" id="s_ContactEmail" value="' + esc(s.ContactEmail) + '"></div></div>' +
+      '<div class="field"><label>WhatsApp Number (intl format, no +)</label><input type="text" id="s_WhatsAppNumber" value="' + esc(s.WhatsAppNumber) + '"></div>' +
+      '<div class="field"><label>Google Maps Embed URL</label><input type="text" id="s_MapEmbedURL" value="' + esc(s.MapEmbedURL) + '"></div></div>' +
+      '<div class="panel"><h3>Shop Hours &amp; Location</h3><div id="shopInfoBox"></div></div>' +
+      '<div class="panel"><h3>Payments</h3>' +
+      '<div class="field"><label>Active Payment Methods</label><div>' + PAYMENT_METHODS_JS.map(function (m) {
+        var active = String(s.ActivePaymentMethods || '').split(',').indexOf(m) > -1;
+        return '<label style="display:inline-flex;align-items:center;gap:5px;margin-right:14px;font-weight:400;"><input type="checkbox" class="payMethodCk" value="' + m + '"' + (active ? ' checked' : '') + '>' + m + '</label>';
+      }).join('') + '</div></div>' +
+      '<div class="form-row"><div class="field"><label>MTN MoMo Name</label><input type="text" id="s_MomoName" value="' + esc(s.MomoName) + '"></div><div class="field"><label>MTN MoMo Number</label><input type="text" id="s_MomoNumber" value="' + esc(s.MomoNumber) + '"></div></div>' +
+      '<div class="form-row"><div class="field"><label>Vodafone Cash Name</label><input type="text" id="s_VodafoneCashName" value="' + esc(s.VodafoneCashName) + '"></div><div class="field"><label>Vodafone Cash Number</label><input type="text" id="s_VodafoneCashNumber" value="' + esc(s.VodafoneCashNumber) + '"></div></div>' +
+      '<div class="form-row"><div class="field"><label>Telecel Cash Name</label><input type="text" id="s_TelecelCashName" value="' + esc(s.TelecelCashName) + '"></div><div class="field"><label>Telecel Cash Number</label><input type="text" id="s_TelecelCashNumber" value="' + esc(s.TelecelCashNumber) + '"></div></div>' +
+      '<div class="form-row"><div class="field"><label>AirtelTigo Money Name</label><input type="text" id="s_AirtelTigoMoneyName" value="' + esc(s.AirtelTigoMoneyName) + '"></div><div class="field"><label>AirtelTigo Money Number</label><input type="text" id="s_AirtelTigoMoneyNumber" value="' + esc(s.AirtelTigoMoneyNumber) + '"></div></div>' +
+      '<div class="form-row"><div class="field"><label>Bank Name</label><input type="text" id="s_BankName" value="' + esc(s.BankName) + '"></div><div class="field"><label>Bank Account Name</label><input type="text" id="s_BankAccountName" value="' + esc(s.BankAccountName) + '"></div><div class="field"><label>Bank Account Number</label><input type="text" id="s_BankAccountNumber" value="' + esc(s.BankAccountNumber) + '"></div></div>' +
+      '<div class="form-row"><div class="field"><label>Tax Rate (%)</label><input type="number" id="s_TaxRatePercent" value="' + esc(s.TaxRatePercent) + '"></div></div></div>' +
+      '<div class="panel"><h3>Loyalty &amp; Booking</h3><div class="form-row">' +
+      '<div class="field"><label>Loyalty Points per ' + (s.Currency || 'GH₵') + '1 spent</label><input type="number" id="s_LoyaltyPointsPerCedi" value="' + esc(s.LoyaltyPointsPerCedi) + '"></div>' +
+      '<div class="field"><label>Slot Interval (minutes)</label><input type="number" id="s_SlotIntervalMinutes" value="' + esc(s.SlotIntervalMinutes) + '"></div>' +
+      '<div class="field"><label>Measurement Unit</label><select id="s_MeasurementUnit"><option' + (s.MeasurementUnit === 'inches' ? ' selected' : '') + '>inches</option><option' + (s.MeasurementUnit === 'cm' ? ' selected' : '') + '>cm</option></select></div></div>' +
+      '<div class="field"><label>Service Categories (comma-separated)</label><input type="text" id="s_ServiceCategories" value="' + esc(s.ServiceCategories) + '"></div>' +
+      '<div class="check-row"><input type="checkbox" id="s_ShowGreetingBanner"' + (s.ShowGreetingBanner === 'Y' ? ' checked' : '') + '><label style="margin:0;">Show greeting banner</label></div>' +
+      '<div class="check-row"><input type="checkbox" id="s_ShowTeamSection"' + (s.ShowTeamSection === 'Y' ? ' checked' : '') + '><label style="margin:0;">Show team section</label></div>' +
+      '<div class="check-row"><input type="checkbox" id="s_NotifyBookingSms"' + (s.NotifyBookingSms === 'Y' ? ' checked' : '') + '><label style="margin:0;">SMS notify on new booking</label></div>' +
+      '<div class="check-row"><input type="checkbox" id="s_NotifyOrderStatusSms"' + (s.NotifyOrderStatusSms === 'Y' ? ' checked' : '') + '><label style="margin:0;">SMS notify on order status change</label></div></div>' +
+      '<div class="panel"><h3>SMS Provider</h3><div class="form-row">' +
+      '<div class="field"><label>Provider</label><select id="s_SmsProvider"><option value="simulate"' + (s.SmsProvider === 'simulate' ? ' selected' : '') + '>Simulate (log only)</option><option value="arkesel"' + (s.SmsProvider === 'arkesel' ? ' selected' : '') + '>Arkesel</option><option value="hubtel"' + (s.SmsProvider === 'hubtel' ? ' selected' : '') + '>Hubtel</option></select></div>' +
+      '<div class="field"><label>Sender ID</label><input type="text" id="s_SmsSenderId" value="' + esc(s.SmsSenderId) + '"></div></div>' +
+      '<div class="field"><label>API Key</label><input type="text" id="s_SmsApiKey" value="' + esc(s.SmsApiKey) + '"></div></div>' +
+      '<button class="btn btn-accent btn-block" onclick="saveAllSettings()">Save Settings</button>' +
+      '<div class="panel" style="margin-top:20px;"><h3>Public Booking QR Code</h3><div class="qrBox" id="qrBox"></div></div>';
+    renderShopInfoEditor();
+    renderQrCard();
+  }).catch(function (e) { host.innerHTML = '<div class="emptyState">' + esc(e.message) + '</div>'; });
+}
+function renderShopInfoEditor() {
+  api('getShopInfo', state.token).then(function (info) {
+    var wh = info.weeklyHours;
+    document.getElementById('shopInfoBox').innerHTML =
+      '<div class="form-row"><div class="field"><label>Shop Name</label><input type="text" id="sh_Name" value="' + esc(info.branch.Name) + '"></div>' +
+      '<div class="field"><label>Phone</label><input type="text" id="sh_Phone" value="' + esc(info.branch.Phone) + '"></div></div>' +
+      '<div class="field"><label>Location</label><input type="text" id="sh_Location" value="' + esc(info.branch.Location) + '"></div>' +
+      '<table class="hoursTable"><tbody id="sh_hours">' + ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(function (d) {
+        var w = wh[d] || { open: true, is24: false, start: '09:00', end: '18:00' };
+        return '<tr data-day="' + d + '"><td style="width:50px;">' + d + '</td>' +
+          '<td><input type="checkbox" class="sh-open" ' + (w.open ? 'checked' : '') + '></td>' +
+          '<td><input type="time" class="sh-start" value="' + w.start + '" style="width:110px;" ' + (!w.open ? 'disabled' : '') + '></td>' +
+          '<td>to</td><td><input type="time" class="sh-end" value="' + w.end + '" style="width:110px;" ' + (!w.open ? 'disabled' : '') + '></td></tr>';
+      }).join('') + '</tbody></table>' +
+      '<button class="btn btn-sm" style="margin-top:10px;" onclick="saveShopInfoUi()">Save Shop Info &amp; Hours</button>';
+    document.querySelectorAll('.sh-open').forEach(function (ck) { ck.addEventListener('change', function () { var row = ck.closest('tr'); row.querySelectorAll('input[type=time]').forEach(function (t) { t.disabled = !ck.checked; }); }); });
+  }).catch(toastError);
+}
+function saveShopInfoUi() {
+  var weeklyHours = {};
+  document.querySelectorAll('#sh_hours tr').forEach(function (row) {
+    var day = row.dataset.day;
+    weeklyHours[day] = { open: row.querySelector('.sh-open').checked, is24: false, start: row.querySelector('.sh-start').value, end: row.querySelector('.sh-end').value };
+  });
+  api('saveShopInfo', state.token, { Name: document.getElementById('sh_Name').value, Phone: document.getElementById('sh_Phone').value, Location: document.getElementById('sh_Location').value, weeklyHours: weeklyHours })
+    .then(function () { toast('Shop info saved.', 'success'); }).catch(toastError);
+}
+function saveAllSettings() {
+  var payload = {
+    BusinessName: val('s_BusinessName'), Tagline: val('s_Tagline'), PrimaryColor: val('s_PrimaryColor'), SecondaryColor: val('s_SecondaryColor'), AccentColor: val('s_SecondaryColor'),
+    ContactPhone: val('s_ContactPhone'), ContactEmail: val('s_ContactEmail'), WhatsAppNumber: val('s_WhatsAppNumber'), MapEmbedURL: val('s_MapEmbedURL'),
+    MomoName: val('s_MomoName'), MomoNumber: val('s_MomoNumber'), VodafoneCashName: val('s_VodafoneCashName'), VodafoneCashNumber: val('s_VodafoneCashNumber'),
+    TelecelCashName: val('s_TelecelCashName'), TelecelCashNumber: val('s_TelecelCashNumber'), AirtelTigoMoneyName: val('s_AirtelTigoMoneyName'), AirtelTigoMoneyNumber: val('s_AirtelTigoMoneyNumber'),
+    BankName: val('s_BankName'), BankAccountName: val('s_BankAccountName'), BankAccountNumber: val('s_BankAccountNumber'), TaxRatePercent: val('s_TaxRatePercent'),
+    LoyaltyPointsPerCedi: val('s_LoyaltyPointsPerCedi'), SlotIntervalMinutes: val('s_SlotIntervalMinutes'), MeasurementUnit: val('s_MeasurementUnit'), ServiceCategories: val('s_ServiceCategories'),
+    ShowGreetingBanner: chk('s_ShowGreetingBanner'), ShowTeamSection: chk('s_ShowTeamSection'), NotifyBookingSms: chk('s_NotifyBookingSms'), NotifyOrderStatusSms: chk('s_NotifyOrderStatusSms'),
+    SmsProvider: val('s_SmsProvider'), SmsSenderId: val('s_SmsSenderId'), SmsApiKey: val('s_SmsApiKey'),
+    ActivePaymentMethods: Array.from(document.querySelectorAll('.payMethodCk:checked')).map(function (c) { return c.value; }).join(',')
+  };
+  var fileInput = document.getElementById('s_LogoFile');
+  var save = function (url) {
+    if (url) payload.LogoURL = url;
+    api('updateSettings', state.token, payload).then(function (s) {
+      state.settings = s; applyTheme(s); toast('Settings saved.', 'success');
+      api('getPublicData').then(function (d) { state.publicData = d; });
+    }).catch(toastError);
+  };
+  if (fileInput.files[0]) {
+    var reader = new FileReader();
+    reader.onload = function () { api('uploadImage', state.token, reader.result, fileInput.files[0].name, fileInput.files[0].type).then(function (r) { save(r.url); }).catch(function (err) { toastError(err); save(''); }); };
+    reader.readAsDataURL(fileInput.files[0]);
+  } else { save(''); }
+}
+function val(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+function chk(id) { var el = document.getElementById(id); return el && el.checked ? 'Y' : 'N'; }
+function renderQrCard() {
+  var url = getWebAppUrlClient();
+  var qrImgSrc = 'https://chart.googleapis.com/chart?cht=qr&chs=160x160&chl=' + encodeURIComponent(url);
+  document.getElementById('qrBox').innerHTML = '<img src="' + qrImgSrc + '" style="border-radius:8px;border:1px solid #eee;">' +
+    '<div><p class="muted">Print this QR code in-store — customers scan it to book instantly.</p><input type="text" readonly value="' + esc(url) + '" style="width:280px;" onclick="this.select()"></div>';
+}
+function getWebAppUrlClient() { return location.href.split('#')[0]; }
+
+/* ============================================================================
+ * MY ACCOUNT
+ * ==========================================================================*/
+function renderAccount(host) {
+  var user = state.user;
+  host.innerHTML = '<div class="panel" style="max-width:440px;"><h3>My Account</h3>' +
+    '<p><strong>' + esc(user.fullName || user.username) + '</strong><br><span class="muted">' + esc(user.role) + ' · ' + esc(user.username) + '</span></p>' +
+    '<h4 style="margin-top:20px;">Change Password</h4>' +
+    '<form id="pwForm"><div class="field"><label>Current Password</label><input type="password" name="oldPassword" required></div>' +
+    '<div class="field"><label>New Password</label><input type="password" name="newPassword" required></div>' +
+    '<button class="btn btn-accent" type="submit">Update Password</button></form></div>';
+  document.getElementById('pwForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var fd = new FormData(e.target);
+    api('changeOwnPassword', state.token, fd.get('oldPassword'), fd.get('newPassword')).then(function (res) { toast(res.message, 'success'); e.target.reset(); }).catch(toastError);
+  });
+}
+</script>
 </body>
 </html>
-        
+
+
+
