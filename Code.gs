@@ -268,56 +268,10 @@ function doGet(e) {
   var page = (e && e.parameter && e.parameter.page) || 'app';
   var tpl = HtmlService.createTemplateFromFile('index');
   tpl.initialPage = page;
-  // Embeds a small "above the fold" snapshot (branding, theme, first hero
-  // slide) directly in this same HTML response — see getBootData_() — so
-  // the very first paint doesn't have to wait on a separate live
-  // google.script.run round trip just to stop looking blank. `</script`
-  // is escaped so nothing in the data (a business name, a caption) can
-  // ever break out of the inline <script> tag it's printed into below.
-  tpl.bootData = JSON.stringify(getBootData_()).replace(/<\/script/gi, '<\\/script');
   return tpl.evaluate()
     .setTitle('Salon & Barber Management System')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-}
-
-/**
- * The minimal "above the fold" slice of the public site — business name,
- * tagline, theme colors/font, logo, the first hero slide (with its image
- * already resolved to a data URI), and live open/closed status — computed
- * once per doGet() and embedded straight into the page's own HTML (see
- * doGet() above). This is deliberately tiny: no services/staff/gallery/
- * reviews/remaining hero slides here — loadPublicSite() still fetches the
- * full getPublicData() payload the normal way right after first paint and
- * fully repaints everything, boot preview included. The only point of this
- * is to make the page look complete and branded the instant it's opened,
- * for the very first visitor who has no localStorage cache yet to fall
- * back on. Never allowed to fail doGet() itself — any error here just
- * means the client falls back to its normal live-fetch-only behavior.
- */
-function getBootData_() {
-  try {
-    var settings = getSettingsMap_();
-    var branches = readAll_('Branches').slice(0, 1);
-    var heroSlides = readAll_('HeroSlides')
-      .filter(function (h) { return String(h.Active).toUpperCase() === 'Y'; })
-      .sort(function (a, b) { return Number(a.SortOrder) - Number(b.SortOrder); });
-    var firstSlide = heroSlides[0] ? stripRow_(heroSlides[0]) : null;
-    // Both images resolved in one batched call (see batchResolveImageUrls_)
-    // rather than two separate ones — on a cold image cache this keeps
-    // doGet() itself, the very first thing a visitor waits on, as fast as
-    // this preview can possibly be.
-    var resolved = batchResolveImageUrls_([settings.LogoURL, firstSlide ? firstSlide.ImageURL : '']);
-    if (settings.LogoURL) settings.LogoURL = resolved[0];
-    if (firstSlide && firstSlide.ImageURL) firstSlide.ImageURL = resolved[1];
-    return {
-      settings: settings,
-      firstHeroSlide: firstSlide,
-      shopStatus: branches[0] ? computeShopStatus_(parseBranchWeeklyHours_(branches[0])) : null
-    };
-  } catch (err) {
-    return null;
-  }
 }
 
 /** Streams an uploaded file's bytes straight from Drive. A missing/bad file ID falls back to a blank transparent pixel instead of throwing, so a stale URL degrades to an empty image rather than a page error. */

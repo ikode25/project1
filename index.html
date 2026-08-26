@@ -1109,33 +1109,7 @@
 
 <div id="modalHost"></div>
 
-<!--
-  BOOT DATA — a small "above the fold" snapshot (branding, theme, first
-  hero slide) that doGet() embeds directly into this page's own HTML
-  response server-side (see getBootData_() in Code.gs), so opening the
-  URL for the very first time doesn't need an extra live round trip just
-  to stop looking blank — see applyBootPreview_() further down.
-
-  Deliberately printed into an inert application/json script tag and
-  parsed with JSON.parse() below, rather than spliced straight into a JS
-  object literal the way an earlier version of this did. JSON.stringify()
-  does not escape the U+2028/U+2029 line/paragraph-separator characters —
-  valid inside a JSON string, but a raw line terminator if a business
-  name/tagline/caption containing one were dropped directly into JS
-  source, which silently breaks the string literal and throws a
-  SyntaxError that fails this ENTIRE inline script (nothing on the page
-  works at all, exactly what happened here) rather than just this one
-  variable. JSON.parse() has no such gotcha — it treats the text as pure
-  data, never as code.
--->
-<script type="application/json" id="bootDataJson"><?!= bootData ?></script>
 <script>
-var BOOT_DATA = null;
-try {
-  var bootDataEl = document.getElementById('bootDataJson');
-  BOOT_DATA = bootDataEl ? JSON.parse(bootDataEl.textContent) : null;
-} catch (bootErr) { BOOT_DATA = null; }
-
 /* =====================================================================
  * ICONS — small inline-SVG line-icon set (no external assets/fonts)
  * ===================================================================*/
@@ -1439,34 +1413,10 @@ function initScrollReveal_() {
   targets.forEach(function (el) { observer.observe(el); });
 }
 
-/**
- * Paints the very top of the public page — theme colors, branding, the
- * first hero slide, and the live open/closed badge — straight from
- * BOOT_DATA, which is already sitting in the page's own HTML by the time
- * this runs (see doGet()/getBootData_() in Code.gs). No network round
- * trip needed for this part. loadPublicSite()'s own getPublicData() call
- * still runs right after and fully repaints everything (every hero slide,
- * services, staff, gallery, reviews, booking wizard, …) exactly as
- * before — this is purely an early, lightweight preview layered
- * underneath that real load, never a replacement for it. Silently does
- * nothing if BOOT_DATA is missing (an old cached page shell, or the
- * server-side snapshot failed) — the normal live load still covers it.
- */
-function applyBootPreview_(boot) {
-  if (!boot || !boot.settings) return;
-  try {
-    applyTheme(boot.settings);
-    renderBranding(boot.settings);
-    if (boot.firstHeroSlide) renderHero([boot.firstHeroSlide]);
-    if (boot.shopStatus) renderShopStatusBadge_('shopStatusBadge', boot.shopStatus);
-  } catch (e) { /* never let a boot-preview hiccup block the real load that follows */ }
-}
-
 /* =====================================================================
  * BOOT
  * ===================================================================*/
 window.addEventListener('DOMContentLoaded', function () {
-  applyBootPreview_(BOOT_DATA);
   document.getElementById('navToggle').innerHTML = icon('menu', 22);
   document.getElementById('adminLoginLink').innerHTML = icon('lock', 18);
   document.getElementById('darkModeToggle').innerHTML = icon('moon', 17);
