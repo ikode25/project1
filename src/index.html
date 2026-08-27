@@ -6769,11 +6769,21 @@
         EmployeeCode: user?.EmployeeCode || '',
         EmergencyContactName: user?.EmergencyContactName || '',
         EmergencyContactPhone: user?.EmergencyContactPhone || '',
-        SSNITNumber: user?.SSNITNumber || ''
+        SSNITNumber: user?.SSNITNumber || '',
+        // admin-defined custom fields (see Settings > Form Fields) — generic key/value bag
+        CustomFields: user?.CustomFields ? { ...user.CustomFields } : {}
       });
       const [saving, setSaving] = useState(false);
+      const [customFieldDefs, setCustomFieldDefs] = useState([]);
 
       const set = (k, v) => setFormData({ ...formData, [k]: v });
+      const setCustomField = (key, v) => setFormData({ ...formData, CustomFields: { ...formData.CustomFields, [key]: v } });
+
+      useEffect(() => {
+        google.script.run
+          .withSuccessHandler((res) => { if (res && res.success) setCustomFieldDefs(res.data.custom || []); })
+          .getFormFieldConfig('staff');
+      }, []);
 
       const handleSubmit = (e) => {
         e.preventDefault();
@@ -6974,6 +6984,37 @@
                     <small style={{color:'#777'}}>Required before a payslip/SSNIT record can be generated for this staff member</small>
                   </div>
                 </div>
+
+                {customFieldDefs.length > 0 && customFieldDefs.some(c => c.visible) && (<>
+                  <hr style={{margin:'22px 0',border:'none',borderTop:'1px solid #e0e0e0'}} />
+                  <h4 style={{color:'var(--navy-primary)',marginBottom:'12px',fontSize:'15px'}}>
+                    <i className="fas fa-plus-circle"></i> Additional Information
+                  </h4>
+                  <div className="form-grid">
+                    {customFieldDefs.filter(c => c.visible).map(c => (
+                      <div key={c.key} className="form-group" style={c.type === 'textarea' ? {gridColumn:'1 / -1'} : undefined}>
+                        <label>{c.label}{c.required && <span style={{color:'#ea4335'}}> *</span>}</label>
+                        {c.type === 'select' ? (
+                          <select value={formData.CustomFields[c.key] || ''} onChange={(e) => setCustomField(c.key, e.target.value)} required={c.required}>
+                            <option value="">— Select —</option>
+                            {(c.options || []).map(o => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        ) : c.type === 'textarea' ? (
+                          <textarea rows="2" value={formData.CustomFields[c.key] || ''} onChange={(e) => setCustomField(c.key, e.target.value)} required={c.required} />
+                        ) : c.type === 'checkbox' ? (
+                          <select value={formData.CustomFields[c.key] || ''} onChange={(e) => setCustomField(c.key, e.target.value)} required={c.required}>
+                            <option value="">— Select —</option>
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                          </select>
+                        ) : (
+                          <input type={c.type === 'number' ? 'number' : c.type === 'date' ? 'date' : 'text'}
+                            value={formData.CustomFields[c.key] || ''} onChange={(e) => setCustomField(c.key, e.target.value)} required={c.required} />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>)}
 
                 <div className="form-actions">
                   <button type="submit" className="btn btn-primary" disabled={saving}>
@@ -11729,6 +11770,16 @@
               }
             });
 
+            // scholarship / fee concession — visible right after status since it directly affects billing
+            cols.push({
+              data: 'ConcessionPercent', title: 'Scholarship',
+              render: (d) => {
+                const pct = parseFloat(d) || 0;
+                if (pct <= 0) return '<span style="color:#bbb">—</span>';
+                return `<span style="display:inline-block;padding:2px 8px;background:#fff3cd;color:#8a6d00;border:1px solid #ffe08a;font-size:11px;font-weight:700;border-radius:3px"><i class="fas fa-graduation-cap"></i> ${pct}%</span>`;
+              }
+            });
+
             // intl: house pill (after status)
             cols.push({
               data: 'HouseName', title: 'House',
@@ -12102,6 +12153,13 @@
                     <div style={{margin:'10px 0',fontSize:13,color:'#555'}}>
                       <div><i className="fas fa-school" style={{width:16,color:'var(--navy-accent)'}}></i> {s.ClassLabel || '—'} · Roll {s.RollNumber || '-'}</div>
                       {!isClerk && s.FatherName && <div><i className="fas fa-user" style={{width:16,color:'#888'}}></i> {s.FatherName}</div>}
+                      {parseFloat(s.ConcessionPercent) > 0 && (
+                        <div style={{marginTop:4}}>
+                          <span style={{display:'inline-block',padding:'2px 8px',background:'#fff3cd',color:'#8a6d00',border:'1px solid #ffe08a',fontSize:10,fontWeight:700,borderRadius:3}}>
+                            <i className="fas fa-graduation-cap"></i> Scholarship {parseFloat(s.ConcessionPercent)}%
+                          </span>
+                        </div>
+                      )}
                     </div>
                     <div style={{display:'flex',gap:8,marginTop:10,flexWrap:'wrap'}}>
                       <button className="action-icon edit-icon" style={{color:'var(--navy-accent)'}} onClick={() => { setViewing(s); setShowViewModal(true); }} title="View"><i className="fas fa-eye"></i></button>
@@ -12234,15 +12292,22 @@
         HouseName: student?.HouseName || '',
         // welfare/finance
         ConcessionPercent: student?.ConcessionPercent != null ? String(student.ConcessionPercent) : '0',
-        SpecialNeeds: student?.SpecialNeeds || ''
+        SpecialNeeds: student?.SpecialNeeds || '',
+        // admin-defined custom fields (see Settings > Form Fields) — generic key/value bag
+        CustomFields: student?.CustomFields ? { ...student.CustomFields } : {}
       });
 
       const [classes, setClasses] = useState([]);
       const [saving, setSaving] = useState(false);
       const [showMore, setShowMore] = useState(false);
+      const [customFieldDefs, setCustomFieldDefs] = useState([]);
       const set = (k, v) => setFormData({ ...formData, [k]: v });
+      const setCustomField = (key, v) => setFormData({ ...formData, CustomFields: { ...formData.CustomFields, [key]: v } });
 
       useEffect(() => {
+        google.script.run
+          .withSuccessHandler((res) => { if (res && res.success) setCustomFieldDefs(res.data.custom || []); })
+          .getFormFieldConfig('student');
         google.script.run
           .withSuccessHandler((res) => { if (res.success) setClasses(res.data || []); })
           .getAllClasses(currentUser, role);
@@ -12819,6 +12884,34 @@
                   </div>
                 </div>
 
+                </>)}
+
+                {customFieldDefs.length > 0 && customFieldDefs.some(c => c.visible) && (<>
+                  <SectionHdr icon="plus-circle" label="Additional Information" />
+                  <div className="form-grid">
+                    {customFieldDefs.filter(c => c.visible).map(c => (
+                      <div key={c.key} className="form-group" style={c.type === 'textarea' ? {gridColumn:'1 / -1'} : undefined}>
+                        <label>{c.label}{c.required && <span style={{color:'#ea4335'}}> *</span>}</label>
+                        {c.type === 'select' ? (
+                          <select value={formData.CustomFields[c.key] || ''} onChange={(e) => setCustomField(c.key, e.target.value)} required={c.required}>
+                            <option value="">— Select —</option>
+                            {(c.options || []).map(o => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        ) : c.type === 'textarea' ? (
+                          <textarea rows="2" value={formData.CustomFields[c.key] || ''} onChange={(e) => setCustomField(c.key, e.target.value)} required={c.required} />
+                        ) : c.type === 'checkbox' ? (
+                          <select value={formData.CustomFields[c.key] || ''} onChange={(e) => setCustomField(c.key, e.target.value)} required={c.required}>
+                            <option value="">— Select —</option>
+                            <option value="yes">Yes</option>
+                            <option value="no">No</option>
+                          </select>
+                        ) : (
+                          <input type={c.type === 'number' ? 'number' : c.type === 'date' ? 'date' : 'text'}
+                            value={formData.CustomFields[c.key] || ''} onChange={(e) => setCustomField(c.key, e.target.value)} required={c.required} />
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </>)}
 
                 <SectionHdr icon="key" label="Login Credentials" />
@@ -30222,6 +30315,25 @@
         });
       };
 
+      const handleCleanupAdmissionDues = () => {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Clean up wrongly-billed admission dues?',
+          text: 'Removes still-unpaid Admission fee dues that were mistakenly generated for students added or imported via the Student Module (they should only ever be billed through the Admissions module). Already-paid admission dues are left untouched.',
+          showCancelButton: true,
+          confirmButtonText: 'Run cleanup'
+        }).then((r) => {
+          if (!r.isConfirmed) return;
+          Swal.fire({ title: 'Cleaning up…', html: 'Please wait — this may take a moment.', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+          google.script.run
+            .withSuccessHandler((res) => {
+              Swal.fire({ icon: res && res.success ? 'success' : 'error', text: (res && res.message) || 'Done' });
+            })
+            .withFailureHandler((err) => Swal.fire({ icon: 'error', text: (err && err.message) || 'Server error' }))
+            .cleanupWronglyBilledAdmissionDues(currentUser, role);
+        });
+      };
+
       const applyColors = () => {
         const root = document.documentElement;
         root.style.setProperty('--navy-primary', customColors.primary);
@@ -30285,10 +30397,17 @@
               <button className={'tt-tab' + (tab === 'dietary' ? ' active' : '')} onClick={() => setTab('dietary')}>
                 <i className="fas fa-utensils"></i> Dietary Options
               </button>
+              <button className={'tt-tab' + (tab === 'formfields' ? ' active' : '')} onClick={() => setTab('formfields')}>
+                <i className="fas fa-list-alt"></i> Form Fields
+              </button>
               <button className={'tt-tab' + (tab === 'maintenance' ? ' active' : '')} onClick={() => setTab('maintenance')}>
                 <i className="fas fa-wrench"></i> Maintenance
               </button>
             </div>
+          )}
+
+          {isAdmin && tab === 'formfields' && (
+            <FormFieldsSettingsTab currentUser={currentUser} role={role} />
           )}
 
           {isAdmin && tab === 'school' && (
@@ -30335,6 +30454,16 @@
               </p>
               <button className="btn btn-secondary" onClick={handleCleanupAttendance}>
                 <i className="fas fa-broom"></i> Clean Up Orphaned Attendance
+              </button>
+
+              <h3 style={{margin:'22px 0 12px', color:'var(--navy-primary)', fontSize:'17px'}}>
+                <i className="fas fa-graduation-cap"></i> Admission Fee Cleanup
+              </h3>
+              <p style={{fontSize:'13px', color:'#666', marginBottom:'12px'}}>
+                Removes unpaid Admission fee dues wrongly generated for students added or imported through the Student Module — admission fee should only ever be billed via the Admissions module's own enrollment flow. Safe to re-run anytime; already-paid admission dues are never touched.
+              </p>
+              <button className="btn btn-secondary" onClick={handleCleanupAdmissionDues}>
+                <i className="fas fa-graduation-cap"></i> Clean Up Wrongly-Billed Admission Dues
               </button>
             </div>
           )}
@@ -30636,6 +30765,145 @@
       );
     }
 
+    // lets admin, per data-entry form, hide fields the school doesn't use, mark any field required,
+    // and add entirely new fields specific to this school (stored generically in a CustomFieldsJSON
+    // blob on the record — no schema change needed per field). Values feed getFormFieldConfig /
+    // saveFormFieldConfig on the backend and are enforced there too, not just in this UI.
+    const FORM_FIELD_TYPES = [
+      { value: 'text', label: 'Text' },
+      { value: 'number', label: 'Number' },
+      { value: 'date', label: 'Date' },
+      { value: 'select', label: 'Dropdown' },
+      { value: 'textarea', label: 'Long Text' },
+      { value: 'checkbox', label: 'Yes/No' }
+    ];
+
+    function FormFieldsSettingsTab({ currentUser, role }) {
+      const [formKey, setFormKey] = useState('student');
+      const [fields, setFields] = useState([]);
+      const [custom, setCustom] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [saving, setSaving] = useState(false);
+
+      const load = (key) => {
+        setLoading(true);
+        google.script.run
+          .withSuccessHandler((res) => {
+            setLoading(false);
+            if (res && res.success) { setFields(res.data.fields); setCustom(res.data.custom); }
+            else Swal.fire({ icon: 'error', text: (res && res.message) || 'Failed to load form fields' });
+          })
+          .withFailureHandler((err) => { setLoading(false); Swal.fire({ icon: 'error', text: (err && err.message) || 'Server error' }); })
+          .getFormFieldConfig(key);
+      };
+
+      useEffect(() => { load(formKey); }, [formKey]);
+
+      const toggleFieldVisible = (i) => setFields(fields.map((f, idx) => idx === i && !f.essential ? { ...f, visible: !f.visible } : f));
+      const toggleFieldRequired = (i) => setFields(fields.map((f, idx) => idx === i ? { ...f, required: !f.required } : f));
+
+      const addCustomField = () => setCustom([...custom, { key: 'field_' + (custom.length + 1), label: '', type: 'text', options: [], visible: true, required: false }]);
+      const updateCustom = (i, patch) => setCustom(custom.map((c, idx) => idx === i ? { ...c, ...patch } : c));
+      const removeCustom = (i) => setCustom(custom.filter((_, idx) => idx !== i));
+
+      const handleSave = () => {
+        const cleanCustom = custom.map(c => ({ ...c, label: String(c.label || '').trim(), key: String(c.key || '').trim() })).filter(c => c.label && c.key);
+        setSaving(true);
+        google.script.run
+          .withSuccessHandler((res) => {
+            setSaving(false);
+            if (res && res.success) { Swal.fire({ icon: 'success', text: res.message, timer: 1800, showConfirmButton: false }); load(formKey); }
+            else Swal.fire({ icon: 'error', text: (res && res.message) || 'Save failed' });
+          })
+          .withFailureHandler((err) => { setSaving(false); Swal.fire({ icon: 'error', text: (err && err.message) || 'Server error' }); })
+          .saveFormFieldConfig(formKey, { fields, custom: cleanCustom }, currentUser, role);
+      };
+
+      return (
+        <div style={{marginTop:'20px'}}>
+          <div className="settings-info-message" style={{marginBottom:'18px'}}>
+            <i className="fas fa-info-circle"></i> <strong>Control what appears on each data-entry form.</strong> Mark any field required, or add entirely new custom fields (a scholarship reference, a church affiliation, a bank branch — whatever's specific to your school) — custom fields appear directly on the Student/Staff Add &amp; Edit forms and are enforced on save. Note: unticking Visible on a built-in field is saved here but doesn't yet remove it from the Add/Edit form itself.
+          </div>
+
+          <div className="tt-tabs" style={{marginBottom:'16px'}}>
+            <button className={'tt-tab' + (formKey === 'student' ? ' active' : '')} onClick={() => setFormKey('student')}>
+              <i className="fas fa-user-graduate"></i> Student Form
+            </button>
+            <button className={'tt-tab' + (formKey === 'staff' ? ' active' : '')} onClick={() => setFormKey('staff')}>
+              <i className="fas fa-chalkboard-teacher"></i> Staff Form
+            </button>
+          </div>
+
+          {loading ? <div style={{padding:'20px',color:'#888'}}><i className="fas fa-spinner fa-spin"></i> Loading…</div> : (<>
+            <h3 style={{marginBottom:'10px',color:'var(--navy-primary)',fontSize:'15px',textTransform:'uppercase',letterSpacing:'0.5px'}}>
+              <i className="fas fa-eye"></i> Built-in Fields
+            </h3>
+            <div style={{overflowX:'auto',marginBottom:'22px'}}>
+              <table className="settings-field-table" style={{width:'100%',borderCollapse:'collapse',fontSize:'13px'}}>
+                <thead>
+                  <tr style={{textAlign:'left',borderBottom:'2px solid #e0e0e0'}}>
+                    <th style={{padding:'6px 8px'}}>Field</th>
+                    <th style={{padding:'6px 8px',width:'90px'}}>Visible</th>
+                    <th style={{padding:'6px 8px',width:'90px'}}>Required</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fields.map((f, i) => (
+                    <tr key={f.key} style={{borderBottom:'1px solid #f0f0f0'}}>
+                      <td style={{padding:'6px 8px'}}>{f.label}{f.essential && <span style={{marginLeft:'6px',fontSize:'10px',color:'#999'}}>(always visible)</span>}</td>
+                      <td style={{padding:'6px 8px'}}>
+                        <input type="checkbox" checked={f.visible} disabled={f.essential} onChange={() => toggleFieldVisible(i)} />
+                      </td>
+                      <td style={{padding:'6px 8px'}}>
+                        <input type="checkbox" checked={f.required} disabled={!f.visible} onChange={() => toggleFieldRequired(i)} />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <h3 style={{marginBottom:'10px',color:'var(--navy-primary)',fontSize:'15px',textTransform:'uppercase',letterSpacing:'0.5px'}}>
+              <i className="fas fa-plus-circle"></i> Custom Fields
+            </h3>
+            <div style={{display:'flex',flexDirection:'column',gap:'10px',marginBottom:'14px'}}>
+              {custom.map((c, i) => (
+                <div key={i} style={{display:'flex',gap:'8px',alignItems:'center',flexWrap:'wrap',border:'1px solid #e0e0e0',borderRadius:'4px',padding:'8px 10px'}}>
+                  <input type="text" placeholder="Field label (e.g. Church Affiliation)" value={c.label}
+                    onChange={(e) => updateCustom(i, { label: e.target.value, key: c.key && c.key.indexOf('field_') !== 0 ? c.key : e.target.value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_') })}
+                    style={{flex:'2 1 220px'}} maxLength="60" />
+                  <select value={c.type} onChange={(e) => updateCustom(i, { type: e.target.value })} style={{flex:'1 1 120px'}}>
+                    {FORM_FIELD_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                  {c.type === 'select' && (
+                    <input type="text" placeholder="Options, comma-separated" value={(c.options || []).join(',')}
+                      onChange={(e) => updateCustom(i, { options: e.target.value.split(',').map(x => x.trim()).filter(Boolean) })}
+                      style={{flex:'2 1 200px'}} />
+                  )}
+                  <label style={{display:'flex',alignItems:'center',gap:'4px',fontSize:'12px',whiteSpace:'nowrap'}}>
+                    <input type="checkbox" checked={!!c.required} onChange={(e) => updateCustom(i, { required: e.target.checked })} /> Required
+                  </label>
+                  <button type="button" className="btn btn-sm btn-danger" onClick={() => removeCustom(i)} title="Remove field">
+                    <i className="fas fa-trash"></i>
+                  </button>
+                </div>
+              ))}
+              {custom.length === 0 && <div style={{color:'#999',fontSize:'13px'}}>No custom fields yet for this form.</div>}
+            </div>
+
+            <div style={{display:'flex',gap:'10px'}}>
+              <button type="button" className="btn btn-secondary" onClick={addCustomField}>
+                <i className="fas fa-plus"></i> Add Custom Field
+              </button>
+              <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>
+                <i className="fas fa-save"></i> {saving ? 'Saving…' : 'Save Form Field Settings'}
+              </button>
+            </div>
+          </>)}
+        </div>
+      );
+    }
+
     // instant-apply (no Save button) — same pattern as the Unified Grading toggle: picking a card
     // saves immediately via updateReportCardTemplate and refreshes schoolSettings school-wide, so
     // every report card view (preview, bulk print, public share links) picks up the new look at once
@@ -30763,6 +31031,13 @@
       const toggleMenuId = (id) => {
         const next = new Set(hiddenSet);
         if (next.has(id)) next.delete(id); else next.add(id);
+        set('HiddenMenuIds', [...next].join(','));
+      };
+      // one-click switch for a whole module group (e.g. turn off Finance entirely because the
+      // school already runs fees through a separate system) instead of unticking each item by hand
+      const setGroupHidden = (ids, hide) => {
+        const next = new Set(hiddenSet);
+        ids.forEach((id) => { if (hide) next.add(id); else next.delete(id); });
         set('HiddenMenuIds', [...next].join(','));
       };
 
@@ -31010,15 +31285,23 @@
             <i className="fas fa-bars"></i> Sidebar Menu
           </h3>
           <p style={{color:'#777', fontSize:'13px', marginBottom:'12px'}}>
-            Untick anything the school doesn't use to keep the sidebar short. Dashboard, Settings, My Account and About can't be hidden.
+            Untick anything the school doesn't use to keep the sidebar short, or hit "Turn Off" on a whole group at once — e.g. if the school already runs Fees through a separate system and doesn't want that module in here at all. Hidden modules disappear from every user's sidebar and stop loading their data entirely. Dashboard, Settings, My Account and About can't be hidden.
           </p>
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(220px,1fr))',gap:'14px'}}>
             {Object.keys(GROUP_LABELS).map(g => {
               const ids = Object.keys(MENU_CATALOG).filter(id => MENU_CATALOG[id].group === g && !PROTECTED_MENU_IDS.includes(id));
               if (ids.length === 0) return null;
+              const allHidden = ids.every(id => hiddenSet.has(id));
               return (
                 <div key={g} style={{border:'1px solid #e0e0e0',borderRadius:'4px',padding:'10px 12px'}}>
-                  <div style={{fontSize:'11px',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',color:'#888',marginBottom:'6px'}}>{GROUP_LABELS[g]}</div>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'8px',marginBottom:'6px'}}>
+                    <div style={{fontSize:'11px',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.5px',color:'#888'}}>{GROUP_LABELS[g]}</div>
+                    <button type="button" onClick={() => setGroupHidden(ids, !allHidden)}
+                      title={allHidden ? `Turn on the whole ${GROUP_LABELS[g]} module for everyone` : `Turn off the whole ${GROUP_LABELS[g]} module for everyone`}
+                      style={{fontSize:'10px',fontWeight:700,padding:'2px 8px',borderRadius:'3px',border:'1px solid ' + (allHidden ? '#34a853' : '#ea4335'),background:'#fff',color:allHidden ? '#34a853' : '#ea4335',cursor:'pointer'}}>
+                      {allHidden ? 'Turn On' : 'Turn Off'}
+                    </button>
+                  </div>
                   {ids.map(id => (
                     <label key={id} style={{display:'flex',alignItems:'center',gap:'8px',padding:'4px 0',fontSize:'13px',cursor:'pointer'}}>
                       <input type="checkbox" checked={!hiddenSet.has(id)} onChange={() => toggleMenuId(id)} />

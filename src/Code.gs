@@ -56,7 +56,7 @@ var DEFAULT_LOGO = 'data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.o
 //       19=CreatedAt, 20=CreatedBy, 21=UpdatedAt, 22=UpdatedBy,
 //       23=EmployeeCode (UNIQUE staff ID), 24=EmergencyContactName, 25=EmergencyContactPhone,
 //       26=SSNITNumber (required before a payslip/SSNIT record can be generated for this user)
-var USER_HEADERS = ['ID','Username','FullName','Email','Password','Mobile','Role','Gender','DateOfBirth','Qualification','Specialization','JoiningDate','ProfilePhoto','Address','Status','LastLogin','IsDeleted','ThemeMode','CustomColors','CreatedAt','CreatedBy','UpdatedAt','UpdatedBy','EmployeeCode','EmergencyContactName','EmergencyContactPhone','SSNITNumber'];
+var USER_HEADERS = ['ID','Username','FullName','Email','Password','Mobile','Role','Gender','DateOfBirth','Qualification','Specialization','JoiningDate','ProfilePhoto','Address','Status','LastLogin','IsDeleted','ThemeMode','CustomColors','CreatedAt','CreatedBy','UpdatedAt','UpdatedBy','EmployeeCode','EmergencyContactName','EmergencyContactPhone','SSNITNumber','CustomFieldsJSON'];
 
 // classes cols: 0=ID, 1=ClassName, 2=Section, 3=AcademicYear, 4=ClassTeacherID,
 //               5=TotalStrength, 6=IsDeleted, 7=CreatedAt, 8=UpdatedAt,
@@ -102,7 +102,7 @@ var ASSIGNMENT_HEADERS = ['ID','TeacherID','ClassID','SubjectID','AcademicYear',
 // BECE (63-64) — populated for JHS3 candidates ahead of the national exam:
 // 63=BECEIndexNumber (WAEC candidate index number, '' until issued), 64=NHISNumber (National Health Insurance number, optional)
 // UNIQUE: AdmissionNumber, GhanaCardNumber (when not null), (ClassID, RollNumber, Status)
-var STUDENT_HEADERS = ['ID','AdmissionNumber','FirstName','MiddleName','LastName','Gender','DateOfBirth','BloodGroup','GhanaCardNumber','Mobile','Email','AddressLine','City','Region','GhanaPostGPS','FatherName','FatherOccupation','FatherMobile','MotherName','MotherOccupation','MotherMobile','GuardianName','GuardianRelation','GuardianMobile','AdmissionDate','ClassID','RollNumber','Category','Religion','PreviousSchool','TransportRequired','TransportRoute','MedicalNotes','PhotoURL','LoginPasswordHash','Status','IsDeleted','CreatedAt','UpdatedAt','Nationality','SecondNationality','CountryOfBirth','PreferredName','PassportNumber','PassportExpiry','VisaType','VisaExpiry','MotherTongue','HomeLanguage','EnglishProficiency','CurriculumTrack','CustodyArrangement','PrimaryContactParent','AuthorizedPickupPersons','MediaConsent','DietaryRequirements','Allergies','InsuranceProvider','InsurancePolicyExpiry','HouseName','AdmissionType','ConcessionPercent','SpecialNeeds','BECEIndexNumber','NHISNumber'];
+var STUDENT_HEADERS = ['ID','AdmissionNumber','FirstName','MiddleName','LastName','Gender','DateOfBirth','BloodGroup','GhanaCardNumber','Mobile','Email','AddressLine','City','Region','GhanaPostGPS','FatherName','FatherOccupation','FatherMobile','MotherName','MotherOccupation','MotherMobile','GuardianName','GuardianRelation','GuardianMobile','AdmissionDate','ClassID','RollNumber','Category','Religion','PreviousSchool','TransportRequired','TransportRoute','MedicalNotes','PhotoURL','LoginPasswordHash','Status','IsDeleted','CreatedAt','UpdatedAt','Nationality','SecondNationality','CountryOfBirth','PreferredName','PassportNumber','PassportExpiry','VisaType','VisaExpiry','MotherTongue','HomeLanguage','EnglishProficiency','CurriculumTrack','CustodyArrangement','PrimaryContactParent','AuthorizedPickupPersons','MediaConsent','DietaryRequirements','Allergies','InsuranceProvider','InsurancePolicyExpiry','HouseName','AdmissionType','ConcessionPercent','SpecialNeeds','BECEIndexNumber','NHISNumber','CustomFieldsJSON'];
 
 // account_transactions cols (13) — day-book for non-fee income & expenses (donations, rent, fines, salary, utilities, supplies...)
 // 0=ID, 1=TxnDate (YYYY-MM-DD), 2=TxnType (income|expense), 3=Category (from matching enum list),
@@ -1770,7 +1770,8 @@ function rowToUser(row) {
     EmployeeCode: row[23] || '',
     EmergencyContactName: row[24] || '',
     EmergencyContactPhone: row[25] || '',
-    SSNITNumber: row[26] || ''
+    SSNITNumber: row[26] || '',
+    CustomFields: (function () { try { return JSON.parse(row[27] || '{}'); } catch (e) { return {}; } })()
   };
 }
 
@@ -2288,6 +2289,10 @@ function addUser(userData, currentUser, currentRole) {
       }
     }
 
+    // admin-configurable required fields (built-in overrides + custom fields) — see Settings > Form Fields
+    var cfv = _validateCustomFieldSubmission('staff', userData);
+    if (!cfv.ok) return { success: false, message: cfv.error };
+
     var generatedPassword = '';
     var password = String(userData.Password || '').trim();
     if (!password) { password = Utilities.getUuid().slice(0, 8); generatedPassword = password; }
@@ -2317,7 +2322,8 @@ function addUser(userData, currentUser, currentRole) {
       empCode,
       String(userData.EmergencyContactName || '').trim(),
       String(userData.EmergencyContactPhone || '').trim(),
-      String(userData.SSNITNumber || '').trim()
+      String(userData.SSNITNumber || '').trim(),
+      JSON.stringify(userData.CustomFields || {})
     ]);
 
     _invalidateRosterCache('roster_users_v1');
@@ -2336,6 +2342,10 @@ function updateUser(username, userData, currentUser, currentRole) {
 
     var sh = getSheet(USERS_SHEET);
     if (!sh) return { success: false, message: 'Users sheet not found' };
+
+    // admin-configurable required fields (built-in overrides + custom fields) — see Settings > Form Fields
+    var cfv = _validateCustomFieldSubmission('staff', userData);
+    if (!cfv.ok) return { success: false, message: cfv.error };
 
     var data = sh.getDataRange().getValues();
     for (var i = 1; i < data.length; i++) {
@@ -2372,6 +2382,7 @@ function updateUser(username, userData, currentUser, currentRole) {
       sh.getRange(row, 25).setValue(String(userData.EmergencyContactName || '').trim());
       sh.getRange(row, 26).setValue(String(userData.EmergencyContactPhone || '').trim());
       if (userData.SSNITNumber !== undefined) sh.getRange(row, 27).setValue(String(userData.SSNITNumber || '').trim());
+      sh.getRange(row, 28).setValue(JSON.stringify(userData.CustomFields || {}));
 
       _invalidateRosterCache('roster_users_v1');
       addLog(currentUser, 'User Updated', 'Updated: ' + username);
@@ -4097,7 +4108,10 @@ function rowToStudent(row) {
     HouseName: row[59] || '',
     AdmissionType: String(row[60] || 'fresh').toLowerCase(),
     ConcessionPercent: parseFloat(row[61]) || 0,
-    SpecialNeeds: row[62] || ''
+    SpecialNeeds: row[62] || '',
+    BECEIndexNumber: row[63] || '',
+    NHISNumber: row[64] || '',
+    CustomFields: (function () { try { return JSON.parse(row[65] || '{}'); } catch (e) { return {}; } })()
   };
 }
 
@@ -4538,6 +4552,10 @@ function addStudent(s, currentUser, currentRole) {
     if (!iv.ok) return { success: false, message: iv.error };
     var ni = iv.normalized;
 
+    // admin-configurable required fields (built-in overrides + custom fields) — see Settings > Form Fields
+    var cfv = _validateCustomFieldSubmission('student', s);
+    if (!cfv.ok) return { success: false, message: cfv.error };
+
     var ts = nowIso(), id = nextStudentId(sh);
     var transportReq = (s.TransportRequired === true || String(s.TransportRequired) === '1' || String(s.TransportRequired).toLowerCase() === 'true') ? '1' : '0';
 
@@ -4588,7 +4606,10 @@ function addStudent(s, currentUser, currentRole) {
       ni.dietaryRequirements, ni.allergies, ni.insuranceProvider, ni.insurancePolicyExpiry,
       ni.houseName, ni.admissionType,
       // welfare/finance cols 61-62
-      ni.concessionPercent, ni.specialNeeds
+      ni.concessionPercent, ni.specialNeeds,
+      s.BECEIndexNumber ? String(s.BECEIndexNumber).trim() : '',
+      s.NHISNumber ? String(s.NHISNumber).trim() : '',
+      JSON.stringify(s.CustomFields || {})
     ]);
 
     if (cid !== null) recomputeClassStrength(cid);
@@ -4702,6 +4723,10 @@ function updateStudent(id, s, currentUser, currentRole) {
     if (!iv.ok) return { success: false, message: iv.error };
     var ni = iv.normalized;
 
+    // admin-configurable required fields (built-in overrides + custom fields) — see Settings > Form Fields
+    var cfv = _validateCustomFieldSubmission('student', s);
+    if (!cfv.ok) return { success: false, message: cfv.error };
+
     var data = sh.getDataRange().getValues();
     for (var i = 1; i < data.length; i++) {
       if (data[i][0] !== idn || String(data[i][36]) === '1') continue;
@@ -4776,6 +4801,9 @@ function updateStudent(id, s, currentUser, currentRole) {
       // welfare/finance cols 62-63
       sh.getRange(row, 62).setValue(ni.concessionPercent);
       sh.getRange(row, 63).setValue(ni.specialNeeds);
+      if (s.BECEIndexNumber !== undefined) sh.getRange(row, 64).setValue(String(s.BECEIndexNumber || '').trim());
+      if (s.NHISNumber !== undefined) sh.getRange(row, 65).setValue(String(s.NHISNumber || '').trim());
+      sh.getRange(row, 66).setValue(JSON.stringify(s.CustomFields || {}));
 
       // recompute strength on both old + new class if class changed
       if (cid !== null) recomputeClassStrength(cid);
@@ -14317,6 +14345,191 @@ function updateSchoolSettings(d, currentUser, currentRole) {
   }
 }
 
+// ============== Custom Form Fields (per-form field visibility/required + admin-defined fields) ==============
+// Lets the admin, per data-entry form, hide a built-in field nobody here uses, mark any field
+// (built-in or custom) required, and add entirely new fields the school needs that aren't part of
+// the base schema — a scholarship reference number, a church/mosque affiliation, a staff bank branch,
+// whatever's specific to this school. Values for admin-added custom fields are stored as a single
+// JSON blob per record (Students.CustomFieldsJSON / Users.CustomFieldsJSON) keyed by the field's key,
+// so adding a new custom field never requires a schema/column change.
+var FORM_FIELD_CONFIG_SHEET = 'Form_Field_Config';
+var FORM_FIELD_CONFIG_HEADERS = ['ID','FormKey','FieldKey','IsCustom','Label','FieldType','OptionsCSV','Visible','Required','DisplayOrder','IsDeleted','CreatedAt','UpdatedAt'];
+
+// registry of every built-in field each supported form's admin can toggle Visible/Required for.
+// `essential: true` fields can never be hidden (the record is meaningless without them) — the
+// checkbox for those is locked visible client-side, and the server ignores an attempt to hide one.
+var FORM_FIELD_CATALOG = {
+  student: [
+    { key: 'MiddleName', label: 'Middle Name', essential: false },
+    { key: 'GhanaCardNumber', label: 'Ghana Card Number', essential: false },
+    { key: 'BloodGroup', label: 'Blood Group', essential: false },
+    { key: 'Mobile', label: 'Student Mobile', essential: false },
+    { key: 'Email', label: 'Student Email', essential: false },
+    { key: 'AddressLine', label: 'Address', essential: false },
+    { key: 'City', label: 'City', essential: false },
+    { key: 'Region', label: 'Region', essential: false },
+    { key: 'GhanaPostGPS', label: 'Ghana Post GPS', essential: false },
+    { key: 'FatherName', label: "Father's Name", essential: false },
+    { key: 'FatherOccupation', label: "Father's Occupation", essential: false },
+    { key: 'FatherMobile', label: "Father's Mobile", essential: false },
+    { key: 'MotherName', label: "Mother's Name", essential: false },
+    { key: 'MotherOccupation', label: "Mother's Occupation", essential: false },
+    { key: 'MotherMobile', label: "Mother's Mobile", essential: false },
+    { key: 'GuardianName', label: "Guardian's Name", essential: false },
+    { key: 'GuardianRelation', label: "Guardian's Relation", essential: false },
+    { key: 'GuardianMobile', label: "Guardian's Mobile", essential: false },
+    { key: 'Religion', label: 'Religion', essential: false },
+    { key: 'PreviousSchool', label: 'Previous School', essential: false },
+    { key: 'TransportRequired', label: 'Transport Required', essential: false },
+    { key: 'TransportRoute', label: 'Transport Route', essential: false },
+    { key: 'MedicalNotes', label: 'Medical Notes', essential: false },
+    { key: 'HouseName', label: 'House', essential: false },
+    { key: 'ConcessionPercent', label: 'Scholarship / Fee Concession %', essential: false },
+    { key: 'SpecialNeeds', label: 'Special Educational Needs (SEN/IEP)', essential: false },
+    { key: 'Allergies', label: 'Allergies', essential: false },
+    { key: 'DietaryRequirements', label: 'Dietary Requirements', essential: false }
+  ],
+  staff: [
+    { key: 'Email', label: 'Email', essential: false },
+    { key: 'Mobile', label: 'Mobile', essential: false },
+    { key: 'Gender', label: 'Gender', essential: false },
+    { key: 'DateOfBirth', label: 'Date of Birth', essential: false },
+    { key: 'Qualification', label: 'Qualification', essential: false },
+    { key: 'Specialization', label: 'Specialization', essential: false },
+    { key: 'JoiningDate', label: 'Joining Date', essential: false },
+    { key: 'Address', label: 'Address', essential: false },
+    { key: 'EmployeeCode', label: 'Employee Code', essential: false },
+    { key: 'EmergencyContactName', label: 'Emergency Contact Name', essential: false },
+    { key: 'EmergencyContactPhone', label: 'Emergency Contact Phone', essential: false },
+    { key: 'SSNITNumber', label: 'SSNIT Number', essential: false }
+  ]
+};
+
+function _ensureFormFieldConfigSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sh = ss.getSheetByName(FORM_FIELD_CONFIG_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(FORM_FIELD_CONFIG_SHEET);
+    sh.appendRow(FORM_FIELD_CONFIG_HEADERS);
+    sh.getRange(1, 1, 1, FORM_FIELD_CONFIG_HEADERS.length).setBackground('#001f3f').setFontColor('white').setFontWeight('bold');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+// any signed-in user can read a form's config (they need it to render the form correctly);
+// only saveFormFieldConfig is admin-gated.
+function getFormFieldConfig(formKey) {
+  try {
+    var key = String(formKey || '').toLowerCase();
+    var catalog = FORM_FIELD_CATALOG[key];
+    if (!catalog) return { success: false, message: 'Unknown form: ' + formKey };
+
+    var overrides = {}; // fieldKey -> {visible, required}
+    var custom = [];
+    var sh = _ensureFormFieldConfigSheet();
+    var data = sh.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][1]).toLowerCase() !== key) continue;
+      if (String(data[i][10]) === '1') continue; // IsDeleted
+      var isCustom = String(data[i][3]) === '1';
+      var visible = String(data[i][7]) !== '0';
+      var required = String(data[i][8]) === '1';
+      if (isCustom) {
+        custom.push({
+          key: data[i][2], label: data[i][4] || data[i][2], type: data[i][5] || 'text',
+          options: String(data[i][6] || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean),
+          visible: visible, required: required, order: parseFloat(data[i][9]) || 0
+        });
+      } else {
+        overrides[data[i][2]] = { visible: visible, required: required };
+      }
+    }
+    custom.sort(function (a, b) { return a.order - b.order; });
+
+    var fields = catalog.map(function (f) {
+      var ov = overrides[f.key] || {};
+      return {
+        key: f.key, label: f.label, essential: !!f.essential,
+        visible: f.essential ? true : (ov.visible !== undefined ? ov.visible : true),
+        required: ov.required || false
+      };
+    });
+
+    return { success: true, data: { formKey: key, fields: fields, custom: custom } };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// admin-only — full replace of a form's overrides + custom fields in one call (the Settings tab
+// sends its whole edited list back on Save, simpler than diffing add/remove one at a time).
+function saveFormFieldConfig(formKey, payload, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var key = String(formKey || '').toLowerCase();
+    var catalog = FORM_FIELD_CATALOG[key];
+    if (!catalog) return { success: false, message: 'Unknown form: ' + formKey };
+    var essentialKeys = {};
+    catalog.forEach(function (f) { if (f.essential) essentialKeys[f.key] = true; });
+
+    var sh = _ensureFormFieldConfigSheet();
+    var data = sh.getDataRange().getValues();
+    // wipe this form's existing rows (soft — just delete them, this sheet carries no payment/audit
+    // trail worth preserving) and rewrite from the submitted lists
+    for (var i = data.length - 1; i >= 1; i--) {
+      if (String(data[i][1]).toLowerCase() === key) sh.deleteRow(i + 1);
+    }
+
+    var ts = nowIso();
+    var nextId = nextRowId(sh);
+    var newRows = [];
+    (payload.fields || []).forEach(function (f) {
+      if (!f || !f.key) return;
+      var visible = essentialKeys[f.key] ? true : (f.visible !== false);
+      newRows.push([nextId++, key, f.key, '0', '', '', '', visible ? '1' : '0', f.required ? '1' : '0', 0, '0', ts, ts]);
+    });
+    (payload.custom || []).forEach(function (c, idx) {
+      if (!c || !String(c.key || '').trim()) return;
+      var ckey = String(c.key).trim().replace(/[^a-zA-Z0-9_]/g, '_');
+      newRows.push([nextId++, key, ckey, '1', String(c.label || ckey).trim(), String(c.type || 'text').toLowerCase(),
+        Array.isArray(c.options) ? c.options.join(',') : String(c.options || ''),
+        c.visible === false ? '0' : '1', c.required ? '1' : '0', idx, '0', ts, ts]);
+    });
+
+    if (newRows.length) {
+      var startRow = sh.getLastRow() + 1;
+      sh.getRange(startRow, 1, newRows.length, FORM_FIELD_CONFIG_HEADERS.length).setValues(newRows);
+    }
+    addLog(currentUser, 'Form Fields Updated', key + ' form field configuration saved');
+    return { success: true, message: 'Form field settings saved' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// server-side gate matching getFormFieldConfig's rules — used by addStudent/addUser etc so a
+// required custom field (or a built-in field an admin has marked required) can't be bypassed just
+// because the client-side form check was skipped or tampered with.
+function _validateCustomFieldSubmission(formKey, payload) {
+  var cfg = getFormFieldConfig(formKey);
+  if (!cfg.success) return { ok: true }; // unknown form key — nothing to enforce
+  var customFields = (payload && payload.CustomFields) || {};
+  for (var i = 0; i < cfg.data.fields.length; i++) {
+    var f = cfg.data.fields[i];
+    if (f.required && f.visible && !String((payload || {})[f.key] || '').trim()) {
+      return { ok: false, error: f.label + ' is required' };
+    }
+  }
+  for (var j = 0; j < cfg.data.custom.length; j++) {
+    var c = cfg.data.custom[j];
+    if (c.required && c.visible && !String(customFields[c.key] || '').trim()) {
+      return { ok: false, error: c.label + ' is required' };
+    }
+  }
+  return { ok: true };
+}
+
 // ============== School Periods CRUD ==============
 function rowToPeriod(row) {
   return {
@@ -21423,6 +21636,13 @@ function generateStudentDues(studentId, currentUser) {
     var admDate = student[24] ? new Date(student[24]) : null;
     if (!admDate || isNaN(admDate.getTime())) return { success: false, message: 'Student has no valid admission date' };
 
+    // ConcessionPercent (scholarship / fee waiver / sibling discount, admin-assigned on the Student
+    // record) shaves the configured percentage off every fee due generated here for this student —
+    // it's what actually makes the "flows into fee billing" promise on that field true. Doesn't touch
+    // admission fee (that's never generated from this path at all, regardless of concession).
+    var concessionPercent = Math.min(100, Math.max(0, parseFloat(student[61]) || 0));
+    var concessionMult = 1 - (concessionPercent / 100);
+
     var fsh = getSheet(FEE_STRUCTURE_SHEET);
     if (!fsh) return { success: false, message: 'Fee_Structure sheet not found' };
     var fsdata = fsh.getDataRange().getValues();
@@ -21467,7 +21687,8 @@ function generateStudentDues(studentId, currentUser) {
         var label = _MONTH_LABELS[month - 1] + ' ' + year;
         monthlyFees.forEach(function(fee) {
           if (existing[fee.id + '|' + ym]) return;
-          newRows.push([nextId++, sid, fee.id, ym, label, fee.amount, 'pending', '', 0, '', ts, ts]);
+          var amt = Math.round(fee.amount * concessionMult * 100) / 100;
+          newRows.push([nextId++, sid, fee.id, ym, label, amt, 'pending', '', 0, '', ts, ts]);
         });
         month++;
         if (month > 12) { month = 1; year++; }
@@ -21490,7 +21711,8 @@ function generateStudentDues(studentId, currentUser) {
           var key = term + '-' + ay;
           if (existing[fee.id + '|' + key]) return;
           var label = TERM_LABELS[term] + ' ' + ay;
-          newRows.push([nextId++, sid, fee.id, key, label, fee.amount, 'pending', '', 0, '', ts, ts]);
+          var amt = Math.round(fee.amount * concessionMult * 100) / 100;
+          newRows.push([nextId++, sid, fee.id, key, label, amt, 'pending', '', 0, '', ts, ts]);
         });
       });
     }
@@ -21505,19 +21727,17 @@ function generateStudentDues(studentId, currentUser) {
         var settingsRes2 = getSchoolSettings();
         curYear2 = (settingsRes2.data && settingsRes2.data.AcademicYear) || '';
       } catch (e) {}
-      // Admission fee is only ever owed by students admitted fresh / by transfer / by re-admission
-      // — a continuing student already schooling here does not pay it again, regardless of which
-      // class a Fee_Structure "admission" item happens to be scoped to. Unlike rowToStudent's own
-      // display default (which assumes 'fresh' for legacy rows with no AdmissionType set, purely
-      // for display purposes), billing requires an EXPLICIT fresh/transfer/re_admission value —
-      // blank/unset never bills. That's the safe direction to default in: a student who really is
-      // new gets their AdmissionType set the moment they're admitted (enrollAdmission, the Add
-      // Student form), so a genuinely blank value only ever means "already here", not "unknown new
-      // admission" — billing everyone in a class by default was exactly the bug being fixed here.
-      var admissionType = String(student[60] || '').toLowerCase();
-      var admissionFeeEligible = ['fresh', 'transfer', 're_admission'].indexOf(admissionType) !== -1;
+      // Admission fee is billed and paid EXCLUSIVELY through the Admissions module's own enrollment
+      // flow (enrollAdmission) — never here. This function runs for every student added or edited
+      // through the Student Module, including bulk CSV import used to digitize a school's existing,
+      // already-enrolled population. Those students are already schooling here (whether admitted
+      // five years ago or five minutes ago via a direct Add Student / import), so no AdmissionType
+      // value selected in the Student Module — not even 'fresh'/'transfer'/'re_admission' — should
+      // ever cause an admission-category due to be generated from this path. AdmissionType on the
+      // Student record stays purely informational here; admission fee eligibility is decided solely
+      // by which module created the fee due (Admissions vs. Student), not by that field's value.
       yearlyFees.forEach(function (fee) {
-        if (fee.category === 'admission' && !admissionFeeEligible) return;
+        if (fee.category === 'admission') return;
         var ay = fee.academicYear || curYear2;
         // Admission fee keys 'admission-<year>' — matching enrollAdmission's own due, which is
         // created (and usually paid in full immediately) at enrollment time under that exact key.
@@ -21527,7 +21747,8 @@ function generateStudentDues(studentId, currentUser) {
         var key = (fee.category === 'admission' ? 'admission-' : 'annual-') + ay;
         if (existing[fee.id + '|' + key]) return;
         var label = (fee.category ? fee.category.charAt(0).toUpperCase() + fee.category.slice(1) + ' — ' : '') + ay;
-        newRows.push([nextId++, sid, fee.id, key, label, fee.amount, 'pending', '', 0, '', ts, ts]);
+        var amt = Math.round(fee.amount * concessionMult * 100) / 100;
+        newRows.push([nextId++, sid, fee.id, key, label, amt, 'pending', '', 0, '', ts, ts]);
       });
     }
 
@@ -21911,6 +22132,57 @@ function deleteFeeDue(dueId, currentUser, currentRole) {
     }
     return { success: false, message: 'Due not found' };
   } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
+}
+
+// admin-only retroactive fix for the admission-fee-over-billing bug: before generateStudentDues
+// was changed to unconditionally skip the 'admission' category, any student added or CSV-imported
+// through the Student Module whose AdmissionType read fresh/transfer/re_admission got a phantom
+// 'admission-<year>' due generated on their record — even though they were already schooling here
+// (or were being digitized from an old paper-based system, per the admin's own explanation). A due
+// created that way is always still 'pending' with PaidAmount 0, because the ONE legitimate source of
+// an admission due (enrollAdmission) pays it in full immediately at enrollment — so an unpaid
+// admission-category due is unambiguous evidence of the bug, never a real outstanding admission fee.
+// Mirrors deleteFeeDue's own safety rule (never touches a due any money has actually been collected
+// against) but runs it in bulk across every student instead of one due at a time.
+function cleanupWronglyBilledAdmissionDues(currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var dsh = _ensureFeeDuesSheet();
+    var data = dsh.getDataRange().getValues();
+    var fsh = getSheet(FEE_STRUCTURE_SHEET);
+    var fsCategoryById = {};
+    if (fsh) {
+      var fsdata = fsh.getDataRange().getValues();
+      for (var f = 1; f < fsdata.length; f++) fsCategoryById[fsdata[f][0]] = String(fsdata[f][2] || '').toLowerCase();
+    }
+    var students = getStudentsLite();
+    var removed = [], skippedPaid = 0;
+    // walk bottom-up so deleteRow doesn't shift the index of rows still to be checked
+    for (var i = data.length - 1; i >= 1; i--) {
+      var billingMonth = String(data[i][3] || '');
+      if (!/^admission-/.test(billingMonth)) continue;
+      var category = fsCategoryById[data[i][2]];
+      if (category != null && category !== 'admission') continue; // key coincidence, not actually an admission fee
+      var status = String(data[i][6] || '').toLowerCase();
+      var paidAmt = parseFloat(data[i][8]) || 0;
+      if (paidAmt > 0 || status === 'paid') { skippedPaid++; continue; } // real, already-settled admission fee — leave alone
+      var sid = parseInt(data[i][1], 10);
+      var stu = students[sid] || students[String(sid)];
+      removed.push({ studentId: sid, name: stu ? (stu.fullName || ('#' + sid)) : ('#' + sid), amount: parseFloat(data[i][5]) || 0 });
+      dsh.deleteRow(i + 1);
+    }
+    if (removed.length) {
+      addLog(currentUser, 'Admission Dues Cleanup', removed.length + ' wrongly-billed admission due(s) removed: ' +
+        removed.map(function (r) { return r.name; }).join(', '));
+    }
+    var message = removed.length
+      ? ('Removed ' + removed.length + ' wrongly-billed admission due(s) for: ' + removed.map(function (r) { return r.name; }).join(', ') + '.'
+         + (skippedPaid ? (' (' + skippedPaid + ' already-paid admission due(s) left untouched.)') : ''))
+      : 'No wrongly-billed admission dues found — nothing to clean.';
+    return { success: true, message: message, removed: removed.length, students: removed };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
 }
 
 // admin-only per-student override for ONE bill line — e.g. a scholarship/sibling discount that
