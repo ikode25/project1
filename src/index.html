@@ -4469,7 +4469,12 @@
       classes:      { icon: 'school',           label: 'Classes & Sections', group: 'records' },
       subjects:     { icon: 'book',             label: 'Subjects',           group: 'records' },
       assignments:  { icon: 'user-plus',        label: 'Teachers',           group: 'records' },
+      payroll:      { icon: 'file-invoice-dollar', label: 'Payroll',         group: 'finance' },
       recruitment:  { icon: 'briefcase',        label: 'Recruitment',        group: 'admin' },
+      feeStructure: { icon: 'money-bill-wave',       label: 'Fee Structure',      group: 'finance' },
+      feePayments:  { icon: 'money-bill-wave',  label: 'Fees Collection',    group: 'finance' },
+      feeBills:     { icon: 'file-invoice',     label: 'Fee Bills',          group: 'finance' },
+      accounts:     { icon: 'wallet',           label: 'Daily Accounts',     group: 'finance' },
       sms:          { icon: 'sms',              label: 'SMS Center',         group: 'communication' },
       foodMenu:     { icon: 'utensils',         label: 'Food Menu',          group: 'daily' },
       ownerPortal:  { icon: 'binoculars',       label: 'Owner Portal',       group: 'overview' },
@@ -4481,6 +4486,9 @@
       substitutes:  { icon: 'user-times',       label: 'Substitutes',        group: 'daily' },
       assets:       { icon: 'desktop',          label: 'Assets',             group: 'records' },
       inventory:    { icon: 'boxes',            label: 'Stock / Inventory',  group: 'records' },
+      pos:          { icon: 'cash-register',    label: 'POS / Sell',         group: 'finance' },
+      stockTransactions: { icon: 'exchange-alt', label: 'Stock Transactions', group: 'finance' },
+      vendors:      { icon: 'truck',            label: 'Vendors',            group: 'finance' },
       trash:        { icon: 'trash-restore',    label: 'Trash',              group: 'account' },
       account:      { icon: 'user-circle',      label: 'My Account',         group: 'account' },
       settings:     { icon: 'cog',              label: 'Settings',           group: 'account' },
@@ -4496,21 +4504,18 @@
     //  - student: timetable + attendance + marks + notices first
     //  - parent: notices + child's attendance/marks/fees first
     const MENU_PRIORITY = {
-      admin: ['dashboard','ownerPortal','reports','admissions','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','questionBank','onlineLinks','hallTickets','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','trash','account','settings','about'],
+      admin: ['dashboard','ownerPortal','reports','admissions','students','classes','timetable','attendance','substitutes','exams','marks','gradingSystem','questionBank','onlineLinks','hallTickets','feePayments','feeBills','accounts','feeStructure','pos','stockTransactions','vendors','payroll','sms','notices','foodMenu','ptm','calendar','discipline','conduct','activities','lessonPlans','logbook','helpdesk','complaints','documents','parents','assets','inventory','subjects','assignments','users','trash','account','settings','about'],
       // headteacher (internal role id stays 'supervisor' — see ROLE_DISPLAY_LABEL) — system-wide
       // oversight: academic operations plus Owner Portal's financial/activity monitoring
       supervisor: ['dashboard','ownerPortal','reports','attendance','substitutes','marks','hallTickets','exams','notices','ptm','calendar','discipline','conduct','helpdesk','complaints','lessonPlans','logbook','activities','students','parents','classes','subjects','assignments','documents','timetable','account','about'],
-      clerk: ['admissions','admissionReqs','students','parents','sms','reports','attendance','helpdesk','complaints','documents','assets','inventory','timetable','classes','notices','calendar','trash','account','about'],
-      // bursar/accountant — the Finance module (fees, POS, stock transactions, vendors, accounts,
-      // payroll) has been removed system-wide; a dedicated separate Fees Management system now
-      // handles all of that (see Settings → SMS & Digest for the daily admission notice sent to its
-      // admin). Bursar keeps only what's left of its original scope: asset/stock inventory.
-      bursar: ['dashboard','assets','inventory','trash','account','about'],
-      teacher: ['timetable','attendance','substitutes','marks','questionBank','onlineLinks','hallTickets','exams','lessonPlans','ptm','logbook','students','discipline','conduct','activities','notices','reports','calendar','documents','complaints','classes','subjects','trash','account','about'],
+      clerk: ['admissions','admissionReqs','students','parents','feePayments','accounts','feeStructure','sms','reports','attendance','helpdesk','complaints','documents','assets','inventory','timetable','classes','notices','calendar','trash','account','about'],
+      // bursar/accountant — finance + asset/stock inventory only, nothing else (per-role scoped portal)
+      bursar: ['dashboard','feePayments','feeBills','feeStructure','pos','stockTransactions','vendors','accounts','payroll','assets','inventory','trash','account','about'],
+      teacher: ['timetable','attendance','substitutes','marks','questionBank','onlineLinks','payroll','hallTickets','exams','lessonPlans','ptm','logbook','students','discipline','conduct','activities','notices','reports','calendar','documents','complaints','classes','subjects','trash','account','about'],
       // student: dashboard → own-class academics → own records → support → profile. Read-only everywhere except helpdesk/complaints/account.
-      student: ['dashboard','timetable','attendance','marks','hallTickets','exams','onlineLinks','notices','calendar','activities','conduct','discipline','documents','helpdesk','complaints','account','about'],
+      student: ['dashboard','timetable','attendance','marks','hallTickets','exams','onlineLinks','notices','calendar','feePayments','feeStructure','activities','conduct','discipline','documents','helpdesk','complaints','account','about'],
       // parent: like student + PTM booking with teachers
-      parent: ['dashboard','notices','ptm','calendar','timetable','attendance','marks','hallTickets','exams','onlineLinks','conduct','discipline','activities','documents','helpdesk','complaints','account','about'],
+      parent: ['dashboard','notices','ptm','calendar','timetable','attendance','marks','hallTickets','exams','onlineLinks','feePayments','feeStructure','conduct','discipline','activities','documents','helpdesk','complaints','account','about'],
       // owner: read-only monitoring portal — no operational menus
       owner: ['ownerPortal','account','about']
     };
@@ -4993,6 +4998,9 @@
             <div className="dash-quick-btn qa-blue" onClick={() => goto('students')}>
               <i className="fas fa-user-plus"></i><span>Add Student</span>
             </div>
+            <div className="dash-quick-btn qa-green" onClick={() => goto('feePayments')}>
+              <i className="fas fa-money-bill-wave"></i><span>Record Payment</span>
+            </div>
             <div className="dash-quick-btn qa-orange" onClick={() => goto('notices')}>
               <i className="fas fa-bullhorn"></i><span>Post Notice</span>
             </div>
@@ -5005,6 +5013,9 @@
             <div className="dash-quick-btn qa-red" onClick={() => goto('helpdesk')}>
               <i className="fas fa-headset"></i><span>View Helpdesk</span>
             </div>
+            <div className="dash-quick-btn qa-navy" onClick={() => goto('pos')}>
+              <i className="fas fa-cash-register"></i><span>POS / Sell</span>
+            </div>
           </div>
 
           <div className="dash-kpi-grid">
@@ -5013,7 +5024,10 @@
             <DashKpi icon="school" label="Classes" value={stats.totalClasses} sub={`${fmt(stats.totalStrength)} seats`} color="navy" onClick={() => goto('classes')} />
             <DashKpi icon="book" label="Subjects" value={stats.totalSubjects} sub={`${stats.totalAssignments} assignments`} color="purple" onClick={() => goto('subjects')} />
             <DashKpi icon="users" label="Parents" value={fmt(stats.totalParents)} sub={`${stats.totalLinks} links`} color="teal" onClick={() => goto('parents')} />
-            <DashKpi icon="user-plus" label="Admitted This Term" value={admStats ? fmt(admStats.admittedCount) : '…'} sub="notified to Fees/Results system admins" color="teal" onClick={() => goto('admissions')} />
+
+            <DashKpi icon="money-bill-wave" label="Today's Collection" value={fmt(extras?.todayCollection || 0)} sub={`${fmt(stats.totalCollected)} all-time`} color="green" onClick={() => goto('feePayments')} />
+            <DashKpi icon="exclamation-circle" label="Outstanding" value={fmt(stats.totalPending)} sub={`${stats.totalPayments} payments`} color="red" onClick={() => goto('feePayments')} />
+            <DashKpi icon="user-plus" label="Admitted This Term" value={admStats ? fmt(admStats.admittedCount) : '…'} sub={admStats ? `GH₵${fmtAmt(admStats.admissionFeeTotal)} admission fees` : 'loading…'} color="teal" onClick={() => goto('admissions')} />
             <DashKpi icon="calendar-check" label="Today Attendance" value={(extras?.todayAttPct || 0) + '%'} sub={`${stats.todayMarked} records`} color="orange" onClick={() => goto('attendance')} />
             <DashKpi icon="graduation-cap" label="Active Exams" value={stats.totalExams} sub={`${stats.publishedExams} published`} color="amber" onClick={() => goto('exams')} />
             <DashKpi icon="gavel" label="Open Incidents" value={stats.openIncidents} sub={`${stats.criticalIncidents} critical`} color="red" onClick={() => goto('discipline')} />
@@ -5025,6 +5039,12 @@
             )}
             <DashKpi icon="circle-nodes" label="Users Online" value={onlineStats ? onlineStats.count : '…'} sub="live · refreshes every 45s" color="green" blink />
           </div>
+
+          {/* day-book snapshot */}
+          <TodayAccountsCard goto={goto} currentUser={currentUser} role={role} />
+
+          {/* fee types quick-reference — for parent inquiries at the front desk */}
+          <FeeBreakdownCard goto={goto} currentUser={currentUser} role={role} />
 
           {/* Critical Alerts — drives daily admin attention */}
           {enrich && (
@@ -5038,6 +5058,12 @@
                   <i className="fas fa-user-slash da-ico"></i>
                   <div className="da-val">{enrich.alerts.todayAbsent}</div>
                   <div className="da-lbl">Absent Today</div>
+                  <i className="fas fa-arrow-right da-go"></i>
+                </div>
+                <div className={'dash-alert a-orange ' + (enrich.alerts.overdueFees.count === 0 ? 'a-zero' : '')} onClick={() => enrich.alerts.overdueFees.count > 0 && goto('feePayments')}>
+                  <i className="fas fa-clock da-ico"></i>
+                  <div className="da-val">{enrich.alerts.overdueFees.count}</div>
+                  <div className="da-lbl">Overdue Fees · {fmtAmt(enrich.alerts.overdueFees.amount)}</div>
                   <i className="fas fa-arrow-right da-go"></i>
                 </div>
                 <div className={'dash-alert a-amber ' + (enrich.alerts.docsPending === 0 ? 'a-zero' : '')} onClick={() => enrich.alerts.docsPending > 0 && goto('documents')}>
@@ -5279,6 +5305,7 @@
             <DashKpi icon="book" label="Subjects" value={k.subjectsCount} color="purple" onClick={() => goto('subjects')} />
             <DashKpi icon="trophy" label="Latest Result" value={k.latestResultPct + '%'} color={k.latestResultPct >= 75 ? 'green' : k.latestResultPct >= 50 ? 'orange' : 'red'} onClick={() => goto('marks')} />
             <DashKpi icon="calendar-check" label="Attendance" value={k.attendancePct + '%'} sub={`${data.attendance.total} records`} color="teal" onClick={() => goto('attendance')} />
+            <DashKpi icon="money-bill-wave" label="Fees Due" value={fmt(k.feesDue)} color={k.feesDue > 0 ? 'red' : 'green'} onClick={() => goto('feePayments')} />
 
             <DashKpi icon="graduation-cap" label="Pending Exams" value={k.pendingExams} sub="upcoming" color="amber" onClick={() => goto('exams')} />
             <DashKpi icon="award" label="Conduct Grade" value={k.conductGrade} color="navy" onClick={() => goto('conduct')} />
@@ -5386,6 +5413,7 @@
 
           <div className="dash-kpi-grid">
             <DashKpi icon="child" label="My Children" value={k.totalChildren} color="blue" />
+            <DashKpi icon="exclamation-circle" label="Total Outstanding" value={fmt(k.totalDue)} color={k.totalDue > 0 ? 'red' : 'green'} onClick={() => goto('feePayments')} />
             <DashKpi icon="calendar-check" label="Avg Attendance" value={k.avgAttendance + '%'} color={k.avgAttendance >= 75 ? 'green' : k.avgAttendance >= 50 ? 'orange' : 'red'} onClick={() => goto('attendance')} />
             <DashKpi icon="trophy" label="Avg Result" value={k.avgResult + '%'} color={k.avgResult >= 75 ? 'green' : k.avgResult >= 50 ? 'orange' : 'red'} onClick={() => goto('marks')} />
             <DashKpi icon="user-friends" label="PTMs Today" value={k.ptmToday} color="pink" onClick={() => goto('ptm')} />
@@ -5594,26 +5622,83 @@
           <DashboardNotices currentUser={currentUser} role={role} goto={goto} />
 
           <div className="dash-kpi-grid">
+            <DashKpi icon="money-bill-wave" label="Today's Collection" value={fmt(k.todayCollection)} sub={`${k.todayReceipts} receipts`} color="green" onClick={() => goto('feePayments')} />
+            <DashKpi icon="receipt" label="Receipts Today" value={k.todayReceipts} sub="generated today" color="blue" onClick={() => goto('feePayments')} />
+            <DashKpi icon="exclamation-circle" label="Outstanding" value={fmt(k.totalOutstanding)} sub="total due" color="red" onClick={() => goto('feePayments')} />
+            <DashKpi icon="undo" label="Refunds Today" value={fmt(k.refundsToday)} sub={`${k.refundsTodayCount} refund(s)`} color="amber" onClick={() => goto('feePayments')} />
+            <DashKpi icon="list-alt" label="Active Fee Items" value={k.activeFeeItems} sub="fee structures" color="purple" onClick={() => goto('feeStructure')} />
+
             <DashKpi icon="user-graduate" label="Active Students" value={fmt(k.activeStudents)} color="navy" onClick={() => goto('students')} />
             <DashKpi icon="users" label="Total Parents" value={fmt(k.totalParents)} color="teal" onClick={() => goto('parents')} />
             <DashKpi icon="life-ring" label="Open Helpdesk" value={k.openHelpdesk} sub="tickets" color="orange" onClick={() => goto('helpdesk')} />
             <DashKpi icon="comment-dots" label="Open Complaints" value={k.openComplaints} color="pink" onClick={() => goto('complaints')} />
             <DashKpi icon="user-plus" label="New Admissions" value={k.newAdmissions} sub="this month" color="green" onClick={() => goto('students')} />
           </div>
+
+          {/* day-book snapshot */}
+          <TodayAccountsCard goto={goto} currentUser={currentUser} role={role} />
+
+          <div className="dash-charts">
+            <div className="dash-chart-card">
+              <h4><i className="fas fa-chart-bar"></i> Collection — Last 7 Days</h4>
+              <div className="dash-chart-body"><canvas ref={collChartRef}></canvas></div>
+            </div>
+            <div className="dash-chart-card">
+              <h4><i className="fas fa-chart-pie"></i> Collection by Mode</h4>
+              <div className="dash-chart-body"><canvas ref={modeChartRef}></canvas></div>
+            </div>
+          </div>
+
+          <div className="dash-lists">
+            <div className="dash-list-card" style={{gridColumn:'1 / -1'}}>
+              <h4><i className="fas fa-history"></i> Recent Payments</h4>
+              {data.recentPayments.length === 0 ? (
+                <div className="dlc-empty">No recent payments</div>
+              ) : data.recentPayments.map((p) => {
+                const stCls = p.PaymentStatus === 'paid' ? 'status-active' : p.PaymentStatus === 'partial' ? 'role-clerk' : p.PaymentStatus === 'refunded' ? 'role-supervisor' : 'status-suspended';
+                return (
+                  <div key={p.ID} className="dlc-row">
+                    <span className="role-badge role-clerk" style={{fontFamily:'monospace',fontSize:'11px'}}>{p.ReceiptNumber}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:600,color:'var(--navy-primary)'}}>{p.StudentName} <span style={{fontSize:'11px',color:'#888'}}>{p.AdmissionNumber}</span></div>
+                      <div style={{fontSize:'11px',color:'#888'}}>{p.ClassLabel}</div>
+                    </div>
+                    <span style={{fontWeight:700,color:'#34a853'}}>{fmt(p.AmountPaid)}</span>
+                    {p.AmountDue > 0 && <span style={{fontSize:'11px',color:'#ea4335'}}>Due {fmt(p.AmountDue)}</span>}
+                    <span style={{textTransform:'uppercase',fontSize:'11px',fontWeight:600,color:'#555'}}>{(p.PaymentMode || '').replace('_',' ')}</span>
+                    <span className={`status-badge ${stCls}`} style={{textTransform:'capitalize',fontSize:'10px'}}>{p.PaymentStatus}</span>
+                    <div style={{fontSize:'11px',color:'#888',fontFamily:'monospace'}}>{p.PaymentDate}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       );
     }
 
     // ============== Bursar / Accountant Dashboard ==============
-    // The Finance module (fees, POS, stock transactions, vendors, accounts, payroll) has been
-    // removed system-wide — a separate Fees Management system now handles all of that. Bursar's
-    // portal is left scoped to what remains: asset/stock inventory oversight.
+    // finance-only portal — reuses the clerk fee-KPI data source (bursar has the same access level
+    // there) plus asset/stock counts, so the bursar's landing page shows exactly what their sidebar
+    // scopes them to: fees, accounts, payroll and inventory. No admissions/helpdesk/parents noise.
     function BursarDashboard({ currentUser, role, goto }) {
-      const { data: assets, isLoading: loading, isValidating: syncing } =
-        useSWR('getAllAssets', () => swrFetcher('getAllAssets', {}, currentUser, role));
+      const { data, isLoading: loading, isValidating: syncing } =
+        useSWR('getClerkDashboardData', () => swrFetcher('getClerkDashboardData', currentUser, role));
+      const { data: assets } = useSWR('getAllAssets', () => swrFetcher('getAllAssets', {}, currentUser, role));
       const { data: stock } = useSWR('getAllStockItems', () => swrFetcher('getAllStockItems', {}, currentUser, role));
+      const { data: admStats } =
+        useSWR('getActiveTermAdmissionStats', () => swrFetcher('getActiveTermAdmissionStats', currentUser, role));
 
-      if (loading) return <DashSkeleton />;
+      const collChartRef = useRef(null);
+      const collData = data && {
+        labels: data.collectionTrend.map(t => t.date.slice(5)),
+        datasets: [{ label: 'Collection', data: data.collectionTrend.map(t => t.amount), backgroundColor: '#34a853', borderRadius: 3 }]
+      };
+      useDashChart(collChartRef, 'bar', collData, { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } });
+
+      if (loading || !data) return <DashSkeleton />;
+      const k = data.kpis;
+      const fmt = (n) => Number(n || 0).toLocaleString();
       const assetCount = (assets || []).length;
       const lowStockCount = (stock || []).filter(s => s.CurrentStock <= s.ReorderLevel).length;
 
@@ -5626,14 +5711,53 @@
 
           <DashboardNotices currentUser={currentUser} role={role} goto={goto} />
 
-          <div className="settings-info-message" style={{marginBottom:'18px'}}>
-            <i className="fas fa-info-circle" style={{marginRight:'6px'}}></i>
-            Fees, POS, stock transactions, vendors, accounts and payroll are now handled by a separate Fees Management system — this portal is scoped to asset/stock inventory only.
-          </div>
-
           <div className="dash-kpi-grid">
+            <DashKpi icon="money-bill-wave" label="Today's Collection" value={fmt(k.todayCollection)} sub={`${k.todayReceipts} receipts`} color="green" onClick={() => goto('feePayments')} />
+            <DashKpi icon="exclamation-circle" label="Outstanding" value={fmt(k.totalOutstanding)} sub="total due" color="red" onClick={() => goto('feePayments')} />
+            <DashKpi icon="user-plus" label="Admitted This Term" value={admStats ? fmt(admStats.admittedCount) : '…'} sub={admStats ? `GH₵${fmt(admStats.admissionFeeTotal)} admission fees` : 'loading…'} color="teal" onClick={() => goto('feePayments')} />
+            <DashKpi icon="undo" label="Refunds Today" value={fmt(k.refundsToday)} sub={`${k.refundsTodayCount} refund(s)`} color="amber" onClick={() => goto('feePayments')} />
+            <DashKpi icon="list-alt" label="Active Fee Items" value={k.activeFeeItems} sub="fee structures" color="purple" onClick={() => goto('feeStructure')} />
             <DashKpi icon="desktop" label="Assets on File" value={assetCount} color="navy" onClick={() => goto('assets')} />
             <DashKpi icon="boxes" label="Stock Items" value={(stock || []).length} sub={lowStockCount ? `${lowStockCount} low stock` : 'all stocked'} color={lowStockCount ? 'red' : 'teal'} onClick={() => goto('inventory')} blink={lowStockCount > 0} />
+            <DashKpi icon="cash-register" label="POS / Sell" value="Sell" sub="record a sale" color="navy" onClick={() => goto('pos')} />
+          </div>
+
+          {/* day-book snapshot */}
+          <TodayAccountsCard goto={goto} currentUser={currentUser} role={role} />
+
+          {/* fee types quick-reference */}
+          <FeeBreakdownCard goto={goto} currentUser={currentUser} role={role} />
+
+          <div className="dash-charts">
+            <div className="dash-chart-card" style={{gridColumn:'1 / -1'}}>
+              <h4><i className="fas fa-chart-bar"></i> Collection — Last 7 Days</h4>
+              <div className="dash-chart-body"><canvas ref={collChartRef}></canvas></div>
+            </div>
+          </div>
+
+          <div className="dash-lists">
+            <div className="dash-list-card" style={{gridColumn:'1 / -1'}}>
+              <h4><i className="fas fa-history"></i> Recent Payments</h4>
+              {data.recentPayments.length === 0 ? (
+                <div className="dlc-empty">No recent payments</div>
+              ) : data.recentPayments.map((p) => {
+                const stCls = p.PaymentStatus === 'paid' ? 'status-active' : p.PaymentStatus === 'partial' ? 'role-clerk' : p.PaymentStatus === 'refunded' ? 'role-supervisor' : 'status-suspended';
+                return (
+                  <div key={p.ID} className="dlc-row">
+                    <span className="role-badge role-clerk" style={{fontFamily:'monospace',fontSize:'11px'}}>{p.ReceiptNumber}</span>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontWeight:600,color:'var(--navy-primary)'}}>{p.StudentName} <span style={{fontSize:'11px',color:'#888'}}>{p.AdmissionNumber}</span></div>
+                      <div style={{fontSize:'11px',color:'#888'}}>{p.ClassLabel}</div>
+                    </div>
+                    <span style={{fontWeight:700,color:'#34a853'}}>{fmt(p.AmountPaid)}</span>
+                    {p.AmountDue > 0 && <span style={{fontSize:'11px',color:'#ea4335'}}>Due {fmt(p.AmountDue)}</span>}
+                    <span style={{textTransform:'uppercase',fontSize:'11px',fontWeight:600,color:'#555'}}>{(p.PaymentMode || '').replace('_',' ')}</span>
+                    <span className={`status-badge ${stCls}`} style={{textTransform:'capitalize',fontSize:'10px'}}>{p.PaymentStatus}</span>
+                    <div style={{fontSize:'11px',color:'#888',fontFamily:'monospace'}}>{p.PaymentDate}</div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       );
@@ -11406,13 +11530,14 @@
               render: () => {
                 const view = `<button class="action-icon edit-icon" data-action="view" title="View" style="color:var(--navy-accent)"><i class="fas fa-eye"></i></button>`;
                 // role-gated drill-downs
+                const fees = (isAdmin || isClerk) ? `<button class="action-icon edit-icon" data-action="fees" title="Fees" style="color:#34a853"><i class="fas fa-money-bill-wave"></i></button>` : '';
                 const att = (isAdmin || isTeacher || isSupervisor) ? `<button class="action-icon edit-icon" data-action="attendance" title="Attendance Report" style="color:#fb8c00"><i class="fas fa-calendar-check"></i></button>` : '';
                 const results = (isAdmin || isTeacher || isSupervisor) ? `<button class="action-icon edit-icon" data-action="results" title="Exam Results" style="color:#0074D9"><i class="fas fa-graduation-cap"></i></button>` : '';
                 const par = (isAdmin || isSupervisor) ? `<button class="action-icon edit-icon" data-action="parents" title="Linked Parents" style="color:#6a1b9a"><i class="fas fa-users"></i></button>` : '';
                 const edit = `<button class="action-icon edit-icon" data-action="edit" title="Edit"><i class="fas fa-edit"></i></button>`;
                 const del = `<button class="action-icon delete-icon" data-action="delete" title="Delete"><i class="fas fa-trash"></i></button>`;
-                if (isAdmin) return view + att + results + par + edit + del;
-                return view + att + results + par;
+                if (isAdmin) return view + fees + att + results + par + edit + del;
+                return view + fees + att + results + par;
               }
             });
 
@@ -14580,10 +14705,13 @@
                 const children = canSeeChildren
                   ? `<button class="action-icon edit-icon" data-action="children" title="Linked Children" style="color:#34a853"><i class="fas fa-child"></i></button>`
                   : '';
-                if (!isAdmin) return view + children;
+                const fees = canSeeFees
+                  ? `<button class="action-icon edit-icon" data-action="fees" title="Fees Records" style="color:#fb8c00"><i class="fas fa-money-bill-wave"></i></button>`
+                  : '';
+                if (!isAdmin) return view + children + fees;
                 const edit = `<button class="action-icon edit-icon" data-action="edit" title="Edit"><i class="fas fa-edit"></i></button>`;
                 const del = `<button class="action-icon delete-icon" data-action="delete" title="Delete"><i class="fas fa-trash"></i></button>`;
-                return view + children + edit + del;
+                return view + children + fees + edit + del;
               }
             });
 
@@ -28888,7 +29016,6 @@
       const [saving, setSaving] = useState(false);
       const [testingDigest, setTestingDigest] = useState(false);
       const [reinstalling, setReinstalling] = useState(false);
-      const [testingExternalDigest, setTestingExternalDigest] = useState(false);
 
       useEffect(() => {
         google.script.run
@@ -28935,18 +29062,6 @@
           })
           .withFailureHandler((err) => { setReinstalling(false); Swal.fire({ icon: 'error', title: 'Error', text: err.message }); })
           .reinstallOwnerDigestTrigger(currentUser, role);
-      };
-
-      const handleTestExternalDigest = () => {
-        setTestingExternalDigest(true);
-        google.script.run
-          .withSuccessHandler((res) => {
-            setTestingExternalDigest(false);
-            if (res.success) Swal.fire({ icon: 'success', title: 'Sent!', text: res.message });
-            else Swal.fire({ icon: 'error', title: 'Error', text: res.message });
-          })
-          .withFailureHandler((err) => { setTestingExternalDigest(false); Swal.fire({ icon: 'error', title: 'Error', text: err.message }); })
-          .sendExternalAdmissionDigestNow(currentUser, role);
       };
 
       return (
@@ -29073,43 +29188,12 @@
               </div>
             </div>
 
-            <h3 style={{margin:'26px 0 12px',color:'var(--navy-primary)',fontSize:'17px'}}>
-              <i className="fas fa-share-nodes"></i> External Fees / Results Systems — Daily Notice
-            </h3>
-            <div className="settings-info-message" style={{marginBottom:'14px'}}>
-              <i className="fas fa-info-circle" style={{marginRight:'6px'}}></i>
-              This app doesn't record fees or results itself. Instead, once a day (at the Daily Digest Time above) it emails/texts these contacts the list of students admitted, transferred, or re-admitted that day, so they can enter them into your separate Fees Management and School Results Management systems.
-            </div>
-            <div className="form-grid" style={{marginBottom:'14px'}}>
-              <div className="form-group">
-                <label><i className="fas fa-envelope"></i> Fees System Admin Email</label>
-                <input type="email" value={data.FeesSystemAdminEmail} onChange={(e) => set('FeesSystemAdminEmail', e.target.value)} placeholder="fees-admin@example.com" />
-              </div>
-              <div className="form-group">
-                <label><i className="fas fa-phone"></i> Fees System Admin Phone</label>
-                <input type="text" value={data.FeesSystemAdminPhone} onChange={(e) => set('FeesSystemAdminPhone', e.target.value)} placeholder="e.g. 0244000000" />
-              </div>
-              <div className="form-group">
-                <label><i className="fas fa-envelope"></i> Results System Admin Email</label>
-                <input type="email" value={data.ResultsSystemAdminEmail} onChange={(e) => set('ResultsSystemAdminEmail', e.target.value)} placeholder="results-admin@example.com" />
-              </div>
-              <div className="form-group">
-                <label><i className="fas fa-phone"></i> Results System Admin Phone</label>
-                <input type="text" value={data.ResultsSystemAdminPhone} onChange={(e) => set('ResultsSystemAdminPhone', e.target.value)} placeholder="e.g. 0244000000" />
-              </div>
-            </div>
-
             <div style={{display:'flex',gap:'10px',flexWrap:'wrap'}}>
               <button type="submit" className="btn btn-primary" disabled={saving}>
                 {saving ? <><i className="fas fa-spinner fa-spin"></i> Saving...</> : <><i className="fas fa-save"></i> Save SMS & Digest Settings</>}
               </button>
               <button type="button" className="btn btn-secondary" disabled={testingDigest || !(data.OwnerEmail || data.OwnerPhone)} onClick={handleTestDigest}>
                 {testingDigest ? <><i className="fas fa-spinner fa-spin"></i> Sending...</> : <><i className="fas fa-paper-plane"></i> Send Test Digest Now</>}
-              </button>
-              <button type="button" className="btn btn-secondary"
-                disabled={testingExternalDigest || !(data.FeesSystemAdminEmail || data.FeesSystemAdminPhone || data.ResultsSystemAdminEmail || data.ResultsSystemAdminPhone)}
-                onClick={handleTestExternalDigest} title="Sends only if at least one student was admitted/transferred/re-admitted today">
-                {testingExternalDigest ? <><i className="fas fa-spinner fa-spin"></i> Sending...</> : <><i className="fas fa-paper-plane"></i> Send Today's Admission Notice Now</>}
               </button>
               <button type="button" className="btn btn-secondary" disabled={reinstalling} onClick={handleReinstallTrigger}>
                 {reinstalling ? <><i className="fas fa-spinner fa-spin"></i> Scheduling...</> : <><i className="fas fa-sync"></i> Reinstall Digest Trigger</>}

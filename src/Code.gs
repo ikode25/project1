@@ -5,18 +5,6 @@
  */
 
 // ============== Config ==============
-
-// This school runs a separate, dedicated Fees Management system (plus a separate School Results
-// Management system — see sendExternalSystemsAdmissionDigest). The Finance module built into this
-// app (Fees Collection, Fee Structure, Fee Bills, POS/Sell, Vendors, the Accounts day-book,
-// Payroll/SSNIT) has been hidden from every portal's menu accordingly. This flag additionally
-// blocks every finance write function at the source, so nothing can slip through and create data
-// nobody is looking at — flip it back to true (a one-line change) to fully restore the module.
-var FINANCE_MODULE_ENABLED = false;
-function _financeDisabledResult() {
-  return { success: false, message: 'This school manages fees separately — the built-in Finance module is switched off.' };
-}
-
 var USERS_SHEET = 'Users';
 var CLASSES_SHEET = 'Classes';
 var SUBJECTS_SHEET = 'Subjects';
@@ -378,12 +366,7 @@ var PERIOD_HEADERS = ['ID','PeriodNumber','StartTime','EndTime','IsBreak','Label
 // matters (Exams, Fee_Structure, Admissions, LessonPlans, etc.) already carries its own
 // AcademicYear/Term columns, so old sessions stay fully queryable forever; this pair only drives
 // which session NEW records default into and what the dashboard banner shows.)
-// 55=FeesSystemAdminEmail, 56=FeesSystemAdminPhone, 57=ResultsSystemAdminEmail, 58=ResultsSystemAdminPhone
-// — contacts for the separate Fees Management and School Results Management systems this school
-// runs outside this app; sendExternalSystemsAdmissionDigest() notifies them daily of new
-// admissions/transfers/re-admissions so THEY can enter the student into their own system (this app
-// never writes to those systems directly — there's no integration to write through).
-var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt','ShowOverallPositionOnReportCard','ShowSubjectAverageOnReportCard','SchoolStampURL','HeadteacherSignatureURL','AdminSignatureURL','PublicAppBaseURL','ActiveTerm','DietaryOptions','BursarEmail','BursarPhone','HeadteacherEmail','HeadteacherPhone','UngradedStages','ShowInterestTalentOnReportCard','ShowConductOnReportCard','ShowAttitudeOnReportCard','ShowClassTeacherRemarkOnReportCard','ShowHeadteacherRemarkOnReportCard','SessionTimeoutMinutes','UseUnifiedGrading','ReportCardTemplate','TermDatesJSON','FeeCategoriesCSV','FeesSystemAdminEmail','FeesSystemAdminPhone','ResultsSystemAdminEmail','ResultsSystemAdminPhone'];
+var SETTINGS_HEADERS = ['ID','SchoolName','SchoolShortName','SchoolLogo','SchoolEmail','SchoolContact','SchoolAddress','SchoolWebsite','AdminName','AdminEmail','AcademicYear','Currency','TimeZone','AboutText','CreatedAt','UpdatedAt','WorkingDays','AcademicYearStartDate','AcademicYearEndDate','HiddenMenuIds','AdmissionNumberPrefix','SmsProvider','SmsApiKey','SmsApiSecret','SmsSenderId','SmsCustomEndpoint','SmsCustomConfig','OwnerEmail','OwnerPhone','DailyDigestTime','SmsBalanceCache','SmsBalanceCacheAt','ShowOverallPositionOnReportCard','ShowSubjectAverageOnReportCard','SchoolStampURL','HeadteacherSignatureURL','AdminSignatureURL','PublicAppBaseURL','ActiveTerm','DietaryOptions','BursarEmail','BursarPhone','HeadteacherEmail','HeadteacherPhone','UngradedStages','ShowInterestTalentOnReportCard','ShowConductOnReportCard','ShowAttitudeOnReportCard','ShowClassTeacherRemarkOnReportCard','ShowHeadteacherRemarkOnReportCard','SessionTimeoutMinutes','UseUnifiedGrading','ReportCardTemplate','TermDatesJSON','FeeCategoriesCSV'];
 // col 55 = FeeCategoriesCSV — admin-editable CSV of "value|label" pairs for the Fee Category picker
 // on Fee Structure (mirrors DietaryOptions above). The old hardcoded 10-item list is now just the
 // fallback seed, not a fixed enum — admin can add a category the school actually uses (e.g. "PTA
@@ -5564,10 +5547,9 @@ function enrollAdmission(id, d, currentUser, currentRole) {
       sh.getRange(row, 55).setValue(nowIso());                        // 54 UpdatedAt
 
       // best-effort: push admission fee into Fee_Payments — never fail the enrollment over this
-      // (skipped entirely while the Finance module is switched off — see FINANCE_MODULE_ENABLED)
       var feePaymentId = '';
       try {
-        var admFee = FINANCE_MODULE_ENABLED ? (parseFloat(ad.AdmissionFee) || 0) : 0;
+        var admFee = parseFloat(ad.AdmissionFee) || 0;
         if (admFee > 0) {
           var year = ad.AcademicYear;
           var fsId = '';
@@ -5865,7 +5847,6 @@ function _validateTransactionFields(d) {
 
 function addTransaction(d, currentUser, currentRole) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return _financeDisabledResult();
     if (!isFinanceStaff(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
     var sh = getSheet(ACCOUNT_TXN_SHEET);
     if (!sh) return { success: false, message: 'Account_Transactions sheet not found' };
@@ -5884,7 +5865,6 @@ function addTransaction(d, currentUser, currentRole) {
 
 function updateTransaction(id, d, currentUser, currentRole) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return _financeDisabledResult();
     if (!isFinanceStaff(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
     var sh = getSheet(ACCOUNT_TXN_SHEET);
     if (!sh) return { success: false, message: 'Account_Transactions sheet not found' };
@@ -5916,7 +5896,6 @@ function updateTransaction(id, d, currentUser, currentRole) {
 
 function deleteTransaction(id, currentUser, currentRole) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return _financeDisabledResult();
     if (!isFinanceStaff(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
     var sh = getSheet(ACCOUNT_TXN_SHEET);
     if (!sh) return { success: false, message: 'Account_Transactions sheet not found' };
@@ -8772,7 +8751,6 @@ var TERMLY_ONLY_FEE_CATEGORIES = ['tuition', 'exam'];
 
 function addFeeStructure(data, currentUser, currentRole) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return _financeDisabledResult();
     if (!isFinanceStaff(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
 
     var sh = getSheet(FEE_STRUCTURE_SHEET);
@@ -8838,7 +8816,6 @@ function addFeeStructure(data, currentUser, currentRole) {
 // validation/shape as addFeeStructure — just looped, so the two never drift apart.
 function addFeeTypeBulk(d, currentUser, currentRole) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return _financeDisabledResult();
     if (!isFinanceStaff(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
     var sh = getSheet(FEE_STRUCTURE_SHEET);
     if (!sh) return { success: false, message: 'Fee_Structure sheet not found' };
@@ -8895,7 +8872,6 @@ function addFeeTypeBulk(d, currentUser, currentRole) {
 
 function updateFeeStructure(id, data, currentUser, currentRole) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return _financeDisabledResult();
     if (!isFinanceStaff(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
     var sh = getSheet(FEE_STRUCTURE_SHEET);
     if (!sh) return { success: false, message: 'Fee_Structure sheet not found' };
@@ -8971,7 +8947,6 @@ function updateFeeStructure(id, data, currentUser, currentRole) {
 
 function deleteFeeStructure(id, currentUser, currentRole) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return _financeDisabledResult();
     if (!isFinanceStaff(currentRole)) return { success: false, message: 'Forbidden — admin/clerk only' };
     var sh = getSheet(FEE_STRUCTURE_SHEET);
     if (!sh) return { success: false, message: 'Fee_Structure sheet not found' };
@@ -9198,7 +9173,6 @@ function receiptNumberExists(sh, receiptNo, excludeId) {
 //      TransactionReference?, ReceiptNumber?, Remarks?, MobileMoneyProvider? }
 function addPayment(p, currentUser, currentRole) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return _financeDisabledResult();
     var role = String(currentRole).toLowerCase();
     if (role !== 'admin' && role !== 'clerk' && role !== 'bursar') return { success: false, message: 'Forbidden — admin, clerk or bursar only' };
 
@@ -9363,7 +9337,6 @@ function addPaymentsBulk(payments, currentUser, currentRole) {
 // due's running balance stays accurate through a correction — not just the payment row's own fields.
 function updatePayment(id, p, currentUser, currentRole) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return _financeDisabledResult();
     var role = String(currentRole).toLowerCase();
     if (role !== 'admin' && role !== 'clerk' && role !== 'bursar') return { success: false, message: 'Forbidden — admin, clerk or bursar only' };
 
@@ -9471,7 +9444,6 @@ function updatePayment(id, p, currentUser, currentRole) {
 
 function deletePayment(id, currentUser, currentRole) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return _financeDisabledResult();
     if (!isAdminOrBursar(currentRole)) return { success: false, message: 'Forbidden — admin or bursar only' };
     var sh = _ensureFeePaymentsSheet();
     var idn = parseInt(id, 10);
@@ -12150,7 +12122,6 @@ function getAllPayslips(currentUser, currentRole) {
 // admin only — Basic + Allowances + admin-entered IncomeTax/OtherDeductions; SSNIT auto-computed
 function generatePayslip(d, currentUser, currentRole) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return _financeDisabledResult();
     if (!isAdminOrBursar(currentRole)) return { success: false, message: 'Forbidden — admin or bursar only' };
     var tid = parseInt(d.TeacherID, 10);
     if (isNaN(tid)) return { success: false, message: 'Staff member is required' };
@@ -12201,7 +12172,6 @@ function generatePayslip(d, currentUser, currentRole) {
 
 function deletePayslip(id, currentUser, currentRole) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return _financeDisabledResult();
     if (!isAdminOrBursar(currentRole)) return { success: false, message: 'Forbidden — admin or bursar only' };
     var idn = parseInt(id, 10);
     var sh = _ensurePayslipsSheet();
@@ -13133,8 +13103,7 @@ function getAdminExtendedSettings(currentUser, currentRole) {
         success: true,
         data: { SmsProvider: '', SmsApiKey: '', SmsApiSecret: '', SmsSenderId: '', SmsCustomEndpoint: '', SmsCustomConfig: '',
                 OwnerEmail: '', OwnerPhone: '', DailyDigestTime: '18:00', SmsBalanceCache: '', SmsBalanceCacheAt: '',
-                BursarEmail: '', BursarPhone: '', HeadteacherEmail: '', HeadteacherPhone: '',
-                FeesSystemAdminEmail: '', FeesSystemAdminPhone: '', ResultsSystemAdminEmail: '', ResultsSystemAdminPhone: '' }
+                BursarEmail: '', BursarPhone: '', HeadteacherEmail: '', HeadteacherPhone: '' }
       };
     }
     return {
@@ -13146,9 +13115,7 @@ function getAdminExtendedSettings(currentUser, currentRole) {
         SmsBalanceCache: row[30] === '' || row[30] == null ? '' : parseFloat(row[30]),
         SmsBalanceCacheAt: row[31] ? toIso(row[31]) : '',
         BursarEmail: row[40] || '', BursarPhone: row[41] || '',
-        HeadteacherEmail: row[42] || '', HeadteacherPhone: row[43] || '',
-        FeesSystemAdminEmail: row[55] || '', FeesSystemAdminPhone: row[56] || '',
-        ResultsSystemAdminEmail: row[57] || '', ResultsSystemAdminPhone: row[58] || ''
+        HeadteacherEmail: row[42] || '', HeadteacherPhone: row[43] || ''
       }
     };
   } catch (err) {
@@ -13205,15 +13172,10 @@ function updateSmsSettings(d, currentUser, currentRole) {
     sh.getRange(foundRow, 42).setValue(String(d.BursarPhone || '').trim());
     sh.getRange(foundRow, 43).setValue(String(d.HeadteacherEmail || '').trim());
     sh.getRange(foundRow, 44).setValue(String(d.HeadteacherPhone || '').trim());
-    sh.getRange(foundRow, 56).setValue(String(d.FeesSystemAdminEmail || '').trim());
-    sh.getRange(foundRow, 57).setValue(String(d.FeesSystemAdminPhone || '').trim());
-    sh.getRange(foundRow, 58).setValue(String(d.ResultsSystemAdminEmail || '').trim());
-    sh.getRange(foundRow, 59).setValue(String(d.ResultsSystemAdminPhone || '').trim());
     sh.getRange(foundRow, 16).setValue(ts);
 
-    // keep both daily-digest triggers in sync with whatever time the admin just set
+    // keep the daily-digest trigger in sync with whatever time the admin just set
     try { _installOwnerDigestTrigger(digestTime); } catch (e) { Logger.log('Trigger install failed: ' + e.toString()); }
-    try { _installExternalAdmissionDigestTrigger(digestTime); } catch (e) { Logger.log('External digest trigger install failed: ' + e.toString()); }
 
     addLog(currentUser, 'SMS Settings Updated', 'Provider: ' + (provider || 'none'));
     return { success: true, message: 'SMS & owner digest settings saved. Daily digest scheduled for ' + digestTime + '.' };
@@ -13756,111 +13718,6 @@ function sendOwnerDigestNow(currentUser, currentRole) {
     if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
     sendOwnerDailyDigest();
     return { success: true, message: 'Digest sent (check owner email/phone).' };
-  } catch (err) {
-    return { success: false, message: 'Error: ' + err.toString() };
-  }
-}
-
-// ============== External Fees/Results Systems — Daily Admission Notice ==============
-// This school runs its Fees Management and School Results Management as separate systems outside
-// this app. This app never writes into them (there's no integration to write through) — instead it
-// tells their admins, once a day, exactly who was admitted/transferred/re-admitted today so THEY
-// can enter those students into their own records. Mirrors sendOwnerDailyDigest's own
-// trigger/email/SMS pattern so the two stay consistent.
-
-function _installExternalAdmissionDigestTrigger(digestTimeHHMM) {
-  ScriptApp.getProjectTriggers().forEach(function (t) {
-    if (t.getHandlerFunction() === 'sendExternalSystemsAdmissionDigest') ScriptApp.deleteTrigger(t);
-  });
-  var parts = String(digestTimeHHMM || '18:00').split(':');
-  var hour = parseInt(parts[0], 10);
-  if (isNaN(hour) || hour < 0 || hour > 23) hour = 18;
-  var minute = parseInt(parts[1], 10);
-  if (isNaN(minute) || minute < 0 || minute > 59) minute = 0;
-  ScriptApp.newTrigger('sendExternalSystemsAdmissionDigest')
-    .timeBased()
-    .everyDays(1)
-    .atHour(hour)
-    .nearMinute(minute)
-    .create();
-}
-
-var _ADMISSION_TYPE_LABEL = { fresh: 'New Admission', transfer: 'Transfer', re_admission: 'Re-Admission' };
-
-// unattended off the time-based trigger — no user session, so it authenticates itself as 'System'/'admin'
-function sendExternalSystemsAdmissionDigest() {
-  try {
-    var ext = getAdminExtendedSettings('System', 'admin');
-    if (!ext.success) return;
-    var d = ext.data;
-    var feesEmail = d.FeesSystemAdminEmail, feesPhone = d.FeesSystemAdminPhone;
-    var resultsEmail = d.ResultsSystemAdminEmail, resultsPhone = d.ResultsSystemAdminPhone;
-    if (!feesEmail && !feesPhone && !resultsEmail && !resultsPhone) return; // nothing configured — nothing to do
-
-    var activityRes = getTodayAdmissionActivity('System', 'admin');
-    var students = activityRes.success ? (activityRes.data || []) : [];
-    if (!students.length) return; // nothing admitted today — don't spam an empty notice
-
-    var settingsRes = getSchoolSettings();
-    var schoolName = settingsRes.success ? settingsRes.data.SchoolName : 'School';
-    var today = todayStr();
-
-    var rowsHtml = students.map(function (s) {
-      return '<tr><td style="padding:5px 10px;border:1px solid #ddd">' + s.AdmissionNumber + '</td>'
-        + '<td style="padding:5px 10px;border:1px solid #ddd">' + s.FullName + '</td>'
-        + '<td style="padding:5px 10px;border:1px solid #ddd">' + (s.ClassLabel || '—') + '</td>'
-        + '<td style="padding:5px 10px;border:1px solid #ddd">' + (_ADMISSION_TYPE_LABEL[s.AdmissionType] || s.AdmissionType) + '</td>'
-        + '<td style="padding:5px 10px;border:1px solid #ddd">' + (s.GuardianMobile || '—') + '</td></tr>';
-    }).join('');
-
-    var htmlBody = '<div style="font-family:Arial,sans-serif;color:#333">'
-      + '<h2 style="color:#001f3f">' + schoolName + ' — New Students Today (' + today + ')</h2>'
-      + '<p>' + students.length + ' student(s) admitted, transferred, or re-admitted today. Please enter ' + (students.length === 1 ? 'this student' : 'these students') + ' into your system.</p>'
-      + '<table style="border-collapse:collapse;font-size:13px">'
-      + '<tr><th style="padding:5px 10px;border:1px solid #ddd;background:#001f3f;color:#fff">Adm. No.</th>'
-      + '<th style="padding:5px 10px;border:1px solid #ddd;background:#001f3f;color:#fff">Name</th>'
-      + '<th style="padding:5px 10px;border:1px solid #ddd;background:#001f3f;color:#fff">Class</th>'
-      + '<th style="padding:5px 10px;border:1px solid #ddd;background:#001f3f;color:#fff">Type</th>'
-      + '<th style="padding:5px 10px;border:1px solid #ddd;background:#001f3f;color:#fff">Guardian Contact</th></tr>'
-      + rowsHtml + '</table>'
-      + '<hr><p style="font-size:11px;color:#888">Automated daily notice from ' + schoolName + '. This app does not record fees or results itself — please add these students to your system.</p>'
-      + '</div>';
-    var subject = schoolName + ' — ' + students.length + ' New Student(s) Today (' + today + ')';
-    var smsMsg = schoolName + ': ' + students.length + ' student(s) admitted/transferred/re-admitted today ('
-      + students.slice(0, 5).map(function (s) { return s.FullName; }).join(', ') + (students.length > 5 ? ', +' + (students.length - 5) + ' more' : '')
-      + '). Check email for the full list — please add to your system.';
-
-    [feesEmail, resultsEmail].forEach(function (email) {
-      if (!email) return;
-      try { MailApp.sendEmail({ to: email, subject: subject, htmlBody: htmlBody }); } catch (e) { Logger.log('External admission digest email failed (' + email + '): ' + e.toString()); }
-    });
-    [feesPhone, resultsPhone].forEach(function (phone) {
-      if (!phone) return;
-      try { sendSms(phone, smsMsg, 'other', null, 'System', 'admin'); } catch (e) { Logger.log('External admission digest SMS failed (' + phone + '): ' + e.toString()); }
-    });
-
-    addLog('System', 'External Admission Digest Sent', students.length + ' student(s) notified to Fees/Results system admins for ' + today);
-  } catch (err) {
-    Logger.log('sendExternalSystemsAdmissionDigest error: ' + err.toString());
-  }
-}
-
-// admin-callable — sends today's notice immediately (even with zero admissions today, unlike the
-// unattended trigger) so the admin can verify email/SMS delivery works before relying on it.
-function sendExternalAdmissionDigestNow(currentUser, currentRole) {
-  try {
-    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
-    var ext = getAdminExtendedSettings(currentUser, currentRole);
-    var d = ext.success ? ext.data : {};
-    if (!d.FeesSystemAdminEmail && !d.FeesSystemAdminPhone && !d.ResultsSystemAdminEmail && !d.ResultsSystemAdminPhone) {
-      return { success: false, message: 'Add at least one Fees/Results system admin contact first.' };
-    }
-    var activityRes = getTodayAdmissionActivity(currentUser, currentRole);
-    if (!activityRes.success || !(activityRes.data || []).length) {
-      return { success: false, message: 'No students admitted/transferred/re-admitted today — nothing to send yet.' };
-    }
-    sendExternalSystemsAdmissionDigest();
-    return { success: true, message: 'Notice sent (check the configured email/phone).' };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
@@ -17811,9 +17668,6 @@ function recordStockTransaction(itemId, d, currentUser, currentRole) {
     if (isNaN(qty) || qty < 0) return { success: false, message: 'quantity must be a positive number' };
     var kind = String(d.kind || (type === 'out' ? 'issue' : 'adjustment')).toLowerCase();
     if (STOCK_TXN_KINDS.indexOf(kind) === -1) return { success: false, message: 'Invalid kind' };
-    // POS/Sell kinds only — plain inventory issue/adjustment movements stay available even with
-    // the Finance module (POS/Sell, Stock Transactions) switched off.
-    if (!FINANCE_MODULE_ENABLED && ['sale', 'purchase', 'return'].indexOf(kind) !== -1) return _financeDisabledResult();
     var unitPrice = d.unitPrice != null && d.unitPrice !== '' ? parseFloat(d.unitPrice) : 0;
     if (isNaN(unitPrice) || unitPrice < 0) unitPrice = 0;
     var totalAmount = Math.round(qty * unitPrice * 100) / 100;
@@ -17924,7 +17778,6 @@ function getAllStockTransactions(filters, currentUser, currentRole) {
 // d: { quantity?, unitPrice?, party?, paymentMode?, transactionDate?, reason?, notes?, reference? }
 function updateStockTransaction(id, d, currentUser, currentRole) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return _financeDisabledResult();
     if (!canIssueStock(currentRole)) return { success: false, message: 'Forbidden — admin/clerk/bursar only' };
     var tid = parseInt(id, 10);
     if (isNaN(tid)) return { success: false, message: 'Invalid id' };
@@ -18032,7 +17885,6 @@ function getAllVendors(currentUser, currentRole) {
 
 function addVendor(d, currentUser, currentRole) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return _financeDisabledResult();
     if (!canWriteVendors(currentRole)) return { success: false, message: 'Forbidden — admin/clerk/bursar only' };
     if (!d || typeof d !== 'object') return { success: false, message: 'Invalid payload' };
     var name = String(d.VendorName || '').trim();
@@ -18050,7 +17902,6 @@ function addVendor(d, currentUser, currentRole) {
 
 function updateVendor(id, d, currentUser, currentRole) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return _financeDisabledResult();
     if (!canWriteVendors(currentRole)) return { success: false, message: 'Forbidden — admin/clerk/bursar only' };
     if (!d || typeof d !== 'object') return { success: false, message: 'Invalid payload' };
     var name = String(d.VendorName || '').trim();
@@ -18077,7 +17928,6 @@ function updateVendor(id, d, currentUser, currentRole) {
 
 function deleteVendor(id, currentUser, currentRole) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return _financeDisabledResult();
     if (!canWriteVendors(currentRole)) return { success: false, message: 'Forbidden — admin/clerk/bursar only' };
     var idn = parseInt(id, 10);
     if (isNaN(idn)) return { success: false, message: 'Invalid id' };
@@ -19817,7 +19667,6 @@ function emailFeeReceipt(paymentId, currentUser, currentRole) {
 // refund a payment (admin only) — sets RefundAmount/Date/Reason and flips status to 'refunded'
 function refundPayment(paymentId, refundAmount, refundReason, currentUser, currentRole) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return _financeDisabledResult();
     if (!isAdminOrBursar(currentRole)) return { success: false, message: 'Forbidden — admin or bursar only' };
     var pid = parseInt(paymentId, 10);
     if (isNaN(pid)) return { success: false, message: 'Invalid payment id' };
@@ -21074,7 +20923,6 @@ function _applyPaymentToDue(dsh, dueData, dueRowIdx, amountPaid, lateFeeDelta, d
 // Idempotent — skips months that already have a due row for that fee structure.
 function generateStudentDues(studentId, currentUser) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return _financeDisabledResult();
     var sid = parseInt(studentId, 10);
     if (isNaN(sid)) return { success: false, message: 'Invalid student id' };
     var ssh = getSheet(STUDENTS_SHEET);
@@ -21280,7 +21128,6 @@ function generateDuesForCurrentMonth() { return backfillAllDues(); }
 // just with a clean slate instead of whatever old/legacy rows had accumulated).
 function resetFeesCollection(currentUser, currentRole) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return _financeDisabledResult();
     if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'GMT', 'yyyyMMdd_HHmmss');
@@ -21460,7 +21307,6 @@ function _isPastBillingPeriod(billingMonth, activeTerm, academicYear) {
 // double-adds the arrears.
 function _rollTermArrears(academicYear, fromTerm, toTerm, currentUser) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return { rolled: 0, totalRolled: 0 };
     var ay = String(academicYear || '').trim();
     if (!ay || !fromTerm || !toTerm || fromTerm === toTerm) return { rolled: 0, totalRolled: 0 };
     var dsh = _ensureFeeDuesSheet();
@@ -21536,7 +21382,6 @@ function _rollTermArrears(academicYear, fromTerm, toTerm, currentUser) {
 // Sets Status='waived' so it drops out of every "still owed" total everywhere the ledger surfaces it.
 function waiveDue(dueId, currentUser, currentRole) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return _financeDisabledResult();
     if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
     var idn = parseInt(dueId, 10);
     if (isNaN(idn)) return { success: false, message: 'Invalid due id' };
@@ -21561,7 +21406,6 @@ function waiveDue(dueId, currentUser, currentRole) {
 // every total) is the right tool from that point on, not deletion.
 function deleteFeeDue(dueId, currentUser, currentRole) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return _financeDisabledResult();
     if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
     var idn = parseInt(dueId, 10);
     if (isNaN(idn)) return { success: false, message: 'Invalid due id' };
@@ -21586,7 +21430,6 @@ function deleteFeeDue(dueId, currentUser, currentRole) {
 // actually collected, so the remaining balance and status recompute automatically from the new figure.
 function updateDueAmount(dueId, newAmount, currentUser, currentRole) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return _financeDisabledResult();
     if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
     var idn = parseInt(dueId, 10);
     if (isNaN(idn)) return { success: false, message: 'Invalid due id' };
@@ -21832,7 +21675,6 @@ function getAllTermBills(term, academicYear, currentUser, currentRole) {
 // wa.me links built client-side from the same data — this function only owns the email channel.
 function sendTermBillEmails(term, academicYear, currentUser, currentRole) {
   try {
-    if (!FINANCE_MODULE_ENABLED) return _financeDisabledResult();
     if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
     var billsRes = getAllTermBills(term, academicYear, currentUser, currentRole);
     if (!billsRes.success) return billsRes;
