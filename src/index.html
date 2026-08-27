@@ -3159,7 +3159,18 @@
       body.print-target .report-card, body.print-target .report-card *,
       body.print-target .tt-wrap, body.print-target .tt-wrap * { visibility: visible !important; }
       body.print-target .fee-bill-bulk-wrap, body.print-target .fee-bill-bulk-wrap * { visibility: visible !important; }
-      body.print-target .fee-bill-bulk-wrap { display: block !important; position: static !important; width: 100% !important; }
+      /* same fix as .report-card below: the wrap is almost always nested inside a modal
+         (position:fixed, flex-centered, fixed height, overflow:auto) — that ancestor box stays in
+         the layout even though invisible, so without anchoring to the viewport here the visible
+         content gets clipped to wherever that modal box used to sit, printing as a small
+         off-position fragment on an otherwise blank page instead of a full page. */
+      body.print-target .fee-bill-bulk-wrap {
+        display: block !important; visibility: visible !important;
+        position: fixed !important; left: 0 !important; top: 0 !important; right: 0 !important;
+        width: auto !important; max-width: none !important; height: auto !important; max-height: none !important;
+        margin: 0 !important; padding: 0 !important; overflow: visible !important;
+        box-sizing: border-box !important;
+      }
       body.print-target .fee-bill-card { page-break-after: always; width: 100% !important; box-sizing: border-box; }
       body.print-target .fee-bill-card:last-child { page-break-after: avoid; }
       /* 2-per-page layout: pair cards up, break only after every 2nd one */
@@ -20115,6 +20126,8 @@
                 if (isAdmin || isClerk) {
                   html += `<button class="action-icon edit-icon" data-action="receipt" title="A4 Receipt" style="color:#001f3f"><i class="fas fa-print"></i></button>`;
                   html += `<button class="action-icon edit-icon" data-action="email" title="Email Receipt" style="color:#0074D9"><i class="fas fa-envelope"></i></button>`;
+                  html += `<button class="action-icon edit-icon" data-action="sms" title="Text Receipt (SMS)" style="color:#fb8c00"><i class="fas fa-sms"></i></button>`;
+                  html += `<button class="action-icon edit-icon" data-action="whatsapp" title="Send Receipt via WhatsApp" style="color:#25D366"><i class="fab fa-whatsapp"></i></button>`;
                   html += `<button class="action-icon edit-icon" data-action="edit" title="Edit"><i class="fas fa-edit"></i></button>`;
                 }
                 if (isAdmin && row.PaymentStatus !== 'refunded') {
@@ -20151,6 +20164,8 @@
               else if (action === 'delete') handleDelete(rowData);
               else if (action === 'receipt') { setDrillPayment(rowData); setShowReceiptModal(true); }
               else if (action === 'email') handleEmailReceipt(rowData);
+              else if (action === 'sms') handleSmsReceipt(rowData);
+              else if (action === 'whatsapp') handleWhatsAppReceipt(rowData);
               else if (action === 'refund') handleRefund(rowData);
             });
             tableInstanceRef.current = table;
@@ -20288,6 +20303,35 @@
             .withFailureHandler((err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }))
             .emailFeeReceipt(p.ID, currentUser, role);
         });
+      };
+
+      const handleSmsReceipt = (p) => {
+        Swal.fire({
+          icon: 'question', title: 'Text Receipt?',
+          html: `Send an SMS receipt for <strong>${p.ReceiptNumber}</strong> to <strong>${p.StudentName}</strong>'s parent/guardian?`,
+          showCancelButton: true, confirmButtonColor: '#fb8c00', confirmButtonText: 'Send SMS'
+        }).then((r) => {
+          if (!r.isConfirmed) return;
+          Swal.fire({ title: 'Sending...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+          google.script.run
+            .withSuccessHandler((rr) => {
+              if (rr.success) Swal.fire({ icon: 'success', title: 'Sent', text: rr.message, timer: 2400, showConfirmButton: false });
+              else Swal.fire({ icon: 'error', title: 'Error', text: rr.message });
+            })
+            .withFailureHandler((err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }))
+            .sendFeeReceiptSms(p.ID, currentUser, role);
+        });
+      };
+
+      const handleWhatsAppReceipt = (p) => {
+        google.script.run
+          .withSuccessHandler((rr) => {
+            if (rr.success && rr.data && rr.data.waLink) {
+              window.open(rr.data.waLink, '_blank');
+            } else Swal.fire({ icon: 'error', title: 'Error', text: (rr && rr.message) || 'Could not build WhatsApp link' });
+          })
+          .withFailureHandler((err) => Swal.fire({ icon: 'error', title: 'Error', text: err.message }))
+          .getFeeReceiptWhatsAppLink(p.ID, currentUser, role);
       };
 
       const handleRefund = (p) => {

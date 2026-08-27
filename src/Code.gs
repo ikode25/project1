@@ -19875,6 +19875,106 @@ function emailFeeReceipt(paymentId, currentUser, currentRole) {
   } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
 }
 
+// parent/guardian phone(s) for a student — same fallback chain as emailFeeReceipt's own email
+// lookup (Parent_Students junction first, then the student's own guardian/father/mother mobile).
+function _getFeeReceiptPhones(studentId) {
+  var phones = [];
+  var psh = getSheet(PARENT_STUDENTS_SHEET), parsh = getSheet(PARENTS_SHEET);
+  if (psh && parsh) {
+    var lsdata = psh.getDataRange().getValues(), parentIds = [];
+    for (var j = 1; j < lsdata.length; j++) {
+      if (parseInt(lsdata[j][2], 10) === studentId) parentIds.push(parseInt(lsdata[j][1], 10));
+    }
+    if (parentIds.length > 0) {
+      var pdata = parsh.getDataRange().getValues();
+      for (var k = 1; k < pdata.length; k++) {
+        if (String(pdata[k][10]) === '1') continue;
+        if (parentIds.indexOf(parseInt(pdata[k][0], 10)) === -1) continue;
+        if (pdata[k][3]) phones.push(String(pdata[k][3]));
+      }
+    }
+  }
+  if (phones.length === 0) {
+    var ssh = getSheet(STUDENTS_SHEET);
+    if (ssh) {
+      var sdata = ssh.getDataRange().getValues();
+      for (var m = 1; m < sdata.length; m++) {
+        if (parseInt(sdata[m][0], 10) === studentId && String(sdata[m][36]) !== '1') {
+          var cand = sdata[m][23] || sdata[m][17] || sdata[m][20]; // GuardianMobile, FatherMobile, MotherMobile
+          if (cand) phones.push(String(cand));
+          break;
+        }
+      }
+    }
+  }
+  return phones;
+}
+
+function _feeReceiptText(p, schoolName) {
+  return schoolName + ': Receipt ' + p.ReceiptNumber + ' — ' + p.StudentName + ' (' + p.AdmissionNumber + '). '
+    + 'Paid GH₵' + p.AmountPaid + ' for ' + String(p.FeeCategory || '').toUpperCase() + ' (' + p.BillingPeriod + '). '
+    + 'Outstanding: GH₵' + p.AmountDue + '. Status: ' + String(p.PaymentStatus || '').toUpperCase() + '. Thank you.';
+}
+
+function _loadFeePaymentById(pid) {
+  var sh = getSheet(FEE_PAYMENTS_SHEET);
+  if (!sh) return null;
+  var students = getStudentsLite(), fmap = getFeeStructuresLite(), umap = getUsersMap();
+  var data = sh.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][0] === pid && String(data[i][15]) !== '1') return rowToPayment(data[i], students, fmap, umap);
+  }
+  return null;
+}
+
+// admin/clerk/bursar — texts a short receipt summary to the parent/guardian's phone(s) on file
+function sendFeeReceiptSms(paymentId, currentUser, currentRole) {
+  try {
+    var role = String(currentRole || '').toLowerCase();
+    if (role !== 'admin' && role !== 'clerk' && role !== 'bursar') return { success: false, message: 'Forbidden — admin/clerk/bursar only' };
+    var pid = parseInt(paymentId, 10);
+    if (isNaN(pid)) return { success: false, message: 'Invalid payment id' };
+    var p = _loadFeePaymentById(pid);
+    if (!p) return { success: false, message: 'Payment not found' };
+    var phones = _getFeeReceiptPhones(p.StudentID);
+    if (!phones.length) return { success: false, message: 'No parent/guardian phone number on file' };
+    var settingsRes = getSchoolSettings();
+    var schoolName = (settingsRes.success && settingsRes.data) ? settingsRes.data.SchoolName : 'School';
+    var msg = _feeReceiptText(p, schoolName);
+    var sent = 0, lastMsg = '';
+    phones.forEach(function (ph) {
+      var res = sendSms(ph, msg, 'fees', p.StudentID, currentUser, currentRole);
+      if (res && res.success) sent++; else lastMsg = (res && res.message) || 'unknown error';
+    });
+    if (!sent) return { success: false, message: 'SMS failed to send: ' + lastMsg };
+    addLog(currentUser, 'Fee Receipt SMS Sent', 'Receipt #' + p.ReceiptNumber + ' texted to ' + sent + ' number(s)');
+    return { success: true, message: 'Receipt texted to ' + sent + ' number(s)' };
+  } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
+}
+
+// admin/clerk/bursar — builds a wa.me "click to chat" link pre-filled with the receipt summary,
+// same pattern already used for the daily admissions digest and report-card WhatsApp sends (no
+// paid WhatsApp Business API configured, so this hands the admin a one-click compose instead)
+function getFeeReceiptWhatsAppLink(paymentId, currentUser, currentRole) {
+  try {
+    var role = String(currentRole || '').toLowerCase();
+    if (role !== 'admin' && role !== 'clerk' && role !== 'bursar') return { success: false, message: 'Forbidden — admin/clerk/bursar only' };
+    var pid = parseInt(paymentId, 10);
+    if (isNaN(pid)) return { success: false, message: 'Invalid payment id' };
+    var p = _loadFeePaymentById(pid);
+    if (!p) return { success: false, message: 'Payment not found' };
+    var phones = _getFeeReceiptPhones(p.StudentID);
+    if (!phones.length) return { success: false, message: 'No parent/guardian phone number on file' };
+    var settingsRes = getSchoolSettings();
+    var schoolName = (settingsRes.success && settingsRes.data) ? settingsRes.data.SchoolName : 'School';
+    var msg = _feeReceiptText(p, schoolName);
+    var digits = _normalizePhone(phones[0]);
+    var waPhone = digits.length === 9 ? '233' + digits : digits; // Ghana country code
+    addLog(currentUser, 'Fee Receipt WhatsApp Link Generated', 'Receipt #' + p.ReceiptNumber + ' for ' + phones[0]);
+    return { success: true, data: { waLink: 'https://wa.me/' + waPhone + '?text=' + encodeURIComponent(msg), phone: phones[0] } };
+  } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
+}
+
 // refund a payment (admin only) — sets RefundAmount/Date/Reason and flips status to 'refunded'
 function refundPayment(paymentId, refundAmount, refundReason, currentUser, currentRole) {
   try {
