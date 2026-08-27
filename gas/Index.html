@@ -248,7 +248,6 @@ var Auth = {
       '<div class="field"><label>Username</label><input id="loginUser" placeholder="admin"></div>' +
       '<div class="field"><label>Password</label><input id="loginPass" type="password" placeholder="••••••••"></div>' +
       '<button class="btn btn-primary btn-block" onclick="Auth.submit()"><i class="fa-solid fa-right-to-bracket"></i> Log in</button>' +
-      '<p class="hint" style="margin-top:16px;text-align:center;">First time? Default is <b>admin / admin123</b> — change it under Settings right after logging in.</p>' +
       '</div></div>';
     document.getElementById('loginPass').addEventListener('keydown', function (e) { if (e.key === 'Enter') Auth.submit(); });
   },
@@ -320,7 +319,14 @@ var Admin = {
     Admin.shell('Dashboard', '<div class="grid kpis" id="kpiGrid"><div class="kpi"><div class="spinner" style="margin:0"></div></div></div><div id="dashExtra"></div>');
     Promise.all([gs('getDashboardStats', Admin.session.user, Admin.session.role), gs('getAllAgreements', Admin.session.user, Admin.session.role)])
       .then(function (r) {
-        var stats = r[0].data || {}, all = r[1].data || [];
+        var statsRes = r[0], allRes = r[1];
+        if (!statsRes || !statsRes.success || !allRes || !allRes.success) {
+          var msg = (statsRes && statsRes.message) || (allRes && allRes.message) || 'No response from the server — try refreshing.';
+          document.getElementById('kpiGrid').innerHTML = '';
+          document.getElementById('dashExtra').innerHTML = '<div class="err-msg">Couldn\'t load the dashboard — ' + esc(msg) + '</div>';
+          return;
+        }
+        var stats = statsRes.data || {}, all = allRes.data || [];
         document.getElementById('kpiGrid').innerHTML =
           Admin.kpi('fa-inbox', stats.newApplications, 'New Applications', 'gold') +
           Admin.kpi('fa-folder-open', stats.total, 'Total Agreements') +
@@ -354,7 +360,10 @@ var Admin = {
           (rows ? '<div class="table-wrap"><table class="data"><thead><tr><th>Tenant</th><th>Premises</th><th>End Date</th><th>Status</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
             : '<div class="empty-state"><i class="fa-regular fa-circle-check"></i><div>Nothing needs attention right now.</div></div>') +
           '</div>';
-      }).catch(function (e) { toast(String(e), 'bad'); });
+      }).catch(function (e) {
+        document.getElementById('kpiGrid').innerHTML = '';
+        document.getElementById('dashExtra').innerHTML = '<div class="err-msg">Couldn\'t load the dashboard — ' + esc(String((e && e.message) || e)) + '</div>';
+      });
   },
   kpi: function (icon, num, label, tone) {
     return '<div class="kpi"><i class="fa-solid ' + icon + '" style="color:var(--' + (tone || 'ink') + ')"></i>' +

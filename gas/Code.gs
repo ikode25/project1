@@ -181,8 +181,19 @@ function computeEndDate(startIso, termValue, termUnit) {
   end.setDate(end.getDate() - 1); // inclusive end-of-term, e.g. 1-year lease from Jan 1 ends Dec 31
   return end.toISOString().split('T')[0];
 }
+// Sheets silently converts a date-looking string written via setValue() into a real Date cell,
+// so a value read back with getValues() can be either a Date object or the original string —
+// handle both rather than assuming String(v).split('T')[0] is meaningful (it isn't for a Date,
+// whose default toString() happens to contain a literal "T" inside "Tue"/"Time" and splits wrong).
+function _dateOnly(v) {
+  if (!v) return null;
+  var d = (v instanceof Date) ? v : new Date(String(v).split('T')[0]);
+  if (isNaN(d.getTime())) return null;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
 function daysBetween(aIso, bIso) {
-  var a = new Date(String(aIso).split('T')[0]), b = new Date(String(bIso).split('T')[0]);
+  var a = _dateOnly(aIso), b = _dateOnly(bIso);
+  if (!a || !b) return null;
   return Math.round((b.getTime() - a.getTime()) / 86400000);
 }
 
@@ -220,6 +231,18 @@ function amountToWords(amount, currencyName) {
 // ============== One-time setup (run from the Apps Script editor) ==============
 function setup() { return initializeSheets(); }
 
+// safe to call on a sheet that already has data: fills in header labels for any columns that
+// exist in `headers` but not yet in row 1 (e.g. after a code update adds a new column) — purely
+// cosmetic, since every read/write in this file addresses columns by the `headers` array position,
+// never by reading the sheet's own header text, so this never touches existing data.
+function _backfillHeaderLabels(sh, headers) {
+  var lastCol = sh.getLastColumn();
+  if (lastCol >= headers.length) return;
+  var range = sh.getRange(1, lastCol + 1, 1, headers.length - lastCol);
+  range.setValues([headers.slice(lastCol)]);
+  range.setBackground(HEADER_BG).setFontColor('white').setFontWeight('bold');
+}
+
 function initializeSheets() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
@@ -254,6 +277,8 @@ function initializeSheets() {
     ag.appendRow(AGREEMENT_HEADERS);
     ag.getRange(1, 1, 1, AGREEMENT_HEADERS.length).setBackground(HEADER_BG).setFontColor('white').setFontWeight('bold');
     ag.setFrozenRows(1);
+  } else {
+    _backfillHeaderLabels(ag, AGREEMENT_HEADERS); // re-running setup() after a column is added (e.g. Notes) labels it instead of leaving it blank
   }
 
   var lg = ss.getSheetByName(LOGS_SHEET);
