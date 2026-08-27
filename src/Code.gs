@@ -11487,6 +11487,101 @@ function addCalendarEvent(d, currentUser, currentRole) {
   } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
 }
 
+// Anonymous Gregorian algorithm (Meeus/Jones/Butcher) — deterministic, no external data needed.
+// Returns a Date for Easter Sunday of the given calendar year.
+function _easterSunday(year) {
+  var a = year % 19, b = Math.floor(year / 100), c = year % 100;
+  var d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+  var g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30;
+  var i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7;
+  var m = Math.floor((a + 11 * h + 22 * l) / 451);
+  var month = Math.floor((h + l - 7 * m + 114) / 31); // 3=March, 4=April
+  var day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(year, month - 1, day);
+}
+function _fmtYmd(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+
+// admin-only, one click — seeds the fixed-date Ghana public holidays plus Good Friday/Easter
+// Monday (computed, not guessed) for a calendar year. Eid al-Fitr/al-Adha are deliberately left
+// out: they follow the lunar calendar and shift by moon sighting, so there's no reliable formula
+// to compute them from — the admin adds those manually once announced, same as any other event.
+function seedGhanaPublicHolidays(year, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var y = parseInt(year, 10);
+    if (isNaN(y) || y < 2000 || y > 2100) return { success: false, message: 'Invalid year' };
+
+    var easter = _easterSunday(y);
+    var goodFriday = new Date(easter); goodFriday.setDate(easter.getDate() - 2);
+    var easterMonday = new Date(easter); easterMonday.setDate(easter.getDate() + 1);
+
+    var holidays = [
+      { name: "New Year's Day", date: y + '-01-01' },
+      { name: 'Constitution Day', date: y + '-01-07' },
+      { name: 'Independence Day', date: y + '-03-06' },
+      { name: 'Good Friday', date: _fmtYmd(goodFriday) },
+      { name: 'Easter Monday', date: _fmtYmd(easterMonday) },
+      { name: 'May Day (Workers\' Day)', date: y + '-05-01' },
+      { name: "Founders' Day", date: y + '-08-04' },
+      { name: 'Kwame Nkrumah Memorial Day', date: y + '-09-21' },
+      { name: 'Christmas Day', date: y + '-12-25' },
+      { name: 'Boxing Day', date: y + '-12-26' }
+    ];
+
+    var sh = getSheet(CALENDAR_SHEET);
+    if (!sh) return { success: false, message: 'Calendar sheet not found' };
+    var data = sh.getDataRange().getValues();
+    var existingDates = {};
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][14]) === '1') continue; // IsDeleted
+      var ed = toIso(data[i][2]).split('T')[0];
+      if (ed) existingDates[ed] = true;
+    }
+
+    var ay = (y) + '-' + (y + 1); // best-effort academic-year tag; doesn't drive anything holiday-related
+    var uid = getCurrentUserId(currentUser) || '';
+    var ts = nowIso(), id = nextRowId(sh), rows = [], added = 0, skipped = 0;
+    holidays.forEach(function (h) {
+      if (existingDates[h.date]) { skipped++; return; }
+      rows.push([id++, h.name, h.date, '', 'holiday', 'Auto-seeded Ghana public holiday', ay, '1', 'all', '', '#ea4335', uid, ts, ts, '0', '0']);
+      added++;
+    });
+    if (rows.length) sh.getRange(sh.getLastRow() + 1, 1, rows.length, CALENDAR_HEADERS.length).setValues(rows);
+
+    addLog(currentUser, 'Ghana Public Holidays Seeded', added + ' added, ' + skipped + ' already existed (' + y + ')');
+    return { success: true, message: added + ' holiday(s) added for ' + y + (skipped ? ', ' + skipped + ' already existed' : '') + '. Eid al-Fitr/al-Adha aren\'t included — add those manually once announced.', added: added, skipped: skipped };
+  } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
+}
+
+// any logged-in role — checked from every dashboard. Returns tomorrow's public holiday (if any),
+// respecting the same audience rules getCalendarEvents already applies (staff-only events hidden
+// from students/parents, class-specific events scoped to that class), so the reminder never leaks
+// something a viewer wouldn't otherwise be allowed to see on the Calendar itself.
+function getUpcomingHolidayReminder(currentUser, currentRole) {
+  try {
+    var sh = getSheet(CALENDAR_SHEET);
+    if (!sh) return { success: true, data: null };
+    var tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+    var tomorrowStr = _fmtYmd(tomorrow);
+    var data = sh.getDataRange().getValues();
+    var scope = getViewerScope(currentUser, currentRole);
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][14]) === '1') continue; // IsDeleted
+      if (String(data[i][7]) !== '1') continue;   // IsHoliday
+      var start = toIso(data[i][2]).split('T')[0];
+      var end = data[i][3] ? toIso(data[i][3]).split('T')[0] : start;
+      if (tomorrowStr < start || tomorrowStr > end) continue;
+      if (!scope.all) {
+        var ap = String(data[i][8] || 'all').toLowerCase();
+        if (ap === 'staff') continue;
+        if (ap === 'class_specific' && scope.classIds.indexOf(parseInt(data[i][9], 10)) === -1) continue;
+      }
+      return { success: true, data: { Name: data[i][1], Date: tomorrowStr } };
+    }
+    return { success: true, data: null };
+  } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
+}
+
 function updateCalendarEvent(id, d, currentUser, currentRole) {
   try {
     if (!canWriteCalendar(currentRole)) return { success: false, message: 'Forbidden — admin only' };

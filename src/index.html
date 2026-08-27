@@ -4790,6 +4790,7 @@
     function DashboardNotices({ currentUser, role, goto }) {
       const { data: menu } = useSWR('getTodayFoodMenu', () => swrFetcher('getTodayFoodMenu', currentUser, role));
       const { data: people } = useSWR('getTodayBirthdays', () => swrFetcher('getTodayBirthdays', currentUser, role));
+      const { data: holiday } = useSWR('getUpcomingHolidayReminder', () => swrFetcher('getUpcomingHolidayReminder', currentUser, role));
       const sch = window.SMS_SCHOOL || {};
       const isAdmin = String(role).toLowerCase() === 'admin';
 
@@ -4805,6 +4806,12 @@
         items.push({
           key: 'food', icon: 'utensils', color: '#fb8c00', label: 'Today\'s Menu',
           content: [menu.Breakfast && `B: ${menu.Breakfast}`, menu.Lunch && `L: ${menu.Lunch}`, menu.Snack && `S: ${menu.Snack}`].filter(Boolean).join(' · ')
+        });
+      }
+      if (holiday) {
+        items.push({
+          key: 'holiday', icon: 'flag', color: '#ea4335', label: 'Holiday Tomorrow',
+          content: <><b>{holiday.Name}</b> — school closed {holiday.Date}</>
         });
       }
       if (people && people.length > 0) {
@@ -19334,18 +19341,37 @@
                   <input type="checkbox" checked={sameAmount} onChange={(e) => setSameAmount(e.target.checked)} /> Same amount for every class
                 </label>
                 {sameAmount ? (
-                  <div className="form-group" style={{maxWidth:'220px'}}><label>Amount (GH₵)</label><input type="number" min="0" step="0.01" value={sharedAmount} onChange={(e) => setSharedAmount(e.target.value)} required /></div>
+                  <div style={{maxWidth:'240px',marginBottom:'10px'}}>
+                    <label style={{display:'block',fontSize:'12px',fontWeight:600,color:'#555',marginBottom:'6px'}}>Amount</label>
+                    <div style={{display:'flex',alignItems:'stretch',border:'1px solid #d0d5dd',borderRadius:'8px',overflow:'hidden',boxShadow:'0 1px 2px rgba(16,24,40,0.05)'}}>
+                      <span style={{padding:'10px 12px',background:'#f4f6f8',color:'#555',fontSize:'14px',fontWeight:700,borderRight:'1px solid #d0d5dd',display:'flex',alignItems:'center'}}>GH₵</span>
+                      <input type="number" min="0" step="0.01" style={{flex:1,border:'none',padding:'10px 12px',fontSize:'15px',fontWeight:600,outline:'none',width:'100%',color:'var(--navy-primary)'}}
+                        value={sharedAmount} onChange={(e) => setSharedAmount(e.target.value)} placeholder="0.00" required />
+                    </div>
+                  </div>
                 ) : (
                   applicableClassIds.length === 0 ? (
                     <div style={{color:'#888',fontSize:'12px'}}>Pick classes above first.</div>
                   ) : (
-                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:'8px',marginBottom:'10px'}}>
+                    <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(190px,1fr))',gap:'12px',marginBottom:'14px'}}>
                       {applicableClassIds.map(cid => {
                         const c = classes.find(x => x.ID === cid);
+                        const val = perClassAmounts[cid] ?? '';
+                        const label = c ? (c.Label || c.ShortLabel) : cid;
                         return (
-                          <div key={cid} style={{display:'flex',alignItems:'center',gap:'8px'}}>
-                            <span style={{fontSize:'12px',flex:1}}>{c ? c.Label : cid}</span>
-                            <input type="number" min="0" step="0.01" style={{width:'90px'}} value={perClassAmounts[cid] ?? ''} onChange={(e) => setPerClassAmounts({ ...perClassAmounts, [cid]: e.target.value })} placeholder="GH₵" required />
+                          <div key={cid} style={{
+                            border:'1px solid #e2e6ea', borderLeft: `3px solid ${val !== '' ? '#34a853' : '#d0d5dd'}`,
+                            borderRadius:'8px', padding:'10px 12px', background:'#fff',
+                            boxShadow:'0 1px 2px rgba(16,24,40,0.04)'
+                          }}>
+                            <div style={{fontSize:'12px',fontWeight:600,color:'var(--navy-primary)',marginBottom:'8px',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}} title={label}>
+                              {label}
+                            </div>
+                            <div style={{display:'flex',alignItems:'stretch',border:'1px solid #d0d5dd',borderRadius:'6px',overflow:'hidden'}}>
+                              <span style={{padding:'7px 9px',background:'#f4f6f8',color:'#777',fontSize:'12px',fontWeight:700,borderRight:'1px solid #d0d5dd',display:'flex',alignItems:'center'}}>GH₵</span>
+                              <input type="number" min="0" step="0.01" style={{flex:1,minWidth:0,border:'none',padding:'7px 9px',fontSize:'13.5px',fontWeight:600,outline:'none',width:'100%',color:'var(--navy-primary)'}}
+                                value={val} onChange={(e) => setPerClassAmounts({ ...perClassAmounts, [cid]: e.target.value })} placeholder="0.00" required />
+                            </div>
                           </div>
                         );
                       })}
@@ -23601,6 +23627,30 @@
         }).withFailureHandler((err) => Swal.fire({ icon: 'error', text: (err && err.message) || 'Save failed' }))[action](...params);
       };
 
+      const handleSeedHolidays = () => {
+        Swal.fire({
+          icon: 'question', title: 'Auto-Fill Public Holidays',
+          html: 'Adds Ghana\'s fixed-date public holidays plus Good Friday/Easter Monday (computed) for the year below. Existing dates are skipped — safe to re-run.<br/><br/>' +
+                `<input id="seed-year" class="swal2-input" type="number" value="${year}" min="2000" max="2100" placeholder="Year" />`,
+          showCancelButton: true, confirmButtonText: 'Add Holidays',
+          preConfirm: () => {
+            const y = parseInt(document.getElementById('seed-year').value, 10);
+            if (!y || y < 2000 || y > 2100) { Swal.showValidationMessage('Enter a valid year'); return false; }
+            return y;
+          }
+        }).then((r) => {
+          if (!r.isConfirmed) return;
+          google.script.run
+            .withSuccessHandler((res) => {
+              if (!res) { Swal.fire({ icon: 'error', text: 'No response from server' }); return; }
+              Swal.fire({ icon: res.success ? 'success' : 'error', title: res.success ? 'Done' : 'Error', text: res.message });
+              if (res.success) load();
+            })
+            .withFailureHandler((err) => Swal.fire({ icon: 'error', text: (err && err.message) || 'Server error' }))
+            .seedGhanaPublicHolidays(r.value, currentUser, role);
+        });
+      };
+
       const handleDelete = (ev) => {
         Swal.fire({ icon: 'warning', title: 'Delete event?', text: ev.EventName, showCancelButton: true, confirmButtonColor: '#ea4335' })
           .then((rr) => {
@@ -23766,6 +23816,11 @@
                 <button className={'btn ' + (view === 'month' ? 'btn-primary' : 'btn-secondary')} style={{padding:'6px 14px'}} onClick={() => setView('month')}><i className="fas fa-th"></i> Month</button>
                 <button className={'btn ' + (view === 'list' ? 'btn-primary' : 'btn-secondary')} style={{padding:'6px 14px'}} onClick={() => setView('list')}><i className="fas fa-list"></i> List</button>
               </div>
+              {r === 'admin' && (
+                <button className="btn btn-secondary" onClick={handleSeedHolidays} title="Adds Ghana's fixed-date public holidays + Good Friday/Easter Monday for a year — Eid dates vary by moon sighting, add those manually">
+                  <i className="fas fa-flag"></i> Auto-Fill Public Holidays
+                </button>
+              )}
               {canWrite && <button className="btn btn-success" onClick={() => { setEditing(null); setShowModal(true); }}><i className="fas fa-plus"></i> Add Event</button>}
             </div>
           </div>
