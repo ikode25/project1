@@ -181,9 +181,25 @@
 // call needs to go through that object rather than being applied directly.
 function gs(fn) {
   var args = Array.prototype.slice.call(arguments, 1);
+  return _gsAttempt(fn, args, 0);
+}
+// google.script.run's client bridge is known to be fragile under a burst of simultaneous calls
+// (e.g. two fired via Promise.all) — it can silently drop one, resolving it with null/undefined
+// instead of ever reaching the success or failure handler with a real value. That's a transient
+// client-bridge race, not a genuine server error, so retry a couple of times (with a short,
+// increasing delay) before surfacing anything to the user.
+function _gsAttempt(fn, args, attempt) {
   return new Promise(function (resolve, reject) {
     var runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(function (e) { reject(e && e.message ? e.message : e); });
     runner[fn].apply(runner, args);
+  }).then(function (result) {
+    if (result === null || result === undefined) {
+      if (attempt < 2) {
+        return new Promise(function (r) { setTimeout(r, 300 * (attempt + 1)); }).then(function () { return _gsAttempt(fn, args, attempt + 1); });
+      }
+      throw new Error('No response from the server for ' + fn + '() — please refresh and try again.');
+    }
+    return result;
   });
 }
 
@@ -317,16 +333,26 @@ var Admin = {
   // ---------------- Dashboard ----------------
   renderDashboard: function () {
     Admin.shell('Dashboard', '<div class="grid kpis" id="kpiGrid"><div class="kpi"><div class="spinner" style="margin:0"></div></div></div><div id="dashExtra"></div>');
-    Promise.all([gs('getDashboardStats', Admin.session.user, Admin.session.role), gs('getAllAgreements', Admin.session.user, Admin.session.role)])
-      .then(function (r) {
-        var statsRes = r[0], allRes = r[1];
-        if (!statsRes || !statsRes.success || !allRes || !allRes.success) {
-          var msg = (statsRes && statsRes.message) || (allRes && allRes.message) || 'No response from the server — try refreshing.';
+    // one call, not two in parallel — google.script.run's client bridge is known to be fragile
+    // under a burst of simultaneous calls, so the KPI counts are derived here from the same
+    // agreements list already needed for the tables below, instead of a separate stats RPC.
+    gs('getAllAgreements', Admin.session.user, Admin.session.role)
+      .then(function (allRes) {
+        if (!allRes || !allRes.success) {
+          var msg = (allRes && allRes.message) || 'No response from the server — try refreshing.';
           document.getElementById('kpiGrid').innerHTML = '';
           document.getElementById('dashExtra').innerHTML = '<div class="err-msg">Couldn\'t load the dashboard — ' + esc(msg) + '</div>';
           return;
         }
-        var stats = statsRes.data || {}, all = allRes.data || [];
+        var all = allRes.data || [];
+        var stats = {
+          total: all.length,
+          newApplications: all.filter(function (a) { return a.EffectiveStatus === 'inquiry'; }).length,
+          awaitingSignature: all.filter(function (a) { return a.EffectiveStatus === 'sent' || a.EffectiveStatus === 'viewed'; }).length,
+          accepted: all.filter(function (a) { return a.EffectiveStatus === 'accepted'; }).length,
+          expiringSoon: all.filter(function (a) { return a.EffectiveStatus === 'accepted' && a.DaysToEnd !== null && a.DaysToEnd <= 30 && a.DaysToEnd >= 0 && !a.RenewedToId; }).length,
+          renewalRequests: all.filter(function (a) { return a.RenewalResponse === 'yes' && !a.RenewedToId; }).length
+        };
         document.getElementById('kpiGrid').innerHTML =
           Admin.kpi('fa-inbox', stats.newApplications, 'New Applications', 'gold') +
           Admin.kpi('fa-folder-open', stats.total, 'Total Agreements') +
