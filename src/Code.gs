@@ -4278,7 +4278,12 @@ function validateStudentIntlFields(d) {
   var custEnum = ['joint','mother_only','father_only','legal_guardian','split','other'];
   var primaryEnum = ['father','mother','guardian','both'];
   var dietEnum = ['halal','kosher','vegetarian','vegan','pescatarian','dairy_free','gluten_free','nut_free','none'];
-  var admTypeEnum = ['fresh','transfer','re_admission'];
+  // 'continuing' = already schooling here, not owed an admission fee — the safe default for
+  // anyone not explicitly flagged fresh/transfer/re_admission (see admissionFeeEligible in
+  // generateStudentDues). 'fresh' used to be the default here, which meant EVERY student added
+  // without this field explicitly set (bulk import, any code path that doesn't surface the
+  // picker) got billed the admission fee alongside genuinely new admissions.
+  var admTypeEnum = ['fresh','transfer','re_admission','continuing'];
 
   var prof = String(d.EnglishProficiency || 'b2').toLowerCase();
   if (profEnum.indexOf(prof) === -1) return { ok: false, error: 'EnglishProficiency must be one of: ' + profEnum.join(', ') };
@@ -4292,7 +4297,7 @@ function validateStudentIntlFields(d) {
   var primary = String(d.PrimaryContactParent || 'both').toLowerCase();
   if (primaryEnum.indexOf(primary) === -1) return { ok: false, error: 'PrimaryContactParent must be one of: ' + primaryEnum.join(', ') };
 
-  var admType = String(d.AdmissionType || 'fresh').toLowerCase();
+  var admType = String(d.AdmissionType || 'continuing').toLowerCase();
   if (admTypeEnum.indexOf(admType) === -1) return { ok: false, error: 'AdmissionType must be one of: ' + admTypeEnum.join(', ') };
 
   // diet — accept CSV or array
@@ -21501,11 +21506,15 @@ function generateStudentDues(studentId, currentUser) {
         curYear2 = (settingsRes2.data && settingsRes2.data.AcademicYear) || '';
       } catch (e) {}
       // Admission fee is only ever owed by students admitted fresh / by transfer / by re-admission
-      // — a continuing student promoted from the term/year before does not pay it again. Ghana
-      // schools bill this once, at the point of admission; AdmissionType defaults to 'fresh' when
-      // unset (same convention rowToStudent already uses), so a legacy record with no explicit type
-      // still bills — only an explicit 'continuing'-style promotion should skip it.
-      var admissionType = String(student[60] || 'fresh').toLowerCase();
+      // — a continuing student already schooling here does not pay it again, regardless of which
+      // class a Fee_Structure "admission" item happens to be scoped to. Unlike rowToStudent's own
+      // display default (which assumes 'fresh' for legacy rows with no AdmissionType set, purely
+      // for display purposes), billing requires an EXPLICIT fresh/transfer/re_admission value —
+      // blank/unset never bills. That's the safe direction to default in: a student who really is
+      // new gets their AdmissionType set the moment they're admitted (enrollAdmission, the Add
+      // Student form), so a genuinely blank value only ever means "already here", not "unknown new
+      // admission" — billing everyone in a class by default was exactly the bug being fixed here.
+      var admissionType = String(student[60] || '').toLowerCase();
       var admissionFeeEligible = ['fresh', 'transfer', 're_admission'].indexOf(admissionType) !== -1;
       yearlyFees.forEach(function (fee) {
         if (fee.category === 'admission' && !admissionFeeEligible) return;

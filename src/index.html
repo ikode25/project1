@@ -11510,7 +11510,7 @@
             <div className="modal-body">
               <div className="settings-info-message" style={{marginBottom:'16px'}}>
                 <i className="fas fa-info-circle" style={{marginRight:'6px'}}></i>
-                Download the template, fill in one row per student, then upload it below. <b>ClassName</b> should match an existing class's name or code exactly (e.g. "Basic 1" or "BS1") — leave it blank to admit without assigning a class yet. Only First Name and Last Name are required; everything else is optional.
+                Download the template, fill in one row per student, then upload it below. <b>ClassName</b> should match an existing class's name or code exactly (e.g. "Basic 1" or "BS1") — leave it blank to admit without assigning a class yet. <b>AdmissionType</b>: leave blank (or "continuing") for a student who's already schooling here — only "fresh", "transfer", or "re_admission" get billed the Admission fee. Only First Name and Last Name are required; everything else is optional.
               </div>
 
               <div style={{display:'flex',gap:'10px',marginBottom:'18px',flexWrap:'wrap'}}>
@@ -12219,7 +12219,7 @@
         HomeLanguage: student?.HomeLanguage || '',
         EnglishProficiency: student?.EnglishProficiency || 'b2',
         CurriculumTrack: student?.CurriculumTrack || 'ges',
-        AdmissionType: student?.AdmissionType || 'fresh',
+        AdmissionType: student?.AdmissionType || 'continuing',
         // intl: safeguarding
         CustodyArrangement: student?.CustodyArrangement || 'joint',
         PrimaryContactParent: student?.PrimaryContactParent || 'both',
@@ -12643,6 +12643,7 @@
                   <SearchableDropdown
                     label="Admission Type" icon="fas fa-door-open"
                     options={[
+                      { value: 'continuing', label: 'Continuing / Already Enrolled' },
                       { value: 'fresh', label: 'Fresh Admission' },
                       { value: 'transfer', label: 'Transfer' },
                       { value: 're_admission', label: 'Re-Admission' }
@@ -12651,6 +12652,11 @@
                     onChange={(v) => set('AdmissionType', v)}
                     placeholder="Select type..."
                   />
+                  {['fresh','transfer','re_admission'].includes(formData.AdmissionType) && (
+                    <div style={{gridColumn:'1 / -1',fontSize:'11px',color:'#888',marginTop:'-8px'}}>
+                      <i className="fas fa-info-circle"></i> Only Fresh/Transfer/Re-Admission students are billed the Admission fee. Pick "Continuing" for a student already schooling here.
+                    </div>
+                  )}
                 </div>
 
                 {/* intl: safeguarding & pickup */}
@@ -22022,7 +22028,17 @@
           <div className={'fee-bill-bulk-wrap' + (printLayout === '2up' ? ' fee-bill-pair-2' : '')} style={{display:'none'}}>
             {visible.map(b => (
               <div key={b.StudentID} className="fee-bill-card" style={{padding: printLayout === '2up' ? '14px' : '24px',fontFamily:'Arial,sans-serif'}}>
-                <h2 style={{color:'#001f3f',borderBottom:'2px solid #001f3f',paddingBottom:'8px'}}>{schoolName}</h2>
+                <div style={{display:'flex',alignItems:'center',gap:'12px',borderBottom:'2px solid #001f3f',paddingBottom:'8px',marginBottom:'6px'}}>
+                  <img src={ss.SchoolLogo || DEFAULT_LOGO} alt="" style={{width:'52px',height:'52px',borderRadius:'50%',objectFit:'cover',flexShrink:0}} onError={(e) => { e.target.style.display = 'none'; }} />
+                  <div>
+                    <h2 style={{color:'#001f3f',margin:0}}>{schoolName}</h2>
+                    {(ss.SchoolAddress || ss.SchoolContact || ss.SchoolEmail) && (
+                      <div style={{fontSize:'11.5px',color:'#555',marginTop:'2px'}}>
+                        {[ss.SchoolAddress, ss.SchoolContact, ss.SchoolEmail].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
+                  </div>
+                </div>
                 <h3 style={{margin:'6px 0'}}>{termLabel} {selectedYear} — Fees Bill</h3>
                 <p><strong>{b.FullName}</strong> ({b.AdmissionNumber}) — {b.ClassLabel}</p>
                 <table style={{width:'100%',borderCollapse:'collapse',marginTop:'14px'}}>
