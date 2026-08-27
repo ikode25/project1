@@ -12232,7 +12232,7 @@ function _rowToPayslip(row, umap) {
   var tid = row[1], gb = row[13];
   var t = umap && umap[tid];
   return {
-    ID: row[0], TeacherID: tid, TeacherName: t ? t.fullName : '— deleted user —', EmployeeCode: t ? t.employeeCode : '', SSNITNumber: t ? t.ssnitNumber : '',
+    ID: row[0], TeacherID: tid, TeacherName: t ? t.fullName : '— deleted user —', EmployeeCode: t ? t.employeeCode : '', SSNITNumber: t ? t.ssnitNumber : '', Role: t ? t.role : '',
     PayPeriodMonth: row[2], PayPeriodYear: row[3],
     BasicSalary: parseFloat(row[4]) || 0, Allowances: parseFloat(row[5]) || 0, GrossPay: parseFloat(row[6]) || 0,
     SSNITContribution: parseFloat(row[7]) || 0, IncomeTax: parseFloat(row[8]) || 0, OtherDeductions: parseFloat(row[9]) || 0,
@@ -21214,7 +21214,10 @@ function _ensureFeeDuesSheet() {
 // dues whose BillingMonth embeds that year (term1-2026-2027, annual-2026-2027) — used by
 // getOutstandingSummary() below to give the Fees Collection page a "current year" total that
 // actually matches the year-scoped payments table sitting next to it.
-function _feeDuesOutstandingMaps(yearFilter) {
+// settingsData is optional — pass an already-fetched getSchoolSettings().data when the caller has
+// one on hand (e.g. getOutstandingSummary already fetched it to resolve yearFilter) so this
+// doesn't re-read the same one-row Settings sheet a second time within the same request.
+function _feeDuesOutstandingMaps(yearFilter, settingsData) {
   var byStudent = {}, total = 0;
   var yf = String(yearFilter || '').trim();
   try {
@@ -21226,8 +21229,8 @@ function _feeDuesOutstandingMaps(yearFilter) {
       // school still in Term 1 never has Term 2/3 "billed" yet — those must not count as owed
       // until the school actually reaches that term (same rule FeeStudentSidePanel already applies
       // to what a student sees; this is the aggregate total every dashboard/report reads from).
-      var settingsRes = getSchoolSettings();
-      var activeTerm = (settingsRes.data && settingsRes.data.ActiveTerm) || 'term1';
+      var s = settingsData || (getSchoolSettings().data || {});
+      var activeTerm = s.ActiveTerm || 'term1';
       var activeOrder = _TERM_ORDER[activeTerm] || 1;
       for (var i = 1; i < data.length; i++) {
         if (!fmapOut[data[i][2]]) continue; // orphaned
@@ -21260,13 +21263,74 @@ function getOutstandingSummary(yearFilter, currentUser, currentRole) {
     var yf = String(yearFilter || '').trim();
     // mirror getAllPayments' own default resolution so "Total Pending" always matches the same year
     // scope as whatever the payments table next to it is currently showing
-    if (!yf) {
-      var settingsRes = getSchoolSettings();
-      yf = (settingsRes.data && settingsRes.data.AcademicYear) || '';
-    }
+    var settingsRes = getSchoolSettings();
+    if (!yf) yf = (settingsRes.data && settingsRes.data.AcademicYear) || '';
     if (yf.toLowerCase() === 'all') yf = '';
-    var res = _feeDuesOutstandingMaps(yf);
+    var res = _feeDuesOutstandingMaps(yf, settingsRes.data);
     return { success: true, data: res.total };
+  } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
+}
+
+// per-class fee ledger — every active student in a class, every fee category billed to them, and
+// what's been paid/is still outstanding on each. Same "future term not billed yet" rule as
+// _feeDuesOutstandingMaps so this never disagrees with the headline Outstanding figure elsewhere.
+function getClassFeeBreakdown(classId, academicYear, currentUser, currentRole) {
+  try {
+    if (!canReadPayments(currentRole)) return { success: false, message: 'Forbidden — no access' };
+    var cid = parseInt(classId, 10);
+    if (isNaN(cid)) return { success: false, message: 'Invalid class id' };
+
+    var students = getStudentsLite();
+    var classStudents = {};
+    Object.keys(students).forEach(function (sid) {
+      if (students[sid].classId === cid) {
+        classStudents[sid] = { StudentID: parseInt(sid, 10), FullName: students[sid].fullName, AdmissionNumber: students[sid].admNo, byCategory: {}, totalBilled: 0, totalPaid: 0 };
+      }
+    });
+    var classLabel = (getClassesMap()[cid] || {}).label || '';
+    if (!Object.keys(classStudents).length) return { success: true, data: { classLabel: classLabel, students: [] } };
+
+    var fmap = getFeeStructuresLite();
+    var yf = String(academicYear || '').trim();
+    var settingsRes = getSchoolSettings();
+    var activeTerm = (settingsRes.data && settingsRes.data.ActiveTerm) || 'term1';
+    var activeOrder = _TERM_ORDER[activeTerm] || 1;
+
+    var dsh = getSheet(FEE_DUES_SHEET);
+    if (dsh) {
+      var data = dsh.getDataRange().getValues();
+      for (var i = 1; i < data.length; i++) {
+        var row = classStudents[data[i][1]];
+        if (!row) continue;
+        var fs = fmap[data[i][2]];
+        if (!fs) continue; // orphaned (fee item since deleted)
+        var billingMonth = String(data[i][3] || '');
+        if (yf && billingMonth.indexOf(yf) === -1) continue;
+        var termMatch = billingMonth.match(/^(term[123])-/);
+        if (termMatch && (_TERM_ORDER[termMatch[1]] || 1) > activeOrder) continue; // not billed yet
+        var status = String(data[i][6] || '').toLowerCase();
+        if (status === 'waived') continue;
+        var amt = parseFloat(data[i][5]) || 0, paid = parseFloat(data[i][8]) || 0;
+        var cat = fs.category || 'other';
+        if (!row.byCategory[cat]) row.byCategory[cat] = { category: cat, billed: 0, paid: 0 };
+        row.byCategory[cat].billed += amt;
+        row.byCategory[cat].paid += paid;
+        row.totalBilled += amt;
+        row.totalPaid += paid;
+      }
+    }
+
+    var rows = Object.keys(classStudents).map(function (sid) {
+      var r = classStudents[sid];
+      r.totalOutstanding = Math.max(0, r.totalBilled - r.totalPaid);
+      r.byCategory = Object.keys(r.byCategory).map(function (c) {
+        var b = r.byCategory[c];
+        return { category: b.category, billed: b.billed, paid: b.paid, outstanding: Math.max(0, b.billed - b.paid) };
+      }).sort(function (a, b) { return a.category.localeCompare(b.category); });
+      return r;
+    }).sort(function (a, b) { return String(a.FullName).localeCompare(String(b.FullName)); });
+
+    return { success: true, data: { classLabel: classLabel, students: rows } };
   } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
 }
 
