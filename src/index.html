@@ -5015,44 +5015,60 @@
 
           <DashboardNotices currentUser={currentUser} role={role} goto={goto} />
 
-          {/* Quick Actions */}
+          {/* Quick Actions — each tile disappears along with the module an admin has turned off
+              (Settings > School Settings > Sidebar Menu), so a hidden module leaves nothing behind
+              for the dashboard to still point at */}
           <div className="dash-quick">
-            <div className="dash-quick-btn qa-blue" onClick={() => goto('students')}>
-              <i className="fas fa-user-plus"></i><span>Add Student</span>
-            </div>
-            <div className="dash-quick-btn qa-green" onClick={() => goto('feePayments')}>
-              <i className="fas fa-money-bill-wave"></i><span>Record Payment</span>
-            </div>
-            <div className="dash-quick-btn qa-orange" onClick={() => goto('notices')}>
-              <i className="fas fa-bullhorn"></i><span>Post Notice</span>
-            </div>
-            <div className="dash-quick-btn qa-purple" onClick={() => goto('attendance')}>
-              <i className="fas fa-clipboard-check"></i><span>Mark Attendance</span>
-            </div>
-            <div className="dash-quick-btn qa-teal" onClick={() => goto('exams')}>
-              <i className="fas fa-graduation-cap"></i><span>Schedule Exam</span>
-            </div>
-            <div className="dash-quick-btn qa-red" onClick={() => goto('helpdesk')}>
-              <i className="fas fa-headset"></i><span>View Helpdesk</span>
-            </div>
-            <div className="dash-quick-btn qa-navy" onClick={() => goto('pos')}>
-              <i className="fas fa-cash-register"></i><span>POS / Sell</span>
-            </div>
+            {!isMenuHidden('students') && (
+              <div className="dash-quick-btn qa-blue" onClick={() => goto('students')}>
+                <i className="fas fa-user-plus"></i><span>Add Student</span>
+              </div>
+            )}
+            {!isMenuHidden('feePayments') && (
+              <div className="dash-quick-btn qa-green" onClick={() => goto('feePayments')}>
+                <i className="fas fa-money-bill-wave"></i><span>Record Payment</span>
+              </div>
+            )}
+            {!isMenuHidden('notices') && (
+              <div className="dash-quick-btn qa-orange" onClick={() => goto('notices')}>
+                <i className="fas fa-bullhorn"></i><span>Post Notice</span>
+              </div>
+            )}
+            {!isMenuHidden('attendance') && (
+              <div className="dash-quick-btn qa-purple" onClick={() => goto('attendance')}>
+                <i className="fas fa-clipboard-check"></i><span>Mark Attendance</span>
+              </div>
+            )}
+            {!isMenuHidden('exams') && (
+              <div className="dash-quick-btn qa-teal" onClick={() => goto('exams')}>
+                <i className="fas fa-graduation-cap"></i><span>Schedule Exam</span>
+              </div>
+            )}
+            {!isMenuHidden('helpdesk') && (
+              <div className="dash-quick-btn qa-red" onClick={() => goto('helpdesk')}>
+                <i className="fas fa-headset"></i><span>View Helpdesk</span>
+              </div>
+            )}
+            {!isMenuHidden('pos') && (
+              <div className="dash-quick-btn qa-navy" onClick={() => goto('pos')}>
+                <i className="fas fa-cash-register"></i><span>POS / Sell</span>
+              </div>
+            )}
           </div>
 
           <div className="dash-kpi-grid">
-            <DashKpi icon="user-graduate" label="Active Students" value={fmt(stats.activeStudents)} sub={`${fmt(stats.totalStudents)} total`} color="blue" onClick={() => goto('students')} />
-            <DashKpi icon="chalkboard-teacher" label="Teachers" value={stats.teacherUsers} sub={`${stats.totalUsers} staff total`} color="green" onClick={() => goto('users')} />
-            <DashKpi icon="school" label="Classes" value={stats.totalClasses} sub={`${fmt(stats.totalStrength)} seats`} color="navy" onClick={() => goto('classes')} />
-            <DashKpi icon="book" label="Subjects" value={stats.totalSubjects} sub={`${stats.totalAssignments} assignments`} color="purple" onClick={() => goto('subjects')} />
-            <DashKpi icon="users" label="Parents" value={fmt(stats.totalParents)} sub={`${stats.totalLinks} links`} color="teal" onClick={() => goto('parents')} />
+            {!isMenuHidden('students') && <DashKpi icon="user-graduate" label="Active Students" value={fmt(stats.activeStudents)} sub={`${fmt(stats.totalStudents)} total`} color="blue" onClick={() => goto('students')} />}
+            {!isMenuHidden('users') && <DashKpi icon="chalkboard-teacher" label="Teachers" value={stats.teacherUsers} sub={`${stats.totalUsers} staff total`} color="green" onClick={() => goto('users')} />}
+            {!isMenuHidden('classes') && <DashKpi icon="school" label="Classes" value={stats.totalClasses} sub={`${fmt(stats.totalStrength)} seats`} color="navy" onClick={() => goto('classes')} />}
+            {!isMenuHidden('subjects') && <DashKpi icon="book" label="Subjects" value={stats.totalSubjects} sub={`${stats.totalAssignments} assignments`} color="purple" onClick={() => goto('subjects')} />}
+            {!isMenuHidden('parents') && <DashKpi icon="users" label="Parents" value={fmt(stats.totalParents)} sub={`${stats.totalLinks} links`} color="teal" onClick={() => goto('parents')} />}
 
-            <DashKpi icon="money-bill-wave" label="Today's Collection" value={fmt(extras?.todayCollection || 0)} sub={`${fmt(stats.totalCollected)} all-time`} color="green" onClick={() => goto('feePayments')} />
-            <DashKpi icon="exclamation-circle" label="Outstanding" value={fmt(stats.totalPending)} sub={`${stats.totalPayments} payments`} color="red" onClick={() => goto('feePayments')} />
-            <DashKpi icon="user-plus" label="Admitted This Term" value={admStats ? fmt(admStats.admittedCount) : '…'} sub={admStats ? `GH₵${fmtAmt(admStats.admissionFeeTotal)} admission fees` : 'loading…'} color="teal" onClick={() => goto('admissions')} />
-            <DashKpi icon="calendar-check" label="Today Attendance" value={(extras?.todayAttPct || 0) + '%'} sub={`${stats.todayMarked} records`} color="orange" onClick={() => goto('attendance')} />
-            <DashKpi icon="graduation-cap" label="Active Exams" value={stats.totalExams} sub={`${stats.publishedExams} published`} color="amber" onClick={() => goto('exams')} />
-            <DashKpi icon="gavel" label="Open Incidents" value={stats.openIncidents} sub={`${stats.criticalIncidents} critical`} color="red" onClick={() => goto('discipline')} />
+            {!isMenuHidden('feePayments') && <DashKpi icon="money-bill-wave" label="Today's Collection" value={fmt(extras?.todayCollection || 0)} sub={`${fmt(stats.totalCollected)} all-time`} color="green" onClick={() => goto('feePayments')} />}
+            {!isMenuHidden('feePayments') && <DashKpi icon="exclamation-circle" label="Outstanding" value={fmt(stats.totalPending)} sub={`${stats.totalPayments} payments`} color="red" onClick={() => goto('feePayments')} />}
+            {!isMenuHidden('admissions') && <DashKpi icon="user-plus" label="Admitted This Term" value={admStats ? fmt(admStats.admittedCount) : '…'} sub={admStats ? `GH₵${fmtAmt(admStats.admissionFeeTotal)} admission fees` : 'loading…'} color="teal" onClick={() => goto('admissions')} />}
+            {!isMenuHidden('attendance') && <DashKpi icon="calendar-check" label="Today Attendance" value={(extras?.todayAttPct || 0) + '%'} sub={`${stats.todayMarked} records`} color="orange" onClick={() => goto('attendance')} />}
+            {!isMenuHidden('exams') && <DashKpi icon="graduation-cap" label="Active Exams" value={stats.totalExams} sub={`${stats.publishedExams} published`} color="amber" onClick={() => goto('exams')} />}
+            {!isMenuHidden('discipline') && <DashKpi icon="gavel" label="Open Incidents" value={stats.openIncidents} sub={`${stats.criticalIncidents} critical`} color="red" onClick={() => goto('discipline')} />}
             {!isMenuHidden('sms') && (
               <DashKpi icon="sms" label="SMS Balance"
                 value={smsStats ? (smsStats.balance == null ? 'N/A' : fmt(smsStats.balance)) : '…'}
@@ -5063,10 +5079,10 @@
           </div>
 
           {/* day-book snapshot */}
-          <TodayAccountsCard goto={goto} currentUser={currentUser} role={role} />
+          {!isMenuHidden('accounts') && <TodayAccountsCard goto={goto} currentUser={currentUser} role={role} />}
 
           {/* fee types quick-reference — for parent inquiries at the front desk */}
-          <FeeBreakdownCard goto={goto} currentUser={currentUser} role={role} />
+          {!isMenuHidden('feeStructure') && <FeeBreakdownCard goto={goto} currentUser={currentUser} role={role} />}
 
           {/* Critical Alerts — drives daily admin attention */}
           {enrich && (
@@ -5076,42 +5092,54 @@
                 Action Items
               </h4>
               <div className="dash-alerts">
-                <div className={'dash-alert a-red ' + (enrich.alerts.todayAbsent === 0 ? 'a-zero' : '')} onClick={() => enrich.alerts.todayAbsent > 0 && goto('attendance')}>
-                  <i className="fas fa-user-slash da-ico"></i>
-                  <div className="da-val">{enrich.alerts.todayAbsent}</div>
-                  <div className="da-lbl">Absent Today</div>
-                  <i className="fas fa-arrow-right da-go"></i>
-                </div>
-                <div className={'dash-alert a-orange ' + (enrich.alerts.overdueFees.count === 0 ? 'a-zero' : '')} onClick={() => enrich.alerts.overdueFees.count > 0 && goto('feePayments')}>
-                  <i className="fas fa-clock da-ico"></i>
-                  <div className="da-val">{enrich.alerts.overdueFees.count}</div>
-                  <div className="da-lbl">Overdue Fees · {fmtAmt(enrich.alerts.overdueFees.amount)}</div>
-                  <i className="fas fa-arrow-right da-go"></i>
-                </div>
-                <div className={'dash-alert a-amber ' + (enrich.alerts.docsPending === 0 ? 'a-zero' : '')} onClick={() => enrich.alerts.docsPending > 0 && goto('documents')}>
-                  <i className="fas fa-file-alt da-ico"></i>
-                  <div className="da-val">{enrich.alerts.docsPending}</div>
-                  <div className="da-lbl">Docs to Verify</div>
-                  <i className="fas fa-arrow-right da-go"></i>
-                </div>
-                <div className={'dash-alert a-purple ' + (enrich.alerts.lowStock.length === 0 ? 'a-zero' : '')} onClick={() => enrich.alerts.lowStock.length > 0 && goto('inventory')}>
-                  <i className="fas fa-boxes da-ico"></i>
-                  <div className="da-val">{enrich.alerts.lowStock.length}</div>
-                  <div className="da-lbl">Low Stock Items</div>
-                  <i className="fas fa-arrow-right da-go"></i>
-                </div>
-                <div className={'dash-alert a-red ' + (enrich.alerts.helpdeskStale === 0 ? 'a-zero' : '')} onClick={() => enrich.alerts.helpdeskStale > 0 && goto('helpdesk')}>
-                  <i className="fas fa-hourglass-half da-ico"></i>
-                  <div className="da-val">{enrich.alerts.helpdeskStale}</div>
-                  <div className="da-lbl">Stale Helpdesk &gt;7d</div>
-                  <i className="fas fa-arrow-right da-go"></i>
-                </div>
-                <div className={'dash-alert a-blue ' + (enrich.alerts.subToday === 0 ? 'a-zero' : '')} onClick={() => enrich.alerts.subToday > 0 && goto('substitutes')}>
-                  <i className="fas fa-exchange-alt da-ico"></i>
-                  <div className="da-val">{enrich.alerts.subToday}</div>
-                  <div className="da-lbl">Substitutes Today</div>
-                  <i className="fas fa-arrow-right da-go"></i>
-                </div>
+                {!isMenuHidden('attendance') && (
+                  <div className={'dash-alert a-red ' + (enrich.alerts.todayAbsent === 0 ? 'a-zero' : '')} onClick={() => enrich.alerts.todayAbsent > 0 && goto('attendance')}>
+                    <i className="fas fa-user-slash da-ico"></i>
+                    <div className="da-val">{enrich.alerts.todayAbsent}</div>
+                    <div className="da-lbl">Absent Today</div>
+                    <i className="fas fa-arrow-right da-go"></i>
+                  </div>
+                )}
+                {!isMenuHidden('feePayments') && (
+                  <div className={'dash-alert a-orange ' + (enrich.alerts.overdueFees.count === 0 ? 'a-zero' : '')} onClick={() => enrich.alerts.overdueFees.count > 0 && goto('feePayments')}>
+                    <i className="fas fa-clock da-ico"></i>
+                    <div className="da-val">{enrich.alerts.overdueFees.count}</div>
+                    <div className="da-lbl">Overdue Fees · {fmtAmt(enrich.alerts.overdueFees.amount)}</div>
+                    <i className="fas fa-arrow-right da-go"></i>
+                  </div>
+                )}
+                {!isMenuHidden('documents') && (
+                  <div className={'dash-alert a-amber ' + (enrich.alerts.docsPending === 0 ? 'a-zero' : '')} onClick={() => enrich.alerts.docsPending > 0 && goto('documents')}>
+                    <i className="fas fa-file-alt da-ico"></i>
+                    <div className="da-val">{enrich.alerts.docsPending}</div>
+                    <div className="da-lbl">Docs to Verify</div>
+                    <i className="fas fa-arrow-right da-go"></i>
+                  </div>
+                )}
+                {!isMenuHidden('inventory') && (
+                  <div className={'dash-alert a-purple ' + (enrich.alerts.lowStock.length === 0 ? 'a-zero' : '')} onClick={() => enrich.alerts.lowStock.length > 0 && goto('inventory')}>
+                    <i className="fas fa-boxes da-ico"></i>
+                    <div className="da-val">{enrich.alerts.lowStock.length}</div>
+                    <div className="da-lbl">Low Stock Items</div>
+                    <i className="fas fa-arrow-right da-go"></i>
+                  </div>
+                )}
+                {!isMenuHidden('helpdesk') && (
+                  <div className={'dash-alert a-red ' + (enrich.alerts.helpdeskStale === 0 ? 'a-zero' : '')} onClick={() => enrich.alerts.helpdeskStale > 0 && goto('helpdesk')}>
+                    <i className="fas fa-hourglass-half da-ico"></i>
+                    <div className="da-val">{enrich.alerts.helpdeskStale}</div>
+                    <div className="da-lbl">Stale Helpdesk &gt;7d</div>
+                    <i className="fas fa-arrow-right da-go"></i>
+                  </div>
+                )}
+                {!isMenuHidden('substitutes') && (
+                  <div className={'dash-alert a-blue ' + (enrich.alerts.subToday === 0 ? 'a-zero' : '')} onClick={() => enrich.alerts.subToday > 0 && goto('substitutes')}>
+                    <i className="fas fa-exchange-alt da-ico"></i>
+                    <div className="da-val">{enrich.alerts.subToday}</div>
+                    <div className="da-lbl">Substitutes Today</div>
+                    <i className="fas fa-arrow-right da-go"></i>
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -5119,79 +5147,93 @@
           {extras && (
             <>
               <div className="dash-charts">
-                <div className="dash-chart-card">
-                  <h4><i className="fas fa-chart-line"></i> Attendance — Last 7 Days</h4>
-                  <div className="dash-chart-body"><canvas ref={attChartRef}></canvas></div>
-                </div>
-                <div className="dash-chart-card">
-                  <h4><i className="fas fa-chart-bar"></i> Fee Collection — Last 30 Days</h4>
-                  <div className="dash-chart-body"><canvas ref={collChartRef}></canvas></div>
-                </div>
-                <div className="dash-chart-card">
-                  <h4><i className="fas fa-venus-mars"></i> Student Gender Mix</h4>
-                  <div className="dash-chart-body"><canvas ref={genderChartRef}></canvas></div>
-                </div>
-                <div className="dash-chart-card">
-                  <h4><i className="fas fa-gavel"></i> Discipline Severity</h4>
-                  <div className="dash-chart-body"><canvas ref={sevChartRef}></canvas></div>
-                </div>
+                {!isMenuHidden('attendance') && (
+                  <div className="dash-chart-card">
+                    <h4><i className="fas fa-chart-line"></i> Attendance — Last 7 Days</h4>
+                    <div className="dash-chart-body"><canvas ref={attChartRef}></canvas></div>
+                  </div>
+                )}
+                {!isMenuHidden('feePayments') && (
+                  <div className="dash-chart-card">
+                    <h4><i className="fas fa-chart-bar"></i> Fee Collection — Last 30 Days</h4>
+                    <div className="dash-chart-body"><canvas ref={collChartRef}></canvas></div>
+                  </div>
+                )}
+                {!isMenuHidden('students') && (
+                  <div className="dash-chart-card">
+                    <h4><i className="fas fa-venus-mars"></i> Student Gender Mix</h4>
+                    <div className="dash-chart-body"><canvas ref={genderChartRef}></canvas></div>
+                  </div>
+                )}
+                {!isMenuHidden('discipline') && (
+                  <div className="dash-chart-card">
+                    <h4><i className="fas fa-gavel"></i> Discipline Severity</h4>
+                    <div className="dash-chart-body"><canvas ref={sevChartRef}></canvas></div>
+                  </div>
+                )}
               </div>
 
               <div className="dash-lists">
-                <div className="dash-list-card">
-                  <h4><i className="fas fa-user-plus"></i> Recent Admissions</h4>
-                  {extras.recentAdmissions.length === 0 ? (
-                    <div className="dlc-empty">No recent admissions</div>
-                  ) : extras.recentAdmissions.map((s) => (
-                    <div key={s.ID} className="dlc-row">
-                      <div className="profile-avatar" style={{width:'32px',height:'32px',fontSize:'13px'}}>{(s.FullName || '?').charAt(0).toUpperCase()}</div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontWeight:600,color:'var(--navy-primary)'}}>{s.FullName}</div>
-                        <div style={{fontSize:'11px',color:'#888'}}><span style={{fontFamily:'monospace'}}>{s.AdmissionNumber}</span> · {s.ClassLabel}</div>
-                      </div>
-                      <div style={{fontSize:'11px',color:'#888',fontFamily:'monospace'}}>{s.AdmissionDate}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="dash-list-card">
-                  <h4><i className="fas fa-calendar-alt"></i> Upcoming Events</h4>
-                  {extras.upcomingEvents.length === 0 ? (
-                    <div className="dlc-empty">No upcoming events</div>
-                  ) : extras.upcomingEvents.map((e) => (
-                    <div key={e.ID} className="dlc-row">
-                      <div style={{width:'34px',height:'34px',background: e.IsHoliday ? '#fff8e1' : '#e7f0fb',color: e.IsHoliday ? '#fb8c00' : '#0074D9',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'4px'}}>
-                        <i className={`fas fa-${e.IsHoliday ? 'umbrella-beach' : 'calendar-day'}`}></i>
-                      </div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{fontWeight:600,color:'var(--navy-primary)'}}>{e.EventName}</div>
-                        <div style={{fontSize:'11px',color:'#888',textTransform:'capitalize'}}>{e.EventType}</div>
-                      </div>
-                      <div style={{fontSize:'11px',color:'#888',fontFamily:'monospace'}}>{e.EventDate}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="dash-list-card" style={{gridColumn:'1 / -1'}}>
-                  <h4><i className="fas fa-exclamation-triangle"></i> Recent Discipline Incidents</h4>
-                  {extras.recentIncidents.length === 0 ? (
-                    <div className="dlc-empty">No incidents</div>
-                  ) : extras.recentIncidents.map((r) => {
-                    const sevColor = r.Severity === 'critical' ? '#b71c1c' : r.Severity === 'high' ? '#ea4335' : r.Severity === 'medium' ? '#fb8c00' : '#34a853';
-                    const stCls = r.Status === 'resolved' ? 'status-active' : r.Status === 'open' ? 'role-clerk' : 'status-suspended';
-                    return (
-                      <div key={r.ID} className="dlc-row">
-                        <span style={{display:'inline-block',padding:'3px 9px',background:sevColor,color:'#fff',fontSize:'10px',fontWeight:700,textTransform:'uppercase',borderRadius:'3px'}}>{r.Severity}</span>
+                {!isMenuHidden('admissions') && (
+                  <div className="dash-list-card">
+                    <h4><i className="fas fa-user-plus"></i> Recent Admissions</h4>
+                    {extras.recentAdmissions.length === 0 ? (
+                      <div className="dlc-empty">No recent admissions</div>
+                    ) : extras.recentAdmissions.map((s) => (
+                      <div key={s.ID} className="dlc-row">
+                        <div className="profile-avatar" style={{width:'32px',height:'32px',fontSize:'13px'}}>{(s.FullName || '?').charAt(0).toUpperCase()}</div>
                         <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontWeight:600,color:'var(--navy-primary)'}}>{r.StudentName} <span style={{fontSize:'11px',color:'#888',fontFamily:'monospace'}}>{r.AdmissionNumber}</span></div>
-                          <div style={{fontSize:'11px',color:'#888',textTransform:'capitalize'}}>{r.IncidentType.replace(/_/g, ' ')}</div>
+                          <div style={{fontWeight:600,color:'var(--navy-primary)'}}>{s.FullName}</div>
+                          <div style={{fontSize:'11px',color:'#888'}}><span style={{fontFamily:'monospace'}}>{s.AdmissionNumber}</span> · {s.ClassLabel}</div>
                         </div>
-                        <span className={`status-badge ${stCls}`} style={{textTransform:'capitalize',fontSize:'10px'}}>{r.Status.replace(/_/g, ' ')}</span>
-                        <div style={{fontSize:'11px',color:'#888',fontFamily:'monospace'}}>{r.IncidentDate}</div>
+                        <div style={{fontSize:'11px',color:'#888',fontFamily:'monospace'}}>{s.AdmissionDate}</div>
                       </div>
-                    );
-                  })}
-                </div>
+                    ))}
+                  </div>
+                )}
+
+                {!isMenuHidden('calendar') && (
+                  <div className="dash-list-card">
+                    <h4><i className="fas fa-calendar-alt"></i> Upcoming Events</h4>
+                    {extras.upcomingEvents.length === 0 ? (
+                      <div className="dlc-empty">No upcoming events</div>
+                    ) : extras.upcomingEvents.map((e) => (
+                      <div key={e.ID} className="dlc-row">
+                        <div style={{width:'34px',height:'34px',background: e.IsHoliday ? '#fff8e1' : '#e7f0fb',color: e.IsHoliday ? '#fb8c00' : '#0074D9',display:'flex',alignItems:'center',justifyContent:'center',borderRadius:'4px'}}>
+                          <i className={`fas fa-${e.IsHoliday ? 'umbrella-beach' : 'calendar-day'}`}></i>
+                        </div>
+                        <div style={{flex:1,minWidth:0}}>
+                          <div style={{fontWeight:600,color:'var(--navy-primary)'}}>{e.EventName}</div>
+                          <div style={{fontSize:'11px',color:'#888',textTransform:'capitalize'}}>{e.EventType}</div>
+                        </div>
+                        <div style={{fontSize:'11px',color:'#888',fontFamily:'monospace'}}>{e.EventDate}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {!isMenuHidden('discipline') && (
+                  <div className="dash-list-card" style={{gridColumn:'1 / -1'}}>
+                    <h4><i className="fas fa-exclamation-triangle"></i> Recent Discipline Incidents</h4>
+                    {extras.recentIncidents.length === 0 ? (
+                      <div className="dlc-empty">No incidents</div>
+                    ) : extras.recentIncidents.map((r) => {
+                      const sevColor = r.Severity === 'critical' ? '#b71c1c' : r.Severity === 'high' ? '#ea4335' : r.Severity === 'medium' ? '#fb8c00' : '#34a853';
+                      const stCls = r.Status === 'resolved' ? 'status-active' : r.Status === 'open' ? 'role-clerk' : 'status-suspended';
+                      return (
+                        <div key={r.ID} className="dlc-row">
+                          <span style={{display:'inline-block',padding:'3px 9px',background:sevColor,color:'#fff',fontSize:'10px',fontWeight:700,textTransform:'uppercase',borderRadius:'3px'}}>{r.Severity}</span>
+                          <div style={{flex:1,minWidth:0}}>
+                            <div style={{fontWeight:600,color:'var(--navy-primary)'}}>{r.StudentName} <span style={{fontSize:'11px',color:'#888',fontFamily:'monospace'}}>{r.AdmissionNumber}</span></div>
+                            <div style={{fontSize:'11px',color:'#888',textTransform:'capitalize'}}>{r.IncidentType.replace(/_/g, ' ')}</div>
+                          </div>
+                          <span className={`status-badge ${stCls}`} style={{textTransform:'capitalize',fontSize:'10px'}}>{r.Status.replace(/_/g, ' ')}</span>
+                          <div style={{fontSize:'11px',color:'#888',fontFamily:'monospace'}}>{r.IncidentDate}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </>
           )}
@@ -5323,16 +5365,16 @@
           <DashboardNotices currentUser={currentUser} role={role} goto={goto} />
 
           <div className="dash-kpi-grid">
-            <DashKpi icon="school" label="Class" value={s.ClassLabel || '—'} sub={`Roll ${s.RollNumber || '—'}`} color="blue" onClick={() => goto('classes')} />
-            <DashKpi icon="book" label="Subjects" value={k.subjectsCount} color="purple" onClick={() => goto('subjects')} />
-            <DashKpi icon="trophy" label="Latest Result" value={k.latestResultPct + '%'} color={k.latestResultPct >= 75 ? 'green' : k.latestResultPct >= 50 ? 'orange' : 'red'} onClick={() => goto('marks')} />
-            <DashKpi icon="calendar-check" label="Attendance" value={k.attendancePct + '%'} sub={`${data.attendance.total} records`} color="teal" onClick={() => goto('attendance')} />
-            <DashKpi icon="money-bill-wave" label="Fees Due" value={fmt(k.feesDue)} color={k.feesDue > 0 ? 'red' : 'green'} onClick={() => goto('feePayments')} />
+            {!isMenuHidden('classes') && <DashKpi icon="school" label="Class" value={s.ClassLabel || '—'} sub={`Roll ${s.RollNumber || '—'}`} color="blue" onClick={() => goto('classes')} />}
+            {!isMenuHidden('subjects') && <DashKpi icon="book" label="Subjects" value={k.subjectsCount} color="purple" onClick={() => goto('subjects')} />}
+            {!isMenuHidden('marks') && <DashKpi icon="trophy" label="Latest Result" value={k.latestResultPct + '%'} color={k.latestResultPct >= 75 ? 'green' : k.latestResultPct >= 50 ? 'orange' : 'red'} onClick={() => goto('marks')} />}
+            {!isMenuHidden('attendance') && <DashKpi icon="calendar-check" label="Attendance" value={k.attendancePct + '%'} sub={`${data.attendance.total} records`} color="teal" onClick={() => goto('attendance')} />}
+            {!isMenuHidden('feePayments') && <DashKpi icon="money-bill-wave" label="Fees Due" value={fmt(k.feesDue)} color={k.feesDue > 0 ? 'red' : 'green'} onClick={() => goto('feePayments')} />}
 
-            <DashKpi icon="graduation-cap" label="Pending Exams" value={k.pendingExams} sub="upcoming" color="amber" onClick={() => goto('exams')} />
-            <DashKpi icon="award" label="Conduct Grade" value={k.conductGrade} color="navy" onClick={() => goto('conduct')} />
-            <DashKpi icon="medal" label="Activities" value={k.activities} sub="recorded" color="pink" onClick={() => goto('activities')} />
-            <DashKpi icon="bullhorn" label="Notices" value={k.unreadNotices} color="orange" onClick={() => goto('notices')} />
+            {!isMenuHidden('exams') && <DashKpi icon="graduation-cap" label="Pending Exams" value={k.pendingExams} sub="upcoming" color="amber" onClick={() => goto('exams')} />}
+            {!isMenuHidden('conduct') && <DashKpi icon="award" label="Conduct Grade" value={k.conductGrade} color="navy" onClick={() => goto('conduct')} />}
+            {!isMenuHidden('activities') && <DashKpi icon="medal" label="Activities" value={k.activities} sub="recorded" color="pink" onClick={() => goto('activities')} />}
+            {!isMenuHidden('notices') && <DashKpi icon="bullhorn" label="Notices" value={k.unreadNotices} color="orange" onClick={() => goto('notices')} />}
             <DashKpi icon="calendar-day" label="Today" value={new Date().getDate()} sub={new Date().toLocaleString('en-US',{weekday:'short',month:'short'})} color="green" onClick={() => goto('calendar')} />
           </div>
 
@@ -5435,12 +5477,12 @@
 
           <div className="dash-kpi-grid">
             <DashKpi icon="child" label="My Children" value={k.totalChildren} color="blue" />
-            <DashKpi icon="exclamation-circle" label="Total Outstanding" value={fmt(k.totalDue)} color={k.totalDue > 0 ? 'red' : 'green'} onClick={() => goto('feePayments')} />
-            <DashKpi icon="calendar-check" label="Avg Attendance" value={k.avgAttendance + '%'} color={k.avgAttendance >= 75 ? 'green' : k.avgAttendance >= 50 ? 'orange' : 'red'} onClick={() => goto('attendance')} />
-            <DashKpi icon="trophy" label="Avg Result" value={k.avgResult + '%'} color={k.avgResult >= 75 ? 'green' : k.avgResult >= 50 ? 'orange' : 'red'} onClick={() => goto('marks')} />
-            <DashKpi icon="user-friends" label="PTMs Today" value={k.ptmToday} color="pink" onClick={() => goto('ptm')} />
+            {!isMenuHidden('feePayments') && <DashKpi icon="exclamation-circle" label="Total Outstanding" value={fmt(k.totalDue)} color={k.totalDue > 0 ? 'red' : 'green'} onClick={() => goto('feePayments')} />}
+            {!isMenuHidden('attendance') && <DashKpi icon="calendar-check" label="Avg Attendance" value={k.avgAttendance + '%'} color={k.avgAttendance >= 75 ? 'green' : k.avgAttendance >= 50 ? 'orange' : 'red'} onClick={() => goto('attendance')} />}
+            {!isMenuHidden('marks') && <DashKpi icon="trophy" label="Avg Result" value={k.avgResult + '%'} color={k.avgResult >= 75 ? 'green' : k.avgResult >= 50 ? 'orange' : 'red'} onClick={() => goto('marks')} />}
+            {!isMenuHidden('ptm') && <DashKpi icon="user-friends" label="PTMs Today" value={k.ptmToday} color="pink" onClick={() => goto('ptm')} />}
 
-            <DashKpi icon="bullhorn" label="Notices" value={k.unreadNotices} color="orange" onClick={() => goto('notices')} />
+            {!isMenuHidden('notices') && <DashKpi icon="bullhorn" label="Notices" value={k.unreadNotices} color="orange" onClick={() => goto('notices')} />}
             <DashKpi icon="calendar" label="Date" value={new Date().getDate()} sub={new Date().toLocaleString('en-US',{month:'short',weekday:'short'})} color="navy" onClick={() => goto('calendar')} />
             <DashKpi icon="graduation-cap" label="Latest Term" value={new Date().toLocaleString('en-US',{month:'short'})} color="purple" onClick={() => goto('exams')} />
             <DashKpi icon="check-circle" label="Active Status" value="OK" sub="account active" color="green" onClick={() => goto('account')} />
@@ -5482,10 +5524,12 @@
                     <div style={{fontSize:'10px',color:'#888',textTransform:'uppercase'}}>Latest Result</div>
                     <div style={{fontWeight:700,color: c.LatestResultPct >= 75 ? '#34a853' : c.LatestResultPct >= 50 ? '#fb8c00' : '#ea4335'}}>{c.LatestResultPct}%</div>
                   </div>
+                  {!isMenuHidden('feePayments') && (
                   <div style={{textAlign:'center',minWidth:'80px'}}>
                     <div style={{fontSize:'10px',color:'#888',textTransform:'uppercase'}}>Fees Due</div>
                     <div style={{fontWeight:700,color: c.FeesDue > 0 ? '#ea4335' : '#888'}}>{fmt(c.FeesDue)}</div>
                   </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -5552,30 +5596,37 @@
           <DashboardNotices currentUser={currentUser} role={role} goto={goto} />
 
           <div className="dash-kpi-grid">
-            <DashKpi icon="user-graduate" label="Active Students" value={fmt(k.totalStudents)} color="blue" onClick={() => goto('students')} />
-            <DashKpi icon="chalkboard-teacher" label="Teachers" value={k.totalTeachers} color="green" onClick={() => goto('users')} />
-            <DashKpi icon="calendar-check" label="Today Attendance" value={k.todayAttPct + '%'} color="orange" onClick={() => goto('attendance')} />
-            <DashKpi icon="graduation-cap" label="Active Exams" value={k.activeExams} sub="in progress" color="amber" onClick={() => goto('exams')} />
-            <DashKpi icon="gavel" label="Open Discipline" value={k.openDiscipline} sub={`${k.criticalIncidents} critical`} color="red" onClick={() => goto('discipline')} />
+            {!isMenuHidden('students') && <DashKpi icon="user-graduate" label="Active Students" value={fmt(k.totalStudents)} color="blue" onClick={() => goto('students')} />}
+            {!isMenuHidden('users') && <DashKpi icon="chalkboard-teacher" label="Teachers" value={k.totalTeachers} color="green" onClick={() => goto('users')} />}
+            {!isMenuHidden('attendance') && <DashKpi icon="calendar-check" label="Today Attendance" value={k.todayAttPct + '%'} color="orange" onClick={() => goto('attendance')} />}
+            {!isMenuHidden('exams') && <DashKpi icon="graduation-cap" label="Active Exams" value={k.activeExams} sub="in progress" color="amber" onClick={() => goto('exams')} />}
+            {!isMenuHidden('discipline') && <DashKpi icon="gavel" label="Open Discipline" value={k.openDiscipline} sub={`${k.criticalIncidents} critical`} color="red" onClick={() => goto('discipline')} />}
 
-            <DashKpi icon="list-alt" label="Lesson Plans" value={k.lpThisWeek} sub="active this week" color="purple" onClick={() => goto('lessonPlans')} />
-            <DashKpi icon="user-friends" label="PTMs Today" value={k.ptmToday} color="pink" onClick={() => goto('ptm')} />
-            <DashKpi icon="life-ring" label="Open Helpdesk" value={k.openHelpdesk} color="navy" onClick={() => goto('helpdesk')} />
-            <DashKpi icon="comment-dots" label="Open Complaints" value={k.openComplaints} color="teal" onClick={() => goto('complaints')} />
-            <DashKpi icon="exclamation-triangle" label="Critical Cases" value={k.criticalIncidents} sub="all-time" color="red" onClick={() => goto('discipline')} />
+            {!isMenuHidden('lessonPlans') && <DashKpi icon="list-alt" label="Lesson Plans" value={k.lpThisWeek} sub="active this week" color="purple" onClick={() => goto('lessonPlans')} />}
+            {!isMenuHidden('ptm') && <DashKpi icon="user-friends" label="PTMs Today" value={k.ptmToday} color="pink" onClick={() => goto('ptm')} />}
+            {!isMenuHidden('helpdesk') && <DashKpi icon="life-ring" label="Open Helpdesk" value={k.openHelpdesk} color="navy" onClick={() => goto('helpdesk')} />}
+            {!isMenuHidden('complaints') && <DashKpi icon="comment-dots" label="Open Complaints" value={k.openComplaints} color="teal" onClick={() => goto('complaints')} />}
+            {!isMenuHidden('discipline') && <DashKpi icon="exclamation-triangle" label="Critical Cases" value={k.criticalIncidents} sub="all-time" color="red" onClick={() => goto('discipline')} />}
           </div>
 
+          {!isMenuHidden('attendance') || !isMenuHidden('discipline') ? (
           <div className="dash-charts">
+            {!isMenuHidden('attendance') && (
             <div className="dash-chart-card">
               <h4><i className="fas fa-chart-line"></i> Attendance — Last 7 Days</h4>
               <div className="dash-chart-body"><canvas ref={attChartRef}></canvas></div>
             </div>
+            )}
+            {!isMenuHidden('discipline') && (
             <div className="dash-chart-card">
               <h4><i className="fas fa-chart-pie"></i> Discipline Severity</h4>
               <div className="dash-chart-body"><canvas ref={sevChartRef}></canvas></div>
             </div>
+            )}
           </div>
+          ) : null}
 
+          {!isMenuHidden('discipline') && (
           <div className="dash-lists">
             <div className="dash-list-card" style={{gridColumn:'1 / -1'}}>
               <h4><i className="fas fa-exclamation-triangle"></i> Recent Discipline Incidents</h4>
@@ -5598,6 +5649,7 @@
               })}
             </div>
           </div>
+          )}
         </div>
       );
     }
@@ -5644,22 +5696,23 @@
           <DashboardNotices currentUser={currentUser} role={role} goto={goto} />
 
           <div className="dash-kpi-grid">
-            <DashKpi icon="money-bill-wave" label="Today's Collection" value={fmt(k.todayCollection)} sub={`${k.todayReceipts} receipts`} color="green" onClick={() => goto('feePayments')} />
-            <DashKpi icon="receipt" label="Receipts Today" value={k.todayReceipts} sub="generated today" color="blue" onClick={() => goto('feePayments')} />
-            <DashKpi icon="exclamation-circle" label="Outstanding" value={fmt(k.totalOutstanding)} sub="total due" color="red" onClick={() => goto('feePayments')} />
-            <DashKpi icon="undo" label="Refunds Today" value={fmt(k.refundsToday)} sub={`${k.refundsTodayCount} refund(s)`} color="amber" onClick={() => goto('feePayments')} />
-            <DashKpi icon="list-alt" label="Active Fee Items" value={k.activeFeeItems} sub="fee structures" color="purple" onClick={() => goto('feeStructure')} />
+            {!isMenuHidden('feePayments') && <DashKpi icon="money-bill-wave" label="Today's Collection" value={fmt(k.todayCollection)} sub={`${k.todayReceipts} receipts`} color="green" onClick={() => goto('feePayments')} />}
+            {!isMenuHidden('feePayments') && <DashKpi icon="receipt" label="Receipts Today" value={k.todayReceipts} sub="generated today" color="blue" onClick={() => goto('feePayments')} />}
+            {!isMenuHidden('feePayments') && <DashKpi icon="exclamation-circle" label="Outstanding" value={fmt(k.totalOutstanding)} sub="total due" color="red" onClick={() => goto('feePayments')} />}
+            {!isMenuHidden('feePayments') && <DashKpi icon="undo" label="Refunds Today" value={fmt(k.refundsToday)} sub={`${k.refundsTodayCount} refund(s)`} color="amber" onClick={() => goto('feePayments')} />}
+            {!isMenuHidden('feeStructure') && <DashKpi icon="list-alt" label="Active Fee Items" value={k.activeFeeItems} sub="fee structures" color="purple" onClick={() => goto('feeStructure')} />}
 
-            <DashKpi icon="user-graduate" label="Active Students" value={fmt(k.activeStudents)} color="navy" onClick={() => goto('students')} />
-            <DashKpi icon="users" label="Total Parents" value={fmt(k.totalParents)} color="teal" onClick={() => goto('parents')} />
-            <DashKpi icon="life-ring" label="Open Helpdesk" value={k.openHelpdesk} sub="tickets" color="orange" onClick={() => goto('helpdesk')} />
-            <DashKpi icon="comment-dots" label="Open Complaints" value={k.openComplaints} color="pink" onClick={() => goto('complaints')} />
-            <DashKpi icon="user-plus" label="New Admissions" value={k.newAdmissions} sub="this month" color="green" onClick={() => goto('students')} />
+            {!isMenuHidden('students') && <DashKpi icon="user-graduate" label="Active Students" value={fmt(k.activeStudents)} color="navy" onClick={() => goto('students')} />}
+            {!isMenuHidden('parents') && <DashKpi icon="users" label="Total Parents" value={fmt(k.totalParents)} color="teal" onClick={() => goto('parents')} />}
+            {!isMenuHidden('helpdesk') && <DashKpi icon="life-ring" label="Open Helpdesk" value={k.openHelpdesk} sub="tickets" color="orange" onClick={() => goto('helpdesk')} />}
+            {!isMenuHidden('complaints') && <DashKpi icon="comment-dots" label="Open Complaints" value={k.openComplaints} color="pink" onClick={() => goto('complaints')} />}
+            {!isMenuHidden('admissions') && <DashKpi icon="user-plus" label="New Admissions" value={k.newAdmissions} sub="this month" color="green" onClick={() => goto('students')} />}
           </div>
 
           {/* day-book snapshot */}
-          <TodayAccountsCard goto={goto} currentUser={currentUser} role={role} />
+          {!isMenuHidden('accounts') && <TodayAccountsCard goto={goto} currentUser={currentUser} role={role} />}
 
+          {!isMenuHidden('feePayments') && (
           <div className="dash-charts">
             <div className="dash-chart-card">
               <h4><i className="fas fa-chart-bar"></i> Collection — Last 7 Days</h4>
@@ -5670,7 +5723,9 @@
               <div className="dash-chart-body"><canvas ref={modeChartRef}></canvas></div>
             </div>
           </div>
+          )}
 
+          {!isMenuHidden('feePayments') && (
           <div className="dash-lists">
             <div className="dash-list-card" style={{gridColumn:'1 / -1'}}>
               <h4><i className="fas fa-history"></i> Recent Payments</h4>
@@ -5695,6 +5750,7 @@
               })}
             </div>
           </div>
+          )}
         </div>
       );
     }
@@ -5734,29 +5790,32 @@
           <DashboardNotices currentUser={currentUser} role={role} goto={goto} />
 
           <div className="dash-kpi-grid">
-            <DashKpi icon="money-bill-wave" label="Today's Collection" value={fmt(k.todayCollection)} sub={`${k.todayReceipts} receipts`} color="green" onClick={() => goto('feePayments')} />
-            <DashKpi icon="exclamation-circle" label="Outstanding" value={fmt(k.totalOutstanding)} sub="total due" color="red" onClick={() => goto('feePayments')} />
-            <DashKpi icon="user-plus" label="Admitted This Term" value={admStats ? fmt(admStats.admittedCount) : '…'} sub={admStats ? `GH₵${fmt(admStats.admissionFeeTotal)} admission fees` : 'loading…'} color="teal" onClick={() => goto('feePayments')} />
-            <DashKpi icon="undo" label="Refunds Today" value={fmt(k.refundsToday)} sub={`${k.refundsTodayCount} refund(s)`} color="amber" onClick={() => goto('feePayments')} />
-            <DashKpi icon="list-alt" label="Active Fee Items" value={k.activeFeeItems} sub="fee structures" color="purple" onClick={() => goto('feeStructure')} />
-            <DashKpi icon="desktop" label="Assets on File" value={assetCount} color="navy" onClick={() => goto('assets')} />
-            <DashKpi icon="boxes" label="Stock Items" value={(stock || []).length} sub={lowStockCount ? `${lowStockCount} low stock` : 'all stocked'} color={lowStockCount ? 'red' : 'teal'} onClick={() => goto('inventory')} blink={lowStockCount > 0} />
-            <DashKpi icon="cash-register" label="POS / Sell" value="Sell" sub="record a sale" color="navy" onClick={() => goto('pos')} />
+            {!isMenuHidden('feePayments') && <DashKpi icon="money-bill-wave" label="Today's Collection" value={fmt(k.todayCollection)} sub={`${k.todayReceipts} receipts`} color="green" onClick={() => goto('feePayments')} />}
+            {!isMenuHidden('feePayments') && <DashKpi icon="exclamation-circle" label="Outstanding" value={fmt(k.totalOutstanding)} sub="total due" color="red" onClick={() => goto('feePayments')} />}
+            {!isMenuHidden('admissions') && <DashKpi icon="user-plus" label="Admitted This Term" value={admStats ? fmt(admStats.admittedCount) : '…'} sub={admStats ? `GH₵${fmt(admStats.admissionFeeTotal)} admission fees` : 'loading…'} color="teal" onClick={() => goto('feePayments')} />}
+            {!isMenuHidden('feePayments') && <DashKpi icon="undo" label="Refunds Today" value={fmt(k.refundsToday)} sub={`${k.refundsTodayCount} refund(s)`} color="amber" onClick={() => goto('feePayments')} />}
+            {!isMenuHidden('feeStructure') && <DashKpi icon="list-alt" label="Active Fee Items" value={k.activeFeeItems} sub="fee structures" color="purple" onClick={() => goto('feeStructure')} />}
+            {!isMenuHidden('assets') && <DashKpi icon="desktop" label="Assets on File" value={assetCount} color="navy" onClick={() => goto('assets')} />}
+            {!isMenuHidden('inventory') && <DashKpi icon="boxes" label="Stock Items" value={(stock || []).length} sub={lowStockCount ? `${lowStockCount} low stock` : 'all stocked'} color={lowStockCount ? 'red' : 'teal'} onClick={() => goto('inventory')} blink={lowStockCount > 0} />}
+            {!isMenuHidden('pos') && <DashKpi icon="cash-register" label="POS / Sell" value="Sell" sub="record a sale" color="navy" onClick={() => goto('pos')} />}
           </div>
 
           {/* day-book snapshot */}
-          <TodayAccountsCard goto={goto} currentUser={currentUser} role={role} />
+          {!isMenuHidden('accounts') && <TodayAccountsCard goto={goto} currentUser={currentUser} role={role} />}
 
           {/* fee types quick-reference */}
-          <FeeBreakdownCard goto={goto} currentUser={currentUser} role={role} />
+          {!isMenuHidden('feeStructure') && <FeeBreakdownCard goto={goto} currentUser={currentUser} role={role} />}
 
+          {!isMenuHidden('feePayments') && (
           <div className="dash-charts">
             <div className="dash-chart-card" style={{gridColumn:'1 / -1'}}>
               <h4><i className="fas fa-chart-bar"></i> Collection — Last 7 Days</h4>
               <div className="dash-chart-body"><canvas ref={collChartRef}></canvas></div>
             </div>
           </div>
+          )}
 
+          {!isMenuHidden('feePayments') && (
           <div className="dash-lists">
             <div className="dash-list-card" style={{gridColumn:'1 / -1'}}>
               <h4><i className="fas fa-history"></i> Recent Payments</h4>
@@ -5781,6 +5840,7 @@
               })}
             </div>
           </div>
+          )}
         </div>
       );
     }
@@ -5821,16 +5881,16 @@
           <DashboardNotices currentUser={currentUser} role={role} goto={goto} />
 
           <div className="dash-kpi-grid">
-            <DashKpi icon="school" label="My Classes" value={k.classes} sub={`${k.students} students`} color="blue" onClick={() => goto('classes')} />
-            <DashKpi icon="user-graduate" label="My Students" value={k.students} sub={`across ${k.classes} classes`} color="green" onClick={() => goto('students')} />
-            <DashKpi icon="book" label="My Subjects" value={k.subjects} sub={`${k.totalAssignments} assignments`} color="purple" onClick={() => goto('subjects')} />
-            <DashKpi icon="calendar-day" label="Today's Lectures" value={k.todayLectures} sub={`${data.dayName}`} color="orange" onClick={() => goto('timetable')} />
-            <DashKpi icon="clock" label="Weekly Periods" value={k.weekPeriods} sub="periods/week" color="navy" onClick={() => goto('timetable')} />
+            {!isMenuHidden('classes') && <DashKpi icon="school" label="My Classes" value={k.classes} sub={`${k.students} students`} color="blue" onClick={() => goto('classes')} />}
+            {!isMenuHidden('students') && <DashKpi icon="user-graduate" label="My Students" value={k.students} sub={`across ${k.classes} classes`} color="green" onClick={() => goto('students')} />}
+            {!isMenuHidden('subjects') && <DashKpi icon="book" label="My Subjects" value={k.subjects} sub={`${k.totalAssignments} assignments`} color="purple" onClick={() => goto('subjects')} />}
+            {!isMenuHidden('timetable') && <DashKpi icon="calendar-day" label="Today's Lectures" value={k.todayLectures} sub={`${data.dayName}`} color="orange" onClick={() => goto('timetable')} />}
+            {!isMenuHidden('timetable') && <DashKpi icon="clock" label="Weekly Periods" value={k.weekPeriods} sub="periods/week" color="navy" onClick={() => goto('timetable')} />}
 
-            <DashKpi icon="book-open" label="Logbook (7d)" value={k.logbook7d} sub="entries last week" color="teal" onClick={() => goto('logbook')} />
-            <DashKpi icon="list-alt" label="Active Plans" value={k.activePlans} sub="lesson plans" color="amber" onClick={() => goto('lessonPlans')} />
-            <DashKpi icon="user-friends" label="PTMs Today" value={k.ptmToday} sub="parent meetings" color="pink" onClick={() => goto('ptm')} />
-            <DashKpi icon="exchange-alt" label="Substitutes (30d)" value={k.subs30} sub="last 30 days" color="purple" onClick={() => goto('substitutes')} />
+            {!isMenuHidden('logbook') && <DashKpi icon="book-open" label="Logbook (7d)" value={k.logbook7d} sub="entries last week" color="teal" onClick={() => goto('logbook')} />}
+            {!isMenuHidden('lessonPlans') && <DashKpi icon="list-alt" label="Active Plans" value={k.activePlans} sub="lesson plans" color="amber" onClick={() => goto('lessonPlans')} />}
+            {!isMenuHidden('ptm') && <DashKpi icon="user-friends" label="PTMs Today" value={k.ptmToday} sub="parent meetings" color="pink" onClick={() => goto('ptm')} />}
+            {!isMenuHidden('substitutes') && <DashKpi icon="exchange-alt" label="Substitutes (30d)" value={k.subs30} sub="last 30 days" color="purple" onClick={() => goto('substitutes')} />}
             <DashKpi icon="calendar-check" label="Date" value={new Date().getDate()} sub={new Date().toLocaleString('en-US',{month:'short',year:'numeric'})} color="green" />
           </div>
 
@@ -6775,13 +6835,22 @@
       });
       const [saving, setSaving] = useState(false);
       const [customFieldDefs, setCustomFieldDefs] = useState([]);
+      const [fieldVisibility, setFieldVisibility] = useState({});
 
       const set = (k, v) => setFormData({ ...formData, [k]: v });
       const setCustomField = (key, v) => setFormData({ ...formData, CustomFields: { ...formData.CustomFields, [key]: v } });
+      const isFieldVisible = (key) => fieldVisibility[key] !== false;
 
       useEffect(() => {
         google.script.run
-          .withSuccessHandler((res) => { if (res && res.success) setCustomFieldDefs(res.data.custom || []); })
+          .withSuccessHandler((res) => {
+            if (res && res.success) {
+              setCustomFieldDefs(res.data.custom || []);
+              const vis = {};
+              (res.data.fields || []).forEach(f => { vis[f.key] = f.visible; });
+              setFieldVisibility(vis);
+            }
+          })
           .getFormFieldConfig('staff');
       }, []);
 
@@ -6827,6 +6896,7 @@
                       required
                     />
                   </div>
+                  {isFieldVisible('Email') && (
                   <div className="form-group">
                     <label><i className="fas fa-envelope"></i> Email</label>
                     <input
@@ -6835,6 +6905,8 @@
                       onChange={(e) => set('Email', e.target.value)}
                     />
                   </div>
+                  )}
+                  {isFieldVisible('Mobile') && (
                   <div className="form-group">
                     <label><i className="fas fa-phone"></i> Mobile</label>
                     <input
@@ -6845,6 +6917,7 @@
                       maxLength="15"
                     />
                   </div>
+                  )}
                   <div className="form-group">
                     <label><i className="fas fa-key"></i> Password <span style={{fontWeight:400,color:'#888',fontSize:'11px'}}>(leave blank to {user ? 'keep current' : 'auto-generate'})</span></label>
                     <input
@@ -6871,6 +6944,7 @@
                     onChange={(val) => set('Role', val)}
                     placeholder="Select role..."
                   />
+                  {isFieldVisible('Gender') && (
                   <SearchableDropdown
                     label="Gender"
                     icon="fas fa-venus-mars"
@@ -6883,6 +6957,7 @@
                     onChange={(val) => set('Gender', val)}
                     placeholder="Select gender..."
                   />
+                  )}
                   <SearchableDropdown
                     label="Status"
                     icon="fas fa-toggle-on"
@@ -6903,6 +6978,7 @@
                   <i className="fas fa-graduation-cap"></i> Personal & Professional
                 </h4>
                 <div className="form-grid">
+                  {isFieldVisible('DateOfBirth') && (
                   <div className="form-group">
                     <label><i className="fas fa-birthday-cake"></i> Date of Birth</label>
                     <input
@@ -6911,6 +6987,8 @@
                       onChange={(e) => set('DateOfBirth', e.target.value)}
                     />
                   </div>
+                  )}
+                  {isFieldVisible('JoiningDate') && (
                   <div className="form-group">
                     <label><i className="fas fa-calendar-plus"></i> Joining Date</label>
                     <input
@@ -6919,6 +6997,8 @@
                       onChange={(e) => set('JoiningDate', e.target.value)}
                     />
                   </div>
+                  )}
+                  {isFieldVisible('Qualification') && (
                   <div className="form-group">
                     <label><i className="fas fa-graduation-cap"></i> Qualification</label>
                     <input
@@ -6929,6 +7009,8 @@
                       maxLength="150"
                     />
                   </div>
+                  )}
+                  {isFieldVisible('Specialization') && (
                   <div className="form-group">
                     <label><i className="fas fa-star"></i> Specialization</label>
                     <input
@@ -6939,6 +7021,8 @@
                       maxLength="100"
                     />
                   </div>
+                  )}
+                  {isFieldVisible('Address') && (
                   <div className="form-group" style={{gridColumn:'1 / -1'}}>
                     <label><i className="fas fa-map-marker-alt"></i> Address</label>
                     <textarea
@@ -6949,6 +7033,7 @@
                       placeholder="House/Street/City"
                     />
                   </div>
+                  )}
                 </div>
 
                 <hr style={{margin:'22px 0',border:'none',borderTop:'1px solid #e0e0e0'}} />
@@ -6957,6 +7042,7 @@
                   <i className="fas fa-id-badge"></i> HR / Emergency
                 </h4>
                 <div className="form-grid">
+                  {isFieldVisible('EmployeeCode') && (
                   <div className="form-group">
                     <label><i className="fas fa-id-badge"></i> Employee Code</label>
                     <input type="text" value={formData.EmployeeCode}
@@ -6964,18 +7050,24 @@
                       maxLength="20" placeholder="EMP001" />
                     <small style={{color:'#777'}}>Unique staff ID for payroll/ID cards</small>
                   </div>
+                  )}
+                  {isFieldVisible('EmergencyContactName') && (
                   <div className="form-group">
                     <label><i className="fas fa-user-shield"></i> Emergency Contact Name</label>
                     <input type="text" value={formData.EmergencyContactName}
                       onChange={(e) => set('EmergencyContactName', e.target.value)}
                       maxLength="120" placeholder="Spouse / parent / sibling" />
                   </div>
+                  )}
+                  {isFieldVisible('EmergencyContactPhone') && (
                   <div className="form-group">
                     <label><i className="fas fa-phone-alt"></i> Emergency Contact Phone</label>
                     <input type="tel" value={formData.EmergencyContactPhone}
                       onChange={(e) => set('EmergencyContactPhone', e.target.value)}
                       maxLength="20" placeholder="+233 24 000 0000" />
                   </div>
+                  )}
+                  {isFieldVisible('SSNITNumber') && (
                   <div className="form-group">
                     <label><i className="fas fa-id-badge"></i> SSNIT Number</label>
                     <input type="text" value={formData.SSNITNumber}
@@ -6983,6 +7075,7 @@
                       maxLength="20" placeholder="e.g. C123456789012" />
                     <small style={{color:'#777'}}>Required before a payslip/SSNIT record can be generated for this staff member</small>
                   </div>
+                  )}
                 </div>
 
                 {customFieldDefs.length > 0 && customFieldDefs.some(c => c.visible) && (<>
@@ -12301,12 +12394,23 @@
       const [saving, setSaving] = useState(false);
       const [showMore, setShowMore] = useState(false);
       const [customFieldDefs, setCustomFieldDefs] = useState([]);
+      const [fieldVisibility, setFieldVisibility] = useState({});
       const set = (k, v) => setFormData({ ...formData, [k]: v });
       const setCustomField = (key, v) => setFormData({ ...formData, CustomFields: { ...formData.CustomFields, [key]: v } });
+      // built-in fields default visible until the config loads (and stay visible for anything not
+      // in the catalog at all) — only an explicit {visible:false} from Settings > Form Fields hides one
+      const isFieldVisible = (key) => fieldVisibility[key] !== false;
 
       useEffect(() => {
         google.script.run
-          .withSuccessHandler((res) => { if (res && res.success) setCustomFieldDefs(res.data.custom || []); })
+          .withSuccessHandler((res) => {
+            if (res && res.success) {
+              setCustomFieldDefs(res.data.custom || []);
+              const vis = {};
+              (res.data.fields || []).forEach(f => { vis[f.key] = f.visible; });
+              setFieldVisibility(vis);
+            }
+          })
           .getFormFieldConfig('student');
         google.script.run
           .withSuccessHandler((res) => { if (res.success) setClasses(res.data || []); })
@@ -12428,11 +12532,13 @@
                     <input type="text" value={formData.FirstName}
                       onChange={(e) => set('FirstName', e.target.value)} maxLength="50" />
                   </div>
+                  {isFieldVisible('MiddleName') && (
                   <div className="form-group">
                     <label><i className="fas fa-user"></i> Middle Name</label>
                     <input type="text" value={formData.MiddleName}
                       onChange={(e) => set('MiddleName', e.target.value)} maxLength="50" />
                   </div>
+                  )}
                   <div className="form-group">
                     <label><i className="fas fa-user"></i> Last Name *</label>
                     <input type="text" value={formData.LastName}
@@ -12455,6 +12561,7 @@
                     <input type="date" value={formData.DateOfBirth}
                       onChange={(e) => set('DateOfBirth', e.target.value)} />
                   </div>
+                  {isFieldVisible('BloodGroup') && (
                   <SearchableDropdown
                     label="Blood Group" icon="fas fa-tint"
                     options={['A+','A-','B+','B-','AB+','AB-','O+','O-','unknown'].map(b => ({ value: b, label: b }))}
@@ -12462,92 +12569,125 @@
                     onChange={(v) => set('BloodGroup', v)}
                     placeholder="Select blood group..."
                   />
+                  )}
+                  {isFieldVisible('GhanaCardNumber') && (
                   <div className="form-group">
                     <label><i className="fas fa-id-card"></i> Ghana Card Number</label>
                     <input type="text" value={formData.GhanaCardNumber}
                       onChange={(e) => set('GhanaCardNumber', e.target.value)}
                       maxLength="15" placeholder="GHA-XXXXXXXXX-X" pattern="GHA-\d{9}-\d" />
                   </div>
+                  )}
                 </div>
 
                 <SectionHdr icon="phone" label="Contact & Address" />
                 <div className="form-grid">
+                  {isFieldVisible('Mobile') && (
                   <div className="form-group">
                     <label><i className="fas fa-phone"></i> Mobile</label>
                     <input type="tel" value={formData.Mobile}
                       onChange={(e) => set('Mobile', e.target.value)} maxLength="15" />
                   </div>
+                  )}
+                  {isFieldVisible('Email') && (
                   <div className="form-group">
                     <label><i className="fas fa-envelope"></i> Email</label>
                     <input type="email" value={formData.Email}
                       onChange={(e) => set('Email', e.target.value)} maxLength="100" />
                   </div>
+                  )}
+                  {isFieldVisible('AddressLine') && (
                   <div className="form-group" style={{gridColumn:'1 / -1'}}>
                     <label><i className="fas fa-map-marker-alt"></i> Address Line</label>
                     <input type="text" value={formData.AddressLine}
                       onChange={(e) => set('AddressLine', e.target.value)} maxLength="255" />
                   </div>
+                  )}
+                  {isFieldVisible('City') && (
                   <div className="form-group">
                     <label><i className="fas fa-city"></i> City</label>
                     <input type="text" value={formData.City}
                       onChange={(e) => set('City', e.target.value)} maxLength="50" />
                   </div>
+                  )}
+                  {isFieldVisible('Region') && (
                   <SearchableDropdown label="Region *" icon="fas fa-flag"
                     options={GHANA_REGION_OPTS} value={formData.Region} onChange={(v) => set('Region', v)} placeholder="Select region..." />
+                  )}
+                  {isFieldVisible('GhanaPostGPS') && (
                   <div className="form-group">
                     <label><i className="fas fa-map-pin"></i> Digital Address (GhanaPost GPS)</label>
                     <input type="text" value={formData.GhanaPostGPS}
                       onChange={(e) => set('GhanaPostGPS', e.target.value)} maxLength="12" placeholder="GA-183-8541" />
                   </div>
+                  )}
                 </div>
 
                 <SectionHdr icon="users" label="Family" />
                 <div className="form-grid">
+                  {isFieldVisible('FatherName') && (
                   <div className="form-group">
                     <label><i className="fas fa-male"></i> Father Name</label>
                     <input type="text" value={formData.FatherName}
                       onChange={(e) => set('FatherName', e.target.value)} maxLength="100" />
                   </div>
+                  )}
+                  {isFieldVisible('FatherOccupation') && (
                   <div className="form-group">
                     <label><i className="fas fa-briefcase"></i> Father Occupation</label>
                     <input type="text" value={formData.FatherOccupation}
                       onChange={(e) => set('FatherOccupation', e.target.value)} maxLength="100" />
                   </div>
+                  )}
+                  {isFieldVisible('FatherMobile') && (
                   <div className="form-group">
                     <label><i className="fas fa-phone"></i> Father Mobile</label>
                     <input type="tel" value={formData.FatherMobile}
                       onChange={(e) => set('FatherMobile', e.target.value)} maxLength="15" />
                   </div>
+                  )}
+                  {isFieldVisible('MotherName') && (
                   <div className="form-group">
                     <label><i className="fas fa-female"></i> Mother Name</label>
                     <input type="text" value={formData.MotherName}
                       onChange={(e) => set('MotherName', e.target.value)} maxLength="100" />
                   </div>
+                  )}
+                  {isFieldVisible('MotherOccupation') && (
                   <div className="form-group">
                     <label><i className="fas fa-briefcase"></i> Mother Occupation</label>
                     <input type="text" value={formData.MotherOccupation}
                       onChange={(e) => set('MotherOccupation', e.target.value)} maxLength="100" />
                   </div>
+                  )}
+                  {isFieldVisible('MotherMobile') && (
                   <div className="form-group">
                     <label><i className="fas fa-phone"></i> Mother Mobile</label>
                     <input type="tel" value={formData.MotherMobile}
                       onChange={(e) => set('MotherMobile', e.target.value)} maxLength="15" />
                   </div>
+                  )}
+                  {isFieldVisible('GuardianName') && (
                   <div className="form-group">
                     <label><i className="fas fa-user-friends"></i> Guardian Name</label>
                     <input type="text" value={formData.GuardianName}
                       onChange={(e) => set('GuardianName', e.target.value)} maxLength="100" />
                   </div>
+                  )}
+                  {isFieldVisible('GuardianRelation') && (
                   <div className="form-group">
                     <label><i className="fas fa-link"></i> Guardian Relation</label>
                     <input type="text" value={formData.GuardianRelation}
                       onChange={(e) => set('GuardianRelation', e.target.value)} maxLength="50" />
                   </div>
+                  )}
+                  {isFieldVisible('GuardianMobile') && (
                   <div className="form-group">
                     <label><i className="fas fa-phone"></i> Guardian Mobile</label>
                     <input type="tel" value={formData.GuardianMobile}
                       onChange={(e) => set('GuardianMobile', e.target.value)} maxLength="15" />
                   </div>
+                  )}
                 </div>
 
                 <SectionHdr icon="info-circle" label="Other Info" />
@@ -12559,14 +12699,19 @@
                     onChange={(v) => set('Category', v)}
                     placeholder="Select category..."
                   />
+                  {isFieldVisible('Religion') && (
                   <SearchableDropdown label="Religion" icon="fas fa-place-of-worship"
                     options={RELIGION_OPTS} value={formData.Religion}
                     onChange={(v) => set('Religion', v)} placeholder="Select religion..." />
+                  )}
+                  {isFieldVisible('PreviousSchool') && (
                   <div className="form-group" style={{gridColumn:'1 / -1'}}>
                     <label><i className="fas fa-school"></i> Previous School</label>
                     <input type="text" value={formData.PreviousSchool}
                       onChange={(e) => set('PreviousSchool', e.target.value)} maxLength="150" />
                   </div>
+                  )}
+                  {isFieldVisible('TransportRequired') && (
                   <div className="form-group">
                     <label><i className="fas fa-bus"></i> Transport Required</label>
                     <div style={{display:'flex',gap:'12px',alignItems:'center',padding:'8px 0'}}>
@@ -12580,6 +12725,8 @@
                       </label>
                     </div>
                   </div>
+                  )}
+                  {isFieldVisible('TransportRoute') && (
                   <div className="form-group">
                     <label><i className="fas fa-route"></i> Transport Route</label>
                     <input type="text" value={formData.TransportRoute}
@@ -12590,12 +12737,15 @@
                       placeholder={formData.TransportRequired !== '1' ? '(transport off)' : 'e.g. Route A'}
                     />
                   </div>
+                  )}
+                  {isFieldVisible('MedicalNotes') && (
                   <div className="form-group" style={{gridColumn:'1 / -1'}}>
                     <label><i className="fas fa-notes-medical"></i> Medical Notes</label>
                     <textarea value={formData.MedicalNotes}
                       onChange={(e) => set('MedicalNotes', e.target.value)} rows="2"
                       placeholder="Allergies, conditions, etc." />
                   </div>
+                  )}
                 </div>
 
                 <button type="button" className="btn btn-secondary no-print" style={{margin:'16px 0 4px'}}
@@ -12774,6 +12924,7 @@
                 {/* intl: health & safety */}
                 <SectionHdr icon="heartbeat" label="Health & Safety" />
                 <div className="form-grid">
+                  {isFieldVisible('DietaryRequirements') && (
                   <div className="form-group" style={{gridColumn:'1 / -1'}}>
                     <label><i className="fas fa-utensils"></i> Dietary Requirements</label>
                     {(() => {
@@ -12812,6 +12963,8 @@
                       );
                     })()}
                   </div>
+                  )}
+                  {isFieldVisible('Allergies') && (
                   <div className="form-group" style={{gridColumn:'1 / -1'}}>
                     <label><i className="fas fa-exclamation-triangle" style={{color:'#ea4335'}}></i> Allergies</label>
                     <textarea value={formData.Allergies}
@@ -12819,6 +12972,7 @@
                       rows="2" maxLength="300"
                       placeholder="Critical: peanut, treenut, dairy, penicillin, etc. — staff sees this everywhere" />
                   </div>
+                  )}
                   <div className="form-group">
                     <label><i className="fas fa-shield-virus"></i> Insurance Provider</label>
                     <input type="text" value={formData.InsuranceProvider}
@@ -12833,6 +12987,7 @@
                 </div>
 
                 {/* intl: house & identity */}
+                {isFieldVisible('HouseName') && (<>
                 <SectionHdr icon="home" label="House & Identity" />
                 <div className="form-grid">
                   <div className="form-group" style={{gridColumn:'1 / -1'}}>
@@ -12862,10 +13017,13 @@
                     </div>
                   </div>
                 </div>
+                </>)}
 
                 {/* welfare/finance — fee concession + SEN/IEP */}
+                {(isFieldVisible('ConcessionPercent') || isFieldVisible('SpecialNeeds')) && (<>
                 <SectionHdr icon="hand-holding-heart" label="Welfare / Finance" />
                 <div className="form-grid">
+                  {isFieldVisible('ConcessionPercent') && (
                   <div className="form-group">
                     <label><i className="fas fa-percent"></i> Fee Concession (%)</label>
                     <input type="number" min="0" max="100" step="0.01"
@@ -12874,6 +13032,8 @@
                       placeholder="0" />
                     <small style={{color:'#777'}}>Scholarship / fee waiver / sibling discount — flows into fee billing</small>
                   </div>
+                  )}
+                  {isFieldVisible('SpecialNeeds') && (
                   <div className="form-group" style={{gridColumn:'1 / -1'}}>
                     <label><i className="fas fa-universal-access"></i> Special Educational Needs (SEN / IEP)</label>
                     <textarea rows="2" maxLength="300"
@@ -12882,7 +13042,9 @@
                       placeholder="e.g. IEP - Dyslexia, extra time on exams" />
                     <small style={{color:'#777'}}>Visible to teaching staff for classroom accommodations</small>
                   </div>
+                  )}
                 </div>
+                </>)}
 
                 </>)}
 
@@ -30822,7 +30984,7 @@
       return (
         <div style={{marginTop:'20px'}}>
           <div className="settings-info-message" style={{marginBottom:'18px'}}>
-            <i className="fas fa-info-circle"></i> <strong>Control what appears on each data-entry form.</strong> Mark any field required, or add entirely new custom fields (a scholarship reference, a church affiliation, a bank branch — whatever's specific to your school) — custom fields appear directly on the Student/Staff Add &amp; Edit forms and are enforced on save. Note: unticking Visible on a built-in field is saved here but doesn't yet remove it from the Add/Edit form itself.
+            <i className="fas fa-info-circle"></i> <strong>Control what appears on each data-entry form.</strong> Untick Visible to remove a field from the Add/Edit form entirely, mark any field required, or add entirely new custom fields (a scholarship reference, a church affiliation, a bank branch — whatever's specific to your school). All of this is live on the Student and Staff Add &amp; Edit forms and enforced on save.
           </div>
 
           <div className="tt-tabs" style={{marginBottom:'16px'}}>
