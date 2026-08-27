@@ -4797,10 +4797,14 @@
         });
       }
       if (people && people.length > 0) {
+        const isTeacher = String(role).toLowerCase() === 'teacher';
+        const ownClass = isTeacher ? people.filter(p => p.IsOwnClass) : [];
         items.push({
           key: 'birthday', icon: 'birthday-cake', color: '#d81b60',
           label: people.length === 1 ? 'Birthday Today' : 'Birthdays Today',
-          content: people.map(p => p.Name).join(', ')
+          content: ownClass.length > 0
+            ? <><b>{ownClass.map(p => p.Name).join(', ')}</b> in your class{people.length > ownClass.length ? ` · also: ${people.filter(p => !p.IsOwnClass).map(p => p.Name).join(', ')}` : ''}</>
+            : people.map(p => p.Name).join(', ')
         });
       }
       if (items.length === 0) return null;
@@ -11863,9 +11867,9 @@
 
       const handleDelete = (s) => {
         Swal.fire({
-          icon: 'warning', title: 'Delete Student?',
-          html: `Soft-delete student:<br><strong>${s.FullName}</strong> (${s.AdmissionNumber})<br><small>Class strength will auto-recalculate.</small>`,
-          showCancelButton: true, confirmButtonColor: '#ea4335', confirmButtonText: 'Delete'
+          icon: 'warning', title: 'Delete Student Permanently?',
+          html: `This <strong>permanently deletes</strong> <strong>${s.FullName}</strong> (${s.AdmissionNumber}) and all their related records (fees, marks, attendance, discipline, documents, etc.) right away — this cannot be undone.<br><small>Class strength will auto-recalculate.</small>`,
+          showCancelButton: true, confirmButtonColor: '#ea4335', confirmButtonText: 'Delete Permanently'
         }).then((r) => {
           if (r.isConfirmed) {
             google.script.run
@@ -29885,6 +29889,25 @@
         });
       };
 
+      const handleCleanupAttendance = () => {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Clean up orphaned attendance?',
+          text: 'Removes attendance entries for students who no longer exist in the system.',
+          showCancelButton: true,
+          confirmButtonText: 'Run cleanup'
+        }).then((r) => {
+          if (!r.isConfirmed) return;
+          Swal.fire({ title: 'Cleaning up…', html: 'Please wait — this may take a moment.', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+          google.script.run
+            .withSuccessHandler((res) => {
+              Swal.fire({ icon: res && res.success ? 'success' : 'error', text: (res && res.message) || 'Done' });
+            })
+            .withFailureHandler((err) => Swal.fire({ icon: 'error', text: (err && err.message) || 'Server error' }))
+            .cleanupOrphanedAttendanceEntries(currentUser, role);
+        });
+      };
+
       const applyColors = () => {
         const root = document.documentElement;
         root.style.setProperty('--navy-primary', customColors.primary);
@@ -29988,6 +30011,16 @@
               </p>
               <button className="btn btn-secondary" onClick={handleRepairDates}>
                 <i className="fas fa-calendar-check"></i> Repair Dates to ISO
+              </button>
+
+              <h3 style={{margin:'22px 0 12px', color:'var(--navy-primary)', fontSize:'17px'}}>
+                <i className="fas fa-broom"></i> Attendance Cleanup
+              </h3>
+              <p style={{fontSize:'13px', color:'#666', marginBottom:'12px'}}>
+                Removes attendance entries left behind for students who no longer exist in the system (e.g. deleted before this cleanup existed), which otherwise keep skewing attendance percentages. Safe to re-run anytime.
+              </p>
+              <button className="btn btn-secondary" onClick={handleCleanupAttendance}>
+                <i className="fas fa-broom"></i> Clean Up Orphaned Attendance
               </button>
             </div>
           )}

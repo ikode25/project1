@@ -2225,6 +2225,7 @@ function getAllUsers(currentUser, currentRole) {
     var data = sh.getDataRange().getValues(), users = [];
     for (var i = 1; i < data.length; i++) {
       if (String(data[i][16]) === '1') continue; // skip soft-deleted
+      if (String(data[i][6] || '').toLowerCase() === 'student') continue; // login mirror row, not a real staff/user account
       users.push(rowToUser(data[i]));
     }
     return { success: true, data: users };
@@ -2648,18 +2649,10 @@ function getDashboardStats(currentUser, currentRole) {
     // outstanding balance — the true "what's still owed right now" figure lives on Fee_Dues
     // (Amount - PaidAmount per due), not summed from Fee_Payments.AmountDue: that column is one
     // payment ROW's snapshot at the time it was recorded, and under daily/partial collection a due
-    // can have several payment rows against it, so summing them over-counts. Fee_Dues.PaidAmount is
-    // the one running total per due, so this is the only place the real outstanding figure lives.
-    var totalPending = 0;
-    var fdu = getSheet(FEE_DUES_SHEET);
-    if (fdu) {
-      var fdd = fdu.getDataRange().getValues();
-      for (var fd = 1; fd < fdd.length; fd++) {
-        var fdStatus = String(fdd[fd][6] || '').toLowerCase();
-        if (fdStatus === 'paid' || fdStatus === 'carried_forward' || fdStatus === 'waived') continue;
-        totalPending += Math.max(0, (parseFloat(fdd[fd][5]) || 0) - (parseFloat(fdd[fd][8]) || 0));
-      }
-    }
+    // can have several payment rows against it, so summing them over-counts. Reuse the same
+    // helper the Fees Collection page's own "Total Pending" reads from (orphan- and
+    // future-term-excluded) so this dashboard figure never disagrees with that one.
+    var totalPending = _feeDuesOutstandingMaps('').total;
 
     // discipline + conduct counts
     var totalIncidents = 0, openIncidents = 0, criticalIncidents = 0;
@@ -4952,6 +4945,11 @@ function promoteStudents(payload, currentUser, currentRole) {
   }
 }
 
+// Deleting a student is immediate and permanent: the row is removed from the sheet right away
+// (not soft-deleted to Trash first) and every related record — fees, marks, attendance mentions,
+// discipline, conduct, activities, PTM bookings, documents, complaints/helpdesk, the Users login
+// mirror — goes with it via the same cascade Trash-purge uses elsewhere. There is no undo once
+// this runs; that's the tradeoff for "Delete" actually meaning delete.
 function deleteStudent(id, currentUser, currentRole) {
   try {
     if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
@@ -4965,15 +4963,13 @@ function deleteStudent(id, currentUser, currentRole) {
     var data = sh.getDataRange().getValues();
     for (var i = 1; i < data.length; i++) {
       if (data[i][0] !== idn || String(data[i][36]) === '1') continue;
-      var row = i + 1, ts = nowIso();
       var classId = parseInt(data[i][25], 10);
-      sh.getRange(row, 37).setValue('1');
-      sh.getRange(row, 39).setValue(ts);
-      recomputeClassStrength(classId);
-      _unmirrorByEmployeeCode('STU-' + idn);  // soft-delete the Users mirror too
+      sh.deleteRow(i + 1);
+      _cascadeDeleteStudentRecords(idn); // fees, marks, attendance, discipline, docs, Users mirror, etc.
+      if (classId) recomputeClassStrength(classId);
       _invalidateRosterCache('roster_students_lite_v1');
-      addLog(currentUser, 'Student Deleted', 'Soft-deleted student id ' + idn);
-      return { success: true, message: 'Student deleted successfully' };
+      addLog(currentUser, 'Student Deleted', 'Permanently deleted student id ' + idn + ' and all related records');
+      return { success: true, message: 'Student and all related records permanently deleted' };
     }
     return { success: false, message: 'Student not found' };
   } catch (err) {
@@ -14026,6 +14022,10 @@ function getTodayBirthdays(currentUser, currentRole) {
     };
 
     var out = [];
+    // a teacher's own students' birthdays get flagged so their dashboard can call those out
+    // specifically, instead of just lumping them into the generic school-wide strip
+    var isTeacherRole = String(currentRole || '').toLowerCase() === 'teacher';
+    var teacherClassIds = isTeacherRole ? getTeacherClassIds(currentUser) : null;
 
     var stSh = getSheet(STUDENTS_SHEET);
     if (stSh) {
@@ -14040,7 +14040,8 @@ function getTodayBirthdays(currentUser, currentRole) {
         out.push({
           Name: [srow[2], srow[4]].filter(Boolean).join(' '), // FirstName + LastName
           Type: 'student',
-          SubLabel: cls ? cls.shortLabel : ''
+          SubLabel: cls ? cls.shortLabel : '',
+          IsOwnClass: teacherClassIds ? teacherClassIds.indexOf(parseInt(srow[25], 10)) !== -1 : false
         });
       }
     }
@@ -14052,8 +14053,9 @@ function getTodayBirthdays(currentUser, currentRole) {
         var urow = usData[j];
         if (String(urow[16]) === '1') continue; // IsDeleted
         if (String(urow[14]).toLowerCase() !== 'active') continue; // Status
-        if (!isBirthdayToday(urow[8])) continue; // DateOfBirth
         var roleRaw = String(urow[6] || '');
+        if (roleRaw.toLowerCase() === 'student') continue; // this is a student's login mirror row, not a staff member — already counted from Students above
+        if (!isBirthdayToday(urow[8])) continue; // DateOfBirth
         out.push({
           Name: urow[2] || '', // FullName
           Type: 'staff',
@@ -21025,9 +21027,19 @@ function _feeDuesOutstandingMaps(yearFilter) {
     if (dsh) {
       var data = dsh.getDataRange().getValues();
       var fmapOut = getFeeStructuresLite(); // cached — orphaned (deleted fee item) dues never count as outstanding
+      // termly dues are all pre-generated for the whole year up front (term1/2/3 at once) so a
+      // school still in Term 1 never has Term 2/3 "billed" yet — those must not count as owed
+      // until the school actually reaches that term (same rule FeeStudentSidePanel already applies
+      // to what a student sees; this is the aggregate total every dashboard/report reads from).
+      var settingsRes = getSchoolSettings();
+      var activeTerm = (settingsRes.data && settingsRes.data.ActiveTerm) || 'term1';
+      var activeOrder = _TERM_ORDER[activeTerm] || 1;
       for (var i = 1; i < data.length; i++) {
         if (!fmapOut[data[i][2]]) continue; // orphaned
-        if (yf && String(data[i][3] || '').indexOf(yf) === -1) continue;
+        var billingMonth = String(data[i][3] || '');
+        if (yf && billingMonth.indexOf(yf) === -1) continue;
+        var termMatch = billingMonth.match(/^(term[123])-/);
+        if (termMatch && (_TERM_ORDER[termMatch[1]] || 1) > activeOrder) continue; // future/unbilled term
         var status = String(data[i][6] || '').toLowerCase();
         if (status === 'paid' || status === 'carried_forward' || status === 'waived') continue;
         var remaining = Math.max(0, (parseFloat(data[i][5]) || 0) - (parseFloat(data[i][8]) || 0));
@@ -22174,7 +22186,80 @@ function _cascadeDeleteStudentRecords(studentId) {
       }
     }
   } catch (e) { Logger.log('_cascadeDeleteStudentRecords users failed: ' + e.toString()); }
+  // Attendance has no StudentID column of its own — one row is a whole class/date's Statuses JSON
+  // blob keyed by student id. Leaving a deleted student's entry in there is exactly what made
+  // attendance % dashboards keep showing a stale figure after the student was gone: their old
+  // present/absent entry kept getting counted forever, on every date they were ever marked.
+  try { _scrubStudentFromAttendance(sid); } catch (e) { Logger.log('_cascadeDeleteStudentRecords attendance failed: ' + e.toString()); }
   try { _invalidateRosterCache('roster_users_v1'); } catch (e) {}
+}
+
+// admin maintenance tool — for students deleted before the cascade above started scrubbing
+// Attendance too, this sweeps every Attendance row once and removes any entry keyed to a student
+// id that no longer exists at all (regardless of how they left), fixing the stale-percentage
+// symptom on already-existing data without needing to touch the student record again.
+function cleanupOrphanedAttendanceEntries(currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    var ash = getSheet(ATTENDANCE_SHEET);
+    if (!ash) return { success: true, message: 'No Attendance sheet found — nothing to clean.' };
+    var students = getStudentsLite(); // id -> {...} for every non-deleted student
+    var data = ash.getDataRange().getValues();
+    var rowsTouched = 0, entriesRemoved = 0;
+    for (var i = 1; i < data.length; i++) {
+      var statuses = parseAttendanceJson(data[i][6]);
+      var keys = Object.keys(statuses);
+      var changed = false;
+      keys.forEach(function (k) {
+        if (!students[k] && !students[parseInt(k, 10)]) { delete statuses[k]; changed = true; entriesRemoved++; }
+      });
+      if (!changed) continue;
+      rowsTouched++;
+      var present = 0, absent = 0, total = 0;
+      Object.keys(statuses).forEach(function (k) {
+        total++;
+        var st = String((statuses[k] || {}).status || '').toLowerCase();
+        if (st === 'present' || st === 'late') present++;
+        else if (st === 'absent') absent++;
+      });
+      var row = i + 1;
+      ash.getRange(row, 7).setValue(serializeAttendanceJson(statuses));
+      ash.getRange(row, 8).setValue(present);
+      ash.getRange(row, 9).setValue(absent);
+      ash.getRange(row, 10).setValue(total);
+    }
+    addLog(currentUser, 'Attendance Cleanup', entriesRemoved + ' orphaned entr(y/ies) removed across ' + rowsTouched + ' record(s)');
+    return { success: true, message: entriesRemoved > 0 ? ('Removed ' + entriesRemoved + ' orphaned entr(y/ies) from ' + rowsTouched + ' attendance record(s).') : 'No orphaned attendance entries found — nothing to clean.' };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function _scrubStudentFromAttendance(studentId) {
+  var sid = parseInt(studentId, 10);
+  if (isNaN(sid)) return;
+  var ash = getSheet(ATTENDANCE_SHEET);
+  if (!ash) return;
+  var data = ash.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    var statuses = parseAttendanceJson(data[i][6]);
+    var hadKey = false;
+    if (statuses[sid] != null) { delete statuses[sid]; hadKey = true; }
+    if (statuses[String(sid)] != null) { delete statuses[String(sid)]; hadKey = true; }
+    if (!hadKey) continue;
+    var present = 0, absent = 0, total = 0;
+    Object.keys(statuses).forEach(function (k) {
+      total++;
+      var st = String((statuses[k] || {}).status || '').toLowerCase();
+      if (st === 'present' || st === 'late') present++;
+      else if (st === 'absent') absent++;
+    });
+    var row = i + 1;
+    ash.getRange(row, 7).setValue(serializeAttendanceJson(statuses)); // Statuses
+    ash.getRange(row, 8).setValue(present);   // PresentCount
+    ash.getRange(row, 9).setValue(absent);    // AbsentCount
+    ash.getRange(row, 10).setValue(total);    // TotalCount
+  }
 }
 
 // removes the row for good — cannot be undone. Same permission as deleting it in the first place.
