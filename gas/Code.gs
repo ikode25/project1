@@ -7,14 +7,19 @@
  *   "public" URL mode for people who don't have (and shouldn't need) a login.
  *
  * Flow this implements:
- *   1. Landlord logs in (admin) and creates an agreement (property, tenant,
+ *   0. The deployed web app URL opens straight into a public Tenancy
+ *      Application Form (no login) — exactly like a job application page.
+ *      A small lock icon in the corner is the landlord's way in.
+ *   1. Landlord logs in (admin, via that icon) and reviews inbound
+ *      applications, or starts an agreement from scratch (property, tenant,
  *      rent, deposit, dates, bank details).
  *   2. Landlord sends the tenant a unique link (email + copy-link).
  *   3. Tenant opens the link — no account needed — reads the full agreement,
  *      must scroll through the Terms & Conditions before they can accept,
  *      reviews a summary, signs (typed signature) and submits.
  *   4. A PDF is generated, emailed to both parties, and offered for download.
- *   5. Landlord's dashboard tracks every agreement and its status.
+ *   5. Landlord's dashboard tracks every application and agreement, and its
+ *      status.
  *   6. A daily trigger (and a manual button) reminds tenants whose tenancy is
  *      coming up for renewal, and lets the tenant tell the landlord whether
  *      they want to renew.
@@ -64,7 +69,7 @@ var AGREEMENT_HEADERS = [
   /*43*/ 'PdfFileId', /*44*/ 'PdfUrl',
   /*45*/ 'RenewalOfId', /*46*/ 'RenewedToId', /*47*/ 'RenewalReminderLeadDaysSent',
   /*48*/ 'RenewalResponse', /*49*/ 'RenewalRespondedAt',
-  /*50*/ 'IsDeleted'
+  /*50*/ 'IsDeleted', /*51*/ 'Notes'
 ];
 var COL = {}; // name -> 0-based index, built once below
 (function buildColMap() { for (var i = 0; i < AGREEMENT_HEADERS.length; i++) COL[AGREEMENT_HEADERS[i]] = i; })();
@@ -511,6 +516,7 @@ function createAgreement(payload, currentUser, currentRole) {
     row[COL.RenewalResponse] = '';
     row[COL.RenewalRespondedAt] = '';
     row[COL.IsDeleted] = '0';
+    row[COL.Notes] = payload.Notes || '';
 
     sh.appendRow(row);
     if (payload.RenewalOfId) {
@@ -545,6 +551,18 @@ function updateAgreement(id, payload, currentUser, currentRole) {
     var freshRow = sh.getDataRange().getValues()[idx];
     if (payload.StartDate || payload.TermValue || payload.TermUnit) {
       sh.getRange(idx + 1, COL.EndDate + 1).setValue(computeEndDate(freshRow[COL.StartDate], Number(freshRow[COL.TermValue]), freshRow[COL.TermUnit]));
+    }
+    // an inbound application (Status='inquiry') graduates into a normal draft agreement the moment
+    // the landlord has filled in everything a signable agreement needs — same "Save" button, no
+    // separate convert step.
+    if (status === 'inquiry') {
+      var settings = rowToSettings(getSettingsRow()) || {};
+      var checkRow = sh.getDataRange().getValues()[idx];
+      var stillMissing = _requiredAgreementFields().some(function (k) { return checkRow[COL[k]] === '' || checkRow[COL[k]] == null; });
+      if (!stillMissing) {
+        sh.getRange(idx + 1, COL.Status + 1).setValue('draft');
+        sh.getRange(idx + 1, COL.TermsSnapshot + 1).setValue(settings.TermsTemplate || DEFAULT_TERMS_TEMPLATE);
+      }
     }
     sh.getRange(idx + 1, COL.UpdatedAt + 1).setValue(nowIso());
     addLog(currentUser, 'Agreement Updated', 'ID ' + id);
@@ -623,6 +641,85 @@ function getShareLink(id, currentUser, currentRole) {
     if (idx < 0) return { success: false, message: 'Agreement not found' };
     var row = sh.getDataRange().getValues()[idx];
     return { success: true, link: _publicLink('?public=agreement&token=' + row[COL.Token]) };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+// ============== Public — tenancy application form (the deployed URL's default landing page) ==============
+// No login, no token — this is the "apply directly" front door, the same shape as a public job
+// application form: a prospective tenant lands here, submits their interest, and it shows up in
+// the landlord's dashboard as a New Application. The landlord reviews it, fills in the missing
+// deal terms (rent, dates, deposit, ...) via the normal agreement form, and from there on it's
+// exactly the same send-link / sign / track flow as an agreement the landlord started from scratch.
+function getPublicLandlordProfile() {
+  try {
+    var settings = rowToSettings(getSettingsRow()) || {};
+    return { success: true, data: { LandlordName: settings.LandlordName || 'Property Management' } };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
+function submitTenancyApplication(payload) {
+  try {
+    var name = String((payload && payload.TenantName) || '').trim();
+    var email = String((payload && payload.TenantEmail) || '').trim();
+    if (!name || !email) return { success: false, message: 'Please provide your name and email.' };
+
+    var settings = rowToSettings(getSettingsRow()) || {};
+    var sh = getSheet(AGREEMENTS_SHEET);
+    var id = nextRowId(sh);
+    var ts = nowIso();
+
+    var row = [];
+    row[COL.ID] = id;
+    row[COL.Token] = Utilities.getUuid().replace(/-/g, '');
+    row[COL.Status] = 'inquiry';
+    row[COL.LandlordName] = settings.LandlordName || '';
+    row[COL.LandlordAddress] = settings.LandlordAddress || '';
+    row[COL.LandlordPhone] = settings.LandlordPhone || '';
+    row[COL.LandlordEmail] = settings.LandlordEmail || '';
+    row[COL.BankName] = ''; row[COL.BankAccountName] = ''; row[COL.BankAccountNumber] = ''; row[COL.BankBranch] = '';
+    row[COL.TenantName] = name;
+    row[COL.TenantEmail] = email;
+    row[COL.TenantPhone] = payload.TenantPhone || '';
+    row[COL.TenantAddress] = '';
+    row[COL.PremisesDescription] = payload.PremisesDescription || 'General enquiry';
+    row[COL.PremisesAddress] = ''; row[COL.Region] = '';
+    row[COL.StartDate] = payload.PreferredStartDate || ''; row[COL.TermValue] = ''; row[COL.TermUnit] = ''; row[COL.EndDate] = '';
+    row[COL.Currency] = settings.Currency || 'GH₵';
+    row[COL.MonthlyRent] = ''; row[COL.RentAdvanceMonths] = ''; row[COL.RentAdvanceAmount] = ''; row[COL.RentAdvanceInWords] = '';
+    row[COL.RetentionDeposit] = ''; row[COL.NoticePeriodMonths] = '';
+    row[COL.LandlordWitnessName] = ''; row[COL.TenantWitnessName] = '';
+    row[COL.TermsSnapshot] = '';
+    row[COL.CreatedBy] = 'public'; row[COL.CreatedAt] = ts; row[COL.UpdatedAt] = ts;
+    row[COL.SentAt] = ''; row[COL.ExpiresAt] = ''; row[COL.ViewedAt] = ''; row[COL.AcceptedAt] = '';
+    row[COL.TenantSignatureName] = ''; row[COL.TenantSignatureIP] = '';
+    row[COL.DeclinedAt] = ''; row[COL.DeclineReason] = '';
+    row[COL.PdfFileId] = ''; row[COL.PdfUrl] = '';
+    row[COL.RenewalOfId] = ''; row[COL.RenewedToId] = ''; row[COL.RenewalReminderLeadDaysSent] = '';
+    row[COL.RenewalResponse] = ''; row[COL.RenewalRespondedAt] = '';
+    row[COL.IsDeleted] = '0';
+    row[COL.Notes] = payload.Message || '';
+
+    sh.appendRow(row);
+    addLog('applicant:' + email, 'Tenancy Application Submitted', name + (payload.PremisesDescription ? ' — ' + payload.PremisesDescription : ''));
+
+    try {
+      if (settings.LandlordEmail) {
+        var html = '<p>New tenancy application received:</p><ul>' +
+          '<li><b>Name:</b> ' + name + '</li><li><b>Email:</b> ' + email + '</li>' +
+          (payload.TenantPhone ? '<li><b>Phone:</b> ' + payload.TenantPhone + '</li>' : '') +
+          (payload.PremisesDescription ? '<li><b>Interested in:</b> ' + payload.PremisesDescription + '</li>' : '') +
+          (payload.PreferredStartDate ? '<li><b>Preferred move-in:</b> ' + payload.PreferredStartDate + '</li>' : '') +
+          (payload.Message ? '<li><b>Message:</b> ' + payload.Message + '</li>' : '') +
+          '</ul><p>Log in to your dashboard to review it.</p>';
+        MailApp.sendEmail({ to: settings.LandlordEmail, subject: 'New tenancy application: ' + name, htmlBody: html });
+      }
+    } catch (e) { /* the application is saved either way */ }
+
+    return { success: true, message: 'Thanks, ' + name + '! Your application has been received — we\'ll be in touch soon.' };
   } catch (err) {
     return { success: false, message: 'Error: ' + err.toString() };
   }
@@ -956,9 +1053,10 @@ function getDashboardStats(currentUser, currentRole) {
     var res = getAllAgreements(currentUser, currentRole);
     if (!res.success) return res;
     var rows = res.data;
-    var stats = { total: rows.length, awaitingSignature: 0, accepted: 0, declined: 0, expiringSoon: 0, renewalRequests: 0 };
+    var stats = { total: rows.length, newApplications: 0, awaitingSignature: 0, accepted: 0, declined: 0, expiringSoon: 0, renewalRequests: 0 };
     rows.forEach(function (a) {
       var s = a.EffectiveStatus;
+      if (s === 'inquiry') stats.newApplications++;
       if (s === 'sent' || s === 'viewed') stats.awaitingSignature++;
       if (s === 'accepted') { stats.accepted++; if (a.DaysToEnd !== null && a.DaysToEnd <= 30 && a.DaysToEnd >= 0 && !a.RenewedToId) stats.expiringSoon++; }
       if (s === 'declined') stats.declined++;

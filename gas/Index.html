@@ -93,6 +93,7 @@
     table.data tr:hover td{background:#f7fafa;}
     .badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;}
     .badge-draft{background:#eceff1;color:#546e7a;}
+    .badge-inquiry{background:#f3e8ff;color:#7c3aed;}
     .badge-sent{background:#e3f0fb;color:var(--info);}
     .badge-viewed{background:#fff3d6;color:#966c11;}
     .badge-accepted{background:#e2f6ea;color:var(--ok);}
@@ -114,7 +115,13 @@
 
     /* ---------- Tenant public flow ---------- */
     .tenant-wrap{min-height:100vh;background:var(--bg);}
-    .tenant-head{background:linear-gradient(120deg,var(--ink-dark),var(--ink));color:#fff;padding:26px 20px 60px;text-align:center;}
+    .admin-icon-btn{position:fixed;top:16px;right:16px;z-index:50;width:42px;height:42px;border-radius:50%;
+      background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.35);color:#fff;font-size:16px;
+      display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px);}
+    .admin-icon-btn:hover{background:rgba(255,255,255,.28);}
+    .back-link{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);text-decoration:none;margin-bottom:14px;}
+    .back-link:hover{color:var(--text);}
+    .tenant-head{background:linear-gradient(120deg,var(--ink-dark),var(--ink));color:#fff;padding:26px 20px 60px;text-align:center;position:relative;}
     .tenant-head h1{margin:0 0 4px;font-size:19px;}
     .tenant-head p{margin:0;opacity:.85;font-size:13px;}
     .stepper{display:flex;justify-content:center;gap:6px;margin-top:18px;flex-wrap:wrap;padding:0 10px;}
@@ -192,7 +199,7 @@ function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function
 function fmtDate(iso) { if (!iso) return '—'; var d = new Date(iso); return isNaN(d) ? String(iso).slice(0, 10) : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); }
 function fmtMoney(n, cur) { n = Number(n) || 0; return (cur || '') + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function statusBadge(s) {
-  var label = { draft: 'Draft', sent: 'Sent', viewed: 'Viewed', accepted: 'Signed', declined: 'Declined', expired: 'Expired' }[s] || s;
+  var label = { inquiry: 'New Application', draft: 'Draft', sent: 'Sent', viewed: 'Viewed', accepted: 'Signed', declined: 'Declined', expired: 'Expired' }[s] || s;
   return '<span class="badge badge-' + s + '">' + label + '</span>';
 }
 function downloadBase64Pdf(base64, filename) {
@@ -221,7 +228,9 @@ function boot() {
   var saved = null;
   try { saved = JSON.parse(sessionStorage.getItem('tap_session') || 'null'); } catch (e) {}
   if (saved && saved.user) { Admin.session = saved; return Admin.go('dashboard'); }
-  return Auth.render();
+  // the deployed URL's front door: a public tenancy application form, same shape as a job
+  // application page. The landlord gets in via the lock icon on that page, not a bare login wall.
+  return ApplicationForm.render();
 }
 window.addEventListener('DOMContentLoaded', boot);
 
@@ -232,6 +241,7 @@ var Auth = {
   render: function (errorMsg) {
     App.root.innerHTML =
       '<div class="auth-wrap"><div class="auth-card">' +
+      '<a href="#" class="back-link" onclick="ApplicationForm.render();return false;"><i class="fa-solid fa-arrow-left"></i> Back to application form</a>' +
       '<div class="auth-logo"><i class="fa-solid fa-house-chimney-window"></i></div>' +
       '<h1>Tenancy Agreement Portal</h1><p class="sub">Landlord / admin sign-in</p>' +
       (errorMsg ? '<div class="err-msg">' + esc(errorMsg) + '</div>' : '') +
@@ -271,7 +281,7 @@ var Admin = {
   logout: function () {
     sessionStorage.removeItem('tap_session');
     Admin.session = null;
-    Auth.render();
+    ApplicationForm.render();
   },
 
   navItems: [
@@ -300,7 +310,7 @@ var Admin = {
   render: function (opts) {
     if (Admin.view === 'dashboard') return Admin.renderDashboard();
     if (Admin.view === 'agreements') return Admin.renderAgreements();
-    if (Admin.view === 'agreementForm') return Admin.renderAgreementForm(opts.id || null, opts.renewFromId || null);
+    if (Admin.view === 'agreementForm') return Admin.renderAgreementForm(opts.id != null ? opts.id : null, opts.renewFromId != null ? opts.renewFromId : null);
     if (Admin.view === 'settings') return Admin.renderSettings();
     if (Admin.view === 'logs') return Admin.renderLogs();
   },
@@ -312,11 +322,18 @@ var Admin = {
       .then(function (r) {
         var stats = r[0].data || {}, all = r[1].data || [];
         document.getElementById('kpiGrid').innerHTML =
+          Admin.kpi('fa-inbox', stats.newApplications, 'New Applications', 'gold') +
           Admin.kpi('fa-folder-open', stats.total, 'Total Agreements') +
           Admin.kpi('fa-hourglass-half', stats.awaitingSignature, 'Awaiting Signature', 'warn') +
           Admin.kpi('fa-file-circle-check', stats.accepted, 'Signed / Active', 'ok') +
           Admin.kpi('fa-triangle-exclamation', stats.expiringSoon, 'Expiring ≤ 30 days', 'bad') +
           Admin.kpi('fa-rotate', stats.renewalRequests, 'Renewal Requests', 'info');
+
+        var applications = all.filter(function (a) { return a.EffectiveStatus === 'inquiry'; });
+        var appRows = applications.slice(0, 8).map(function (a) {
+          return '<tr><td>' + esc(a.TenantName) + '</td><td>' + esc(a.TenantEmail) + '</td><td>' + esc(a.PremisesDescription) + '</td><td>' + fmtDate(a.CreatedAt) + '</td>' +
+            '<td class="row-actions"><button class="btn btn-primary btn-sm" onclick="Admin.go(\'agreementForm\',{id:' + a.ID + '})"><i class="fa-solid fa-clipboard-check"></i> Review</button></td></tr>';
+        }).join('');
 
         var needsAttention = all.filter(function (a) { return (a.RenewalResponse === 'yes' && !a.RenewedToId) || (a.EffectiveStatus === 'accepted' && a.DaysToEnd !== null && a.DaysToEnd <= 30 && a.DaysToEnd >= 0 && !a.RenewedToId); });
         var rows = needsAttention.slice(0, 8).map(function (a) {
@@ -329,6 +346,10 @@ var Admin = {
             '</td></tr>';
         }).join('');
         document.getElementById('dashExtra').innerHTML =
+          '<div class="card"><h3>New applications <small>submitted from the public application form</small></h3>' +
+          (appRows ? '<div class="table-wrap"><table class="data"><thead><tr><th>Name</th><th>Email</th><th>Interested in</th><th>Applied</th><th></th></tr></thead><tbody>' + appRows + '</tbody></table></div>'
+            : '<div class="empty-state"><i class="fa-regular fa-folder-open"></i><div>No new applications right now.</div></div>') +
+          '</div>' +
           '<div class="card"><h3>Needs your attention</h3>' +
           (rows ? '<div class="table-wrap"><table class="data"><thead><tr><th>Tenant</th><th>Premises</th><th>End Date</th><th>Status</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'
             : '<div class="empty-state"><i class="fa-regular fa-circle-check"></i><div>Nothing needs attention right now.</div></div>') +
@@ -349,7 +370,7 @@ var Admin = {
       '<input type="text" id="fltQ" placeholder="Search tenant or premises…" value="' + esc(Admin.filters.q) + '" oninput="Admin.filters.q=this.value;Admin.applyFilters();">' +
       '<select id="fltStatus" onchange="Admin.filters.status=this.value;Admin.applyFilters();">' +
       '<option value="">All statuses</option>' +
-      ['draft', 'sent', 'viewed', 'accepted', 'declined', 'expired'].map(function (s) { return '<option value="' + s + '"' + (Admin.filters.status === s ? ' selected' : '') + '>' + s.charAt(0).toUpperCase() + s.slice(1) + '</option>'; }).join('') +
+      ['inquiry', 'draft', 'sent', 'viewed', 'accepted', 'declined', 'expired'].map(function (s) { return '<option value="' + s + '"' + (Admin.filters.status === s ? ' selected' : '') + '>' + (s === 'inquiry' ? 'New Application' : s.charAt(0).toUpperCase() + s.slice(1)) + '</option>'; }).join('') +
       '</select></div>' +
       '<button class="btn btn-primary" onclick="Admin.go(\'agreementForm\',{})"><i class="fa-solid fa-plus"></i> New Agreement</button>' +
       '</div>' +
@@ -374,6 +395,9 @@ var Admin = {
   },
   agreementRow: function (a) {
     var actions = [];
+    if (a.EffectiveStatus === 'inquiry') {
+      actions.push(btn('fa-clipboard-check', 'Review & Complete', "Admin.go('agreementForm',{id:" + a.ID + "})", 'primary'));
+    }
     if (a.EffectiveStatus === 'draft') {
       actions.push(btn('fa-pen', 'Edit', "Admin.go('agreementForm',{id:" + a.ID + "})"));
       actions.push(btn('fa-paper-plane', 'Send', 'Admin.sendLink(' + a.ID + ')', 'primary'));
@@ -490,7 +514,8 @@ var Admin = {
       var val = d[key] == null ? '' : d[key];
       return '<div class="field"><label>' + label + '</label><input id="f_' + key + '" type="' + type + '" value="' + esc(val) + '" ' + (extra || '') + '></div>';
     }
-    return (isRenew ? '<div class="err-msg" style="background:#e3f0fb;color:var(--info);">Renewing agreement #' + renewFromId + '. Adjust the dates/rent below, then save and send the tenant a fresh link to sign.</div>' : '') +
+    return (d.Status === 'inquiry' ? '<div class="err-msg" style="background:#f3e8ff;color:#7c3aed;">This started as a tenant application' + (d.Notes ? ' — their message: "' + esc(d.Notes) + '"' : '') + '. Fill in the remaining details (premises address, rent, term, dates) and Save — it will automatically move to Draft, ready to send.</div>' : '') +
+      (isRenew ? '<div class="err-msg" style="background:#e3f0fb;color:var(--info);">Renewing agreement #' + renewFromId + '. Adjust the dates/rent below, then save and send the tenant a fresh link to sign.</div>' : '') +
       '<div class="section-title">Landlord Details</div><div class="form-grid">' +
       f('Landlord / Landlady Name', 'LandlordName') + f('Landlord Email', 'LandlordEmail', 'email') +
       f('Landlord Phone', 'LandlordPhone') + f('Landlord Address', 'LandlordAddress') +
@@ -804,6 +829,66 @@ var TenantFlow = {
   downloadJustSigned: function () {
     if (TenantFlow.lastPdf && TenantFlow.lastPdf.base64) return downloadBase64Pdf(TenantFlow.lastPdf.base64, TenantFlow.lastPdf.filename);
     TenantFlow.download();
+  }
+};
+
+// ===================================================================
+// TENANCY APPLICATION FORM (public — the deployed URL's default landing page)
+// Same shape as a job application page: a prospective tenant lands here directly (no link, no
+// token, no login) and submits their interest. It shows up on the landlord's dashboard as a New
+// Application; the landlord's lock icon is the only way into the admin side from here.
+// ===================================================================
+var ApplicationForm = {
+  landlordName: 'Property Management',
+
+  render: function () {
+    App.root.innerHTML = ApplicationForm.wrap('<div class="center-state"><div class="spinner"></div></div>');
+    gs('getPublicLandlordProfile').then(function (res) {
+      if (res.success && res.data && res.data.LandlordName) ApplicationForm.landlordName = res.data.LandlordName;
+      ApplicationForm.renderForm();
+    }).catch(function () { ApplicationForm.renderForm(); });
+  },
+
+  wrap: function (inner) {
+    return '<div class="tenant-wrap">' +
+      '<button class="admin-icon-btn" title="Landlord / Admin login" onclick="Auth.render()"><i class="fa-solid fa-user-lock"></i></button>' +
+      '<div class="tenant-head"><h1><i class="fa-solid fa-house-chimney-window"></i> ' + esc(ApplicationForm.landlordName) + '</h1><p>Tenancy Application Form</p></div>' +
+      '<div class="tenant-card">' + inner + '</div></div>';
+  },
+
+  renderForm: function () {
+    var html =
+      '<h3 style="margin-top:0;">Apply for a tenancy</h3>' +
+      '<p style="color:var(--muted);font-size:13.5px;margin-top:-6px;">Tell us a little about yourself and what you\'re looking for — ' + esc(ApplicationForm.landlordName) + ' will follow up with you directly.</p>' +
+      '<div class="form-grid">' +
+      '<div class="field"><label>Full Name *</label><input id="app_TenantName"></div>' +
+      '<div class="field"><label>Email *</label><input id="app_TenantEmail" type="email"></div>' +
+      '<div class="field"><label>Phone</label><input id="app_TenantPhone"></div>' +
+      '<div class="field"><label>Preferred Move-in Date</label><input id="app_PreferredStartDate" type="date"></div>' +
+      '<div class="field full"><label>Property / Unit you\'re interested in</label><input id="app_PremisesDescription" placeholder="e.g. 2-bedroom apartment, Spintex — or leave blank for a general enquiry"></div>' +
+      '<div class="field full"><label>Message</label><textarea id="app_Message" rows="4" placeholder="Anything else you\'d like us to know"></textarea></div>' +
+      '</div>' +
+      '<button class="btn btn-primary btn-block" id="appSubmitBtn" onclick="ApplicationForm.submit()"><i class="fa-solid fa-paper-plane"></i> Submit Application</button>';
+    App.root.innerHTML = ApplicationForm.wrap(html);
+  },
+
+  submit: function () {
+    var payload = {
+      TenantName: document.getElementById('app_TenantName').value.trim(),
+      TenantEmail: document.getElementById('app_TenantEmail').value.trim(),
+      TenantPhone: document.getElementById('app_TenantPhone').value.trim(),
+      PreferredStartDate: document.getElementById('app_PreferredStartDate').value,
+      PremisesDescription: document.getElementById('app_PremisesDescription').value.trim(),
+      Message: document.getElementById('app_Message').value.trim()
+    };
+    if (!payload.TenantName || !payload.TenantEmail) return toast('Please enter your name and email.', 'bad');
+    var btn = document.getElementById('appSubmitBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting…';
+    gs('submitTenancyApplication', payload).then(function (res) {
+      if (!res.success) { toast(res.message, 'bad'); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Application'; return; }
+      App.root.innerHTML = ApplicationForm.wrap(
+        '<div class="center-state"><i class="fa-solid fa-circle-check" style="color:var(--ok)"></i><h2>Application received</h2><p>' + esc(res.message) + '</p></div>');
+    }).catch(function (e) { toast(String(e), 'bad'); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Application'; });
   }
 };
 

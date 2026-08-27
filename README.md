@@ -7,9 +7,19 @@ front end**, with a tokenised public link so tenants never need an account.
 
 ## What it does
 
-- **Landlord (admin)** logs in, creates a tenancy agreement (property, tenant,
-  rent, deposit, dates, bank details), and sends the tenant a unique link by
-  email (or copies it to send however they like).
+- **The deployed web app URL opens straight into a public Tenancy Application
+  Form** — no login, no link needed — the same way a job application page
+  works: a prospective tenant lands on it directly, fills in their name,
+  contact details, what they're interested in, and submits. It shows up on
+  the landlord's dashboard as a **New Application**. A small lock icon in the
+  corner of that page is the landlord's way in — click it to reach the admin
+  login.
+- **Landlord (admin)** logs in via that icon, reviews new applications (or
+  starts an agreement from scratch), fills in the deal terms (property, rent,
+  deposit, dates, bank details), and sends the tenant a unique signing link by
+  email (or copies it to send however they like). Reviewing an application and
+  saving it with all the required fields filled in automatically promotes it
+  from "New Application" to "Draft", ready to send — no separate convert step.
 - **Tenant** opens the link — no account needed — and walks through:
   1. Review the full agreement (parties, premises, rent, dates, deposit).
   2. Read the Terms & Conditions — the "I agree" checkbox only unlocks once
@@ -60,7 +70,8 @@ front end**, with a tokenised public link so tenants never need an account.
 6. Run **`installDailyReminderTrigger`** once (same toolbar dropdown) to turn
    on automatic renewal reminders. You can also do this later from the
    spreadsheet's **🏠 Tenancy Portal** menu (reload the Sheet tab to see it).
-7. Open the `.../exec` URL, log in with `admin` / `admin123`, and:
+7. Open the `.../exec` URL — you'll see the public Tenancy Application Form.
+   Click the lock icon (top-right) to log in with `admin` / `admin123`, and:
    - Go to **Settings** and change your password immediately.
    - Fill in your landlord name, address, phone, email, bank details, and
      review the Terms & Conditions text (already pre-filled from a standard
