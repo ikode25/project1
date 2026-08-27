@@ -11382,6 +11382,207 @@
     }
 
     // ============== Students ==============
+    // minimal RFC4180-ish CSV parser — handles quoted fields, embedded commas, and escaped quotes,
+    // which is all a template downloaded from this same app / opened in Excel will ever produce.
+    function _parseCsvText(text) {
+      const rows = [];
+      let row = [], field = '', inQuotes = false;
+      const src = String(text || '').replace(/^﻿/, ''); // strip BOM if Excel added one
+      for (let i = 0; i < src.length; i++) {
+        const c = src[i];
+        if (inQuotes) {
+          if (c === '"') { if (src[i + 1] === '"') { field += '"'; i++; } else inQuotes = false; }
+          else field += c;
+        } else if (c === '"') inQuotes = true;
+        else if (c === ',') { row.push(field); field = ''; }
+        else if (c === '\n' || c === '\r') {
+          if (c === '\r' && src[i + 1] === '\n') i++;
+          row.push(field); field = '';
+          if (row.length > 1 || row[0] !== '') rows.push(row);
+          row = [];
+        } else field += c;
+      }
+      if (field !== '' || row.length) { row.push(field); rows.push(row); }
+      return rows;
+    }
+
+    const STUDENT_IMPORT_COLUMNS = [
+      'FirstName', 'MiddleName', 'LastName', 'Gender', 'DateOfBirth', 'ClassName', 'RollNumber',
+      'AdmissionDate', 'AdmissionType', 'FatherName', 'FatherMobile', 'MotherName', 'MotherMobile',
+      'GuardianName', 'GuardianRelation', 'GuardianMobile', 'AddressLine', 'City', 'Region', 'Religion', 'PreviousSchool'
+    ];
+    const STUDENT_IMPORT_EXAMPLE = [
+      'Kwame', '', 'Mensah', 'male', '2015-03-12', 'Basic 1', '12', '2026-09-01', 'fresh',
+      'Kofi Mensah', '0244000000', 'Ama Mensah', '0208000000', '', '', '', 'East Legon', 'Accra', 'Greater Accra', 'Christian', ''
+    ];
+
+    function downloadStudentImportTemplate() {
+      const csv = STUDENT_IMPORT_COLUMNS.join(',') + '\n' + STUDENT_IMPORT_EXAMPLE.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',') + '\n';
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'student_import_template.csv';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // ============== Import Students (CSV + downloadable template) ==============
+    function ImportStudentsModal({ currentUser, role, onClose, onImported }) {
+      const [fileName, setFileName] = useState('');
+      const [rows, setRows] = useState([]);       // parsed row objects
+      const [parseError, setParseError] = useState('');
+      const [importing, setImporting] = useState(false);
+      const [results, setResults] = useState(null); // { imported, failed, results: [...] }
+      const fileInputRef = useRef(null);
+
+      const handleFile = (file) => {
+        setParseError(''); setResults(null); setRows([]); setFileName(file ? file.name : '');
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const table = _parseCsvText(e.target.result);
+            if (table.length < 2) { setParseError('The file has no data rows below the header.'); return; }
+            const headers = table[0].map(h => String(h || '').trim());
+            const missingRequired = ['FirstName', 'LastName'].filter(c => !headers.includes(c));
+            if (missingRequired.length) { setParseError('Missing required column(s): ' + missingRequired.join(', ')); return; }
+            const parsed = table.slice(1)
+              .filter(r => r.some(cell => String(cell || '').trim() !== ''))
+              .map(r => {
+                const obj = {};
+                headers.forEach((h, i) => { obj[h] = r[i] != null ? String(r[i]).trim() : ''; });
+                return obj;
+              });
+            if (!parsed.length) { setParseError('No data rows found.'); return; }
+            if (parsed.length > 500) { setParseError(`Found ${parsed.length} rows — import is limited to 500 rows at a time. Split the file into smaller batches.`); return; }
+            setRows(parsed);
+          } catch (err) { setParseError('Could not read file: ' + err.message); }
+        };
+        reader.onerror = () => setParseError('Could not read file.');
+        reader.readAsText(file);
+      };
+
+      const handleImport = () => {
+        setImporting(true); setResults(null);
+        google.script.run
+          .withSuccessHandler((res) => {
+            setImporting(false);
+            if (res && res.success) {
+              setResults(res);
+              if (res.imported > 0) onImported();
+            } else Swal.fire({ icon: 'error', title: 'Import Failed', text: (res && res.message) || 'Unknown error' });
+          })
+          .withFailureHandler((err) => { setImporting(false); Swal.fire({ icon: 'error', title: 'Error', text: (err && err.message) || 'Server error' }); })
+          .bulkImportStudents(rows, currentUser, role);
+      };
+
+      const rowsWithoutRequired = rows.filter(r => !String(r.FirstName || '').trim() || !String(r.LastName || '').trim()).length;
+
+      return (
+        <div className="modal-overlay" onClick={onClose}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:'820px'}}>
+            <div className="modal-header">
+              <h3><i className="fas fa-file-import"></i> Import Students</h3>
+              <button className="close-btn" onClick={onClose}><i className="fas fa-times"></i></button>
+            </div>
+            <div className="modal-body">
+              <div className="settings-info-message" style={{marginBottom:'16px'}}>
+                <i className="fas fa-info-circle" style={{marginRight:'6px'}}></i>
+                Download the template, fill in one row per student, then upload it below. <b>ClassName</b> should match an existing class's name or code exactly (e.g. "Basic 1" or "BS1") — leave it blank to admit without assigning a class yet. Only First Name and Last Name are required; everything else is optional.
+              </div>
+
+              <div style={{display:'flex',gap:'10px',marginBottom:'18px',flexWrap:'wrap'}}>
+                <button type="button" className="btn btn-secondary" onClick={downloadStudentImportTemplate}>
+                  <i className="fas fa-download"></i> Download CSV Template
+                </button>
+                <button type="button" className="btn btn-primary" onClick={() => fileInputRef.current && fileInputRef.current.click()}>
+                  <i className="fas fa-upload"></i> {fileName ? 'Choose a Different File' : 'Choose CSV File'}
+                </button>
+                <input ref={fileInputRef} type="file" accept=".csv,text/csv" style={{display:'none'}}
+                  onChange={(e) => handleFile(e.target.files && e.target.files[0])} />
+                {fileName && <span style={{alignSelf:'center',fontSize:'13px',color:'#666'}}><i className="fas fa-file-csv"></i> {fileName}</span>}
+              </div>
+
+              {parseError && (
+                <div className="settings-info-message" style={{marginBottom:'16px',borderLeftColor:'#ea4335'}}>
+                  <i className="fas fa-triangle-exclamation" style={{marginRight:'6px',color:'#ea4335'}}></i>{parseError}
+                </div>
+              )}
+
+              {rows.length > 0 && !results && (
+                <>
+                  <div style={{display:'flex',gap:'10px',alignItems:'center',marginBottom:'10px',flexWrap:'wrap'}}>
+                    <strong style={{color:'var(--navy-primary)'}}>{rows.length} row(s) ready to import</strong>
+                    {rowsWithoutRequired > 0 && (
+                      <span style={{color:'#ea4335',fontSize:'13px'}}><i className="fas fa-triangle-exclamation"></i> {rowsWithoutRequired} row(s) missing First/Last Name — those will fail</span>
+                    )}
+                  </div>
+                  <div style={{overflowX:'auto',maxHeight:'260px',overflowY:'auto',border:'1px solid #e0e0e0',marginBottom:'16px'}}>
+                    <table className="simple-table" style={{width:'100%',fontSize:'12px'}}>
+                      <thead>
+                        <tr><th>#</th><th>First Name</th><th>Last Name</th><th>Gender</th><th>Class</th><th>Guardian Mobile</th></tr>
+                      </thead>
+                      <tbody>
+                        {rows.slice(0, 50).map((r, i) => (
+                          <tr key={i} style={(!r.FirstName || !r.LastName) ? {background:'#fdecea'} : undefined}>
+                            <td>{i + 1}</td><td>{r.FirstName}</td><td>{r.LastName}</td><td>{r.Gender}</td>
+                            <td>{r.ClassName}</td><td>{r.GuardianMobile || r.FatherMobile || r.MotherMobile}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {rows.length > 50 && <div style={{padding:'8px',fontSize:'12px',color:'#888',textAlign:'center'}}>+ {rows.length - 50} more row(s) not shown</div>}
+                  </div>
+                  <div className="form-actions">
+                    <button type="button" className="btn btn-primary" disabled={importing} onClick={handleImport}>
+                      {importing ? <><i className="fas fa-spinner fa-spin"></i> Importing…</> : <><i className="fas fa-check"></i> Import {rows.length} Student(s)</>}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {results && (
+                <>
+                  <div style={{display:'flex',gap:'12px',marginBottom:'16px',flexWrap:'wrap'}}>
+                    <div style={{flex:1,minWidth:'140px',padding:'12px',background:'#e8f5e9',border:'1px solid #34a853',textAlign:'center'}}>
+                      <div style={{fontSize:'22px',fontWeight:700,color:'#1b5e20'}}>{results.imported}</div>
+                      <div style={{fontSize:'12px',color:'#1b5e20'}}>Imported</div>
+                    </div>
+                    <div style={{flex:1,minWidth:'140px',padding:'12px',background: results.failed ? '#fdecea' : '#f8f9fa',border: results.failed ? '1px solid #ea4335' : '1px solid #e0e0e0',textAlign:'center'}}>
+                      <div style={{fontSize:'22px',fontWeight:700,color: results.failed ? '#7a1f1f' : '#888'}}>{results.failed}</div>
+                      <div style={{fontSize:'12px',color: results.failed ? '#7a1f1f' : '#888'}}>Failed</div>
+                    </div>
+                  </div>
+                  {results.results && results.results.length > 0 && (
+                    <div style={{overflowX:'auto',maxHeight:'260px',overflowY:'auto',border:'1px solid #e0e0e0'}}>
+                      <table className="simple-table" style={{width:'100%',fontSize:'12px'}}>
+                        <thead><tr><th>Row</th><th>Name</th><th>Status</th><th>Message</th></tr></thead>
+                        <tbody>
+                          {results.results.map((r) => (
+                            <tr key={r.row} style={!r.success ? {background:'#fdecea'} : undefined}>
+                              <td>{r.row}</td><td>{r.name}</td>
+                              <td>{r.success ? <span style={{color:'#34a853'}}><i className="fas fa-check"></i> OK</span> : <span style={{color:'#ea4335'}}><i className="fas fa-times"></i> Failed</span>}</td>
+                              <td>{r.message}{r.admissionNumber ? ` (${r.admissionNumber})` : ''}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="form-actions" style={{borderTop:'1px solid #e0e0e0',marginTop:'18px',paddingTop:'14px'}}>
+                <button type="button" className="btn btn-secondary" onClick={onClose}>
+                  <i className="fas fa-times"></i> {results ? 'Close' : 'Cancel'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     function StudentsView({ currentUser, role }) {
       const r = String(role).toLowerCase();
       const isAdmin = r === 'admin';
@@ -11394,6 +11595,7 @@
         useSWR('getAllStudents', () => swrFetcher('getAllStudents', currentUser, role));
       const items = itemsData || [];
       const [showFormModal, setShowFormModal] = useState(false);
+      const [showImportModal, setShowImportModal] = useState(false);
       const [showViewModal, setShowViewModal] = useState(false);
       const [editing, setEditing] = useState(null);
       const [viewing, setViewing] = useState(null);
@@ -11694,12 +11896,26 @@
             <div style={{display:'flex',gap:'10px'}}>
               <ViewToggle mode={viewMode} onChange={setViewMode} />
               {isAdmin && (
+                <button className="btn btn-secondary" onClick={() => setShowImportModal(true)}>
+                  <i className="fas fa-file-import"></i> Import
+                </button>
+              )}
+              {isAdmin && (
                 <button className="btn btn-success" onClick={() => { setEditing(null); setShowFormModal(true); }}>
                   <i className="fas fa-plus"></i> Add Student
                 </button>
               )}
             </div>
           </div>
+
+          {showImportModal && (
+            <ImportStudentsModal
+              currentUser={currentUser}
+              role={role}
+              onClose={() => setShowImportModal(false)}
+              onImported={() => { setShowImportModal(false); refreshStudents(); }}
+            />
+          )}
 
           {loadError && !loading && items.length === 0 && (
             <div className="settings-info-message" style={{marginBottom:'15px',borderLeftColor:'#ea4335'}}>
@@ -13264,6 +13480,7 @@
 
       const [from, setFrom] = useState(defFrom);
       const [to, setTo] = useState(today);
+      const [term, setTerm] = useState(''); // '' | 'term1' | 'term2' | 'term3' — takes over from/to when set
       const [loading, setLoading] = useState(true);
       const [data, setData] = useState(null);
       const [statusFilter, setStatusFilter] = useState('');
@@ -13273,7 +13490,7 @@
         present: '#34a853', absent: '#ea4335', late: '#fb8c00', half_day: '#fbbc04', leave: '#0074D9'
       })[s] || '#888';
 
-      const load = (f, t) => {
+      const load = (f, t, termArg) => {
         setLoading(true);
         if (tableRef.current) {
           try { tableRef.current.destroy(); tableRef.current = null; $('#studentAttHistTable').empty(); } catch (e) {}
@@ -13281,11 +13498,11 @@
         google.script.run
           .withSuccessHandler((res) => {
             setLoading(false);
-            if (res.success) setData(res.data);
+            if (res.success) { setData(res.data); if (res.data.range) { setFrom(res.data.range.from); setTo(res.data.range.to); } }
             else Swal.fire({ icon: 'error', title: 'Error', text: res.message });
           })
           .withFailureHandler((err) => { setLoading(false); Swal.fire({ icon: 'error', title: 'Error', text: err.message }); })
-          .getStudentAttendanceReport(student.ID, f, t, currentUser, role);
+          .getStudentAttendanceReport(student.ID, f, t, currentUser, role, termArg || '', (window.SMS_SCHOOL && window.SMS_SCHOOL.AcademicYear) || '');
       };
 
       useEffect(() => {
@@ -13389,20 +13606,32 @@
                   <label><i className="fas fa-calendar"></i> To</label>
                   <input type="date" className="filter-input" value={to} onChange={(e) => setTo(e.target.value)} min={from} max={today} />
                 </div>
-                <button className="btn btn-primary" onClick={() => { setStatusFilter(''); load(from, to); }} disabled={loading}>
+                <button className="btn btn-primary" onClick={() => { setStatusFilter(''); setTerm(''); load(from, to); }} disabled={loading}>
                   {loading ? <><i className="fas fa-spinner fa-spin"></i> Loading</> : <><i className="fas fa-filter"></i> Apply</>}
                 </button>
+                <div style={{display:'flex',gap:'6px'}}>
+                  {['term1','term2','term3'].map(t => (
+                    <button key={t} type="button"
+                      className={`btn btn-sm ${term === t ? 'btn-primary' : 'btn-secondary'}`}
+                      onClick={() => { setStatusFilter(''); setTerm(t); load(null, null, t); }} disabled={loading}>
+                      {TERM_LABELS[t]}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {loading ? <TableSkeleton rows={5} columns={5} /> : data ? (
                 <>
                   <div style={{display:'flex',gap:'10px',flexWrap:'wrap',marginBottom:'18px'}}>
                     <StatCard label="Records" value={data.summary.totalRecords} color="#001f3f" icon="list" />
+                    {data.summary.expectedDays != null && (
+                      <StatCard label="Expected Days (Term)" value={data.summary.expectedDays} color="#0074D9" icon="calendar-alt" />
+                    )}
                     <StatCard label="Present" value={data.summary.present} color="#34a853" icon="check" />
                     <StatCard label="Absent" value={data.summary.absent} color="#ea4335" icon="times" />
                     <StatCard label="Late" value={data.summary.late} color="#fb8c00" icon="clock" />
                     <StatCard label="Leave" value={data.summary.leave} color="#0074D9" icon="suitcase" />
-                    <StatCard label="Attendance %" value={data.summary.percentage + '%'} color="#6a1b9a" icon="percentage" />
+                    <StatCard label={data.summary.termPercentage != null ? 'Term %' : 'Attendance %'} value={(data.summary.termPercentage != null ? data.summary.termPercentage : data.summary.percentage) + '%'} color="#6a1b9a" icon="percentage" />
                   </div>
 
                   <h4 style={{color:'var(--navy-primary)',marginBottom:'10px',fontSize:'15px',borderBottom:'2px solid var(--navy-primary)',paddingBottom:'6px'}}>
@@ -17813,6 +18042,7 @@
       const [search, setSearch] = useState('');
       const [statusFilter, setStatusFilter] = useState('');
       const [recent, setRecent] = useState({ dates: [], byStudent: {} });
+      const [topTab, setTopTab] = useState('mark'); // 'mark' | 'termSummary'
       const originalRef = useRef({});  // snapshot for dirty tracking
 
       const STATUSES = [
@@ -18062,6 +18292,19 @@
             )}
           </div>
 
+          <div style={{display:'flex',gap:'8px',marginBottom:'16px'}}>
+            <button className={`btn btn-sm ${topTab === 'mark' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTopTab('mark')}>
+              <i className="fas fa-clipboard-check"></i> Mark Attendance
+            </button>
+            <button className={`btn btn-sm ${topTab === 'termSummary' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setTopTab('termSummary')}>
+              <i className="fas fa-chart-bar"></i> Term Summary
+            </button>
+          </div>
+
+          {topTab === 'termSummary' ? (
+            <TermAttendanceSummaryPanel currentUser={currentUser} role={role} classes={classes} />
+          ) : (
+          <>
           {!isAdmin && isTeacher && (
             <div className="settings-info-message" style={{marginBottom:'15px'}}>
               <i className="fas fa-info-circle" style={{marginRight:'6px'}}></i>
@@ -18363,6 +18606,137 @@
                       {saving ? <><i className="fas fa-spinner fa-spin"></i> Saving All...</> : <><i className="fas fa-save"></i> Save Attendance</>}
                     </button>
                   </div>
+                </div>
+              )}
+            </>
+          )}
+          </>
+          )}
+        </div>
+      );
+    }
+
+    // ============== Term Attendance Accumulation Summary ==============
+    // Ghana school terms run Mon-Fri with holidays/mid-term breaks deducted from the expected
+    // total — this shows the calendar-aware running total for every student in a class, for the
+    // whole term, exactly as attendance has been accumulating day by day.
+    function TermAttendanceSummaryPanel({ currentUser, role, classes }) {
+      const [classId, setClassId] = useState('');
+      const [academicYear, setAcademicYear] = useState((window.SMS_SCHOOL && window.SMS_SCHOOL.AcademicYear) || '');
+      const [term, setTerm] = useState((window.SMS_SCHOOL && window.SMS_SCHOOL.ActiveTerm) || 'term1');
+      const [data, setData] = useState(null);
+      const [loading, setLoading] = useState(false);
+      const [search, setSearch] = useState('');
+
+      const load = () => {
+        if (!classId || !term || !academicYear) return;
+        setLoading(true); setData(null);
+        google.script.run
+          .withSuccessHandler((res) => {
+            setLoading(false);
+            if (res && res.success) setData(res.data);
+            else Swal.fire({ icon: 'error', title: 'Error', text: (res && res.message) || 'Failed to load' });
+          })
+          .withFailureHandler((err) => { setLoading(false); Swal.fire({ icon: 'error', title: 'Error', text: (err && err.message) || 'Server error' }); })
+          .getTermAttendanceSummary(classId, term, academicYear, currentUser, role);
+      };
+
+      useEffect(() => { if (classId) load(); }, [classId, term, academicYear]);
+
+      const yearOptions = (() => {
+        const cy = new Date().getFullYear(); const list = [];
+        for (let i = -2; i <= 1; i++) list.push(`${cy + i}-${cy + i + 1}`);
+        if (academicYear && !list.includes(academicYear)) list.push(academicYear);
+        return list;
+      })();
+
+      const visibleRows = (data && data.students || []).filter(s => {
+        if (!search.trim()) return true;
+        const q = search.trim().toLowerCase();
+        return (s.FullName + ' ' + (s.AdmissionNumber || '')).toLowerCase().indexOf(q) !== -1;
+      });
+
+      const pctColor = (p) => p >= 90 ? '#34a853' : p >= 75 ? '#fbbc04' : '#ea4335';
+
+      return (
+        <div>
+          <div className="settings-info-message" style={{marginBottom:'16px'}}>
+            <i className="fas fa-info-circle" style={{marginRight:'6px'}}></i>
+            Accumulates every marked attendance record across the whole term. <b>Expected Days</b> is every school weekday in the term's date range, minus any day flagged as a Holiday or Mid-Term Break on the School Calendar — set those there so they're deducted automatically.
+          </div>
+
+          <div style={{display:'flex',gap:'10px',alignItems:'flex-end',marginBottom:'18px',flexWrap:'wrap'}}>
+            <div className="form-group" style={{minWidth:'220px',marginBottom:0}}>
+              <label><i className="fas fa-school"></i> Class</label>
+              <SearchableDropdown options={(classes || []).map(c => ({ value: String(c.ID), label: c.Label || c.ShortLabel }))}
+                value={classId} onChange={setClassId} placeholder="Select class..." />
+            </div>
+            <div className="form-group" style={{minWidth:'160px',marginBottom:0}}>
+              <label><i className="fas fa-calendar-alt"></i> Academic Year</label>
+              <SearchableDropdown options={yearOptions.map(y => ({ value: y, label: y }))} value={academicYear} onChange={setAcademicYear} />
+            </div>
+            <div className="form-group" style={{minWidth:'140px',marginBottom:0}}>
+              <label><i className="fas fa-layer-group"></i> Term</label>
+              <SearchableDropdown options={[{value:'term1',label:'Term 1'},{value:'term2',label:'Term 2'},{value:'term3',label:'Term 3'}]} value={term} onChange={setTerm} />
+            </div>
+            <div className="form-group" style={{flex:1,minWidth:'180px',marginBottom:0}}>
+              <label><i className="fas fa-search"></i> Search Student</label>
+              <input type="text" className="filter-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Name or admission no." />
+            </div>
+          </div>
+
+          {!classId ? (
+            <div style={{textAlign:'center',padding:'30px',color:'#888',background:'#f8f9fa'}}>Pick a class to see its term attendance totals.</div>
+          ) : loading ? <TableSkeleton rows={6} columns={7} /> : !data ? null : (
+            <>
+              <div style={{display:'flex',gap:'12px',marginBottom:'16px',flexWrap:'wrap'}}>
+                <div style={{flex:1,minWidth:'160px',padding:'12px 15px',background:'#fff',border:'1px solid #e0e0e0',borderLeft:'4px solid var(--navy-primary)'}}>
+                  <div style={{fontSize:'11px',color:'#888',textTransform:'uppercase'}}>Term Range</div>
+                  <div style={{fontSize:'14px',fontWeight:700,color:'var(--navy-primary)'}}>{data.range.from} → {data.range.to}</div>
+                </div>
+                <div style={{flex:1,minWidth:'160px',padding:'12px 15px',background:'#fff',border:'1px solid #e0e0e0',borderLeft:'4px solid #0074D9'}}>
+                  <div style={{fontSize:'11px',color:'#888',textTransform:'uppercase'}}>Expected School Days</div>
+                  <div style={{fontSize:'20px',fontWeight:700,color:'var(--navy-primary)'}}>{data.expectedDays}</div>
+                </div>
+                <div style={{flex:1,minWidth:'160px',padding:'12px 15px',background:'#fff',border:'1px solid #e0e0e0',borderLeft:'4px solid #fb8c00'}}>
+                  <div style={{fontSize:'11px',color:'#888',textTransform:'uppercase'}}>Holidays / Breaks Deducted</div>
+                  <div style={{fontSize:'20px',fontWeight:700,color:'var(--navy-primary)'}}>{data.holidayCount}</div>
+                </div>
+              </div>
+
+              {visibleRows.length === 0 ? (
+                <div style={{textAlign:'center',padding:'30px',color:'#888',background:'#f8f9fa'}}>No students in this class.</div>
+              ) : (
+                <div style={{overflowX:'auto'}}>
+                  <table className="simple-table" style={{width:'100%'}}>
+                    <thead>
+                      <tr>
+                        <th>Student</th><th>Adm. No.</th>
+                        <th style={{textAlign:'center'}}>Present</th>
+                        <th style={{textAlign:'center'}}>Absent</th>
+                        <th style={{textAlign:'center'}}>Late</th>
+                        <th style={{textAlign:'center'}}>Half-Day</th>
+                        <th style={{textAlign:'center'}}>Leave</th>
+                        <th style={{textAlign:'center'}}>Term %</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleRows.map(s => (
+                        <tr key={s.StudentID}>
+                          <td style={{fontWeight:600,color:'var(--navy-primary)'}}>{s.FullName}</td>
+                          <td style={{fontFamily:'monospace',fontSize:'12px'}}>{s.AdmissionNumber}</td>
+                          <td style={{textAlign:'center',color:'#34a853',fontWeight:600}}>{s.Present}</td>
+                          <td style={{textAlign:'center',color:'#ea4335',fontWeight:600}}>{s.Absent}</td>
+                          <td style={{textAlign:'center',color:'#fb8c00'}}>{s.Late}</td>
+                          <td style={{textAlign:'center',color:'#0074D9'}}>{s.HalfDay}</td>
+                          <td style={{textAlign:'center',color:'#6a1b9a'}}>{s.Leave}</td>
+                          <td style={{textAlign:'center'}}>
+                            <span style={{fontWeight:700,color:pctColor(s.Percentage)}}>{s.Percentage}%</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </>
@@ -23123,12 +23497,12 @@
 
     // ============== Calendar (school events / holidays / exams) ==============
     const CAL_COLORS = {
-      holiday: '#ea4335', event: '#0074D9', exam: '#6a1b9a',
+      holiday: '#ea4335', midterm_break: '#fb8c00', event: '#0074D9', exam: '#6a1b9a',
       meeting: '#fbbc04', sports: '#34a853', function: '#e91e63',
       ptm: '#00897b', working_day: '#6c757d', other: '#9e9e9e'
     };
     const CAL_TYPE_LABELS = {
-      holiday: 'Holiday', event: 'Event', exam: 'Exam', meeting: 'Meeting',
+      holiday: 'Holiday', midterm_break: 'Mid-Term Break', event: 'Event', exam: 'Exam', meeting: 'Meeting',
       sports: 'Sports', function: 'Function', ptm: 'PTM',
       working_day: 'Working Day', other: 'Other'
     };

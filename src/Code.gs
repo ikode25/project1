@@ -4609,6 +4609,61 @@ function addStudent(s, currentUser, currentRole) {
   }
 }
 
+// admin-only bulk import (CSV, parsed client-side into row objects) — reuses addStudent's own
+// validation/insert logic per row, one call at a time, so imported students are never held to a
+// different standard than one added by hand. A row's ClassName is resolved against the class's
+// name, class code, or "name + section" (case-insensitive) so the CSV never has to carry internal
+// numeric ClassIDs the admin would have no way of knowing.
+function bulkImportStudents(rows, currentUser, currentRole) {
+  try {
+    if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
+    if (!Array.isArray(rows) || !rows.length) return { success: false, message: 'No rows to import' };
+    if (rows.length > 500) return { success: false, message: 'Import is limited to 500 rows at a time — split into smaller files' };
+
+    var nameToId = {};
+    var csh = getSheet(CLASSES_SHEET);
+    if (csh) {
+      var cData = csh.getDataRange().getValues();
+      for (var ci = 1; ci < cData.length; ci++) {
+        if (String(cData[ci][6]) === '1') continue; // IsDeleted
+        var cid = cData[ci][0];
+        var cName = String(cData[ci][1] || '').trim().toLowerCase();
+        var cSection = String(cData[ci][2] || '').trim().toLowerCase();
+        var cCode = String(cData[ci][10] || '').trim().toLowerCase();
+        if (cName) nameToId[cName] = cid;
+        if (cCode) nameToId[cCode] = cid;
+        if (cName && cSection) nameToId[cName + ' ' + cSection] = cid;
+      }
+    }
+
+    var results = [], imported = 0, failed = 0;
+    rows.forEach(function (row, idx) {
+      var payload = {};
+      Object.keys(row || {}).forEach(function (k) { payload[k] = row[k]; });
+      if ((!payload.ClassID || payload.ClassID === '') && payload.ClassName) {
+        var match = nameToId[String(payload.ClassName).trim().toLowerCase()];
+        if (match != null) payload.ClassID = match;
+      }
+      var label = [payload.FirstName, payload.LastName].filter(Boolean).join(' ') || ('Row ' + (idx + 1));
+      var res;
+      try { res = addStudent(payload, currentUser, currentRole); }
+      catch (rowErr) { res = { success: false, message: rowErr.toString() }; }
+      if (res && res.success) {
+        imported++;
+        results.push({ row: idx + 1, name: label, success: true, message: res.message, admissionNumber: res.admissionNumber });
+      } else {
+        failed++;
+        results.push({ row: idx + 1, name: label, success: false, message: (res && res.message) || 'Unknown error' });
+      }
+    });
+
+    addLog(currentUser, 'Students Bulk Imported', imported + ' imported, ' + failed + ' failed (of ' + rows.length + ' row(s))');
+    return { success: true, message: imported + ' imported, ' + failed + ' failed', imported: imported, failed: failed, results: results };
+  } catch (err) {
+    return { success: false, message: 'Error: ' + err.toString() };
+  }
+}
+
 function updateStudent(id, s, currentUser, currentRole) {
   try {
     if (!isAdmin(currentRole)) return { success: false, message: 'Forbidden — admin only' };
@@ -11327,7 +11382,7 @@ function canReadCalendar(role) {
 }
 function canWriteCalendar(role) { return String(role || '').toLowerCase() === 'admin'; }
 
-var CALENDAR_EVENT_TYPES = ['holiday','event','exam','meeting','sports','function','ptm','working_day','other'];
+var CALENDAR_EVENT_TYPES = ['holiday','midterm_break','event','exam','meeting','sports','function','ptm','working_day','other'];
 var CALENDAR_APPLY_TO   = ['all','staff','students','class_specific'];
 
 // row -> public event obj
@@ -11378,7 +11433,7 @@ function validateCalendarPayload(d) {
   }
   var color = String(d.Color || '').trim();
   if (color && !/^#[0-9a-fA-F]{6}$/.test(color)) return { ok: false, message: 'Color must be hex like #34a853' };
-  var isHol = (d.IsHoliday === true || d.IsHoliday === 1 || String(d.IsHoliday) === '1' || et === 'holiday') ? '1' : '0';
+  var isHol = (d.IsHoliday === true || d.IsHoliday === 1 || String(d.IsHoliday) === '1' || et === 'holiday' || et === 'midterm_break') ? '1' : '0';
   var isRec = (d.IsRecurring === true || d.IsRecurring === 1 || String(d.IsRecurring) === '1') ? '1' : '0';
   return {
     ok: true,
@@ -18047,8 +18102,150 @@ function getStudentFeeSummary(studentId, currentUser, currentRole) {
   }
 }
 
-// per-student attendance scan over date range; walks Statuses JSON per row
-function getStudentAttendanceReport(studentId, fromDate, toDate, currentUser, currentRole) {
+// ============== Term Attendance Accumulation ==============
+// Ghana basic school terms run Mon-Fri; a term's own span (from the settings-configured
+// Term Vacation & Reopening Dates) already includes any vacation/break weeks, so the "expected
+// school days" for a term is simply every weekday in that span MINUS any day a public holiday or
+// mid-term break (or any other calendar event flagged IsHoliday) actually falls on. Attendance
+// already accumulates naturally as it's marked day by day — this just totals it up correctly
+// against a calendar-aware denominator instead of "however many days happened to get marked".
+var _WEEKDAY_NAMES = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+
+// term1 runs from the academic year's start date; term2/term3 run from the PREVIOUS term's own
+// Reopening Date (that's the date the school actually resumed) through this term's own Vacation
+// Date (or the academic year's end date for term3 if no Vacation Date is set yet).
+function _getTermDateRange(term, academicYear, settingsData) {
+  var s = settingsData || (getSchoolSettings().data || {});
+  var ay = String(academicYear || s.AcademicYear || '').trim();
+  var termDates = s.TermDates || {};
+  var order = ['term1', 'term2', 'term3'];
+  var idx = order.indexOf(String(term || '').toLowerCase());
+  if (idx === -1) return null;
+  var from;
+  if (idx === 0) {
+    from = s.AcademicYearStartDate ? String(s.AcademicYearStartDate).split('T')[0] : (ay.split('-')[0] + '-09-01');
+  } else {
+    from = (termDates[order[idx - 1]] && termDates[order[idx - 1]].reopening) || '';
+  }
+  var to = (termDates[order[idx]] && termDates[order[idx]].vacation) || '';
+  if (!to) to = (idx === order.length - 1 && s.AcademicYearEndDate) ? String(s.AcademicYearEndDate).split('T')[0] : todayStr();
+  if (!from) return null;
+  return { from: from, to: to, academicYear: ay };
+}
+
+// weekdays (per Settings.WorkingDays) in [fromDate, toDate] minus any date covered by an
+// IsHoliday-flagged calendar event (holiday, mid-term break, or anything else the admin flagged)
+function _computeExpectedSchoolDays(fromDate, toDate) {
+  var from = String(fromDate || '').split('T')[0];
+  var to = String(toDate || '').split('T')[0];
+  if (!from || !to || from > to) return { expectedDays: 0, holidayDates: [] };
+
+  var settingsRes = getSchoolSettings();
+  var workingDaysCsv = (settingsRes.data && settingsRes.data.WorkingDays) || 'monday,tuesday,wednesday,thursday,friday';
+  var workingDays = workingDaysCsv.split(',').map(function (x) { return String(x).trim().toLowerCase(); });
+
+  var holidaySet = {};
+  try {
+    var csh = getSheet(CALENDAR_SHEET);
+    if (csh) {
+      var cdata = csh.getDataRange().getValues();
+      for (var i = 1; i < cdata.length; i++) {
+        if (String(cdata[i][14]) === '1') continue; // IsDeleted
+        if (String(cdata[i][7]) !== '1') continue;  // IsHoliday
+        var evStart = toIso(cdata[i][2]).split('T')[0];
+        if (!evStart) continue;
+        var evEnd = cdata[i][3] ? toIso(cdata[i][3]).split('T')[0] : evStart;
+        if (evEnd < from || evStart > to) continue; // no overlap with the requested range
+        var curD = new Date(evStart > from ? evStart : from);
+        var lastD = new Date(evEnd < to ? evEnd : to);
+        while (curD <= lastD) {
+          holidaySet[curD.toISOString().split('T')[0]] = true;
+          curD.setDate(curD.getDate() + 1);
+        }
+      }
+    }
+  } catch (e) { Logger.log('_computeExpectedSchoolDays holiday scan failed: ' + e.toString()); }
+
+  var expectedDays = 0, holidayDates = [];
+  var cursor = new Date(from), end = new Date(to);
+  while (cursor <= end) {
+    var iso = cursor.toISOString().split('T')[0];
+    if (workingDays.indexOf(_WEEKDAY_NAMES[cursor.getDay()]) !== -1) {
+      if (holidaySet[iso]) holidayDates.push(iso); else expectedDays++;
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return { expectedDays: expectedDays, holidayDates: holidayDates };
+}
+
+// class-wide term totals — one row per student: Present/Absent/Late/HalfDay/Leave accumulated
+// from every marked Attendance record in the term's date range, against the term's calendar-aware
+// Expected Days (holidays/mid-term break already deducted).
+function getTermAttendanceSummary(classId, term, academicYear, currentUser, currentRole) {
+  try {
+    if (!canReadAttendance(currentRole)) return { success: false, message: 'Forbidden — no access' };
+    var cid = parseInt(classId, 10);
+    if (isNaN(cid)) return { success: false, message: 'Invalid class id' };
+
+    var settingsRes = getSchoolSettings();
+    var range = _getTermDateRange(term, academicYear, settingsRes.data);
+    if (!range) return { success: false, message: 'Set this term\'s Vacation & Reopening Dates in Settings first' };
+
+    var exp = _computeExpectedSchoolDays(range.from, range.to);
+
+    var students = getStudentsLite();
+    var counts = {};
+    Object.keys(students).forEach(function (sid) {
+      if (students[sid].classId === cid) counts[sid] = { present: 0, absent: 0, late: 0, half_day: 0, leave: 0 };
+    });
+
+    var ash = getSheet(ATTENDANCE_SHEET);
+    if (ash) {
+      var adata = ash.getDataRange().getValues();
+      for (var i = 1; i < adata.length; i++) {
+        if (parseInt(adata[i][1], 10) !== cid) continue;
+        var dOnly = toIso(adata[i][2]).split('T')[0];
+        if (!dOnly || dOnly < range.from || dOnly > range.to) continue;
+        var jsonObj = parseAttendanceJson(adata[i][6]);
+        Object.keys(jsonObj).forEach(function (sidKey) {
+          var c = counts[sidKey];
+          if (!c) return;
+          var status = String((jsonObj[sidKey] || {}).status || '').toLowerCase();
+          if (c[status] != null) c[status]++;
+        });
+      }
+    }
+
+    var rows = Object.keys(counts).map(function (sid) {
+      var c = counts[sid];
+      var attended = c.present + c.late + (c.half_day * 0.5);
+      var pct = exp.expectedDays > 0 ? Math.round((attended / exp.expectedDays) * 1000) / 10 : 0;
+      var st = students[sid];
+      return {
+        StudentID: parseInt(sid, 10), FullName: st.fullName, AdmissionNumber: st.admNo,
+        Present: c.present, Absent: c.absent, Late: c.late, HalfDay: c.half_day, Leave: c.leave,
+        Percentage: pct
+      };
+    }).sort(function (a, b) { return String(a.FullName).localeCompare(String(b.FullName)); });
+
+    return {
+      success: true,
+      data: {
+        classLabel: (getClassesMap()[cid] || {}).label || '',
+        term: term, academicYear: range.academicYear,
+        range: { from: range.from, to: range.to },
+        expectedDays: exp.expectedDays,
+        holidayCount: exp.holidayDates.length,
+        students: rows
+      }
+    };
+  } catch (err) { return { success: false, message: 'Error: ' + err.toString() }; }
+}
+
+// per-student attendance scan over date range; walks Statuses JSON per row. Pass `term` (+
+// optional `academicYearForTerm`) instead of fromDate/toDate to scope the whole report to a term
+// and get back a calendar-aware expectedDays figure alongside the usual marked-days totals.
+function getStudentAttendanceReport(studentId, fromDate, toDate, currentUser, currentRole, term, academicYearForTerm) {
   try {
     if (!canReadAttendance(currentRole)) return { success: false, message: 'Forbidden — no access' };
     var sid = parseInt(studentId, 10);
@@ -18060,9 +18257,17 @@ function getStudentAttendanceReport(studentId, fromDate, toDate, currentUser, cu
     var s = students[sid];
     if (!s) return { success: false, message: 'Student not found or deleted' };
 
-    // default range: last 60 days
+    // default range: last 60 days — unless a term was requested, which takes over the whole range
     var to = toDate ? toIso(toDate).split('T')[0] : todayStr();
     var from = fromDate ? toIso(fromDate).split('T')[0] : '';
+    var expectedDays = null, termRange = null;
+    if (term) {
+      termRange = _getTermDateRange(term, academicYearForTerm, null);
+      if (termRange) {
+        from = termRange.from; to = termRange.to;
+        expectedDays = _computeExpectedSchoolDays(from, to).expectedDays;
+      }
+    }
     if (!from) {
       var d = new Date(to);
       d.setDate(d.getDate() - 60);
@@ -18121,7 +18326,11 @@ function getStudentAttendanceReport(studentId, fromDate, toDate, currentUser, cu
           late: counts.late,
           halfDay: counts.half_day,
           leave: counts.leave,
-          percentage: pct
+          percentage: pct,
+          // only set when a `term` was requested — the calendar-aware "Expected Days" denominator
+          // (term span minus holidays/mid-term break), distinct from totalDays (days actually marked)
+          expectedDays: expectedDays,
+          termPercentage: expectedDays != null && expectedDays > 0 ? Math.round((attended / expectedDays) * 1000) / 10 : null
         }
       }
     };
