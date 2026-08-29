@@ -583,6 +583,46 @@
         .actions-toggle-btn:hover { background: #f1f5f9; color: var(--primary); border-color: var(--primary); }
         .actions-toggle-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 
+        /* ── Per-row action buttons expand/collapse (Fee Records tables & cards) ── */
+        .act-btns-toggle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            border-radius: 7px;
+            border: 1px solid #cbd5e1;
+            background: #fff;
+            color: #64748b;
+            cursor: pointer;
+            vertical-align: middle;
+            transition: all .15s ease;
+            flex-shrink: 0;
+        }
+        .act-btns-toggle:hover { background: #f1f5f9; color: var(--primary); border-color: var(--primary); }
+        .act-btns-toggle.expanded { background: var(--primary); color: #fff; border-color: var(--primary); }
+        .act-btns-toggle i { font-size: 13px; transition: transform .2s ease; display: block; }
+        .act-btns-toggle.expanded i { transform: rotate(180deg); }
+        .act-btns-wrap {
+            display: none;
+            margin-left: 6px;
+            align-items: center;
+            gap: 4px;
+            flex-wrap: wrap;
+            vertical-align: middle;
+        }
+        .act-btns-wrap.expanded { display: inline-flex; }
+        body.dark-mode .act-btns-toggle {
+            background: #1e293b !important;
+            border-color: #475569 !important;
+            color: #cbd5e1 !important;
+        }
+        body.dark-mode .act-btns-toggle:hover,
+        body.dark-mode .act-btns-toggle.expanded {
+            background: var(--primary) !important;
+            color: #fff !important;
+        }
+
         .sidebar-header {
             padding: 20px;
             border-bottom: 1px solid rgba(255, 255, 255, .1);
@@ -7691,10 +7731,12 @@
 
                 if (typeof applyRolePermissionsToUI === 'function') applyRolePermissionsToUI();
 
-                // Trigger onboarding system tour for first-time users
+                // Trigger onboarding system tour for first-time users — desktop/PC only.
+                // On mobile viewports the welcome guide is skipped entirely (never shown).
                 setTimeout(function() {
                     var username = currentUser ? (currentUser.username || currentUser.email || 'User') : 'User';
-                    if (!lsGet('seenTour_' + username) && (currentUser.role === 'admin' || currentUser.role === 'collector')) {
+                    var isMobileViewport = window.innerWidth <= 767;
+                    if (!isMobileViewport && !lsGet('seenTour_' + username) && (currentUser.role === 'admin' || currentUser.role === 'collector')) {
                         if (typeof startSystemTour === 'function') startSystemTour();
                     }
                 }, 1500);
@@ -9141,7 +9183,7 @@
 
             if (selectedFeeType !== 'regular') {
                 if (currentUser && currentUser.role === 'viewer') {
-                    return html;
+                    return wrapActionBtns(html);
                 }
                 html += '<button class="act-btn btn btn-sm btn-outline-primary me-1" data-action="editcustom" data-id="' + r.id + '" data-session="' + session + '" data-feename="' + selectedFeeType + '" title="Pay / Collect Fee"><i class="bi bi-credit-card"></i></button>';
                 var customRecord = allCustomFeeRecords.find(function(cf) {
@@ -9162,7 +9204,7 @@
                     html += '<button class="act-btn btn btn-sm btn-whatsapp me-1" data-action="whatsappcustom" data-id="' + r.id + '" data-session="' + session + '" data-feename="' + selectedFeeType + '" title="WhatsApp"><i class="bi bi-whatsapp"></i></button>';
                     html += '<button class="act-btn btn btn-sm btn-outline-secondary me-1" data-action="smscustom" data-id="' + r.id + '" data-session="' + session + '" data-feename="' + selectedFeeType + '" title="Send SMS" style="font-size:11px;padding:2px 7px"><i class="bi bi-chat-dots"></i></button>';
                 }
-                return html;
+                return wrapActionBtns(html);
             }
 
             // Collector: Edit, Next Bill, Thermal Print, plus Call/WhatsApp/SMS to parents
@@ -9176,7 +9218,7 @@
                     html += '<button class="act-btn btn btn-sm btn-whatsapp me-1" data-action="whatsapp" data-id="' + r.id + '" data-session="' + session + '" title="WhatsApp"><i class="bi bi-whatsapp"></i></button>';
                     html += '<button class="act-btn btn btn-sm btn-outline-secondary me-1" data-action="sms" data-id="' + r.id + '" data-session="' + session + '" title="Send SMS" style="font-size:11px;padding:2px 7px"><i class="bi bi-chat-dots"></i></button>';
                 }
-                return html;
+                return wrapActionBtns(html);
             }
 
             // Admin has all action buttons
@@ -9195,7 +9237,27 @@
                 html += '<button class="act-btn act-btn-secondary btn btn-sm btn-outline-warning me-1" data-action="promote" data-id="' + r.id + '" data-session="' + session + '" title="Promote to Next Term"><i class="bi bi-person-up"></i></button>';
                 html += '<button class="act-btn btn btn-sm btn-outline-danger" data-action="delete" data-id="' + r.id + '" data-session="' + session + '" title="Delete"><i class="bi bi-trash"></i></button>';
             }
-            return html;
+            return wrapActionBtns(html);
+        }
+
+        // Wraps a row's action-button HTML behind a small expand/collapse toggle so the
+        // buttons stay hidden until the admin/collector clicks it — used everywhere
+        // buildActionBtns() renders a row (term tables, cards view, historical records,
+        // new-students report), on both desktop and mobile.
+        var __actBtnsSeq = 0;
+        function wrapActionBtns(innerHtml) {
+            if (!innerHtml) return '';
+            var uid = 'ab' + (++__actBtnsSeq);
+            return '<span class="act-btns-toggle" id="toggle-' + uid + '" onclick="toggleRowActions(\'' + uid + '\')" title="Show/hide action buttons"><i class="bi bi-chevron-down"></i></span>' +
+                   '<span class="act-btns-wrap" id="actwrap-' + uid + '">' + innerHtml + '</span>';
+        }
+
+        function toggleRowActions(uid) {
+            var wrap = document.getElementById('actwrap-' + uid);
+            var toggle = document.getElementById('toggle-' + uid);
+            if (!wrap) return;
+            var expanded = wrap.classList.toggle('expanded');
+            if (toggle) toggle.classList.toggle('expanded', expanded);
         }
 
         function buildFeeInputs(recData) {
