@@ -8083,6 +8083,11 @@
                                     lsSet('customFeeRecords', allCustomFeeRecords);
                                     var visibleTerm = getVisibleTermSection();
                                     if (visibleTerm) renderTerm(visibleTerm.key, visibleTerm.name, visibleTerm.page || 1);
+                                    // Re-run the dashboard totals now that fresh custom/extra-fee data is
+                                    // in — the updateDash() call above ran before this fetch resolved, so
+                                    // it used the stale allCustomFeeRecords and under/over-counted revenue,
+                                    // collected and outstanding until the admin manually refreshed the page.
+                                    updateDash();
                                 }
                             }).getCustomStudentFees('all');
                              
@@ -9766,8 +9771,28 @@
                             }
                         }
                         
-                        // Force refresh of cached data and table
-                        loadAllData();
+                        // Instantly merge the saved record into local state and re-render —
+                        // don't wait on a full loadAllData() round-trip for the table/dashboard
+                        // to reflect it (that's what previously left the amounts looking stale
+                        // until the admin manually refreshed the page).
+                        var savedCfRec = res.record || recordData;
+                        if (!Array.isArray(allCustomFeeRecords)) allCustomFeeRecords = [];
+                        var cfIdx = allCustomFeeRecords.findIndex(function(cf) {
+                            return cf && (savedCfRec.id ? String(cf.id) === String(savedCfRec.id) :
+                                (String(cf.studentId) === String(savedCfRec.studentId) &&
+                                 String(cf.feeTypeName) === String(savedCfRec.feeTypeName) &&
+                                 String(cf.academicSession) === String(savedCfRec.academicSession)));
+                        });
+                        if (cfIdx !== -1) allCustomFeeRecords[cfIdx] = savedCfRec;
+                        else allCustomFeeRecords.push(savedCfRec);
+                        lsSet('customFeeRecords', allCustomFeeRecords);
+
+                        var visibleTermForCf = getVisibleTermSection();
+                        if (visibleTermForCf) renderTerm(visibleTermForCf.key, visibleTermForCf.name, (termState[visibleTermForCf.key] && termState[visibleTermForCf.key].page) || 1);
+                        try { updateDash(); } catch (e) { console.error('updateDash after custom fee save error:', e); }
+
+                        // Background sync for full consistency (silent — UI is already up to date)
+                        loadAllData(true);
 
                         // Detect overpayment on this extra fee record
                         try {

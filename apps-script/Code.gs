@@ -878,6 +878,13 @@ function getPublicSchoolData(studentIdOrPhone) {
           const activeTerm = settings.activeTerm || 'First Term';
           const activeSess = activeYr + ' ' + activeTerm;
           
+          // Collect every row across all three term sheets that shares the parent's
+          // phone number, then keep ONE record per sibling student — preferring their
+          // record for the current active session, but falling back to their latest
+          // known record. Previously a sibling with no active-session record yet (not
+          // registered for the new term, still on an older/newer term) was silently
+          // dropped from the portal entirely even though the phone number matched.
+          const candidatesByStudent = {}; // studentId(lower) -> { active: rec|null, latest: rec|null, latestTs: number }
           for (const term of terms) {
             const sheet = ss.getSheetByName(SHEET_PREFIX + " - " + term);
             if (!sheet) continue;
@@ -886,53 +893,64 @@ function getPublicSchoolData(studentIdOrPhone) {
             const headers = data[0].map(h => String(h).trim());
             const idIdx = headers.indexOf('id');
             const phoneIdx = headers.indexOf('phoneNumber');
-            const nameIdx = headers.indexOf('studentName');
             const sessIdx = headers.indexOf('academicSession');
-            
+
             if (idIdx === -1 || phoneIdx === -1) continue;
-            
+
             for (let i = 1; i < data.length; i++) {
               const rowId = String(data[i][idIdx] || '').trim();
               const rowPhone = String(data[i][phoneIdx] || '').trim();
-              const rowName = nameIdx !== -1 ? String(data[i][nameIdx] || '').trim() : '';
-              const rowSess = sessIdx !== -1 ? String(data[i][sessIdx] || '').trim() : '';
-              
+
               if (!rowId || !rowPhone) continue;
               if (seenSiblingIds[rowId.toLowerCase()]) continue;
-              
-              // Only match current active session records for the sibling
-              if (rowSess && !rowSess.includes(activeSess)) continue;
-              
+
               const rowPhoneNormalized = rowPhone.replace(/\D/g, "");
               const cleanRowPhone = rowPhoneNormalized.startsWith("233") && rowPhoneNormalized.length === 12 ? "0" + rowPhoneNormalized.substring(3) : rowPhoneNormalized;
-              
-              if (cleanRowPhone === cleanMainPhone) {
-                seenSiblingIds[rowId.toLowerCase()] = true;
-                const rec = {};
-                headers.forEach((h, idx) => {
-                  const val = data[i][idx];
-                  if (val instanceof Date)
-                    rec[h] = Utilities.formatDate(val, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-                  else rec[h] = val;
-                });
-                
-                // Fetch sibling custom fees
-                let sibCustomFees = [];
-                const cfRes = getCustomStudentFees(rec.id);
-                if (cfRes.success) {
-                  sibCustomFees = cfRes.history;
-                }
-                
-                const sibExtras = getStudentUniformsAndBooks(rec.id);
-                siblings.push({
-                  record: rec,
-                  customFees: sibCustomFees,
-                  uniforms: sibExtras.uniforms,
-                  books: sibExtras.books
-                });
+              if (cleanRowPhone !== cleanMainPhone) continue;
+
+              const rowSess = sessIdx !== -1 ? String(data[i][sessIdx] || '').trim() : '';
+              const rec = {};
+              headers.forEach((h, idx) => {
+                const val = data[i][idx];
+                if (val instanceof Date)
+                  rec[h] = Utilities.formatDate(val, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+                else rec[h] = val;
+              });
+
+              const key = rowId.toLowerCase();
+              if (!candidatesByStudent[key]) candidatesByStudent[key] = { active: null, latest: null, latestTs: -1 };
+              if (rowSess && rowSess.includes(activeSess)) {
+                candidatesByStudent[key].active = rec;
+              }
+              const ts = Date.parse(rec.updatedAt || rec.createdAt || '') || 0;
+              if (ts >= candidatesByStudent[key].latestTs) {
+                candidatesByStudent[key].latest = rec;
+                candidatesByStudent[key].latestTs = ts;
               }
             }
           }
+
+          Object.keys(candidatesByStudent).forEach(key => {
+            if (seenSiblingIds[key]) return;
+            seenSiblingIds[key] = true;
+            const chosen = candidatesByStudent[key].active || candidatesByStudent[key].latest;
+            if (!chosen) return;
+
+            // Fetch sibling custom fees
+            let sibCustomFees = [];
+            const cfRes = getCustomStudentFees(chosen.id);
+            if (cfRes.success) {
+              sibCustomFees = cfRes.history;
+            }
+
+            const sibExtras = getStudentUniformsAndBooks(chosen.id);
+            siblings.push({
+              record: chosen,
+              customFees: sibCustomFees,
+              uniforms: sibExtras.uniforms,
+              books: sibExtras.books
+            });
+          });
         }
       } catch (sibErr) {
         Logger.log("Error fetching siblings in getPublicSchoolData: " + sibErr.message);
