@@ -1,0 +1,3698 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parent Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@300;400;500;600&family=Poppins:wght@300;400;500;600;700&family=Nunito+Sans:wght@300;400;600;700&family=Inter:wght@300;400;500;600;700;800&family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;600;700&display=swap"
+        rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --gold: #f59e0b;
+            --gold-light: #fde68a;
+            --deep: #1e1b4b;
+            --deep2: #312e81;
+            --green: #059669;
+            --primary: var(--primary);
+            --secondary: #6366f1;
+            --red: #dc2626;
+            --surface: #fff;
+            --muted: #64748b;
+            --radius: 16px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
+
+        body, input, select, textarea, button, table, td, th, label {
+            font-family: var(--system-font, 'DM Sans'), sans-serif !important;
+            font-size: var(--system-font-size, 14px) !important;
+            font-weight: var(--system-font-weight, 400) !important;
+        }
+        html {
+            height: 100%;
+            overflow-x: hidden;
+        }
+        body {
+            background: #f8f7ff;
+            color: #1e293b;
+            min-height: 100vh;
+            width: 100%;
+            overflow-x: hidden;
+            overscroll-behavior-y: contain;
+        }
+
+        /* ── HERO ── */
+        .hero {
+            background: linear-gradient(135deg, var(--deep) 0%, var(--deep2) 50%, #4c1d95 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='30' cy='30' r='1.5' fill='rgba(255,255,255,0.06)'/%3E%3C/svg%3E");
+            opacity: 1
+        }
+
+        .hero-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none
+        }
+
+        .orb1 {
+            width: 500px;
+            height: 500px;
+            background: rgba(124, 58, 237, .25);
+            top: -200px;
+            right: -100px
+        }
+
+        .orb2 {
+            width: 400px;
+            height: 400px;
+            background: rgba(245, 158, 11, .12);
+            bottom: -150px;
+            left: -100px
+        }
+
+        .orb3 {
+            width: 300px;
+            height: 300px;
+            background: rgba(5, 150, 105, .15);
+            top: 40%;
+            left: 40%
+        }
+
+        /* Nav */
+        .nav-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 40px;
+            position: relative;
+            z-index: 10
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 14px
+        }
+
+        .nav-logo {
+            width: 52px;
+            height: 52px;
+            border-radius: 12px;
+            object-fit: cover;
+            background: rgba(255, 255, 255, .1)
+        }
+
+        .nav-logo-placeholder {
+            width: 52px;
+            height: 52px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--gold), #f97316);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--deep)
+        }
+
+        .nav-school {
+            color: #fff
+        }
+
+        .nav-school-name {
+            font-family: 'Playfair Display', serif;
+            font-size: 18px;
+            font-weight: 700;
+            line-height: 1.1
+        }
+
+        .nav-school-motto {
+            font-size: 11px;
+            opacity: .7;
+            font-style: italic
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 20px
+        }
+
+        .social-link {
+            color: rgba(255, 255, 255, .7);
+            font-size: 20px;
+            transition: .2s;
+            text-decoration: none
+        }
+
+        .social-link:hover {
+            color: var(--gold);
+            transform: translateY(-2px)
+        }
+
+        .portal-btn {
+            background: var(--gold);
+            color: var(--deep);
+            border: none;
+            border-radius: 30px;
+            padding: 10px 22px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: .2s;
+            text-decoration: none;
+            font-family: 'DM Sans', sans-serif
+        }
+
+        .portal-btn:hover {
+            background: var(--gold-light);
+            transform: translateY(-1px)
+        }
+
+        /* Hero Content */
+        .hero-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 5;
+            text-align: center
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(245, 158, 11, .15);
+            border: 1px solid rgba(245, 158, 11, .3);
+            border-radius: 30px;
+            padding: 6px 16px;
+            color: var(--gold);
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: .5px;
+            margin-bottom: 24px;
+            animation: fadeUp .6s ease both
+        }
+
+        .hero-title {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(36px, 6vw, 64px);
+            color: #fff;
+            line-height: 1.1;
+            margin-bottom: 16px;
+            animation: fadeUp .7s ease both .1s
+        }
+
+        .hero-title span {
+            color: var(--gold)
+        }
+
+        .hero-sub {
+            font-size: 17px;
+            color: rgba(255, 255, 255, .7);
+            max-width: 520px;
+            margin-bottom: 40px;
+            line-height: 1.7;
+            animation: fadeUp .7s ease both .2s
+        }
+
+        /* Search Card */
+        .search-card {
+            background: rgba(255, 255, 255, .06);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, .15);
+            border-radius: 20px;
+            padding: 32px;
+            width: 100%;
+            max-width: 480px;
+            animation: fadeUp .7s ease both .3s
+        }
+
+        .search-label {
+            color: rgba(255, 255, 255, .8);
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 10px;
+            display: block
+        }
+
+        .search-row {
+            display: flex;
+            gap: 10px
+        }
+
+        .search-input {
+            flex: 1;
+            background: rgba(255, 255, 255, .1);
+            border: 1px solid rgba(255, 255, 255, .2);
+            border-radius: 12px;
+            padding: 13px 16px;
+            font-size: 15px;
+            color: #fff;
+            font-family: 'DM Sans', sans-serif;
+            outline: none;
+            transition: .2s
+        }
+
+        .search-input::placeholder {
+            color: rgba(255, 255, 255, .4)
+        }
+
+        .search-input:focus {
+            border-color: var(--gold);
+            background: rgba(255, 255, 255, .15)
+        }
+
+        .search-btn {
+            background: var(--gold);
+            color: var(--deep);
+            border: none;
+            border-radius: 12px;
+            padding: 13px 20px;
+            font-size: 20px;
+            cursor: pointer;
+            font-weight: 700;
+            transition: .2s;
+            flex-shrink: 0
+        }
+
+        .search-btn:hover {
+            background: var(--gold-light);
+            transform: scale(1.04)
+        }
+
+        .search-hint {
+            color: rgba(255, 255, 255, .45);
+            font-size: 12px;
+            margin-top: 10px
+        }
+
+        /* Stats bar */
+        .stats-bar {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            padding: 28px 40px;
+            background: rgba(0, 0, 0, .2);
+            position: relative;
+            z-index: 5;
+            flex-wrap: wrap;
+            gap: 20px
+        }
+
+        .stat-item {
+            text-align: center;
+            color: rgba(255, 255, 255, .8)
+        }
+
+        .stat-num {
+            font-family: 'Playfair Display', serif;
+            font-size: 28px;
+            font-weight: 700;
+            color: #fff
+        }
+
+        .stat-lbl {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .8px;
+            opacity: .6;
+            margin-top: 2px
+        }
+
+        /* ── PORTAL (after search) ── */
+        .portal-wrap {
+            display: none;
+            min-height: 100vh;
+            background: #f8f7ff;
+            animation: fadeUp .4s ease both
+        }
+
+        .portal-wrap.show {
+            display: block
+        }
+
+        /* Portal Header */
+        .portal-header {
+            background: linear-gradient(135deg, var(--deep), var(--deep2));
+            padding: 0
+        }
+
+        .portal-header-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            max-width: 900px;
+            margin: 0 auto
+        }
+
+        .portal-school-info {
+            display: flex;
+            align-items: center;
+            gap: 12px
+        }
+
+        .portal-logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            object-fit: cover
+        }
+
+        .portal-school-name {
+            color: #fff;
+            font-weight: 600;
+            font-size: 15px
+        }
+
+        .back-btn {
+            background: rgba(255, 255, 255, .1);
+            border: 1px solid rgba(255, 255, 255, .2);
+            color: #fff;
+            border-radius: 8px;
+            padding: 7px 14px;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-family: 'DM Sans', sans-serif;
+            transition: .2s
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, .2)
+        }
+
+        /* Student Card */
+        .student-card {
+            background: linear-gradient(135deg, var(--primary), var(--deep2));
+            margin: 0;
+            padding: 28px 24px;
+            max-width: 900px;
+            margin: 0 auto
+        }
+
+        .student-id-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(245, 158, 11, .2);
+            border: 1px solid rgba(245, 158, 11, .4);
+            border-radius: 20px;
+            padding: 4px 12px;
+            color: var(--gold);
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 10px
+        }
+
+        .student-name {
+            font-family: 'Playfair Display', serif;
+            font-size: 26px;
+            color: #fff;
+            font-weight: 700;
+            margin-bottom: 4px
+        }
+
+        .student-meta {
+            color: rgba(255, 255, 255, .7);
+            font-size: 13px;
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap
+        }
+
+        .meta-pill {
+            background: rgba(255, 255, 255, .1);
+            border-radius: 20px;
+            padding: 3px 10px;
+            font-size: 12px;
+            color: rgba(255, 255, 255, .8)
+        }
+
+        /* Balance Summary */
+        .balance-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            padding: 16px 24px;
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--deep)
+        }
+
+        .bal-card {
+            background: rgba(255, 255, 255, .06);
+            border-radius: 12px;
+            padding: 14px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, .1)
+        }
+
+        .bal-label {
+            font-size: 11px;
+            color: rgba(255, 255, 255, .5);
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            margin-bottom: 4px
+        }
+
+        .bal-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: #fff
+        }
+
+        .bal-value.danger {
+            color: #fca5a5
+        }
+
+        .bal-value.success {
+            color: #6ee7b7
+        }
+
+        /* Content */
+        .portal-content {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 24px
+        }
+
+        /* Section Cards */
+        .section-card {
+            background: #fff;
+            border-radius: var(--radius);
+            box-shadow: 0 2px 12px rgba(0, 0, 0, .06);
+            margin-bottom: 20px;
+            overflow: hidden
+        }
+
+        .section-head {
+            padding: 16px 20px;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex;
+            align-items: center;
+            gap: 10px
+        }
+
+        .section-head h6 {
+            font-size: 15px;
+            font-weight: 600;
+            margin: 0
+        }
+
+        .section-head .icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px
+        }
+
+        .section-body {
+            padding: 20px
+        }
+
+        /* Fee breakdown table */
+        .fee-table {
+            width: 100%;
+            border-collapse: collapse
+        }
+
+        .fee-table th {
+            background: #f8fafc;
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .4px;
+            padding: 10px 14px;
+            text-align: left
+        }
+
+        .fee-table td {
+            padding: 11px 14px;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 14px
+        }
+
+        .fee-table tr:last-child td {
+            border: none;
+            font-weight: 700;
+            background: #f8fafc;
+            font-size: 15px
+        }
+
+        /* Installments */
+        .inst-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px
+        }
+
+        .inst-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            border-radius: 10px;
+            background: #f8fafc
+        }
+
+        .inst-item.paid {
+            background: #f0fdf4
+        }
+
+        .inst-badge {
+            background: #dcfce7;
+            color: #166534;
+            border-radius: 20px;
+            padding: 2px 10px;
+            font-size: 12px;
+            font-weight: 600
+        }
+
+        .inst-badge.empty {
+            background: #f1f5f9;
+            color: #94a3b8
+        }
+
+        /* Payment Section */
+        .momo-card {
+            background: linear-gradient(135deg, #064e3b, #065f46);
+            border-radius: 14px;
+            padding: 22px;
+            color: #fff;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 16px
+        }
+
+        .momo-card::after {
+            content: '📱';
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 52px;
+            opacity: .15
+        }
+
+        .momo-network {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .8px;
+            color: rgba(255, 255, 255, .6);
+            margin-bottom: 4px
+        }
+
+        .momo-name {
+            font-family: 'Playfair Display', serif;
+            font-size: 22px;
+            font-weight: 700
+        }
+
+        .momo-number {
+            font-size: 20px;
+            font-weight: 700;
+            color: #6ee7b7;
+            letter-spacing: 2px;
+            margin-top: 4px
+        }
+
+        .momo-copy {
+            position: absolute;
+            top: 14px;
+            right: 14px;
+            background: rgba(255, 255, 255, .15);
+            border: none;
+            border-radius: 8px;
+            padding: 6px 10px;
+            color: #fff;
+            cursor: pointer;
+            font-size: 12px;
+            font-family: 'DM Sans', sans-serif
+        }
+
+        .momo-copy:hover {
+            background: rgba(255, 255, 255, .25)
+        }
+
+        .payment-notice {
+            background: #fffbeb;
+            border: 1px solid #fde68a;
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            color: #92400e
+        }
+
+        .payment-notice strong {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 14px
+        }
+
+        /* Form */
+        .form-group {
+            margin-bottom: 14px
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: #475569;
+            margin-bottom: 5px
+        }
+
+        .form-control {
+            width: 100%;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 11px 14px;
+            font-size: 14px;
+            font-family: 'DM Sans', sans-serif;
+            outline: none;
+            transition: .2s
+        }
+
+        .form-control:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, .1)
+        }
+
+        .submit-btn {
+            width: 100%;
+            background: linear-gradient(135deg, #059669, #065f46);
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            padding: 14px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'DM Sans', sans-serif;
+            transition: .2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px rgba(5, 150, 105, .35)
+        }
+
+        .submit-btn:disabled {
+            opacity: .6;
+            cursor: not-allowed;
+            transform: none
+        }
+
+        /* Status badges */
+        .status-paid {
+            background: #dcfce7;
+            color: #166534;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600
+        }
+
+        .status-partial {
+            background: #fef9c3;
+            color: #854d0e;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600
+        }
+
+        .status-unpaid {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600
+        }
+
+        /* Receipt */
+        .receipt-btn {
+            background: #eef2ff;
+            color: var(--primary);
+            border: 1.5px solid #c7d2fe;
+            border-radius: 10px;
+            padding: 11px 18px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: 'DM Sans', sans-serif;
+            transition: .2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px
+        }
+
+        .receipt-btn:hover {
+            background: var(--primary);
+            color: #fff
+        }
+
+        /* ── CHATBOT + MESSAGING ── */
+        @keyframes pChatBounce {
+
+            0%,
+            100% {
+                transform: translateY(0) scale(1)
+            }
+
+            20% {
+                transform: translateY(-14px) scale(1.06)
+            }
+
+            40% {
+                transform: translateY(-6px) scale(1.02)
+            }
+
+            55% {
+                transform: translateY(-10px) scale(1.04)
+            }
+
+            70% {
+                transform: translateY(-3px) scale(1.01)
+            }
+
+            85% {
+                transform: translateY(-7px) scale(1.02)
+            }
+        }
+
+        @keyframes pPulseRing {
+            0% {
+                box-shadow: 0 0 0 0 rgba(245, 158, 11, .5), 0 4px 20px rgba(245, 158, 11, .4)
+            }
+
+            70% {
+                box-shadow: 0 0 0 14px rgba(245, 158, 11, 0), 0 4px 20px rgba(245, 158, 11, .4)
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(245, 158, 11, 0), 0 4px 20px rgba(245, 158, 11, .4)
+            }
+        }
+
+        @keyframes pFadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        .p-chat-fab {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            width: 58px;
+            height: 58px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--gold), #f97316);
+            color: var(--deep);
+            border: none;
+            font-size: 0;
+            cursor: pointer;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: pChatBounce 3.2s ease-in-out 1.5s infinite, pPulseRing 2s ease-out .5s 3;
+            transition: transform .15s, box-shadow .15s
+        }
+
+        .p-chat-fab:hover {
+            transform: scale(1.1) !important
+        }
+
+        .p-chat-fab svg {
+            width: 26px;
+            height: 26px;
+            stroke: var(--deep);
+            stroke-width: 2;
+            fill: none
+        }
+
+        .p-chat-fab-badge {
+            position: absolute;
+            top: -3px;
+            right: -3px;
+            background: #ef4444;
+            color: #fff;
+            border-radius: 50%;
+            min-width: 20px;
+            height: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #fff
+        }
+
+        .p-chat-fab-badge.show {
+            display: flex
+        }
+
+        .p-chat-win {
+            position: fixed;
+            bottom: 92px;
+            right: 24px;
+            width: 380px;
+            max-width: calc(100vw - 32px);
+            height: 560px;
+            max-height: calc(100vh - 120px);
+            background: #fff;
+            border-radius: 20px;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, .16);
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+            transform: scale(.88) translateY(24px);
+            opacity: 0;
+            pointer-events: none;
+            transition: transform .28s cubic-bezier(.34, 1.56, .64, 1), opacity .2s
+        }
+
+        .p-chat-win.open {
+            transform: scale(1) translateY(0);
+            opacity: 1;
+            pointer-events: all
+        }
+
+        /* Tab bar */
+        .p-chat-tabs {
+            display: flex;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            flex-shrink: 0;
+            border-radius: 0
+        }
+
+        .p-chat-tab {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            background: none;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            color: #94a3b8;
+            border-bottom: 2px solid transparent;
+            transition: .15s;
+            font-family: 'DM Sans', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px
+        }
+
+        .p-chat-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            background: #fff
+        }
+
+        .p-chat-tab svg {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
+            stroke-width: 2;
+            fill: none
+        }
+
+        .p-chat-hdr {
+            background: linear-gradient(135deg, var(--gold), #f97316);
+            color: var(--deep);
+            padding: 14px 16px;
+            border-radius: 20px 20px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between
+        }
+
+        .p-chat-hdr-l {
+            display: flex;
+            align-items: center;
+            gap: 10px
+        }
+
+        .p-chat-av {
+            width: 36px;
+            height: 36px;
+            background: rgba(0, 0, 0, .15);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center
+        }
+
+        .p-chat-av svg {
+            width: 18px;
+            height: 18px;
+            stroke: var(--deep);
+            stroke-width: 2;
+            fill: none
+        }
+
+        .p-chat-title {
+            font-weight: 700;
+            font-size: 14px
+        }
+
+        .p-chat-sub {
+            font-size: 11px;
+            opacity: .7
+        }
+
+        .p-chat-close {
+            background: rgba(0, 0, 0, .1);
+            border: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 7px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center
+        }
+
+        .p-chat-close svg {
+            width: 14px;
+            height: 14px;
+            stroke: var(--deep);
+            stroke-width: 2.5;
+            fill: none
+        }
+
+        /* Tab panels */
+        .p-tab-panel {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            overflow: hidden
+        }
+
+        .p-tab-panel.active {
+            display: flex
+        }
+
+        /* Assistant panel */
+        .p-chat-msgs {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px
+        }
+
+        .p-chat-msgs::-webkit-scrollbar {
+            width: 3px
+        }
+
+        .p-chat-msgs::-webkit-scrollbar-thumb {
+            background: #e2e8f0;
+            border-radius: 4px
+        }
+
+        .p-msg {
+            max-width: 88%;
+            padding: 9px 13px;
+            border-radius: 14px;
+            font-size: 13px;
+            line-height: 1.5;
+            animation: pFadeUp .2s ease both
+        }
+
+        .p-msg.user {
+            align-self: flex-end;
+            background: linear-gradient(135deg, var(--primary), #312e81);
+            color: #fff;
+            border-radius: 14px 14px 4px 14px
+        }
+
+        .p-msg.bot {
+            align-self: flex-start;
+            background: #f1f5f9;
+            color: #1e293b;
+            border-radius: 14px 14px 14px 4px
+        }
+
+        .p-chat-sugs {
+            padding: 6px 10px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            border-top: 1px solid #f1f5f9;
+            flex-shrink: 0
+        }
+
+        .p-sug {
+            background: #eef2ff;
+            color: var(--primary);
+            border: none;
+            border-radius: 20px;
+            padding: 4px 10px;
+            font-size: 11px;
+            cursor: pointer;
+            font-family: 'DM Sans', sans-serif
+        }
+
+        .p-sug:hover {
+            background: var(--primary);
+            color: #fff
+        }
+
+        /* Messaging panel */
+        .p-msgs-thread {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px
+        }
+
+        .p-msg-thread-item {
+            animation: pFadeUp .2s ease both
+        }
+
+        .p-msg-sent {
+            align-self: flex-end;
+            max-width: 80%;
+            background: linear-gradient(135deg, var(--primary), #312e81);
+            color: #fff;
+            border-radius: 14px 14px 4px 14px;
+            padding: 10px 13px;
+            font-size: 13px;
+            line-height: 1.5
+        }
+
+        .p-msg-sent .p-msg-meta {
+            font-size: 10px;
+            opacity: .65;
+            margin-top: 3px;
+            text-align: right
+        }
+
+        .p-msg-reply {
+            align-self: flex-start;
+            max-width: 80%;
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 14px 14px 14px 4px;
+            padding: 10px 13px;
+            font-size: 13px;
+            line-height: 1.5;
+            color: #166534
+        }
+
+        .p-msg-reply .p-msg-meta {
+            font-size: 10px;
+            color: #86efac;
+            margin-top: 3px
+        }
+
+        .p-msg-thread-empty {
+            text-align: center;
+            color: #94a3b8;
+            font-size: 13px;
+            padding: 24px 12px
+        }
+
+        /* Input bar with audio */
+        .p-chat-input-row {
+            padding: 10px 12px;
+            border-top: 1px solid #f1f5f9;
+            display: flex;
+            gap: 7px;
+            flex-shrink: 0;
+            align-items: flex-end
+        }
+
+        .p-chat-input {
+            flex: 1;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 20px;
+            padding: 9px 14px;
+            font-size: 13px;
+            outline: none;
+            font-family: 'DM Sans', sans-serif;
+            resize: none;
+            max-height: 80px;
+            min-height: 36px;
+            overflow-y: auto;
+            transition: .2s;
+            line-height: 1.4
+        }
+
+        .p-chat-input:focus {
+            border-color: var(--gold);
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, .12)
+        }
+
+        .p-chat-send {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--gold);
+            color: var(--deep);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: .15s
+        }
+
+        .p-chat-send:hover {
+            background: var(--gold-light)
+        }
+
+        .p-chat-send svg {
+            width: 15px;
+            height: 15px;
+            stroke: var(--deep);
+            stroke-width: 2.5;
+            fill: none
+        }
+
+        .p-audio-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #f1f5f9;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: .2s
+        }
+
+        .p-audio-btn:hover {
+            background: #e0e7ff;
+            color: var(--primary)
+        }
+
+        .p-audio-btn.recording {
+            background: #fee2e2;
+            animation: pPulseRing 1s ease infinite
+        }
+
+        .p-audio-btn svg {
+            width: 16px;
+            height: 16px;
+            stroke: #64748b;
+            stroke-width: 2;
+            fill: none
+        }
+
+        .p-audio-btn.recording svg {
+            stroke: #dc2626
+        }
+
+        .p-audio-indicator {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            background: #fee2e2;
+            border-radius: 20px;
+            padding: 6px 12px;
+            font-size: 12px;
+            color: #dc2626;
+            font-weight: 600
+        }
+
+        .p-audio-indicator.show {
+            display: flex
+        }
+
+        .p-audio-dot {
+            width: 8px;
+            height: 8px;
+            background: #dc2626;
+            border-radius: 50%;
+            animation: pPulseRing 1s ease infinite
+        }
+
+        /* ── FOOTER ── */
+        /* ── FOOTER ── */
+        .footer {
+            background: var(--deep);
+            color: rgba(255, 255, 255, .6);
+            text-align: center;
+            padding: 24px;
+            font-size: 13px;
+            margin-top: 40px
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 10px;
+            flex-wrap: wrap
+        }
+
+        .footer-links a {
+            color: var(--gold);
+            text-decoration: none;
+            font-size: 13px
+        }
+
+        .footer-links a:hover {
+            color: var(--gold-light)
+        }
+
+        /* Animations */
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        @media(max-width:600px) {
+            .nav-bar {
+                padding: 14px 16px
+            }
+
+            .balance-row {
+                grid-template-columns: 1fr 1fr;
+                gap: 8px
+            }
+
+            .stats-bar {
+                gap: 16px;
+                padding: 20px
+            }
+
+            .portal-content {
+                padding: 16px
+            }
+
+            .p-chat-win {
+                right: 12px;
+                bottom: 78px;
+                width: calc(100vw-24px)
+            }
+        }
+
+        /* ── TOAST ── */
+        #pToastContainer {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+            max-width: 340px
+        }
+
+        .p-toast {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            background: #fff;
+            border-radius: 14px;
+            padding: 13px 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, .14);
+            border-left: 4px solid #059669;
+            pointer-events: all;
+            animation: pToastIn .3s cubic-bezier(.34, 1.56, .64, 1) both;
+            max-width: 340px;
+            word-break: break-word
+        }
+
+        .p-toast.error {
+            border-left-color: #dc2626
+        }
+
+        .p-toast.warning {
+            border-left-color: #d97706
+        }
+
+        .p-toast.info {
+            border-left-color: #0ea5e9
+        }
+
+        .p-toast-icon {
+            font-size: 18px;
+            flex-shrink: 0;
+            line-height: 1
+        }
+
+        .p-toast-body {
+            flex: 1;
+            min-width: 0
+        }
+
+        .p-toast-title {
+            font-weight: 700;
+            font-size: 13px;
+            color: #1e293b;
+            margin-bottom: 2px
+        }
+
+        .p-toast-msg {
+            font-size: 12.5px;
+            color: #475569;
+            line-height: 1.4
+        }
+
+        .p-toast-close {
+            background: none;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            font-size: 15px;
+            padding: 0;
+            line-height: 1
+        }
+
+        .p-toast.removing {
+            animation: pToastOut .25s ease forwards
+        }
+
+        @keyframes pToastIn {
+            from {
+                opacity: 0;
+                transform: translateX(50px) scale(.9)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0) scale(1)
+            }
+        }
+
+        @keyframes pToastOut {
+            to {
+                opacity: 0;
+                transform: translateX(50px) scale(.88)
+            }
+        }
+        @keyframes pSpin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .spin {
+            animation: pSpin 1s linear infinite;
+            display: inline-block;
+        }
+
+        /* Fee tabs style */
+        .fee-tabs-container {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 4px 0 12px 0;
+            margin-bottom: 0px;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .fee-tabs-container::-webkit-scrollbar {
+            display: none;
+        }
+        .fee-tab-btn {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            color: #64748b;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .fee-tab-btn:hover {
+            background: #f1f5f9;
+            color: #1e1b4b;
+        }
+        .fee-tab-btn.active {
+            background: #1e1b4b;
+            color: #fff;
+            border-color: #1e1b4b;
+            box-shadow: 0 4px 12px rgba(30, 27, 75, 0.15);
+        }
+
+        /* Settled congrats banner style */
+        .congrats-card {
+            background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+            border: 1px solid #86efac;
+            color: #166534;
+            border-radius: 12px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 0px;
+            box-shadow: 0 4px 12px rgba(22, 101, 52, 0.08);
+            animation: bounceIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+        }
+        .congrats-icon {
+            font-size: 24px;
+            color: #15803d;
+            background: #fff;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            flex-shrink: 0;
+        }
+        .congrats-body {
+            flex: 1;
+        }
+        .congrats-body h6 {
+            font-size: 15px;
+            font-weight: 700;
+            margin: 0 0 3px 0;
+            color: #166534;
+        }
+        .congrats-body p {
+            font-size: 13px;
+            margin: 0;
+            opacity: 0.9;
+        }
+        @keyframes bounceIn {
+            0% { opacity: 0; transform: scale(0.3); }
+            50% { opacity: 0.9; transform: scale(1.1); }
+            80% { transform: scale(0.89); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        /* Sibling switcher style */
+        .sibling-switcher-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .sibling-btn {
+            background: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+        .sibling-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            color: #fff;
+        }
+        .sibling-btn.active {
+            background: #fff;
+            color: #1e1b4b;
+            border-color: #fff;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        .family-summary-card {
+            background: #fff;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+        }
+        .family-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .family-table th {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: #64748b;
+            background: #f8fafc;
+            padding: 8px 12px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+        .family-table td {
+            font-size: 13px;
+            padding: 10px 12px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        /* ── Dark Theme Overrides ── */
+        body.dark-mode {
+            background-color: #0f172a !important;
+            color: #f8fafc !important;
+        }
+        body.dark-mode .portal-wrap {
+            background-color: #0f172a !important;
+        }
+        body.dark-mode .section-card,
+        body.dark-mode .card,
+        body.dark-mode .momo-card,
+        body.dark-mode .inst-item,
+        body.dark-mode .family-table {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+            color: #f1f5f9 !important;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
+        }
+        body.dark-mode .family-table {
+            background: #1e293b !important;
+        }
+        body.dark-mode .family-table th {
+            background: #1e293b !important;
+            color: #cbd5e1 !important;
+            border-bottom: 2px solid #334155 !important;
+        }
+        body.dark-mode .family-table td {
+            color: #e2e8f0 !important;
+            border-bottom: 1px solid #334155 !important;
+        }
+        body.dark-mode .inst-item.paid {
+            background-color: rgba(16,185,129,0.08) !important;
+            border-color: rgba(16,185,129,0.2) !important;
+        }
+        body.dark-mode .inst-item div {
+            color: #e2e8f0 !important;
+        }
+        body.dark-mode .section-card h6 {
+            color: #f8fafc !important;
+        }
+        body.dark-mode table,
+        body.dark-mode .table {
+            color: #f1f5f9 !important;
+        }
+        body.dark-mode th {
+            background-color: #1e293b !important;
+            color: #cbd5e1 !important;
+            border-bottom: 2px solid #334155 !important;
+        }
+        body.dark-mode td {
+            color: #e2e8f0 !important;
+            border-bottom: 1px solid #334155 !important;
+        }
+        body.dark-mode .form-control,
+        body.dark-mode .form-select,
+        body.dark-mode input[type="text"],
+        body.dark-mode input[type="number"],
+        body.dark-mode input[type="tel"] {
+            background-color: #1e293b !important;
+            border-color: #475569 !important;
+            color: #f8fafc !important;
+        }
+        body.dark-mode input[type="text"]:focus,
+        body.dark-mode input[type="number"]:focus,
+        body.dark-mode input[type="tel"]:focus {
+            background-color: #334155 !important;
+            color: #ffffff !important;
+        }
+        body.dark-mode .text-muted,
+        body.dark-mode .info-label,
+        body.dark-mode .bal-label {
+            color: #94a3b8 !important;
+        }
+        body.dark-mode .toast-box {
+            background: #1e293b !important;
+            border-color: #334155 !important;
+            color: #f1f5f9 !important;
+        }
+    </style>
+</head>
+
+<body>
+
+    <script>
+        // Guards against the deployed Apps Script web app rendering
+        // squeezed into a short strip: some Apps Script sandboxes
+        // resolve vh/percentage heights against a stale/undersized
+        // iframe box, so we pin an explicit pixel min-height matching
+        // the real browser window and keep it in sync.
+        (function () {
+            var lastWidth = window.innerWidth;
+            function syncAppHeight() {
+                var h = (window.innerHeight || document.documentElement.clientHeight || 600) + 'px';
+                document.documentElement.style.minHeight = h;
+                document.body.style.minHeight = h;
+            }
+            // On mobile, opening the on-screen keyboard fires a "resize" that only changes the
+            // height (not the width) — re-syncing min-height on that made the whole page appear
+            // to reload/jump while a parent was typing. Only re-sync on genuine width changes.
+            function handleResize() {
+                if (window.innerWidth !== lastWidth) {
+                    lastWidth = window.innerWidth;
+                    syncAppHeight();
+                }
+            }
+            syncAppHeight();
+            window.addEventListener('load', syncAppHeight);
+            window.addEventListener('resize', handleResize);
+            window.addEventListener('orientationchange', function () { lastWidth = window.innerWidth; syncAppHeight(); });
+        })();
+    </script>
+
+    <!-- ═══ HERO / LANDING PAGE ════════════════════════════ -->
+    <div id="heroSection" class="hero">
+        <div class="hero-orb orb1"></div>
+        <div class="hero-orb orb2"></div>
+        <div class="hero-orb orb3"></div>
+
+        <nav class="nav-bar">
+            <div class="nav-brand">
+                <div id="navLogoWrap">
+                    <div class="nav-logo-placeholder" id="navLogoPlaceholder">S</div>
+                </div>
+                <div class="nav-school">
+                    <div class="nav-school-name" id="heroSchoolName">School Fees Portal</div>
+                    <div class="nav-school-motto" id="heroSchoolMotto">Parent Payment Portal</div>
+                </div>
+            </div>
+            <div class="nav-links" id="socialLinks">
+                <!-- Social links injected here -->
+            </div>
+        </nav>
+
+        <div class="hero-content">
+            <div class="hero-badge"><i class="bi bi-shield-check-fill"></i> SECURE PARENT PORTAL</div>
+            <h1 class="hero-title">Check &amp; Pay <span>School Fees</span><br>From Anywhere</h1>
+            <p class="hero-sub" id="heroSubText">Enter your phone number to receive a verification code, then instantly view fee balance, payment
+                history, and make Mobile Money payments for all your wards.</p>
+
+            <div class="search-card">
+                <span class="search-label"><i class="bi bi-phone me-1"></i> Your Phone Number</span>
+                <div class="search-row" style="margin-bottom:10px">
+                    <input type="text" class="search-input" id="studentIdInput" placeholder="Enter your registered phone number"
+                        onkeydown="if(event.key==='Enter') lookupStudent()">
+                </div>
+                <div style="font-size: 11px; margin-top: -6px; margin-bottom: 12px; opacity: 0.9; color: #fef9c3;"><i class="bi bi-info-circle"></i> We'll send a verification code to this number — no class selection needed.</div>
+                <div class="search-row" style="margin-bottom:10px; display:none;">
+                    <select class="search-input" id="studentClassInput"
+                        style="background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:12px 16px;font-size:14px;font-family:inherit;cursor:pointer;flex:1">
+                        <option value="" style="color:#1e1b4b">— Select class —</option>
+                    </select>
+                </div>
+                <button class="portal-btn w-100" style="padding:13px;font-size:15px;border-radius:12px"
+                    onclick="lookupStudent()">
+                    <i class="bi bi-search me-2"></i>Send Verification Code
+                </button>
+                <div class="search-hint" id="searchHint" style="margin-top:10px">Enter your phone number to receive a one-time verification code.</div>
+            </div>
+
+            <!-- OTP Verification Step (shown for multi-child parents) -->
+            <div id="otpVerifyCard" class="search-card" style="display:none;">
+                <div style="text-align:center; margin-bottom:14px;">
+                    <div style="width:54px;height:54px;background:rgba(255,255,255,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 10px;">
+                        <i class="bi bi-shield-lock-fill" style="font-size:24px;color:#fef08a;"></i>
+                    </div>
+                    <div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:4px;">Verify Your Identity</div>
+                    <div style="font-size:13px;color:rgba(255,255,255,0.8);" id="otpDesc">A verification code has been sent to your phone number.</div>
+                </div>
+                <span class="search-label"><i class="bi bi-key me-1"></i> Enter Verification Code</span>
+                <div class="search-row" style="margin-bottom:10px;">
+                    <input type="text" class="search-input" id="otpCodeInput" placeholder="e.g. 847291"
+                        maxlength="6" inputmode="numeric" pattern="[0-9]*"
+                        onkeydown="if(event.key==='Enter') verifyParentOtp()"
+                        style="letter-spacing:8px;font-size:20px;text-align:center;font-weight:700;">
+                </div>
+                <button class="portal-btn w-100" style="padding:13px;font-size:15px;border-radius:12px;margin-bottom:10px;" onclick="verifyParentOtp()">
+                    <i class="bi bi-check-circle me-2"></i>Verify &amp; Access Portal
+                </button>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+                    <button onclick="cancelOtpStep()" style="background:none;border:none;color:rgba(255,255,255,0.7);font-size:13px;cursor:pointer;">
+                        <i class="bi bi-arrow-left me-1"></i>Go Back
+                    </button>
+                    <button onclick="resendParentOtp()" style="background:none;border:none;color:rgba(255,255,255,0.7);font-size:13px;cursor:pointer;" id="resendOtpBtn">
+                        <i class="bi bi-arrow-repeat me-1"></i>Resend Code
+                    </button>
+                </div>
+                <div class="search-hint" id="otpHint" style="margin-top:10px;">Enter the 6-digit code sent to your registered phone number.</div>
+            </div>
+        </div>
+
+        <div class="stats-bar" id="statsBar" style="display:none">
+            <div class="stat-item">
+                <div class="stat-num" id="statSchool">—</div>
+                <div class="stat-lbl">School</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-num" id="statYear">—</div>
+                <div class="stat-lbl">Academic Year</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-num" id="statCurrency">GHC</div>
+                <div class="stat-lbl">Currency</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ PARENT PORTAL (after lookup) ═════════════════════ -->
+    <div id="portalSection" class="portal-wrap">
+
+        <!-- Portal Header -->
+        <div class="portal-header">
+            <div class="portal-header-inner">
+                <div class="portal-school-info">
+                    <div id="portalLogoWrap"></div>
+                    <div class="portal-school-name" id="portalSchoolName">School Portal</div>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <!-- Light/Dark Mode Switcher -->
+                    <button class="back-btn" id="portalThemeToggleBtn" onclick="togglePortalTheme()" style="width:36px; height:36px; padding:0; display:flex; align-items:center; justify-content:center; border-radius:50%; background:rgba(255,255,255,0.1); border:none; color:#fff;" title="Toggle Light/Dark Theme">
+                        <i id="portalThemeToggleIcon" class="bi bi-moon-fill"></i>
+                    </button>
+                    <button class="back-btn" onclick="refreshParentPortalData()" id="pRefreshBtn"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+                    <button class="back-btn" onclick="goBack()"><i class="bi bi-arrow-left"></i> Go Back</button>
+                </div>
+            </div>
+            <!-- Sibling switcher -->
+            <div id="siblingSwitcherContainer" class="sibling-switcher-container" style="display:none; padding:10px 16px; background:rgba(255,255,255,0.05); border-bottom:1px solid rgba(255,255,255,0.1); margin-top:-10px; margin-bottom:10px; border-radius:12px;">
+                <span class="small text-white-50 me-2" style="font-size:11px;"><i class="bi bi-people me-1"></i> Family Wards:</span>
+                <div class="d-flex gap-1 flex-wrap" id="siblingSwitcherButtons"></div>
+            </div>
+
+            <!-- Student info band -->
+            <div class="student-card" style="display:flex; align-items:center; gap:16px;">
+                <div id="pStudentAvatar" style="width:60px; height:60px; border-radius:50%; overflow:hidden; border:2px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 4px 10px rgba(0,0,0,0.15);">
+                    <i class="bi bi-person-fill text-white-50" style="font-size:32px;"></i>
+                </div>
+                <div style="flex-grow:1;">
+                    <div class="student-id-badge" style="margin-top:0;"><i class="bi bi-id-card"></i> <span id="pStudentId">—</span></div>
+                    <div class="student-name" id="pStudentName">Student Name</div>
+                    <div class="student-meta">
+                        <span class="meta-pill" id="pGrade">Grade</span>
+                        <span class="meta-pill" id="pSession">Session</span>
+                        <span class="meta-pill text-dark bg-warning" id="pDiscountPill" style="display:none; background-color:#ffc107!important; color:#000!important;"><i class="bi bi-percent me-1"></i>Discount</span>
+                        <span id="pStatusBadge" class="ms-auto"></span>
+                    </div>
+                </div>
+            </div>
+            <!-- Balance row -->
+            <div class="balance-row">
+                <div class="bal-card">
+                    <div class="bal-label">Total Fees</div>
+                    <div class="bal-value" id="pTotalFees">—</div>
+                </div>
+                <div class="bal-card">
+                    <div class="bal-label">Total Paid</div>
+                    <div class="bal-value success" id="pTotalPaid">—</div>
+                </div>
+                <div class="bal-card">
+                    <div class="bal-label">Balance Due</div>
+                    <div class="bal-value danger" id="pBalance">—</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="portal-content">
+            <!-- Fee Tabs -->
+            <div id="portalFeeTabs" class="fee-tabs-container"></div>
+
+            <!-- Family Summary Dashboard -->
+            <div id="familyOverviewCard" class="family-summary-card" style="display:none; margin-bottom:16px;">
+                <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom" style="border-color:#cbd5e1!important;">
+                    <h6 class="mb-0 fw-bold text-primary" style="color:#1e1b4b!important; font-size:14px;"><i class="bi bi-people-fill me-2 text-indigo"></i>Family Wards Fee Summary</h6>
+                    <span class="badge bg-danger fs-6" id="familyTotalDueBadge" style="border-radius:30px; font-weight:600; font-size:11px; padding:4px 10px;">Total Due: GHC 0.00</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="family-table">
+                        <thead>
+                            <tr style="border-bottom: 2px solid #e2e8f0;">
+                                <th style="text-align:left; font-size:11px; color:#64748b; padding:6px 8px;">Ward Name</th>
+                                <th style="text-align:left; font-size:11px; color:#64748b; padding:6px 8px;">Class</th>
+                                <th style="text-align:left; font-size:11px; color:#64748b; padding:6px 8px;">Total Bill</th>
+                                <th style="text-align:left; font-size:11px; color:#64748b; padding:6px 8px;">Paid</th>
+                                <th style="text-align:left; font-size:11px; color:#64748b; padding:6px 8px;">Outstanding</th>
+                                <th style="text-align:right; font-size:11px; color:#64748b; padding:6px 8px;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="familyOverviewBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Congratulations Banner -->
+            <div class="congrats-card" id="pCongratsCard" style="display:none">
+                <div class="congrats-icon"><i class="bi bi-trophy-fill"></i></div>
+                <div class="congrats-body">
+                    <h6>Congratulations!</h6>
+                    <p>This fee is fully settled. Thank you for your payment!</p>
+                </div>
+            </div>
+
+            <!-- Fee Breakdown -->
+            <div class="section-card">
+                <div class="section-head">
+                    <div class="icon" style="background:#eef2ff;color:var(--primary)"><i class="bi bi-receipt"></i></div>
+                    <h6>Fee Breakdown</h6>
+                </div>
+                <div id="feeDiscountNote" style="display:none;margin:0 16px 10px;padding:8px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:12px;color:#166534;"></div>
+                <div class="section-body" style="padding:0">
+                    <table class="fee-table" id="feeTable">
+                        <thead>
+                            <tr>
+                                <th>Description</th>
+                                <th style="text-align:right">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody id="feeTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Payment History -->
+            <div class="section-card">
+                <div class="section-head">
+                    <div class="icon" style="background:#f0fdf4;color:#059669"><i class="bi bi-clock-history"></i></div>
+                    <h6>Payment History</h6>
+                </div>
+                <div class="section-body">
+                    <div class="inst-list" id="instList"></div>
+                </div>
+            </div>
+
+            <!-- Next Term Bill Preview -->
+            <div class="section-card" id="nextBillCard" style="display:none">
+                <div class="section-head" style="display:flex;justify-content:space-between;align-items:center;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <div class="icon" style="background:#fae8ff;color:#d946ef"><i class="bi bi-calendar-plus"></i></div>
+                        <h6 style="margin:0;">Next Term Bill Preview</h6>
+                    </div>
+                    <button class="back-btn" onclick="downloadNextBillPdf()" style="margin:0;padding:4px 10px;font-size:12px;background:var(--primary);color:#fff;border-color:var(--primary);"><i class="bi bi-file-earmark-pdf"></i> Download PDF</button>
+                </div>
+                <div class="section-body" style="padding:0">
+                    <div style="padding:10px 15px;background:#f8fafc;color:#64748b;font-size:11px;border-bottom:1px solid #e2e8f0;line-height:1.4;">
+                        💡 This preview shows your ward's next term estimated bill, including any outstanding arrears carried forward from this term.
+                    </div>
+                    <table class="fee-table" id="nextBillTable" style="margin:0;">
+                        <thead>
+                            <tr>
+                                <th>Description</th>
+                                <th style="text-align:right">Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody id="nextBillTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Pay Now -->
+            <div class="section-card" id="payNowCard">
+                <div class="section-head">
+                    <div class="icon" style="background:#fef9c3;color:#854d0e"><i class="bi bi-phone-fill"></i></div>
+                    <h6>Pay via Mobile Money</h6>
+                </div>
+                <div class="section-body">
+                    <!-- Dynamic Configured Payment Methods List -->
+                    <div id="portalPaymentMethodsList" style="margin-bottom: 12px;"></div>
+
+                    <!-- MoMo details (Legacy Fallback) -->
+                    <div class="momo-card" id="momoCard">
+                        <button class="momo-copy" onclick="copyMoMoNum()" id="momoCopyBtn">Copy</button>
+                        <div class="momo-network">Mobile Money Payment</div>
+                        <div class="momo-name" id="momoNameDisp">Loading…</div>
+                        <div class="momo-number" id="momoNumDisp">—</div>
+                    </div>
+                    <!-- Important notice -->
+                    <div class="payment-notice">
+                        <strong>⚠️ Important — Reference Name</strong>
+                        When sending Mobile Money, use your ward's <strong>full name or Student ID</strong> as the
+                        reference/note so the school can identify your payment.
+                        <br><br>
+                        <span id="momoNoteDisp" style="display:none"></span>
+                    </div>
+                    <!-- Notification form -->
+                    <div class="form-group" style="display:none">
+                        <label>Select Fee Type</label>
+                        <select class="form-control" id="payFeeType" onchange="onPortalFeeTypeChange()">
+                            <option value="regular">Regular School Fees</option>
+                        </select>
+                    </div>
+                    <!-- Sibling payment checkbox -->
+                    <div class="form-group mb-3" id="portalFamilyPaymentGroup" style="display:none; margin-bottom:12px;">
+                        <div class="form-check form-switch" style="padding-left: 2.5em; text-align: left; margin-bottom: 8px;">
+                            <input class="form-check-input" type="checkbox" id="portalFamilyPayCheckbox" style="margin-left: -2.5em; cursor: pointer; width: 3em; height: 1.5em;">
+                            <label class="form-check-label fw-semibold text-primary" for="portalFamilyPayCheckbox" style="cursor: pointer; font-size:12px; vertical-align: middle; margin-left: 8px;">
+                                <i class="bi bi-people-fill me-1"></i> Pay consolidated Family Fees (all wards)
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Payment Method Used</label>
+                        <select class="form-control" id="payMethodUsed">
+                            <option value="">-- Select how you paid --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Amount You're Paying (<span id="formCurrency">GHC</span>)</label>
+                        <input type="number" class="form-control" id="payAmount" placeholder="Enter amount" min="1"
+                            step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label>Reference / Transaction ID</label>
+                        <input type="text" class="form-control" id="payRef"
+                            placeholder="e.g. GHM2410481234 (from your MoMo/Bank message)">
+                    </div>
+                    <div class="form-group">
+                        <label>Your Phone Number (for confirmation)</label>
+                        <input type="tel" class="form-control" id="payPhone" placeholder="e.g. 0244123456">
+                    </div>
+                    <div class="form-group">
+                        <label>Additional Note (optional)</label>
+                        <textarea class="form-control" id="payNote" rows="2"
+                            placeholder="Any message for the school"></textarea>
+                    </div>
+                    <button class="submit-btn" onclick="submitPayment()" id="submitPayBtn">
+                        <i class="bi bi-send-check-fill"></i> Notify School of Payment
+                    </button>
+                    <p style="font-size:12px;color:#94a3b8;margin-top:10px;text-align:center">
+                        Your payment notification will be reviewed and your account updated by the school admin.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Download Receipt -->
+            <div class="section-card">
+                <div class="section-head">
+                    <div class="icon" style="background:#f0fdf4;color:#059669"><i class="bi bi-download"></i></div>
+                    <h6>Download Receipt</h6>
+                </div>
+                <div class="section-body">
+                    <p style="font-size:13px;color:#64748b;margin-bottom:14px">Download a PDF receipt showing all fee
+                        details and payment history for your records.</p>
+                    <button class="receipt-btn" onclick="downloadReceipt()">
+                        <i class="bi bi-file-earmark-pdf-fill"></i> Download Fee Receipt
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <div class="footer-links" id="footerLinks"></div>
+            <div id="footerSchool">School Fees Parent Portal</div>
+            <div style="margin-top:6px;font-size:11px;opacity:.5">Powered by School Fees Management System</div>
+        </div>
+    </div>
+
+    <!-- Chatbot & Messaging -->
+    <div id="pChatFabBadge" class="p-chat-fab-badge">1</div>
+    <button class="p-chat-fab" id="pChatFab" onclick="togglePChat()">
+        <svg id="pChatFabIcon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            <circle cx="9" cy="10" r="1" fill="currentColor" stroke="none" />
+            <circle cx="12" cy="10" r="1" fill="currentColor" stroke="none" />
+            <circle cx="15" cy="10" r="1" fill="currentColor" stroke="none" />
+        </svg>
+    </button>
+
+    <div class="p-chat-win" id="pChatWin">
+        <!-- Header -->
+        <div class="p-chat-hdr">
+            <div class="p-chat-hdr-l">
+                <div class="p-chat-av">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="10" rx="2" fill="rgba(0,0,0,.15)" stroke="none" />
+                        <path d="M12 2a3 3 0 0 0-3 3v6h6V5a3 3 0 0 0-3-3z" fill="rgba(0,0,0,.15)" stroke="none" />
+                        <circle cx="9" cy="16" r="1.2" fill="var(--deep)" stroke="none" />
+                        <circle cx="15" cy="16" r="1.2" fill="var(--deep)" stroke="none" />
+                    </svg>
+                </div>
+                <div>
+                    <div class="p-chat-title" id="pChatTitle">School Assistant</div>
+                    <div class="p-chat-sub" id="pChatSub">Tap to ask a question</div>
+                </div>
+            </div>
+            <button class="p-chat-close" onclick="togglePChat()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                    <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+
+        <!-- Tabs -->
+        <div class="p-chat-tabs">
+            <button class="p-chat-tab active" id="tabAssist" onclick="switchPTab('assist')">
+                <svg viewBox="0 0 24 24">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                Assistant
+            </button>
+            <button class="p-chat-tab" id="tabMsg" onclick="switchPTab('msg')">
+                <svg viewBox="0 0 24 24">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07" />
+                    <path
+                        d="M2 8.54A19.94 19.94 0 0 1 5.54 2.05 2 2 0 0 1 7.65 4.4v3a2 2 0 0 1-1.5 1.94l-1.44.48a16 16 0 0 0 8.47 8.47l.48-1.44A2 2 0 0 1 15.6 15.5h3a2 2 0 0 1 2 2.18A19.79 19.79 0 0 1 17.46 22" />
+                </svg>
+                Message Admin
+                <span id="pMsgUnreadBadge"
+                    style="background:#ef4444;color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;display:none">!</span>
+            </button>
+        </div>
+
+        <!-- Assistant Panel -->
+        <div class="p-tab-panel active" id="pPanelAssist">
+            <div class="p-chat-msgs" id="pChatMsgs">
+                <div class="p-msg bot">👋 Hi! I can help you with fee questions, how to pay, or contact the
+                    school.<br><br>Or use the <strong>Message Admin</strong> tab to send a direct message!</div>
+            </div>
+            <div class="p-chat-sugs">
+                <button class="p-sug" onclick="pAsk('How do I pay?')">How to pay?</button>
+                <button class="p-sug" onclick="pAsk('What is a reference ID?')">Reference ID?</button>
+                <button class="p-sug" onclick="pAsk('How to find my student ID?')">Student ID?</button>
+                <button class="p-sug" onclick="pAsk('Contact school')">Contact school</button>
+            </div>
+            <div class="p-chat-input-row">
+                <textarea class="p-chat-input" id="pChatInput" placeholder="Ask a question…" rows="1"
+                    onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendPChat()}"
+                    oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,80)+'px'"></textarea>
+                <button class="p-chat-send" onclick="sendPChat()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M22 2L11 13" />
+                        <path d="M22 2L15 22l-4-9-9-4 20-7z" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Message Admin Panel -->
+        <div class="p-tab-panel" id="pPanelMsg">
+            <div id="pMsgsThread" class="p-msgs-thread">
+                <div class="p-msg-thread-empty">
+                    <div style="font-size:36px;margin-bottom:8px">💬</div>
+                    <p>Send a message to the school admin.</p>
+                    <small>Enter your Student ID first and look up your record to send messages.</small>
+                </div>
+            </div>
+            <!-- Audio recording indicator -->
+            <div class="p-audio-indicator" id="pAudioIndicator">
+                <div class="p-audio-dot"></div>
+                Recording… <span id="pAudioTimer">0:00</span>
+                <button onclick="stopAudioRecording(true)"
+                    style="margin-left:auto;background:none;border:none;cursor:pointer;color:#dc2626;font-weight:700;font-size:13px">✕
+                    Cancel</button>
+            </div>
+            <div class="p-chat-input-row">
+                <textarea class="p-chat-input" id="pMsgInput" placeholder="Type your message to the school admin…"
+                    rows="1"
+                    onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendParentMsg()}"
+                    oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,80)+'px'"></textarea>
+                <button class="p-audio-btn" id="pAudioBtn" onclick="toggleAudioRecording()"
+                    title="Record voice message">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                        <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                        <line x1="12" y1="19" x2="12" y2="23" />
+                        <line x1="8" y1="23" x2="16" y2="23" />
+                    </svg>
+                </button>
+                <button class="p-chat-send" onclick="sendParentMsg()" id="pMsgSendBtn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M22 2L11 13" />
+                        <path d="M22 2L15 22l-4-9-9-4 20-7z" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        function showPToast(msg, type, title, duration) {
+            var container = document.getElementById('pToastContainer');
+            if (!container) { alert(msg); return; }
+            type = type || 'success'; duration = duration || 3500;
+            var icons = {
+                success: '<i class="bi bi-check-circle-fill text-success" style="font-size:18px"></i>',
+                error: '<i class="bi bi-x-circle-fill text-danger" style="font-size:18px"></i>',
+                warning: '<i class="bi bi-exclamation-triangle-fill text-warning" style="font-size:18px"></i>',
+                info: '<i class="bi bi-info-circle-fill text-info" style="font-size:18px"></i>'
+            };
+            var titles = { success: 'Success', error: 'Error', warning: 'Warning', info: 'Info' };
+            var item = document.createElement('div');
+            item.className = 'p-toast ' + type;
+            item.innerHTML = '<div class="p-toast-icon">' + (icons[type] || icons.success) + '</div>'
+                + '<div class="p-toast-body"><div class="p-toast-title">' + (title || titles[type] || 'Notice') + '</div>'
+                + '<div class="p-toast-msg">' + msg + '</div></div>'
+                + '<button class="p-toast-close" onclick="this.parentNode.remove()">×</button>';
+            container.appendChild(item);
+            setTimeout(function () { item.classList.add('removing'); setTimeout(function () { if (item.parentNode) item.parentNode.removeChild(item); }, 260); }, duration);
+        }
+
+        // ══════════════════════════════════════════════════════
+        // STATE
+        // ══════════════════════════════════════════════════════
+        var schoolData = null;
+        var studentRec = null;
+        var customFeeTypes = [];
+        var customFees = [];
+        var uniforms = [];
+        var books = [];
+        var pChatOpen = false;
+        var pCurrentTab = 'assist';
+        var mediaRecorder = null;
+        var audioChunks = [];
+        var audioTimerInt = null;
+        var audioSeconds = 0;
+
+        // ── INIT ─────────────────────────────────────────────
+        document.addEventListener('DOMContentLoaded', function () {
+            loadSchoolInfo();
+        });
+
+        function loadSchoolInfo() {
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run
+                    .withSuccessHandler(function (r) {
+                        if (r.success) { schoolData = r.school; applySchoolBranding(); }
+                    })
+                    .getPublicSchoolData('__school_only__');
+            }
+        }
+
+        function applySchoolBranding() {
+            if (!schoolData) return;
+            var s = schoolData;
+
+            // Dynamic branding colors and typography fonts configuration propagation
+            if (s.systemFont) {
+                document.documentElement.style.setProperty('--system-font', s.systemFont);
+            }
+            if (s.themeColor) {
+                document.documentElement.style.setProperty('--primary', s.themeColor);
+            }
+            if (s.themeSecondary) {
+                document.documentElement.style.setProperty('--secondary', s.themeSecondary);
+            }
+            if (s.themeBg) {
+                document.documentElement.style.setProperty('--deep', s.themeBg);
+            }
+            if (s.systemFontSize) {
+                var szMap = { small: '13px', normal: '14px', medium: '15px', large: '16px' };
+                document.documentElement.style.setProperty('--system-font-size', szMap[s.systemFontSize] || '14px');
+            }
+            if (s.systemFontWeight) {
+                document.documentElement.style.setProperty('--system-font-weight', s.systemFontWeight);
+            }
+            if (s.name) {
+                document.getElementById('heroSchoolName').textContent = s.name;
+                document.getElementById('portalSchoolName').textContent = s.name;
+                document.title = s.name + ' — Parent Portal';
+                document.getElementById('statSchool').textContent = s.name.split(' ').slice(0, 2).join(' ');
+                document.getElementById('footerSchool').textContent = s.name + ' — Parent Fee Portal';
+            }
+            if (s.motto) document.getElementById('heroSchoolMotto').textContent = '"' + s.motto + '"';
+            if (s.currency) document.getElementById('statCurrency').textContent = s.currency;
+            if (s.logo) {
+                var ph = document.getElementById('navLogoPlaceholder');
+                if (ph) ph.outerHTML = '<img src="' + s.logo + '" class="nav-logo" id="navLogoImg">';
+                document.getElementById('portalLogoWrap').innerHTML = '<img src="' + s.logo + '" class="portal-logo">';
+            } else {
+                var ph2 = document.getElementById('navLogoPlaceholder');
+                if (ph2) ph2.textContent = (s.name || 'S')[0].toUpperCase();
+            }
+            if (s.name) document.getElementById('statsBar').style.display = 'flex';
+            var socialLinks = document.getElementById('socialLinks');
+            var links = '';
+            if (s.facebook) links += '<a href="' + s.facebook + '"    target="_blank" class="social-link"><i class="bi bi-facebook"></i></a>';
+            if (s.twitter) links += '<a href="' + s.twitter + '"     target="_blank" class="social-link"><i class="bi bi-twitter-x"></i></a>';
+            if (s.instagram) links += '<a href="' + s.instagram + '"   target="_blank" class="social-link"><i class="bi bi-instagram"></i></a>';
+            if (s.whatsapp) links += '<a href="' + s.whatsapp + '"    target="_blank" class="social-link"><i class="bi bi-whatsapp"></i></a>';
+            if (s.website) links += '<a href="' + s.website + '"     target="_blank" class="social-link"><i class="bi bi-globe"></i></a>';
+            socialLinks.innerHTML = links + '<button class="portal-btn" onclick="document.getElementById(\'studentIdInput\').focus()">Check Fees →</button>';
+            var fl = document.getElementById('footerLinks');
+            var flinks = [];
+            if (s.website) flinks.push('<a href="' + s.website + '" target="_blank">Website</a>');
+            if (s.facebook) flinks.push('<a href="' + s.facebook + '" target="_blank">Facebook</a>');
+            if (s.instagram) flinks.push('<a href="' + s.instagram + '" target="_blank">Instagram</a>');
+            if (s.whatsapp) flinks.push('<a href="' + s.whatsapp + '" target="_blank">WhatsApp</a>');
+            if (s.phone) flinks.push('<a href="tel:' + s.phone + '">Call Us</a>');
+            if (s.email) flinks.push('<a href="mailto:' + s.email + '">Email Us</a>');
+            fl.innerHTML = flinks.join('');
+
+            // Populate class dropdown if classes are provided
+            if (s.classes && s.classes.length) {
+                populateClassDropdown(s.classes);
+            }
+        }
+
+        function populateClassDropdown(classes) {
+            var sel = document.getElementById('studentClassInput');
+            if (!sel) return;
+            var current = sel.value;
+            sel.innerHTML = '<option value="" style="color:#1e1b4b">— Select class —</option>'
+                + classes.map(function (c) {
+                    return '<option value="' + c + '" style="color:#1e1b4b">' + c + '</option>';
+                }).join('');
+            if (current) sel.value = current;
+        }
+
+        var currentWards = [];
+        var currentWardIndex = 0;
+
+        function safeTotalsForWard(rec) {
+            var feeKeys = Object.keys(rec).filter(function (k) {
+                return !['id', 'studentName', 'phoneNumber', 'grade', 'academicSession', 'isNewStudent',
+                    'totalFees', 'totalPaid', 'balance', 'paymentStatus', 'createdAt', 'updatedAt', 'discount']
+                    .includes(k) && !k.startsWith('inst') && parseFloat(rec[k]) > 0;
+            });
+            var totalFees = 0, totalPaid = 0;
+            feeKeys.forEach(function (k) { totalFees += parseFloat(rec[k]) || 0; });
+            for (var i = 1; i <= 6; i++) totalPaid += parseFloat(rec['inst' + i]) || 0;
+            if (parseFloat(rec.totalFees) > 0) {
+                totalFees = parseFloat(rec.totalFees); // server value is already net of any discount
+            } else {
+                totalFees = Math.max(0, totalFees - (parseFloat(rec.discount) || 0));
+            }
+            if (parseFloat(rec.totalPaid) >= 0) totalPaid = parseFloat(rec.totalPaid);
+            var balance = Math.max(0, totalFees - totalPaid);
+            return { totalFees: totalFees, totalPaid: totalPaid, balance: balance };
+        }
+
+        function switchWard(index) {
+            currentWardIndex = index;
+            studentRec = currentWards[index].record;
+            customFees = currentWards[index].customFees || [];
+            uniforms = currentWards[index].uniforms || [];
+            books = currentWards[index].books || [];
+
+            var btns = document.querySelectorAll('.sibling-btn');
+            btns.forEach(function(btn, idx) {
+                btn.classList.toggle('active', idx === index);
+            });
+
+            buildPortalFeeTabs(applicablePortalFeeTypes(customFeeTypes, customFees));
+            selectPortalFeeTab('regular');
+
+            var rows = document.querySelectorAll('.family-table tbody tr');
+            rows.forEach(function(row, idx) {
+                row.style.background = (idx === index) ? '#f0fdf4' : '';
+            });
+        }
+
+        function handlePortalDataLoad(r) {
+            schoolData = r.school;
+            customFeeTypes = r.customFeeTypes || [];
+
+            var prevWardId = (currentWards.length > 0 && currentWardIndex < currentWards.length) ? currentWards[currentWardIndex].record.id : null;
+
+            currentWards = [];
+            currentWards.push({
+                record: r.record,
+                customFees: r.customFees || [],
+                uniforms: r.uniforms || [],
+                books: r.books || []
+            });
+            if (r.siblings && Array.isArray(r.siblings)) {
+                r.siblings.forEach(function(sib) {
+                    currentWards.push(sib);
+                });
+            }
+
+            var newIndex = 0;
+            if (prevWardId) {
+                var foundIdx = currentWards.findIndex(function(w) { return w.record.id === prevWardId; });
+                if (foundIdx !== -1) newIndex = foundIdx;
+            }
+            currentWardIndex = newIndex;
+
+            studentRec = currentWards[currentWardIndex].record;
+            customFees = currentWards[currentWardIndex].customFees || [];
+            uniforms = currentWards[currentWardIndex].uniforms || [];
+            books = currentWards[currentWardIndex].books || [];
+
+            var switcherContainer = document.getElementById('siblingSwitcherContainer');
+            var switcherButtons = document.getElementById('siblingSwitcherButtons');
+            var familyOverviewCard = document.getElementById('familyOverviewCard');
+            var familyOverviewBody = document.getElementById('familyOverviewBody');
+            var familyTotalDueBadge = document.getElementById('familyTotalDueBadge');
+            var cur = (schoolData && schoolData.currency) || 'GHC';
+
+            if (currentWards.length > 1) {
+                if (switcherContainer) switcherContainer.style.display = 'block';
+                if (switcherButtons) {
+                    var btnHtml = '';
+                    currentWards.forEach(function(ward, idx) {
+                        var activeCls = (idx === currentWardIndex) ? 'active' : '';
+                        btnHtml += '<button type="button" class="sibling-btn ' + activeCls + '" onclick="switchWard(' + idx + ')"><i class="bi bi-person me-1"></i>' + ward.record.studentName + '</button>';
+                    });
+                    switcherButtons.innerHTML = btnHtml;
+                }
+
+                if (familyOverviewCard && familyOverviewBody) {
+                    var famHtml = '';
+                    var totalDue = 0;
+                    currentWards.forEach(function(ward, idx) {
+                        var t = safeTotalsForWard(ward.record);
+                        totalDue += t.balance;
+                        var activeStyle = (idx === currentWardIndex) ? ' style="background:#f0fdf4"' : '';
+                        famHtml += '<tr' + activeStyle + '>' +
+                            '  <td style="padding:10px 8px;"><strong>' + ward.record.studentName + '</strong></td>' +
+                            '  <td style="padding:10px 8px;">' + ward.record.grade + '</td>' +
+                            '  <td style="padding:10px 8px;">' + cur + ' ' + fmt(t.totalFees) + '</td>' +
+                            '  <td style="padding:10px 8px;"><span class="text-success">' + cur + ' ' + fmt(t.totalPaid) + '</span></td>' +
+                            '  <td style="padding:10px 8px;" class="text-danger fw-bold">' + cur + ' ' + fmt(t.balance) + '</td>' +
+                            '  <td style="padding:10px 8px; text-align:right"><button type="button" class="btn btn-xs btn-outline-primary" onclick="switchWard(' + idx + ')" style="padding:2px 8px; font-size:11px; border-radius:30px;"><i class="bi bi-eye me-1"></i>View</button></td>' +
+                            '</tr>';
+                    });
+                    familyOverviewBody.innerHTML = famHtml;
+                    if (familyTotalDueBadge) familyTotalDueBadge.textContent = 'Family Balance: ' + cur + ' ' + fmt(totalDue);
+                    familyOverviewCard.style.display = 'block';
+                }
+            } else {
+                if (switcherContainer) switcherContainer.style.display = 'none';
+                if (familyOverviewCard) familyOverviewCard.style.display = 'none';
+            }
+
+            // Sibling portal payment setup
+            var portalFamilyGroup = document.getElementById('portalFamilyPaymentGroup');
+            var portalFamilyPayCheckbox = document.getElementById('portalFamilyPayCheckbox');
+            if (portalFamilyGroup) {
+                if (currentWards.length > 1) {
+                    portalFamilyGroup.style.display = 'block';
+                    if (portalFamilyPayCheckbox) {
+                        portalFamilyPayCheckbox.checked = false;
+                        portalFamilyPayCheckbox.onchange = function() {
+                            if (this.checked) {
+                                var totalFamilyBal = 0;
+                                currentWards.forEach(function(w) {
+                                   totalFamilyBal += safeTotalsForWard(w.record).balance;
+                                });
+                                document.getElementById('payAmount').value = totalFamilyBal.toFixed(2);
+                            } else {
+                                var bal = safeTotalsForWard(studentRec).balance;
+                                document.getElementById('payAmount').value = bal.toFixed(2);
+                            }
+                        };
+                    }
+                } else {
+                    portalFamilyGroup.style.display = 'none';
+                }
+            }
+        }
+
+        // ── STUDENT LOOKUP ────────────────────────────────────
+        // OTP state for multi-child parent verification
+        var pendingParentPhone = null;
+        var pendingOtpHash = null;
+        var pendingPortalData = null;
+
+        function lookupStudent() {
+            var id = (document.getElementById('studentIdInput').value || '').trim();
+            var selClass = (document.getElementById('studentClassInput').value || '').trim();
+            if (!id) { showPToast('Please enter your Student ID or Phone Number', 'warning'); return; }
+            // Class selection is now optional to improve usability for semi-literate parents
+
+            var hint = document.getElementById('searchHint');
+            hint.innerHTML = '<i class="bi bi-hourglass-split me-1 spin"></i> Verifying…';
+            hint.style.color = '#fde68a';
+
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run
+                    .withSuccessHandler(function (r) {
+                        hint.innerHTML = 'Enter Student ID or Parent Phone Number to access fees.';
+                        hint.style.color = '';
+                        if (!r.success) { showPToast('Error: ' + r.message, 'error'); return; }
+                        schoolData = r.school;
+                        if (!r.record) {
+                            hint.innerHTML = '<i class="bi bi-exclamation-octagon-fill me-1"></i> Student ID not found. Please check and try again.';
+                            hint.style.color = '#fca5a5';
+                            return;
+                        }
+                        // ── SECURITY CHECK: class must match (only if selected) ──
+                        if (selClass) {
+                            var recClass = String(r.record.grade || '').trim().toLowerCase();
+                            var entClass = selClass.trim().toLowerCase();
+                            if (recClass !== entClass) {
+                                hint.innerHTML = '<i class="bi bi-exclamation-octagon-fill me-1"></i> Class does not match our records. Please check and try again.';
+                                hint.style.color = '#fca5a5';
+                                showPToast('Incorrect class selected. Please verify the class and try again.', 'error', 'Access Denied', 5000);
+                                return;
+                            }
+                        }
+
+                        // Phone-number logins always require OTP verification (no class selection needed)
+                        var isPhoneLookup = /^\d{7,15}$/.test(id.replace(/\s/g, ''));
+                        if (isPhoneLookup) {
+                            // Trigger OTP verification
+                            pendingPortalData = r;
+                            pendingParentPhone = id;
+                            sendParentOtp(id);
+                            return;
+                        }
+
+                        // Single child or ID lookup — go straight to portal
+                        handlePortalDataLoad(r);
+                        applySchoolBranding();
+                        showPortal();
+                    })
+                    .withFailureHandler(function (e) {
+                        hint.innerHTML = '<i class="bi bi-wifi-off me-1"></i> Connection error. Please try again.';
+                        hint.style.color = '#fca5a5';
+                    })
+                    .getPublicSchoolData(id);
+            } else {
+                // Demo mode
+                hint.textContent = 'Enter Student ID or Parent Phone Number to access fees.';
+                hint.style.color = '';
+                studentRec = {
+                    id: id, studentName: 'Demo Student', grade: selClass || 'Class 5',
+                    academicSession: '2025/2026 Second Term',
+                    arrears: 0, actualFees: 900, pta: 10, cleaning: 150, admissionFees: 0,
+                    isNewStudent: false,
+                    inst1: 400, inst1Date: '2026-01-15',
+                    inst2: 0, inst2Date: '', inst3: 0, inst3Date: '', inst4: 0, inst4Date: '', inst5: 0, inst5Date: '', inst6: 0, inst6Date: ''
+                };
+                if (!schoolData) schoolData = { name: 'Demo School', currency: 'GHC', motto: 'Excellence in Education', momoName: 'Demo School Acc', momoNumber: '0244000000', momoNote: 'Pay and send reference to admin.' };
+                applySchoolBranding();
+                showPortal();
+            }
+        }
+
+        function sendParentOtp(phone) {
+            // Generate a 6-digit OTP and display it directly on the portal —
+            // no SMS is sent, so this only works as an "are you really you"
+            // click-through step, not a real security barrier.
+            var otp = String(Math.floor(100000 + Math.random() * 900000));
+            pendingOtpHash = otp;
+            sessionStorage.setItem('pendingOtp', otp);
+            sessionStorage.setItem('pendingOtpExp', Date.now() + 5 * 60 * 1000); // 5 min expiry
+
+            // Show OTP card
+            document.getElementById('otpVerifyCard').style.display = 'block';
+            document.querySelector('.search-card:not(#otpVerifyCard)') && (document.querySelector('.search-card:not(#otpVerifyCard)').style.display = 'none');
+            document.getElementById('otpCodeInput').value = '';
+            document.getElementById('otpCodeInput').focus();
+
+            var childCount = 1 + ((pendingPortalData.siblings && pendingPortalData.siblings.length) ? pendingPortalData.siblings.length : 0);
+            document.getElementById('otpDesc').innerHTML =
+                'You have <strong>' + childCount + ' ' + (childCount === 1 ? 'child' : 'children') + '</strong> registered under this number. ' +
+                'Enter the verification code shown below to continue.';
+            document.getElementById('otpHint').innerHTML =
+                '<div style="background:rgba(245,158,11,0.15); border:1px solid rgba(245,158,11,0.4); border-radius:10px; padding:10px; margin-bottom:8px;">' +
+                '<div style="font-size:11px; color:rgba(255,255,255,0.7); margin-bottom:4px;">Your verification code</div>' +
+                '<div style="font-size:26px; font-weight:800; letter-spacing:6px; color:#fef08a;">' + otp + '</div>' +
+                '</div><i class="bi bi-clock me-1"></i>Code expires in 5 minutes.';
+        }
+
+        function verifyParentOtp() {
+            var entered = (document.getElementById('otpCodeInput').value || '').trim();
+            if (!entered) { showPToast('Please enter the verification code', 'warning'); return; }
+
+            var stored = sessionStorage.getItem('pendingOtp');
+            var expiry = parseInt(sessionStorage.getItem('pendingOtpExp') || '0');
+
+            if (Date.now() > expiry) {
+                showPToast('Verification code has expired. Please request a new one.', 'error');
+                document.getElementById('otpHint').innerHTML = '<i class="bi bi-clock-history me-1"></i>Code expired. Click Resend.';
+                return;
+            }
+
+            if (entered !== stored) {
+                showPToast('Incorrect verification code. Please try again.', 'error');
+                document.getElementById('otpHint').innerHTML = '<i class="bi bi-x-circle me-1" style="color:#fca5a5;"></i>Incorrect code. Check and try again.';
+                document.getElementById('otpHint').style.color = '#fca5a5';
+                return;
+            }
+
+            // Code correct — clear session and load portal
+            sessionStorage.removeItem('pendingOtp');
+            sessionStorage.removeItem('pendingOtpExp');
+            document.getElementById('otpVerifyCard').style.display = 'none';
+
+            if (pendingPortalData) {
+                handlePortalDataLoad(pendingPortalData);
+                applySchoolBranding();
+                showPortal();
+                pendingPortalData = null;
+                pendingParentPhone = null;
+                pendingOtpHash = null;
+            }
+        }
+
+        function resendParentOtp() {
+            if (!pendingParentPhone) return;
+            document.getElementById('otpCodeInput').value = '';
+            var btn = document.getElementById('resendOtpBtn');
+            if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+            sendParentOtp(pendingParentPhone);
+            setTimeout(function() {
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Resend Code'; }
+            }, 30000);
+        }
+
+        function cancelOtpStep() {
+            document.getElementById('otpVerifyCard').style.display = 'none';
+            document.querySelector('.search-card:not(#otpVerifyCard)') && (document.querySelector('.search-card:not(#otpVerifyCard)').style.display = 'block');
+            sessionStorage.removeItem('pendingOtp');
+            sessionStorage.removeItem('pendingOtpExp');
+            pendingPortalData = null;
+            pendingParentPhone = null;
+            pendingOtpHash = null;
+        }
+
+
+        function buildPortalFeeTabs(cfList) {
+            var container = document.getElementById('portalFeeTabs');
+            if (!container) return;
+            var html = '<button class="fee-tab-btn active" data-fee="regular" onclick="selectPortalFeeTab(\'regular\')">' +
+                       '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>' +
+                       'Regular Fees</button>';
+
+            cfList.forEach(function(cf) {
+                var iconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>';
+                var lowerName = cf.name.toLowerCase();
+                if (lowerName.includes('graduation')) {
+                    iconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"></path></svg>';
+                } else if (lowerName.includes('excursion') || lowerName.includes('trip')) {
+                    iconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C20.1 10.7 19 9.3 19 8h-3V5c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v3H5c0 1.3-1.1 2.7-1.5 3.1C2.7 11.3 2 12.1 2 13v3c0 .6.4 1 1 1h2"></path><circle cx="7" cy="17" r="2"></circle><circle cx="17" cy="17" r="2"></circle></svg>';
+                } else if (lowerName.includes('print') || lowerName.includes('exam')) {
+                    iconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>';
+                } else if (lowerName.includes('ourday')) {
+                    iconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>';
+                }
+                html += '<button class="fee-tab-btn" data-fee="' + cf.name + '" onclick="selectPortalFeeTab(\'' + cf.name + '\')">' +
+                        iconSvg + cf.name + '</button>';
+            });
+            container.innerHTML = html;
+        }
+
+        function selectPortalFeeTab(feeType) {
+            var btns = document.querySelectorAll('.fee-tab-btn');
+            btns.forEach(function(btn) {
+                btn.classList.toggle('active', btn.getAttribute('data-fee') === feeType);
+            });
+            var payFeeTypeSelect = document.getElementById('payFeeType');
+            if (payFeeTypeSelect) {
+                payFeeTypeSelect.value = feeType;
+            }
+            renderFeeDetails(feeType);
+        }
+
+        // Builds the list of extra-fee tabs to show: the school-configured custom fee
+        // TYPES applicable to this term, PLUS any fee type the ward actually has a
+        // record for (even if its config doesn't match the term filter, or the type
+        // was never registered in the config list at all) — so a real balance is
+        // never hidden from the parent just because the tab-building filter missed it.
+        function applicablePortalFeeTypes(cfList, feeRecs) {
+            var sess = String(studentRec.academicSession || '').toLowerCase();
+            var applicable = (cfList || []).filter(function (cf) {
+                if (!cf) return false;
+                var term = String(cf.term || '').toLowerCase();
+                return term === 'all terms' || sess.includes(term);
+            });
+            var seen = {};
+            applicable.forEach(function (cf) { seen[cf.name] = true; });
+            (feeRecs || []).forEach(function (rec) {
+                var name = rec && (rec.feeTypeName || rec.feetypename);
+                if (name && !seen[name]) {
+                    seen[name] = true;
+                    var config = (cfList || []).find(function (cf) { return cf && cf.name === name; });
+                    applicable.push(config || { name: name });
+                }
+            });
+            return applicable;
+        }
+
+        function showPortal() {
+            var payFeeTypeSelect = document.getElementById('payFeeType');
+            var cfList = customFeeTypes || [];
+
+            var applicableCf = applicablePortalFeeTypes(cfList, customFees);
+
+            if (payFeeTypeSelect) {
+                var optHtml = '<option value="regular">Regular School Fees</option>';
+                applicableCf.forEach(function(cf) {
+                    optHtml += '<option value="' + cf.name + '">' + cf.name + '</option>';
+                });
+                payFeeTypeSelect.innerHTML = optHtml;
+                payFeeTypeSelect.value = 'regular';
+            }
+
+            // Build fee tabs
+            buildPortalFeeTabs(applicableCf);
+
+            renderFeeDetails('regular');
+            renderNextTermBill();
+
+            // Enable messaging
+            loadParentMessages();
+            document.getElementById('heroSection').style.display = 'none';
+            document.getElementById('portalSection').classList.add('show');
+            window.scrollTo(0, 0);
+        }
+
+        function onPortalFeeTypeChange() {
+            var selected = document.getElementById('payFeeType').value;
+            selectPortalFeeTab(selected);
+        }
+
+        function renderFeeDetails(feeType) {
+            var rec = studentRec;
+            var cur = (schoolData && schoolData.currency) || 'GHC';
+            document.getElementById('pStudentId').textContent = rec.id;
+            document.getElementById('pStudentName').textContent = rec.studentName;
+            var av = document.getElementById('pStudentAvatar');
+            if (av) {
+                if (rec.studentPhoto) {
+                    av.innerHTML = '<img src="' + rec.studentPhoto + '" style="width:100%; height:100%; object-fit:cover;">';
+                } else {
+                    av.innerHTML = '<i class="bi bi-person-fill text-white-50" style="font-size:32px;"></i>';
+                }
+            }
+            document.getElementById('pGrade').textContent = rec.grade;
+            document.getElementById('pSession').textContent = rec.academicSession;
+
+            // Discount display
+            var discAmt = parseFloat(rec.discount) || 0;
+            var discPill = document.getElementById('pDiscountPill');
+            if (discPill) {
+                if (discAmt > 0) {
+                    discPill.innerHTML = '<i class="bi bi-percent me-1"></i>Discount: ' + cur + ' ' + discAmt.toFixed(2);
+                    discPill.style.display = 'inline-block';
+                } else {
+                    discPill.style.display = 'none';
+                }
+            }
+            var discNoteEl = document.getElementById('feeDiscountNote');
+            if (discNoteEl) {
+                if (discAmt > 0 && feeType === 'regular') {
+                    discNoteEl.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>A scholarship/discount of <strong>' + cur + ' ' + discAmt.toFixed(2) + '</strong> has already been taken off the amount below — you do not need to pay this part.';
+                    discNoteEl.style.display = 'block';
+                } else {
+                    discNoteEl.style.display = 'none';
+                }
+            }
+
+            if (feeType === 'regular') {
+                var feeKeys = Object.keys(rec).filter(function (k) {
+                    return !['id', 'studentName', 'phoneNumber', 'grade', 'academicSession', 'isNewStudent',
+                        'totalFees', 'totalPaid', 'balance', 'paymentStatus', 'createdAt', 'updatedAt', 'discount']
+                        .includes(k) && !k.startsWith('inst') && parseFloat(rec[k]) > 0;
+                });
+                var totalFees = 0, totalPaid = 0;
+                feeKeys.forEach(function (k) { totalFees += parseFloat(rec[k]) || 0; });
+                for (var i = 1; i <= 6; i++) totalPaid += parseFloat(rec['inst' + i]) || 0;
+                if (parseFloat(rec.totalFees) > 0) {
+                    totalFees = parseFloat(rec.totalFees); // server value is already net of any discount
+                } else {
+                    totalFees = Math.max(0, totalFees - (parseFloat(rec.discount) || 0));
+                }
+                if (parseFloat(rec.totalPaid) >= 0) totalPaid = parseFloat(rec.totalPaid);
+                var balance = totalFees - totalPaid;
+
+                document.getElementById('pTotalFees').textContent = cur + ' ' + fmt(totalFees);
+                document.getElementById('pTotalPaid').textContent = cur + ' ' + fmt(totalPaid);
+                document.getElementById('pBalance').textContent = cur + ' ' + fmt(Math.max(0, balance));
+                document.getElementById('formCurrency').textContent = cur;
+
+                var statusHtml = balance <= 0 && totalFees > 0
+                    ? '<span class="status-paid"><i class="bi bi-check-circle-fill me-1"></i> Fully Paid</span>'
+                    : totalPaid > 0
+                        ? '<span class="status-partial"><i class="bi bi-exclamation-circle-fill me-1"></i> Partial</span>'
+                        : '<span class="status-unpaid"><i class="bi bi-x-circle-fill me-1"></i> Unpaid</span>';
+                document.getElementById('pStatusBadge').innerHTML = statusHtml;
+
+                var discAmt = parseFloat(rec.discount) || 0;
+                var tbodyHtml = feeKeys.map(function (k) {
+                    var amt = parseFloat(rec[k]) || 0;
+                    if (amt <= 0) return '';
+                    var label = k.replace(/_\d+$/, '').replace(/([A-Z])/g, ' $1').replace(/^./, function (c) { return c.toUpperCase(); });
+                    if (k === 'arrears') {
+                        return '<tr style="background:#fff7ed;"><td style="color:#c2410c;font-weight:700"><i class="bi bi-exclamation-triangle-fill me-1"></i>Arrears (carried over from a previous term)</td><td style="text-align:right;color:#c2410c;font-weight:700">' + cur + ' ' + fmt(amt) + '</td></tr>';
+                    }
+                    return '<tr><td>' + label + '</td><td style="text-align:right">' + cur + ' ' + fmt(amt) + '</td></tr>';
+                }).join('');
+                if (discAmt > 0) {
+                    tbodyHtml += '<tr><td style="color:#dc2626">Discount</td><td style="text-align:right;color:#dc2626">-' + cur + ' ' + fmt(discAmt) + '</td></tr>';
+                }
+                tbodyHtml += '<tr><td><strong>Total</strong></td><td style="text-align:right"><strong>' + cur + ' ' + fmt(totalFees) + '</strong></td></tr>';
+                document.getElementById('feeTableBody').innerHTML = tbodyHtml;
+
+                var instHtml = '';
+                for (var i = 1; i <= 6; i++) {
+                    var amt = parseFloat(rec['inst' + i]) || 0, dt = rec['inst' + i + 'Date'] || '';
+                    if (amt > 0 || i <= 2) {
+                        var ic = amt > 0 ? 'paid' : '', ib = amt > 0 ? '<span class="inst-badge">' + cur + ' ' + fmt(amt) + '</span>' : '<span class="inst-badge empty">Not paid</span>';
+                        var ds = dt ? '<span style="color:#94a3b8;font-size:12px"> — ' + dt + '</span>' : '';
+                        instHtml += '<div class="inst-item ' + ic + '"><div><strong>Instalment ' + i + '</strong>' + ds + '</div>' + ib + '</div>';
+                    }
+                }
+                document.getElementById('instList').innerHTML = instHtml || '<p style="color:#94a3b8;font-size:13px">No installments recorded yet.</p>';
+
+                if (schoolData) {
+                    document.getElementById('momoNameDisp').textContent = schoolData.momoName || 'Contact school';
+                    document.getElementById('momoNumDisp').textContent = schoolData.momoNumber || '—';
+                    var noteEl = document.getElementById('momoNoteDisp');
+                    if (schoolData.momoNote) { noteEl.textContent = schoolData.momoNote; noteEl.style.display = 'block'; }
+                    if (balance > 0) document.getElementById('payAmount').value = balance.toFixed(2);
+                    if (rec.phoneNumber) document.getElementById('payPhone').value = rec.phoneNumber;
+                }
+                populatePortalPaymentMethods();
+                var isPaid = (balance <= 0 && totalFees > 0);
+                document.getElementById('pCongratsCard').style.display = isPaid ? 'flex' : 'none';
+                document.getElementById('payNowCard').style.display = isPaid ? 'none' : 'block';
+            } else {
+                // Custom fee details rendering
+                var config = customFeeTypes.find(function(c) { return c.name === feeType; });
+                var customRec = customFees.find(function(f) { return f.feeTypeName === feeType; });
+
+                var totalFees = customRec ? (parseFloat(customRec.amount) || 0) : (config ? getCustomFeeAmount(config, rec.grade) : 0);
+                var totalPaid = customRec ? (parseFloat(customRec.totalPaid) || 0) : 0;
+                var balance = Math.max(0, totalFees - totalPaid);
+
+                document.getElementById('pTotalFees').textContent = cur + ' ' + fmt(totalFees);
+                document.getElementById('pTotalPaid').textContent = cur + ' ' + fmt(totalPaid);
+                document.getElementById('pBalance').textContent = cur + ' ' + fmt(balance);
+                document.getElementById('formCurrency').textContent = cur;
+
+                var statusHtml = balance <= 0 && totalFees > 0
+                    ? '<span class="status-paid"><i class="bi bi-check-circle-fill me-1"></i> Fully Paid</span>'
+                    : totalPaid > 0
+                        ? '<span class="status-partial"><i class="bi bi-exclamation-circle-fill me-1"></i> Partial</span>'
+                        : '<span class="status-unpaid"><i class="bi bi-x-circle-fill me-1"></i> Unpaid</span>';
+                document.getElementById('pStatusBadge').innerHTML = statusHtml;
+
+                var tbodyHtml = '<tr><td>' + feeType + ' (Ad-hoc Fee)</td><td style="text-align:right">' + cur + ' ' + fmt(totalFees) + '</td></tr>';
+                tbodyHtml += '<tr><td><strong>Total</strong></td><td style="text-align:right"><strong>' + cur + ' ' + fmt(totalFees) + '</strong></td></tr>';
+                document.getElementById('feeTableBody').innerHTML = tbodyHtml;
+
+                var numInst = config && config.installmentAllowed ? (parseInt(config.numInstallments) || 1) : 1;
+                var instHtml = '';
+                for (var i = 1; i <= numInst; i++) {
+                    var amt = customRec ? (parseFloat(customRec['inst' + i]) || 0) : 0;
+                    var dt = customRec ? (customRec['inst' + i + 'Date'] || '') : '';
+                    var ic = amt > 0 ? 'paid' : '';
+                    var ib = amt > 0 ? '<span class="inst-badge">' + cur + ' ' + fmt(amt) + '</span>' : '<span class="inst-badge empty">Not paid</span>';
+                    var ds = dt ? '<span style="color:#94a3b8;font-size:12px"> — ' + dt + '</span>' : '';
+                    instHtml += '<div class="inst-item ' + ic + '"><div><strong>Instalment ' + i + '</strong>' + ds + '</div>' + ib + '</div>';
+                }
+                document.getElementById('instList').innerHTML = instHtml;
+
+                if (schoolData) {
+                    document.getElementById('momoNameDisp').textContent = schoolData.momoName || 'Contact school';
+                    document.getElementById('momoNumDisp').textContent = schoolData.momoNumber || '—';
+                    var noteEl = document.getElementById('momoNoteDisp');
+                    if (schoolData.momoNote) { noteEl.textContent = schoolData.momoNote; noteEl.style.display = 'block'; }
+                    if (balance > 0) document.getElementById('payAmount').value = balance.toFixed(2);
+                    if (rec.phoneNumber) document.getElementById('payPhone').value = rec.phoneNumber;
+                }
+                populatePortalPaymentMethods();
+                var isPaid = (balance <= 0 && totalFees > 0);
+                document.getElementById('pCongratsCard').style.display = isPaid ? 'flex' : 'none';
+                document.getElementById('payNowCard').style.display = isPaid ? 'none' : 'block';
+            }
+        }
+
+        function refreshParentPortalData() {
+            var btn = document.getElementById('pRefreshBtn');
+            var icon = btn ? btn.querySelector('i') : null;
+            if (icon) icon.classList.add('spin');
+            if (btn) btn.disabled = true;
+
+            showPToast('Refreshing ward fee records…', 'info', 'Refreshing Portal');
+
+            var id = (document.getElementById('studentIdInput').value || '').trim();
+            var selClass = (document.getElementById('studentClassInput').value || '').trim();
+
+            if (!id && studentRec) id = studentRec.id;
+            if (!selClass && studentRec) selClass = studentRec.grade;
+
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run
+                    .withSuccessHandler(function (r) {
+                        if (icon) icon.classList.remove('spin');
+                        if (btn) btn.disabled = false;
+                        if (!r.success) { showPToast('Error: ' + r.message, 'error'); return; }
+                        schoolData = r.school;
+                        if (!r.record) {
+                            showPToast('Student record not found.', 'error');
+                            return;
+                        }
+                        // Load records and siblings
+                        handlePortalDataLoad(r);
+
+                        applySchoolBranding();
+                        showPortal();
+                        showPToast('Fee records updated successfully!', 'success', 'Portal Refreshed');
+                    })
+                    .withFailureHandler(function (e) {
+                        if (icon) icon.classList.remove('spin');
+                        if (btn) btn.disabled = false;
+                        showPToast('Connection error: ' + e.message, 'error');
+                    })
+                    .getPublicSchoolData(id);
+            } else {
+                // Demo fallback
+                setTimeout(function() {
+                    if (icon) icon.classList.remove('spin');
+                    if (btn) btn.disabled = false;
+                    showPToast('Demo mode: records refreshed successfully!', 'success', 'Portal Refreshed');
+                }, 1000);
+            }
+        }
+
+        function goBack() {
+            document.getElementById('portalSection').classList.remove('show');
+            document.getElementById('heroSection').style.display = 'flex';
+            studentRec = null;
+            document.getElementById('studentIdInput').value = '';
+            window.scrollTo(0, 0);
+        }
+
+        // ── PAYMENT ──────────────────────────────────────────
+        function submitPayment() {
+            var amount = document.getElementById('payAmount').value;
+            var ref = (document.getElementById('payRef').value || '').trim();
+            var phone = (document.getElementById('payPhone').value || '').trim();
+            var note = (document.getElementById('payNote').value || '').trim();
+            var methodUsed = (document.getElementById('payMethodUsed') ? document.getElementById('payMethodUsed').value : '').trim();
+            var feeType = document.getElementById('payFeeType').value;
+            if (feeType !== 'regular') {
+                note = '[Fee Type: ' + feeType + '] ' + note;
+            }
+            if (!amount || parseFloat(amount) <= 0) { showPToast('Please enter the amount you paid', 'warning'); return; }
+            if (!methodUsed) { showPToast('Please select how you paid (payment method)', 'warning'); return; }
+            if (!ref) { showPToast('Please enter the Reference / Transaction ID', 'warning'); return; }
+            if (!phone) { showPToast('Please enter your phone number', 'warning'); return; }
+            var isFamilyPay = false;
+            var portalFamilyPayCheckbox = document.getElementById('portalFamilyPayCheckbox');
+            if (portalFamilyPayCheckbox && portalFamilyPayCheckbox.checked && currentWards.length > 1) {
+                isFamilyPay = true;
+            }
+
+            var targetStudentId = studentRec.id;
+            var targetStudentName = studentRec.studentName;
+            if (isFamilyPay) {
+                targetStudentId = 'FAMILY:' + currentWards.map(function(w) { return w.record.id; }).join(',');
+                targetStudentName = 'Family Payment (' + currentWards.map(function(w) { return w.record.studentName; }).join(', ') + ')';
+                note = '[Family Payment] ' + note;
+            }
+
+            var btn = document.getElementById('submitPayBtn');
+            btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split spin me-1"></i> Sending…';
+            var data = { studentId: targetStudentId, studentName: targetStudentName, amount: amount, reference: ref, momoNumber: phone, note: note, paymentMethodUsed: methodUsed };
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run
+                    .withSuccessHandler(function (r) {
+                        btn.disabled = false; btn.innerHTML = '<i class="bi bi-send-check-fill"></i> Notify School of Payment';
+                        if (r.success) { showPToast('Payment notification sent! The school will verify and update your account.', 'success', 'Notification Sent', 5000); document.getElementById('payRef').value = ''; document.getElementById('payNote').value = ''; document.getElementById('payMethodUsed').value = ''; }
+                        else showPToast('Error: ' + r.message, 'error');
+                    })
+                    .withFailureHandler(function (e) { btn.disabled = false; btn.innerHTML = 'Notify School'; showPToast('Error: ' + e.message, 'error'); })
+                    .submitPaymentNotification(data);
+            } else { btn.disabled = false; btn.innerHTML = 'Notify School'; showPToast('Sent (Demo mode)', 'info'); }
+        }
+
+        function copyMoMoNum() {
+            navigator.clipboard.writeText(document.getElementById('momoNumDisp').textContent).then(function () {
+                var b = document.getElementById('momoCopyBtn'); b.textContent = 'Copied!'; setTimeout(function () { b.textContent = 'Copy'; }, 2000);
+            });
+        }
+
+        // ── RECEIPT ──────────────────────────────────────────
+        function downloadReceipt() {
+            if (!studentRec || !schoolData) return;
+            var cur = schoolData.currency || 'GHC', rec = studentRec;
+            var feeType = document.getElementById('payFeeType').value;
+
+            var tf, tp, bal, pays = [], title = "OFFICIAL FEE RECEIPT";
+
+            if (feeType === 'regular') {
+                tf = parseFloat(rec.totalFees) || 0;
+                tp = parseFloat(rec.totalPaid) || 0;
+                bal = tf - tp;
+                for (var i = 1; i <= 6; i++) {
+                    var a = parseFloat(rec['inst' + i]) || 0;
+                    var d = rec['inst' + i + 'Date'] || '';
+                    if (a > 0) pays.push({ n: i, amt: a, date: d });
+                }
+            } else {
+                title = feeType.toUpperCase() + " RECEIPT";
+                var config = customFeeTypes.find(function(c) { return c.name === feeType; });
+                var customRec = customFees.find(function(f) { return f.feeTypeName === feeType; });
+
+                tf = customRec ? (parseFloat(customRec.amount) || 0) : (config ? getCustomFeeAmount(config, rec.grade) : 0);
+                tp = customRec ? (parseFloat(customRec.totalPaid) || 0) : 0;
+                bal = Math.max(0, tf - tp);
+
+                var numInst = config && config.installmentAllowed ? (parseInt(config.numInstallments) || 1) : 1;
+                for (var i = 1; i <= numInst; i++) {
+                    var amt = customRec ? (parseFloat(customRec['inst' + i]) || 0) : 0;
+                    var dt = customRec ? (customRec['inst' + i + 'Date'] || '') : '';
+                    if (amt > 0) {
+                        pays.push({ n: i, amt: amt, date: dt });
+                    }
+                }
+            }
+
+            var w = window.open('', '_blank');
+            w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Receipt</title>');
+            w.document.write('<style>body{font-family:Arial,sans-serif;padding:20mm;max-width:160mm;margin:0 auto;font-size:12px}.hdr{text-align:center;border-bottom:3px solid #1e1b4b;padding-bottom:12px;margin-bottom:14px}h1{font-size:17px;color:#1e1b4b}.si{background:#f8f7ff;padding:10px;border-radius:8px;margin:10px 0;display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:11px}table{width:100%;border-collapse:collapse;margin:10px 0}th{background:#1e1b4b;color:#fff;padding:7px;text-align:left;font-size:11px}td{padding:7px;border-bottom:1px solid #eee;font-size:11px}.tot{background:#f0fdf4;font-weight:700}@media print{.np{display:none}}</style></head><body>');
+            w.document.write('<div class="hdr">');
+            if (schoolData.logo) w.document.write('<img src="' + schoolData.logo + '" style="max-height:55px;margin-bottom:6px"><br>');
+            w.document.write('<h1>' + (schoolData.name || 'School') + '</h1><p class="badge" style="background:#1e1b4b;color:#fff;padding:3px 12px;border-radius:20px;font-size:11px;display:inline-block">' + title + '</p></div>');
+            w.document.write('<div class="si"><div><b>Student:</b> ' + rec.studentName + '</div><div><b>ID:</b> ' + rec.id + '</div><div><b>Grade:</b> ' + rec.grade + '</div><div><b>Session:</b> ' + rec.academicSession + '</div><div><b>Date:</b> ' + new Date().toLocaleDateString('en-GB') + '</div><div><b>Status:</b> ' + (bal <= 0 ? 'Paid' : tp > 0 ? 'Partial' : 'Unpaid') + '</div></div>');
+            w.document.write('<table><thead><tr><th>Instalment</th><th>Amount</th><th>Date</th></tr></thead><tbody>');
+            pays.forEach(function (p) { w.document.write('<tr><td>Instalment ' + p.n + '</td><td>' + cur + ' ' + fmt(p.amt) + '</td><td>' + p.date + '</td></tr>'); });
+            w.document.write('<tr class="tot"><td>Total Fees</td><td>' + cur + ' ' + fmt(tf) + '</td><td></td></tr><tr class="tot"><td>Total Paid</td><td>' + cur + ' ' + fmt(tp) + '</td><td></td></tr><tr class="tot"><td>Balance</td><td>' + cur + ' ' + fmt(Math.max(0, bal)) + '</td><td></td></tr></tbody></table>');
+            w.document.write('<div class="np" style="text-align:center;margin-top:14px"><button onclick="window.print()" style="padding:8px 22px;background:#1e1b4b;color:#fff;border:none;border-radius:6px;cursor:pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>Print / Save PDF</button></div></html>');
+            w.document.close();
+        }
+
+        function getCustomFeeAmount(config, grade) {
+            if (!config) return 0;
+            if (config.classAmounts && grade) {
+                var cleanGrade = String(grade).trim().toLowerCase();
+                for (var c in config.classAmounts) {
+                    if (c.trim().toLowerCase() === cleanGrade) {
+                        var amt = parseFloat(config.classAmounts[c]);
+                        if (!isNaN(amt)) return amt;
+                    }
+                }
+            }
+            return parseFloat(config.defaultAmount) || 0;
+        }
+
+        function fmt(n) { return (isNaN(n) ? 0 : n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+        // ── CHATBOT TOGGLE ────────────────────────────────────
+        function togglePChat() {
+            pChatOpen = !pChatOpen;
+            document.getElementById('pChatWin').classList.toggle('open', pChatOpen);
+            var fab = document.getElementById('pChatFab');
+            var badge = document.getElementById('pChatFabBadge');
+            if (pChatOpen) {
+                fab.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+                if (badge) badge.classList.remove('show');
+            } else {
+                fab.innerHTML = '<svg id="pChatFabIcon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><circle cx="9" cy="10" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="10" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r="1" fill="currentColor" stroke="none"/></svg>';
+            }
+        }
+
+        function switchPTab(tab) {
+            pCurrentTab = tab;
+            ['assist', 'msg'].forEach(function (t) {
+                document.getElementById('tabAssist'.replace('assist', t === 'assist' ? 'Assist' : 'Msg')).classList.toggle('active', t === tab);
+                document.getElementById('pPanel' + t.charAt(0).toUpperCase() + t.slice(1)).classList.toggle('active', t === tab);
+            });
+            // Actually fix the IDs:
+            document.getElementById('tabAssist').classList.toggle('active', tab === 'assist');
+            document.getElementById('tabMsg').classList.toggle('active', tab === 'msg');
+            document.getElementById('pPanelAssist').classList.toggle('active', tab === 'assist');
+            document.getElementById('pPanelMsg').classList.toggle('active', tab === 'msg');
+            if (tab === 'msg') loadParentMessages();
+        }
+
+        // ── PARENT → ADMIN MESSAGING ─────────────────────────
+        function loadParentMessages() {
+            if (!studentRec) return;
+            var thread = document.getElementById('pMsgsThread');
+            if (!thread) return;
+
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run
+                    .withSuccessHandler(function (r) {
+                        renderParentMessages(r.messages || []);
+                    })
+                    .withFailureHandler(function () { })
+                    .getParentMessages(studentRec.id);
+            } else {
+                renderParentMessages([
+                    { id: 'M1', timestamp: '2026-03-15 09:20', type: 'text', content: 'Hello, when can I pay the balance?', adminReply: 'You can come in any weekday between 8am–3pm.', replyTs: '2026-03-15 10:00' },
+                    { id: 'M2', timestamp: '2026-03-15 11:30', type: 'text', content: 'Thank you!', adminReply: '', replyTs: '' },
+                ]);
+            }
+        }
+
+        function renderParentMessages(msgs) {
+            var thread = document.getElementById('pMsgsThread');
+            if (!thread) return;
+            if (!msgs.length) {
+                thread.innerHTML = '<div class="p-msg-thread-empty"><div style="font-size:36px;margin-bottom:8px;color:#94a3b8"><i class="bi bi-chat-left-dots"></i></div><p>No messages yet.</p><small>Type a message below to contact the school admin.</small></div>';
+                return;
+            }
+            thread.innerHTML = msgs.map(function (m) {
+                var typeIcon = m.type === 'audio' ? '<i class="bi bi-mic me-1"></i>' : '';
+                var sent = '<div class="p-msg-thread-item"><div class="p-msg-sent">' + typeIcon + m.content + '<div class="p-msg-meta">You • ' + m.timestamp + '</div></div></div>';
+                var reply = m.adminReply
+                    ? '<div class="p-msg-thread-item"><div class="p-msg-reply"><i class="bi bi-envelope-open me-1"></i>' + m.adminReply + '<div class="p-msg-meta">Admin • ' + m.replyTs + '</div></div></div>'
+                    : '';
+                return sent + reply;
+            }).join('');
+            thread.scrollTop = thread.scrollHeight;
+            // Check for unread replies
+            var hasUnread = msgs.some(function (m) { return m.adminReply && !m.read; });
+            if (hasUnread) {
+                var b = document.getElementById('pMsgUnreadBadge');
+                if (b) b.style.display = 'inline';
+            }
+        }
+
+        function sendParentMsg() {
+            if (!studentRec) { showPToast('Please look up your Student ID first', 'warning'); return; }
+            var inp = document.getElementById('pMsgInput');
+            var msg = (inp.value || '').trim();
+            if (!msg) return;
+
+            var btn = document.getElementById('pMsgSendBtn');
+            btn.disabled = true;
+            var data = { studentId: studentRec.id, studentName: studentRec.studentName, type: 'text', content: msg };
+
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run
+                    .withSuccessHandler(function (r) {
+                        btn.disabled = false;
+                        if (r.success) { inp.value = ''; inp.style.height = 'auto'; setTimeout(loadParentMessages, 400); }
+                        else showPToast('Error sending: ' + r.message, 'error');
+                    })
+                    .withFailureHandler(function (e) { btn.disabled = false; showPToast('Error: ' + e.message, 'error'); })
+                    .sendParentMessage(data);
+            } else {
+                btn.disabled = false; inp.value = ''; inp.style.height = 'auto';
+                renderParentMessages([{ id: 'demo', timestamp: new Date().toLocaleString(), type: 'text', content: msg, adminReply: '', replyTs: '' }]);
+            }
+        }
+
+        // ── AUDIO RECORDING ───────────────────────────────────
+        function toggleAudioRecording() {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                stopAudioRecording(false);
+            } else {
+                startAudioRecording();
+            }
+        }
+
+        function startAudioRecording() {
+            if (!studentRec) { showPToast('Please look up your Student ID first', 'warning'); return; }
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showPToast('Audio recording is not supported in this browser. Please type your message.', 'info');
+                return;
+            }
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(function (stream) {
+                    audioChunks = [];
+                    mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorder.ondataavailable = function (e) { audioChunks.push(e.data); };
+                    mediaRecorder.onstop = function () {
+                        stream.getTracks().forEach(function (t) { t.stop(); });
+                        var blob = new Blob(audioChunks, { type: 'audio/webm' });
+                        sendAudioMessage(blob);
+                    };
+                    mediaRecorder.start();
+                    // UI
+                    document.getElementById('pAudioBtn').classList.add('recording');
+                    document.getElementById('pAudioIndicator').classList.add('show');
+                    audioSeconds = 0;
+                    audioTimerInt = setInterval(function () {
+                        audioSeconds++;
+                        var m = Math.floor(audioSeconds / 60), s = audioSeconds % 60;
+                        document.getElementById('pAudioTimer').textContent = m + ':' + (s < 10 ? '0' : '') + s;
+                        if (audioSeconds >= 120) stopAudioRecording(false); // max 2 min
+                    }, 1000);
+                })
+                .catch(function (err) {
+                    showPToast('Microphone access denied. Please allow microphone access in your browser settings.', 'warning', 'Microphone Blocked', 6000);
+                });
+        }
+
+        function stopAudioRecording(cancel) {
+            clearInterval(audioTimerInt);
+            document.getElementById('pAudioBtn').classList.remove('recording');
+            document.getElementById('pAudioIndicator').classList.remove('show');
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                if (cancel) {
+                    mediaRecorder.stream.getTracks().forEach(function (t) { t.stop(); });
+                    mediaRecorder.ondataavailable = null;
+                    mediaRecorder.onstop = null;
+                    mediaRecorder.stop();
+                    mediaRecorder = null;
+                } else {
+                    mediaRecorder.stop(); // triggers onstop
+                }
+            }
+        }
+
+        function sendAudioMessage(blob) {
+            if (!studentRec) return;
+            var dur = audioSeconds, m = Math.floor(dur / 60), s = dur % 60;
+            var durationStr = m + ':' + (s < 10 ? '0' : '') + s;
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                var base64 = e.target.result;
+                var data = {
+                    studentId: studentRec.id,
+                    studentName: studentRec.studentName,
+                    type: 'audio',
+                    content: '[Audio message — ' + durationStr + '] ' + base64.substring(0, 60) + '…'
+                };
+                if (typeof google !== 'undefined' && google.script) {
+                    google.script.run
+                        .withSuccessHandler(function (r) {
+                            if (r.success) { setTimeout(loadParentMessages, 400); }
+                            else showPToast('Error sending audio: ' + r.message, 'error');
+                        })
+                        .sendParentMessage(data);
+                } else {
+                    renderParentMessages([{ id: 'a1', timestamp: new Date().toLocaleString(), type: 'audio', content: '[Audio message — ' + durationStr + ']', adminReply: '', replyTs: '' }]);
+                }
+            };
+            reader.readAsDataURL(blob);
+        }
+
+        // ── PARENT ASSISTANT CHATBOT ──────────────────────────
+        function pAsk(q) { document.getElementById('pChatInput').value = q; sendPChat(); }
+
+        function pAppendMsg(txt, role) {
+            var msgs = document.getElementById('pChatMsgs');
+            var d = document.createElement('div');
+            d.className = 'p-msg ' + (role || 'bot');
+            d.innerHTML = txt;
+            msgs.appendChild(d);
+            msgs.scrollTop = msgs.scrollHeight;
+        }
+
+        function sendPChat() {
+            var inp = document.getElementById('pChatInput');
+            var q = (inp.value || '').trim();
+            if (!q) return;
+            inp.value = ''; inp.style.height = 'auto';
+            pAppendMsg(q, 'user');
+            setTimeout(function () { pAppendMsg(parentChatAnswer(q), 'bot'); }, 150);
+        }
+
+        function parentChatAnswer(raw) {
+            var q = raw.toLowerCase();
+            var s = schoolData || {};
+            var cur = s.currency || 'GHC';
+            if (q.includes('how') && (q.includes('pay') || q.includes('payment')))
+                return '<i class="bi bi-phone-fill text-primary me-1"></i> <b>How to Pay:</b><br>1. Send MoMo to:<br><b>' + (s.momoName || 'School account') + '</b><br><b>' + (s.momoNumber || 'See payment section') + '</b><br>2. Use your ward\'s name or Student ID as reference<br>3. Come back here and submit the Reference ID in the <b>Pay via MoMo</b> section.';
+            if (q.includes('reference') || q.includes('transaction'))
+                return '<i class="bi bi-key-fill text-warning me-1"></i> <b>Reference ID</b> is the transaction ID in your MoMo confirmation SMS (e.g. GHM2410481234).<br>Enter it in the <b>MoMo Reference</b> field so the school can verify your payment.';
+            if (q.includes('student id') || q.includes('fee id') || q.includes('find id'))
+                return '<i class="bi bi-card-text text-success me-1"></i> Your Student ID is on:<br>• Admission letter<br>• Previous fee bill<br>• Ask class teacher or school office<br><br>It looks like: <b>YDMS260001</b>';
+            if (q.includes('contact') || q.includes('phone') || q.includes('call') || q.includes('school')) {
+                var info = '';
+                if (s.name) info += '<b>' + s.name + '</b><br>';
+                if (s.address) info += '<i class="bi bi-geo-alt-fill text-danger me-1"></i> ' + s.address + '<br>';
+                if (s.phone) info += '<i class="bi bi-telephone-fill text-info me-1"></i> <a href="tel:' + s.phone + '">' + s.phone + '</a><br>';
+                if (s.email) info += '<i class="bi bi-envelope-fill text-secondary me-1"></i> <a href="mailto:' + s.email + '">' + s.email + '</a><br>';
+                if (s.whatsapp) info += '<i class="bi bi-chat-dots-fill text-success me-1"></i> <a href="' + s.whatsapp + '" target="_blank">WhatsApp</a><br>';
+                return info || 'Contact the school office directly for assistance.';
+            }
+            if (q.includes('message') || q.includes('send') || q.includes('chat') || q.includes('admin'))
+                return '<i class="bi bi-chat-dots-fill text-primary me-1"></i> To message the school admin directly, tap the <b>Message Admin</b> tab above!<br><br>You can also record a <b>voice message</b> using the <i class="bi bi-mic-fill text-danger"></i> button if you prefer.';
+            if (q.includes('receipt') || q.includes('download'))
+                return '<i class="bi bi-file-earmark-pdf-fill text-danger me-1"></i> Scroll down on this page to <b>Download Receipt</b> and click the button for a printable PDF.';
+            if (q.includes('momo') || q.includes('mobile money'))
+                return '<i class="bi bi-phone-fill text-primary me-1"></i> <b>MoMo Payment:</b><br>Send to <b>' + (s.momoName || 'School Account') + '</b><br>Number: <b>' + (s.momoNumber || 'Contact school') + '</b><br>' + (s.momoNote ? '<em>' + s.momoNote + '</em><br>' : '') + '<br>Use your ward\'s name as reference!';
+            if (q.includes('balance') || q.includes('amount') || q.includes('fee') || q.includes('owe')) {
+                if (studentRec) {
+                    var tf = parseFloat(studentRec.totalFees) || 0, tp = parseFloat(studentRec.totalPaid) || 0;
+                    return '<i class="bi bi-cash-coin text-success me-1"></i> <b>' + studentRec.studentName + ':</b><br>Total Fees: <b>' + cur + ' ' + fmt(tf) + '</b><br>Paid: <b>' + cur + ' ' + fmt(tp) + '</b><br>Balance: <b>' + cur + ' ' + fmt(Math.max(0, tf - tp)) + '</b>';
+                }
+                return 'Enter your Student ID on the home screen to check your balance.';
+            }
+            return '<i class="bi bi-robot text-primary me-1"></i> I can help with:<br>• <b>How to pay</b><br>• <b>Reference ID</b> explanation<br>• <b>Finding your Student ID</b><br>• <b>Downloading receipts</b><br>• <b>Contacting the school</b><br>• <b>Fee balance</b><br><br>Or use <b>Message Admin</b> tab to chat directly with the school!';
+        }
+
+        function renderNextTermBill() {
+            var rec = studentRec;
+            if (!rec) return;
+            var cur = (schoolData && schoolData.currency) || 'GHC';
+
+            // Calculate regular school fee arrears
+            var totalFees = 0, totalPaid = 0;
+
+            // Omit system fields and components that are new-admissions only
+            var feeKeys = Object.keys(rec).filter(function (k) {
+                if (['id', 'studentName', 'phoneNumber', 'grade', 'academicSession', 'isNewStudent',
+                     'totalFees', 'totalPaid', 'balance', 'paymentStatus', 'createdAt', 'updatedAt', 'discount'].includes(k)) {
+                    return false;
+                }
+                if (k.startsWith('inst')) return false;
+                if (k.toLowerCase().includes('admission')) return false; // skip admission fee on next term bill
+
+                // Check if this component is marked as isForNewStudentsOnly in schoolData.feeComponents
+                var comps = (schoolData && schoolData.feeComponents) || [];
+                var isNewOnly = false;
+                for (var i = 0; i < comps.length; i++) {
+                    if (comps[i].id === k && comps[i].isForNewStudentsOnly) {
+                        isNewOnly = true;
+                        break;
+                    }
+                }
+                if (isNewOnly) return false;
+
+                return parseFloat(rec[k]) > 0;
+            });
+
+            feeKeys.forEach(function (k) { totalFees += parseFloat(rec[k]) || 0; });
+            for (var i = 1; i <= 6; i++) totalPaid += parseFloat(rec['inst' + i]) || 0;
+            if (parseFloat(rec.totalFees) > 0) {
+                totalFees = parseFloat(rec.totalFees); // server value is already net of any discount
+            } else {
+                totalFees = Math.max(0, totalFees - (parseFloat(rec.discount) || 0));
+            }
+            if (parseFloat(rec.totalPaid) >= 0) totalPaid = parseFloat(rec.totalPaid);
+            var arrears = Math.max(0, totalFees - totalPaid);
+
+            // Determine next term session
+            var session = String(rec.academicSession || '');
+            var yearPart = session.split(' ')[0] || '2025/2026';
+            var nextTerm = '';
+            var nextYear = yearPart;
+            if (session.includes('First Term')) {
+                nextTerm = 'Second Term';
+            } else if (session.includes('Second Term')) {
+                nextTerm = 'Third Term';
+            } else {
+                var parts = yearPart.split('/');
+                if (parts.length === 2) {
+                    var y1 = parseInt(parts[0]) + 1;
+                    var y2 = parseInt(parts[1]) + 1;
+                    nextYear = y1 + '/' + y2;
+                }
+                nextTerm = 'First Term';
+            }
+
+            var billItems = [];
+            var totalNextFees = 0;
+
+            // 1. Regular school fee arrears
+            if (arrears > 0) {
+                billItems.push({ name: 'School Fees Arrears (from ' + session + ')', amount: arrears });
+                totalNextFees += arrears;
+            }
+
+            // 2. Custom Fee Arrears — only for extra fee types the admin has
+            //    chosen to roll forward (Settings → "Rollover to next term as
+            //    arrears"); an empty list means roll all forward by default,
+            //    matching the admin app's own Generate Next Term Bill logic.
+            var rolledPortal = (schoolData && schoolData.rolloverCustomFees) ? (typeof schoolData.rolloverCustomFees === 'string' ? schoolData.rolloverCustomFees.split(',').filter(Boolean) : schoolData.rolloverCustomFees) : [];
+            var rollAllExtraFeesByDefaultPortal = rolledPortal.length === 0;
+            var cFeesList = customFees || [];
+            cFeesList.forEach(function(cf) {
+                if (cf) {
+                    var cfStudentId = cf.studentId || cf.studentid || '';
+                    var cfSession = cf.academicSession || cf.academicsession || '';
+                    if (String(cfStudentId).toLowerCase() === String(rec.id).toLowerCase()) {
+                        var name = cf.feeTypeName || cf.feetypename || 'Custom Fee';
+                        var isRolled = rollAllExtraFeesByDefaultPortal || rolledPortal.some(function(r) { return r.toLowerCase().trim() === name.toLowerCase().trim(); });
+                        var bal = parseFloat(cf.balance || 0);
+                        if (isRolled && bal > 0) {
+                            billItems.push({ name: name + ' Arrears (from ' + cfSession + ')', amount: bal });
+                            totalNextFees += bal;
+                        }
+                    }
+                }
+            });
+
+            // 3. Uniform Purchase Arrears
+            var uList = uniforms || [];
+            uList.forEach(function(u) {
+                if (u && parseFloat(u.balance) > 0) {
+                    billItems.push({ name: 'Uniform Purchase Arrears (' + (u.uniformTypes || 'Uniform') + ')', amount: parseFloat(u.balance) });
+                    totalNextFees += parseFloat(u.balance);
+                }
+            });
+
+            // 4. Book Purchase Arrears
+            var bList = books || [];
+            bList.forEach(function(b) {
+                if (b && parseFloat(b.balance) > 0) {
+                    billItems.push({ name: 'Book Purchase Arrears (' + (b.books || 'Books') + ')', amount: parseFloat(b.balance) });
+                    totalNextFees += parseFloat(b.balance);
+                }
+            });
+
+            // 5. Standard term components
+            feeKeys.forEach(function(k) {
+                var amt = parseFloat(rec[k]) || 0;
+                if (amt > 0) {
+                    var label = k.replace(/_\d+$/, '').replace(/([A-Z])/g, ' $1').replace(/^./, function (c) { return c.toUpperCase(); });
+                    billItems.push({ name: label, amount: amt });
+                    totalNextFees += amt;
+                }
+            });
+
+            // 6. Extra fees the school has chosen to fold into next term's regular bill
+            var nextTermIncludedPortal = (schoolData && schoolData.nextTermIncludedExtraFees) ? (typeof schoolData.nextTermIncludedExtraFees === 'string' ? schoolData.nextTermIncludedExtraFees.split(',').filter(Boolean) : schoolData.nextTermIncludedExtraFees) : [];
+            if (nextTermIncludedPortal.length) {
+                nextTermIncludedPortal.forEach(function(feeName) {
+                    var config = (customFeeTypes || []).find(function(cf) { return cf.name === feeName; });
+                    if (!config) return;
+                    var amt = getCustomFeeAmount(config, rec.grade);
+                    if (amt > 0) {
+                        billItems.push({ name: feeName + ' (' + nextTerm + ')', amount: amt });
+                        totalNextFees += amt;
+                    }
+                });
+            }
+
+            var card = document.getElementById('nextBillCard');
+            if (billItems.length > 0 || totalNextFees > 0) {
+                card.style.display = 'block';
+                var tbodyHtml = billItems.map(function(item) {
+                    return '<tr><td>' + item.name + '</td><td style="text-align:right">' + cur + ' ' + fmt(item.amount) + '</td></tr>';
+                }).join('');
+                tbodyHtml += '<tr style="font-weight:bold;background:#eef2ff;"><td style="font-weight:bold;">Total Amount Due</td><td style="text-align:right;font-weight:bold;">' + cur + ' ' + fmt(totalNextFees) + '</td></tr>';
+                document.getElementById('nextBillTableBody').innerHTML = tbodyHtml;
+            } else {
+                card.style.display = 'none';
+            }
+        }
+        function downloadNextBillPdf() {
+            var rec = studentRec;
+            if (!rec) return;
+            var cur = (schoolData && schoolData.currency) || 'GHC';
+
+            // Re-calculate exactly as above
+            var totalFees = 0, totalPaid = 0;
+            var feeKeys = Object.keys(rec).filter(function (k) {
+                return !['id', 'studentName', 'phoneNumber', 'grade', 'academicSession', 'isNewStudent',
+                    'totalFees', 'totalPaid', 'balance', 'paymentStatus', 'createdAt', 'updatedAt', 'discount']
+                    .includes(k) && !k.startsWith('inst') && parseFloat(rec[k]) > 0;
+            });
+            feeKeys.forEach(function (k) { totalFees += parseFloat(rec[k]) || 0; });
+            for (var i = 1; i <= 6; i++) totalPaid += parseFloat(rec['inst' + i]) || 0;
+            if (parseFloat(rec.totalFees) > 0) {
+                totalFees = parseFloat(rec.totalFees); // server value is already net of any discount
+            } else {
+                totalFees = Math.max(0, totalFees - (parseFloat(rec.discount) || 0));
+            }
+            if (parseFloat(rec.totalPaid) >= 0) totalPaid = parseFloat(rec.totalPaid);
+            var arrears = Math.max(0, totalFees - totalPaid);
+
+            var rolled = (schoolData && schoolData.rolloverCustomFees) ? (typeof schoolData.rolloverCustomFees === 'string' ? schoolData.rolloverCustomFees.split(',').filter(Boolean) : schoolData.rolloverCustomFees) : [];
+            rolled = rolled.map(function(r) { return r.trim().toLowerCase(); });
+            // An empty list means the admin hasn't restricted anything —
+            // roll all extra fee types' balances forward by default, same as
+            // the on-screen preview and the admin app's Generate Next Term Bill.
+            var rollAllByDefaultPdf = rolled.length === 0;
+            var customArrears = 0;
+            var customArrearsItems = [];
+
+            var cFeesList = customFees || [];
+            cFeesList.forEach(function(cf) {
+                if (cf) {
+                    var cfStudentId = cf.studentId || cf.studentid || '';
+                    var cfSession = cf.academicSession || cf.academicsession || '';
+                    if (String(cfStudentId).toLowerCase() === String(rec.id).toLowerCase() && String(cfSession).toLowerCase() === String(rec.academicSession).toLowerCase()) {
+                        var name = cf.feeTypeName || cf.feetypename || '';
+                        if (rollAllByDefaultPdf || rolled.includes(name.trim().toLowerCase())) {
+                            var bal = parseFloat(cf.balance || 0);
+                            if (bal > 0) {
+                                customArrears += bal;
+                                customArrearsItems.push({ name: name + ' Arrears', amount: bal });
+                            }
+                        }
+                    }
+                }
+            });
+
+            var session = String(rec.academicSession || '');
+            var yearPart = session.split(' ')[0] || '2025/2026';
+            var nextTerm = '';
+            var nextYear = yearPart;
+            if (session.includes('First Term')) {
+                nextTerm = 'Second Term';
+            } else if (session.includes('Second Term')) {
+                nextTerm = 'Third Term';
+            } else {
+                var parts = yearPart.split('/');
+                if (parts.length === 2) {
+                    var y1 = parseInt(parts[0]) + 1;
+                    var y2 = parseInt(parts[1]) + 1;
+                    nextYear = y1 + '/' + y2;
+                }
+                nextTerm = 'First Term';
+            }
+            var nextSession = nextYear + ' ' + nextTerm;
+
+            var billItems = [];
+            var totalNextFees = 0;
+
+            if (arrears > 0) {
+                billItems.push({ name: 'School Fees Arrears (from ' + session + ')', amount: arrears, isArrears: true });
+                totalNextFees += arrears;
+            }
+            customArrearsItems.forEach(function(item) {
+                billItems.push({ name: item.name + ' (from ' + session + ')', amount: item.amount, isArrears: true });
+                totalNextFees += item.amount;
+            });
+            feeKeys.forEach(function(k) {
+                if (k === 'arrears' || k === 'admissionFees') return;
+                var amt = parseFloat(rec[k]) || 0;
+                if (amt > 0) {
+                    var label = k.replace(/_\d+$/, '').replace(/([A-Z])/g, ' $1').replace(/^./, function (c) { return c.toUpperCase(); });
+                    billItems.push({ name: label, amount: amt, isArrears: false });
+                    totalNextFees += amt;
+                }
+            });
+            var nextTermIncludedPrint = (schoolData && schoolData.nextTermIncludedExtraFees) ? (typeof schoolData.nextTermIncludedExtraFees === 'string' ? schoolData.nextTermIncludedExtraFees.split(',').filter(Boolean) : schoolData.nextTermIncludedExtraFees) : [];
+            if (nextTermIncludedPrint.length) {
+                nextTermIncludedPrint.forEach(function(feeName) {
+                    var config = (customFeeTypes || []).find(function(cf) { return cf.name === feeName; });
+                    if (!config) return;
+                    var amt = getCustomFeeAmount(config, rec.grade);
+                    if (amt > 0) {
+                        billItems.push({ name: feeName + ' (' + nextTerm + ')', amount: amt, isArrears: false });
+                        totalNextFees += amt;
+                    }
+                });
+            }
+
+            var w = window.open('', '_blank');
+            w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Next Term Bill - ' + rec.studentName + '</title>');
+            w.document.write('<style>');
+            w.document.write('*{box-sizing:border-box;margin:0;padding:0}');
+            w.document.write('body{font-family:Arial,sans-serif;font-size:12px;padding:15mm;max-width:180mm;margin:0 auto;color:#1e293b}');
+            w.document.write('.header{display:flex;align-items:flex-start;gap:15px;border-bottom:3px solid var(--primary);padding-bottom:12px;margin-bottom:12px}');
+            w.document.write('.logo{max-height:70px;max-width:70px;object-fit:contain}');
+            w.document.write('.school-name{font-size:18px;font-weight:bold;color:#1e1b4b}');
+            w.document.write('.school-sub{font-size:10px;color:#64748b;margin-top:3px}');
+            w.document.write('.bill-title{text-align:center;background:#1e1b4b;color:#fff;padding:8px;border-radius:4px;font-size:14px;font-weight:bold;margin:10px 0 8px}');
+            w.document.write('.student-info{background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px;margin-bottom:12px;display:grid;grid-template-columns:1fr 1fr;gap:6px}');
+            w.document.write('.info-row{font-size:11px}.info-row span{font-weight:bold}');
+            w.document.write('table{width:100%;border-collapse:collapse;margin-bottom:10px}');
+            w.document.write('th{background:var(--primary);color:#fff;padding:7px 10px;text-align:left;font-size:11px}');
+            w.document.write('td{padding:7px 10px;border-bottom:1px solid #f1f5f9;font-size:11px}');
+            w.document.write('.arrears-row td{background:#fff7ed;color:#c2410c;font-weight:bold}');
+            w.document.write('.total-row td{background:#eef2ff;font-weight:bold;font-size:13px;border-top:2px solid var(--primary)}');
+            w.document.write('.note{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:8px;font-size:10px;color:#166534;margin-bottom:12px}');
+            w.document.write('.sig-area{display:flex;justify-content:space-between;margin-top:25px}');
+            w.document.write('.sig-box{text-align:center;width:140px}');
+            w.document.write('.sig-line{border-bottom:1px solid #000;height:35px;margin-bottom:4px;display:flex;align-items:flex-end;justify-content:center}');
+            w.document.write('.footer{margin-top:12px;padding-top:8px;border-top:1px solid #e2e8f0;font-size:9px;color:#94a3b8;text-align:center}');
+            w.document.write('@media print{.no-print{display:none}@page{margin:10mm;size:A4}}');
+            w.document.write('</style></head><body>');
+
+            w.document.write('<div class="header">');
+            if (schoolData && schoolData.logo) w.document.write('<img src="' + schoolData.logo + '" class="logo">');
+            w.document.write('<div><div class="school-name">' + ((schoolData && schoolData.name) || 'School') + '</div>');
+            if (schoolData && schoolData.motto) w.document.write('<div class="school-sub"><em>' + schoolData.motto + '</em></div>');
+            if (schoolData && schoolData.address) w.document.write('<div class="school-sub">' + schoolData.address + '</div>');
+            if (schoolData && schoolData.phone) w.document.write('<div class="school-sub">Tel: ' + schoolData.phone + '</div>');
+            w.document.write('</div></div>');
+
+            w.document.write('<div class="bill-title">📋 ESTIMATED NEXT TERM BILL — ' + nextSession.toUpperCase() + '</div>');
+
+            var combinedArrears = arrears + customArrears;
+            if (combinedArrears > 0) {
+                w.document.write('<div class="note">⚠️ <strong>Note:</strong> This bill includes outstanding arrears of <strong>' + cur + ' ' + fmt(combinedArrears) + '</strong> carried forward from ' + session + '.</div>');
+            }
+
+            w.document.write('<div class="student-info">');
+            w.document.write('<div class="info-row">Student: <span>' + rec.studentName + '</span></div>');
+            w.document.write('<div class="info-row">Grade: <span>' + rec.grade + '</span></div>');
+            w.document.write('<div class="info-row">Student ID: <span>' + rec.id + '</span></div>');
+            w.document.write('<div class="info-row">Date Issued: <span>' + new Date().toLocaleDateString('en-GB') + '</span></div>');
+            w.document.write('<div class="info-row">Previous Term: <span>' + session + '</span></div>');
+            w.document.write('<div class="info-row">Phone: <span>' + (rec.phoneNumber || '-') + '</span></div>');
+            w.document.write('</div>');
+
+            w.document.write('<table><thead><tr><th>#</th><th>Description</th><th style="text-align:right">Amount (' + cur + ')</th></tr></thead><tbody>');
+            billItems.forEach(function (item, i) {
+                var rowClass = item.isArrears ? 'arrears-row' : '';
+                w.document.write('<tr class="' + rowClass + '"><td>' + (i + 1) + '</td><td>' + item.name + (item.isArrears ? ' <span style="color:#ef4444">(Arrears)</span>' : '') + '</td><td style="text-align:right">' + fmt(item.amount) + '</td></tr>');
+            });
+            w.document.write('<tr class="total-row"><td colspan="2">TOTAL AMOUNT DUE</td><td style="text-align:right">' + cur + ' ' + fmt(totalNextFees) + '</td></tr>');
+            w.document.write('</tbody></table>');
+
+            var bFooterText = (schoolData && schoolData.billFooter) || 'This bill is computer generated · Please retain for your records';
+            w.document.write('<div class="footer">' + ((schoolData && schoolData.name) || 'School') + ' · ' + bFooterText + '</div>');
+            w.document.write('<div class="no-print" style="text-align:center;padding:15px"><button onclick="window.print()" style="padding:8px 24px;background:var(--primary);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>Print Bill</button> <button onclick="window.close()" style="padding:8px 24px;background:#64748b;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;margin-left:8px">Close</button></div>');
+            w.document.write('</body></html>');
+            w.document.close();
+        }
+
+        function populatePortalPaymentMethods() {
+            var pmDiv = document.getElementById('portalPaymentMethodsList');
+            var oldMomoCard = document.getElementById('momoCard');
+            var noteEl = document.getElementById('momoNoteDisp');
+            if (pmDiv && schoolData) {
+                var methods = [];
+                if (schoolData.paymentMethods) {
+                    try {
+                        methods = typeof schoolData.paymentMethods === 'string' ? JSON.parse(schoolData.paymentMethods) : schoolData.paymentMethods;
+                    } catch(e) {
+                        methods = [];
+                    }
+                }
+                methods = (methods || []).filter(function(m) { return m && m.active !== false; });
+
+                var methodSel = document.getElementById('payMethodUsed');
+                if (methodSel) {
+                    var prevVal = methodSel.value;
+                    methodSel.innerHTML = '<option value="">-- Select how you paid --</option>' +
+                        methods.map(function(m) { return '<option value="' + m.name + '">' + m.name + '</option>'; }).join('') +
+                        '<option value="Cash">Cash (paid at school)</option>' +
+                        '<option value="Other">Other</option>';
+                    if (prevVal) methodSel.value = prevVal;
+                }
+
+                if (methods.length > 0) {
+                    if (oldMomoCard) oldMomoCard.style.display = 'none';
+                    if (noteEl) noteEl.style.display = 'none';
+
+                    var pmHtml = '';
+                    methods.forEach(function(m, idx) {
+                        var copyBtnHtml = '';
+                        var numericAcc = String(m.account).replace(/\D/g, '');
+                        if (numericAcc && numericAcc.length >= 9) {
+                            copyBtnHtml = '<button type="button" class="momo-copy" onclick="copyCustomNum(\'' + numericAcc + '\', \'copyBtn_' + idx + '\')" id="copyBtn_' + idx + '" style="position: absolute; right: 12px; top: 12px; font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #e2e8f0; border: 1px solid #cbd5e1; cursor: pointer; line-height: 1.2;">Copy</button>';
+                        }
+                        var logoHtml = m.logo ? '<img src="' + m.logo + '" style="width:34px;height:34px;object-fit:contain;border-radius:6px;border:1px solid #e2e8f0;background:#fff;flex-shrink:0;">' : '<div style="width:34px;height:34px;border-radius:6px;background:#e2e8f0;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:16px;">&#128179;</div>';
+                        pmHtml += '<div class="momo-card" style="position: relative; margin-bottom: 12px; padding: 14px; border-radius: 8px; background: #f8fafc; border: 1px solid #e2e8f0; text-align: left; display:flex; align-items:flex-start; gap:10px;">' +
+                            copyBtnHtml +
+                            logoHtml +
+                            '  <div style="flex:1;min-width:0;">' +
+                            '  <div class="momo-network" style="font-size: 12px; text-transform: uppercase; color: #64748b; font-weight: 700; margin-bottom: 5px;">' + m.name + '</div>' +
+                            '  <div class="momo-number" style="font-size: 22px; color: #0f766e; font-weight: 800; letter-spacing: 1px; margin-bottom: 6px; word-break: break-all;">' + m.account + '</div>' +
+                            '  <div class="momo-name" style="font-size: 16px; color: #1e293b; font-weight: 700;">' + m.instructions + '</div>' +
+                            '  </div>' +
+                            '</div>';
+                    });
+                    pmDiv.innerHTML = pmHtml;
+                } else {
+                    if (oldMomoCard) oldMomoCard.style.display = 'block';
+                    if (noteEl && schoolData.momoNote) { noteEl.textContent = schoolData.momoNote; noteEl.style.display = 'block'; }
+                    pmDiv.innerHTML = '';
+                }
+            }
+        }
+
+        function copyCustomNum(text, btnId) {
+            navigator.clipboard.writeText(text).then(function() {
+                var btn = document.getElementById(btnId);
+                if (btn) {
+                    var original = btn.textContent;
+                    btn.textContent = 'Copied!';
+                    btn.style.background = '#4ade80';
+                    btn.style.color = '#fff';
+                    setTimeout(function() {
+                        btn.textContent = original;
+                        btn.style.background = '#e2e8f0';
+                        btn.style.color = 'inherit';
+                    }, 1500);
+                }
+            });
+        }
+
+        // ════════════════════════════════════════════════════════
+        // PARENT PORTAL LIGHT / DARK THEMING MODULE
+        // ════════════════════════════════════════════════════════
+        function togglePortalTheme() {
+            var isDark = document.body.classList.toggle('dark-mode');
+            localStorage.setItem('portalThemeMode', isDark ? 'dark' : 'light');
+            var icon = document.getElementById('portalThemeToggleIcon');
+            if (icon) {
+                icon.className = isDark ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
+            }
+        }
+
+        // Initialize Theme from localStorage
+        (function() {
+            var theme = localStorage.getItem('portalThemeMode') || 'light';
+            if (theme === 'dark') {
+                document.body.classList.add('dark-mode');
+                setTimeout(function() {
+                    var icon = document.getElementById('portalThemeToggleIcon');
+                    if (icon) icon.className = 'bi bi-sun-fill';
+                }, 100);
+            }
+        })();
+    </script>
+    <div id="pToastContainer"></div>
+</body>
+
+</html>
