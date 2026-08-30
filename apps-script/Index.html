@@ -675,6 +675,12 @@
             border: 1px solid rgba(255, 255, 255, .12);
             border-radius: 10px;
             color: #fff;
+            cursor: pointer;
+            transition: background .15s, border-color .15s;
+        }
+        .sidebar-active-term:hover {
+            background: rgba(255, 255, 255, .14);
+            border-color: rgba(255, 255, 255, .22);
         }
         .sidebar-active-term > i {
             font-size: 16px;
@@ -2746,7 +2752,7 @@
                     <button class="sidebar-close" onclick="closeSidebar()"><i class="bi bi-x-lg"></i></button>
                 </div>
             </div>
-            <div class="sidebar-active-term" id="sidebarActiveTerm" title="The term currently open for new payments, set in Settings">
+            <div class="sidebar-active-term" id="sidebarActiveTerm" title="The term currently open for new payments — click to view its records" onclick="accessCollectorActiveTerm()">
                 <i class="bi bi-calendar-check-fill"></i>
                 <div>
                     <div class="sidebar-active-term-label">Active Term</div>
