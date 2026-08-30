@@ -6575,6 +6575,32 @@
         </div>
     </div>
 
+    <!-- Refund Payment Modal -->
+    <div class="modal-overlay" id="refundModal">
+        <div class="modal-box" style="max-width: 420px; text-align: center; padding: 30px 26px;">
+            <div style="width:64px;height:64px;border-radius:50%;background:#fff7ed;border:2px solid #f59e0b;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+                <i class="bi bi-exclamation-lg" style="font-size:28px;color:#f59e0b;"></i>
+            </div>
+            <h5 class="fw-bold mb-2">Refund Payment</h5>
+            <p class="text-muted small mb-1">Refund payment for <strong id="refundWardName">—</strong>?</p>
+            <p class="text-muted small mb-1" id="refundStudentLine">Student: —</p>
+            <p class="text-muted small mb-3">Paid: <strong id="refundPaidAmount">—</strong></p>
+            <div class="mb-2 text-start">
+                <label class="form-label small fw-semibold mb-1">Refund Amount (<span id="refundCurrency">GHC</span>)</label>
+                <input type="number" class="form-control" id="refundAmount" min="0.01" step="0.01">
+                <small class="text-muted" id="refundMaxHint" style="font-size:11px;"></small>
+            </div>
+            <div class="mb-3 text-start">
+                <label class="form-label small fw-semibold mb-1">Reason</label>
+                <textarea class="form-control" id="refundReason" rows="2" placeholder="Reason (min 3 chars)"></textarea>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-danger flex-fill" onclick="submitRefund()" id="refundSubmitBtn"><i class="bi bi-arrow-return-left me-1"></i>Refund</button>
+                <button type="button" class="btn btn-secondary flex-fill" onclick="closeRefundModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Student Profile Modal -->
     <div class="modal-overlay" id="studentProfileModal">
         <div class="modal-box" style="max-width: 650px; max-height: 85vh; overflow-y: auto;">
@@ -7430,6 +7456,7 @@
             else if (action === 'thermalcustom') printThermalReceiptCustom(id, session, btn.dataset.feename);
             else if (action === 'billcustom') printBillCustom(id, session, btn.dataset.feename);
             else if (action === 'receiptcustom') printReceiptCustom(id, session, btn.dataset.feename);
+            else if (action === 'refund') openRefundModal(id, session, btn.dataset.feename || 'regular');
         });
 
         function toggleDropdown() { document.getElementById('dropdownMenu').classList.toggle('show'); }
@@ -9203,6 +9230,9 @@
                 if (customRecord && (parseFloat(customRecord.totalPaid) || 0) > 0) {
                     html += '<button class="act-btn btn btn-sm btn-outline-warning me-1" data-action="thermalcustom" data-id="' + r.id + '" data-session="' + session + '" data-feename="' + selectedFeeType + '" title="Thermal Print Receipt"><i class="bi bi-printer-fill"></i></button>';
                 }
+                if (customRecord && (parseFloat(customRecord.totalPaid) || 0) > 0) {
+                    html += '<button class="act-btn btn btn-sm btn-outline-danger me-1" data-action="refund" data-id="' + r.id + '" data-session="' + session + '" data-feename="' + selectedFeeType + '" title="Refund Payment"><i class="bi bi-arrow-return-left"></i></button>';
+                }
                 if (phone) {
                     var intlPhone = phone.startsWith('0') ? '233' + phone.substring(1) : (phone.startsWith('233') ? phone : '233' + phone);
                     html += '<a href="tel:+' + intlPhone + '" class="btn btn-sm btn-outline-success me-1" title="Call Parent" style="padding:2px 7px;font-size:11px"><i class="bi bi-telephone"></i></a>';
@@ -9217,6 +9247,9 @@
                 html += '<button class="act-btn btn btn-sm btn-outline-primary me-1" data-action="edit" data-id="' + r.id + '" data-session="' + session + '" title="Pay / Edit Fee"><i class="bi bi-credit-card"></i></button>';
                 html += '<button class="act-btn btn btn-sm btn-outline-warning me-1" data-action="nextbill" data-id="' + r.id + '" data-session="' + session + '" title="Generate Next Term Bill"><i class="bi bi-calendar-plus"></i></button>';
                 html += '<button class="act-btn btn btn-sm btn-outline-warning me-1" data-action="thermal" data-id="' + r.id + '" data-session="' + session + '" title="Thermal Print Receipt"><i class="bi bi-printer-fill"></i></button>';
+                if (safeTotals(r).totalPaid > 0) {
+                    html += '<button class="act-btn btn btn-sm btn-outline-danger me-1" data-action="refund" data-id="' + r.id + '" data-session="' + session + '" data-feename="regular" title="Refund Payment"><i class="bi bi-arrow-return-left"></i></button>';
+                }
                 if (phone) {
                     var intlPhoneCol = phone.startsWith('0') ? '233' + phone.substring(1) : (phone.startsWith('233') ? phone : '233' + phone);
                     html += '<a href="tel:+' + intlPhoneCol + '" class="btn btn-sm btn-outline-success me-1" title="Call Parent" style="padding:2px 7px;font-size:11px"><i class="bi bi-telephone"></i></a>';
@@ -9240,6 +9273,9 @@
             if (isAdmin) {
                 html += '<button class="act-btn act-btn-secondary btn btn-sm btn-outline-warning me-1" data-action="nextbill" data-id="' + r.id + '" data-session="' + session + '" title="Generate Next Term Bill"><i class="bi bi-calendar-plus"></i></button>';
                 html += '<button class="act-btn act-btn-secondary btn btn-sm btn-outline-warning me-1" data-action="promote" data-id="' + r.id + '" data-session="' + session + '" title="Promote to Next Term"><i class="bi bi-person-up"></i></button>';
+                if (safeTotals(r).totalPaid > 0) {
+                    html += '<button class="act-btn act-btn-secondary btn btn-sm btn-outline-danger me-1" data-action="refund" data-id="' + r.id + '" data-session="' + session + '" data-feename="regular" title="Refund Payment"><i class="bi bi-arrow-return-left"></i></button>';
+                }
                 html += '<button class="act-btn btn btn-sm btn-outline-danger" data-action="delete" data-id="' + r.id + '" data-session="' + session + '" title="Delete"><i class="bi bi-trash"></i></button>';
             }
             return wrapActionBtns(html);
@@ -9811,6 +9847,115 @@
                 hideLoad();
                 showToast('Payment saved (demo mode)!', 'success');
                 closeCustomFeeModal();
+            }
+        }
+
+        // ════════════════════════════════════════════════════════
+        // REFUND PAYMENT — admin/collector refund a parent (overpayment
+        // or a parent-requested refund) straight from the student row.
+        // Reduces the actual recorded payment (not just a bookkeeping
+        // note), so the balance/dashboard/portal reflect it correctly.
+        // ════════════════════════════════════════════════════════
+        var _refundCtx = null;
+
+        function openRefundModal(id, session, feeType) {
+            feeType = feeType || 'regular';
+            var rec = allRecords.find(function (r) { return String(r.id) === String(id) && (!session || String(r.academicSession) === String(session)); });
+            if (!rec) { showToast('Student record not found', 'error'); return; }
+            var cur = settings.currency || 'GHC';
+
+            var paid, label;
+            if (feeType === 'regular') {
+                paid = safeTotals(rec).totalPaid;
+                label = 'Regular School Fees';
+            } else {
+                var cf = allCustomFeeRecords.find(function (c) {
+                    return c && String(c.studentId) === String(id) && String(c.feeTypeName) === String(feeType) && String(c.academicSession) === String(session);
+                });
+                paid = cf ? (parseFloat(cf.totalPaid) || 0) : 0;
+                label = feeType;
+            }
+            if (paid <= 0) { showToast('No payment recorded to refund for this fee', 'warning'); return; }
+
+            _refundCtx = { id: id, session: session, feeType: feeType, studentName: rec.studentName, grade: rec.grade, maxAmount: paid };
+
+            document.getElementById('refundWardName').textContent = rec.studentName;
+            document.getElementById('refundStudentLine').textContent = 'Student: ' + rec.studentName + ' (' + id + ') — ' + label;
+            document.getElementById('refundPaidAmount').textContent = cur + ' ' + paid.toFixed(2);
+            document.getElementById('refundCurrency').textContent = cur;
+            document.getElementById('refundAmount').value = paid.toFixed(2);
+            document.getElementById('refundAmount').max = paid;
+            document.getElementById('refundMaxHint').textContent = 'Up to ' + cur + ' ' + paid.toFixed(2) + ' can be refunded.';
+            document.getElementById('refundReason').value = '';
+            document.getElementById('refundModal').classList.add('show');
+        }
+
+        function closeRefundModal() {
+            document.getElementById('refundModal').classList.remove('show');
+            _refundCtx = null;
+        }
+
+        function submitRefund() {
+            if (!_refundCtx) { closeRefundModal(); return; }
+            var amount = parseFloat(document.getElementById('refundAmount').value) || 0;
+            var reason = (document.getElementById('refundReason').value || '').trim();
+            var cur = settings.currency || 'GHC';
+
+            if (amount <= 0) { showToast('Enter a refund amount greater than zero', 'warning'); return; }
+            if (amount > _refundCtx.maxAmount + 0.001) { showToast('Refund cannot exceed the amount paid (' + cur + ' ' + _refundCtx.maxAmount.toFixed(2) + ')', 'warning'); return; }
+            if (reason.length < 3) { showToast('Please enter a reason (at least 3 characters)', 'warning'); return; }
+
+            var ctx = _refundCtx;
+            var btn = document.getElementById('refundSubmitBtn');
+            btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Refunding…';
+
+            var payload = { studentId: ctx.id, session: ctx.session, feeType: ctx.feeType, amount: amount, reason: reason, refundedBy: (currentUser && (currentUser.username || currentUser.email)) || 'Admin' };
+
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run.withSuccessHandler(function (res) {
+                    btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-return-left me-1"></i>Refund';
+                    if (!res.success) { showToast(res.message || 'Refund failed', 'error'); return; }
+
+                    // Instantly merge the updated record into local state — same pattern
+                    // used elsewhere so the table/dashboard don't need a manual refresh.
+                    if (ctx.feeType === 'regular') {
+                        var idx = allRecords.findIndex(function (r) { return String(r.id) === String(ctx.id) && String(r.academicSession) === String(ctx.session); });
+                        if (idx !== -1) allRecords[idx] = Object.assign({}, allRecords[idx], res.record);
+                        lsSet('records', allRecords);
+                    } else {
+                        if (!Array.isArray(allCustomFeeRecords)) allCustomFeeRecords = [];
+                        var cfIdx = allCustomFeeRecords.findIndex(function (c) {
+                            return c && String(c.studentId) === String(ctx.id) && String(c.feeTypeName) === String(ctx.feeType) && String(c.academicSession) === String(ctx.session);
+                        });
+                        if (cfIdx !== -1) allCustomFeeRecords[cfIdx] = Object.assign({}, allCustomFeeRecords[cfIdx], res.record);
+                        lsSet('customFeeRecords', allCustomFeeRecords);
+                    }
+
+                    // Log the refund as an expense too, so Finance & Reports stays accurate
+                    // (same convention as the overpayment "refund" flow).
+                    var ieEntry = {
+                        date: todayStr(), type: 'Expense', category: 'Fee Refund',
+                        description: 'Refund to ' + ctx.studentName + ' (' + ctx.id + ', ' + ctx.session + ') — ' + reason,
+                        amount: amount
+                    };
+                    google.script.run.withSuccessHandler(function (ieRes) {
+                        if (ieRes && ieRes.success) { ieEntry.id = ieRes.id; allIEEntries.push(ieEntry); try { renderIETable(); } catch (e) {} }
+                    }).withFailureHandler(function () {}).saveIncomeExpense(ieEntry);
+
+                    var visibleTerm = getVisibleTermSection();
+                    if (visibleTerm) renderTerm(visibleTerm.key, visibleTerm.name, (termState[visibleTerm.key] && termState[visibleTerm.key].page) || 1);
+                    try { updateDash(); } catch (e) {}
+
+                    showToast(cur + ' ' + amount.toFixed(2) + ' refunded to ' + ctx.studentName + '.', 'success', 'Refund Processed', 5000);
+                    closeRefundModal();
+                }).withFailureHandler(function (err) {
+                    btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-return-left me-1"></i>Refund';
+                    showToast('Error: ' + err.message, 'error');
+                }).refundPayment(payload);
+            } else {
+                btn.disabled = false; btn.innerHTML = '<i class="bi bi-arrow-return-left me-1"></i>Refund';
+                showToast('Refund processed (demo mode)', 'info');
+                closeRefundModal();
             }
         }
 

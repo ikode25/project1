@@ -1601,6 +1601,248 @@
             padding: 10px 12px;
             border-bottom: 1px solid #f1f5f9;
         }
+        /* A wide table scrolls inside its own box instead of pushing the page
+           past the phone's edge — .table-responsive had no rule at all before,
+           so wide tables just got silently clipped by body{overflow-x:hidden}. */
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            max-width: 100%;
+        }
+
+        /* ════════════════════════════════════════════════════════
+           PARENT PORTAL SHELL — sidebar (desktop) / slide-in drawer
+           (mobile) + paged content, so a parent sees one focused
+           screen at a time instead of everything stacked at once.
+           ════════════════════════════════════════════════════════ */
+        .portal-topbar {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, var(--deep), var(--deep2));
+            position: sticky;
+            top: 0;
+            z-index: 70;
+        }
+        .portal-topbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #fff;
+            font-weight: 700;
+            font-size: 14px;
+            min-width: 0;
+            overflow: hidden;
+        }
+        .portal-topbar-brand span {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .portal-topbar-btn {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            border: none;
+            background: rgba(255,255,255,.12);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .portal-sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, .5);
+            z-index: 90;
+        }
+        .portal-sidebar-overlay.show { display: block; }
+
+        .portal-sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            width: 240px;
+            background: linear-gradient(180deg, var(--deep), var(--deep2));
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+            overflow-y: auto;
+        }
+        .portal-sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 20px 18px;
+            border-bottom: 1px solid rgba(255,255,255,.1);
+        }
+        .portal-sidebar-schoolname {
+            color: #fff;
+            font-weight: 700;
+            font-size: 14px;
+            font-family: 'Playfair Display', serif;
+            line-height: 1.25;
+        }
+        .portal-sidebar-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            padding: 14px 12px;
+            flex: 1;
+        }
+        .portal-nav-link {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            padding: 11px 14px;
+            border-radius: 10px;
+            color: rgba(255,255,255,.7);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: .15s;
+        }
+        .portal-nav-link i { font-size: 15px; width: 18px; text-align: center; }
+        .portal-nav-link:hover { background: rgba(255,255,255,.08); color: #fff; }
+        .portal-nav-link.active { background: var(--gold); color: var(--deep); }
+        .portal-sidebar-footer {
+            padding: 14px 12px 20px;
+            border-top: 1px solid rgba(255,255,255,.1);
+        }
+        .portal-sidebar-footer .back-btn { justify-content: center; width: 100%; }
+        .portal-sidebar-footer .back-btn + .back-btn { margin-top: 8px; }
+
+        .portal-main {
+            margin-left: 240px;
+            min-height: 100vh;
+        }
+        .portal-page { display: none; }
+        .portal-page.active { display: block; }
+
+        @media (max-width: 900px) {
+            .portal-topbar { display: flex; }
+            .portal-sidebar {
+                width: 82%;
+                max-width: 280px;
+                transform: translateX(-100%);
+                transition: transform .25s ease;
+                box-shadow: 10px 0 30px rgba(0,0,0,.25);
+            }
+            .portal-sidebar.open { transform: translateX(0); }
+            .portal-main { margin-left: 0; }
+        }
+
+        /* Dashboard page */
+        .pdash-header {
+            background: linear-gradient(135deg, var(--deep), var(--deep2));
+            padding: 22px 24px;
+        }
+        .pdash-greeting { color: rgba(255,255,255,.7); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
+        .pdash-title { color: #fff; font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; margin-top: 3px; }
+        .pdash-total-strip {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            padding: 14px 24px;
+            background: var(--deep);
+        }
+        .pdash-total-card {
+            background: rgba(255,255,255,.06);
+            border: 1px solid rgba(255,255,255,.1);
+            border-radius: 12px;
+            padding: 12px 16px;
+            flex: 1;
+            min-width: 140px;
+        }
+        .pdash-total-label { color: rgba(255,255,255,.5); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+        .pdash-total-value { color: #fff; font-size: 19px; font-weight: 700; margin-top: 3px; }
+        .pdash-total-value.danger { color: #fca5a5; }
+        .pdash-body { max-width: 900px; margin: 0 auto; padding: 22px 20px; }
+        .pdash-section-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #475569;
+            text-transform: uppercase;
+            letter-spacing: .4px;
+            margin: 0 0 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .pdash-section-title a { font-size: 12px; font-weight: 600; color: var(--primary); text-decoration: none; text-transform: none; letter-spacing: 0; }
+        .ward-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; margin-bottom: 26px; }
+        .ward-card {
+            background: #fff;
+            border-radius: 14px;
+            box-shadow: 0 2px 12px rgba(0,0,0,.06);
+            padding: 18px;
+            cursor: pointer;
+            transition: transform .15s, box-shadow .15s;
+            border: 1px solid #f1f5f9;
+        }
+        .ward-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,.1); }
+        .ward-card-name { font-weight: 700; font-size: 15px; color: #1e293b; margin-bottom: 2px; }
+        .ward-card-meta { font-size: 12px; color: #94a3b8; margin-bottom: 12px; }
+        .ward-card-bal-label { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: .4px; }
+        .ward-card-bal { font-size: 20px; font-weight: 800; color: #dc2626; margin-top: 2px; }
+        .ward-card-bal.zero { color: #059669; }
+        .ward-card-btn {
+            margin-top: 12px;
+            width: 100%;
+            background: #eef2ff;
+            color: var(--primary);
+            border: none;
+            border-radius: 9px;
+            padding: 9px;
+            font-size: 12.5px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .ward-card-btn:hover { background: var(--primary); color: #fff; }
+
+        .activity-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            background: #fff;
+            border-radius: 12px;
+            border: 1px solid #f1f5f9;
+            margin-bottom: 8px;
+        }
+        .activity-icon {
+            width: 36px; height: 36px; border-radius: 50%;
+            background: #f0fdf4; color: #059669;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0; font-size: 15px;
+        }
+        .activity-main { flex: 1; min-width: 0; }
+        .activity-title { font-size: 13px; font-weight: 600; color: #1e293b; }
+        .activity-sub { font-size: 11.5px; color: #94a3b8; }
+        .activity-amount { font-weight: 700; color: #059669; font-size: 13.5px; white-space: nowrap; }
+        .pdash-empty { text-align: center; color: #94a3b8; font-size: 13px; padding: 24px; }
+
+        /* Payment History page (consolidated, all wards) */
+        .phist-body { max-width: 900px; margin: 0 auto; padding: 22px 20px; }
+
+        /* Next Term Bill page (per-ward stacked cards) */
+        .pntb-body { max-width: 900px; margin: 0 auto; padding: 22px 20px; }
+        .pntb-ward-card { background: #fff; border-radius: var(--radius); box-shadow: 0 2px 12px rgba(0,0,0,.06); margin-bottom: 20px; overflow: hidden; }
+        .pntb-ward-head { padding: 14px 18px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+        .pntb-ward-head h6 { margin: 0; font-size: 14.5px; font-weight: 700; }
+        .pntb-ward-settled { text-align: center; color: #64748b; font-size: 12.5px; padding: 18px; }
+
+        /* Ward Detail page inherits the previous .portal-content spacing */
+        #pageWardDetail .portal-content { padding: 0; }
 
         /* ── Dark Theme Overrides ── */
         body.dark-mode {
@@ -1614,11 +1856,25 @@
         body.dark-mode .card,
         body.dark-mode .momo-card,
         body.dark-mode .inst-item,
-        body.dark-mode .family-table {
+        body.dark-mode .family-table,
+        body.dark-mode .ward-card,
+        body.dark-mode .activity-item,
+        body.dark-mode .pntb-ward-card {
             background-color: #1e293b !important;
             border-color: #334155 !important;
             color: #f1f5f9 !important;
             box-shadow: 0 10px 25px rgba(0,0,0,0.2) !important;
+        }
+        body.dark-mode .ward-card-name,
+        body.dark-mode .activity-title,
+        body.dark-mode .pntb-ward-head h6 {
+            color: #f8fafc !important;
+        }
+        body.dark-mode .ward-card-btn {
+            background: rgba(99,102,241,.15) !important;
+        }
+        body.dark-mode .pdash-section-title {
+            color: #cbd5e1 !important;
         }
         body.dark-mode .family-table {
             background: #1e293b !important;
@@ -1811,21 +2067,76 @@
     <!-- ═══ PARENT PORTAL (after lookup) ═════════════════════ -->
     <div id="portalSection" class="portal-wrap">
 
+        <!-- Mobile top bar -->
+        <div class="portal-topbar" id="portalTopbar">
+            <button class="portal-topbar-btn" onclick="togglePortalSidebar()" title="Menu"><i class="bi bi-list"></i></button>
+            <div class="portal-topbar-brand">
+                <div id="portalLogoWrapMobile"></div>
+                <span id="portalSchoolNameMobile">School Portal</span>
+            </div>
+            <button class="portal-topbar-btn" onclick="togglePortalTheme()" title="Toggle Light/Dark Theme"><i id="portalThemeToggleIconMobile" class="bi bi-moon-fill"></i></button>
+        </div>
+
+        <!-- Sidebar overlay (mobile) -->
+        <div class="portal-sidebar-overlay" id="portalSidebarOverlay" onclick="closePortalSidebar()"></div>
+
+        <!-- Sidebar -->
+        <nav class="portal-sidebar" id="portalSidebar">
+            <div class="portal-sidebar-brand">
+                <div id="portalLogoWrap"></div>
+                <div class="portal-sidebar-schoolname" id="portalSchoolName">School Portal</div>
+            </div>
+            <div class="portal-sidebar-nav">
+                <a class="portal-nav-link active" data-page="dashboard" onclick="switchPortalPage('dashboard')"><i class="bi bi-grid-1x2-fill"></i> Dashboard</a>
+                <a class="portal-nav-link" data-page="wardDetail" onclick="switchPortalPage('wardDetail')"><i class="bi bi-receipt"></i> Pay Fees</a>
+                <a class="portal-nav-link" data-page="paymentHistory" onclick="switchPortalPage('paymentHistory')"><i class="bi bi-clock-history"></i> Payment History</a>
+                <a class="portal-nav-link" data-page="nextTermBill" onclick="switchPortalPage('nextTermBill')"><i class="bi bi-calendar-plus"></i> Next Term Bill</a>
+            </div>
+            <div class="portal-sidebar-footer">
+                <button class="back-btn" onclick="togglePortalTheme()"><i id="portalThemeToggleIcon" class="bi bi-moon-fill"></i> <span id="portalThemeToggleLabel">Dark Mode</span></button>
+                <button class="back-btn" onclick="refreshParentPortalData()" id="pRefreshBtn"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+                <button class="back-btn" onclick="goBack()"><i class="bi bi-arrow-left"></i> Go Back</button>
+            </div>
+        </nav>
+
+        <!-- Main content -->
+        <div class="portal-main" id="portalMain">
+
+        <!-- ══ PAGE: Dashboard ══ -->
+        <div class="portal-page active" id="pageDashboard">
+            <div class="pdash-header">
+                <div class="pdash-greeting">Welcome back</div>
+                <div class="pdash-title" id="pdashGreetingName">Your Wards</div>
+            </div>
+            <div class="pdash-total-strip" id="pdashTotalStrip" style="display:none">
+                <div class="pdash-total-card">
+                    <div class="pdash-total-label">Family Total Fees</div>
+                    <div class="pdash-total-value" id="pdashTotalFees">—</div>
+                </div>
+                <div class="pdash-total-card">
+                    <div class="pdash-total-label">Family Total Paid</div>
+                    <div class="pdash-total-value" id="pdashTotalPaid" style="color:#6ee7b7">—</div>
+                </div>
+                <div class="pdash-total-card">
+                    <div class="pdash-total-label">Family Balance Due</div>
+                    <div class="pdash-total-value danger" id="pdashTotalDue">—</div>
+                </div>
+            </div>
+            <div class="pdash-body">
+                <div class="pdash-section-title">Your Wards</div>
+                <div class="ward-card-grid" id="pdashWardGrid"></div>
+
+                <div class="pdash-section-title">Recent Payments <a onclick="switchPortalPage('paymentHistory')">View All</a></div>
+                <div id="pdashActivityList"></div>
+            </div>
+        </div>
+
+        <!-- ══ PAGE: Ward Detail (fee breakdown / pay / receipt) ══ -->
+        <div class="portal-page" id="pageWardDetail">
         <!-- Portal Header -->
         <div class="portal-header">
-            <div class="portal-header-inner">
-                <div class="portal-school-info">
-                    <div id="portalLogoWrap"></div>
-                    <div class="portal-school-name" id="portalSchoolName">School Portal</div>
-                </div>
-                <div style="display:flex; gap:8px; align-items:center;">
-                    <!-- Light/Dark Mode Switcher -->
-                    <button class="back-btn" id="portalThemeToggleBtn" onclick="togglePortalTheme()" style="width:36px; height:36px; padding:0; display:flex; align-items:center; justify-content:center; border-radius:50%; background:rgba(255,255,255,0.1); border:none; color:#fff;" title="Toggle Light/Dark Theme">
-                        <i id="portalThemeToggleIcon" class="bi bi-moon-fill"></i>
-                    </button>
-                    <button class="back-btn" onclick="refreshParentPortalData()" id="pRefreshBtn"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
-                    <button class="back-btn" onclick="goBack()"><i class="bi bi-arrow-left"></i> Go Back</button>
-                </div>
+            <div class="portal-header-inner" style="justify-content:flex-end;">
+                <button class="back-btn" onclick="switchPortalPage('dashboard')"><i class="bi bi-arrow-left"></i> Dashboard</button>
             </div>
             <!-- Sibling switcher -->
             <div id="siblingSwitcherContainer" class="sibling-switcher-container" style="display:none; padding:10px 16px; background:rgba(255,255,255,0.05); border-bottom:1px solid rgba(255,255,255,0.1); margin-top:-10px; margin-bottom:10px; border-radius:12px;">
@@ -1870,29 +2181,6 @@
             <!-- Fee Tabs -->
             <div id="portalFeeTabs" class="fee-tabs-container"></div>
 
-            <!-- Family Summary Dashboard -->
-            <div id="familyOverviewCard" class="family-summary-card" style="display:none; margin-bottom:16px;">
-                <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom" style="border-color:#cbd5e1!important;">
-                    <h6 class="mb-0 fw-bold text-primary" style="color:#1e1b4b!important; font-size:14px;"><i class="bi bi-people-fill me-2 text-indigo"></i>Family Wards Fee Summary</h6>
-                    <span class="badge bg-danger fs-6" id="familyTotalDueBadge" style="border-radius:30px; font-weight:600; font-size:11px; padding:4px 10px;">Total Due: GHC 0.00</span>
-                </div>
-                <div class="table-responsive">
-                    <table class="family-table">
-                        <thead>
-                            <tr style="border-bottom: 2px solid #e2e8f0;">
-                                <th style="text-align:left; font-size:11px; color:#64748b; padding:6px 8px;">Ward Name</th>
-                                <th style="text-align:left; font-size:11px; color:#64748b; padding:6px 8px;">Class</th>
-                                <th style="text-align:left; font-size:11px; color:#64748b; padding:6px 8px;">Total Bill</th>
-                                <th style="text-align:left; font-size:11px; color:#64748b; padding:6px 8px;">Paid</th>
-                                <th style="text-align:left; font-size:11px; color:#64748b; padding:6px 8px;">Outstanding</th>
-                                <th style="text-align:right; font-size:11px; color:#64748b; padding:6px 8px;">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="familyOverviewBody"></tbody>
-                    </table>
-                </div>
-            </div>
-
             <!-- Congratulations Banner -->
             <div class="congrats-card" id="pCongratsCard" style="display:none">
                 <div class="congrats-icon"><i class="bi bi-trophy-fill"></i></div>
@@ -1930,31 +2218,6 @@
                 </div>
                 <div class="section-body">
                     <div class="inst-list" id="instList"></div>
-                </div>
-            </div>
-
-            <!-- Next Term Bill Preview -->
-            <div class="section-card" id="nextBillCard" style="display:none">
-                <div class="section-head" style="display:flex;justify-content:space-between;align-items:center;">
-                    <div style="display:flex;align-items:center;gap:10px;">
-                        <div class="icon" style="background:#fae8ff;color:#d946ef"><i class="bi bi-calendar-plus"></i></div>
-                        <h6 style="margin:0;">Next Term Bill Preview</h6>
-                    </div>
-                    <button class="back-btn" onclick="downloadNextBillPdf()" style="margin:0;padding:4px 10px;font-size:12px;background:var(--primary);color:#fff;border-color:var(--primary);"><i class="bi bi-file-earmark-pdf"></i> Download PDF</button>
-                </div>
-                <div class="section-body" style="padding:0">
-                    <div style="padding:10px 15px;background:#f8fafc;color:#64748b;font-size:11px;border-bottom:1px solid #e2e8f0;line-height:1.4;">
-                        💡 This preview shows your ward's next term estimated bill, including any outstanding arrears carried forward from this term.
-                    </div>
-                    <table class="fee-table" id="nextBillTable" style="margin:0;">
-                        <thead>
-                            <tr>
-                                <th>Description</th>
-                                <th style="text-align:right">Amount</th>
-                            </tr>
-                        </thead>
-                        <tbody id="nextBillTableBody"></tbody>
-                    </table>
                 </div>
             </div>
 
@@ -2049,6 +2312,34 @@
             </div>
 
         </div>
+        </div><!-- /pageWardDetail -->
+
+        <!-- ══ PAGE: Payment History (consolidated, all wards) ══ -->
+        <div class="portal-page" id="pagePaymentHistory">
+            <div class="pdash-header">
+                <div class="pdash-greeting">All Wards</div>
+                <div class="pdash-title">Payment History</div>
+            </div>
+            <div class="phist-body">
+                <div id="phistList"></div>
+            </div>
+        </div>
+
+        <!-- ══ PAGE: Next Term Bill (per-ward, all wards) ══ -->
+        <div class="portal-page" id="pageNextTermBill">
+            <div class="pdash-header">
+                <div class="pdash-greeting">All Wards</div>
+                <div class="pdash-title">Next Term Bill Preview</div>
+            </div>
+            <div class="pntb-body">
+                <div style="background:#eef2ff;color:#3730a3;font-size:12px;border-radius:10px;padding:10px 14px;margin-bottom:16px;line-height:1.5;">
+                    💡 These are estimated bills for next term, including any outstanding arrears carried forward from this term.
+                </div>
+                <div id="pntbList"></div>
+            </div>
+        </div>
+
+        </div><!-- /portalMain -->
 
         <!-- Footer -->
         <div class="footer">
@@ -2265,6 +2556,7 @@
             if (s.name) {
                 document.getElementById('heroSchoolName').textContent = s.name;
                 document.getElementById('portalSchoolName').textContent = s.name;
+                if (document.getElementById('portalSchoolNameMobile')) document.getElementById('portalSchoolNameMobile').textContent = s.name;
                 document.title = s.name + ' — Parent Portal';
                 document.getElementById('statSchool').textContent = s.name.split(' ').slice(0, 2).join(' ');
                 document.getElementById('footerSchool').textContent = s.name + ' — Parent Fee Portal';
@@ -2274,7 +2566,8 @@
             if (s.logo) {
                 var ph = document.getElementById('navLogoPlaceholder');
                 if (ph) ph.outerHTML = '<img src="' + s.logo + '" class="nav-logo" id="navLogoImg">';
-                document.getElementById('portalLogoWrap').innerHTML = '<img src="' + s.logo + '" class="portal-logo">';
+                document.getElementById('portalLogoWrap').innerHTML = '<img src="' + s.logo + '" style="width:34px;height:34px;border-radius:8px;object-fit:cover;">';
+                if (document.getElementById('portalLogoWrapMobile')) document.getElementById('portalLogoWrapMobile').innerHTML = '<img src="' + s.logo + '" style="width:26px;height:26px;border-radius:6px;object-fit:cover;">';
             } else {
                 var ph2 = document.getElementById('navLogoPlaceholder');
                 if (ph2) ph2.textContent = (s.name || 'S')[0].toUpperCase();
@@ -2337,7 +2630,10 @@
             return { totalFees: totalFees, totalPaid: totalPaid, balance: balance };
         }
 
-        function switchWard(index) {
+        // navigateToPage: when called from the Dashboard's ward cards, also
+        // switch straight to the Pay Fees page so parents land on the ward's
+        // details instead of having to navigate there separately.
+        function switchWard(index, navigateToPage) {
             currentWardIndex = index;
             studentRec = currentWards[index].record;
             customFees = currentWards[index].customFees || [];
@@ -2352,10 +2648,7 @@
             buildPortalFeeTabs(applicablePortalFeeTypes(customFeeTypes, customFees));
             selectPortalFeeTab('regular');
 
-            var rows = document.querySelectorAll('.family-table tbody tr');
-            rows.forEach(function(row, idx) {
-                row.style.background = (idx === index) ? '#f0fdf4' : '';
-            });
+            if (navigateToPage) switchPortalPage('wardDetail');
         }
 
         function handlePortalDataLoad(r) {
@@ -2391,10 +2684,6 @@
 
             var switcherContainer = document.getElementById('siblingSwitcherContainer');
             var switcherButtons = document.getElementById('siblingSwitcherButtons');
-            var familyOverviewCard = document.getElementById('familyOverviewCard');
-            var familyOverviewBody = document.getElementById('familyOverviewBody');
-            var familyTotalDueBadge = document.getElementById('familyTotalDueBadge');
-            var cur = (schoolData && schoolData.currency) || 'GHC';
 
             if (currentWards.length > 1) {
                 if (switcherContainer) switcherContainer.style.display = 'block';
@@ -2406,31 +2695,16 @@
                     });
                     switcherButtons.innerHTML = btnHtml;
                 }
-
-                if (familyOverviewCard && familyOverviewBody) {
-                    var famHtml = '';
-                    var totalDue = 0;
-                    currentWards.forEach(function(ward, idx) {
-                        var t = safeTotalsForWard(ward.record);
-                        totalDue += t.balance;
-                        var activeStyle = (idx === currentWardIndex) ? ' style="background:#f0fdf4"' : '';
-                        famHtml += '<tr' + activeStyle + '>' +
-                            '  <td style="padding:10px 8px;"><strong>' + ward.record.studentName + '</strong></td>' +
-                            '  <td style="padding:10px 8px;">' + ward.record.grade + '</td>' +
-                            '  <td style="padding:10px 8px;">' + cur + ' ' + fmt(t.totalFees) + '</td>' +
-                            '  <td style="padding:10px 8px;"><span class="text-success">' + cur + ' ' + fmt(t.totalPaid) + '</span></td>' +
-                            '  <td style="padding:10px 8px;" class="text-danger fw-bold">' + cur + ' ' + fmt(t.balance) + '</td>' +
-                            '  <td style="padding:10px 8px; text-align:right"><button type="button" class="btn btn-xs btn-outline-primary" onclick="switchWard(' + idx + ')" style="padding:2px 8px; font-size:11px; border-radius:30px;"><i class="bi bi-eye me-1"></i>View</button></td>' +
-                            '</tr>';
-                    });
-                    familyOverviewBody.innerHTML = famHtml;
-                    if (familyTotalDueBadge) familyTotalDueBadge.textContent = 'Family Balance: ' + cur + ' ' + fmt(totalDue);
-                    familyOverviewCard.style.display = 'block';
-                }
-            } else {
-                if (switcherContainer) switcherContainer.style.display = 'none';
-                if (familyOverviewCard) familyOverviewCard.style.display = 'none';
+            } else if (switcherContainer) {
+                switcherContainer.style.display = 'none';
             }
+
+            // Dashboard / Payment History / Next Term Bill pages are all-wards
+            // views built from the currentWards array — refresh them here so
+            // they're ready whichever page the parent lands on next.
+            try { renderDashboardPage(); } catch (e) { console.error('renderDashboardPage error:', e); }
+            try { renderPaymentHistoryPage(); } catch (e) { console.error('renderPaymentHistoryPage error:', e); }
+            try { renderNextTermBillPage(); } catch (e) { console.error('renderNextTermBillPage error:', e); }
 
             // Sibling portal payment setup
             var portalFamilyGroup = document.getElementById('portalFamilyPaymentGroup');
@@ -2701,13 +2975,160 @@
             buildPortalFeeTabs(applicableCf);
 
             renderFeeDetails('regular');
-            renderNextTermBill();
 
             // Enable messaging
             loadParentMessages();
             document.getElementById('heroSection').style.display = 'none';
             document.getElementById('portalSection').classList.add('show');
+
+            // Land on the Dashboard first — a lean per-ward summary instead of
+            // dumping the full fee breakdown/payment history/next-term-bill/pay
+            // form on screen at once, which is what parents were finding
+            // confusing. They drill into a ward's details from there.
+            switchPortalPage('dashboard');
             window.scrollTo(0, 0);
+        }
+
+        // ── Sidebar navigation (Dashboard / Pay Fees / Payment History / Next Term Bill) ──
+        function switchPortalPage(page) {
+            document.querySelectorAll('.portal-page').forEach(function (el) { el.classList.remove('active'); });
+            var pageIds = { dashboard: 'pageDashboard', wardDetail: 'pageWardDetail', paymentHistory: 'pagePaymentHistory', nextTermBill: 'pageNextTermBill' };
+            var target = document.getElementById(pageIds[page] || 'pageDashboard');
+            if (target) target.classList.add('active');
+
+            document.querySelectorAll('.portal-nav-link').forEach(function (el) {
+                el.classList.toggle('active', el.getAttribute('data-page') === page);
+            });
+
+            closePortalSidebar();
+            var main = document.getElementById('portalMain');
+            if (main) main.scrollTop = 0;
+            window.scrollTo(0, 0);
+        }
+
+        function togglePortalSidebar() {
+            var sb = document.getElementById('portalSidebar');
+            var overlay = document.getElementById('portalSidebarOverlay');
+            if (!sb) return;
+            var opening = !sb.classList.contains('open');
+            sb.classList.toggle('open', opening);
+            if (overlay) overlay.classList.toggle('show', opening);
+        }
+
+        function closePortalSidebar() {
+            var sb = document.getElementById('portalSidebar');
+            var overlay = document.getElementById('portalSidebarOverlay');
+            if (sb) sb.classList.remove('open');
+            if (overlay) overlay.classList.remove('show');
+        }
+
+        // ── Dashboard page: ward summary cards + family totals + recent activity ──
+        function renderDashboardPage() {
+            var cur = (schoolData && schoolData.currency) || 'GHC';
+            var nameEl = document.getElementById('pdashGreetingName');
+            if (nameEl) {
+                nameEl.textContent = currentWards.length > 1
+                    ? currentWards.map(function (w) { return w.record.studentName; }).join(', ')
+                    : (currentWards[0] ? currentWards[0].record.studentName : 'Your Ward');
+            }
+
+            var totalFees = 0, totalPaid = 0, totalDue = 0;
+            var gridHtml = currentWards.map(function (ward, idx) {
+                var t = safeTotalsForWard(ward.record);
+                totalFees += t.totalFees; totalPaid += t.totalPaid; totalDue += t.balance;
+                var statusHtml = t.balance <= 0 && t.totalFees > 0
+                    ? '<span class="status-paid" style="font-size:11px;padding:3px 10px;">Fully Paid</span>'
+                    : t.totalPaid > 0
+                        ? '<span class="status-partial" style="font-size:11px;padding:3px 10px;">Partial</span>'
+                        : '<span class="status-unpaid" style="font-size:11px;padding:3px 10px;">Unpaid</span>';
+                return '<div class="ward-card" onclick="switchWard(' + idx + ', true)">' +
+                    '<div class="ward-card-name">' + ward.record.studentName + '</div>' +
+                    '<div class="ward-card-meta">' + ward.record.grade + ' · ' + ward.record.academicSession + '</div>' +
+                    statusHtml +
+                    '<div style="margin-top:12px;"><div class="ward-card-bal-label">Balance Due</div>' +
+                    '<div class="ward-card-bal' + (t.balance <= 0 ? ' zero' : '') + '">' + cur + ' ' + fmt(t.balance) + '</div></div>' +
+                    '<button type="button" class="ward-card-btn" onclick="event.stopPropagation(); switchWard(' + idx + ', true)"><i class="bi bi-receipt me-1"></i>View &amp; Pay Fees</button>' +
+                    '</div>';
+            }).join('');
+            var gridEl = document.getElementById('pdashWardGrid');
+            if (gridEl) gridEl.innerHTML = gridHtml || '<div class="pdash-empty">No wards found.</div>';
+
+            var totalStrip = document.getElementById('pdashTotalStrip');
+            if (totalStrip) {
+                if (currentWards.length > 1) {
+                    totalStrip.style.display = 'flex';
+                    document.getElementById('pdashTotalFees').textContent = cur + ' ' + fmt(totalFees);
+                    document.getElementById('pdashTotalPaid').textContent = cur + ' ' + fmt(totalPaid);
+                    document.getElementById('pdashTotalDue').textContent = cur + ' ' + fmt(totalDue);
+                } else {
+                    totalStrip.style.display = 'none';
+                }
+            }
+
+            // Recent activity — last 5 payments across all wards, newest first
+            var activityEl = document.getElementById('pdashActivityList');
+            if (activityEl) {
+                var allPayments = collectAllWardPayments();
+                var recent = allPayments.slice(0, 5);
+                if (!recent.length) {
+                    activityEl.innerHTML = '<div class="pdash-empty">No payments recorded yet.</div>';
+                } else {
+                    activityEl.innerHTML = recent.map(function (p) {
+                        return '<div class="activity-item">' +
+                            '<div class="activity-icon"><i class="bi bi-check-lg"></i></div>' +
+                            '<div class="activity-main"><div class="activity-title">' + p.wardName + '</div>' +
+                            '<div class="activity-sub">' + p.feeType + ' · ' + (p.date || 'Date unknown') + '</div></div>' +
+                            '<div class="activity-amount">' + cur + ' ' + fmt(p.amount) + '</div>' +
+                            '</div>';
+                    }).join('');
+                }
+            }
+        }
+
+        // Gathers every paid installment (regular + custom/extra fees) across all
+        // wards into one flat list, tagged with ward name / fee type / date, sorted
+        // newest first. Shared by the Dashboard's recent-activity preview and the
+        // full Payment History page.
+        function collectAllWardPayments() {
+            var payments = [];
+            currentWards.forEach(function (ward) {
+                for (var i = 1; i <= 6; i++) {
+                    var amt = parseFloat(ward.record['inst' + i]) || 0;
+                    if (amt > 0) {
+                        payments.push({ wardName: ward.record.studentName, feeType: 'Regular School Fees', date: ward.record['inst' + i + 'Date'] || '', amount: amt });
+                    }
+                }
+                (ward.customFees || []).forEach(function (cf) {
+                    for (var i = 1; i <= 6; i++) {
+                        var amt = parseFloat(cf['inst' + i]) || 0;
+                        if (amt > 0) {
+                            payments.push({ wardName: ward.record.studentName, feeType: cf.feeTypeName || 'Extra Fee', date: cf['inst' + i + 'Date'] || '', amount: amt });
+                        }
+                    }
+                });
+            });
+            payments.sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); });
+            return payments;
+        }
+
+        // ── Payment History page: full consolidated list, all wards ──
+        function renderPaymentHistoryPage() {
+            var container = document.getElementById('phistList');
+            if (!container) return;
+            var cur = (schoolData && schoolData.currency) || 'GHC';
+            var payments = collectAllWardPayments();
+            if (!payments.length) {
+                container.innerHTML = '<div class="pdash-empty">No payments recorded yet.</div>';
+                return;
+            }
+            container.innerHTML = payments.map(function (p) {
+                return '<div class="activity-item">' +
+                    '<div class="activity-icon"><i class="bi bi-cash-coin"></i></div>' +
+                    '<div class="activity-main"><div class="activity-title">' + p.wardName + '</div>' +
+                    '<div class="activity-sub">' + p.feeType + ' · ' + (p.date || 'Date unknown') + '</div></div>' +
+                    '<div class="activity-amount">' + cur + ' ' + fmt(p.amount) + '</div>' +
+                    '</div>';
+            }).join('');
         }
 
         function onPortalFeeTypeChange() {
@@ -2882,6 +3303,8 @@
 
             var id = (document.getElementById('studentIdInput').value || '').trim();
             var selClass = (document.getElementById('studentClassInput').value || '').trim();
+            var wasOnPage = document.querySelector('.portal-nav-link.active');
+            wasOnPage = wasOnPage ? wasOnPage.getAttribute('data-page') : 'dashboard';
 
             if (!id && studentRec) id = studentRec.id;
             if (!selClass && studentRec) selClass = studentRec.grade;
@@ -2902,6 +3325,7 @@
 
                         applySchoolBranding();
                         showPortal();
+                        switchPortalPage(wasOnPage); // stay on whichever page the parent was viewing
                         showPToast('Fee records updated successfully!', 'success', 'Portal Refreshed');
                     })
                     .withFailureHandler(function (e) {
@@ -2925,6 +3349,7 @@
             document.getElementById('heroSection').style.display = 'flex';
             studentRec = null;
             document.getElementById('studentIdInput').value = '';
+            closePortalSidebar();
             window.scrollTo(0, 0);
         }
 
@@ -3284,31 +3709,30 @@
             return '<i class="bi bi-robot text-primary me-1"></i> I can help with:<br>• <b>How to pay</b><br>• <b>Reference ID</b> explanation<br>• <b>Finding your Student ID</b><br>• <b>Downloading receipts</b><br>• <b>Contacting the school</b><br>• <b>Fee balance</b><br><br>Or use <b>Message Admin</b> tab to chat directly with the school!';
         }
 
-        function renderNextTermBill() {
-            var rec = studentRec;
-            if (!rec) return;
-            var cur = (schoolData && schoolData.currency) || 'GHC';
+        // Computes one ward's estimated next-term bill (arrears carried forward +
+        // standard term components + folded-in extra fees). Shared by the on-screen
+        // Next Term Bill page and the PDF download, keyed off a `ward` object
+        // ({record, customFees, uniforms, books}) instead of the current-ward globals,
+        // so it works for every ward in the family, not just whichever is selected.
+        function computeNextTermBillForWard(ward) {
+            var rec = ward.record;
+            var wardCustomFees = ward.customFees || [];
+            var wardUniforms = ward.uniforms || [];
+            var wardBooks = ward.books || [];
 
-            // Calculate regular school fee arrears
             var totalFees = 0, totalPaid = 0;
-
-            // Omit system fields and components that are new-admissions only
             var feeKeys = Object.keys(rec).filter(function (k) {
                 if (['id', 'studentName', 'phoneNumber', 'grade', 'academicSession', 'isNewStudent',
                      'totalFees', 'totalPaid', 'balance', 'paymentStatus', 'createdAt', 'updatedAt', 'discount'].includes(k)) {
                     return false;
                 }
                 if (k.startsWith('inst')) return false;
-                if (k.toLowerCase().includes('admission')) return false; // skip admission fee on next term bill
+                if (k.toLowerCase().includes('admission')) return false;
 
-                // Check if this component is marked as isForNewStudentsOnly in schoolData.feeComponents
                 var comps = (schoolData && schoolData.feeComponents) || [];
                 var isNewOnly = false;
                 for (var i = 0; i < comps.length; i++) {
-                    if (comps[i].id === k && comps[i].isForNewStudentsOnly) {
-                        isNewOnly = true;
-                        break;
-                    }
+                    if (comps[i].id === k && comps[i].isForNewStudentsOnly) { isNewOnly = true; break; }
                 }
                 if (isNewOnly) return false;
 
@@ -3318,14 +3742,13 @@
             feeKeys.forEach(function (k) { totalFees += parseFloat(rec[k]) || 0; });
             for (var i = 1; i <= 6; i++) totalPaid += parseFloat(rec['inst' + i]) || 0;
             if (parseFloat(rec.totalFees) > 0) {
-                totalFees = parseFloat(rec.totalFees); // server value is already net of any discount
+                totalFees = parseFloat(rec.totalFees);
             } else {
                 totalFees = Math.max(0, totalFees - (parseFloat(rec.discount) || 0));
             }
             if (parseFloat(rec.totalPaid) >= 0) totalPaid = parseFloat(rec.totalPaid);
             var arrears = Math.max(0, totalFees - totalPaid);
 
-            // Determine next term session
             var session = String(rec.academicSession || '');
             var yearPart = session.split(' ')[0] || '2025/2026';
             var nextTerm = '';
@@ -3346,21 +3769,17 @@
 
             var billItems = [];
             var totalNextFees = 0;
+            var combinedArrears = 0;
 
-            // 1. Regular school fee arrears
             if (arrears > 0) {
-                billItems.push({ name: 'School Fees Arrears (from ' + session + ')', amount: arrears });
+                billItems.push({ name: 'School Fees Arrears (from ' + session + ')', amount: arrears, isArrears: true });
                 totalNextFees += arrears;
+                combinedArrears += arrears;
             }
 
-            // 2. Custom Fee Arrears — only for extra fee types the admin has
-            //    chosen to roll forward (Settings → "Rollover to next term as
-            //    arrears"); an empty list means roll all forward by default,
-            //    matching the admin app's own Generate Next Term Bill logic.
             var rolledPortal = (schoolData && schoolData.rolloverCustomFees) ? (typeof schoolData.rolloverCustomFees === 'string' ? schoolData.rolloverCustomFees.split(',').filter(Boolean) : schoolData.rolloverCustomFees) : [];
             var rollAllExtraFeesByDefaultPortal = rolledPortal.length === 0;
-            var cFeesList = customFees || [];
-            cFeesList.forEach(function(cf) {
+            wardCustomFees.forEach(function(cf) {
                 if (cf) {
                     var cfStudentId = cf.studentId || cf.studentid || '';
                     var cfSession = cf.academicSession || cf.academicsession || '';
@@ -3369,148 +3788,31 @@
                         var isRolled = rollAllExtraFeesByDefaultPortal || rolledPortal.some(function(r) { return r.toLowerCase().trim() === name.toLowerCase().trim(); });
                         var bal = parseFloat(cf.balance || 0);
                         if (isRolled && bal > 0) {
-                            billItems.push({ name: name + ' Arrears (from ' + cfSession + ')', amount: bal });
+                            billItems.push({ name: name + ' Arrears (from ' + cfSession + ')', amount: bal, isArrears: true });
                             totalNextFees += bal;
+                            combinedArrears += bal;
                         }
                     }
                 }
             });
 
-            // 3. Uniform Purchase Arrears
-            var uList = uniforms || [];
-            uList.forEach(function(u) {
+            wardUniforms.forEach(function(u) {
                 if (u && parseFloat(u.balance) > 0) {
-                    billItems.push({ name: 'Uniform Purchase Arrears (' + (u.uniformTypes || 'Uniform') + ')', amount: parseFloat(u.balance) });
+                    billItems.push({ name: 'Uniform Purchase Arrears (' + (u.uniformTypes || 'Uniform') + ')', amount: parseFloat(u.balance), isArrears: true });
                     totalNextFees += parseFloat(u.balance);
+                    combinedArrears += parseFloat(u.balance);
                 }
             });
 
-            // 4. Book Purchase Arrears
-            var bList = books || [];
-            bList.forEach(function(b) {
+            wardBooks.forEach(function(b) {
                 if (b && parseFloat(b.balance) > 0) {
-                    billItems.push({ name: 'Book Purchase Arrears (' + (b.books || 'Books') + ')', amount: parseFloat(b.balance) });
+                    billItems.push({ name: 'Book Purchase Arrears (' + (b.books || 'Books') + ')', amount: parseFloat(b.balance), isArrears: true });
                     totalNextFees += parseFloat(b.balance);
+                    combinedArrears += parseFloat(b.balance);
                 }
             });
 
-            // 5. Standard term components
             feeKeys.forEach(function(k) {
-                var amt = parseFloat(rec[k]) || 0;
-                if (amt > 0) {
-                    var label = k.replace(/_\d+$/, '').replace(/([A-Z])/g, ' $1').replace(/^./, function (c) { return c.toUpperCase(); });
-                    billItems.push({ name: label, amount: amt });
-                    totalNextFees += amt;
-                }
-            });
-
-            // 6. Extra fees the school has chosen to fold into next term's regular bill
-            var nextTermIncludedPortal = (schoolData && schoolData.nextTermIncludedExtraFees) ? (typeof schoolData.nextTermIncludedExtraFees === 'string' ? schoolData.nextTermIncludedExtraFees.split(',').filter(Boolean) : schoolData.nextTermIncludedExtraFees) : [];
-            if (nextTermIncludedPortal.length) {
-                nextTermIncludedPortal.forEach(function(feeName) {
-                    var config = (customFeeTypes || []).find(function(cf) { return cf.name === feeName; });
-                    if (!config) return;
-                    var amt = getCustomFeeAmount(config, rec.grade);
-                    if (amt > 0) {
-                        billItems.push({ name: feeName + ' (' + nextTerm + ')', amount: amt });
-                        totalNextFees += amt;
-                    }
-                });
-            }
-
-            var card = document.getElementById('nextBillCard');
-            if (billItems.length > 0 || totalNextFees > 0) {
-                card.style.display = 'block';
-                var tbodyHtml = billItems.map(function(item) {
-                    return '<tr><td>' + item.name + '</td><td style="text-align:right">' + cur + ' ' + fmt(item.amount) + '</td></tr>';
-                }).join('');
-                tbodyHtml += '<tr style="font-weight:bold;background:#eef2ff;"><td style="font-weight:bold;">Total Amount Due</td><td style="text-align:right;font-weight:bold;">' + cur + ' ' + fmt(totalNextFees) + '</td></tr>';
-                document.getElementById('nextBillTableBody').innerHTML = tbodyHtml;
-            } else {
-                card.style.display = 'none';
-            }
-        }
-        function downloadNextBillPdf() {
-            var rec = studentRec;
-            if (!rec) return;
-            var cur = (schoolData && schoolData.currency) || 'GHC';
-
-            // Re-calculate exactly as above
-            var totalFees = 0, totalPaid = 0;
-            var feeKeys = Object.keys(rec).filter(function (k) {
-                return !['id', 'studentName', 'phoneNumber', 'grade', 'academicSession', 'isNewStudent',
-                    'totalFees', 'totalPaid', 'balance', 'paymentStatus', 'createdAt', 'updatedAt', 'discount']
-                    .includes(k) && !k.startsWith('inst') && parseFloat(rec[k]) > 0;
-            });
-            feeKeys.forEach(function (k) { totalFees += parseFloat(rec[k]) || 0; });
-            for (var i = 1; i <= 6; i++) totalPaid += parseFloat(rec['inst' + i]) || 0;
-            if (parseFloat(rec.totalFees) > 0) {
-                totalFees = parseFloat(rec.totalFees); // server value is already net of any discount
-            } else {
-                totalFees = Math.max(0, totalFees - (parseFloat(rec.discount) || 0));
-            }
-            if (parseFloat(rec.totalPaid) >= 0) totalPaid = parseFloat(rec.totalPaid);
-            var arrears = Math.max(0, totalFees - totalPaid);
-
-            var rolled = (schoolData && schoolData.rolloverCustomFees) ? (typeof schoolData.rolloverCustomFees === 'string' ? schoolData.rolloverCustomFees.split(',').filter(Boolean) : schoolData.rolloverCustomFees) : [];
-            rolled = rolled.map(function(r) { return r.trim().toLowerCase(); });
-            // An empty list means the admin hasn't restricted anything —
-            // roll all extra fee types' balances forward by default, same as
-            // the on-screen preview and the admin app's Generate Next Term Bill.
-            var rollAllByDefaultPdf = rolled.length === 0;
-            var customArrears = 0;
-            var customArrearsItems = [];
-
-            var cFeesList = customFees || [];
-            cFeesList.forEach(function(cf) {
-                if (cf) {
-                    var cfStudentId = cf.studentId || cf.studentid || '';
-                    var cfSession = cf.academicSession || cf.academicsession || '';
-                    if (String(cfStudentId).toLowerCase() === String(rec.id).toLowerCase() && String(cfSession).toLowerCase() === String(rec.academicSession).toLowerCase()) {
-                        var name = cf.feeTypeName || cf.feetypename || '';
-                        if (rollAllByDefaultPdf || rolled.includes(name.trim().toLowerCase())) {
-                            var bal = parseFloat(cf.balance || 0);
-                            if (bal > 0) {
-                                customArrears += bal;
-                                customArrearsItems.push({ name: name + ' Arrears', amount: bal });
-                            }
-                        }
-                    }
-                }
-            });
-
-            var session = String(rec.academicSession || '');
-            var yearPart = session.split(' ')[0] || '2025/2026';
-            var nextTerm = '';
-            var nextYear = yearPart;
-            if (session.includes('First Term')) {
-                nextTerm = 'Second Term';
-            } else if (session.includes('Second Term')) {
-                nextTerm = 'Third Term';
-            } else {
-                var parts = yearPart.split('/');
-                if (parts.length === 2) {
-                    var y1 = parseInt(parts[0]) + 1;
-                    var y2 = parseInt(parts[1]) + 1;
-                    nextYear = y1 + '/' + y2;
-                }
-                nextTerm = 'First Term';
-            }
-            var nextSession = nextYear + ' ' + nextTerm;
-
-            var billItems = [];
-            var totalNextFees = 0;
-
-            if (arrears > 0) {
-                billItems.push({ name: 'School Fees Arrears (from ' + session + ')', amount: arrears, isArrears: true });
-                totalNextFees += arrears;
-            }
-            customArrearsItems.forEach(function(item) {
-                billItems.push({ name: item.name + ' (from ' + session + ')', amount: item.amount, isArrears: true });
-                totalNextFees += item.amount;
-            });
-            feeKeys.forEach(function(k) {
-                if (k === 'arrears' || k === 'admissionFees') return;
                 var amt = parseFloat(rec[k]) || 0;
                 if (amt > 0) {
                     var label = k.replace(/_\d+$/, '').replace(/([A-Z])/g, ' $1').replace(/^./, function (c) { return c.toUpperCase(); });
@@ -3518,9 +3820,10 @@
                     totalNextFees += amt;
                 }
             });
-            var nextTermIncludedPrint = (schoolData && schoolData.nextTermIncludedExtraFees) ? (typeof schoolData.nextTermIncludedExtraFees === 'string' ? schoolData.nextTermIncludedExtraFees.split(',').filter(Boolean) : schoolData.nextTermIncludedExtraFees) : [];
-            if (nextTermIncludedPrint.length) {
-                nextTermIncludedPrint.forEach(function(feeName) {
+
+            var nextTermIncludedPortal = (schoolData && schoolData.nextTermIncludedExtraFees) ? (typeof schoolData.nextTermIncludedExtraFees === 'string' ? schoolData.nextTermIncludedExtraFees.split(',').filter(Boolean) : schoolData.nextTermIncludedExtraFees) : [];
+            if (nextTermIncludedPortal.length) {
+                nextTermIncludedPortal.forEach(function(feeName) {
                     var config = (customFeeTypes || []).find(function(cf) { return cf.name === feeName; });
                     if (!config) return;
                     var amt = getCustomFeeAmount(config, rec.grade);
@@ -3530,6 +3833,44 @@
                     }
                 });
             }
+
+            return { billItems: billItems, totalNextFees: totalNextFees, session: session, nextSession: nextYear + ' ' + nextTerm, combinedArrears: combinedArrears };
+        }
+
+        // Renders the "Next Term Bill" sidebar page — one stacked card per ward.
+        function renderNextTermBillPage() {
+            var container = document.getElementById('pntbList');
+            if (!container) return;
+            var cur = (schoolData && schoolData.currency) || 'GHC';
+            if (!currentWards.length) { container.innerHTML = '<div class="pdash-empty">No wards found.</div>'; return; }
+
+            container.innerHTML = currentWards.map(function(ward, idx) {
+                var res = computeNextTermBillForWard(ward);
+                var head = '<div class="pntb-ward-head"><h6><i class="bi bi-person-circle me-1 text-muted"></i>' + ward.record.studentName + '</h6>' +
+                    (res.totalNextFees > 0 ? '<button class="back-btn" onclick="downloadNextBillPdf(' + idx + ')" style="margin:0;padding:5px 12px;font-size:12px;background:var(--primary);color:#fff;border-color:var(--primary);"><i class="bi bi-file-earmark-pdf"></i> Download PDF</button>' : '') +
+                    '</div>';
+                var body;
+                if (!res.billItems.length) {
+                    body = '<div class="pntb-ward-settled"><i class="bi bi-check-circle-fill text-success me-1"></i>No estimated next-term charges yet.</div>';
+                } else {
+                    body = '<table class="fee-table" style="margin:0;"><thead><tr><th>Description</th><th style="text-align:right">Amount</th></tr></thead><tbody>' +
+                        res.billItems.map(function(item) {
+                            return '<tr><td>' + item.name + (item.isArrears ? ' <span style="color:#ef4444;font-size:11px;">(Arrears)</span>' : '') + '</td><td style="text-align:right">' + cur + ' ' + fmt(item.amount) + '</td></tr>';
+                        }).join('') +
+                        '<tr style="font-weight:bold;background:#eef2ff;"><td style="font-weight:bold;">Total Amount Due</td><td style="text-align:right;font-weight:bold;">' + cur + ' ' + fmt(res.totalNextFees) + '</td></tr>' +
+                        '</tbody></table>';
+                }
+                return '<div class="pntb-ward-card">' + head + body + '</div>';
+            }).join('');
+        }
+
+        function downloadNextBillPdf(wardIndex) {
+            var ward = currentWards[wardIndex];
+            if (!ward) return;
+            var rec = ward.record;
+            var cur = (schoolData && schoolData.currency) || 'GHC';
+            var res = computeNextTermBillForWard(ward);
+            var billItems = res.billItems, totalNextFees = res.totalNextFees, session = res.session, nextSession = res.nextSession, combinedArrears = res.combinedArrears;
 
             var w = window.open('', '_blank');
             w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Next Term Bill - ' + rec.studentName + '</title>');
@@ -3674,10 +4015,17 @@
         function togglePortalTheme() {
             var isDark = document.body.classList.toggle('dark-mode');
             localStorage.setItem('portalThemeMode', isDark ? 'dark' : 'light');
+            applyPortalThemeIcons(isDark);
+        }
+
+        function applyPortalThemeIcons(isDark) {
+            var iconClass = isDark ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
             var icon = document.getElementById('portalThemeToggleIcon');
-            if (icon) {
-                icon.className = isDark ? 'bi bi-sun-fill' : 'bi bi-moon-fill';
-            }
+            if (icon) icon.className = iconClass;
+            var iconMobile = document.getElementById('portalThemeToggleIconMobile');
+            if (iconMobile) iconMobile.className = iconClass;
+            var label = document.getElementById('portalThemeToggleLabel');
+            if (label) label.textContent = isDark ? 'Light Mode' : 'Dark Mode';
         }
 
         // Initialize Theme from localStorage
@@ -3685,10 +4033,7 @@
             var theme = localStorage.getItem('portalThemeMode') || 'light';
             if (theme === 'dark') {
                 document.body.classList.add('dark-mode');
-                setTimeout(function() {
-                    var icon = document.getElementById('portalThemeToggleIcon');
-                    if (icon) icon.className = 'bi bi-sun-fill';
-                }, 100);
+                setTimeout(function() { applyPortalThemeIcons(true); }, 100);
             }
         })();
     </script>

@@ -3467,6 +3467,189 @@ function saveCustomFeeRecord(recordData) {
   }
 }
 
+// ════════════════════════════════════════════════════════
+// REFUND PAYMENT — admin/collector refund a parent (overpayment or a
+// parent-requested refund) from a student's row. Reduces the actual
+// recorded installment amounts (working backwards from the most recent
+// payment) rather than just leaving a bookkeeping note, so totalPaid/
+// balance stay correct everywhere that reads them — the admin table,
+// dashboard, and Parent Portal all recompute from the same sheet data.
+// ════════════════════════════════════════════════════════
+function refundPayment(data) {
+  try {
+    const amount = parseFloat(data.amount) || 0;
+    if (amount <= 0) return { success: false, message: 'Refund amount must be greater than zero' };
+    const reason = String(data.reason || '').trim();
+    if (reason.length < 3) return { success: false, message: 'Please provide a reason (at least 3 characters)' };
+
+    const feeType = data.feeType || 'regular';
+    const result = feeType === 'regular'
+      ? refundRegularFee(data.studentId, data.session, amount)
+      : refundCustomFee(data.studentId, data.session, feeType, amount);
+
+    if (!result.success) return result;
+
+    try {
+      logRefund({
+        timestamp: new Date().toISOString(),
+        studentId: data.studentId,
+        studentName: result.studentName || '',
+        feeType: feeType,
+        session: data.session || '',
+        amount: amount,
+        reason: reason,
+        processedBy: data.refundedBy || ''
+      });
+    } catch(logErr) {
+      Logger.log('logRefund error: ' + logErr.message);
+    }
+
+    return { success: true, record: result.record };
+  } catch(e) {
+    Logger.log('refundPayment error: ' + e.message);
+    return { success: false, message: e.message };
+  }
+}
+
+// Deducts `amount` from a regular term-fee record's paid installments,
+// working backwards from inst6 to inst1 (undoing the most recent
+// payments first), then recomputes totalPaid/balance/paymentStatus.
+function refundRegularFee(studentId, session, amount) {
+  const term = getTermFromSession(session);
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_PREFIX + ' - ' + term);
+  if (!sheet) return { success: false, message: 'Term sheet not found' };
+
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map(h => String(h).trim());
+  const idIdx = headers.indexOf('id');
+  if (idIdx === -1) return { success: false, message: 'Invalid sheet' };
+
+  let rowIdx = -1;
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][idIdx]).trim().toLowerCase() === String(studentId).trim().toLowerCase()) { rowIdx = i; break; }
+  }
+  if (rowIdx === -1) return { success: false, message: 'Student record not found' };
+
+  return applyRefundToInstallments(sheet, headers, rowIdx, amount, 'totalFees');
+}
+
+// Same as refundRegularFee but against a row in the Custom Fee Records sheet.
+function refundCustomFee(studentId, session, feeTypeName, amount) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(CUSTOM_FEE_RECORDS_SHEET);
+  if (!sheet) return { success: false, message: 'No custom fee records found' };
+
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map(h => String(h).trim());
+  const normHeaders = headers.map(h => h.toLowerCase());
+  const stuIdIdx = normHeaders.indexOf('studentid');
+  const feeNameIdx = normHeaders.indexOf('feetypename');
+  const sessIdx = normHeaders.indexOf('academicsession');
+
+  let rowIdx = -1;
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][stuIdIdx]).trim().toLowerCase() === String(studentId).trim().toLowerCase() &&
+        String(data[i][feeNameIdx]).trim() === String(feeTypeName).trim() &&
+        (!session || String(data[i][sessIdx]).trim() === String(session).trim())) {
+      rowIdx = i; break;
+    }
+  }
+  if (rowIdx === -1) return { success: false, message: 'Fee record not found' };
+
+  return applyRefundToInstallments(sheet, headers, rowIdx, amount, 'amount');
+}
+
+// Shared installment-refund logic for both regular and custom fee sheets.
+// `feesColName` is 'totalFees' for the term sheets, 'amount' for custom fees.
+function applyRefundToInstallments(sheet, headers, rowIdx, amount, feesColName) {
+  const normHeaders = headers.map(h => h.toLowerCase());
+  const instIdx = [];
+  for (let n = 1; n <= 6; n++) instIdx.push(normHeaders.indexOf('inst' + n));
+
+  const rowRange = sheet.getRange(rowIdx + 1, 1, 1, headers.length);
+  const row = rowRange.getValues()[0];
+
+  let currentPaid = 0;
+  instIdx.forEach(idx => { if (idx !== -1) currentPaid += parseFloat(row[idx]) || 0; });
+  if (amount > currentPaid + 0.01) {
+    return { success: false, message: 'Refund amount exceeds amount paid (' + currentPaid.toFixed(2) + ')' };
+  }
+
+  let remaining = amount;
+  for (let n = 5; n >= 0 && remaining > 0.001; n--) {
+    const idx = instIdx[n];
+    if (idx === -1) continue;
+    let val = parseFloat(row[idx]) || 0;
+    if (val <= 0) continue;
+    const deduct = Math.min(val, remaining);
+    row[idx] = val - deduct;
+    remaining -= deduct;
+  }
+
+  const feesIdx = normHeaders.indexOf(feesColName.toLowerCase());
+  const totalPaidIdx = normHeaders.indexOf('totalpaid');
+  const balanceIdx = normHeaders.indexOf('balance');
+  const statusIdx = normHeaders.indexOf('paymentstatus');
+  const updatedAtIdx = normHeaders.indexOf('updatedat');
+  const nameIdx = normHeaders.indexOf('studentname');
+
+  const feesTotal = feesIdx !== -1 ? (parseFloat(row[feesIdx]) || 0) : 0;
+  let newPaid = 0;
+  instIdx.forEach(idx => { if (idx !== -1) newPaid += parseFloat(row[idx]) || 0; });
+  const newBalance = Math.max(0, feesTotal - newPaid);
+  const newStatus = (newBalance <= 0 && feesTotal > 0) ? 'Paid' : (newPaid > 0 ? 'Partial' : 'Unpaid');
+
+  if (totalPaidIdx !== -1) row[totalPaidIdx] = newPaid;
+  if (balanceIdx !== -1) row[balanceIdx] = newBalance;
+  if (statusIdx !== -1) row[statusIdx] = newStatus;
+  if (updatedAtIdx !== -1) row[updatedAtIdx] = new Date().toISOString();
+
+  rowRange.setValues([row]);
+
+  const record = {};
+  headers.forEach((h, idx) => { record[h] = row[idx]; });
+  return { success: true, record: record, studentName: nameIdx !== -1 ? row[nameIdx] : '' };
+}
+
+const REFUNDS_SHEET = 'Refunds';
+
+function logRefund(entry) {
+  const sheet = getOrCreateSheet(REFUNDS_SHEET, ['timestamp', 'studentId', 'studentName', 'feeType', 'session', 'amount', 'reason', 'processedBy']);
+  sheet.appendRow([
+    entry.timestamp || new Date().toISOString(),
+    entry.studentId || '',
+    entry.studentName || '',
+    entry.feeType || 'regular',
+    entry.session || '',
+    entry.amount || 0,
+    entry.reason || '',
+    entry.processedBy || ''
+  ]);
+}
+
+function getRefundHistory(studentId) {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(REFUNDS_SHEET);
+    if (!sheet || sheet.getLastRow() <= 1) return { success: true, refunds: [] };
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0].map(h => String(h).trim());
+    const sidIdx = headers.indexOf('studentId');
+    const refunds = [];
+    for (let i = 1; i < data.length; i++) {
+      if (studentId === 'all' || String(data[i][sidIdx]).trim().toLowerCase() === String(studentId).trim().toLowerCase()) {
+        const rec = {};
+        headers.forEach((h, idx) => {
+          const val = data[i][idx];
+          rec[h] = (val instanceof Date) ? Utilities.formatDate(val, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm') : val;
+        });
+        refunds.push(rec);
+      }
+    }
+    return { success: true, refunds: refunds };
+  } catch(e) {
+    return { success: false, message: e.message };
+  }
+}
+
 // ── Student Promotion History Logs ────────────────────────────
 const PROMOTION_HISTORY_SHEET = "Promotion History";
 
