@@ -1474,44 +1474,65 @@
             display: inline-block;
         }
 
-        /* Fee tabs style */
-        .fee-tabs-container {
+        /* Pay Fee-Type selector — replaces the old fee tabs. One dropdown to
+           pick which billed fee (Regular/Tuition, Books, Exams, …) to pay,
+           instead of a tab per fee type. */
+        .pay-select-group label {
+            font-weight: 700;
+            color: #1e293b;
+        }
+        .pay-sel-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin: 14px 0;
+        }
+        .pay-sel-stat {
+            background: #f8fafc;
+            border: 1px solid #f1f5f9;
+            border-radius: 10px;
+            padding: 10px 12px;
+            text-align: center;
+        }
+        .pay-sel-stat-label { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: .4px; }
+        .pay-sel-stat-val { font-size: 15px; font-weight: 800; color: #1e293b; margin-top: 2px; }
+        .pay-sel-stat-val.danger { color: #dc2626; }
+        .pay-sel-stat-val.success { color: #059669; }
+
+        /* Pay in Full / Pay in Installment mode toggle */
+        .pay-mode-toggle {
             display: flex;
             gap: 8px;
-            overflow-x: auto;
-            padding: 4px 0 12px 0;
-            margin-bottom: 0px;
-            -webkit-overflow-scrolling: touch;
-            scrollbar-width: none;
+            margin-bottom: 16px;
         }
-        .fee-tabs-container::-webkit-scrollbar {
-            display: none;
-        }
-        .fee-tab-btn {
-            background: #fff;
-            border: 1px solid #e2e8f0;
+        .pay-mode-btn {
+            flex: 1;
+            background: #f8fafc;
+            border: 1.5px solid #e2e8f0;
             color: #64748b;
-            padding: 10px 20px;
-            border-radius: 30px;
+            padding: 10px 12px;
+            border-radius: 10px;
             font-size: 13px;
-            font-weight: 600;
-            white-space: nowrap;
+            font-weight: 700;
             cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+            transition: all .15s ease;
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             gap: 6px;
+            font-family: 'DM Sans', sans-serif;
         }
-        .fee-tab-btn:hover {
-            background: #f1f5f9;
-            color: #1e1b4b;
-        }
-        .fee-tab-btn.active {
-            background: #1e1b4b;
+        .pay-mode-btn:hover { background: #f1f5f9; }
+        .pay-mode-btn.active {
+            background: var(--primary);
             color: #fff;
-            border-color: #1e1b4b;
-            box-shadow: 0 4px 12px rgba(30, 27, 75, 0.15);
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(79, 70, 229, .2);
+        }
+        #payAmount.locked {
+            background: #f1f5f9;
+            color: #475569;
+            cursor: not-allowed;
         }
 
         /* Settled congrats banner style */
@@ -1990,8 +2011,42 @@
         body.dark-mode .inst-toggle-btn {
             color: #c7d2fe !important;
         }
+        body.dark-mode .pay-sel-stat {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+        }
+        body.dark-mode .pay-sel-stat-val {
+            color: #f8fafc !important;
+        }
+        body.dark-mode .pay-mode-btn {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+            color: #cbd5e1 !important;
+        }
+        body.dark-mode .pay-mode-btn.active {
+            background: var(--primary) !important;
+            color: #fff !important;
+            border-color: var(--primary) !important;
+        }
+        body.dark-mode #payAmount.locked {
+            background-color: #1e293b !important;
+            color: #cbd5e1 !important;
+        }
+        body.dark-mode .pay-select-group label {
+            color: #f1f5f9 !important;
+        }
         body.dark-mode .pdash-section-title {
             color: #cbd5e1 !important;
+        }
+        body.dark-mode .fee-table th {
+            background-color: #0f172a !important;
+            color: #94a3b8 !important;
+        }
+        body.dark-mode .fee-table td {
+            border-color: #334155 !important;
+        }
+        body.dark-mode .fee-table tr:last-child td {
+            background-color: #0f172a !important;
         }
         body.dark-mode .family-table {
             background: #1e293b !important;
@@ -2334,19 +2389,9 @@
         </div>
 
         <div class="portal-content">
-            <!-- Fee Tabs -->
-            <div id="portalFeeTabs" class="fee-tabs-container"></div>
-
-            <!-- Congratulations Banner -->
-            <div class="congrats-card" id="pCongratsCard" style="display:none">
-                <div class="congrats-icon"><i class="bi bi-trophy-fill"></i></div>
-                <div class="congrats-body">
-                    <h6>Congratulations!</h6>
-                    <p>This fee is fully settled. Thank you for your payment!</p>
-                </div>
-            </div>
-
-            <!-- Fee Breakdown -->
+            <!-- Fee Breakdown — every fee billed to this ward (regular fee
+                 components + every extra fee) in one list, with a combined
+                 Total. Not tied to which fee is selected for payment below. -->
             <div class="section-card">
                 <div class="section-head">
                     <div class="icon" style="background:#eef2ff;color:var(--primary)"><i class="bi bi-receipt"></i></div>
@@ -2366,12 +2411,13 @@
                 </div>
             </div>
 
-            <!-- Payment History — collapsed by default so a long list of paid
-                 instalments doesn't push the Pay section further down. -->
+            <!-- Payment History — scoped to whichever fee is selected below;
+                 collapsed by default so a long list of paid instalments
+                 doesn't push the Pay section further down. -->
             <div class="section-card">
                 <div class="section-head">
                     <div class="icon" style="background:#f0fdf4;color:#059669"><i class="bi bi-clock-history"></i></div>
-                    <h6>Payment History</h6>
+                    <h6>Payment History <span id="payHistFeeLabel" style="font-weight:400;color:#94a3b8;font-size:12px;"></span></h6>
                     <button type="button" class="inst-toggle-btn" id="instToggleBtn" onclick="toggleInstList()">
                         <span id="instToggleLabel">Show</span> <i class="bi bi-chevron-down" id="instToggleIcon"></i>
                     </button>
@@ -2381,13 +2427,55 @@
                 </div>
             </div>
 
-            <!-- Pay Now -->
+            <!-- Make a Payment — pick which billed fee to pay from a dropdown
+                 (no more one tab per fee type), see that fee's own
+                 Billed/Paid/Balance, choose to pay it in full or in an
+                 instalment amount, then pay via Mobile Money. -->
             <div class="section-card" id="payNowCard">
                 <div class="section-head">
                     <div class="icon" style="background:#fef9c3;color:#854d0e"><i class="bi bi-phone-fill"></i></div>
-                    <h6>Pay via Mobile Money</h6>
+                    <h6>Make a Payment</h6>
                 </div>
                 <div class="section-body">
+                    <div class="form-group pay-select-group">
+                        <label><i class="bi bi-tag-fill me-1"></i>Which fee would you like to pay?</label>
+                        <select class="form-control" id="payFeeType" onchange="onPortalFeeTypeChange()">
+                            <option value="regular">Regular School Fees</option>
+                        </select>
+                    </div>
+
+                    <div class="pay-sel-stats">
+                        <div class="pay-sel-stat">
+                            <div class="pay-sel-stat-label">Billed</div>
+                            <div class="pay-sel-stat-val" id="paySelBilled">—</div>
+                        </div>
+                        <div class="pay-sel-stat">
+                            <div class="pay-sel-stat-label">Paid</div>
+                            <div class="pay-sel-stat-val success" id="paySelPaid">—</div>
+                        </div>
+                        <div class="pay-sel-stat">
+                            <div class="pay-sel-stat-label">Balance</div>
+                            <div class="pay-sel-stat-val danger" id="paySelBalance">—</div>
+                        </div>
+                    </div>
+
+                    <!-- Congratulations Banner — shown instead of the pay form
+                         when the selected fee is already fully settled. -->
+                    <div class="congrats-card" id="pCongratsCard" style="display:none">
+                        <div class="congrats-icon"><i class="bi bi-trophy-fill"></i></div>
+                        <div class="congrats-body">
+                            <h6>Congratulations!</h6>
+                            <p>This fee is fully settled. Thank you for your payment!</p>
+                        </div>
+                    </div>
+
+                    <div id="payFormFields">
+                    <!-- Pay in Full / Pay in Installment -->
+                    <div class="pay-mode-toggle" id="payModeToggle">
+                        <button type="button" class="pay-mode-btn active" id="payModeFullBtn" onclick="setPayMode('full')"><i class="bi bi-check2-circle"></i>Pay in Full</button>
+                        <button type="button" class="pay-mode-btn" id="payModeInstBtn" onclick="setPayMode('installment')"><i class="bi bi-layers"></i>Pay in Instalment</button>
+                    </div>
+
                     <!-- Dynamic Configured Payment Methods List -->
                     <div id="portalPaymentMethodsList" style="margin-bottom: 12px;"></div>
 
@@ -2405,13 +2493,6 @@
                         reference/note so the school can identify your payment.
                         <br><br>
                         <span id="momoNoteDisp" style="display:none"></span>
-                    </div>
-                    <!-- Notification form -->
-                    <div class="form-group" style="display:none">
-                        <label>Select Fee Type</label>
-                        <select class="form-control" id="payFeeType" onchange="onPortalFeeTypeChange()">
-                            <option value="regular">Regular School Fees</option>
-                        </select>
                     </div>
                     <!-- Sibling payment checkbox -->
                     <div class="form-group mb-3" id="portalFamilyPaymentGroup" style="display:none; margin-bottom:12px;">
@@ -2453,6 +2534,7 @@
                     <p style="font-size:12px;color:#94a3b8;margin-top:10px;text-align:center">
                         Your payment notification will be reviewed and your account updated by the school admin.
                     </p>
+                    </div><!-- /payFormFields -->
                 </div>
             </div>
 
@@ -2803,8 +2885,9 @@
             var switcherSelectEl = document.getElementById('siblingSwitcherSelect');
             if (switcherSelectEl) switcherSelectEl.value = String(index);
 
-            buildPortalFeeTabs(applicablePortalFeeTypes(customFeeTypes, customFees));
-            selectPortalFeeTab('regular');
+            buildPortalPaySelector(applicablePortalFeeTypes(customFeeTypes, customFees));
+            renderWardWideSummary();
+            selectPortalPayFeeType('regular');
 
             if (navigateToPage) switchPortalPage('wardDetail');
         }
@@ -3067,41 +3150,37 @@
         }
 
 
-        function buildPortalFeeTabs(cfList) {
-            var container = document.getElementById('portalFeeTabs');
-            if (!container) return;
-            var html = '<button class="fee-tab-btn active" data-fee="regular" onclick="selectPortalFeeTab(\'regular\')">' +
-                       '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>' +
-                       'Regular Fees</button>';
-
-            cfList.forEach(function(cf) {
-                var iconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>';
-                var lowerName = cf.name.toLowerCase();
-                if (lowerName.includes('graduation')) {
-                    iconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"></path></svg>';
-                } else if (lowerName.includes('excursion') || lowerName.includes('trip')) {
-                    iconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C20.1 10.7 19 9.3 19 8h-3V5c0-1.1-.9-2-2-2h-4c-1.1 0-2 .9-2 2v3H5c0 1.3-1.1 2.7-1.5 3.1C2.7 11.3 2 12.1 2 13v3c0 .6.4 1 1 1h2"></path><circle cx="7" cy="17" r="2"></circle><circle cx="17" cy="17" r="2"></circle></svg>';
-                } else if (lowerName.includes('print') || lowerName.includes('exam')) {
-                    iconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>';
-                } else if (lowerName.includes('ourday')) {
-                    iconSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>';
-                }
-                html += '<button class="fee-tab-btn" data-fee="' + cf.name + '" onclick="selectPortalFeeTab(\'' + cf.name + '\')">' +
-                        iconSvg + cf.name + '</button>';
+        // Builds the "Which fee would you like to pay?" dropdown — one option
+        // per billed fee (no more one tab per fee type). The regular-fees
+        // option is labelled with the ward's actual fee component name (e.g.
+        // "Tuition Fee") when there's just one, since for most schools that
+        // IS the whole regular bill; falls back to "Regular School Fees" when
+        // a ward has several regular components (nothing to pick between —
+        // they're all paid together into the same balance either way).
+        function buildPortalPaySelector(cfList) {
+            var select = document.getElementById('payFeeType');
+            if (!select) return;
+            var rec = studentRec;
+            var regularKeys = Object.keys(rec).filter(function (k) {
+                return !['id', 'studentName', 'phoneNumber', 'grade', 'academicSession', 'isNewStudent',
+                    'totalFees', 'totalPaid', 'balance', 'paymentStatus', 'createdAt', 'updatedAt', 'discount']
+                    .includes(k) && !k.startsWith('inst') && parseFloat(rec[k]) > 0;
             });
-            container.innerHTML = html;
+            var regularLabel = 'Regular School Fees';
+            if (regularKeys.length === 1) {
+                regularLabel = regularKeys[0].replace(/_\d+$/, '').replace(/([A-Z])/g, ' $1').replace(/^./, function (c) { return c.toUpperCase(); });
+            }
+            var optHtml = '<option value="regular">' + regularLabel + '</option>';
+            cfList.forEach(function(cf) {
+                optHtml += '<option value="' + cf.name + '">' + cf.name + '</option>';
+            });
+            select.innerHTML = optHtml;
         }
 
-        function selectPortalFeeTab(feeType) {
-            var btns = document.querySelectorAll('.fee-tab-btn');
-            btns.forEach(function(btn) {
-                btn.classList.toggle('active', btn.getAttribute('data-fee') === feeType);
-            });
-            var payFeeTypeSelect = document.getElementById('payFeeType');
-            if (payFeeTypeSelect) {
-                payFeeTypeSelect.value = feeType;
-            }
-            renderFeeDetails(feeType);
+        function selectPortalPayFeeType(feeType) {
+            var select = document.getElementById('payFeeType');
+            if (select) select.value = feeType;
+            renderPaySelection(feeType);
             scrollToPortalPaySection();
         }
 
@@ -3143,24 +3222,12 @@
         }
 
         function showPortal() {
-            var payFeeTypeSelect = document.getElementById('payFeeType');
             var cfList = customFeeTypes || [];
-
             var applicableCf = applicablePortalFeeTypes(cfList, customFees);
 
-            if (payFeeTypeSelect) {
-                var optHtml = '<option value="regular">Regular School Fees</option>';
-                applicableCf.forEach(function(cf) {
-                    optHtml += '<option value="' + cf.name + '">' + cf.name + '</option>';
-                });
-                payFeeTypeSelect.innerHTML = optHtml;
-                payFeeTypeSelect.value = 'regular';
-            }
-
-            // Build fee tabs
-            buildPortalFeeTabs(applicableCf);
-
-            renderFeeDetails('regular');
+            buildPortalPaySelector(applicableCf);
+            renderWardWideSummary();
+            selectPortalPayFeeType('regular');
 
             // Enable messaging
             loadParentMessages();
@@ -3514,34 +3581,34 @@
             }
         }
 
-        // Individual pay: jump straight to one ward's Pay Fees page, on this
-        // fee type's tab if it has one (a named extra fee), or the Regular
-        // Fees tab if this is a regular fee component (there's no separate
-        // tab/balance per component — payment applies to the ward's overall
-        // regular fees).
+        // Individual pay: jump straight to one ward's Pay Fees page, with this
+        // fee type pre-selected in the dropdown if it's one of the ward's
+        // named extra fees, or "regular" if this is a regular fee component
+        // (there's no separate balance per component — payment applies to the
+        // ward's overall regular fees).
         function goPayWard(wardIdx, feeType) {
             switchWard(wardIdx, true);
             var cb = document.getElementById('portalFamilyPayCheckbox');
             if (cb && cb.checked) { cb.checked = false; if (typeof cb.onchange === 'function') cb.onchange(); }
             if (feeType) {
-                var hasTab = document.querySelector('.fee-tab-btn[data-fee="' + feeType.replace(/"/g, '\\"') + '"]');
-                if (hasTab) selectPortalFeeTab(feeType);
+                var hasOption = document.querySelector('#payFeeType option[value="' + feeType.replace(/"/g, '\\"') + '"]');
+                if (hasOption) selectPortalPayFeeType(feeType);
             }
             scrollToPortalPaySection();
         }
 
-        // Combined pay: land on the first billed ward's Pay Fees page (on this
-        // fee type's tab, if any), then check + trigger "Pay consolidated
-        // Family Fees" so the amount pre-fills with the combined total for
-        // every ward billed for this specific fee type.
+        // Combined pay: land on the first billed ward's Pay Fees page (with
+        // this fee type pre-selected, if it applies there), then check +
+        // trigger "Pay consolidated Family Fees" so the amount pre-fills with
+        // the combined total for every ward billed for this specific fee type.
         function goPayFamilyForFeeType(feeType) {
             var idx = computeFamilyFeeTypeIndex();
             var d = idx.data[feeType];
             var landIdx = (d && d.wards.length) ? d.wards[0].idx : 0;
             switchWard(landIdx, true);
             if (feeType) {
-                var hasTab = document.querySelector('.fee-tab-btn[data-fee="' + feeType.replace(/"/g, '\\"') + '"]');
-                if (hasTab) selectPortalFeeTab(feeType);
+                var hasOption = document.querySelector('#payFeeType option[value="' + feeType.replace(/"/g, '\\"') + '"]');
+                if (hasOption) selectPortalPayFeeType(feeType);
             }
             var cb = document.getElementById('portalFamilyPayCheckbox');
             if (cb) {
@@ -3599,7 +3666,7 @@
 
         function onPortalFeeTypeChange() {
             var selected = document.getElementById('payFeeType').value;
-            selectPortalFeeTab(selected);
+            selectPortalPayFeeType(selected);
         }
 
         // Collapses the Payment History / Instalments list — called whenever
@@ -3625,10 +3692,13 @@
             if (label) label.textContent = isHidden ? 'Hide' : 'Show';
         }
 
-        function renderFeeDetails(feeType) {
+        // Ward-level header + the always-unified Fee Breakdown (every regular
+        // fee component + every extra fee, one combined Total) and the
+        // balance row above it — none of this depends on which fee is
+        // selected to pay below; it's the whole picture for this one ward.
+        function renderWardWideSummary() {
             var rec = studentRec;
             var cur = (schoolData && schoolData.currency) || 'GHC';
-            collapseInstList();
             document.getElementById('pStudentId').textContent = rec.id;
             document.getElementById('pStudentName').textContent = rec.studentName;
             var av = document.getElementById('pStudentAvatar');
@@ -3642,7 +3712,6 @@
             document.getElementById('pGrade').textContent = rec.grade;
             document.getElementById('pSession').textContent = rec.academicSession;
 
-            // Discount display
             var discAmt = parseFloat(rec.discount) || 0;
             var discPill = document.getElementById('pDiscountPill');
             if (discPill) {
@@ -3655,133 +3724,142 @@
             }
             var discNoteEl = document.getElementById('feeDiscountNote');
             if (discNoteEl) {
-                if (discAmt > 0 && feeType === 'regular') {
-                    discNoteEl.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>A scholarship/discount of <strong>' + cur + ' ' + discAmt.toFixed(2) + '</strong> has already been taken off the amount below — you do not need to pay this part.';
+                if (discAmt > 0) {
+                    discNoteEl.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>A scholarship/discount of <strong>' + cur + ' ' + discAmt.toFixed(2) + '</strong> has already been taken off ' + rec.studentName.split(' ')[0] + '\'s Regular School Fees below.';
                     discNoteEl.style.display = 'block';
                 } else {
                     discNoteEl.style.display = 'none';
                 }
             }
 
+            var ward = currentWards[currentWardIndex] || { record: rec, customFees: customFees };
+            var fb = computeWardFeeItems(ward);
+            var regTotals = safeTotalsForWard(rec);
+            var customPaid = 0, customBal = 0;
+            (ward.customFees || []).forEach(function (cf) {
+                var billed = parseFloat(cf.amount) || 0;
+                if (billed <= 0) return;
+                var paid = parseFloat(cf.totalPaid) || 0;
+                customPaid += paid;
+                customBal += Math.max(0, billed - paid);
+            });
+            var totalFees = regTotals.totalFees + fb.customTotal;
+            var totalPaid = regTotals.totalPaid + customPaid;
+            var balance = regTotals.balance + customBal;
+
+            document.getElementById('pTotalFees').textContent = cur + ' ' + fmt(totalFees);
+            document.getElementById('pTotalPaid').textContent = cur + ' ' + fmt(totalPaid);
+            document.getElementById('pBalance').textContent = cur + ' ' + fmt(Math.max(0, balance));
+
+            var statusHtml = balance <= 0 && totalFees > 0
+                ? '<span class="status-paid"><i class="bi bi-check-circle-fill me-1"></i> Fully Paid</span>'
+                : totalPaid > 0
+                    ? '<span class="status-partial"><i class="bi bi-exclamation-circle-fill me-1"></i> Partial</span>'
+                    : '<span class="status-unpaid"><i class="bi bi-x-circle-fill me-1"></i> Unpaid</span>';
+            document.getElementById('pStatusBadge').innerHTML = statusHtml;
+
+            var tbodyHtml = fb.items.map(function (it) {
+                var amtStr = (it.amount < 0 ? '-' : '') + cur + ' ' + fmt(Math.abs(it.amount));
+                var color = it.isDiscount ? 'color:#dc2626;' : '';
+                return '<tr><td style="' + color + '">' + it.name + (it.isCustom ? ' <span style="color:#94a3b8;font-size:10.5px;">(Extra Fee)</span>' : '') + '</td><td style="' + color + 'text-align:right">' + amtStr + '</td></tr>';
+            }).join('');
+            tbodyHtml += '<tr><td><strong>Total Fee for ' + rec.studentName.split(' ')[0] + '</strong></td><td style="text-align:right"><strong>' + cur + ' ' + fmt(fb.total) + '</strong></td></tr>';
+            document.getElementById('feeTableBody').innerHTML = tbodyHtml;
+        }
+
+        // The part of the page scoped to whichever fee the parent picked from
+        // the "Which fee would you like to pay?" dropdown: that fee's own
+        // Billed/Paid/Balance, its instalment history, and the pay form
+        // (locked to the full balance in "Pay in Full" mode, or freely
+        // editable in "Pay in Instalment" mode).
+        var currentPaySelBalance = 0;
+        function renderPaySelection(feeType) {
+            var rec = studentRec;
+            var cur = (schoolData && schoolData.currency) || 'GHC';
+            collapseInstList();
+            document.getElementById('formCurrency').textContent = cur;
+
+            var totalFees, totalPaid, balance, numInst, getInst, selLabel;
+
             if (feeType === 'regular') {
-                var feeKeys = Object.keys(rec).filter(function (k) {
-                    return !['id', 'studentName', 'phoneNumber', 'grade', 'academicSession', 'isNewStudent',
-                        'totalFees', 'totalPaid', 'balance', 'paymentStatus', 'createdAt', 'updatedAt', 'discount']
-                        .includes(k) && !k.startsWith('inst') && parseFloat(rec[k]) > 0;
-                });
-                var totalFees = 0, totalPaid = 0;
-                feeKeys.forEach(function (k) { totalFees += parseFloat(rec[k]) || 0; });
-                for (var i = 1; i <= 6; i++) totalPaid += parseFloat(rec['inst' + i]) || 0;
-                if (parseFloat(rec.totalFees) > 0) {
-                    totalFees = parseFloat(rec.totalFees); // server value is already net of any discount
-                } else {
-                    totalFees = Math.max(0, totalFees - (parseFloat(rec.discount) || 0));
-                }
-                if (parseFloat(rec.totalPaid) >= 0) totalPaid = parseFloat(rec.totalPaid);
-                var balance = totalFees - totalPaid;
-
-                document.getElementById('pTotalFees').textContent = cur + ' ' + fmt(totalFees);
-                document.getElementById('pTotalPaid').textContent = cur + ' ' + fmt(totalPaid);
-                document.getElementById('pBalance').textContent = cur + ' ' + fmt(Math.max(0, balance));
-                document.getElementById('formCurrency').textContent = cur;
-
-                var statusHtml = balance <= 0 && totalFees > 0
-                    ? '<span class="status-paid"><i class="bi bi-check-circle-fill me-1"></i> Fully Paid</span>'
-                    : totalPaid > 0
-                        ? '<span class="status-partial"><i class="bi bi-exclamation-circle-fill me-1"></i> Partial</span>'
-                        : '<span class="status-unpaid"><i class="bi bi-x-circle-fill me-1"></i> Unpaid</span>';
-                document.getElementById('pStatusBadge').innerHTML = statusHtml;
-
-                var discAmt = parseFloat(rec.discount) || 0;
-                var tbodyHtml = feeKeys.map(function (k) {
-                    var amt = parseFloat(rec[k]) || 0;
-                    if (amt <= 0) return '';
-                    var label = k.replace(/_\d+$/, '').replace(/([A-Z])/g, ' $1').replace(/^./, function (c) { return c.toUpperCase(); });
-                    if (k === 'arrears') {
-                        return '<tr style="background:#fff7ed;"><td style="color:#c2410c;font-weight:700"><i class="bi bi-exclamation-triangle-fill me-1"></i>Arrears (carried over from a previous term)</td><td style="text-align:right;color:#c2410c;font-weight:700">' + cur + ' ' + fmt(amt) + '</td></tr>';
-                    }
-                    return '<tr><td>' + label + '</td><td style="text-align:right">' + cur + ' ' + fmt(amt) + '</td></tr>';
-                }).join('');
-                if (discAmt > 0) {
-                    tbodyHtml += '<tr><td style="color:#dc2626">Discount</td><td style="text-align:right;color:#dc2626">-' + cur + ' ' + fmt(discAmt) + '</td></tr>';
-                }
-                tbodyHtml += '<tr><td><strong>Total</strong></td><td style="text-align:right"><strong>' + cur + ' ' + fmt(totalFees) + '</strong></td></tr>';
-                document.getElementById('feeTableBody').innerHTML = tbodyHtml;
-
-                var instHtml = '';
-                for (var i = 1; i <= 6; i++) {
-                    var amt = parseFloat(rec['inst' + i]) || 0, dt = rec['inst' + i + 'Date'] || '';
-                    if (amt > 0 || i <= 2) {
-                        var ic = amt > 0 ? 'paid' : '', ib = amt > 0 ? '<span class="inst-badge">' + cur + ' ' + fmt(amt) + '</span>' : '<span class="inst-badge empty">Not paid</span>';
-                        var ds = dt ? '<span style="color:#94a3b8;font-size:12px"> — ' + dt + '</span>' : '';
-                        instHtml += '<div class="inst-item ' + ic + '"><div><strong>Instalment ' + i + '</strong>' + ds + '</div>' + ib + '</div>';
-                    }
-                }
-                document.getElementById('instList').innerHTML = instHtml || '<p style="color:#94a3b8;font-size:13px">No installments recorded yet.</p>';
-
-                if (schoolData) {
-                    document.getElementById('momoNameDisp').textContent = schoolData.momoName || 'Contact school';
-                    document.getElementById('momoNumDisp').textContent = schoolData.momoNumber || '—';
-                    var noteEl = document.getElementById('momoNoteDisp');
-                    if (schoolData.momoNote) { noteEl.textContent = schoolData.momoNote; noteEl.style.display = 'block'; }
-                    if (balance > 0) document.getElementById('payAmount').value = balance.toFixed(2);
-                    if (rec.phoneNumber) document.getElementById('payPhone').value = rec.phoneNumber;
-                }
-                populatePortalPaymentMethods();
-                var isPaid = (balance <= 0 && totalFees > 0);
-                document.getElementById('pCongratsCard').style.display = isPaid ? 'flex' : 'none';
-                document.getElementById('payNowCard').style.display = isPaid ? 'none' : 'block';
+                var t = safeTotalsForWard(rec);
+                totalFees = t.totalFees; totalPaid = t.totalPaid; balance = t.balance;
+                numInst = 6;
+                getInst = function (i) { return { amt: parseFloat(rec['inst' + i]) || 0, date: rec['inst' + i + 'Date'] || '' }; };
+                var selOpt = document.querySelector('#payFeeType option[value="regular"]');
+                selLabel = selOpt ? selOpt.textContent : 'Regular School Fees';
             } else {
-                // Custom fee details rendering
-                var config = customFeeTypes.find(function(c) { return c.name === feeType; });
-                var customRec = customFees.find(function(f) { return f.feeTypeName === feeType; });
+                var config = customFeeTypes.find(function (c) { return c.name === feeType; });
+                var customRec = customFees.find(function (f) { return f.feeTypeName === feeType; });
+                totalFees = customRec ? (parseFloat(customRec.amount) || 0) : (config ? getCustomFeeAmount(config, rec.grade) : 0);
+                totalPaid = customRec ? (parseFloat(customRec.totalPaid) || 0) : 0;
+                balance = Math.max(0, totalFees - totalPaid);
+                numInst = config && config.installmentAllowed ? (parseInt(config.numInstallments) || 1) : 1;
+                getInst = function (i) { return { amt: customRec ? (parseFloat(customRec['inst' + i]) || 0) : 0, date: customRec ? (customRec['inst' + i + 'Date'] || '') : '' }; };
+                selLabel = feeType;
+            }
+            currentPaySelBalance = Math.max(0, balance);
 
-                var totalFees = customRec ? (parseFloat(customRec.amount) || 0) : (config ? getCustomFeeAmount(config, rec.grade) : 0);
-                var totalPaid = customRec ? (parseFloat(customRec.totalPaid) || 0) : 0;
-                var balance = Math.max(0, totalFees - totalPaid);
+            document.getElementById('paySelBilled').textContent = cur + ' ' + fmt(totalFees);
+            document.getElementById('paySelPaid').textContent = cur + ' ' + fmt(totalPaid);
+            document.getElementById('paySelBalance').textContent = cur + ' ' + fmt(currentPaySelBalance);
+            var histLabel = document.getElementById('payHistFeeLabel');
+            if (histLabel) histLabel.textContent = '— ' + selLabel;
 
-                document.getElementById('pTotalFees').textContent = cur + ' ' + fmt(totalFees);
-                document.getElementById('pTotalPaid').textContent = cur + ' ' + fmt(totalPaid);
-                document.getElementById('pBalance').textContent = cur + ' ' + fmt(balance);
-                document.getElementById('formCurrency').textContent = cur;
-
-                var statusHtml = balance <= 0 && totalFees > 0
-                    ? '<span class="status-paid"><i class="bi bi-check-circle-fill me-1"></i> Fully Paid</span>'
-                    : totalPaid > 0
-                        ? '<span class="status-partial"><i class="bi bi-exclamation-circle-fill me-1"></i> Partial</span>'
-                        : '<span class="status-unpaid"><i class="bi bi-x-circle-fill me-1"></i> Unpaid</span>';
-                document.getElementById('pStatusBadge').innerHTML = statusHtml;
-
-                var tbodyHtml = '<tr><td>' + feeType + ' (Ad-hoc Fee)</td><td style="text-align:right">' + cur + ' ' + fmt(totalFees) + '</td></tr>';
-                tbodyHtml += '<tr><td><strong>Total</strong></td><td style="text-align:right"><strong>' + cur + ' ' + fmt(totalFees) + '</strong></td></tr>';
-                document.getElementById('feeTableBody').innerHTML = tbodyHtml;
-
-                var numInst = config && config.installmentAllowed ? (parseInt(config.numInstallments) || 1) : 1;
-                var instHtml = '';
-                for (var i = 1; i <= numInst; i++) {
-                    var amt = customRec ? (parseFloat(customRec['inst' + i]) || 0) : 0;
-                    var dt = customRec ? (customRec['inst' + i + 'Date'] || '') : '';
-                    var ic = amt > 0 ? 'paid' : '';
-                    var ib = amt > 0 ? '<span class="inst-badge">' + cur + ' ' + fmt(amt) + '</span>' : '<span class="inst-badge empty">Not paid</span>';
-                    var ds = dt ? '<span style="color:#94a3b8;font-size:12px"> — ' + dt + '</span>' : '';
+            var instHtml = '';
+            for (var i = 1; i <= numInst; i++) {
+                var inst = getInst(i);
+                if (inst.amt > 0 || (feeType === 'regular' && i <= 2)) {
+                    var ic = inst.amt > 0 ? 'paid' : '', ib = inst.amt > 0 ? '<span class="inst-badge">' + cur + ' ' + fmt(inst.amt) + '</span>' : '<span class="inst-badge empty">Not paid</span>';
+                    var ds = inst.date ? '<span style="color:#94a3b8;font-size:12px"> — ' + inst.date + '</span>' : '';
                     instHtml += '<div class="inst-item ' + ic + '"><div><strong>Instalment ' + i + '</strong>' + ds + '</div>' + ib + '</div>';
                 }
-                document.getElementById('instList').innerHTML = instHtml;
+            }
+            document.getElementById('instList').innerHTML = instHtml || '<p style="color:#94a3b8;font-size:13px">No installments recorded yet.</p>';
 
-                if (schoolData) {
-                    document.getElementById('momoNameDisp').textContent = schoolData.momoName || 'Contact school';
-                    document.getElementById('momoNumDisp').textContent = schoolData.momoNumber || '—';
-                    var noteEl = document.getElementById('momoNoteDisp');
-                    if (schoolData.momoNote) { noteEl.textContent = schoolData.momoNote; noteEl.style.display = 'block'; }
-                    if (balance > 0) document.getElementById('payAmount').value = balance.toFixed(2);
-                    if (rec.phoneNumber) document.getElementById('payPhone').value = rec.phoneNumber;
-                }
-                populatePortalPaymentMethods();
-                var isPaid = (balance <= 0 && totalFees > 0);
-                document.getElementById('pCongratsCard').style.display = isPaid ? 'flex' : 'none';
-                document.getElementById('payNowCard').style.display = isPaid ? 'none' : 'block';
+            if (schoolData) {
+                document.getElementById('momoNameDisp').textContent = schoolData.momoName || 'Contact school';
+                document.getElementById('momoNumDisp').textContent = schoolData.momoNumber || '—';
+                var noteEl = document.getElementById('momoNoteDisp');
+                if (schoolData.momoNote) { noteEl.textContent = schoolData.momoNote; noteEl.style.display = 'block'; }
+                if (rec.phoneNumber) document.getElementById('payPhone').value = rec.phoneNumber;
+            }
+            populatePortalPaymentMethods();
+
+            var isPaid = (balance <= 0 && totalFees > 0);
+            document.getElementById('pCongratsCard').style.display = isPaid ? 'flex' : 'none';
+            var fieldsEl = document.getElementById('payFormFields');
+            if (fieldsEl) fieldsEl.style.display = isPaid ? 'none' : 'block';
+
+            setPayMode('full');
+        }
+
+        // "Pay in Full" locks the amount to the outstanding balance for the
+        // selected fee (or the combined family total, if that checkbox is
+        // on); "Pay in Instalment" leaves it open for the parent to enter any
+        // amount up to that balance. Reset to "Full" every time the fee-type
+        // selection changes, so a stale partial amount never carries over
+        // onto a different fee.
+        function setPayMode(mode) {
+            currentPayMode = mode;
+            var fullBtn = document.getElementById('payModeFullBtn');
+            var instBtn = document.getElementById('payModeInstBtn');
+            if (fullBtn) fullBtn.classList.toggle('active', mode === 'full');
+            if (instBtn) instBtn.classList.toggle('active', mode === 'installment');
+            var amountInput = document.getElementById('payAmount');
+            if (!amountInput) return;
+            var famCb = document.getElementById('portalFamilyPayCheckbox');
+            var isFamily = famCb && famCb.checked;
+            if (mode === 'full') {
+                amountInput.readOnly = true;
+                amountInput.classList.add('locked');
+                if (!isFamily) amountInput.value = currentPaySelBalance > 0 ? currentPaySelBalance.toFixed(2) : '';
+            } else {
+                amountInput.readOnly = false;
+                amountInput.classList.remove('locked');
             }
         }
+        var currentPayMode = 'full';
 
         function refreshParentPortalData() {
             var btn = document.getElementById('pRefreshBtn');
@@ -3879,7 +3957,7 @@
                 google.script.run
                     .withSuccessHandler(function (r) {
                         btn.disabled = false; btn.innerHTML = '<i class="bi bi-send-check-fill"></i> Notify School of Payment';
-                        if (r.success) { showPToast('Payment notification sent! The school will verify and update your account.', 'success', 'Notification Sent', 5000); document.getElementById('payRef').value = ''; document.getElementById('payNote').value = ''; document.getElementById('payMethodUsed').value = ''; }
+                        if (r.success) { showPToast('Payment notification sent! The school will verify and update your account.', 'success', 'Notification Sent', 5000); document.getElementById('payRef').value = ''; document.getElementById('payNote').value = ''; document.getElementById('payMethodUsed').value = ''; if (!isFamilyPay) setPayMode(currentPayMode); }
                         else showPToast('Error: ' + r.message, 'error');
                     })
                     .withFailureHandler(function (e) { btn.disabled = false; btn.innerHTML = 'Notify School'; showPToast('Error: ' + e.message, 'error'); })

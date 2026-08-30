@@ -2347,11 +2347,20 @@
         body.dark-mode .stat-card,
         body.dark-mode .modal-box,
         body.dark-mode .id-prefix-card,
-        body.dark-mode .momo-card {
+        body.dark-mode .momo-card,
+        body.dark-mode .data-table {
             background-color: #1e293b !important;
             color: #f1f5f9 !important;
             border-color: #334155 !important;
             box-shadow: 0 10px 25px rgba(0,0,0,0.25) !important;
+        }
+        /* .data-table (the white card wrapping every records/notifications/
+           activity-log table) was never covered above — its background
+           stayed white in dark mode while .table td's text color below was
+           already switched to light gray, leaving every table in the app
+           reading as near-invisible light text on a white card. */
+        body.dark-mode .table-header {
+            border-bottom-color: #334155 !important;
         }
         body.dark-mode .table {
             color: #f1f5f9 !important;
@@ -2364,6 +2373,9 @@
         body.dark-mode .table td {
             color: #e2e8f0 !important;
             border-color: #334155 !important;
+        }
+        body.dark-mode .table-responsive {
+            background-color: transparent !important;
         }
         body.dark-mode .form-control,
         body.dark-mode .form-select {
@@ -2402,6 +2414,18 @@
         }
         body.dark-mode .nav-link:not(.active) {
             color: #cbd5e1 !important;
+        }
+        /* A handful of pill-tab buttons (e.g. the Settings sub-tabs) are plain
+           <button class="nav-link ..."> elements without Bootstrap's base
+           .btn class, so the browser's native button chrome (light gray
+           background, outset border) shows through instead of Bootstrap's
+           nav-pills styling. In light mode that's an unnoticed light-gray
+           button; in dark mode the text color above turns light too, leaving
+           near-invisible light-on-light text. Strip the native chrome here so
+           inactive tabs render as plain text like their <a>-based siblings. */
+        body.dark-mode button.nav-link:not(.active) {
+            background-color: transparent !important;
+            border: none !important;
         }
 
         /* ── Sub-Card Form Layouts ── */
@@ -5120,8 +5144,9 @@
                             <strong>How to process a payment notification:</strong><br>
                             1. Check your Mobile Money account for the <strong>Reference ID</strong> shown<br>
                             2. Verify the amount matches what the parent entered<br>
-                            3. Click <strong>✅ Confirm</strong> to mark as confirmed, then manually update the student's
-                            record in the relevant term page<br>
+                            3. Click <strong>✅ Confirm</strong> — the payment is automatically recorded into the
+                            student's next open instalment (regular fees, or the specific extra fee named in the
+                            parent's note) and their record updates right away, no manual entry needed<br>
                             4. Click <strong>❌ Reject</strong> if the reference is invalid or amount doesn't match
                         </div>
                     </div>
@@ -15863,7 +15888,7 @@
         }
 
         async function confirmNotif(row, studentId, studentName) {
-            var ok = await showConfirm('Confirm payment from ' + studentName + ' (ID: ' + studentId + ')? Remember to update their record after confirming.', { title: 'Confirm Payment?', icon: '💰', okLabel: 'Yes, Confirm', okClass: 'primary' });
+            var ok = await showConfirm('Confirm payment from ' + studentName + ' (ID: ' + studentId + ')? This automatically records it into their next open instalment.', { title: 'Confirm Payment?', icon: '💰', okLabel: 'Yes, Confirm', okClass: 'primary' });
             if (!ok) return;
             updateNotifStatus(row, 'Confirmed');
         }
@@ -15914,12 +15939,20 @@
                                     lsSet('customFeeRecords', allCustomFeeRecords);
                                 }
                                 
-                                // Rerender active term page if applicable
+                                // Rerender the active term page — but ONLY if it actually IS one of
+                                // the three term pages. Previously this ran unconditionally, so
+                                // confirming a notification while viewing the Notifications page
+                                // (or any other section) called renderTerm('notifications', 'First
+                                // Term', 1), which found #notificationsSection (matching key+'Section')
+                                // and overwrote it with the First Term student records table —
+                                // silently replacing the notifications list with student records.
                                 var activeSec = document.querySelector('.content-section.active');
-                                if (activeSec) {
+                                var termSectionIds = { firstTermSection: 'First Term', secondTermSection: 'Second Term', thirdTermSection: 'Third Term' };
+                                if (activeSec && termSectionIds[activeSec.id]) {
                                     var secId = activeSec.id;
-                                    var termName = secId === 'secondTermSection' ? 'Second Term' : secId === 'thirdTermSection' ? 'Third Term' : 'First Term';
-                                    renderTerm(secId.replace('Section', ''), termName, 1);
+                                    var termKeyForRerender = secId.replace('Section', '');
+                                    var pageForRerender = (termState[termKeyForRerender] && termState[termKeyForRerender].page) || 1;
+                                    renderTerm(termKeyForRerender, termSectionIds[secId], pageForRerender);
                                 }
                                 
                                 // Send automatic SMS to parent
