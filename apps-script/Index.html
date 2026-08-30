@@ -665,6 +665,37 @@
             color: #fff
         }
 
+        .sidebar-active-term {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 12px 16px;
+            padding: 9px 12px;
+            background: rgba(255, 255, 255, .08);
+            border: 1px solid rgba(255, 255, 255, .12);
+            border-radius: 10px;
+            color: #fff;
+        }
+        .sidebar-active-term > i {
+            font-size: 16px;
+            color: var(--warning);
+            flex-shrink: 0;
+        }
+        .sidebar-active-term-label {
+            font-size: 9.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            color: rgba(255, 255, 255, .55);
+            line-height: 1.2;
+        }
+        .sidebar-active-term-value {
+            font-size: 12.5px;
+            font-weight: 700;
+            line-height: 1.25;
+        }
+        body.sidebar-collapsed .sidebar-active-term { display: none; }
+
         .sidebar .nav-item {
             display: flex;
             align-items: center;
@@ -2715,6 +2746,13 @@
                     <button class="sidebar-close" onclick="closeSidebar()"><i class="bi bi-x-lg"></i></button>
                 </div>
             </div>
+            <div class="sidebar-active-term" id="sidebarActiveTerm" title="The term currently open for new payments, set in Settings">
+                <i class="bi bi-calendar-check-fill"></i>
+                <div>
+                    <div class="sidebar-active-term-label">Active Term</div>
+                    <div class="sidebar-active-term-value" id="sidebarActiveTermValue">—</div>
+                </div>
+            </div>
             <div class="sidebar-body">
                 <a class="nav-item active" data-section="dashboard"><i
                         class="bi bi-speedometer2"></i><span>Dashboard</span></a>
@@ -4278,6 +4316,60 @@
                                                     <button type="button" class="btn btn-outline-secondary fw-semibold" id="btnInitPhotosFolder" onclick="initPhotosFolder()" title="Only needed if you want to set this up ahead of time">Create Now</button>
                                                 </div>
                                                 <small class="text-muted d-block" style="font-size:10px; line-height:1.3;">A Drive folder for student photos is created automatically the first time anyone uploads a photo — you don't need to do anything here. Photos are kept viewable via link for portal rendering.</small>
+                                            </div>
+                                            <div class="mb-3 border rounded-3 p-3 bg-light text-start shadow-xs">
+                                                <label class="form-label small fw-bold text-dark mb-1"><i class="bi bi-ui-checks-grid me-1 text-primary"></i>Action Buttons on Student Records</label>
+                                                <small class="text-muted d-block mb-2" style="font-size:10px; line-height:1.3;">Choose which action buttons appear on each student's row (Students / Class list, Custom Fees, Collector view). Unchecked actions are hidden for everyone, including Admin. Leave all checked to show every button.</small>
+                                                <div id="actionBtnCheckboxes" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;">
+                                                    <div class="form-check">
+                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_profile" value="profile" checked>
+                                                        <label class="form-check-label small" for="actbtn_profile" style="font-size:11.5px;">View Profile</label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_edit" value="edit" checked>
+                                                        <label class="form-check-label small" for="actbtn_edit" style="font-size:11.5px;">Pay / Edit Fee</label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_bill" value="bill" checked>
+                                                        <label class="form-check-label small" for="actbtn_bill" style="font-size:11.5px;">Print Bill</label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_receipt" value="receipt" checked>
+                                                        <label class="form-check-label small" for="actbtn_receipt" style="font-size:11.5px;">Print Receipt</label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_thermal" value="thermal" checked>
+                                                        <label class="form-check-label small" for="actbtn_thermal" style="font-size:11.5px;">Thermal Receipt</label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_whatsapp" value="whatsapp" checked>
+                                                        <label class="form-check-label small" for="actbtn_whatsapp" style="font-size:11.5px;">WhatsApp</label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_sms" value="sms" checked>
+                                                        <label class="form-check-label small" for="actbtn_sms" style="font-size:11.5px;">Send SMS</label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_call" value="call" checked>
+                                                        <label class="form-check-label small" for="actbtn_call" style="font-size:11.5px;">Call Parent</label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_nextbill" value="nextbill" checked>
+                                                        <label class="form-check-label small" for="actbtn_nextbill" style="font-size:11.5px;">Next Term Bill</label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_promote" value="promote" checked>
+                                                        <label class="form-check-label small" for="actbtn_promote" style="font-size:11.5px;">Promote to Next Term</label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_refund" value="refund" checked>
+                                                        <label class="form-check-label small" for="actbtn_refund" style="font-size:11.5px;">Refund Payment</label>
+                                                    </div>
+                                                    <div class="form-check">
+                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_delete" value="delete" checked>
+                                                        <label class="form-check-label small" for="actbtn_delete" style="font-size:11.5px;">Delete Record</label>
+                                                    </div>
+                                                </div>
                                             </div>
                                             <input type="hidden" id="setSigName">
                                             <input type="hidden" id="setSigTitle">
@@ -9199,84 +9291,100 @@
         // ════════════════════════════════════════════════════════
         // ACTION BUTTONS
         // ════════════════════════════════════════════════════════
+        // Which action buttons the admin has chosen to show on student records
+        // (Settings → Action Buttons). Unset/empty means "show everything" —
+        // keeps existing behavior for schools that never touch the new setting.
+        function actionEnabled(key) {
+            var cfg = settings.visibleActionButtons;
+            if (!cfg) return true;
+            var list;
+            try { list = typeof cfg === 'string' ? JSON.parse(cfg) : cfg; } catch(e) { return true; }
+            if (!Array.isArray(list) || !list.length) return true;
+            return list.indexOf(key) !== -1;
+        }
+
         function buildActionBtns(r, isAdmin, selectedFeeType) {
             selectedFeeType = selectedFeeType || 'regular';
             var phone = String(r.phoneNumber || '').replace(/\D/g, '');
             var html = '';
             var session = r.academicSession || '';
-            
+
             // Viewer has no action buttons
             if (currentUser && currentUser.role === 'viewer') {
                 return '';
             }
 
-            // Profile action button (always visible)
-            html += '<button class="act-btn btn btn-sm btn-outline-info me-1" data-action="profile" data-id="' + r.id + '" data-session="' + session + '" title="View Profile"><i class="bi bi-person-bounding-box"></i></button>';
+            // Profile action button
+            if (actionEnabled('profile')) {
+                html += '<button class="act-btn btn btn-sm btn-outline-info me-1" data-action="profile" data-id="' + r.id + '" data-session="' + session + '" title="View Profile"><i class="bi bi-person-bounding-box"></i></button>';
+            }
 
             if (selectedFeeType !== 'regular') {
                 if (currentUser && currentUser.role === 'viewer') {
                     return wrapActionBtns(html);
                 }
-                html += '<button class="act-btn btn btn-sm btn-outline-primary me-1" data-action="editcustom" data-id="' + r.id + '" data-session="' + session + '" data-feename="' + selectedFeeType + '" title="Pay / Collect Fee"><i class="bi bi-credit-card"></i></button>';
+                if (actionEnabled('edit')) {
+                    html += '<button class="act-btn btn btn-sm btn-outline-primary me-1" data-action="editcustom" data-id="' + r.id + '" data-session="' + session + '" data-feename="' + selectedFeeType + '" title="Pay / Collect Fee"><i class="bi bi-credit-card"></i></button>';
+                }
                 var customRecord = allCustomFeeRecords.find(function(cf) {
                     return cf && String(cf.studentId) === String(r.id) && String(cf.feeTypeName) === String(selectedFeeType) && String(cf.academicSession) === String(session);
                 });
-                if (currentUser && currentUser.role === 'admin') {
+                if (currentUser && currentUser.role === 'admin' && actionEnabled('bill')) {
                     html += '<button class="act-btn btn btn-sm btn-outline-success me-1" data-action="billcustom" data-id="' + r.id + '" data-session="' + session + '" data-feename="' + selectedFeeType + '" title="Print Custom Bill"><i class="bi bi-printer"></i></button>';
                 }
-                if (currentUser && currentUser.role === 'admin' && customRecord && (parseFloat(customRecord.totalPaid) || 0) > 0) {
+                if (currentUser && currentUser.role === 'admin' && customRecord && (parseFloat(customRecord.totalPaid) || 0) > 0 && actionEnabled('receipt')) {
                     html += '<button class="act-btn btn btn-sm btn-outline-info me-1" data-action="receiptcustom" data-id="' + r.id + '" data-session="' + session + '" data-feename="' + selectedFeeType + '" title="Print Custom Receipt"><i class="bi bi-receipt"></i></button>';
                 }
-                if (customRecord && (parseFloat(customRecord.totalPaid) || 0) > 0) {
+                if (customRecord && (parseFloat(customRecord.totalPaid) || 0) > 0 && actionEnabled('thermal')) {
                     html += '<button class="act-btn btn btn-sm btn-outline-warning me-1" data-action="thermalcustom" data-id="' + r.id + '" data-session="' + session + '" data-feename="' + selectedFeeType + '" title="Thermal Print Receipt"><i class="bi bi-printer-fill"></i></button>';
                 }
-                if (customRecord && (parseFloat(customRecord.totalPaid) || 0) > 0) {
+                if (customRecord && (parseFloat(customRecord.totalPaid) || 0) > 0 && actionEnabled('refund')) {
                     html += '<button class="act-btn btn btn-sm btn-outline-danger me-1" data-action="refund" data-id="' + r.id + '" data-session="' + session + '" data-feename="' + selectedFeeType + '" title="Refund Payment"><i class="bi bi-arrow-return-left"></i></button>';
                 }
                 if (phone) {
                     var intlPhone = phone.startsWith('0') ? '233' + phone.substring(1) : (phone.startsWith('233') ? phone : '233' + phone);
-                    html += '<a href="tel:+' + intlPhone + '" class="btn btn-sm btn-outline-success me-1" title="Call Parent" style="padding:2px 7px;font-size:11px"><i class="bi bi-telephone"></i></a>';
-                    html += '<button class="act-btn btn btn-sm btn-whatsapp me-1" data-action="whatsappcustom" data-id="' + r.id + '" data-session="' + session + '" data-feename="' + selectedFeeType + '" title="WhatsApp"><i class="bi bi-whatsapp"></i></button>';
-                    html += '<button class="act-btn btn btn-sm btn-outline-secondary me-1" data-action="smscustom" data-id="' + r.id + '" data-session="' + session + '" data-feename="' + selectedFeeType + '" title="Send SMS" style="font-size:11px;padding:2px 7px"><i class="bi bi-chat-dots"></i></button>';
+                    if (actionEnabled('call')) html += '<a href="tel:+' + intlPhone + '" class="btn btn-sm btn-outline-success me-1" title="Call Parent" style="padding:2px 7px;font-size:11px"><i class="bi bi-telephone"></i></a>';
+                    if (actionEnabled('whatsapp')) html += '<button class="act-btn btn btn-sm btn-whatsapp me-1" data-action="whatsappcustom" data-id="' + r.id + '" data-session="' + session + '" data-feename="' + selectedFeeType + '" title="WhatsApp"><i class="bi bi-whatsapp"></i></button>';
+                    if (actionEnabled('sms')) html += '<button class="act-btn btn btn-sm btn-outline-secondary me-1" data-action="smscustom" data-id="' + r.id + '" data-session="' + session + '" data-feename="' + selectedFeeType + '" title="Send SMS" style="font-size:11px;padding:2px 7px"><i class="bi bi-chat-dots"></i></button>';
                 }
                 return wrapActionBtns(html);
             }
 
             // Collector: Edit, Next Bill, Thermal Print, plus Call/WhatsApp/SMS to parents
             if (currentUser && currentUser.role === 'collector') {
-                html += '<button class="act-btn btn btn-sm btn-outline-primary me-1" data-action="edit" data-id="' + r.id + '" data-session="' + session + '" title="Pay / Edit Fee"><i class="bi bi-credit-card"></i></button>';
-                html += '<button class="act-btn btn btn-sm btn-outline-warning me-1" data-action="nextbill" data-id="' + r.id + '" data-session="' + session + '" title="Generate Next Term Bill"><i class="bi bi-calendar-plus"></i></button>';
-                html += '<button class="act-btn btn btn-sm btn-outline-warning me-1" data-action="thermal" data-id="' + r.id + '" data-session="' + session + '" title="Thermal Print Receipt"><i class="bi bi-printer-fill"></i></button>';
-                if (safeTotals(r).totalPaid > 0) {
+                if (actionEnabled('edit')) html += '<button class="act-btn btn btn-sm btn-outline-primary me-1" data-action="edit" data-id="' + r.id + '" data-session="' + session + '" title="Pay / Edit Fee"><i class="bi bi-credit-card"></i></button>';
+                if (actionEnabled('nextbill')) html += '<button class="act-btn btn btn-sm btn-outline-warning me-1" data-action="nextbill" data-id="' + r.id + '" data-session="' + session + '" title="Generate Next Term Bill"><i class="bi bi-calendar-plus"></i></button>';
+                if (actionEnabled('thermal')) html += '<button class="act-btn btn btn-sm btn-outline-warning me-1" data-action="thermal" data-id="' + r.id + '" data-session="' + session + '" title="Thermal Print Receipt"><i class="bi bi-printer-fill"></i></button>';
+                if (safeTotals(r).totalPaid > 0 && actionEnabled('refund')) {
                     html += '<button class="act-btn btn btn-sm btn-outline-danger me-1" data-action="refund" data-id="' + r.id + '" data-session="' + session + '" data-feename="regular" title="Refund Payment"><i class="bi bi-arrow-return-left"></i></button>';
                 }
                 if (phone) {
                     var intlPhoneCol = phone.startsWith('0') ? '233' + phone.substring(1) : (phone.startsWith('233') ? phone : '233' + phone);
-                    html += '<a href="tel:+' + intlPhoneCol + '" class="btn btn-sm btn-outline-success me-1" title="Call Parent" style="padding:2px 7px;font-size:11px"><i class="bi bi-telephone"></i></a>';
-                    html += '<button class="act-btn btn btn-sm btn-whatsapp me-1" data-action="whatsapp" data-id="' + r.id + '" data-session="' + session + '" title="WhatsApp"><i class="bi bi-whatsapp"></i></button>';
-                    html += '<button class="act-btn btn btn-sm btn-outline-secondary me-1" data-action="sms" data-id="' + r.id + '" data-session="' + session + '" title="Send SMS" style="font-size:11px;padding:2px 7px"><i class="bi bi-chat-dots"></i></button>';
+                    if (actionEnabled('call')) html += '<a href="tel:+' + intlPhoneCol + '" class="btn btn-sm btn-outline-success me-1" title="Call Parent" style="padding:2px 7px;font-size:11px"><i class="bi bi-telephone"></i></a>';
+                    if (actionEnabled('whatsapp')) html += '<button class="act-btn btn btn-sm btn-whatsapp me-1" data-action="whatsapp" data-id="' + r.id + '" data-session="' + session + '" title="WhatsApp"><i class="bi bi-whatsapp"></i></button>';
+                    if (actionEnabled('sms')) html += '<button class="act-btn btn btn-sm btn-outline-secondary me-1" data-action="sms" data-id="' + r.id + '" data-session="' + session + '" title="Send SMS" style="font-size:11px;padding:2px 7px"><i class="bi bi-chat-dots"></i></button>';
                 }
                 return wrapActionBtns(html);
             }
 
-            // Admin has all action buttons
-            html += '<button class="act-btn btn btn-sm btn-outline-primary me-1" data-action="edit"    data-id="' + r.id + '" data-session="' + session + '" title="Pay / Edit"><i class="bi bi-credit-card"></i></button>';
-            html += '<button class="act-btn btn btn-sm btn-outline-success me-1" data-action="bill"    data-id="' + r.id + '" data-session="' + session + '" title="Print Bill"><i class="bi bi-printer"></i></button>';
-            html += '<button class="act-btn btn btn-sm btn-outline-info me-1"    data-action="receipt" data-id="' + r.id + '" data-session="' + session + '" title="Print Receipt"><i class="bi bi-receipt"></i></button>';
-            html += '<button class="act-btn act-btn-secondary btn btn-sm btn-outline-warning me-1" data-action="thermal" data-id="' + r.id + '" data-session="' + session + '" title="Thermal Print Receipt"><i class="bi bi-printer-fill"></i></button>';
+            // Admin has all action buttons (subject to the same enabled-list)
+            if (actionEnabled('edit')) html += '<button class="act-btn btn btn-sm btn-outline-primary me-1" data-action="edit"    data-id="' + r.id + '" data-session="' + session + '" title="Pay / Edit"><i class="bi bi-credit-card"></i></button>';
+            if (actionEnabled('bill')) html += '<button class="act-btn btn btn-sm btn-outline-success me-1" data-action="bill"    data-id="' + r.id + '" data-session="' + session + '" title="Print Bill"><i class="bi bi-printer"></i></button>';
+            if (actionEnabled('receipt')) html += '<button class="act-btn btn btn-sm btn-outline-info me-1"    data-action="receipt" data-id="' + r.id + '" data-session="' + session + '" title="Print Receipt"><i class="bi bi-receipt"></i></button>';
+            if (actionEnabled('thermal')) html += '<button class="act-btn act-btn-secondary btn btn-sm btn-outline-warning me-1" data-action="thermal" data-id="' + r.id + '" data-session="' + session + '" title="Thermal Print Receipt"><i class="bi bi-printer-fill"></i></button>';
             if (phone) {
                 var intlPhone = phone.startsWith('0') ? '233' + phone.substring(1) : (phone.startsWith('233') ? phone : '233' + phone);
-                html += '<a href="tel:+' + intlPhone + '" class="act-btn-secondary btn btn-sm btn-outline-success me-1" title="Call Parent" style="padding:2px 7px;font-size:11px"><i class="bi bi-telephone"></i></a>';
-                html += '<button class="act-btn act-btn-secondary btn btn-sm btn-whatsapp me-1" data-action="whatsapp" data-id="' + r.id + '" data-session="' + session + '" title="WhatsApp"><i class="bi bi-whatsapp"></i></button>';
-                html += '<button class="act-btn act-btn-secondary btn btn-sm btn-outline-secondary me-1" data-action="sms" data-id="' + r.id + '" data-session="' + session + '" title="Send SMS" style="font-size:11px;padding:2px 7px"><i class="bi bi-chat-dots"></i></button>';
+                if (actionEnabled('call')) html += '<a href="tel:+' + intlPhone + '" class="act-btn-secondary btn btn-sm btn-outline-success me-1" title="Call Parent" style="padding:2px 7px;font-size:11px"><i class="bi bi-telephone"></i></a>';
+                if (actionEnabled('whatsapp')) html += '<button class="act-btn act-btn-secondary btn btn-sm btn-whatsapp me-1" data-action="whatsapp" data-id="' + r.id + '" data-session="' + session + '" title="WhatsApp"><i class="bi bi-whatsapp"></i></button>';
+                if (actionEnabled('sms')) html += '<button class="act-btn act-btn-secondary btn btn-sm btn-outline-secondary me-1" data-action="sms" data-id="' + r.id + '" data-session="' + session + '" title="Send SMS" style="font-size:11px;padding:2px 7px"><i class="bi bi-chat-dots"></i></button>';
             }
             if (isAdmin) {
-                html += '<button class="act-btn act-btn-secondary btn btn-sm btn-outline-warning me-1" data-action="nextbill" data-id="' + r.id + '" data-session="' + session + '" title="Generate Next Term Bill"><i class="bi bi-calendar-plus"></i></button>';
-                html += '<button class="act-btn act-btn-secondary btn btn-sm btn-outline-warning me-1" data-action="promote" data-id="' + r.id + '" data-session="' + session + '" title="Promote to Next Term"><i class="bi bi-person-up"></i></button>';
-                if (safeTotals(r).totalPaid > 0) {
+                if (actionEnabled('nextbill')) html += '<button class="act-btn act-btn-secondary btn btn-sm btn-outline-warning me-1" data-action="nextbill" data-id="' + r.id + '" data-session="' + session + '" title="Generate Next Term Bill"><i class="bi bi-calendar-plus"></i></button>';
+                if (actionEnabled('promote')) html += '<button class="act-btn act-btn-secondary btn btn-sm btn-outline-warning me-1" data-action="promote" data-id="' + r.id + '" data-session="' + session + '" title="Promote to Next Term"><i class="bi bi-person-up"></i></button>';
+                if (safeTotals(r).totalPaid > 0 && actionEnabled('refund')) {
                     html += '<button class="act-btn act-btn-secondary btn btn-sm btn-outline-danger me-1" data-action="refund" data-id="' + r.id + '" data-session="' + session + '" data-feename="regular" title="Refund Payment"><i class="bi bi-arrow-return-left"></i></button>';
                 }
-                html += '<button class="act-btn btn btn-sm btn-outline-danger" data-action="delete" data-id="' + r.id + '" data-session="' + session + '" title="Delete"><i class="bi bi-trash"></i></button>';
+                if (actionEnabled('delete')) html += '<button class="act-btn btn btn-sm btn-outline-danger" data-action="delete" data-id="' + r.id + '" data-session="' + session + '" title="Delete"><i class="bi bi-trash"></i></button>';
             }
             return wrapActionBtns(html);
         }
@@ -11949,6 +12057,14 @@
             if (document.getElementById('setPhotosFolderId')) {
                 document.getElementById('setPhotosFolderId').value = settings.studentPhotosFolderId || '';
             }
+            if (document.getElementById('actionBtnCheckboxes')) {
+                var visibleBtns = settings.visibleActionButtons;
+                try { visibleBtns = typeof visibleBtns === 'string' ? JSON.parse(visibleBtns) : visibleBtns; } catch(e) { visibleBtns = null; }
+                var allChecked = !Array.isArray(visibleBtns) || !visibleBtns.length;
+                document.querySelectorAll('.actbtn-check').forEach(function(cb) {
+                    cb.checked = allChecked || visibleBtns.indexOf(cb.value) !== -1;
+                });
+            }
             if (settings.idPrefix) updatePrefixPreview();
             // Sibling discounts settings
             if (document.getElementById('setSiblingDiscount2')) document.getElementById('setSiblingDiscount2').value = settings.siblingDiscount2 || '';
@@ -12302,6 +12418,16 @@
             document.querySelectorAll('.nte-fee-cb').forEach(function(cb) {
                 if (cb.checked) nextTermIncluded.push(cb.value);
             });
+            var allActionBtnCbs = document.querySelectorAll('.actbtn-check');
+            var visibleActionButtonsVal = settings.visibleActionButtons || '';
+            if (allActionBtnCbs.length) {
+                var visibleActionBtns = [];
+                allActionBtnCbs.forEach(function(cb) {
+                    if (cb.checked) visibleActionBtns.push(cb.value);
+                });
+                // All checked means "show everything" — store as empty so actionEnabled() treats it as no restriction.
+                visibleActionButtonsVal = (visibleActionBtns.length < allActionBtnCbs.length) ? JSON.stringify(visibleActionBtns) : '';
+            }
             var s = {
                 schoolName: document.getElementById('setName').value, schoolAddress: document.getElementById('setAddr').value,
                 schoolPhone: document.getElementById('setPhone').value, schoolEmail: document.getElementById('setEmail').value,
@@ -12326,7 +12452,8 @@
                 enableAutoOutstandingSms: document.getElementById('setAutoOutstandingSms') ? document.getElementById('setAutoOutstandingSms').checked : false,
                 autoOutstandingSmsTime: document.getElementById('setAutoOutstandingSmsTime') ? document.getElementById('setAutoOutstandingSmsTime').value : '08:00',
                 monthlyCollectionTarget: document.getElementById('setMonthlyTarget') ? document.getElementById('setMonthlyTarget').value : '',
-                studentPhotosFolderId: document.getElementById('setPhotosFolderId') ? document.getElementById('setPhotosFolderId').value : ''
+                studentPhotosFolderId: document.getElementById('setPhotosFolderId') ? document.getElementById('setPhotosFolderId').value : '',
+                visibleActionButtons: visibleActionButtonsVal
             };
             showLoad('Saving…');
             if (typeof google !== 'undefined' && google.script) {
@@ -12426,6 +12553,7 @@
                 if (s.themePattern !== 'none') document.body.classList.add('pattern-' + s.themePattern);
             }
             updateTermTiles();
+            updateSidebarActiveTermBadge();
 
             // Sync parent portal link to bypass popup blockers
             if (typeof updateParentPortalLink === 'function') {
@@ -12434,6 +12562,17 @@
 
             try { populatePaymentModeDropdowns(); } catch (e) { console.error('populatePaymentModeDropdowns error:', e); }
             try { applyRoleLabels(); } catch (e) { console.error('applyRoleLabels error:', e); }
+        }
+
+        // Shows the admin-configured active term (Settings → academic year/active term)
+        // at the top of the sidebar, so admin/collector always know which term new
+        // payments are being recorded against without opening Settings.
+        function updateSidebarActiveTermBadge() {
+            var el = document.getElementById('sidebarActiveTermValue');
+            if (!el) return;
+            var yr = settings.academicYear || '';
+            var term = settings.activeTerm || '';
+            el.textContent = term ? (term + (yr ? ' — ' + yr : '')) : 'Not set';
         }
 
         // Every active payment method configured in Settings (Payment Methods tab) is added to
