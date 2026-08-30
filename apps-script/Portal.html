@@ -2108,6 +2108,287 @@
             border-color: #334155 !important;
             color: #f1f5f9 !important;
         }
+
+        /* ════════════════════════════════════════════════════════
+           SIMPLE PORTAL REDESIGN — Dashboard / Children's Fees /
+           My Children / Next Term Bill, matching the plain sidebar +
+           blue-header-bar + card/table reference layout.
+           ════════════════════════════════════════════════════════ */
+
+        /* Sidebar: solid theme color instead of the dark gradient */
+        .portal-sidebar { background: var(--primary); }
+
+        /* Persistent white "Welcome, X (Parent)" bar + Logout, above every page */
+        .pwelcome-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            background: #fff;
+            padding: 16px 24px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .pwelcome-topbar-label { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: .5px; }
+        .pwelcome-topbar-name { font-size: 19px; font-weight: 800; color: #1e293b; margin-top: 2px; }
+        .pwelcome-logout-btn {
+            background: #dc2626;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 9px 16px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-family: 'DM Sans', sans-serif;
+        }
+        .pwelcome-logout-btn:hover { background: #b91c1c; }
+
+        /* Section header bar — solid, one row: icon + title (+ optional action) */
+        .pdash-header {
+            background: var(--primary);
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .pdash-header-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #fff;
+            font-size: 17px;
+            font-weight: 800;
+        }
+        .pdash-body { max-width: 1000px; margin: 0 auto; padding: 22px 20px; }
+        .pdash-empty { text-align: center; color: #94a3b8; font-size: 13px; padding: 24px; }
+
+        /* Dashboard: welcome card */
+        .pwelcome-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 18px 20px;
+            margin-bottom: 20px;
+        }
+        .pwelcome-card-title { font-size: 15px; font-weight: 800; color: var(--primary); margin-bottom: 12px; }
+        .pwelcome-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 14px;
+        }
+        .pwelcome-info-label { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: .4px; }
+        .pwelcome-info-val { font-size: 14px; font-weight: 700; color: #1e293b; margin-top: 2px; }
+
+        /* Dashboard: colored stat bars */
+        .pstat-bars { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+        .pstat-bar-item { border-radius: 10px; overflow: hidden; }
+        .pstat-bar-fill {
+            padding: 12px 16px;
+            color: #fff;
+            font-size: 18px;
+            font-weight: 800;
+        }
+        .pstat-bar-fill.total { background: #2563eb; }
+        .pstat-bar-fill.paid { background: #059669; }
+        .pstat-bar-fill.pending { background: #dc2626; }
+        .pstat-bar-label { font-size: 12px; font-weight: 500; opacity: .9; margin-top: 1px; }
+
+        /* Dashboard: Children Summary list */
+        .pchildsum-row {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 14px 16px;
+            margin-bottom: 10px;
+        }
+        .pchildsum-name { font-size: 14px; font-weight: 800; color: var(--primary); margin-bottom: 8px; }
+        .pchildsum-stats { display: flex; gap: 24px; flex-wrap: wrap; font-size: 13px; }
+        .pchildsum-stats b { font-weight: 700; }
+
+        /* My Children: one card per ward */
+        .pchild-card {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 18px 20px;
+            margin-bottom: 16px;
+        }
+        .pchild-card-name { font-size: 17px; font-weight: 800; color: var(--primary); display: flex; align-items: center; gap: 8px; }
+        .pchild-card-badge {
+            display: inline-block;
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-size: 11.5px;
+            font-weight: 700;
+        }
+        .pchild-card-badge.active { background: #dcfce7; color: #166534; }
+        .pchild-card-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px 20px;
+            margin: 14px 0;
+        }
+        .pchild-card-info-grid .lbl { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: .4px; }
+        .pchild-card-info-grid .val { font-size: 13.5px; font-weight: 700; color: #1e293b; margin-top: 2px; }
+        .pchild-card-feesum {
+            border-top: 1px solid #f1f5f9;
+            padding-top: 12px;
+            margin-top: 4px;
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+            align-items: center;
+            font-size: 13px;
+        }
+        .pchild-card-feesum b { font-weight: 700; }
+        .pchild-card-feesum-label { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: .4px; display: block; margin-bottom: 2px; }
+
+        /* Children's Fees: filter bar */
+        .pfilter-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 12px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 18px;
+        }
+        .pfilter-bar label { font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .4px; display: block; margin-bottom: 5px; }
+        .pfilter-bar .pfilter-actions { display: flex; align-items: flex-end; }
+        .pfilter-clear-btn {
+            background: #64748b;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 9px 14px;
+            font-size: 12.5px;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: 'DM Sans', sans-serif;
+        }
+        .pfilter-clear-btn:hover { background: #475569; }
+
+        /* Children's Fees: table */
+        .pfees-table-wrap { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+        .pfees-table { width: 100%; border-collapse: collapse; }
+        .pfees-table th {
+            background: #f8fafc;
+            color: #64748b;
+            font-size: 11.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .4px;
+            padding: 12px 14px;
+            text-align: left;
+            white-space: nowrap;
+        }
+        .pfees-table td {
+            padding: 12px 14px;
+            border-top: 1px solid #f1f5f9;
+            font-size: 13px;
+            vertical-align: middle;
+        }
+        .pprogress-track { width: 110px; height: 6px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+        .pprogress-fill { height: 100%; background: var(--primary); }
+        .pprogress-text { font-size: 11px; color: #94a3b8; margin-top: 3px; white-space: nowrap; }
+        .pstatus-pill { display: inline-block; padding: 3px 11px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+        .pstatus-pill.paid { background: #dcfce7; color: #166534; }
+        .pstatus-pill.partial { background: #fef9c3; color: #854d0e; }
+        .pstatus-pill.pending { background: #fee2e2; color: #991b1b; }
+        .prow-act-btn {
+            width: 30px; height: 30px;
+            border-radius: 7px;
+            border: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            margin-right: 5px;
+            font-size: 13px;
+        }
+        .prow-act-btn.view { background: #eef2ff; color: var(--primary); }
+        .prow-act-btn.pay { background: #dcfce7; color: #166534; }
+        .prow-act-btn:hover { opacity: .8; }
+
+        /* Pay / View modal */
+        .pmodal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15,23,42,.55);
+            z-index: 500;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 40px 16px;
+            overflow-y: auto;
+        }
+        .pmodal-overlay.show { display: flex; }
+        .pmodal-box {
+            background: #fff;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 460px;
+            overflow: hidden;
+            animation: pFadeUp .2s ease both;
+        }
+        .pmodal-head {
+            background: var(--primary);
+            color: #fff;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .pmodal-head-title { font-size: 15px; font-weight: 800; }
+        .pmodal-head-sub { font-size: 12px; opacity: .8; margin-top: 2px; }
+        .pmodal-close {
+            background: rgba(255,255,255,.15);
+            border: none;
+            color: #fff;
+            width: 30px; height: 30px;
+            border-radius: 8px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .pmodal-body { padding: 20px; max-height: 78vh; overflow-y: auto; }
+
+        @media (max-width: 640px) {
+            .pwelcome-topbar { padding: 12px 16px; }
+            .pwelcome-topbar-name { font-size: 16px; }
+            .pdash-header { padding: 14px 16px; }
+            .pdash-body { padding: 16px 12px; }
+            .pfees-table-wrap { overflow-x: auto; }
+            .pfees-table { min-width: 620px; }
+        }
+
+        /* Dark mode coverage for the redesigned pages */
+        body.dark-mode .pwelcome-topbar { background-color: #1e293b !important; border-color: #334155 !important; }
+        body.dark-mode .pwelcome-topbar-name { color: #f8fafc !important; }
+        body.dark-mode .pwelcome-card,
+        body.dark-mode .pchildsum-row,
+        body.dark-mode .pchild-card,
+        body.dark-mode .pfilter-bar,
+        body.dark-mode .pfees-table-wrap,
+        body.dark-mode .pmodal-box {
+            background-color: #1e293b !important;
+            border-color: #334155 !important;
+            color: #f1f5f9 !important;
+        }
+        body.dark-mode .pchildsum-name,
+        body.dark-mode .pchild-card-info-grid .val,
+        body.dark-mode .pwelcome-info-val {
+            color: #f8fafc !important;
+        }
+        body.dark-mode .pfees-table th { background-color: #0f172a !important; color: #94a3b8 !important; }
+        body.dark-mode .pfees-table td { border-color: #334155 !important; color: #e2e8f0 !important; }
+        body.dark-mode .pprogress-track { background-color: #334155 !important; }
     </style>
 </head>
 
@@ -2259,321 +2540,123 @@
                 <div class="portal-sidebar-schoolname" id="portalSchoolName">School Portal</div>
             </div>
             <div class="portal-sidebar-nav">
-                <a class="portal-nav-link active" data-page="dashboard" onclick="switchPortalPage('dashboard')"><i class="bi bi-grid-1x2-fill"></i> Dashboard</a>
-                <a class="portal-nav-link" data-page="wardDetail" onclick="switchPortalPage('wardDetail')"><i class="bi bi-receipt"></i> Pay Fees</a>
-                <a class="portal-nav-link" data-page="paymentHistory" onclick="switchPortalPage('paymentHistory')"><i class="bi bi-clock-history"></i> Payment History</a>
+                <a class="portal-nav-link active" data-page="dashboard" onclick="switchPortalPage('dashboard')"><i class="bi bi-pie-chart-fill"></i> Dashboard</a>
+                <a class="portal-nav-link" data-page="childrenFees" onclick="switchPortalPage('childrenFees')"><i class="bi bi-credit-card-2-front-fill"></i> Children's Fees</a>
+                <a class="portal-nav-link" data-page="myChildren" onclick="switchPortalPage('myChildren')"><i class="bi bi-people-fill"></i> My Children</a>
                 <a class="portal-nav-link" data-page="nextTermBill" onclick="switchPortalPage('nextTermBill')"><i class="bi bi-calendar-plus"></i> Next Term Bill</a>
             </div>
             <div class="portal-sidebar-footer">
                 <button class="back-btn" onclick="togglePortalTheme()"><i id="portalThemeToggleIcon" class="bi bi-moon-fill"></i> <span id="portalThemeToggleLabel">Dark Mode</span></button>
                 <button class="back-btn" onclick="refreshParentPortalData()" id="pRefreshBtn"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
-                <button class="back-btn" onclick="goBack()"><i class="bi bi-arrow-left"></i> Go Back</button>
             </div>
         </nav>
 
         <!-- Main content -->
         <div class="portal-main" id="portalMain">
 
+        <!-- Persistent "Welcome, X (parent)" bar + Logout — shown above every page -->
+        <div class="pwelcome-topbar">
+            <div>
+                <div class="pwelcome-topbar-label">Welcome,</div>
+                <div class="pwelcome-topbar-name" id="pwelcomeTopbarName">Parent</div>
+            </div>
+            <button class="pwelcome-logout-btn" onclick="goBack()"><i class="bi bi-box-arrow-right"></i> Logout</button>
+        </div>
+
         <!-- ══ PAGE: Dashboard ══ -->
         <div class="portal-page active" id="pageDashboard">
             <div class="pdash-header">
-                <div class="pdash-greeting">Welcome back</div>
-                <div class="pdash-title" id="pdashGreetingName">Your Wards</div>
-                <div class="pdash-term-badge" id="pdashTermBadge" style="display:none"><i class="bi bi-calendar-check-fill me-1"></i><span id="pdashTermBadgeText">—</span></div>
-            </div>
-            <div class="pdash-total-strip" id="pdashTotalStrip" style="display:none">
-                <div class="pdash-total-card">
-                    <div class="pdash-total-label">Family Total Fees</div>
-                    <div class="pdash-total-value" id="pdashTotalFees">—</div>
-                </div>
-                <div class="pdash-total-card">
-                    <div class="pdash-total-label">Family Total Paid</div>
-                    <div class="pdash-total-value" id="pdashTotalPaid" style="color:#6ee7b7">—</div>
-                </div>
-                <div class="pdash-total-card">
-                    <div class="pdash-total-label">Family Balance Due</div>
-                    <div class="pdash-total-value danger" id="pdashTotalDue">—</div>
-                </div>
+                <div class="pdash-header-title"><i class="bi bi-pie-chart-fill"></i> Parent Dashboard</div>
             </div>
             <div class="pdash-body">
-                <div class="pdash-section-title">Fee Types — Tap One to Pay</div>
-                <div class="feetype-card-grid" id="pdashFeeTypeGrid"></div>
-
-                <div class="pdash-section-title">Your Wards</div>
-                <div class="ward-card-grid" id="pdashWardGrid"></div>
-
-                <div class="pdash-section-title">Fees Breakdown by Ward</div>
-                <div id="pdashWardBreakdown"></div>
-
-                <div class="pdash-section-title">Recent Payments <a onclick="switchPortalPage('paymentHistory')">View All</a></div>
-                <div id="pdashActivityList"></div>
-            </div>
-        </div>
-
-        <!-- ══ PAGE: Fee Type Detail (one fee type, all wards) ══ -->
-        <div class="portal-page" id="pageFeeType">
-            <div class="pdash-header" style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-                <div>
-                    <div class="pdash-greeting">All Wards</div>
-                    <div class="pdash-title" id="ftdTitle">Fee Type</div>
-                </div>
-                <button class="back-btn" onclick="switchPortalPage('dashboard')"><i class="bi bi-arrow-left"></i> Dashboard</button>
-            </div>
-            <div class="pdash-total-strip" id="ftdTotalStrip">
-                <div class="pdash-total-card">
-                    <div class="pdash-total-label">Total Billed</div>
-                    <div class="pdash-total-value" id="ftdTotalBilled">—</div>
-                </div>
-                <div class="pdash-total-card" id="ftdTotalPaidCard">
-                    <div class="pdash-total-label">Total Paid</div>
-                    <div class="pdash-total-value" id="ftdTotalPaid" style="color:#6ee7b7">—</div>
-                </div>
-                <div class="pdash-total-card" id="ftdTotalBalCard">
-                    <div class="pdash-total-label">Balance Due</div>
-                    <div class="pdash-total-value danger" id="ftdTotalBal">—</div>
-                </div>
-            </div>
-            <div class="ftd-body">
-                <div class="ftd-note" id="ftdNote"></div>
-                <div id="ftdWardList"></div>
-                <div id="ftdCombinedWrap"></div>
-            </div>
-        </div>
-
-        <!-- ══ PAGE: Ward Detail (fee breakdown / pay / receipt) ══ -->
-        <div class="portal-page" id="pageWardDetail">
-        <!-- Portal Header -->
-        <div class="portal-header">
-            <div class="portal-header-inner" style="justify-content:flex-end;">
-                <button class="back-btn" onclick="switchPortalPage('dashboard')"><i class="bi bi-arrow-left"></i> Dashboard</button>
-            </div>
-            <!-- Sibling switcher — a compact dropdown (not a row of every ward's
-                 name) so this page doesn't open with the whole family across
-                 the top; only relevant when there's more than one ward. -->
-            <div id="siblingSwitcherContainer" class="sibling-switcher-container" style="display:none; align-items:center; gap:8px; padding:9px 16px; background:rgba(255,255,255,0.05); border-bottom:1px solid rgba(255,255,255,0.1); margin-top:-10px; margin-bottom:10px; border-radius:12px;">
-                <span class="small text-white-50" style="font-size:11px; white-space:nowrap;"><i class="bi bi-people me-1"></i>Viewing:</span>
-                <select id="siblingSwitcherSelect" class="form-select form-select-sm" style="max-width:220px; background:rgba(255,255,255,0.12); color:#fff; border:1px solid rgba(255,255,255,0.25); font-size:12.5px;" onchange="switchWard(parseInt(this.value, 10), true)"></select>
-            </div>
-
-            <!-- Student info band -->
-            <div class="student-card" style="display:flex; align-items:center; gap:16px;">
-                <div id="pStudentAvatar" style="width:60px; height:60px; border-radius:50%; overflow:hidden; border:2px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 4px 10px rgba(0,0,0,0.15);">
-                    <i class="bi bi-person-fill text-white-50" style="font-size:32px;"></i>
-                </div>
-                <div style="flex-grow:1;">
-                    <div class="student-id-badge" style="margin-top:0;"><i class="bi bi-id-card"></i> <span id="pStudentId">—</span></div>
-                    <div class="student-name" id="pStudentName">Student Name</div>
-                    <div class="student-meta">
-                        <span class="meta-pill" id="pGrade">Grade</span>
-                        <span class="meta-pill" id="pSession">Session</span>
-                        <span class="meta-pill text-dark bg-warning" id="pDiscountPill" style="display:none; background-color:#ffc107!important; color:#000!important;"><i class="bi bi-percent me-1"></i>Discount</span>
-                        <span id="pStatusBadge" class="ms-auto"></span>
+                <div class="pwelcome-card">
+                    <div class="pwelcome-card-title"><i class="bi bi-person-circle me-1"></i>Welcome, <span id="pdashParentName">Parent</span>!</div>
+                    <div class="pwelcome-info-grid">
+                        <div><div class="pwelcome-info-label">Phone</div><div class="pwelcome-info-val" id="pdashParentPhone">—</div></div>
+                        <div><div class="pwelcome-info-label">Children</div><div class="pwelcome-info-val" id="pdashParentChildCount">—</div></div>
+                        <div><div class="pwelcome-info-label">Active Term</div><div class="pwelcome-info-val" id="pdashParentTerm">—</div></div>
                     </div>
                 </div>
-            </div>
-            <!-- Balance row -->
-            <div class="balance-row">
-                <div class="bal-card">
-                    <div class="bal-label">Total Fees</div>
-                    <div class="bal-value" id="pTotalFees">—</div>
+
+                <div class="pstat-bars">
+                    <div class="pstat-bar-item">
+                        <div class="pstat-bar-fill total"><span id="pdashStatTotal">—</span><div class="pstat-bar-label">Total Fees (All Children)</div></div>
+                    </div>
+                    <div class="pstat-bar-item">
+                        <div class="pstat-bar-fill paid"><span id="pdashStatPaid">—</span><div class="pstat-bar-label">Paid Fees</div></div>
+                    </div>
+                    <div class="pstat-bar-item">
+                        <div class="pstat-bar-fill pending"><span id="pdashStatPending">—</span><div class="pstat-bar-label">Pending Fees</div></div>
+                    </div>
                 </div>
-                <div class="bal-card">
-                    <div class="bal-label">Total Paid</div>
-                    <div class="bal-value success" id="pTotalPaid">—</div>
-                </div>
-                <div class="bal-card">
-                    <div class="bal-label">Balance Due</div>
-                    <div class="bal-value danger" id="pBalance">—</div>
-                </div>
+
+                <div class="pdash-section-title" style="font-size:13px;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px;display:flex;align-items:center;gap:8px;"><i class="bi bi-people-fill"></i>Children Summary</div>
+                <div id="pdashChildrenSummary"></div>
             </div>
         </div>
 
-        <div class="portal-content">
-            <!-- Fee Breakdown — every fee billed to this ward (regular fee
-                 components + every extra fee) in one list, with a combined
-                 Total. Not tied to which fee is selected for payment below. -->
-            <div class="section-card">
-                <div class="section-head">
-                    <div class="icon" style="background:#eef2ff;color:var(--primary)"><i class="bi bi-receipt"></i></div>
-                    <h6>Fee Breakdown</h6>
+        <!-- ══ PAGE: Children's Fees (flat table, all wards) ══ -->
+        <div class="portal-page" id="pageChildrenFees">
+            <div class="pdash-header">
+                <div class="pdash-header-title"><i class="bi bi-credit-card-2-front-fill"></i> <span id="pcfHeaderCount">Fees Management</span></div>
+            </div>
+            <div class="pdash-body">
+                <div class="pfilter-bar">
+                    <div>
+                        <label>Search Fees</label>
+                        <input type="text" class="form-control" id="pcfSearch" placeholder="Search by student or fee type..." oninput="renderChildrenFeesPage()">
+                    </div>
+                    <div>
+                        <label>Filter by Fee Type</label>
+                        <select class="form-control" id="pcfFeeTypeFilter" onchange="renderChildrenFeesPage()">
+                            <option value="">All Fee Types</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label>Filter by Status</label>
+                        <select class="form-control" id="pcfStatusFilter" onchange="renderChildrenFeesPage()">
+                            <option value="">All Statuses</option>
+                            <option value="paid">Paid</option>
+                            <option value="partial">Partial</option>
+                            <option value="pending">Pending</option>
+                        </select>
+                    </div>
+                    <div class="pfilter-actions">
+                        <button type="button" class="pfilter-clear-btn" onclick="clearChildrenFeesFilters()"><i class="bi bi-x-lg me-1"></i>Clear Filters</button>
+                    </div>
                 </div>
-                <div id="feeDiscountNote" style="display:none;margin:0 16px 10px;padding:8px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;font-size:12px;color:#166534;"></div>
-                <div class="section-body" style="padding:0">
-                    <table class="fee-table" id="feeTable">
+                <div class="pfees-table-wrap">
+                    <table class="pfees-table">
                         <thead>
                             <tr>
-                                <th>Description</th>
-                                <th style="text-align:right">Amount</th>
+                                <th>Student</th>
+                                <th>Fee Type</th>
+                                <th>Total Amount</th>
+                                <th>Payment Progress</th>
+                                <th>Status</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
-                        <tbody id="feeTableBody"></tbody>
+                        <tbody id="pcfTableBody"></tbody>
                     </table>
                 </div>
             </div>
-
-            <!-- Payment History — scoped to whichever fee is selected below;
-                 collapsed by default so a long list of paid instalments
-                 doesn't push the Pay section further down. -->
-            <div class="section-card">
-                <div class="section-head">
-                    <div class="icon" style="background:#f0fdf4;color:#059669"><i class="bi bi-clock-history"></i></div>
-                    <h6>Payment History <span id="payHistFeeLabel" style="font-weight:400;color:#94a3b8;font-size:12px;"></span></h6>
-                    <button type="button" class="inst-toggle-btn" id="instToggleBtn" onclick="toggleInstList()">
-                        <span id="instToggleLabel">Show</span> <i class="bi bi-chevron-down" id="instToggleIcon"></i>
-                    </button>
-                </div>
-                <div class="section-body" id="instSectionBody" style="display:none">
-                    <div class="inst-list" id="instList"></div>
-                </div>
-            </div>
-
-            <!-- Make a Payment — pick which billed fee to pay from a dropdown
-                 (no more one tab per fee type), see that fee's own
-                 Billed/Paid/Balance, choose to pay it in full or in an
-                 instalment amount, then pay via Mobile Money. -->
-            <div class="section-card" id="payNowCard">
-                <div class="section-head">
-                    <div class="icon" style="background:#fef9c3;color:#854d0e"><i class="bi bi-phone-fill"></i></div>
-                    <h6>Make a Payment</h6>
-                </div>
-                <div class="section-body">
-                    <div class="form-group pay-select-group">
-                        <label><i class="bi bi-tag-fill me-1"></i>Which fee would you like to pay?</label>
-                        <select class="form-control" id="payFeeType" onchange="onPortalFeeTypeChange()">
-                            <option value="regular">Regular School Fees</option>
-                        </select>
-                    </div>
-
-                    <div class="pay-sel-stats">
-                        <div class="pay-sel-stat">
-                            <div class="pay-sel-stat-label">Billed</div>
-                            <div class="pay-sel-stat-val" id="paySelBilled">—</div>
-                        </div>
-                        <div class="pay-sel-stat">
-                            <div class="pay-sel-stat-label">Paid</div>
-                            <div class="pay-sel-stat-val success" id="paySelPaid">—</div>
-                        </div>
-                        <div class="pay-sel-stat">
-                            <div class="pay-sel-stat-label">Balance</div>
-                            <div class="pay-sel-stat-val danger" id="paySelBalance">—</div>
-                        </div>
-                    </div>
-
-                    <!-- Congratulations Banner — shown instead of the pay form
-                         when the selected fee is already fully settled. -->
-                    <div class="congrats-card" id="pCongratsCard" style="display:none">
-                        <div class="congrats-icon"><i class="bi bi-trophy-fill"></i></div>
-                        <div class="congrats-body">
-                            <h6>Congratulations!</h6>
-                            <p>This fee is fully settled. Thank you for your payment!</p>
-                        </div>
-                    </div>
-
-                    <div id="payFormFields">
-                    <!-- Pay in Full / Pay in Installment -->
-                    <div class="pay-mode-toggle" id="payModeToggle">
-                        <button type="button" class="pay-mode-btn active" id="payModeFullBtn" onclick="setPayMode('full')"><i class="bi bi-check2-circle"></i>Pay in Full</button>
-                        <button type="button" class="pay-mode-btn" id="payModeInstBtn" onclick="setPayMode('installment')"><i class="bi bi-layers"></i>Pay in Instalment</button>
-                    </div>
-
-                    <!-- Dynamic Configured Payment Methods List -->
-                    <div id="portalPaymentMethodsList" style="margin-bottom: 12px;"></div>
-
-                    <!-- MoMo details (Legacy Fallback) -->
-                    <div class="momo-card" id="momoCard">
-                        <button class="momo-copy" onclick="copyMoMoNum()" id="momoCopyBtn">Copy</button>
-                        <div class="momo-network">Mobile Money Payment</div>
-                        <div class="momo-name" id="momoNameDisp">Loading…</div>
-                        <div class="momo-number" id="momoNumDisp">—</div>
-                    </div>
-                    <!-- Important notice -->
-                    <div class="payment-notice">
-                        <strong>⚠️ Important — Reference Name</strong>
-                        When sending Mobile Money, use your ward's <strong>full name or Student ID</strong> as the
-                        reference/note so the school can identify your payment.
-                        <br><br>
-                        <span id="momoNoteDisp" style="display:none"></span>
-                    </div>
-                    <!-- Sibling payment checkbox -->
-                    <div class="form-group mb-3" id="portalFamilyPaymentGroup" style="display:none; margin-bottom:12px;">
-                        <div class="form-check form-switch" style="padding-left: 2.5em; text-align: left; margin-bottom: 8px;">
-                            <input class="form-check-input" type="checkbox" id="portalFamilyPayCheckbox" style="margin-left: -2.5em; cursor: pointer; width: 3em; height: 1.5em;">
-                            <label class="form-check-label fw-semibold text-primary" for="portalFamilyPayCheckbox" style="cursor: pointer; font-size:12px; vertical-align: middle; margin-left: 8px;">
-                                <i class="bi bi-people-fill me-1"></i> Pay consolidated Family Fees (all wards)
-                            </label>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>Payment Method Used</label>
-                        <select class="form-control" id="payMethodUsed">
-                            <option value="">-- Select how you paid --</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Amount You're Paying (<span id="formCurrency">GHC</span>)</label>
-                        <input type="number" class="form-control" id="payAmount" placeholder="Enter amount" min="1"
-                            step="0.01">
-                    </div>
-                    <div class="form-group">
-                        <label>Reference / Transaction ID</label>
-                        <input type="text" class="form-control" id="payRef"
-                            placeholder="e.g. GHM2410481234 (from your MoMo/Bank message)">
-                    </div>
-                    <div class="form-group">
-                        <label>Your Phone Number (for confirmation)</label>
-                        <input type="tel" class="form-control" id="payPhone" placeholder="e.g. 0244123456">
-                    </div>
-                    <div class="form-group">
-                        <label>Additional Note (optional)</label>
-                        <textarea class="form-control" id="payNote" rows="2"
-                            placeholder="Any message for the school"></textarea>
-                    </div>
-                    <button class="submit-btn" onclick="submitPayment()" id="submitPayBtn">
-                        <i class="bi bi-send-check-fill"></i> Notify School of Payment
-                    </button>
-                    <p style="font-size:12px;color:#94a3b8;margin-top:10px;text-align:center">
-                        Your payment notification will be reviewed and your account updated by the school admin.
-                    </p>
-                    </div><!-- /payFormFields -->
-                </div>
-            </div>
-
-            <!-- Download Receipt -->
-            <div class="section-card">
-                <div class="section-head">
-                    <div class="icon" style="background:#f0fdf4;color:#059669"><i class="bi bi-download"></i></div>
-                    <h6>Download Receipt</h6>
-                </div>
-                <div class="section-body">
-                    <p style="font-size:13px;color:#64748b;margin-bottom:14px">Download a PDF receipt showing all fee
-                        details and payment history for your records.</p>
-                    <button class="receipt-btn" onclick="downloadReceipt()">
-                        <i class="bi bi-file-earmark-pdf-fill"></i> Download Fee Receipt
-                    </button>
-                </div>
-            </div>
-
         </div>
-        </div><!-- /pageWardDetail -->
 
-        <!-- ══ PAGE: Payment History (consolidated, all wards) ══ -->
-        <div class="portal-page" id="pagePaymentHistory">
+        <!-- ══ PAGE: My Children (one card per ward) ══ -->
+        <div class="portal-page" id="pageMyChildren">
             <div class="pdash-header">
-                <div class="pdash-greeting">All Wards</div>
-                <div class="pdash-title">Payment History</div>
+                <div class="pdash-header-title"><i class="bi bi-people-fill"></i> My Children</div>
             </div>
-            <div class="phist-body">
-                <div id="phistList"></div>
-            </div>
+            <div class="pdash-body" id="pmcBody"></div>
         </div>
 
         <!-- ══ PAGE: Next Term Bill (per-ward, all wards) ══ -->
         <div class="portal-page" id="pageNextTermBill">
             <div class="pdash-header">
-                <div class="pdash-greeting">All Wards</div>
-                <div class="pdash-title">Next Term Bill Preview</div>
+                <div class="pdash-header-title"><i class="bi bi-calendar-plus"></i> Next Term Bill Preview</div>
             </div>
-            <div class="pntb-body">
+            <div class="pdash-body">
                 <div style="background:#eef2ff;color:#3730a3;font-size:12px;border-radius:10px;padding:10px 14px;margin-bottom:16px;line-height:1.5;">
                     💡 These are estimated bills for next term, including any outstanding arrears carried forward from this term.
                 </div>
@@ -2588,6 +2671,132 @@
             <div class="footer-links" id="footerLinks"></div>
             <div id="footerSchool">School Fees Parent Portal</div>
             <div style="margin-top:6px;font-size:11px;opacity:.5">Powered by School Fees Management System</div>
+        </div>
+    </div>
+
+    <!-- Pay Modal — opened from a "Pay" row action in Children's Fees, scoped
+         to that one (ward, fee type) so there's no fee-type dropdown to pick
+         from; the row already says which fee this is. -->
+    <div class="pmodal-overlay" id="payModalOverlay" onclick="if(event.target===this) closePayModal()">
+        <div class="pmodal-box">
+            <div class="pmodal-head">
+                <div>
+                    <div class="pmodal-head-title" id="payModalTitle">Pay Fee</div>
+                    <div class="pmodal-head-sub" id="payModalSub">Student</div>
+                </div>
+                <button class="pmodal-close" onclick="closePayModal()"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="pmodal-body">
+                <div class="pay-sel-stats">
+                    <div class="pay-sel-stat">
+                        <div class="pay-sel-stat-label">Billed</div>
+                        <div class="pay-sel-stat-val" id="pmBilled">—</div>
+                    </div>
+                    <div class="pay-sel-stat">
+                        <div class="pay-sel-stat-label">Paid</div>
+                        <div class="pay-sel-stat-val success" id="pmPaid">—</div>
+                    </div>
+                    <div class="pay-sel-stat">
+                        <div class="pay-sel-stat-label">Balance</div>
+                        <div class="pay-sel-stat-val danger" id="pmBalance">—</div>
+                    </div>
+                </div>
+
+                <!-- Congratulations Banner — shown instead of the pay form when
+                     this fee is already fully settled. -->
+                <div class="congrats-card" id="pmCongratsCard" style="display:none">
+                    <div class="congrats-icon"><i class="bi bi-trophy-fill"></i></div>
+                    <div class="congrats-body">
+                        <h6>Congratulations!</h6>
+                        <p>This fee is fully settled. Thank you for your payment!</p>
+                    </div>
+                </div>
+
+                <div id="pmFormFields">
+                    <div class="pay-mode-toggle" id="pmModeToggle">
+                        <button type="button" class="pay-mode-btn active" id="pmModeFullBtn" onclick="setModalPayMode('full')"><i class="bi bi-check2-circle"></i>Pay in Full</button>
+                        <button type="button" class="pay-mode-btn" id="pmModeInstBtn" onclick="setModalPayMode('installment')"><i class="bi bi-layers"></i>Pay in Instalment</button>
+                    </div>
+
+                    <div id="portalPaymentMethodsList" style="margin-bottom: 12px;"></div>
+
+                    <div class="momo-card" id="momoCard">
+                        <button class="momo-copy" onclick="copyMoMoNum()" id="momoCopyBtn">Copy</button>
+                        <div class="momo-network">Mobile Money Payment</div>
+                        <div class="momo-name" id="momoNameDisp">Loading…</div>
+                        <div class="momo-number" id="momoNumDisp">—</div>
+                    </div>
+                    <div class="payment-notice">
+                        <strong>⚠️ Important — Reference Name</strong>
+                        When sending Mobile Money, use your ward's <strong>full name or Student ID</strong> as the
+                        reference/note so the school can identify your payment.
+                        <br><br>
+                        <span id="momoNoteDisp" style="display:none"></span>
+                    </div>
+                    <div class="form-group">
+                        <label>Payment Method Used</label>
+                        <select class="form-control" id="payMethodUsed">
+                            <option value="">-- Select how you paid --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Amount You're Paying (<span id="formCurrency">GHC</span>)</label>
+                        <input type="number" class="form-control" id="payAmount" placeholder="Enter amount" min="1" step="0.01">
+                    </div>
+                    <div class="form-group">
+                        <label>Reference / Transaction ID</label>
+                        <input type="text" class="form-control" id="payRef" placeholder="e.g. GHM2410481234 (from your MoMo/Bank message)">
+                    </div>
+                    <div class="form-group">
+                        <label>Your Phone Number (for confirmation)</label>
+                        <input type="tel" class="form-control" id="payPhone" placeholder="e.g. 0244123456">
+                    </div>
+                    <div class="form-group">
+                        <label>Additional Note (optional)</label>
+                        <textarea class="form-control" id="payNote" rows="2" placeholder="Any message for the school"></textarea>
+                    </div>
+                    <button class="submit-btn" onclick="submitModalPayment()" id="submitPayBtn">
+                        <i class="bi bi-send-check-fill"></i> Notify School of Payment
+                    </button>
+                    <p style="font-size:12px;color:#94a3b8;margin-top:10px;text-align:center">
+                        Your payment notification will be reviewed and your account updated by the school admin.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Modal — opened from a "View" row action; shows that one fee's
+         instalment history and a receipt download. -->
+    <div class="pmodal-overlay" id="viewModalOverlay" onclick="if(event.target===this) closeViewModal()">
+        <div class="pmodal-box">
+            <div class="pmodal-head">
+                <div>
+                    <div class="pmodal-head-title" id="viewModalTitle">Fee Details</div>
+                    <div class="pmodal-head-sub" id="viewModalSub">Student</div>
+                </div>
+                <button class="pmodal-close" onclick="closeViewModal()"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="pmodal-body">
+                <div class="pay-sel-stats" style="margin-bottom:16px;">
+                    <div class="pay-sel-stat">
+                        <div class="pay-sel-stat-label">Billed</div>
+                        <div class="pay-sel-stat-val" id="vmBilled">—</div>
+                    </div>
+                    <div class="pay-sel-stat">
+                        <div class="pay-sel-stat-label">Paid</div>
+                        <div class="pay-sel-stat-val success" id="vmPaid">—</div>
+                    </div>
+                    <div class="pay-sel-stat">
+                        <div class="pay-sel-stat-label">Balance</div>
+                        <div class="pay-sel-stat-val danger" id="vmBalance">—</div>
+                    </div>
+                </div>
+                <div class="inst-list" id="vmInstList"></div>
+                <button class="receipt-btn" style="margin-top:16px;width:100%;justify-content:center;" onclick="downloadReceiptFromModal()">
+                    <i class="bi bi-file-earmark-pdf-fill"></i> Download Fee Receipt
+                </button>
+            </div>
         </div>
     </div>
 
@@ -2872,31 +3081,9 @@
             return { totalFees: totalFees, totalPaid: totalPaid, balance: balance };
         }
 
-        // navigateToPage: when called from the Dashboard's ward cards, also
-        // switch straight to the Pay Fees page so parents land on the ward's
-        // details instead of having to navigate there separately.
-        function switchWard(index, navigateToPage) {
-            currentWardIndex = index;
-            studentRec = currentWards[index].record;
-            customFees = currentWards[index].customFees || [];
-            uniforms = currentWards[index].uniforms || [];
-            books = currentWards[index].books || [];
-
-            var switcherSelectEl = document.getElementById('siblingSwitcherSelect');
-            if (switcherSelectEl) switcherSelectEl.value = String(index);
-
-            buildPortalPaySelector(applicablePortalFeeTypes(customFeeTypes, customFees));
-            renderWardWideSummary();
-            selectPortalPayFeeType('regular');
-
-            if (navigateToPage) switchPortalPage('wardDetail');
-        }
-
         function handlePortalDataLoad(r) {
             schoolData = r.school;
             customFeeTypes = r.customFeeTypes || [];
-
-            var prevWardId = (currentWards.length > 0 && currentWardIndex < currentWards.length) ? currentWards[currentWardIndex].record.id : null;
 
             currentWards = [];
             currentWards.push({
@@ -2911,82 +3098,23 @@
                 });
             }
 
-            var newIndex = 0;
-            if (prevWardId) {
-                var foundIdx = currentWards.findIndex(function(w) { return w.record.id === prevWardId; });
-                if (foundIdx !== -1) newIndex = foundIdx;
-            }
-            currentWardIndex = newIndex;
+            // studentRec always points at the primary registered ward (the one
+            // actually looked up) — used for parent-admin messaging context.
+            // Fee pages below work off currentWards directly, by explicit ward
+            // index, rather than a single "current ward" concept.
+            currentWardIndex = 0;
+            studentRec = currentWards[0].record;
+            customFees = currentWards[0].customFees || [];
+            uniforms = currentWards[0].uniforms || [];
+            books = currentWards[0].books || [];
 
-            studentRec = currentWards[currentWardIndex].record;
-            customFees = currentWards[currentWardIndex].customFees || [];
-            uniforms = currentWards[currentWardIndex].uniforms || [];
-            books = currentWards[currentWardIndex].books || [];
+            var nameEl = document.getElementById('pwelcomeTopbarName');
+            if (nameEl) nameEl.textContent = currentWards.map(function(w) { return w.record.studentName; }).join(', ') + ' (Parent)';
 
-            var switcherContainer = document.getElementById('siblingSwitcherContainer');
-            var switcherSelect = document.getElementById('siblingSwitcherSelect');
-
-            if (currentWards.length > 1) {
-                if (switcherContainer) switcherContainer.style.display = 'flex';
-                if (switcherSelect) {
-                    switcherSelect.innerHTML = currentWards.map(function(ward, idx) {
-                        return '<option value="' + idx + '"' + (idx === currentWardIndex ? ' selected' : '') + '>' + ward.record.studentName + '</option>';
-                    }).join('');
-                }
-            } else if (switcherContainer) {
-                switcherContainer.style.display = 'none';
-            }
-
-            // Dashboard / Payment History / Next Term Bill pages are all-wards
-            // views built from the currentWards array — refresh them here so
-            // they're ready whichever page the parent lands on next.
             try { renderDashboardPage(); } catch (e) { console.error('renderDashboardPage error:', e); }
-            try { renderPaymentHistoryPage(); } catch (e) { console.error('renderPaymentHistoryPage error:', e); }
+            try { renderMyChildrenPage(); } catch (e) { console.error('renderMyChildrenPage error:', e); }
+            try { renderChildrenFeesPage(); } catch (e) { console.error('renderChildrenFeesPage error:', e); }
             try { renderNextTermBillPage(); } catch (e) { console.error('renderNextTermBillPage error:', e); }
-
-            // Sibling portal payment setup
-            var portalFamilyGroup = document.getElementById('portalFamilyPaymentGroup');
-            var portalFamilyPayCheckbox = document.getElementById('portalFamilyPayCheckbox');
-            if (portalFamilyGroup) {
-                if (currentWards.length > 1) {
-                    portalFamilyGroup.style.display = 'block';
-                    if (portalFamilyPayCheckbox) {
-                        portalFamilyPayCheckbox.checked = false;
-                        // Sums whichever fee type is currently selected (Regular Fees or one
-                        // extra-fee tab) across every ward that has it billed — not just the
-                        // regular balance — so "Pay for All Wards" is correct on any tab.
-                        portalFamilyPayCheckbox.onchange = function() {
-                            var payFeeTypeEl = document.getElementById('payFeeType');
-                            var ft = payFeeTypeEl ? payFeeTypeEl.value : 'regular';
-                            if (this.checked) {
-                                var totalFamilyBal = 0;
-                                if (ft === 'regular') {
-                                    currentWards.forEach(function(w) {
-                                       totalFamilyBal += safeTotalsForWard(w.record).balance;
-                                    });
-                                } else {
-                                    currentWards.forEach(function(w) {
-                                        var cf = (w.customFees || []).find(function(f) { return f.feeTypeName === ft; });
-                                        if (cf) totalFamilyBal += Math.max(0, (parseFloat(cf.amount) || 0) - (parseFloat(cf.totalPaid) || 0));
-                                    });
-                                }
-                                document.getElementById('payAmount').value = totalFamilyBal.toFixed(2);
-                            } else {
-                                var bal;
-                                if (ft === 'regular') {
-                                    bal = safeTotalsForWard(studentRec).balance;
-                                } else {
-                                    var curCf = customFees.find(function(f) { return f.feeTypeName === ft; });
-                                    bal = curCf ? Math.max(0, (parseFloat(curCf.amount) || 0) - (parseFloat(curCf.totalPaid) || 0)) : 0;
-                                }
-                                document.getElementById('payAmount').value = bal.toFixed(2);
-                            }
-                        };
-                    }
-                } else {
-                    portalFamilyGroup.style.display = 'none';
-                }
-            }
         }
 
         // ── STUDENT LOOKUP ────────────────────────────────────
@@ -3157,52 +3285,15 @@
         // IS the whole regular bill; falls back to "Regular School Fees" when
         // a ward has several regular components (nothing to pick between —
         // they're all paid together into the same balance either way).
-        function buildPortalPaySelector(cfList) {
-            var select = document.getElementById('payFeeType');
-            if (!select) return;
-            var rec = studentRec;
-            var regularKeys = Object.keys(rec).filter(function (k) {
-                return !['id', 'studentName', 'phoneNumber', 'grade', 'academicSession', 'isNewStudent',
-                    'totalFees', 'totalPaid', 'balance', 'paymentStatus', 'createdAt', 'updatedAt', 'discount']
-                    .includes(k) && !k.startsWith('inst') && parseFloat(rec[k]) > 0;
-            });
-            var regularLabel = 'Regular School Fees';
-            if (regularKeys.length === 1) {
-                regularLabel = regularKeys[0].replace(/_\d+$/, '').replace(/([A-Z])/g, ' $1').replace(/^./, function (c) { return c.toUpperCase(); });
-            }
-            var optHtml = '<option value="regular">' + regularLabel + '</option>';
-            cfList.forEach(function(cf) {
-                optHtml += '<option value="' + cf.name + '">' + cf.name + '</option>';
-            });
-            select.innerHTML = optHtml;
-        }
-
-        function selectPortalPayFeeType(feeType) {
-            var select = document.getElementById('payFeeType');
-            if (select) select.value = feeType;
-            renderPaySelection(feeType);
-            scrollToPortalPaySection();
-        }
-
-        // Jumps straight to the "Pay via Mobile Money" section — called after
-        // picking a ward or a specific fee, since that's what a parent clicked
-        // through for. Delayed a beat so it runs after switchPortalPage has
-        // finished making the Pay Fees page visible (scrollIntoView is a no-op
-        // on a still-hidden page).
-        function scrollToPortalPaySection() {
-            setTimeout(function() {
-                var el = document.getElementById('payNowCard');
-                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 80);
-        }
-
-        // Builds the list of extra-fee tabs to show: the school-configured custom fee
-        // TYPES applicable to this term, PLUS any fee type the ward actually has a
-        // record for (even if its config doesn't match the term filter, or the type
-        // was never registered in the config list at all) — so a real balance is
-        // never hidden from the parent just because the tab-building filter missed it.
-        function applicablePortalFeeTypes(cfList, feeRecs) {
-            var sess = String(studentRec.academicSession || '').toLowerCase();
+        // Which extra-fee TYPES apply to one ward: the school-configured
+        // custom fee types for its term, PLUS any fee type it actually has a
+        // record for (even if its config doesn't match the term filter, or
+        // the type was never registered in the config list at all) — so a
+        // real balance is never hidden from the parent just because the
+        // filter missed it. `session` defaults to the primary ward's if
+        // omitted, for backward compatibility.
+        function applicablePortalFeeTypes(cfList, feeRecs, session) {
+            var sess = String(session || (studentRec && studentRec.academicSession) || '').toLowerCase();
             var applicable = (cfList || []).filter(function (cf) {
                 if (!cf) return false;
                 var term = String(cf.term || '').toLowerCase();
@@ -3222,30 +3313,18 @@
         }
 
         function showPortal() {
-            var cfList = customFeeTypes || [];
-            var applicableCf = applicablePortalFeeTypes(cfList, customFees);
-
-            buildPortalPaySelector(applicableCf);
-            renderWardWideSummary();
-            selectPortalPayFeeType('regular');
-
             // Enable messaging
             loadParentMessages();
             document.getElementById('heroSection').style.display = 'none';
             document.getElementById('portalSection').classList.add('show');
-
-            // Land on the Dashboard first — a lean per-ward summary instead of
-            // dumping the full fee breakdown/payment history/next-term-bill/pay
-            // form on screen at once, which is what parents were finding
-            // confusing. They drill into a ward's details from there.
             switchPortalPage('dashboard');
             window.scrollTo(0, 0);
         }
 
-        // ── Sidebar navigation (Dashboard / Pay Fees / Payment History / Next Term Bill) ──
+        // ── Sidebar navigation (Dashboard / Children's Fees / My Children / Next Term Bill) ──
         function switchPortalPage(page) {
             document.querySelectorAll('.portal-page').forEach(function (el) { el.classList.remove('active'); });
-            var pageIds = { dashboard: 'pageDashboard', wardDetail: 'pageWardDetail', paymentHistory: 'pagePaymentHistory', nextTermBill: 'pageNextTermBill', feeType: 'pageFeeType' };
+            var pageIds = { dashboard: 'pageDashboard', childrenFees: 'pageChildrenFees', myChildren: 'pageMyChildren', nextTermBill: 'pageNextTermBill' };
             var target = document.getElementById(pageIds[page] || 'pageDashboard');
             if (target) target.classList.add('active');
 
@@ -3275,120 +3354,91 @@
             if (overlay) overlay.classList.remove('show');
         }
 
-        // ── Dashboard page: ward summary cards + family totals + recent activity ──
+        // ── Dashboard page: welcome card + Total/Paid/Pending stat bars + Children Summary ──
         function renderDashboardPage() {
             var cur = (schoolData && schoolData.currency) || 'GHC';
-            var nameEl = document.getElementById('pdashGreetingName');
-            if (nameEl) {
-                nameEl.textContent = currentWards.length > 1
-                    ? currentWards.map(function (w) { return w.record.studentName; }).join(', ')
-                    : (currentWards[0] ? currentWards[0].record.studentName : 'Your Ward');
-            }
 
-            var termBadge = document.getElementById('pdashTermBadge');
-            if (termBadge) {
-                var termTxt = schoolData && schoolData.activeTerm
-                    ? schoolData.activeTerm + (schoolData.academicYear ? ' — ' + schoolData.academicYear : '')
-                    : '';
-                if (termTxt) {
-                    document.getElementById('pdashTermBadgeText').textContent = termTxt;
-                    termBadge.style.display = 'inline-flex';
-                } else {
-                    termBadge.style.display = 'none';
-                }
-            }
+            var primary = currentWards[0];
+            var parentNameEl = document.getElementById('pdashParentName');
+            if (parentNameEl) parentNameEl.textContent = primary ? (primary.record.phoneNumber || 'Parent') : 'Parent';
+            var phoneEl = document.getElementById('pdashParentPhone');
+            if (phoneEl) phoneEl.textContent = primary ? (primary.record.phoneNumber || '—') : '—';
+            var countEl = document.getElementById('pdashParentChildCount');
+            if (countEl) countEl.textContent = currentWards.length;
+            var termEl = document.getElementById('pdashParentTerm');
+            if (termEl) termEl.textContent = (schoolData && schoolData.activeTerm) ? schoolData.activeTerm + (schoolData.academicYear ? ' — ' + schoolData.academicYear : '') : '—';
 
-            var totalFees = 0, totalPaid = 0, totalDue = 0;
-            var gridHtml = currentWards.map(function (ward, idx) {
-                var t = safeTotalsForWard(ward.record);
-                var fb = computeWardFeeItems(ward);
-                var customPaid = 0, customBal = 0;
-                (ward.customFees || []).forEach(function (cf) {
-                    var billed = parseFloat(cf.amount) || 0;
-                    if (billed <= 0) return;
-                    var paid = parseFloat(cf.totalPaid) || 0;
-                    customPaid += paid;
-                    customBal += Math.max(0, billed - paid);
-                });
-                // Combine regular + extra fees so the ward card's balance/status
-                // matches the truth — a ward owing only on an extra fee (e.g.
-                // Books) shouldn't read "Fully Paid".
-                var wardTotalFees = t.totalFees + fb.customTotal;
-                var wardTotalPaid = t.totalPaid + customPaid;
-                var wardBalance = t.balance + customBal;
-                totalFees += wardTotalFees; totalPaid += wardTotalPaid; totalDue += wardBalance;
-                var statusHtml = wardBalance <= 0 && wardTotalFees > 0
-                    ? '<span class="status-paid" style="font-size:11px;padding:3px 10px;">Fully Paid</span>'
-                    : wardTotalPaid > 0
-                        ? '<span class="status-partial" style="font-size:11px;padding:3px 10px;">Partial</span>'
-                        : '<span class="status-unpaid" style="font-size:11px;padding:3px 10px;">Unpaid</span>';
-                return '<div class="ward-card" onclick="switchWard(' + idx + ', true)">' +
-                    '<div class="ward-card-name">' + ward.record.studentName + '</div>' +
-                    '<div class="ward-card-meta">' + ward.record.grade + ' · ' + ward.record.academicSession + '</div>' +
-                    statusHtml +
-                    '<div style="margin-top:12px;"><div class="ward-card-bal-label">Balance Due (All Fees)</div>' +
-                    '<div class="ward-card-bal' + (wardBalance <= 0 ? ' zero' : '') + '">' + cur + ' ' + fmt(wardBalance) + '</div></div>' +
-                    '<button type="button" class="ward-card-btn" onclick="event.stopPropagation(); switchWard(' + idx + ', true)"><i class="bi bi-receipt me-1"></i>View &amp; Pay Fees</button>' +
-                    '</div>';
+            var totalFees = 0, totalPaid = 0, totalPending = 0;
+            var summaryHtml = currentWards.map(function (ward) {
+                var w = wardFeeTotals(ward);
+                totalFees += w.totalFees; totalPaid += w.totalPaid; totalPending += w.balance;
+                return '<div class="pchildsum-row">' +
+                    '<div class="pchildsum-name">' + ward.record.studentName + ' (' + ward.record.id + ') — ' + (ward.record.grade || '') + '</div>' +
+                    '<div class="pchildsum-stats">' +
+                        '<div>Total: <b>' + cur + ' ' + fmt(w.totalFees) + '</b></div>' +
+                        '<div style="color:#059669;">Paid: <b>' + cur + ' ' + fmt(w.totalPaid) + '</b></div>' +
+                        '<div style="color:#dc2626;">Pending: <b>' + cur + ' ' + fmt(w.balance) + '</b></div>' +
+                        '<div>Fees Count: <b>' + w.feeCount + '</b></div>' +
+                    '</div>' +
+                '</div>';
             }).join('');
-            var gridEl = document.getElementById('pdashWardGrid');
-            if (gridEl) gridEl.innerHTML = gridHtml || '<div class="pdash-empty">No wards found.</div>';
 
-            var totalStrip = document.getElementById('pdashTotalStrip');
-            if (totalStrip) {
-                if (currentWards.length > 1) {
-                    totalStrip.style.display = 'flex';
-                    document.getElementById('pdashTotalFees').textContent = cur + ' ' + fmt(totalFees);
-                    document.getElementById('pdashTotalPaid').textContent = cur + ' ' + fmt(totalPaid);
-                    document.getElementById('pdashTotalDue').textContent = cur + ' ' + fmt(totalDue);
-                } else {
-                    totalStrip.style.display = 'none';
-                }
-            }
+            var summaryEl = document.getElementById('pdashChildrenSummary');
+            if (summaryEl) summaryEl.innerHTML = summaryHtml || '<div class="pdash-empty">No wards found.</div>';
 
-            renderFeeTypesSection();
-            renderWardBreakdownSection();
-
-            // Recent activity — last 5 payments across all wards, newest first
-            var activityEl = document.getElementById('pdashActivityList');
-            if (activityEl) {
-                var allPayments = collectAllWardPayments();
-                var recent = allPayments.slice(0, 5);
-                if (!recent.length) {
-                    activityEl.innerHTML = '<div class="pdash-empty">No payments recorded yet.</div>';
-                } else {
-                    activityEl.innerHTML = recent.map(function (p) {
-                        return '<div class="activity-item">' +
-                            '<div class="activity-icon"><i class="bi bi-check-lg"></i></div>' +
-                            '<div class="activity-main"><div class="activity-title">' + p.wardName + '</div>' +
-                            '<div class="activity-sub">' + p.feeType + ' · ' + (p.date || 'Date unknown') + '</div></div>' +
-                            '<div class="activity-amount">' + cur + ' ' + fmt(p.amount) + '</div>' +
-                            '</div>';
-                    }).join('');
-                }
-            }
+            var statTotal = document.getElementById('pdashStatTotal'); if (statTotal) statTotal.textContent = cur + ' ' + fmt(totalFees);
+            var statPaid = document.getElementById('pdashStatPaid'); if (statPaid) statPaid.textContent = cur + ' ' + fmt(totalPaid);
+            var statPending = document.getElementById('pdashStatPending'); if (statPending) statPending.textContent = cur + ' ' + fmt(totalPending);
         }
 
-        // Picks a Bootstrap icon for a fee type card by keyword match on its name.
-        function feeTypeIconClass(name, isCustom) {
-            var n = (name || '').toLowerCase();
-            if (n.includes('book')) return 'bi-journal-bookmark-fill';
-            if (n.includes('exam') || n.includes('print')) return 'bi-file-earmark-text-fill';
-            if (n.includes('excursion') || n.includes('trip')) return 'bi-bus-front-fill';
-            if (n.includes('ourday') || n.includes('open day')) return 'bi-flag-fill';
-            if (n.includes('graduation')) return 'bi-mortarboard-fill';
-            if (n.includes('uniform')) return 'bi-bag-fill';
-            if (n.includes('admission')) return 'bi-file-earmark-person-fill';
-            if (n.includes('transport') || n.includes('bus')) return 'bi-truck-front-fill';
-            if (n.includes('feeding') || n.includes('food') || n.includes('lunch')) return 'bi-cup-hot-fill';
-            return isCustom ? 'bi-tag-fill' : 'bi-mortarboard-fill';
+        // ── My Children page: one card per ward ──
+        function renderMyChildrenPage() {
+            var container = document.getElementById('pmcBody');
+            if (!container) return;
+            var cur = (schoolData && schoolData.currency) || 'GHC';
+            if (!currentWards.length) { container.innerHTML = '<div class="pdash-empty">No wards found.</div>'; return; }
+
+            container.innerHTML = currentWards.map(function (ward) {
+                var rec = ward.record;
+                var w = wardFeeTotals(ward);
+                return '<div class="pchild-card">' +
+                    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">' +
+                        '<div class="pchild-card-name"><i class="bi bi-person-circle"></i>' + rec.studentName + '</div>' +
+                        '<span class="pchild-card-badge active">Active</span>' +
+                    '</div>' +
+                    '<div class="pchild-card-info-grid">' +
+                        '<div><div class="lbl">Student ID</div><div class="val">' + rec.id + '</div></div>' +
+                        '<div><div class="lbl">Class</div><div class="val">' + (rec.grade || '—') + '</div></div>' +
+                        '<div><div class="lbl">Academic Session</div><div class="val">' + (rec.academicSession || '—') + '</div></div>' +
+                        '<div><div class="lbl">Phone</div><div class="val">' + (rec.phoneNumber || '—') + '</div></div>' +
+                    '</div>' +
+                    '<div class="pchild-card-feesum">' +
+                        '<div><span class="pchild-card-feesum-label">Total Fees</span><b>' + cur + ' ' + fmt(w.totalFees) + '</b></div>' +
+                        '<div><span class="pchild-card-feesum-label">Paid</span><b style="color:#059669;">' + cur + ' ' + fmt(w.totalPaid) + '</b></div>' +
+                        '<div><span class="pchild-card-feesum-label">Pending</span><b style="color:#dc2626;">' + cur + ' ' + fmt(w.balance) + '</b></div>' +
+                        '<div><span class="pchild-card-feesum-label">Fee Count</span><b>' + w.feeCount + '</b></div>' +
+                    '</div>' +
+                '</div>';
+            }).join('');
         }
 
-        // One ward's fee breakdown: every regular fee component (each its own
-        // line, matching how the school itemizes them, e.g. "Tuition Fee") plus
-        // every extra/custom fee type it's been billed, ending with a combined
-        // total. Shared by the Dashboard's per-ward breakdown and the Fee Types
-        // family index below.
+        // One ward's combined regular + extra fee totals (used by the
+        // Dashboard's stat bars/Children Summary and the My Children cards).
+        function wardFeeTotals(ward) {
+            var t = safeTotalsForWard(ward.record);
+            var fb = computeWardFeeItems(ward);
+            var customPaid = 0, customBal = 0;
+            (ward.customFees || []).forEach(function (cf) {
+                var billed = parseFloat(cf.amount) || 0;
+                if (billed <= 0) return;
+                var paid = parseFloat(cf.totalPaid) || 0;
+                customPaid += paid;
+                customBal += Math.max(0, billed - paid);
+            });
+            var feeCount = fb.items.filter(function (it) { return !it.isDiscount; }).length;
+            return { totalFees: t.totalFees + fb.customTotal, totalPaid: t.totalPaid + customPaid, balance: t.balance + customBal, feeCount: feeCount };
+        }
+
         function computeWardFeeItems(ward) {
             var rec = ward.record;
             var feeKeys = Object.keys(rec).filter(function (k) {
@@ -3415,451 +3465,274 @@
             return { items: items, regularTotal: regularTotal, customTotal: customTotal, total: regularTotal + customTotal };
         }
 
-        // Family-wide index of every fee type billed across all wards — one entry
-        // per regular fee component name and per extra/custom fee type, each
-        // listing which wards it applies to and their billed/paid/balance
-        // amounts. Powers the Dashboard's "Fee Types" grid and the Fee Type
-        // detail page (pay one ward, or all wards billed for that type, at once).
-        function computeFamilyFeeTypeIndex() {
-            var order = [];
-            var data = {};
-            function ensure(name, isCustom) {
-                if (!data[name]) { data[name] = { isCustom: isCustom, wards: [], totalBilled: 0, totalPaid: 0, totalBalance: 0 }; order.push(name); }
-                return data[name];
-            }
-            currentWards.forEach(function (ward, wIdx) {
-                var rec = ward.record;
-                var feeKeys = Object.keys(rec).filter(function (k) {
+        // One (ward, feeType) pair's Billed/Paid/Balance + instalment lookup —
+        // the shared core behind the Children's Fees table rows, the Pay
+        // modal, the View modal, and the receipt download.
+        function getFeeInfo(wardIdx, feeType) {
+            var ward = currentWards[wardIdx];
+            if (!ward) return null;
+            var rec = ward.record;
+            if (feeType === 'regular') {
+                var t = safeTotalsForWard(rec);
+                var regularKeys = Object.keys(rec).filter(function (k) {
                     return !['id', 'studentName', 'phoneNumber', 'grade', 'academicSession', 'isNewStudent',
                         'totalFees', 'totalPaid', 'balance', 'paymentStatus', 'createdAt', 'updatedAt', 'discount']
                         .includes(k) && !k.startsWith('inst') && parseFloat(rec[k]) > 0;
                 });
-                feeKeys.forEach(function (k) {
-                    var label = k.replace(/_\d+$/, '').replace(/([A-Z])/g, ' $1').replace(/^./, function (c) { return c.toUpperCase(); });
-                    var amt = parseFloat(rec[k]) || 0;
-                    var entry = ensure(label, false);
-                    entry.wards.push({ idx: wIdx, wardName: rec.studentName, grade: rec.grade, billed: amt });
-                    entry.totalBilled += amt;
-                });
-                (ward.customFees || []).forEach(function (cf) {
-                    var billed = parseFloat(cf.amount) || 0;
-                    if (billed <= 0) return;
-                    var paid = parseFloat(cf.totalPaid) || 0;
-                    var bal = Math.max(0, billed - paid);
-                    var entry = ensure(cf.feeTypeName || 'Extra Fee', true);
-                    entry.wards.push({ idx: wIdx, wardName: rec.studentName, grade: rec.grade, billed: billed, paid: paid, balance: bal });
-                    entry.totalBilled += billed; entry.totalPaid += paid; entry.totalBalance += bal;
-                });
-            });
-            return { order: order, data: data };
-        }
-
-        // Dashboard "Fee Types" grid — one clickable card per fee type set for
-        // the active term, aggregated across every ward. Tapping one opens the
-        // Fee Type detail page (all wards, that type only).
-        function renderFeeTypesSection() {
-            var grid = document.getElementById('pdashFeeTypeGrid');
-            if (!grid) return;
-            var cur = (schoolData && schoolData.currency) || 'GHC';
-            var idx = computeFamilyFeeTypeIndex();
-            if (!idx.order.length) { grid.innerHTML = '<div class="pdash-empty">No fees billed yet.</div>'; return; }
-            grid.innerHTML = idx.order.map(function (name) {
-                var d = idx.data[name];
-                var icon = feeTypeIconClass(name, d.isCustom);
-                var wardCount = d.wards.length;
-                var amtLine = d.isCustom
-                    ? cur + ' ' + fmt(d.totalBalance) + ' due'
-                    : cur + ' ' + fmt(d.totalBilled) + ' billed';
-                var amtCls = d.isCustom ? (d.totalBalance > 0 ? 'danger' : 'success') : '';
-                var safeName = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-                return '<div class="feetype-card" onclick="openFeeTypePage(\'' + safeName + '\')">' +
-                    '<div class="feetype-icon"><i class="bi ' + icon + '"></i></div>' +
-                    '<div class="feetype-body">' +
-                        '<div class="feetype-name">' + name + '</div>' +
-                        '<div class="feetype-sub">' + wardCount + ' ward' + (wardCount !== 1 ? 's' : '') + ' billed</div>' +
-                        '<div class="feetype-amt ' + amtCls + '">' + amtLine + '</div>' +
-                    '</div>' +
-                '</div>';
-            }).join('');
-        }
-
-        // Dashboard "Fees Breakdown by Ward" — a mini fee table per ward listing
-        // every fee type it's billed for (regular components + extras) and its
-        // combined total, right on the dashboard.
-        function renderWardBreakdownSection() {
-            var container = document.getElementById('pdashWardBreakdown');
-            if (!container) return;
-            var cur = (schoolData && schoolData.currency) || 'GHC';
-            if (!currentWards.length) { container.innerHTML = '<div class="pdash-empty">No wards found.</div>'; return; }
-            container.innerHTML = currentWards.map(function (ward) {
-                var fb = computeWardFeeItems(ward);
-                var rows = fb.items.map(function (it) {
-                    var amtStr = (it.amount < 0 ? '-' : '') + cur + ' ' + fmt(Math.abs(it.amount));
-                    var color = it.isDiscount ? 'color:#dc2626;' : '';
-                    return '<tr><td style="' + color + '">' + it.name + (it.isCustom ? ' <span style="color:#94a3b8;font-size:10.5px;">(Extra Fee)</span>' : '') + '</td><td style="' + color + 'text-align:right">' + amtStr + '</td></tr>';
-                }).join('');
-                return '<div class="wardfb-card">' +
-                    '<div class="wardfb-head"><h6><i class="bi bi-person-circle me-1 text-muted"></i>' + ward.record.studentName + '</h6></div>' +
-                    '<table class="fee-table" style="margin:0;"><thead><tr><th>Fee Type</th><th style="text-align:right">Amount</th></tr></thead><tbody>' +
-                    (rows || '<tr><td colspan="2" style="text-align:center;color:#94a3b8;">No fees billed yet.</td></tr>') +
-                    '<tr style="font-weight:bold;background:#eef2ff;"><td style="font-weight:bold;">Total</td><td style="text-align:right;font-weight:bold;">' + cur + ' ' + fmt(fb.total) + '</td></tr>' +
-                    '</tbody></table>' +
-                '</div>';
-            }).join('');
-        }
-
-        // ── Fee Type detail page: one fee type, every ward that's billed for it ──
-        function openFeeTypePage(name) {
-            renderFeeTypePage(name);
-            switchPortalPage('feeType');
-        }
-
-        function renderFeeTypePage(name) {
-            var idx = computeFamilyFeeTypeIndex();
-            var d = idx.data[name];
-            var cur = (schoolData && schoolData.currency) || 'GHC';
-            var titleEl = document.getElementById('ftdTitle');
-            if (titleEl) titleEl.textContent = name;
-            var listEl = document.getElementById('ftdWardList');
-            var combinedEl = document.getElementById('ftdCombinedWrap');
-
-            if (!d || !d.wards.length) {
-                if (listEl) listEl.innerHTML = '<div class="pdash-empty">No wards billed for this fee type.</div>';
-                if (combinedEl) combinedEl.innerHTML = '';
-                return;
-            }
-
-            document.getElementById('ftdTotalBilled').textContent = cur + ' ' + fmt(d.totalBilled);
-            var paidCard = document.getElementById('ftdTotalPaidCard');
-            var balCard = document.getElementById('ftdTotalBalCard');
-            if (d.isCustom) {
-                paidCard.style.display = ''; balCard.style.display = '';
-                document.getElementById('ftdTotalPaid').textContent = cur + ' ' + fmt(d.totalPaid);
-                document.getElementById('ftdTotalBal').textContent = cur + ' ' + fmt(d.totalBalance);
+                var label = 'Regular School Fees';
+                if (regularKeys.length === 1) {
+                    label = regularKeys[0].replace(/_\d+$/, '').replace(/([A-Z])/g, ' $1').replace(/^./, function (c) { return c.toUpperCase(); });
+                }
+                return {
+                    wardIdx: wardIdx, feeType: 'regular', label: label,
+                    totalFees: t.totalFees, totalPaid: t.totalPaid, balance: t.balance,
+                    numInst: 6,
+                    getInst: function (i) { return { amt: parseFloat(rec['inst' + i]) || 0, date: rec['inst' + i + 'Date'] || '' }; }
+                };
             } else {
-                paidCard.style.display = 'none'; balCard.style.display = 'none';
-            }
-
-            var noteEl = document.getElementById('ftdNote');
-            if (noteEl) {
-                noteEl.innerHTML = d.isCustom
-                    ? '💡 Pay for one ward at a time below, or use "Pay for All Wards" to settle everyone’s ' + name + ' in a single Mobile Money payment.'
-                    : '💡 "' + name + '" is one part of each ward’s Regular School Fees. Paying it pays into that ward’s overall regular fees balance.';
-            }
-
-            var safeName = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-            if (listEl) {
-                listEl.innerHTML = d.wards.map(function (w) {
-                    var amtsHtml;
-                    if (d.isCustom) {
-                        amtsHtml =
-                            '<div class="ftd-ward-amt-item"><div class="ftd-ward-amt-label">Billed</div><div class="ftd-ward-amt-val">' + cur + ' ' + fmt(w.billed) + '</div></div>' +
-                            '<div class="ftd-ward-amt-item"><div class="ftd-ward-amt-label">Paid</div><div class="ftd-ward-amt-val success">' + cur + ' ' + fmt(w.paid) + '</div></div>' +
-                            '<div class="ftd-ward-amt-item"><div class="ftd-ward-amt-label">Balance</div><div class="ftd-ward-amt-val' + (w.balance > 0 ? ' danger' : ' success') + '">' + cur + ' ' + fmt(w.balance) + '</div></div>';
-                    } else {
-                        amtsHtml = '<div class="ftd-ward-amt-item"><div class="ftd-ward-amt-label">Billed</div><div class="ftd-ward-amt-val">' + cur + ' ' + fmt(w.billed) + '</div></div>';
-                    }
-                    return '<div class="ftd-ward-row">' +
-                        '<div class="ftd-ward-main"><div class="ftd-ward-name">' + w.wardName + '</div><div class="ftd-ward-meta">' + (w.grade || '') + '</div></div>' +
-                        '<div class="ftd-ward-amts">' + amtsHtml + '</div>' +
-                        '<button type="button" class="ftd-pay-btn" onclick="goPayWard(' + w.idx + ', \'' + safeName + '\')"><i class="bi bi-credit-card me-1"></i>Pay</button>' +
-                        '</div>';
-                }).join('');
-            }
-
-            if (combinedEl) {
-                if (currentWards.length > 1 && d.wards.length > 1) {
-                    combinedEl.innerHTML =
-                        '<div class="ftd-combined-card">' +
-                            '<div><div style="font-weight:700;font-size:14px;margin-bottom:3px;"><i class="bi bi-people-fill me-1"></i>Pay for All Wards Together</div>' +
-                            '<div class="ftd-combined-text">Settle ' + name + ' for all ' + d.wards.length + ' wards billed for it in one Mobile Money payment.</div></div>' +
-                            '<button type="button" class="ftd-combined-btn" onclick="goPayFamilyForFeeType(\'' + safeName + '\')">Pay Combined</button>' +
-                        '</div>';
-                } else {
-                    combinedEl.innerHTML = '';
-                }
+                var config = (customFeeTypes || []).find(function (c) { return c.name === feeType; });
+                var customRec = (ward.customFees || []).find(function (f) { return f.feeTypeName === feeType; });
+                var totalFees = customRec ? (parseFloat(customRec.amount) || 0) : (config ? getCustomFeeAmount(config, rec.grade) : 0);
+                var totalPaid = customRec ? (parseFloat(customRec.totalPaid) || 0) : 0;
+                var balance = Math.max(0, totalFees - totalPaid);
+                var numInst = config && config.installmentAllowed ? (parseInt(config.numInstallments) || 1) : 1;
+                return {
+                    wardIdx: wardIdx, feeType: feeType, label: feeType,
+                    totalFees: totalFees, totalPaid: totalPaid, balance: balance,
+                    numInst: numInst,
+                    getInst: function (i) { return { amt: customRec ? (parseFloat(customRec['inst' + i]) || 0) : 0, date: customRec ? (customRec['inst' + i + 'Date'] || '') : '' }; }
+                };
             }
         }
 
-        // Individual pay: jump straight to one ward's Pay Fees page, with this
-        // fee type pre-selected in the dropdown if it's one of the ward's
-        // named extra fees, or "regular" if this is a regular fee component
-        // (there's no separate balance per component — payment applies to the
-        // ward's overall regular fees).
-        function goPayWard(wardIdx, feeType) {
-            switchWard(wardIdx, true);
-            var cb = document.getElementById('portalFamilyPayCheckbox');
-            if (cb && cb.checked) { cb.checked = false; if (typeof cb.onchange === 'function') cb.onchange(); }
-            if (feeType) {
-                var hasOption = document.querySelector('#payFeeType option[value="' + feeType.replace(/"/g, '\\"') + '"]');
-                if (hasOption) selectPortalPayFeeType(feeType);
-            }
-            scrollToPortalPaySection();
-        }
+        // Flattens every ward's billed fees (regular bucket + every extra fee)
+        // into one row-per-fee list for the Children's Fees table.
+        function buildChildrenFeesRows() {
+            var rows = [];
+            currentWards.forEach(function (ward, wIdx) {
+                var rec = ward.record;
+                var regInfo = getFeeInfo(wIdx, 'regular');
+                if (regInfo.totalFees > 0) rows.push(regInfo);
 
-        // Combined pay: land on the first billed ward's Pay Fees page (with
-        // this fee type pre-selected, if it applies there), then check +
-        // trigger "Pay consolidated Family Fees" so the amount pre-fills with
-        // the combined total for every ward billed for this specific fee type.
-        function goPayFamilyForFeeType(feeType) {
-            var idx = computeFamilyFeeTypeIndex();
-            var d = idx.data[feeType];
-            var landIdx = (d && d.wards.length) ? d.wards[0].idx : 0;
-            switchWard(landIdx, true);
-            if (feeType) {
-                var hasOption = document.querySelector('#payFeeType option[value="' + feeType.replace(/"/g, '\\"') + '"]');
-                if (hasOption) selectPortalPayFeeType(feeType);
-            }
-            var cb = document.getElementById('portalFamilyPayCheckbox');
-            if (cb) {
-                cb.checked = true;
-                if (typeof cb.onchange === 'function') cb.onchange();
-            }
-            scrollToPortalPaySection();
-        }
-
-        // Gathers every paid installment (regular + custom/extra fees) across all
-        // wards into one flat list, tagged with ward name / fee type / date, sorted
-        // newest first. Shared by the Dashboard's recent-activity preview and the
-        // full Payment History page.
-        function collectAllWardPayments() {
-            var payments = [];
-            currentWards.forEach(function (ward) {
-                for (var i = 1; i <= 6; i++) {
-                    var amt = parseFloat(ward.record['inst' + i]) || 0;
-                    if (amt > 0) {
-                        payments.push({ wardName: ward.record.studentName, feeType: 'Regular School Fees', date: ward.record['inst' + i + 'Date'] || '', amount: amt });
-                    }
-                }
-                (ward.customFees || []).forEach(function (cf) {
-                    for (var i = 1; i <= 6; i++) {
-                        var amt = parseFloat(cf['inst' + i]) || 0;
-                        if (amt > 0) {
-                            payments.push({ wardName: ward.record.studentName, feeType: cf.feeTypeName || 'Extra Fee', date: cf['inst' + i + 'Date'] || '', amount: amt });
-                        }
-                    }
+                var applicable = applicablePortalFeeTypes(customFeeTypes, ward.customFees, rec.academicSession);
+                applicable.forEach(function (cf) {
+                    var info = getFeeInfo(wIdx, cf.name);
+                    if (info.totalFees > 0) rows.push(info);
                 });
             });
-            payments.sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); });
-            return payments;
+            return rows;
         }
 
-        // ── Payment History page: full consolidated list, all wards ──
-        function renderPaymentHistoryPage() {
-            var container = document.getElementById('phistList');
-            if (!container) return;
+        // ── Children's Fees page: flat filterable table across every ward ──
+        function renderChildrenFeesPage() {
+            var tbody = document.getElementById('pcfTableBody');
+            if (!tbody) return;
             var cur = (schoolData && schoolData.currency) || 'GHC';
-            var payments = collectAllWardPayments();
-            if (!payments.length) {
-                container.innerHTML = '<div class="pdash-empty">No payments recorded yet.</div>';
+            var rows = buildChildrenFeesRows();
+
+            var typeSel = document.getElementById('pcfFeeTypeFilter');
+            if (typeSel) {
+                var prevVal = typeSel.value;
+                var seenLabels = {};
+                var opts = '<option value="">All Fee Types</option>';
+                rows.forEach(function (r) {
+                    if (!seenLabels[r.label]) {
+                        seenLabels[r.label] = true;
+                        opts += '<option value="' + r.label.replace(/"/g, '&quot;') + '">' + r.label + '</option>';
+                    }
+                });
+                typeSel.innerHTML = opts;
+                if (prevVal && seenLabels[prevVal]) typeSel.value = prevVal;
+            }
+
+            var search = ((document.getElementById('pcfSearch') && document.getElementById('pcfSearch').value) || '').trim().toLowerCase();
+            var typeFilter = typeSel ? typeSel.value : '';
+            var statusFilter = document.getElementById('pcfStatusFilter') ? document.getElementById('pcfStatusFilter').value : '';
+
+            var filtered = rows.filter(function (r) {
+                var ward = currentWards[r.wardIdx];
+                var status = (r.balance <= 0 && r.totalFees > 0) ? 'paid' : (r.totalPaid > 0 ? 'partial' : 'pending');
+                if (search) {
+                    var hay = (ward.record.studentName + ' ' + r.label).toLowerCase();
+                    if (hay.indexOf(search) === -1) return false;
+                }
+                if (typeFilter && r.label !== typeFilter) return false;
+                if (statusFilter && status !== statusFilter) return false;
+                return true;
+            });
+
+            var headerCount = document.getElementById('pcfHeaderCount');
+            if (headerCount) headerCount.textContent = 'Fees Management (' + filtered.length + '/' + rows.length + ')';
+
+            if (!filtered.length) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#94a3b8;padding:24px;">No fees match your filters.</td></tr>';
                 return;
             }
-            container.innerHTML = payments.map(function (p) {
-                return '<div class="activity-item">' +
-                    '<div class="activity-icon"><i class="bi bi-cash-coin"></i></div>' +
-                    '<div class="activity-main"><div class="activity-title">' + p.wardName + '</div>' +
-                    '<div class="activity-sub">' + p.feeType + ' · ' + (p.date || 'Date unknown') + '</div></div>' +
-                    '<div class="activity-amount">' + cur + ' ' + fmt(p.amount) + '</div>' +
-                    '</div>';
+
+            tbody.innerHTML = filtered.map(function (r) {
+                var ward = currentWards[r.wardIdx];
+                var status = (r.balance <= 0 && r.totalFees > 0) ? 'paid' : (r.totalPaid > 0 ? 'partial' : 'pending');
+                var statusLabel = status === 'paid' ? 'Paid' : status === 'partial' ? 'Partial' : 'Pending';
+                var pct = r.totalFees > 0 ? Math.min(100, Math.round((r.totalPaid / r.totalFees) * 100)) : 0;
+                var safeFeeType = r.feeType.replace(/'/g, "\\'");
+                return '<tr>' +
+                    '<td><strong>' + ward.record.studentName + '</strong><div style="font-size:11px;color:#94a3b8;">' + ward.record.id + '</div></td>' +
+                    '<td>' + r.label + (r.feeType !== 'regular' ? ' <span style="color:#94a3b8;font-size:10.5px;">(Extra)</span>' : '') + '</td>' +
+                    '<td>' + cur + ' ' + fmt(r.totalFees) + '</td>' +
+                    '<td><div class="pprogress-track"><div class="pprogress-fill" style="width:' + pct + '%"></div></div><div class="pprogress-text">' + cur + ' ' + fmt(r.totalPaid) + ' / ' + cur + ' ' + fmt(r.totalFees) + '</div></td>' +
+                    '<td><span class="pstatus-pill ' + status + '">' + statusLabel + '</span></td>' +
+                    '<td><button type="button" class="prow-act-btn view" title="View" onclick="openViewModal(' + r.wardIdx + ", '" + safeFeeType + "')" + '"><i class="bi bi-eye-fill"></i></button>' +
+                    (status !== 'paid' ? '<button type="button" class="prow-act-btn pay" title="Pay" onclick="openPayModal(' + r.wardIdx + ", '" + safeFeeType + "')" + '"><i class="bi bi-credit-card-fill"></i></button>' : '') +
+                    '</td>' +
+                    '</tr>';
             }).join('');
         }
 
-        function onPortalFeeTypeChange() {
-            var selected = document.getElementById('payFeeType').value;
-            selectPortalPayFeeType(selected);
+        function clearChildrenFeesFilters() {
+            var s = document.getElementById('pcfSearch'); if (s) s.value = '';
+            var t = document.getElementById('pcfFeeTypeFilter'); if (t) t.value = '';
+            var st = document.getElementById('pcfStatusFilter'); if (st) st.value = '';
+            renderChildrenFeesPage();
         }
 
-        // Collapses the Payment History / Instalments list — called whenever
-        // fee details re-render (ward or fee-type switch) so it always starts
-        // tucked away instead of piling up paid instalments on screen.
-        function collapseInstList() {
-            var body = document.getElementById('instSectionBody');
-            var icon = document.getElementById('instToggleIcon');
-            var label = document.getElementById('instToggleLabel');
-            if (body) body.style.display = 'none';
-            if (icon) { icon.classList.remove('bi-chevron-up'); icon.classList.add('bi-chevron-down'); }
-            if (label) label.textContent = 'Show';
-        }
-
-        function toggleInstList() {
-            var body = document.getElementById('instSectionBody');
-            var icon = document.getElementById('instToggleIcon');
-            var label = document.getElementById('instToggleLabel');
-            if (!body) return;
-            var isHidden = body.style.display === 'none';
-            body.style.display = isHidden ? 'block' : 'none';
-            if (icon) { icon.classList.toggle('bi-chevron-up', isHidden); icon.classList.toggle('bi-chevron-down', !isHidden); }
-            if (label) label.textContent = isHidden ? 'Hide' : 'Show';
-        }
-
-        // Ward-level header + the always-unified Fee Breakdown (every regular
-        // fee component + every extra fee, one combined Total) and the
-        // balance row above it — none of this depends on which fee is
-        // selected to pay below; it's the whole picture for this one ward.
-        function renderWardWideSummary() {
-            var rec = studentRec;
-            var cur = (schoolData && schoolData.currency) || 'GHC';
-            document.getElementById('pStudentId').textContent = rec.id;
-            document.getElementById('pStudentName').textContent = rec.studentName;
-            var av = document.getElementById('pStudentAvatar');
-            if (av) {
-                if (rec.studentPhoto) {
-                    av.innerHTML = '<img src="' + rec.studentPhoto + '" style="width:100%; height:100%; object-fit:cover;">';
-                } else {
-                    av.innerHTML = '<i class="bi bi-person-fill text-white-50" style="font-size:32px;"></i>';
-                }
-            }
-            document.getElementById('pGrade').textContent = rec.grade;
-            document.getElementById('pSession').textContent = rec.academicSession;
-
-            var discAmt = parseFloat(rec.discount) || 0;
-            var discPill = document.getElementById('pDiscountPill');
-            if (discPill) {
-                if (discAmt > 0) {
-                    discPill.innerHTML = '<i class="bi bi-percent me-1"></i>Discount: ' + cur + ' ' + discAmt.toFixed(2);
-                    discPill.style.display = 'inline-block';
-                } else {
-                    discPill.style.display = 'none';
-                }
-            }
-            var discNoteEl = document.getElementById('feeDiscountNote');
-            if (discNoteEl) {
-                if (discAmt > 0) {
-                    discNoteEl.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i>A scholarship/discount of <strong>' + cur + ' ' + discAmt.toFixed(2) + '</strong> has already been taken off ' + rec.studentName.split(' ')[0] + '\'s Regular School Fees below.';
-                    discNoteEl.style.display = 'block';
-                } else {
-                    discNoteEl.style.display = 'none';
-                }
-            }
-
-            var ward = currentWards[currentWardIndex] || { record: rec, customFees: customFees };
-            var fb = computeWardFeeItems(ward);
-            var regTotals = safeTotalsForWard(rec);
-            var customPaid = 0, customBal = 0;
-            (ward.customFees || []).forEach(function (cf) {
-                var billed = parseFloat(cf.amount) || 0;
-                if (billed <= 0) return;
-                var paid = parseFloat(cf.totalPaid) || 0;
-                customPaid += paid;
-                customBal += Math.max(0, billed - paid);
-            });
-            var totalFees = regTotals.totalFees + fb.customTotal;
-            var totalPaid = regTotals.totalPaid + customPaid;
-            var balance = regTotals.balance + customBal;
-
-            document.getElementById('pTotalFees').textContent = cur + ' ' + fmt(totalFees);
-            document.getElementById('pTotalPaid').textContent = cur + ' ' + fmt(totalPaid);
-            document.getElementById('pBalance').textContent = cur + ' ' + fmt(Math.max(0, balance));
-
-            var statusHtml = balance <= 0 && totalFees > 0
-                ? '<span class="status-paid"><i class="bi bi-check-circle-fill me-1"></i> Fully Paid</span>'
-                : totalPaid > 0
-                    ? '<span class="status-partial"><i class="bi bi-exclamation-circle-fill me-1"></i> Partial</span>'
-                    : '<span class="status-unpaid"><i class="bi bi-x-circle-fill me-1"></i> Unpaid</span>';
-            document.getElementById('pStatusBadge').innerHTML = statusHtml;
-
-            var tbodyHtml = fb.items.map(function (it) {
-                var amtStr = (it.amount < 0 ? '-' : '') + cur + ' ' + fmt(Math.abs(it.amount));
-                var color = it.isDiscount ? 'color:#dc2626;' : '';
-                return '<tr><td style="' + color + '">' + it.name + (it.isCustom ? ' <span style="color:#94a3b8;font-size:10.5px;">(Extra Fee)</span>' : '') + '</td><td style="' + color + 'text-align:right">' + amtStr + '</td></tr>';
-            }).join('');
-            tbodyHtml += '<tr><td><strong>Total Fee for ' + rec.studentName.split(' ')[0] + '</strong></td><td style="text-align:right"><strong>' + cur + ' ' + fmt(fb.total) + '</strong></td></tr>';
-            document.getElementById('feeTableBody').innerHTML = tbodyHtml;
-        }
-
-        // The part of the page scoped to whichever fee the parent picked from
-        // the "Which fee would you like to pay?" dropdown: that fee's own
-        // Billed/Paid/Balance, its instalment history, and the pay form
-        // (locked to the full balance in "Pay in Full" mode, or freely
-        // editable in "Pay in Instalment" mode).
+        // ── Pay Modal ──────────────────────────────────────────
+        var _payModalCtx = null;
+        var currentPayMode = 'full';
         var currentPaySelBalance = 0;
-        function renderPaySelection(feeType) {
-            var rec = studentRec;
+
+        function openPayModal(wardIdx, feeType) {
+            var info = getFeeInfo(wardIdx, feeType);
+            if (!info) return;
+            var ward = currentWards[wardIdx];
+            _payModalCtx = { wardIdx: wardIdx, feeType: feeType };
+
+            document.getElementById('payModalTitle').textContent = 'Pay ' + info.label;
+            document.getElementById('payModalSub').textContent = ward.record.studentName + ' — ' + (ward.record.grade || '');
             var cur = (schoolData && schoolData.currency) || 'GHC';
-            collapseInstList();
             document.getElementById('formCurrency').textContent = cur;
+            document.getElementById('pmBilled').textContent = cur + ' ' + fmt(info.totalFees);
+            document.getElementById('pmPaid').textContent = cur + ' ' + fmt(info.totalPaid);
+            document.getElementById('pmBalance').textContent = cur + ' ' + fmt(Math.max(0, info.balance));
+            currentPaySelBalance = Math.max(0, info.balance);
 
-            var totalFees, totalPaid, balance, numInst, getInst, selLabel;
+            var isPaid = info.balance <= 0 && info.totalFees > 0;
+            document.getElementById('pmCongratsCard').style.display = isPaid ? 'flex' : 'none';
+            document.getElementById('pmFormFields').style.display = isPaid ? 'none' : 'block';
 
-            if (feeType === 'regular') {
-                var t = safeTotalsForWard(rec);
-                totalFees = t.totalFees; totalPaid = t.totalPaid; balance = t.balance;
-                numInst = 6;
-                getInst = function (i) { return { amt: parseFloat(rec['inst' + i]) || 0, date: rec['inst' + i + 'Date'] || '' }; };
-                var selOpt = document.querySelector('#payFeeType option[value="regular"]');
-                selLabel = selOpt ? selOpt.textContent : 'Regular School Fees';
-            } else {
-                var config = customFeeTypes.find(function (c) { return c.name === feeType; });
-                var customRec = customFees.find(function (f) { return f.feeTypeName === feeType; });
-                totalFees = customRec ? (parseFloat(customRec.amount) || 0) : (config ? getCustomFeeAmount(config, rec.grade) : 0);
-                totalPaid = customRec ? (parseFloat(customRec.totalPaid) || 0) : 0;
-                balance = Math.max(0, totalFees - totalPaid);
-                numInst = config && config.installmentAllowed ? (parseInt(config.numInstallments) || 1) : 1;
-                getInst = function (i) { return { amt: customRec ? (parseFloat(customRec['inst' + i]) || 0) : 0, date: customRec ? (customRec['inst' + i + 'Date'] || '') : '' }; };
-                selLabel = feeType;
+            if (schoolData) {
+                document.getElementById('momoNameDisp').textContent = schoolData.momoName || 'Contact school';
+                document.getElementById('momoNumDisp').textContent = schoolData.momoNumber || '—';
+                var noteEl = document.getElementById('momoNoteDisp');
+                noteEl.style.display = 'none';
+                if (schoolData.momoNote) { noteEl.textContent = schoolData.momoNote; noteEl.style.display = 'block'; }
+                if (ward.record.phoneNumber) document.getElementById('payPhone').value = ward.record.phoneNumber;
             }
-            currentPaySelBalance = Math.max(0, balance);
+            populatePortalPaymentMethods();
+            document.getElementById('payRef').value = '';
+            document.getElementById('payNote').value = '';
+            document.getElementById('payMethodUsed').value = '';
+            setModalPayMode('full');
 
-            document.getElementById('paySelBilled').textContent = cur + ' ' + fmt(totalFees);
-            document.getElementById('paySelPaid').textContent = cur + ' ' + fmt(totalPaid);
-            document.getElementById('paySelBalance').textContent = cur + ' ' + fmt(currentPaySelBalance);
-            var histLabel = document.getElementById('payHistFeeLabel');
-            if (histLabel) histLabel.textContent = '— ' + selLabel;
+            document.getElementById('payModalOverlay').classList.add('show');
+        }
+
+        function closePayModal() {
+            document.getElementById('payModalOverlay').classList.remove('show');
+            _payModalCtx = null;
+        }
+
+        function setModalPayMode(mode) {
+            currentPayMode = mode;
+            var fullBtn = document.getElementById('pmModeFullBtn');
+            var instBtn = document.getElementById('pmModeInstBtn');
+            if (fullBtn) fullBtn.classList.toggle('active', mode === 'full');
+            if (instBtn) instBtn.classList.toggle('active', mode === 'installment');
+            var amountInput = document.getElementById('payAmount');
+            if (!amountInput) return;
+            if (mode === 'full') {
+                amountInput.readOnly = true;
+                amountInput.classList.add('locked');
+                amountInput.value = currentPaySelBalance > 0 ? currentPaySelBalance.toFixed(2) : '';
+            } else {
+                amountInput.readOnly = false;
+                amountInput.classList.remove('locked');
+            }
+        }
+
+        function submitModalPayment() {
+            if (!_payModalCtx) return;
+            var ward = currentWards[_payModalCtx.wardIdx];
+            var feeType = _payModalCtx.feeType;
+            var amount = document.getElementById('payAmount').value;
+            var ref = (document.getElementById('payRef').value || '').trim();
+            var phone = (document.getElementById('payPhone').value || '').trim();
+            var note = (document.getElementById('payNote').value || '').trim();
+            var methodUsed = (document.getElementById('payMethodUsed') ? document.getElementById('payMethodUsed').value : '').trim();
+            if (feeType !== 'regular') {
+                note = '[Fee Type: ' + feeType + '] ' + note;
+            }
+            if (!amount || parseFloat(amount) <= 0) { showPToast('Please enter the amount you paid', 'warning'); return; }
+            if (!methodUsed) { showPToast('Please select how you paid (payment method)', 'warning'); return; }
+            if (!ref) { showPToast('Please enter the Reference / Transaction ID', 'warning'); return; }
+            if (!phone) { showPToast('Please enter your phone number', 'warning'); return; }
+
+            var btn = document.getElementById('submitPayBtn');
+            btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split spin me-1"></i> Sending…';
+            var data = { studentId: ward.record.id, studentName: ward.record.studentName, amount: amount, reference: ref, momoNumber: phone, note: note, paymentMethodUsed: methodUsed };
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run
+                    .withSuccessHandler(function (r) {
+                        btn.disabled = false; btn.innerHTML = '<i class="bi bi-send-check-fill"></i> Notify School of Payment';
+                        if (r.success) {
+                            showPToast('Payment notification sent! The school will verify and update your account.', 'success', 'Notification Sent', 5000);
+                            closePayModal();
+                        } else showPToast('Error: ' + r.message, 'error');
+                    })
+                    .withFailureHandler(function (e) { btn.disabled = false; btn.innerHTML = 'Notify School'; showPToast('Error: ' + e.message, 'error'); })
+                    .submitPaymentNotification(data);
+            } else { btn.disabled = false; btn.innerHTML = 'Notify School'; showPToast('Sent (Demo mode)', 'info'); closePayModal(); }
+        }
+
+        // ── View Modal (instalment history + receipt) ──────────
+        var _viewModalCtx = null;
+
+        function openViewModal(wardIdx, feeType) {
+            var info = getFeeInfo(wardIdx, feeType);
+            if (!info) return;
+            var ward = currentWards[wardIdx];
+            _viewModalCtx = { wardIdx: wardIdx, feeType: feeType };
+            var cur = (schoolData && schoolData.currency) || 'GHC';
+
+            document.getElementById('viewModalTitle').textContent = info.label;
+            document.getElementById('viewModalSub').textContent = ward.record.studentName + ' — ' + (ward.record.grade || '');
+            document.getElementById('vmBilled').textContent = cur + ' ' + fmt(info.totalFees);
+            document.getElementById('vmPaid').textContent = cur + ' ' + fmt(info.totalPaid);
+            document.getElementById('vmBalance').textContent = cur + ' ' + fmt(Math.max(0, info.balance));
 
             var instHtml = '';
-            for (var i = 1; i <= numInst; i++) {
-                var inst = getInst(i);
+            for (var i = 1; i <= info.numInst; i++) {
+                var inst = info.getInst(i);
                 if (inst.amt > 0 || (feeType === 'regular' && i <= 2)) {
                     var ic = inst.amt > 0 ? 'paid' : '', ib = inst.amt > 0 ? '<span class="inst-badge">' + cur + ' ' + fmt(inst.amt) + '</span>' : '<span class="inst-badge empty">Not paid</span>';
                     var ds = inst.date ? '<span style="color:#94a3b8;font-size:12px"> — ' + inst.date + '</span>' : '';
                     instHtml += '<div class="inst-item ' + ic + '"><div><strong>Instalment ' + i + '</strong>' + ds + '</div>' + ib + '</div>';
                 }
             }
-            document.getElementById('instList').innerHTML = instHtml || '<p style="color:#94a3b8;font-size:13px">No installments recorded yet.</p>';
+            document.getElementById('vmInstList').innerHTML = instHtml || '<p style="color:#94a3b8;font-size:13px">No installments recorded yet.</p>';
 
-            if (schoolData) {
-                document.getElementById('momoNameDisp').textContent = schoolData.momoName || 'Contact school';
-                document.getElementById('momoNumDisp').textContent = schoolData.momoNumber || '—';
-                var noteEl = document.getElementById('momoNoteDisp');
-                if (schoolData.momoNote) { noteEl.textContent = schoolData.momoNote; noteEl.style.display = 'block'; }
-                if (rec.phoneNumber) document.getElementById('payPhone').value = rec.phoneNumber;
-            }
-            populatePortalPaymentMethods();
-
-            var isPaid = (balance <= 0 && totalFees > 0);
-            document.getElementById('pCongratsCard').style.display = isPaid ? 'flex' : 'none';
-            var fieldsEl = document.getElementById('payFormFields');
-            if (fieldsEl) fieldsEl.style.display = isPaid ? 'none' : 'block';
-
-            setPayMode('full');
+            document.getElementById('viewModalOverlay').classList.add('show');
         }
 
-        // "Pay in Full" locks the amount to the outstanding balance for the
-        // selected fee (or the combined family total, if that checkbox is
-        // on); "Pay in Instalment" leaves it open for the parent to enter any
-        // amount up to that balance. Reset to "Full" every time the fee-type
-        // selection changes, so a stale partial amount never carries over
-        // onto a different fee.
-        function setPayMode(mode) {
-            currentPayMode = mode;
-            var fullBtn = document.getElementById('payModeFullBtn');
-            var instBtn = document.getElementById('payModeInstBtn');
-            if (fullBtn) fullBtn.classList.toggle('active', mode === 'full');
-            if (instBtn) instBtn.classList.toggle('active', mode === 'installment');
-            var amountInput = document.getElementById('payAmount');
-            if (!amountInput) return;
-            var famCb = document.getElementById('portalFamilyPayCheckbox');
-            var isFamily = famCb && famCb.checked;
-            if (mode === 'full') {
-                amountInput.readOnly = true;
-                amountInput.classList.add('locked');
-                if (!isFamily) amountInput.value = currentPaySelBalance > 0 ? currentPaySelBalance.toFixed(2) : '';
-            } else {
-                amountInput.readOnly = false;
-                amountInput.classList.remove('locked');
-            }
+        function closeViewModal() {
+            document.getElementById('viewModalOverlay').classList.remove('show');
+            _viewModalCtx = null;
         }
-        var currentPayMode = 'full';
+
+        function downloadReceiptFromModal() {
+            if (!_viewModalCtx) return;
+            downloadReceipt(_viewModalCtx.wardIdx, _viewModalCtx.feeType);
+        }
+
 
         function refreshParentPortalData() {
             var btn = document.getElementById('pRefreshBtn');
@@ -3922,49 +3795,6 @@
         }
 
         // ── PAYMENT ──────────────────────────────────────────
-        function submitPayment() {
-            var amount = document.getElementById('payAmount').value;
-            var ref = (document.getElementById('payRef').value || '').trim();
-            var phone = (document.getElementById('payPhone').value || '').trim();
-            var note = (document.getElementById('payNote').value || '').trim();
-            var methodUsed = (document.getElementById('payMethodUsed') ? document.getElementById('payMethodUsed').value : '').trim();
-            var feeType = document.getElementById('payFeeType').value;
-            if (feeType !== 'regular') {
-                note = '[Fee Type: ' + feeType + '] ' + note;
-            }
-            if (!amount || parseFloat(amount) <= 0) { showPToast('Please enter the amount you paid', 'warning'); return; }
-            if (!methodUsed) { showPToast('Please select how you paid (payment method)', 'warning'); return; }
-            if (!ref) { showPToast('Please enter the Reference / Transaction ID', 'warning'); return; }
-            if (!phone) { showPToast('Please enter your phone number', 'warning'); return; }
-            var isFamilyPay = false;
-            var portalFamilyPayCheckbox = document.getElementById('portalFamilyPayCheckbox');
-            if (portalFamilyPayCheckbox && portalFamilyPayCheckbox.checked && currentWards.length > 1) {
-                isFamilyPay = true;
-            }
-
-            var targetStudentId = studentRec.id;
-            var targetStudentName = studentRec.studentName;
-            if (isFamilyPay) {
-                targetStudentId = 'FAMILY:' + currentWards.map(function(w) { return w.record.id; }).join(',');
-                targetStudentName = 'Family Payment (' + currentWards.map(function(w) { return w.record.studentName; }).join(', ') + ')';
-                note = '[Family Payment] ' + note;
-            }
-
-            var btn = document.getElementById('submitPayBtn');
-            btn.disabled = true; btn.innerHTML = '<i class="bi bi-hourglass-split spin me-1"></i> Sending…';
-            var data = { studentId: targetStudentId, studentName: targetStudentName, amount: amount, reference: ref, momoNumber: phone, note: note, paymentMethodUsed: methodUsed };
-            if (typeof google !== 'undefined' && google.script) {
-                google.script.run
-                    .withSuccessHandler(function (r) {
-                        btn.disabled = false; btn.innerHTML = '<i class="bi bi-send-check-fill"></i> Notify School of Payment';
-                        if (r.success) { showPToast('Payment notification sent! The school will verify and update your account.', 'success', 'Notification Sent', 5000); document.getElementById('payRef').value = ''; document.getElementById('payNote').value = ''; document.getElementById('payMethodUsed').value = ''; if (!isFamilyPay) setPayMode(currentPayMode); }
-                        else showPToast('Error: ' + r.message, 'error');
-                    })
-                    .withFailureHandler(function (e) { btn.disabled = false; btn.innerHTML = 'Notify School'; showPToast('Error: ' + e.message, 'error'); })
-                    .submitPaymentNotification(data);
-            } else { btn.disabled = false; btn.innerHTML = 'Notify School'; showPToast('Sent (Demo mode)', 'info'); }
-        }
-
         function copyMoMoNum() {
             navigator.clipboard.writeText(document.getElementById('momoNumDisp').textContent).then(function () {
                 var b = document.getElementById('momoCopyBtn'); b.textContent = 'Copied!'; setTimeout(function () { b.textContent = 'Copy'; }, 2000);
@@ -3972,39 +3802,17 @@
         }
 
         // ── RECEIPT ──────────────────────────────────────────
-        function downloadReceipt() {
-            if (!studentRec || !schoolData) return;
-            var cur = schoolData.currency || 'GHC', rec = studentRec;
-            var feeType = document.getElementById('payFeeType').value;
+        function downloadReceipt(wardIdx, feeType) {
+            var ward = currentWards[wardIdx];
+            var info = getFeeInfo(wardIdx, feeType);
+            if (!ward || !info || !schoolData) return;
+            var cur = schoolData.currency || 'GHC', rec = ward.record;
+            var title = feeType === 'regular' ? "OFFICIAL FEE RECEIPT" : (feeType.toUpperCase() + " RECEIPT");
 
-            var tf, tp, bal, pays = [], title = "OFFICIAL FEE RECEIPT";
-
-            if (feeType === 'regular') {
-                tf = parseFloat(rec.totalFees) || 0;
-                tp = parseFloat(rec.totalPaid) || 0;
-                bal = tf - tp;
-                for (var i = 1; i <= 6; i++) {
-                    var a = parseFloat(rec['inst' + i]) || 0;
-                    var d = rec['inst' + i + 'Date'] || '';
-                    if (a > 0) pays.push({ n: i, amt: a, date: d });
-                }
-            } else {
-                title = feeType.toUpperCase() + " RECEIPT";
-                var config = customFeeTypes.find(function(c) { return c.name === feeType; });
-                var customRec = customFees.find(function(f) { return f.feeTypeName === feeType; });
-
-                tf = customRec ? (parseFloat(customRec.amount) || 0) : (config ? getCustomFeeAmount(config, rec.grade) : 0);
-                tp = customRec ? (parseFloat(customRec.totalPaid) || 0) : 0;
-                bal = Math.max(0, tf - tp);
-
-                var numInst = config && config.installmentAllowed ? (parseInt(config.numInstallments) || 1) : 1;
-                for (var i = 1; i <= numInst; i++) {
-                    var amt = customRec ? (parseFloat(customRec['inst' + i]) || 0) : 0;
-                    var dt = customRec ? (customRec['inst' + i + 'Date'] || '') : '';
-                    if (amt > 0) {
-                        pays.push({ n: i, amt: amt, date: dt });
-                    }
-                }
+            var tf = info.totalFees, tp = info.totalPaid, bal = info.balance, pays = [];
+            for (var i = 1; i <= info.numInst; i++) {
+                var inst = info.getInst(i);
+                if (inst.amt > 0) pays.push({ n: i, amt: inst.amt, date: inst.date });
             }
 
             var w = window.open('', '_blank');
