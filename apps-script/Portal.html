@@ -18,7 +18,7 @@
             --deep: #1e1b4b;
             --deep2: #312e81;
             --green: #059669;
-            --primary: var(--primary);
+            --primary: #4f46e5;
             --secondary: #6366f1;
             --red: #dc2626;
             --surface: #fff;
@@ -2130,6 +2130,8 @@
         }
         .pwelcome-topbar-label { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: .5px; }
         .pwelcome-topbar-name { font-size: 19px; font-weight: 800; color: #1e293b; margin-top: 2px; }
+        .pwelcome-topbar-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
+        .pwelcome-topbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .pwelcome-logout-btn {
             background: #dc2626;
             color: #fff;
@@ -2145,6 +2147,53 @@
             font-family: 'DM Sans', sans-serif;
         }
         .pwelcome-logout-btn:hover { background: #b91c1c; }
+
+        /* Icon buttons in the top header: sidebar collapse, theme, refresh */
+        .ptopbar-icon-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 9px;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            color: #475569;
+            font-size: 15px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .ptopbar-icon-btn:hover { background: #eef2ff; color: var(--primary); }
+
+        /* Active Term badge in the top header */
+        .ptopbar-term-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 14px;
+            background: #eef2ff;
+            border: 1px solid #c7d2fe;
+            border-radius: 8px;
+            color: var(--primary);
+            font-size: 12.5px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        /* Sidebar collapse (desktop only — mobile keeps its own off-canvas
+           hamburger behavior via .portal-topbar / .portal-sidebar.open) */
+        .portal-sidebar { transition: width .2s ease; }
+        .pnav-label { transition: opacity .15s ease; }
+        @media (min-width: 901px) {
+            body.sidebar-collapsed .portal-sidebar { width: 76px; }
+            body.sidebar-collapsed .portal-sidebar-brand { justify-content: center; padding: 20px 8px; }
+            body.sidebar-collapsed .portal-sidebar-schoolname { display: none; }
+            body.sidebar-collapsed .portal-nav-link { justify-content: center; padding: 12px 0; }
+            body.sidebar-collapsed .pnav-label { display: none; }
+            body.sidebar-collapsed .portal-main { margin-left: 76px; }
+        }
+        @media (max-width: 900px) {
+            .sidebar-collapse-btn { display: none; }
+        }
 
         /* Section header bar — solid, one row: icon + title (+ optional action) */
         .pdash-header {
@@ -2247,6 +2296,15 @@
         }
         .pchild-card-feesum b { font-weight: 700; }
         .pchild-card-feesum-label { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: .4px; display: block; margin-bottom: 2px; }
+        .pchild-card-toggle { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; cursor: pointer; }
+        .pchild-chevron { color: #94a3b8; font-size: 14px; transition: transform .15s ease; }
+        .pchild-chevron.rotated { transform: rotate(180deg); }
+        .pchild-breakdown { margin-top: 14px; border-top: 1px solid #f1f5f9; padding-top: 14px; }
+        .pchild-breakdown-title { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 8px; }
+        .pchild-breakdown .fee-table { width: 100%; }
+        .pchild-breakdown-total { font-weight: bold; background: #f8fafc; }
+        body.dark-mode .pchild-breakdown-total { background-color: #0f172a !important; }
+        body.dark-mode .pchild-breakdown-title { color: #94a3b8 !important; }
 
         /* Children's Fees: filter bar */
         .pfilter-bar {
@@ -2276,7 +2334,7 @@
 
         /* Children's Fees: table */
         .pfees-table-wrap { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
-        .pfees-table { width: 100%; border-collapse: collapse; }
+        .pfees-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         .pfees-table th {
             background: #f8fafc;
             color: #64748b;
@@ -2284,17 +2342,23 @@
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: .4px;
-            padding: 12px 14px;
+            padding: 16px 22px;
             text-align: left;
             white-space: nowrap;
         }
         .pfees-table td {
-            padding: 12px 14px;
+            padding: 16px 22px;
             border-top: 1px solid #f1f5f9;
-            font-size: 13px;
+            font-size: 13.5px;
             vertical-align: middle;
         }
-        .pprogress-track { width: 110px; height: 6px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
+        .pfees-table th:nth-child(1), .pfees-table td:nth-child(1) { width: 22%; }
+        .pfees-table th:nth-child(2), .pfees-table td:nth-child(2) { width: 16%; }
+        .pfees-table th:nth-child(3), .pfees-table td:nth-child(3) { width: 14%; }
+        .pfees-table th:nth-child(4), .pfees-table td:nth-child(4) { width: 22%; }
+        .pfees-table th:nth-child(5), .pfees-table td:nth-child(5) { width: 12%; }
+        .pfees-table th:nth-child(6), .pfees-table td:nth-child(6) { width: 14%; }
+        .pprogress-track { width: 150px; height: 7px; background: #e2e8f0; border-radius: 4px; overflow: hidden; }
         .pprogress-fill { height: 100%; background: var(--primary); }
         .pprogress-text { font-size: 11px; color: #94a3b8; margin-top: 3px; white-space: nowrap; }
         .pstatus-pill { display: inline-block; padding: 3px 11px; border-radius: 20px; font-size: 11px; font-weight: 700; }
@@ -2365,12 +2429,14 @@
             .pdash-header { padding: 14px 16px; }
             .pdash-body { padding: 16px 12px; }
             .pfees-table-wrap { overflow-x: auto; }
-            .pfees-table { min-width: 620px; }
+            .pfees-table { min-width: 720px; }
         }
 
         /* Dark mode coverage for the redesigned pages */
         body.dark-mode .pwelcome-topbar { background-color: #1e293b !important; border-color: #334155 !important; }
         body.dark-mode .pwelcome-topbar-name { color: #f8fafc !important; }
+        body.dark-mode .ptopbar-icon-btn { background-color: #0f172a !important; border-color: #334155 !important; color: #cbd5e1 !important; }
+        body.dark-mode .ptopbar-term-badge { background-color: rgba(99,102,241,.15) !important; border-color: rgba(99,102,241,.35) !important; color: #c7d2fe !important; }
         body.dark-mode .pwelcome-card,
         body.dark-mode .pchildsum-row,
         body.dark-mode .pchild-card,
@@ -2540,27 +2606,32 @@
                 <div class="portal-sidebar-schoolname" id="portalSchoolName">School Portal</div>
             </div>
             <div class="portal-sidebar-nav">
-                <a class="portal-nav-link active" data-page="dashboard" onclick="switchPortalPage('dashboard')"><i class="bi bi-pie-chart-fill"></i> Dashboard</a>
-                <a class="portal-nav-link" data-page="childrenFees" onclick="switchPortalPage('childrenFees')"><i class="bi bi-credit-card-2-front-fill"></i> Children's Fees</a>
-                <a class="portal-nav-link" data-page="myChildren" onclick="switchPortalPage('myChildren')"><i class="bi bi-people-fill"></i> My Children</a>
-                <a class="portal-nav-link" data-page="nextTermBill" onclick="switchPortalPage('nextTermBill')"><i class="bi bi-calendar-plus"></i> Next Term Bill</a>
-            </div>
-            <div class="portal-sidebar-footer">
-                <button class="back-btn" onclick="togglePortalTheme()"><i id="portalThemeToggleIcon" class="bi bi-moon-fill"></i> <span id="portalThemeToggleLabel">Dark Mode</span></button>
-                <button class="back-btn" onclick="refreshParentPortalData()" id="pRefreshBtn"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+                <a class="portal-nav-link active" data-page="dashboard" onclick="switchPortalPage('dashboard')" title="Dashboard"><i class="bi bi-pie-chart-fill"></i> <span class="pnav-label">Dashboard</span></a>
+                <a class="portal-nav-link" data-page="childrenFees" onclick="switchPortalPage('childrenFees')" title="Children's Fees"><i class="bi bi-credit-card-2-front-fill"></i> <span class="pnav-label">Children's Fees</span></a>
+                <a class="portal-nav-link" data-page="myChildren" onclick="switchPortalPage('myChildren')" title="My Children"><i class="bi bi-people-fill"></i> <span class="pnav-label">My Children</span></a>
+                <a class="portal-nav-link" data-page="nextTermBill" onclick="switchPortalPage('nextTermBill')" title="Next Term Bill"><i class="bi bi-calendar-plus"></i> <span class="pnav-label">Next Term Bill</span></a>
             </div>
         </nav>
 
         <!-- Main content -->
         <div class="portal-main" id="portalMain">
 
-        <!-- Persistent "Welcome, X (parent)" bar + Logout — shown above every page -->
+        <!-- Persistent header: sidebar collapse toggle, "Welcome, X (parent)",
+             Active Term, theme/refresh/logout — shown above every page -->
         <div class="pwelcome-topbar">
-            <div>
-                <div class="pwelcome-topbar-label">Welcome,</div>
-                <div class="pwelcome-topbar-name" id="pwelcomeTopbarName">Parent</div>
+            <div class="pwelcome-topbar-left">
+                <button class="ptopbar-icon-btn sidebar-collapse-btn" onclick="togglePortalSidebarCollapse()" title="Collapse/Expand Sidebar"><i class="bi bi-list"></i></button>
+                <div>
+                    <div class="pwelcome-topbar-label">Welcome,</div>
+                    <div class="pwelcome-topbar-name" id="pwelcomeTopbarName">Parent</div>
+                </div>
             </div>
-            <button class="pwelcome-logout-btn" onclick="goBack()"><i class="bi bi-box-arrow-right"></i> Logout</button>
+            <div class="pwelcome-topbar-right">
+                <div class="ptopbar-term-badge" id="ptopbarTermBadge" style="display:none"><i class="bi bi-calendar-check-fill me-1"></i><span id="ptopbarTermText">—</span></div>
+                <button class="ptopbar-icon-btn" onclick="togglePortalTheme()" title="Toggle Light/Dark Theme"><i id="portalThemeToggleIcon" class="bi bi-moon-fill"></i></button>
+                <button class="ptopbar-icon-btn" onclick="refreshParentPortalData()" id="pRefreshBtn" title="Refresh"><i class="bi bi-arrow-clockwise"></i></button>
+                <button class="pwelcome-logout-btn" onclick="goBack()"><i class="bi bi-box-arrow-right"></i> Logout</button>
+            </div>
         </div>
 
         <!-- ══ PAGE: Dashboard ══ -->
@@ -3111,6 +3182,19 @@
             var nameEl = document.getElementById('pwelcomeTopbarName');
             if (nameEl) nameEl.textContent = currentWards.map(function(w) { return w.record.studentName; }).join(', ') + ' (Parent)';
 
+            var termBadge = document.getElementById('ptopbarTermBadge');
+            if (termBadge) {
+                var termTxt = schoolData && schoolData.activeTerm
+                    ? schoolData.activeTerm + (schoolData.academicYear ? ' — ' + schoolData.academicYear : '')
+                    : '';
+                if (termTxt) {
+                    document.getElementById('ptopbarTermText').textContent = termTxt;
+                    termBadge.style.display = 'inline-flex';
+                } else {
+                    termBadge.style.display = 'none';
+                }
+            }
+
             try { renderDashboardPage(); } catch (e) { console.error('renderDashboardPage error:', e); }
             try { renderMyChildrenPage(); } catch (e) { console.error('renderMyChildrenPage error:', e); }
             try { renderChildrenFeesPage(); } catch (e) { console.error('renderChildrenFeesPage error:', e); }
@@ -3347,6 +3431,15 @@
             if (overlay) overlay.classList.toggle('show', opening);
         }
 
+        // Desktop-only icon-in/out collapse (distinct from the mobile
+        // off-canvas open/close above) — shrinks the sidebar to icons only,
+        // remembered across visits.
+        function togglePortalSidebarCollapse() {
+            var collapsed = !document.body.classList.contains('sidebar-collapsed');
+            document.body.classList.toggle('sidebar-collapsed', collapsed);
+            localStorage.setItem('portalSidebarCollapsed', collapsed ? '1' : '0');
+        }
+
         function closePortalSidebar() {
             var sb = document.getElementById('portalSidebar');
             var overlay = document.getElementById('portalSidebarOverlay');
@@ -3398,13 +3491,24 @@
             var cur = (schoolData && schoolData.currency) || 'GHC';
             if (!currentWards.length) { container.innerHTML = '<div class="pdash-empty">No wards found.</div>'; return; }
 
-            container.innerHTML = currentWards.map(function (ward) {
+            container.innerHTML = currentWards.map(function (ward, idx) {
                 var rec = ward.record;
                 var w = wardFeeTotals(ward);
+                var fb = computeWardFeeItems(ward);
+                var breakdownRows = fb.items.map(function (it) {
+                    var amtStr = (it.amount < 0 ? '-' : '') + cur + ' ' + fmt(Math.abs(it.amount));
+                    var color = it.isDiscount ? 'color:#dc2626;' : '';
+                    return '<tr><td style="' + color + '">' + it.name + (it.isCustom ? ' <span style="color:#94a3b8;font-size:10.5px;">(Extra Fee)</span>' : '') + '</td><td style="' + color + 'text-align:right">' + amtStr + '</td></tr>';
+                }).join('');
+                breakdownRows += '<tr class="pchild-breakdown-total"><td>Total</td><td style="text-align:right">' + cur + ' ' + fmt(fb.total) + '</td></tr>';
+
                 return '<div class="pchild-card">' +
-                    '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">' +
+                    '<div class="pchild-card-toggle" onclick="toggleChildCard(' + idx + ')">' +
                         '<div class="pchild-card-name"><i class="bi bi-person-circle"></i>' + rec.studentName + '</div>' +
-                        '<span class="pchild-card-badge active">Active</span>' +
+                        '<div style="display:flex;align-items:center;gap:10px;">' +
+                            '<span class="pchild-card-badge active">Active</span>' +
+                            '<i class="bi bi-chevron-down pchild-chevron" id="pchildChevron' + idx + '"></i>' +
+                        '</div>' +
                     '</div>' +
                     '<div class="pchild-card-info-grid">' +
                         '<div><div class="lbl">Student ID</div><div class="val">' + rec.id + '</div></div>' +
@@ -3418,8 +3522,22 @@
                         '<div><span class="pchild-card-feesum-label">Pending</span><b style="color:#dc2626;">' + cur + ' ' + fmt(w.balance) + '</b></div>' +
                         '<div><span class="pchild-card-feesum-label">Fee Count</span><b>' + w.feeCount + '</b></div>' +
                     '</div>' +
+                    '<div class="pchild-breakdown" id="pchildBreakdown' + idx + '" style="display:none;">' +
+                        '<div class="pchild-breakdown-title">Fees Breakdown</div>' +
+                        '<table class="fee-table"><tbody>' + breakdownRows + '</tbody></table>' +
+                    '</div>' +
                 '</div>';
             }).join('');
+        }
+
+        // Expands/collapses one My Children card's fee breakdown table.
+        function toggleChildCard(idx) {
+            var body = document.getElementById('pchildBreakdown' + idx);
+            var chevron = document.getElementById('pchildChevron' + idx);
+            if (!body) return;
+            var expanded = body.style.display !== 'none';
+            body.style.display = expanded ? 'none' : 'block';
+            if (chevron) chevron.classList.toggle('rotated', !expanded);
         }
 
         // One ward's combined regular + extra fee totals (used by the
@@ -4283,7 +4401,6 @@
 
             w.document.write('<div class="bill-title">📋 ESTIMATED NEXT TERM BILL — ' + nextSession.toUpperCase() + '</div>');
 
-            var combinedArrears = arrears + customArrears;
             if (combinedArrears > 0) {
                 w.document.write('<div class="note">⚠️ <strong>Note:</strong> This bill includes outstanding arrears of <strong>' + cur + ' ' + fmt(combinedArrears) + '</strong> carried forward from ' + session + '.</div>');
             }
@@ -4410,6 +4527,13 @@
             if (theme === 'dark') {
                 document.body.classList.add('dark-mode');
                 setTimeout(function() { applyPortalThemeIcons(true); }, 100);
+            }
+        })();
+
+        // Initialize sidebar collapsed state from localStorage
+        (function() {
+            if (localStorage.getItem('portalSidebarCollapsed') === '1') {
+                document.body.classList.add('sidebar-collapsed');
             }
         })();
     </script>
