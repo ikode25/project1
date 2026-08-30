@@ -7555,6 +7555,7 @@
             else if (action === 'billcustom') printBillCustom(id, session, btn.dataset.feename);
             else if (action === 'receiptcustom') printReceiptCustom(id, session, btn.dataset.feename);
             else if (action === 'refund') openRefundModal(id, session, btn.dataset.feename || 'regular');
+            else if (action === 'deletecustom') deleteCustomFee(id, session, btn.dataset.feename);
         });
 
         function toggleDropdown() { document.getElementById('dropdownMenu').classList.toggle('show'); }
@@ -9353,6 +9354,9 @@
                     if (actionEnabled('whatsapp')) html += '<button class="act-btn btn btn-sm btn-whatsapp me-1" data-action="whatsappcustom" data-id="' + r.id + '" data-session="' + session + '" data-feename="' + selectedFeeType + '" title="WhatsApp"><i class="bi bi-whatsapp"></i></button>';
                     if (actionEnabled('sms')) html += '<button class="act-btn btn btn-sm btn-outline-secondary me-1" data-action="smscustom" data-id="' + r.id + '" data-session="' + session + '" data-feename="' + selectedFeeType + '" title="Send SMS" style="font-size:11px;padding:2px 7px"><i class="bi bi-chat-dots"></i></button>';
                 }
+                if (currentUser && currentUser.role === 'admin' && customRecord && actionEnabled('delete')) {
+                    html += '<button class="act-btn btn btn-sm btn-outline-danger me-1" data-action="deletecustom" data-id="' + r.id + '" data-session="' + session + '" data-feename="' + selectedFeeType + '" title="Delete This Extra Fee — removes it entirely, e.g. a stray/mistaken charge"><i class="bi bi-trash"></i></button>';
+                }
                 return wrapActionBtns(html);
             }
 
@@ -9961,6 +9965,45 @@
                 hideLoad();
                 showToast('Payment saved (demo mode)!', 'success');
                 closeCustomFeeModal();
+            }
+        }
+
+        // Permanently removes one student's extra/custom fee record (e.g. a
+        // stray or mistakenly-billed "Books" charge) — not just its config
+        // template in Settings, the actual billed record. This is the fix for
+        // a fee type still showing on a student (or the Parent Portal) after
+        // its "Extra Fee Type" was removed from Settings: the template and the
+        // already-billed record are separate, so removing the template alone
+        // never deletes fees already charged to specific students.
+        async function deleteCustomFee(id, session, feeName) {
+            var rec = allRecords.find(function (r) { return String(r.id) === String(id) && (!session || String(r.academicSession) === String(session)); });
+            var studentName = rec ? rec.studentName : id;
+            var ok = await showConfirm('This permanently deletes the "' + feeName + '" extra fee record for ' + studentName + ' — including any payments already recorded against it. This cannot be undone.', { title: 'Delete Extra Fee?', icon: '🗑', okLabel: 'Delete', okClass: 'danger' });
+            if (!ok) return;
+            showLoad('Deleting…');
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run
+                    .withSuccessHandler(function (r) {
+                        hideLoad();
+                        if (r.success) {
+                            allCustomFeeRecords = allCustomFeeRecords.filter(function (cf) {
+                                return !(cf && String(cf.studentId) === String(id) && String(cf.feeTypeName) === String(feeName) && (!session || String(cf.academicSession) === String(session)));
+                            });
+                            lsSet('customFeeRecords', allCustomFeeRecords);
+                            var visibleTermForDel = getVisibleTermSection();
+                            if (visibleTermForDel) renderTerm(visibleTermForDel.key, visibleTermForDel.name, (termState[visibleTermForDel.key] && termState[visibleTermForDel.key].page) || 1);
+                            try { updateDash(); } catch (e) { console.error('updateDash after custom fee delete error:', e); }
+                            showToast('Extra fee deleted.', 'success');
+                        } else showToast(r.message, 'error');
+                    })
+                    .withFailureHandler(function (e) { hideLoad(); showToast('Error: ' + e.message, 'error'); })
+                    .deleteCustomFeeRecord(String(id), session, feeName);
+            } else {
+                hideLoad();
+                allCustomFeeRecords = allCustomFeeRecords.filter(function (cf) {
+                    return !(cf && String(cf.studentId) === String(id) && String(cf.feeTypeName) === String(feeName) && (!session || String(cf.academicSession) === String(session)));
+                });
+                showToast('Extra fee deleted (demo)!', 'success');
             }
         }
 

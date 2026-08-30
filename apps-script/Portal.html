@@ -538,6 +538,23 @@
             font-size: 16px
         }
 
+        .inst-toggle-btn {
+            margin-left: auto;
+            background: #f1f5f9;
+            color: #475569;
+            border: none;
+            border-radius: 20px;
+            padding: 5px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-family: 'DM Sans', sans-serif;
+        }
+        .inst-toggle-btn:hover { background: #e2e8f0; }
+
         .section-body {
             padding: 20px
         }
@@ -1748,6 +1765,18 @@
         }
         .pdash-greeting { color: rgba(255,255,255,.7); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
         .pdash-title { color: #fff; font-family: 'Playfair Display', serif; font-size: 22px; font-weight: 700; margin-top: 3px; }
+        .pdash-term-badge {
+            display: inline-flex;
+            align-items: center;
+            margin-top: 10px;
+            padding: 5px 12px;
+            background: rgba(245,158,11,.15);
+            border: 1px solid rgba(245,158,11,.35);
+            border-radius: 20px;
+            color: var(--gold);
+            font-size: 11.5px;
+            font-weight: 700;
+        }
         .pdash-total-strip {
             display: flex;
             gap: 12px;
@@ -1954,8 +1983,12 @@
         }
         body.dark-mode .ward-card-btn,
         body.dark-mode .feetype-icon,
-        body.dark-mode .ftd-pay-btn {
+        body.dark-mode .ftd-pay-btn,
+        body.dark-mode .inst-toggle-btn {
             background: rgba(99,102,241,.15) !important;
+        }
+        body.dark-mode .inst-toggle-btn {
+            color: #c7d2fe !important;
         }
         body.dark-mode .pdash-section-title {
             color: #cbd5e1 !important;
@@ -2191,6 +2224,7 @@
             <div class="pdash-header">
                 <div class="pdash-greeting">Welcome back</div>
                 <div class="pdash-title" id="pdashGreetingName">Your Wards</div>
+                <div class="pdash-term-badge" id="pdashTermBadge" style="display:none"><i class="bi bi-calendar-check-fill me-1"></i><span id="pdashTermBadgeText">—</span></div>
             </div>
             <div class="pdash-total-strip" id="pdashTotalStrip" style="display:none">
                 <div class="pdash-total-card">
@@ -2258,10 +2292,12 @@
             <div class="portal-header-inner" style="justify-content:flex-end;">
                 <button class="back-btn" onclick="switchPortalPage('dashboard')"><i class="bi bi-arrow-left"></i> Dashboard</button>
             </div>
-            <!-- Sibling switcher -->
-            <div id="siblingSwitcherContainer" class="sibling-switcher-container" style="display:none; padding:10px 16px; background:rgba(255,255,255,0.05); border-bottom:1px solid rgba(255,255,255,0.1); margin-top:-10px; margin-bottom:10px; border-radius:12px;">
-                <span class="small text-white-50 me-2" style="font-size:11px;"><i class="bi bi-people me-1"></i> Family Wards:</span>
-                <div class="d-flex gap-1 flex-wrap" id="siblingSwitcherButtons"></div>
+            <!-- Sibling switcher — a compact dropdown (not a row of every ward's
+                 name) so this page doesn't open with the whole family across
+                 the top; only relevant when there's more than one ward. -->
+            <div id="siblingSwitcherContainer" class="sibling-switcher-container" style="display:none; align-items:center; gap:8px; padding:9px 16px; background:rgba(255,255,255,0.05); border-bottom:1px solid rgba(255,255,255,0.1); margin-top:-10px; margin-bottom:10px; border-radius:12px;">
+                <span class="small text-white-50" style="font-size:11px; white-space:nowrap;"><i class="bi bi-people me-1"></i>Viewing:</span>
+                <select id="siblingSwitcherSelect" class="form-select form-select-sm" style="max-width:220px; background:rgba(255,255,255,0.12); color:#fff; border:1px solid rgba(255,255,255,0.25); font-size:12.5px;" onchange="switchWard(parseInt(this.value, 10), true)"></select>
             </div>
 
             <!-- Student info band -->
@@ -2330,13 +2366,17 @@
                 </div>
             </div>
 
-            <!-- Payment History -->
+            <!-- Payment History — collapsed by default so a long list of paid
+                 instalments doesn't push the Pay section further down. -->
             <div class="section-card">
                 <div class="section-head">
                     <div class="icon" style="background:#f0fdf4;color:#059669"><i class="bi bi-clock-history"></i></div>
                     <h6>Payment History</h6>
+                    <button type="button" class="inst-toggle-btn" id="instToggleBtn" onclick="toggleInstList()">
+                        <span id="instToggleLabel">Show</span> <i class="bi bi-chevron-down" id="instToggleIcon"></i>
+                    </button>
                 </div>
-                <div class="section-body">
+                <div class="section-body" id="instSectionBody" style="display:none">
                     <div class="inst-list" id="instList"></div>
                 </div>
             </div>
@@ -2760,10 +2800,8 @@
             uniforms = currentWards[index].uniforms || [];
             books = currentWards[index].books || [];
 
-            var btns = document.querySelectorAll('.sibling-btn');
-            btns.forEach(function(btn, idx) {
-                btn.classList.toggle('active', idx === index);
-            });
+            var switcherSelectEl = document.getElementById('siblingSwitcherSelect');
+            if (switcherSelectEl) switcherSelectEl.value = String(index);
 
             buildPortalFeeTabs(applicablePortalFeeTypes(customFeeTypes, customFees));
             selectPortalFeeTab('regular');
@@ -2803,17 +2841,14 @@
             books = currentWards[currentWardIndex].books || [];
 
             var switcherContainer = document.getElementById('siblingSwitcherContainer');
-            var switcherButtons = document.getElementById('siblingSwitcherButtons');
+            var switcherSelect = document.getElementById('siblingSwitcherSelect');
 
             if (currentWards.length > 1) {
-                if (switcherContainer) switcherContainer.style.display = 'block';
-                if (switcherButtons) {
-                    var btnHtml = '';
-                    currentWards.forEach(function(ward, idx) {
-                        var activeCls = (idx === currentWardIndex) ? 'active' : '';
-                        btnHtml += '<button type="button" class="sibling-btn ' + activeCls + '" onclick="switchWard(' + idx + ')"><i class="bi bi-person me-1"></i>' + ward.record.studentName + '</button>';
-                    });
-                    switcherButtons.innerHTML = btnHtml;
+                if (switcherContainer) switcherContainer.style.display = 'flex';
+                if (switcherSelect) {
+                    switcherSelect.innerHTML = currentWards.map(function(ward, idx) {
+                        return '<option value="' + idx + '"' + (idx === currentWardIndex ? ' selected' : '') + '>' + ward.record.studentName + '</option>';
+                    }).join('');
                 }
             } else if (switcherContainer) {
                 switcherContainer.style.display = 'none';
@@ -3067,6 +3102,19 @@
                 payFeeTypeSelect.value = feeType;
             }
             renderFeeDetails(feeType);
+            scrollToPortalPaySection();
+        }
+
+        // Jumps straight to the "Pay via Mobile Money" section — called after
+        // picking a ward or a specific fee, since that's what a parent clicked
+        // through for. Delayed a beat so it runs after switchPortalPage has
+        // finished making the Pay Fees page visible (scrollIntoView is a no-op
+        // on a still-hidden page).
+        function scrollToPortalPaySection() {
+            setTimeout(function() {
+                var el = document.getElementById('payNowCard');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 80);
         }
 
         // Builds the list of extra-fee tabs to show: the school-configured custom fee
@@ -3168,6 +3216,19 @@
                 nameEl.textContent = currentWards.length > 1
                     ? currentWards.map(function (w) { return w.record.studentName; }).join(', ')
                     : (currentWards[0] ? currentWards[0].record.studentName : 'Your Ward');
+            }
+
+            var termBadge = document.getElementById('pdashTermBadge');
+            if (termBadge) {
+                var termTxt = schoolData && schoolData.activeTerm
+                    ? schoolData.activeTerm + (schoolData.academicYear ? ' — ' + schoolData.academicYear : '')
+                    : '';
+                if (termTxt) {
+                    document.getElementById('pdashTermBadgeText').textContent = termTxt;
+                    termBadge.style.display = 'inline-flex';
+                } else {
+                    termBadge.style.display = 'none';
+                }
             }
 
             var totalFees = 0, totalPaid = 0, totalDue = 0;
@@ -3466,10 +3527,7 @@
                 var hasTab = document.querySelector('.fee-tab-btn[data-fee="' + feeType.replace(/"/g, '\\"') + '"]');
                 if (hasTab) selectPortalFeeTab(feeType);
             }
-            setTimeout(function () {
-                var payCard = document.getElementById('payNowCard');
-                if (payCard) payCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 60);
+            scrollToPortalPaySection();
         }
 
         // Combined pay: land on the first billed ward's Pay Fees page (on this
@@ -3490,10 +3548,7 @@
                 cb.checked = true;
                 if (typeof cb.onchange === 'function') cb.onchange();
             }
-            setTimeout(function () {
-                var payCard = document.getElementById('payNowCard');
-                if (payCard) payCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 60);
+            scrollToPortalPaySection();
         }
 
         // Gathers every paid installment (regular + custom/extra fees) across all
@@ -3547,9 +3602,33 @@
             selectPortalFeeTab(selected);
         }
 
+        // Collapses the Payment History / Instalments list — called whenever
+        // fee details re-render (ward or fee-type switch) so it always starts
+        // tucked away instead of piling up paid instalments on screen.
+        function collapseInstList() {
+            var body = document.getElementById('instSectionBody');
+            var icon = document.getElementById('instToggleIcon');
+            var label = document.getElementById('instToggleLabel');
+            if (body) body.style.display = 'none';
+            if (icon) { icon.classList.remove('bi-chevron-up'); icon.classList.add('bi-chevron-down'); }
+            if (label) label.textContent = 'Show';
+        }
+
+        function toggleInstList() {
+            var body = document.getElementById('instSectionBody');
+            var icon = document.getElementById('instToggleIcon');
+            var label = document.getElementById('instToggleLabel');
+            if (!body) return;
+            var isHidden = body.style.display === 'none';
+            body.style.display = isHidden ? 'block' : 'none';
+            if (icon) { icon.classList.toggle('bi-chevron-up', isHidden); icon.classList.toggle('bi-chevron-down', !isHidden); }
+            if (label) label.textContent = isHidden ? 'Hide' : 'Show';
+        }
+
         function renderFeeDetails(feeType) {
             var rec = studentRec;
             var cur = (schoolData && schoolData.currency) || 'GHC';
+            collapseInstList();
             document.getElementById('pStudentId').textContent = rec.id;
             document.getElementById('pStudentName').textContent = rec.studentName;
             var av = document.getElementById('pStudentAvatar');

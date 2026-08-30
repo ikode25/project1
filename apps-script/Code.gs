@@ -981,6 +981,8 @@ function getPublicSchoolData(studentIdOrPhone) {
         motto:     settings.schoolMotto    || '',
         logo:      settings.schoolLogo     || '',
         currency:  settings.currency       || 'GHC',
+        academicYear: settings.academicYear || '',
+        activeTerm:   settings.activeTerm   || '',
         facebook:  settings.facebook       || '',
         twitter:   settings.twitter        || '',
         instagram: settings.instagram      || '',
@@ -3464,6 +3466,45 @@ function saveCustomFeeRecord(recordData) {
     }
   } catch(e) {
     return {success: false, message: e.message};
+  }
+}
+
+// Removes one student's extra/custom fee record entirely (e.g. a stray or
+// mistakenly-billed "Books" charge) from the Custom Fee Records sheet.
+// Unlike the Extra Fee Type templates in Settings (which only control what
+// NEW fees look like), this is the only way to remove a fee that's already
+// been billed to a specific student — deleting a template doesn't touch
+// records already created from it.
+function deleteCustomFeeRecord(studentId, academicSession, feeTypeName) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(CUSTOM_FEE_RECORDS_SHEET);
+    if (!sheet) return { success: false, message: 'Custom Fee Records sheet not found' };
+    const data = sheet.getDataRange().getValues();
+    if (data.length <= 1) return { success: false, message: 'Not found' };
+    const headers = data[0].map(h => String(h).trim().toLowerCase());
+    const stuIdIdx = headers.indexOf('studentid');
+    const feeNameIdx = headers.indexOf('feetypename');
+    const sessionIdx = headers.indexOf('academicsession');
+    if (stuIdIdx === -1 || feeNameIdx === -1) return { success: false, message: 'Sheet columns not found' };
+
+    const targetStu = String(studentId || '').trim().toLowerCase();
+    const targetFee = String(feeTypeName || '').trim().toLowerCase();
+    const targetSess = String(academicSession || '').trim().toLowerCase();
+
+    for (let i = 1; i < data.length; i++) {
+      const rowStu = String(data[i][stuIdIdx] || '').trim().toLowerCase();
+      const rowFee = String(data[i][feeNameIdx] || '').trim().toLowerCase();
+      const rowSess = sessionIdx !== -1 ? String(data[i][sessionIdx] || '').trim().toLowerCase() : '';
+      if (rowStu === targetStu && rowFee === targetFee && (!targetSess || rowSess === targetSess)) {
+        sheet.deleteRow(i + 1);
+        logActivity('Deleted Custom Fee', studentId + ' - ' + feeTypeName + ' (' + academicSession + ')');
+        return { success: true };
+      }
+    }
+    return { success: false, message: 'Not found' };
+  } catch(e) {
+    return { success: false, message: e.message };
   }
 }
 
