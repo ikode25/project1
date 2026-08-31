@@ -7165,9 +7165,9 @@
         var DEFAULT_COMPS = [
             { id: 'arrears', name: 'Arrears', isActive: true, isForNewStudentsOnly: false },
             { id: 'actualFees', name: 'Tuition Fees', isActive: true, isForNewStudentsOnly: false },
-            { id: 'books', name: 'Books', isActive: true, isForNewStudentsOnly: false },
-            { id: 'pta', name: 'PTA', isActive: true, isForNewStudentsOnly: false },
-            { id: 'cleaning', name: 'Cleaning', isActive: true, isForNewStudentsOnly: false },
+            { id: 'books', name: 'Books', isActive: false, isForNewStudentsOnly: false },
+            { id: 'pta', name: 'PTA', isActive: false, isForNewStudentsOnly: false },
+            { id: 'cleaning', name: 'Cleaning', isActive: false, isForNewStudentsOnly: false },
             { id: 'admissionFees', name: 'Admission Fees', isActive: true, isForNewStudentsOnly: true }
         ];
 
@@ -9817,7 +9817,17 @@
             var configItem = cfConfigs.find(function(cf) { return cf.name === feeName; });
             var defAmt = configItem ? getCustomFeeAmount(configItem, rec.grade) : 0;
             var numInst = configItem && configItem.installmentAllowed ? (parseInt(configItem.numInstallments) || 1) : 1;
-            
+            // Never show/save fewer installment slots than this record already
+            // has real payments in — a stale/lower cached fee-type config
+            // (e.g. after switching devices, or the admin later reducing the
+            // installment count) must not hide, and then wipe out, money
+            // already recorded in inst4/inst5/etc.
+            if (customRecord) {
+                for (var ci = 6; ci >= 1; ci--) {
+                    if ((parseFloat(customRecord['inst' + ci]) || 0) > 0) { numInst = Math.max(numInst, ci); break; }
+                }
+            }
+
             document.getElementById('cfmStudentId').value = id;
             document.getElementById('cfmSession').value = session;
             document.getElementById('cfmStudentName').value = rec.studentName || '';

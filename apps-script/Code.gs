@@ -8,13 +8,21 @@ const SETTINGS_SHEET       = "Settings";
 const FEE_COMPONENTS_SHEET = "Fee Components";
 const CLASSES_SHEET        = "Classes";
 
+// NOTE: "isActive" here controls whether a component gets its own column on the
+// term sheets (First/Second/Third Term) AND is included in fee totals. Only
+// components the admin has actually configured for regular-fee billing should
+// default to active. Books/PTA/Cleaning are commonly collected as one-off or
+// termly EXTRA fees (see Custom Fee Types) rather than as a fixed regular-fee
+// column billed to every student every term, so they default to inactive here
+// — the admin can activate them from Settings → Fee Components if their school
+// really does want them as a standing regular-fee column for every student.
 const DEFAULT_COMPONENTS = [
-  {id:"arrears",       name:"Arrears",        defaultAmount:0, isActive:true, isForNewStudentsOnly:false, order:1},
-  {id:"actualFees",    name:"Tuition Fees",   defaultAmount:0, isActive:true, isForNewStudentsOnly:false, order:2},
-  {id:"books",         name:"Books",          defaultAmount:0, isActive:true, isForNewStudentsOnly:false, order:3},
-  {id:"pta",           name:"PTA",            defaultAmount:0, isActive:true, isForNewStudentsOnly:false, order:4},
-  {id:"cleaning",      name:"Cleaning",       defaultAmount:0, isActive:true, isForNewStudentsOnly:false, order:5},
-  {id:"admissionFees", name:"Admission Fees", defaultAmount:0, isActive:true, isForNewStudentsOnly:true,  order:6}
+  {id:"arrears",       name:"Arrears",        defaultAmount:0, isActive:true,  isForNewStudentsOnly:false, order:1},
+  {id:"actualFees",    name:"Tuition Fees",   defaultAmount:0, isActive:true,  isForNewStudentsOnly:false, order:2},
+  {id:"books",         name:"Books",          defaultAmount:0, isActive:false, isForNewStudentsOnly:false, order:3},
+  {id:"pta",           name:"PTA",            defaultAmount:0, isActive:false, isForNewStudentsOnly:false, order:4},
+  {id:"cleaning",      name:"Cleaning",       defaultAmount:0, isActive:false, isForNewStudentsOnly:false, order:5},
+  {id:"admissionFees", name:"Admission Fees", defaultAmount:0, isActive:true,  isForNewStudentsOnly:true,  order:6}
 ];
 
 const DEFAULT_CLASSES = [
@@ -116,8 +124,10 @@ function getOrCreateTermSheet(term) {
     try {
       var existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
       
-      // Migrate missing fee components
-      const comps = getFeeComponentsList();
+      // Migrate missing fee components — only ACTIVE ones. A component the
+      // admin never activated (or deliberately deactivated) must never get a
+      // column forced back onto the sheet.
+      const comps = getFeeComponentsList().filter(c => c.isActive);
       comps.forEach(c => {
         const cId = String(c.id).trim();
         if (existingHeaders.indexOf(cId) === -1) {
@@ -251,7 +261,11 @@ const RESERVED_TERM_SHEET_COLUMNS = [
 // from Fee Components). Reports whether each has any real data so the
 // caller can warn before deleting.
 function findOrphanedFeeColumns() {
-  const activeIds = getFeeComponentsList().map(c => String(c.id).trim());
+  // Only components the admin has actually activated should keep their column.
+  // A component that was deleted OR merely deactivated (e.g. Books/PTA/Cleaning
+  // left at their default off state) is reported as orphaned so it can be
+  // cleaned up from every term sheet in one click.
+  const activeIds = getFeeComponentsList().filter(c => c.isActive).map(c => String(c.id).trim());
   const orphans = {}; // name -> hasData
   ["First Term", "Second Term", "Third Term"].forEach(term => {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_PREFIX + " - " + term);
@@ -296,7 +310,7 @@ function removeOrphanedFeeColumns(columnNames) {
 }
 
 function buildHeaders() {
-  const comps = getFeeComponentsList();
+  const comps = getFeeComponentsList().filter(c => c.isActive);
   return [
     "id","studentName","phoneNumber","grade","academicSession",
     ...comps.map(c => c.id),
@@ -1781,12 +1795,35 @@ function generateId(term) {
       if (data[i][0] === 'idPrefix' && data[i][1]) { prefix = String(data[i][1]).trim(); break; }
     }
   }
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_PREFIX + " - " + term);
-  const count = sheet ? Math.max(0, sheet.getLastRow() - 1) : 0;
-  const num   = (count + 1).toString().padStart(4, '0');
-  if (prefix) return prefix + num;
   const code = term.includes("Second") ? "ST" : term.includes("Third") ? "TT" : "FT";
-  return "SFMS-" + code + "-" + num;
+  const base = prefix || ("SFMS-" + code + "-");
+
+  // IMPORTANT: the next ID number must be based on the HIGHEST numeric suffix
+  // already in use — never on the current row count. Basing it on row count
+  // (the old approach) reuses a number the moment any student has ever been
+  // deleted, silently merging a brand-new student under an existing student's
+  // ID (shared payment history, wrong totals) — unacceptable in a financial
+  // system. Scanning every term sheet (not just this one) also protects
+  // against collisions when a custom idPrefix is shared across all terms.
+  let maxNum = 0;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  ["First Term", "Second Term", "Third Term"].forEach(t => {
+    const sheet = ss.getSheetByName(SHEET_PREFIX + " - " + t);
+    if (!sheet || sheet.getLastRow() < 2) return;
+    const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const idCol = headerRow.indexOf('id');
+    if (idCol === -1) return;
+    const ids = sheet.getRange(2, idCol + 1, sheet.getLastRow() - 1, 1).getValues();
+    ids.forEach(row => {
+      const idVal = String(row[0] || '').trim();
+      if (idVal.indexOf(base) !== 0) return;
+      const n = parseInt(idVal.substring(base.length), 10);
+      if (!isNaN(n) && n > maxNum) maxNum = n;
+    });
+  });
+
+  const num = (maxNum + 1).toString().padStart(4, '0');
+  return base + num;
 }
 
 function getNextIdPreview(term) {
@@ -3395,9 +3432,40 @@ function saveCustomFeeRecord(recordData) {
     }
     
     let totalPaid = 0;
-    const numInst = parseInt(recordData.numInstallments) || 1;
+    let numInst = parseInt(recordData.numInstallments) || 1;
     const amount = parseFloat(recordData.amount) || 0;
-    
+
+    // SAFETY NET: a client's numInstallments can be stale (its cached copy of
+    // the Extra Fee Type config hasn't picked up a later admin change on
+    // another device/tab, or the modal simply built its form from an older
+    // value) and lower than what this row was ORIGINALLY recorded with. The
+    // save handler below zeroes every installment slot past numInstallments
+    // — if we trusted the incoming value blindly, real money already
+    // recorded in inst4/inst5/etc. would be silently wiped the next time
+    // anyone re-opens and re-saves this record. So: if the row already has
+    // money in a slot beyond what the client just sent, keep that slot's
+    // existing amount/date/mode instead of letting it be cleared, and widen
+    // the effective installment count to match.
+    if (foundRow !== -1) {
+      const existingRow = data[foundRow - 1];
+      let maxExistingInst = 0;
+      for (let i = 1; i <= 6; i++) {
+        const instIdx = normHeaders.indexOf('inst' + i);
+        if (instIdx !== -1 && (parseFloat(existingRow[instIdx]) || 0) > 0) maxExistingInst = i;
+      }
+      if (maxExistingInst > numInst) {
+        for (let i = numInst + 1; i <= maxExistingInst; i++) {
+          const instIdx = normHeaders.indexOf('inst' + i);
+          const dateIdx = normHeaders.indexOf('inst' + i + 'date');
+          const modeIdx = normHeaders.indexOf('inst' + i + 'mode');
+          recordData['inst' + i]          = instIdx !== -1 ? (parseFloat(existingRow[instIdx]) || 0) : 0;
+          recordData['inst' + i + 'Date'] = dateIdx !== -1 ? existingRow[dateIdx] : '';
+          recordData['inst' + i + 'Mode'] = modeIdx !== -1 ? existingRow[modeIdx] : '';
+        }
+        numInst = maxExistingInst;
+      }
+    }
+
     for (let i = 1; i <= 6; i++) {
       if (i <= numInst) {
         totalPaid += parseFloat(recordData['inst' + i]) || 0;
@@ -4088,6 +4156,14 @@ function applyClassFeeRatesToExistingStudents(rates) {
   });
   if (!Object.keys(byClass).length) return 0;
 
+  // Components flagged "new students only" (e.g. Admission Fees) must never be
+  // auto-billed to a continuing/active student — only to rows where isNewStudent
+  // is actually true. Build a quick lookup once.
+  var newStudentOnlyIds = {};
+  getFeeComponentsList().forEach(function(c) {
+    if (c.isForNewStudentsOnly) newStudentOnlyIds[String(c.id).trim().toLowerCase()] = true;
+  });
+
   ["First Term", "Second Term", "Third Term"].forEach(function(term) {
     var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_PREFIX + " - " + term);
     if (!sheet || sheet.getLastRow() < 2) return;
@@ -4096,6 +4172,7 @@ function applyClassFeeRatesToExistingStudents(rates) {
     var lowerHeaders = headers.map(function(h) { return h.toLowerCase(); });
     var gradeIdx = lowerHeaders.indexOf('grade');
     var stoppedIdx = lowerHeaders.indexOf('isstopped');
+    var newStudentIdx = lowerHeaders.indexOf('isnewstudent');
     var totalFeesIdx = lowerHeaders.indexOf('totalfees');
     var totalPaidIdx = lowerHeaders.indexOf('totalpaid');
     var balanceIdx = lowerHeaders.indexOf('balance');
@@ -4106,9 +4183,13 @@ function applyClassFeeRatesToExistingStudents(rates) {
       var grade = data[i][gradeIdx];
       var classRates = byClass[grade];
       if (!classRates || !classRates.length) continue;
+      var isNew = newStudentIdx !== -1 && isBoolTrue(data[i][newStudentIdx]);
 
       var rowChanged = false;
       classRates.forEach(function(cr) {
+        // Never bill a "new students only" component (e.g. Admission Fees) to
+        // an existing/continuing student — only genuinely new admissions.
+        if (newStudentOnlyIds[String(cr.componentId).trim().toLowerCase()] && !isNew) return;
         var colIdx = lowerHeaders.indexOf(String(cr.componentId).toLowerCase());
         if (colIdx === -1) return;
         var current = parseFloat(data[i][colIdx]) || 0;
