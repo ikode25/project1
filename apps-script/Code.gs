@@ -5351,7 +5351,7 @@ function sendDailyAccountingReport() {
     return { success: true, emailSent: emailSent, smsSent: smsSent, smsError: smsError };
   } catch(e) {
     Logger.log("Error sending daily accounting report: " + e.toString());
-    return { success: false, message: e.message };
+    return { success: false, message: describeGoogleAuthError(e.message, 'https://www.googleapis.com/auth/script.send_mail (or gmail.send)', 'sendDailyReportNow') };
   }
 }
 
@@ -5454,22 +5454,31 @@ function createStudentPhotosFolder() {
     return { success: true, folderId: folderId };
   } catch(e) {
     Logger.log("createStudentPhotosFolder error: " + e.message);
-    return { success: false, message: describeDriveAuthError(e.message) };
+    return { success: false, message: describeGoogleAuthError(e.message, 'https://www.googleapis.com/auth/drive', 'createStudentPhotosFolder') };
   }
 }
 
-// Turns the two Drive-related failures admins actually hit into a message
-// that tells them exactly what to fix, instead of Apps Script's raw (and
-// fairly cryptic) exception text.
-function describeDriveAuthError(rawMessage) {
+// Turns the Google-authorization failures admins actually hit (missing
+// manifest scope, or a deployment that's simply never been authorized yet)
+// into a message that tells them exactly what to fix, instead of Apps
+// Script's raw (and fairly cryptic) exception text. `scopeUrl` is the OAuth
+// scope the failing call needs (e.g. drive, or gmail.send/script.send_mail
+// for MailApp); `exampleFn` is a function name from this project the admin
+// can run once from the editor toolbar to trigger the consent screen.
+function describeGoogleAuthError(rawMessage, scopeUrl, exampleFn) {
   var msg = String(rawMessage || '');
   if (/not sufficient|insufficient permission/i.test(msg)) {
-    return 'Google Drive access is blocked by this project\'s permission scopes. Fix: in the Apps Script editor, open Project Settings, tick "Show appsscript.json manifest file in editor", open appsscript.json, and either add "https://www.googleapis.com/auth/drive" to the oauthScopes array or delete the oauthScopes array entirely (Apps Script will then auto-detect the scopes the code actually needs). Save, then re-run this from Settings once more so Google shows the new consent screen. (' + msg + ')';
+    return 'This is blocked by this project\'s permission scopes' + (scopeUrl ? ' (needs ' + scopeUrl + ')' : '') + '. Fix: in the Apps Script editor, open Project Settings, tick "Show appsscript.json manifest file in editor", open appsscript.json, and either add "' + (scopeUrl || 'the missing scope') + '" to the oauthScopes array or delete the oauthScopes array entirely (Apps Script will then auto-detect every scope the code actually needs — this is the simplest fix if you are not sure what else the array should contain). Save, then re-run this action once more so Google shows the new consent screen. (' + msg + ')';
   }
   if (/authorization is required|authorization required/i.test(msg)) {
-    return 'This deployment needs a one-time Google authorization for Drive access. Fix: in the Apps Script editor, open this project, run any function once from the editor toolbar (e.g. createStudentPhotosFolder) and approve the Google consent screen when it appears — then re-deploy (Deploy → Manage deployments → Edit → New version) so the live web app picks up the granted permission. (' + msg + ')';
+    return 'This deployment needs a one-time Google authorization. Fix: in the Apps Script editor, open this project, run ' + (exampleFn ? 'the "' + exampleFn + '" function' : 'any function') + ' once from the editor toolbar (select it from the function dropdown and click Run) and approve the Google consent screen when it appears — then re-deploy (Deploy → Manage deployments → Edit → New version) so the live web app picks up the granted permission. (' + msg + ')';
   }
   return msg;
+}
+
+// Kept for backward compatibility with any older call sites.
+function describeDriveAuthError(rawMessage) {
+  return describeGoogleAuthError(rawMessage, 'https://www.googleapis.com/auth/drive', 'createStudentPhotosFolder');
 }
 
 // Deletes the daily accounting time-based report trigger if disabled by admin
@@ -6827,7 +6836,7 @@ function sendPayslipEmail(paymentId) {
     logActivity('Emailed Payslip', payment.staffName + ' - ' + payment.monthLabel);
     return { success: true };
   } catch (e) {
-    return { success: false, message: e.message };
+    return { success: false, message: describeGoogleAuthError(e.message, 'https://www.googleapis.com/auth/script.send_mail (or gmail.send)', 'sendPayslipEmail') };
   }
 }
 
