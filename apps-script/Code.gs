@@ -2810,10 +2810,14 @@ function promoteStudentToNextTerm(studentId) {
     promotedRecord.isNewStudent = false;
     promotedRecord.isStopped = false;
     
-    // Carry forward current outstanding balance to arrears
+    // Carry forward current outstanding balance to arrears. A NEGATIVE
+    // balance (the student overpaid) is carried forward too, as a negative
+    // arrears amount — this is what actually applies an "overpayment credit"
+    // to the student's next term: it reduces that term's total fees by the
+    // credited amount instead of the credit being silently discarded.
     const currentBalance = parseFloat(studentRecord.balance) || 0;
-    promotedRecord.arrears = Math.max(0, currentBalance);
-    
+    promotedRecord.arrears = currentBalance;
+
     // Clear other payment fields
     for (let i = 1; i <= 10; i++) {
       promotedRecord['inst' + i] = 0;
@@ -2956,8 +2960,10 @@ function promoteAllStudentsToNextTerm(termName, academicYear) {
         }
       });
       
+      // Negative balance (overpayment credit) carries forward as negative
+      // arrears — see the matching comment in promoteStudentToNextTerm.
       const currentBalance = parseFloat(studentRecord.balance) || 0;
-      promotedRecord.arrears = Math.max(0, currentBalance);
+      promotedRecord.arrears = currentBalance;
       
       const saveRes = saveRecord(promotedRecord);
       if (saveRes.success) {
@@ -3760,6 +3766,26 @@ function applyRefundToInstallments(sheet, headers, rowIdx, amount, feesColName) 
   const record = {};
   headers.forEach((h, idx) => { record[h] = row[idx]; });
   return { success: true, record: record, studentName: nameIdx !== -1 ? row[nameIdx] : '' };
+}
+
+// Logs an admin's choice to credit an overpayment toward a student's next
+// academic term instead of refunding it. The credit itself is not applied
+// here — it already exists as the negative balance on the current record,
+// and is carried forward automatically as negative arrears the next time
+// this student is promoted (see promoteStudentToNextTerm /
+// promoteAllStudentsToNextTerm). This just records the admin's decision
+// for an audit trail.
+function logOverpaymentCredit(data) {
+  try {
+    logActivity(
+      'Overpayment Credited to Next Term',
+      (data && data.studentName || '') + ' (' + (data && data.studentId || '') + ', ' + (data && data.academicSession || '') + ') — ' +
+        (parseFloat(data && data.amount) || 0).toFixed(2)
+    );
+    return { success: true };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
 }
 
 const REFUNDS_SHEET = 'Refunds';

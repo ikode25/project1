@@ -4241,7 +4241,11 @@
                 totalFees = Math.max(0, totalFees - (parseFloat(rec.discount) || 0));
             }
             if (parseFloat(rec.totalPaid) >= 0) totalPaid = parseFloat(rec.totalPaid);
-            var arrears = Math.max(0, totalFees - totalPaid);
+            // Negative (this student overpaid, i.e. is in credit) is kept, not
+            // floored to 0 — an overpayment credit is applied to next term's
+            // bill below as a reduction, matching how the admin side actually
+            // carries it forward (as negative arrears) when promoting.
+            var arrears = totalFees - totalPaid;
 
             var session = String(rec.academicSession || '');
             var yearPart = session.split(' ')[0] || '2025/2026';
@@ -4267,6 +4271,10 @@
 
             if (arrears > 0) {
                 billItems.push({ name: 'School Fees Arrears (from ' + session + ')', amount: arrears, isArrears: true });
+                totalNextFees += arrears;
+                combinedArrears += arrears;
+            } else if (arrears < 0) {
+                billItems.push({ name: 'Overpayment Credit (from ' + session + ')', amount: arrears, isCredit: true });
                 totalNextFees += arrears;
                 combinedArrears += arrears;
             }
@@ -4341,17 +4349,21 @@
             container.innerHTML = currentWards.map(function(ward, idx) {
                 var res = computeNextTermBillForWard(ward);
                 var head = '<div class="pntb-ward-head"><h6><i class="bi bi-person-circle me-1 text-muted"></i>' + ward.record.studentName + '</h6>' +
-                    (res.totalNextFees > 0 ? '<button class="back-btn" onclick="downloadNextBillPdf(' + idx + ')" style="margin:0;padding:5px 12px;font-size:12px;background:var(--primary);color:#fff;border-color:var(--primary);"><i class="bi bi-file-earmark-pdf"></i> Download PDF</button>' : '') +
+                    (res.billItems.length ? '<button class="back-btn" onclick="downloadNextBillPdf(' + idx + ')" style="margin:0;padding:5px 12px;font-size:12px;background:var(--primary);color:#fff;border-color:var(--primary);"><i class="bi bi-file-earmark-pdf"></i> Download PDF</button>' : '') +
                     '</div>';
                 var body;
                 if (!res.billItems.length) {
                     body = '<div class="pntb-ward-settled"><i class="bi bi-check-circle-fill text-success me-1"></i>No estimated next-term charges yet.</div>';
                 } else {
+                    var totalRowLabel = res.totalNextFees < 0 ? 'Credit Balance (reduces future fees)' : 'Total Amount Due';
+                    var totalRowColor = res.totalNextFees < 0 ? '#059669' : '';
                     body = '<table class="fee-table" style="margin:0;"><thead><tr><th>Description</th><th style="text-align:right">Amount</th></tr></thead><tbody>' +
                         res.billItems.map(function(item) {
-                            return '<tr><td>' + item.name + (item.isArrears ? ' <span style="color:#ef4444;font-size:11px;">(Arrears)</span>' : '') + '</td><td style="text-align:right">' + cur + ' ' + fmt(item.amount) + '</td></tr>';
+                            var tag = item.isArrears ? ' <span style="color:#ef4444;font-size:11px;">(Arrears)</span>' : (item.isCredit ? ' <span style="color:#059669;font-size:11px;">(Credit)</span>' : '');
+                            var amtDisp = item.amount < 0 ? ('-' + cur + ' ' + fmt(Math.abs(item.amount))) : (cur + ' ' + fmt(item.amount));
+                            return '<tr><td>' + item.name + tag + '</td><td style="text-align:right' + (item.isCredit ? ';color:#059669' : '') + '">' + amtDisp + '</td></tr>';
                         }).join('') +
-                        '<tr style="font-weight:bold;background:#eef2ff;"><td style="font-weight:bold;">Total Amount Due</td><td style="text-align:right;font-weight:bold;">' + cur + ' ' + fmt(res.totalNextFees) + '</td></tr>' +
+                        '<tr style="font-weight:bold;background:#eef2ff;"><td style="font-weight:bold;' + (totalRowColor ? 'color:' + totalRowColor + ';' : '') + '">' + totalRowLabel + '</td><td style="text-align:right;font-weight:bold;' + (totalRowColor ? 'color:' + totalRowColor + ';' : '') + '">' + cur + ' ' + fmt(Math.abs(res.totalNextFees)) + '</td></tr>' +
                         '</tbody></table>';
                 }
                 return '<div class="pntb-ward-card">' + head + body + '</div>';
@@ -4403,6 +4415,8 @@
 
             if (combinedArrears > 0) {
                 w.document.write('<div class="note">⚠️ <strong>Note:</strong> This bill includes outstanding arrears of <strong>' + cur + ' ' + fmt(combinedArrears) + '</strong> carried forward from ' + session + '.</div>');
+            } else if (combinedArrears < 0) {
+                w.document.write('<div class="note">✅ <strong>Note:</strong> A credit of <strong>' + cur + ' ' + fmt(Math.abs(combinedArrears)) + '</strong> from ' + session + ' has been applied to reduce this bill.</div>');
             }
 
             w.document.write('<div class="student-info">');
@@ -4416,10 +4430,14 @@
 
             w.document.write('<table><thead><tr><th>#</th><th>Description</th><th style="text-align:right">Amount (' + cur + ')</th></tr></thead><tbody>');
             billItems.forEach(function (item, i) {
-                var rowClass = item.isArrears ? 'arrears-row' : '';
-                w.document.write('<tr class="' + rowClass + '"><td>' + (i + 1) + '</td><td>' + item.name + (item.isArrears ? ' <span style="color:#ef4444">(Arrears)</span>' : '') + '</td><td style="text-align:right">' + fmt(item.amount) + '</td></tr>');
+                var rowClass = item.isArrears ? 'arrears-row' : (item.isCredit ? '' : '');
+                var tag = item.isArrears ? ' <span style="color:#ef4444">(Arrears)</span>' : (item.isCredit ? ' <span style="color:#059669">(Credit)</span>' : '');
+                var amtDisp = item.amount < 0 ? ('-' + fmt(Math.abs(item.amount))) : fmt(item.amount);
+                var styleAttr = item.isCredit ? ' style="color:#059669;font-weight:bold"' : '';
+                w.document.write('<tr class="' + rowClass + '"><td>' + (i + 1) + '</td><td>' + item.name + tag + '</td><td style="text-align:right"' + styleAttr + '>' + amtDisp + '</td></tr>');
             });
-            w.document.write('<tr class="total-row"><td colspan="2">TOTAL AMOUNT DUE</td><td style="text-align:right">' + cur + ' ' + fmt(totalNextFees) + '</td></tr>');
+            var totalLabel = totalNextFees < 0 ? 'CREDIT BALANCE (reduces future fees)' : 'TOTAL AMOUNT DUE';
+            w.document.write('<tr class="total-row"><td colspan="2">' + totalLabel + '</td><td style="text-align:right">' + cur + ' ' + fmt(Math.abs(totalNextFees)) + '</td></tr>');
             w.document.write('</tbody></table>');
 
             var bFooterText = (schoolData && schoolData.billFooter) || 'This bill is computer generated · Please retain for your records';

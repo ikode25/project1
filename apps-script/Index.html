@@ -20910,6 +20910,21 @@
                 lsSet('customFeeRecords', allCustomFeeRecords);
                 showToast(cur + ' ' + applyAmt.toFixed(2) + ' applied to ' + target.feeTypeName + ' for ' + rec.studentName + '. Regular Fees will show a credit balance reflecting the reassigned amount.', 'success', 'Excess Applied', 6000);
                 try { updateDash(); } catch (e) {}
+            } else if (action === 'credit') {
+                // No money moves and no balance is touched here — the record
+                // already shows a negative balance (a credit) the moment it's
+                // overpaid. What this option guarantees is that the credit
+                // actually gets USED: when this student is next promoted to a
+                // new term (promoteStudentToNextTerm / promoteAllStudentsToNextTerm),
+                // their negative balance now carries forward as a negative
+                // arrears amount, which reduces that new term's total fees by
+                // exactly this much instead of being discarded. We just log it
+                // for a clear audit trail of the admin's choice.
+                var note = { studentId: rec.id, studentName: rec.studentName, academicSession: rec.academicSession, amount: excess };
+                if (typeof google !== 'undefined' && google.script) {
+                    google.script.run.withFailureHandler(function () {}).logOverpaymentCredit(note);
+                }
+                showToast(cur + ' ' + excess.toFixed(2) + ' will be credited to ' + rec.studentName + '\'s fees next academic term — it is applied automatically the next time this student is promoted to a new term.', 'success', 'Credit Recorded', 7000);
             }
             // 'ignore' — leave the credit balance as-is, no action needed
 
@@ -23206,6 +23221,7 @@
                 <select class="form-select form-select-sm" id="overpaymentAction" onchange="onOverpaymentActionChange()">
                     <option value="refund">Refund the excess to the parent</option>
                     <option value="apply">Apply the excess to another fee this student owes</option>
+                    <option value="credit">Credit the excess to next academic term's fees</option>
                     <option value="ignore">Leave as a credit balance (do nothing now)</option>
                 </select>
             </div>
