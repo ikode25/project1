@@ -21323,12 +21323,20 @@
             var isSpecificExtra = appliesTo.indexOf('extra:') === 0;
             var specificExtraName = isSpecificExtra ? appliesTo.slice(6) : null;
             var appliesToExtra = appliesTo === 'all' || isSpecificExtra;
+            // A scholarship only fully WAIVES (skips future billing entirely for)
+            // a category when the percentage actually applied works out to 100% —
+            // e.g. a "50% scheme" at "full" coverage is still only a 50% discount,
+            // not a waiver. Fixed-amount schemes can't reliably promise 100% of a
+            // future, not-yet-known fee amount, so they never count as a full waiver.
+            var appliedPct = scheme.discountType === 'percentage' ? (parseFloat(scheme.discountValue) || 0) * coverageFactor : 0;
+            var fullyWaives = appliedPct >= 100;
 
             var studentRecords = allRecords.filter(function(r) { return String(r.id) === String(studentId); });
             studentRecords.forEach(function(r) {
                 r.scholarshipScheme = scheme.name;
                 r.scholarshipCoverage = coverage;
                 r.scholarshipAppliesTo = appliesTo;
+                r.scholarshipFullyWaives = fullyWaives;
                 if (appliesTo === 'regular' || appliesTo === 'all') {
                     var t = safeTotals(r);
                     var baseFees = t.totalFees + (parseFloat(r.discount) || 0); // undo any existing discount to get the true base
@@ -21391,6 +21399,7 @@
                     delete r.scholarshipScheme;
                     delete r.scholarshipCoverage;
                     delete r.scholarshipAppliesTo;
+                    delete r.scholarshipFullyWaives;
                     if (typeof google !== 'undefined' && google.script) { google.script.run.saveRecord(r); }
                 }
             });

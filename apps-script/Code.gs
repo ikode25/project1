@@ -204,7 +204,25 @@ function getOrCreateTermSheet(term) {
         sheet.insertColumnAfter(lastCol);
         sheet.getRange(1, lastCol + 1).setValue('discount')
           .setBackground('#4285F4').setFontColor('white').setFontWeight('bold');
+        existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
       }
+
+      // Migrate scholarship columns if missing — without these, Scholarship
+      // Management's assignment (scheme name, full/half coverage, what it
+      // applies to) never actually persists past the moment it's assigned:
+      // saveRecord() only writes fields that match an existing column, so a
+      // page refresh or a different device would silently lose which scheme
+      // a student is on and whether it was meant to cover extra fees too
+      // (only the resulting discount amount would survive).
+      ['scholarshipScheme', 'scholarshipCoverage', 'scholarshipAppliesTo', 'scholarshipFullyWaives'].forEach(col => {
+        if (existingHeaders.indexOf(col) === -1) {
+          var lastCol2 = sheet.getLastColumn();
+          sheet.insertColumnAfter(lastCol2);
+          sheet.getRange(1, lastCol2 + 1).setValue(col)
+            .setBackground('#4285F4').setFontColor('white').setFontWeight('bold');
+          existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+        }
+      });
     } catch(migErr) {
       Logger.log('Header migration info: ' + migErr.message);
     }
@@ -272,7 +290,8 @@ const RESERVED_TERM_SHEET_COLUMNS = [
   "inst4","inst4Date","inst5","inst5Date","inst6","inst6Date",
   "inst7","inst7Date","inst8","inst8Date","inst9","inst9Date","inst10","inst10Date",
   "totalPaid","balance","paymentStatus","createdAt","updatedAt",
-  "paymentMode","recordedBy","isStaffChild","studentPhoto"
+  "paymentMode","recordedBy","isStaffChild","studentPhoto",
+  "scholarshipScheme","scholarshipCoverage","scholarshipAppliesTo","scholarshipFullyWaives"
 ];
 
 // Finds columns present in the term sheets that are no longer part of the
@@ -338,7 +357,7 @@ function buildHeaders() {
     "inst4","inst4Date","inst5","inst5Date","inst6","inst6Date",
     "inst7","inst7Date","inst8","inst8Date","inst9","inst9Date","inst10","inst10Date",
     "totalPaid","balance","paymentStatus","createdAt","updatedAt",
-    "paymentMode","recordedBy"
+    "paymentMode","recordedBy","scholarshipScheme","scholarshipCoverage","scholarshipAppliesTo","scholarshipFullyWaives"
   ];
 }
 
@@ -2043,6 +2062,19 @@ function getActiveExtraFeeTypes() {
   } catch (e) { return []; }
 }
 
+// True when a student's scholarship fully waives (100% of a scheme applied
+// at that percentage) the given extra fee — either because it covers "all"
+// fees or that specific extra fee type by name. Only a full (100%) waiver
+// skips new billing outright; a partial scholarship still gets billed
+// normally (its reduced amount is applied at "Assign Beneficiary" time).
+function isExtraFeeFullyWaivedForStudent(rec, feeTypeName) {
+  if (!rec) return false;
+  if (!isBoolTrue(rec.scholarshipFullyWaives)) return false;
+  var appliesTo = String(rec.scholarshipAppliesTo || '').trim();
+  if (appliesTo === 'all') return true;
+  return appliesTo === ('extra:' + feeTypeName);
+}
+
 // Auto-assigns every currently active extra fee type to a single
 // newly-created student record (called right after saveRecord adds
 // a new row).
@@ -2052,6 +2084,7 @@ function autoAssignExtraFeesForStudent(recordData) {
   var term = getTermFromSession(recordData.academicSession);
   feeTypes.forEach(function(ft) {
     if (!extraFeeAppliesToTerm(ft, term)) return;
+    if (isExtraFeeFullyWaivedForStudent(recordData, ft.name)) return;
     var amount = getExtraFeeClassRate(ft, recordData.grade);
     if (amount <= 0) return;
     createCustomFeeRecordIfMissing(recordData.id, recordData.studentName, recordData.grade, recordData.academicSession, ft.name, amount, ft);
@@ -2075,8 +2108,14 @@ function autoAssignExtraFeeToAllStudents(feeType) {
     var gradeIdx = headers.indexOf('grade');
     var sessionIdx = headers.indexOf('academicsession');
     var stoppedIdx = headers.indexOf('isstopped');
+    var scholFullyIdx = headers.indexOf('scholarshipfullywaives');
+    var scholAppliesIdx = headers.indexOf('scholarshipappliesto');
     for (var i = 1; i < data.length; i++) {
       if (stoppedIdx !== -1 && isBoolTrue(data[i][stoppedIdx])) continue;
+      if (scholFullyIdx !== -1 && isBoolTrue(data[i][scholFullyIdx])) {
+        var appliesTo = scholAppliesIdx !== -1 ? String(data[i][scholAppliesIdx] || '').trim() : '';
+        if (appliesTo === 'all' || appliesTo === ('extra:' + feeType.name)) continue;
+      }
       var grade = data[i][gradeIdx];
       var amount = getExtraFeeClassRate(feeType, grade);
       if (amount <= 0) continue;
@@ -4246,9 +4285,18 @@ function applyClassFeeRatesToExistingStudents(rates) {
     var totalPaidIdx = lowerHeaders.indexOf('totalpaid');
     var balanceIdx = lowerHeaders.indexOf('balance');
     var discountIdx = lowerHeaders.indexOf('discount');
+    var scholFullyIdx = lowerHeaders.indexOf('scholarshipfullywaives');
+    var scholAppliesIdx = lowerHeaders.indexOf('scholarshipappliesto');
 
     for (var i = 1; i < data.length; i++) {
       if (stoppedIdx !== -1 && isBoolTrue(data[i][stoppedIdx])) continue;
+      // A student on a full ("regular" or "all") scholarship waiver should
+      // never get a new standard-rate charge auto-billed onto their regular
+      // fees either.
+      if (scholFullyIdx !== -1 && isBoolTrue(data[i][scholFullyIdx])) {
+        var scholAppliesTo = scholAppliesIdx !== -1 ? String(data[i][scholAppliesIdx] || '').trim() : '';
+        if (scholAppliesTo === 'regular' || scholAppliesTo === 'all') continue;
+      }
       var grade = data[i][gradeIdx];
       var classRates = byClass[grade];
       if (!classRates || !classRates.length) continue;
