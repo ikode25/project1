@@ -7613,6 +7613,7 @@
             else if (action === 'thermal') printThermalReceipt(id, session);
             else if (action === 'whatsapp') sendWhatsApp(id, session);
             else if (action === 'whatsappcustom') sendWhatsApp(id, session, btn.dataset.feename);
+            else if (action === 'whatsappnextbill') sendNextTermBillWhatsApp(id, session);
             else if (action === 'sms') sendSmsToParent(id, session);
             else if (action === 'smscustom') sendSmsToParent(id, session, btn.dataset.feename);
             else if (action === 'delete') delRec(id, session);
@@ -7837,6 +7838,13 @@
                 classesList = JSON.parse(localStorage.getItem('classesList') || 'null') || getDefaultClasses();
                 cachedClassRates = lsGet('classRates') || [];
             } catch(e) { console.error("Error loading cached config:", e); }
+
+            // Re-fetch Settings now too — the one fetch that ran at page load may
+            // have happened before this browser/device had ever seen this app
+            // (nothing to instantly paint from cache) or may simply have failed;
+            // this guarantees every login gets a fresh, correct copy of the
+            // school's actual saved name/logo/branding, not stale defaults.
+            try { fetchAndApplySettings(2); } catch (e) { console.error('Settings refresh on login failed:', e); }
 
             try {
                 document.getElementById('loginPage').style.display = 'none';
@@ -10630,14 +10638,20 @@
                 }
             }
             
+            // NOTE: emoji are written as \u{...} escapes, not literal characters —
+            // literal multi-byte emoji in this source file have shown up as
+            // mangled "�" replacement characters in the actual WhatsApp message
+            // once copy-pasted through the Apps Script editor. Escapes are plain
+            // ASCII in the source, so they can't be corrupted in transit; the JS
+            // engine reconstructs the real emoji at runtime.
             var msg = 'Dear Parent,\n\n'
                 + 'Fee reminder from *' + sch + '* for ' + rec.studentName + '.\n\n'
-                + '📋 *Fee Type:* ' + feeLabel + '\n'
-                + '📋 *Session:* ' + rec.academicSession + '\n'
-                + '🎓 *Grade:* ' + rec.grade + '\n'
-                + '💰 *Total Fees:* ' + cur + ' ' + fmt(t.totalFees) + '\n'
-                + '✅ *Paid:* ' + cur + ' ' + fmt(t.totalPaid) + '\n'
-                + '⚠️ *Balance:* ' + cur + ' ' + fmt(t.balance) + '\n\n'
+                + '\u{1F4CB} *Fee Type:* ' + feeLabel + '\n'
+                + '\u{1F4CB} *Session:* ' + rec.academicSession + '\n'
+                + '\u{1F393} *Grade:* ' + rec.grade + '\n'
+                + '\u{1F4B0} *Total Fees:* ' + cur + ' ' + fmt(t.totalFees) + '\n'
+                + '\u{2705} *Paid:* ' + cur + ' ' + fmt(t.totalPaid) + '\n'
+                + '\u{26A0}\u{FE0F} *Balance:* ' + cur + ' ' + fmt(t.balance) + '\n\n'
                 + (t.balance > 0 ? 'Kindly settle the outstanding balance.' : 'Account is fully settled. Thank you!');
             var phone = String(rec.phoneNumber || '').replace(/\D/g, '');
             window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
@@ -10688,7 +10702,7 @@
                 if (t.totalPaid >= t.totalFees && t.totalFees > 0) { st = 'Paid'; cl = 'status-paid'; }
                 else if (t.totalPaid > 0) { st = 'Partial'; cl = 'status-partial'; }
                 var phone = String(r.phoneNumber || '').replace(/\D/g, '');
-                var waBtn = phone ? '<button class="act-btn btn btn-sm btn-whatsapp" data-action="whatsapp" data-id="' + r.id + '"><i class="bi bi-whatsapp"></i></button>' : '';
+                var waBtn = phone ? '<button class="act-btn btn btn-sm btn-whatsapp" data-action="whatsappnextbill" data-id="' + r.id + '" data-session="' + r.academicSession + '" title="Send Next Term Bill via WhatsApp"><i class="bi bi-whatsapp"></i></button>' : '';
                 return '<tr>'
                     + '<td><input type="checkbox" class="bill-cb" data-id="' + r.id + '"></td>'
                     + '<td>' + r.id + '</td><td>' + r.studentName + '</td><td>' + r.grade + '</td>'
@@ -12594,7 +12608,10 @@
             };
             showLoad('Saving…');
             if (typeof google !== 'undefined' && google.script) {
-                google.script.run.withSuccessHandler(function (r) { hideLoad(); if (r.success) { Object.assign(settings, s); lsSet('settings', settings); applySettings(settings); applyInstallmentFieldCount(); showToast('Settings saved!', 'success'); } else showToast(r.message, 'error'); }).saveSettings(s);
+                google.script.run
+                    .withSuccessHandler(function (r) { hideLoad(); if (r.success) { Object.assign(settings, s); lsSet('settings', settings); applySettings(settings); applyInstallmentFieldCount(); showToast('Settings saved!', 'success'); } else showToast(r.message, 'error'); })
+                    .withFailureHandler(function (err) { hideLoad(); showToast('Save failed: ' + err.message + ' — please try again.', 'error'); })
+                    .saveSettings(s);
             } else { hideLoad(); Object.assign(settings, s); lsSet('settings', settings); applySettings(settings); applyInstallmentFieldCount(); showToast('Settings saved!', 'success'); }
         }
 
@@ -13240,6 +13257,102 @@
             w.document.close();
         }
 
+
+        // Sends a NEXT TERM bill reminder over WhatsApp (arrears + next term's
+        // fees) rather than a current-term reminder — used by the Generate
+        // Bills module, whose whole purpose is preparing next-term bills before
+        // students leave for vacation. Mirrors generateNextTermBill()'s
+        // computation (arrears + custom/uniform/book arrears + standard
+        // components + folded-in extra fees) but drafts a WhatsApp message
+        // instead of opening a print window.
+        function sendNextTermBillWhatsApp(id, session) {
+            var rec = allRecords.find(function (r) { return String(r.id) === String(id) && (!session || String(r.academicSession) === String(session)); });
+            if (!rec) { showToast('Record not found', 'error'); return; }
+            var phone = String(rec.phoneNumber || '').replace(/\D/g, '');
+            if (!phone) { showToast('No phone number on file for ' + rec.studentName, 'warning'); return; }
+            if (!session) session = rec.academicSession;
+
+            var cur = settings.currency || 'GHC';
+            var t = safeTotals(rec);
+            var arrears = Math.max(0, t.balance);
+
+            var billItems = [];
+            var totalNextFees = 0;
+            if (arrears > 0) { billItems.push({ name: 'School Fees Arrears (from ' + session + ')', amount: arrears }); totalNextFees += arrears; }
+
+            var rolled = settings.rolloverCustomFees ? (typeof settings.rolloverCustomFees === 'string' ? settings.rolloverCustomFees.split(',').filter(Boolean) : settings.rolloverCustomFees) : [];
+            var rollAllExtraFeesByDefault = rolled.length === 0;
+            allCustomFeeRecords.forEach(function (cf) {
+                if (!cf) return;
+                var cfStudentId = cf.studentId || cf.studentid || cf.studentID || '';
+                if (String(cfStudentId).toLowerCase() !== String(id).toLowerCase()) return;
+                var name = cf.feeTypeName || cf.feetypename || cf.feetype || '';
+                var isRolled = rollAllExtraFeesByDefault || rolled.some(function (r) { return r.toLowerCase().trim() === name.toLowerCase().trim(); });
+                if (!isRolled) return;
+                var bal = parseFloat(cf.balance || cf.Balance || cf.outstandingBalance || 0);
+                if (bal > 0) { billItems.push({ name: name + ' Arrears (from ' + session + ')', amount: bal }); totalNextFees += bal; }
+            });
+
+            (cachedUniformSales || []).forEach(function (u) {
+                if (u && String(u.studentId).toLowerCase() === String(id).toLowerCase()) {
+                    var bal = parseFloat(u.balance) || 0;
+                    if (bal > 0) { billItems.push({ name: 'Uniform Purchase Arrears (' + (u.uniformTypes || 'Uniform') + ')', amount: bal }); totalNextFees += bal; }
+                }
+            });
+            (cachedBookSales || []).forEach(function (b) {
+                if (b && String(b.studentId).toLowerCase() === String(id).toLowerCase()) {
+                    var bal = parseFloat(b.balance) || 0;
+                    if (bal > 0) { billItems.push({ name: 'Book Purchase Arrears (' + (b.books || 'Books') + ')', amount: bal }); totalNextFees += bal; }
+                }
+            });
+
+            var session2 = String(rec.academicSession || '');
+            var yearPart = session2.split(' ')[0] || (settings.academicYear || '2025/2026');
+            var nextTerm = '', nextYear = yearPart;
+            if (session2.includes('First Term')) { nextTerm = 'Second Term'; }
+            else if (session2.includes('Second Term')) { nextTerm = 'Third Term'; }
+            else {
+                var parts = yearPart.split('/');
+                if (parts.length === 2) { nextYear = (parseInt(parts[0]) + 1) + '/' + (parseInt(parts[1]) + 1); }
+                nextTerm = 'First Term';
+            }
+            var nextSession = nextYear + ' ' + nextTerm;
+
+            var active = comps().filter(function (c) { return c.isActive; });
+            active.forEach(function (c) {
+                if (c.id === 'arrears' || c.isForNewStudentsOnly) return;
+                if (c.name.toLowerCase().includes('admission') || c.id.toLowerCase().includes('admission')) return;
+                var amt = parseFloat(rec[c.id]) || 0;
+                if (amt > 0) { billItems.push({ name: c.name, amount: amt }); totalNextFees += amt; }
+            });
+
+            var nextTermIncluded = settings.nextTermIncludedExtraFees ? (typeof settings.nextTermIncludedExtraFees === 'string' ? settings.nextTermIncludedExtraFees.split(',').filter(Boolean) : settings.nextTermIncludedExtraFees) : [];
+            if (nextTermIncluded.length) {
+                var cfConfigsForFold = settings.customFeeTypes ? (typeof settings.customFeeTypes === 'string' ? JSON.parse(settings.customFeeTypes) : settings.customFeeTypes) : [];
+                nextTermIncluded.forEach(function (feeName) {
+                    var config = cfConfigsForFold.find(function (cf) { return cf.name === feeName; });
+                    if (!config) return;
+                    var amt = getCustomFeeAmount(config, rec.grade);
+                    if (amt > 0) { billItems.push({ name: feeName + ' (' + nextTerm + ')', amount: amt }); totalNextFees += amt; }
+                });
+            }
+
+            if (!billItems.length) {
+                showToast('No next-term fee amounts found for ' + rec.studentName + '.', 'warning', 'No Fee Data', 5000);
+                return;
+            }
+
+            var sch = settings.schoolName || 'School';
+            var lines = billItems.map(function (it) { return '• ' + it.name + ': ' + cur + ' ' + fmt(it.amount); }).join('\n');
+            var msg = 'Dear Parent,\n\n'
+                + '\u{1F4CB} *Next Term Bill* from *' + sch + '* for ' + rec.studentName + '.\n\n'
+                + '\u{1F393} *Grade:* ' + rec.grade + '\n'
+                + '\u{1F4C5} *Upcoming Term:* ' + nextSession + '\n\n'
+                + lines + '\n\n'
+                + '\u{1F4B0} *Total Amount Due:* ' + cur + ' ' + fmt(totalNextFees) + '\n\n'
+                + 'Kindly prepare this amount ahead of resumption. Thank you!';
+            window.open('https://wa.me/' + phone + '?text=' + encodeURIComponent(msg), '_blank');
+        }
 
         // ════════════════════════════════════════════════════════
         // GENERATE NEXT TERM BILL
@@ -16946,13 +17059,32 @@
         }
 
 
-        (function loadSettingsOnStart() {
-            if (typeof google !== 'undefined' && google.script) {
-                google.script.run.withSuccessHandler(function (r) { if (r.success) applySettings(r.settings); }).getSettings();
-            } else {
+        // Fetches Settings (school name/logo/theme/etc.) from the server and applies
+        // it. This is the ONLY thing that fetches real, shared settings — a device
+        // that has never logged in before has no localStorage cache to fall back on,
+        // so if this single call is ever lost (cold start, brief network hiccup) that
+        // device is stuck showing default placeholder branding for the whole
+        // session with nothing to correct it. Retries a couple of times before
+        // giving up, and is called again once more after login (see showApp()) so a
+        // fresh session always gets one more chance at the real values.
+        function fetchAndApplySettings(retriesLeft) {
+            if (typeof google === 'undefined' || !google.script) {
                 applySettings(lsGet('settings') || {});
+                return;
             }
-        })();
+            google.script.run
+                .withSuccessHandler(function (r) {
+                    if (r && r.success) { applySettings(r.settings); lsSet('settings', Object.assign({}, lsGet('settings') || {}, r.settings)); }
+                })
+                .withFailureHandler(function (err) {
+                    console.error('fetchAndApplySettings failed:', err);
+                    if ((retriesLeft || 0) > 0) {
+                        setTimeout(function () { fetchAndApplySettings(retriesLeft - 1); }, 1500);
+                    }
+                })
+                .getSettings();
+        }
+        fetchAndApplySettings(2);
 
         // ════════════════════════════════════════════════════════
         // INCOME & EXPENSES MODULE
