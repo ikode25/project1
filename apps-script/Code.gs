@@ -2001,10 +2001,21 @@ function getActiveExtraFeeTypes() {
   var settingsSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SETTINGS_SHEET);
   if (!settingsSheet) return [];
   var data = settingsSheet.getDataRange().getValues();
-  var raw = null;
+  var rawExtra = null, rawCustom = null;
   for (var i = 1; i < data.length; i++) {
-    if (data[i][0] === 'extraFeeTypes') { raw = data[i][1]; break; }
+    if (data[i][0] === 'extraFeeTypes') rawExtra = data[i][1];
+    else if (data[i][0] === 'customFeeTypes') rawCustom = data[i][1];
   }
+  // The admin UI has two settings panels that both edit this same concept —
+  // "Extra Fee Types Management" (writes extraFeeTypes + customFeeTypes
+  // together) and an older "Fee Types" panel (writes ONLY customFeeTypes).
+  // Trusting only 'extraFeeTypes' meant a fee type added/edited through the
+  // older panel was invisible to auto-billing (new-student assignment, term
+  // restrictions, class rollover) even though it showed up fine in the UI.
+  // 'customFeeTypes' is the one every settings panel and the rest of the
+  // app already writes/reads, so prefer it (falling back to 'extraFeeTypes'
+  // only if it was somehow never set) rather than the other way around.
+  var raw = rawCustom || rawExtra;
   if (!raw) return [];
   try {
     var list = JSON.parse(raw);
@@ -4792,13 +4803,16 @@ function sendDailyAccountingReport() {
     const logoUrl = settings.schoolLogo || '';
     const schoolName = settings.schoolName || 'Our School';
     
-    // Compile email recipients
+    // Compile email recipients — NOTE: do not early-return here just because
+    // this is empty. The report can still go out by SMS alone (reportPhone,
+    // checked further down); bailing out here with a bare `return` used to
+    // (a) skip a school's SMS-only report setup entirely and (b) hand the
+    // client an `undefined` result instead of the {success:false, message}
+    // object it expects, which threw inside the success handler and made
+    // "Send Report Now" look broken/stuck. The real "nothing configured"
+    // check already exists below, after SMS is attempted too.
     let recipients = settings.reportEmails || settings.schoolEmail || '';
-    if (!recipients) {
-      Logger.log("No report email addresses configured. Exiting.");
-      return;
-    }
-    
+
     let regSum = 0, customSum = 0, uniSum = 0, bookSum = 0, incSum = 0, expSum = 0;
     const transactions = [];
     
@@ -5334,8 +5348,22 @@ function createStudentPhotosFolder() {
     return { success: true, folderId: folderId };
   } catch(e) {
     Logger.log("createStudentPhotosFolder error: " + e.message);
-    return { success: false, message: e.message };
+    return { success: false, message: describeDriveAuthError(e.message) };
   }
+}
+
+// Turns the two Drive-related failures admins actually hit into a message
+// that tells them exactly what to fix, instead of Apps Script's raw (and
+// fairly cryptic) exception text.
+function describeDriveAuthError(rawMessage) {
+  var msg = String(rawMessage || '');
+  if (/not sufficient|insufficient permission/i.test(msg)) {
+    return 'Google Drive access is blocked by this project\'s permission scopes. Fix: in the Apps Script editor, open Project Settings, tick "Show appsscript.json manifest file in editor", open appsscript.json, and either add "https://www.googleapis.com/auth/drive" to the oauthScopes array or delete the oauthScopes array entirely (Apps Script will then auto-detect the scopes the code actually needs). Save, then re-run this from Settings once more so Google shows the new consent screen. (' + msg + ')';
+  }
+  if (/authorization is required|authorization required/i.test(msg)) {
+    return 'This deployment needs a one-time Google authorization for Drive access. Fix: in the Apps Script editor, open this project, run any function once from the editor toolbar (e.g. createStudentPhotosFolder) and approve the Google consent screen when it appears — then re-deploy (Deploy → Manage deployments → Edit → New version) so the live web app picks up the granted permission. (' + msg + ')';
+  }
+  return msg;
 }
 
 // Deletes the daily accounting time-based report trigger if disabled by admin
@@ -6603,7 +6631,7 @@ function sendPayslipEmail(paymentId) {
     if (!payment) return { success: false, message: 'Payment not found' };
 
     const staffRes = getStaffList();
-    const person = (staffRes.staff || []).find(s => s.id === payment.staffId);
+    const person = (staffRes.staff || []).find(s => String(s.id) === String(payment.staffId));
     const email = person && person.email ? String(person.email).trim() : '';
     if (!email) return { success: false, message: 'This staff member has no email address on file' };
 

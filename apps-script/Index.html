@@ -12420,12 +12420,16 @@
             }
             
             showLoad('Saving fee configuration...');
-            var s = { customFeeTypes: JSON.stringify(list) };
+            // Also write extraFeeTypes so this stays in sync with the "Extra Fee
+            // Types Management" panel — both edit the same underlying list, and
+            // server-side auto-billing/term-restriction logic reads either key.
+            var s = { customFeeTypes: JSON.stringify(list), extraFeeTypes: JSON.stringify(list) };
             if (typeof google !== 'undefined' && google.script) {
                 google.script.run.withSuccessHandler(function (r) {
                     hideLoad();
                     if (r.success) {
                         settings.customFeeTypes = list;
+                        settings.extraFeeTypes = list;
                         lsSet('settings', settings);
                         renderFeeTypesTable();
                         clearFeeTypeForm();
@@ -12435,6 +12439,7 @@
             } else {
                 hideLoad();
                 settings.customFeeTypes = list;
+                settings.extraFeeTypes = list;
                 lsSet('settings', settings);
                 renderFeeTypesTable();
                 clearFeeTypeForm();
@@ -12472,12 +12477,13 @@
             var list = settings.customFeeTypes ? (typeof settings.customFeeTypes === 'string' ? JSON.parse(settings.customFeeTypes) : settings.customFeeTypes) : [];
             list.splice(idx, 1);
             showLoad('Deleting...');
-            var s = { customFeeTypes: JSON.stringify(list) };
+            var s = { customFeeTypes: JSON.stringify(list), extraFeeTypes: JSON.stringify(list) };
             if (typeof google !== 'undefined' && google.script) {
                 google.script.run.withSuccessHandler(function (r) {
                     hideLoad();
                     if (r.success) {
                         settings.customFeeTypes = list;
+                        settings.extraFeeTypes = list;
                         lsSet('settings', settings);
                         renderFeeTypesTable();
                         showToast('Fee type deleted!', 'success');
@@ -12486,6 +12492,7 @@
             } else {
                 hideLoad();
                 settings.customFeeTypes = list;
+                settings.extraFeeTypes = list;
                 lsSet('settings', settings);
                 renderFeeTypesTable();
                 showToast('Fee type deleted (demo)!', 'success');
