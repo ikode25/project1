@@ -724,7 +724,13 @@
         .sidebar .nav-item i {
             font-size: 20px;
             width: 24px;
-            text-align: center
+            text-align: center;
+            /* Some icons (e.g. bi-people-fill, used by "Parents Directory")
+               are force-colored to the school's theme color everywhere else
+               in the app via ".bi-people-fill { color: var(--primary) !important }"
+               — that must not leak into the dark sidebar, where every nav
+               icon needs to stay the same light/white tone. */
+            color: inherit !important;
         }
 
         .nav-divider {
@@ -761,6 +767,7 @@
             font-size: 20px;
             width: 24px;
             text-align: center;
+            color: inherit !important;
         }
         .nav-group-header .nav-group-chevron {
             margin-left: auto;
@@ -5003,6 +5010,15 @@
                                         <button class="btn btn-xs btn-outline-secondary"
                                             style="font-size:11px;padding:3px 8px"
                                             onclick="setSmsTemplate('balance_due')">⚠️ Balance Due</button>
+                                        <button class="btn btn-xs btn-outline-secondary"
+                                            style="font-size:11px;padding:3px 8px"
+                                            onclick="setSmsTemplate('reopening')">🏫 School Reopening</button>
+                                        <button class="btn btn-xs btn-outline-secondary"
+                                            style="font-size:11px;padding:3px 8px"
+                                            onclick="setSmsTemplate('public_holiday')">📅 Public Holiday</button>
+                                        <button class="btn btn-xs btn-outline-secondary"
+                                            style="font-size:11px;padding:3px 8px"
+                                            onclick="setSmsTemplate('school_event')">🎉 School Event</button>
                                     </div>
                                 </div>
                                 <textarea class="form-control form-control-sm" id="smsMessage" rows="5"
@@ -10683,7 +10699,6 @@
                     + '<td>'
                     + '<button class="act-btn btn btn-sm btn-outline-success me-1" data-action="bill"    data-id="' + r.id + '"><i class="bi bi-printer"></i></button>'
                     + '<button class="act-btn btn btn-sm btn-outline-info me-1"    data-action="receipt" data-id="' + r.id + '"><i class="bi bi-receipt"></i></button>'
-                    + '<button class="act-btn btn btn-sm btn-outline-warning me-1" data-action="thermal" data-id="' + r.id + '" title="Thermal Print Receipt"><i class="bi bi-printer-fill"></i></button>'
                     + waBtn
                     + '</td></tr>';
             }).join('');
@@ -16399,7 +16414,10 @@
             fee_reminder: 'Dear Parent, this is a fee reminder for {name} ({grade}). Total Fees: {fees}, Paid: {paid}, Balance: {balance}. Please visit the school to make payment. Thank you. - {school}',
             payment_confirm: 'Dear Parent,\n\nThis is a gentle reminder regarding the outstanding school fees for {name} ({grade}) for {session}.\n\nTotal Fees: {fees}\nAmount Paid: {paid}\nOutstanding Balance: {balance}\n\nWe kindly request that you settle the remaining balance of {balance} at your earliest convenience to keep your ward\'s school account up to date.\n\nTo check and pay the remaining balance online, please follow the steps below:\n\nSteps to Check and Pay Fees:\n1. Open this link: {portalUrl}\n2. Enter your registered phone number\n3. Enter the verification code sent to your phone\n4. Tap "Send Verification Code" to open the portal.\n\nThank you for your continued support. - {school}',
             new_term: 'Dear Parent, a new term has started for {name} in {grade}. Total fees for {session}: {fees}. Please make payment promptly. - {school}',
-            balance_due: 'Dear Parent, {name} ({grade}) has an outstanding balance of {balance} for {session}. Kindly settle at your earliest convenience. - {school}'
+            balance_due: 'Dear Parent, {name} ({grade}) has an outstanding balance of {balance} for {session}. Kindly settle at your earliest convenience. - {school}',
+            reopening: 'Dear Parent, kindly note that {school} reopens for the new term on [DATE]. Please ensure {name} arrives promptly with all required items. Thank you. - {school}',
+            public_holiday: 'Dear Parent, please be informed that {school} will be closed on [DATE] in observance of [HOLIDAY NAME]. Classes resume on [DATE]. Thank you. - {school}',
+            school_event: 'Dear Parent, you are cordially invited to [EVENT NAME] at {school} on [DATE] at [TIME]. Your presence and support are highly appreciated. - {school}'
         };
 
         function setSmsTemplate(key) {
@@ -20492,6 +20510,14 @@
                 });
             }
 
+            // Default Amount only needs to be filled in when there's no
+            // per-class rate to fall back on — a school that gives every
+            // class its own rate shouldn't be forced to also type a default.
+            if (amount <= 0 && !Object.keys(classAmounts).length) {
+                showToast('Enter a Default Amount, or set at least one class rate below', 'warning');
+                return;
+            }
+
             var installmentAllowed = document.getElementById('extraFeeInstallmentToggle').checked;
             var numInst = installmentAllowed ? (parseInt(document.getElementById('extraFeeNumInst').value) || 3) : 1;
             numInst = Math.max(1, Math.min(6, numInst));
@@ -23069,7 +23095,7 @@
                 </div>
                 <div class="mb-2">
                     <label class="form-label small fw-semibold">Default Amount (GHC)</label>
-                    <input type="number" class="form-control form-control-sm" id="extraFeeAmount" min="0" step="0.01" placeholder="0.00" required>
+                    <input type="number" class="form-control form-control-sm" id="extraFeeAmount" min="0" step="0.01" placeholder="0.00">
                     <div class="form-text" style="font-size:11px;">Used for any class without its own rate below.</div>
                 </div>
                 <div class="mb-2">
