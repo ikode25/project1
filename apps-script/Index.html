@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>School Fees Management</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Nunito+Sans:wght@300;400;600;700&family=Inter:wght@300;400;500;600;700;800&family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Nunito+Sans:wght@300;400;600;700&family=Inter:wght@300;400;500;600;700;800&family=Roboto:wght@300;400;500;700&family=Open+Sans:wght@300;400;600;700&family=Playfair+Display:wght@500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
@@ -180,8 +180,27 @@
             min-height: 100vh;
             display: flex;
             background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            background-size: cover;
+            background-position: center;
             position: relative;
             overflow: hidden
+        }
+        /* Admin-uploaded background photo (settings.loginBackgroundImage) sits
+           behind everything via this ::after layer instead of the page's own
+           background-image, so the pulsing gradient + a legibility scrim can
+           still sit on top of it without extra markup. */
+        .login-page::after {
+            content: '';
+            position: absolute; inset: 0;
+            background-image: var(--login-bg-photo, none);
+            background-size: cover;
+            background-position: center;
+            z-index: 0;
+        }
+        .login-page.has-bg-photo::before {
+            /* Photo present: swap the decorative pulse for a legibility scrim */
+            background: linear-gradient(160deg, rgba(10,8,30,0.88) 0%, rgba(20,14,46,0.72) 45%, rgba(10,8,30,0.9) 100%);
+            animation: none;
         }
         .login-page::before {
             content: '';
@@ -191,8 +210,34 @@
             background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 50%),
                         radial-gradient(circle at 80% 20%, rgba(168,85,247,0.12) 0%, transparent 40%),
                         radial-gradient(circle at 20% 80%, rgba(59,130,246,0.1) 0%, transparent 40%);
-            animation: loginBgPulse 15s ease-in-out infinite
+            animation: loginBgPulse 15s ease-in-out infinite;
+            z-index: 1;
         }
+        .login-page > * { position: relative; z-index: 2; }
+        .login-crest-divider {
+            display: flex; align-items: center; gap: 14px; justify-content: center; margin: 6px 0 18px;
+        }
+        .login-crest-divider .line { height: 1px; width: 48px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent); }
+        .login-crest-divider .dot { width: 5px; height: 5px; border-radius: 50%; background: #d4af6a; }
+        .login-motto {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-style: italic;
+            color: rgba(255,255,255,0.75);
+            font-size: 15px;
+            letter-spacing: 0.3px;
+            text-align: center;
+            margin: -6px 0 28px;
+        }
+        .login-elite-name {
+            font-family: 'Playfair Display', Georgia, serif;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+        }
+        .login-create-account {
+            text-align: center; margin-top: 18px; font-size: 13px; color: rgba(255,255,255,0.65);
+        }
+        .login-create-account a { color: #d4af6a; font-weight: 600; text-decoration: none; }
+        .login-create-account a:hover { text-decoration: underline; }
         @keyframes loginBgPulse {
             0%, 100% { transform: translate(0,0) scale(1) }
             33% { transform: translate(2%,-2%) scale(1.02) }
@@ -2686,11 +2731,13 @@
             <div class="login-floating" style="width:200px;height:200px;background:linear-gradient(135deg,#3b82f6,#06b6d4);bottom:15%;right:10%;animation-delay:-5s"></div>
             <div class="login-floating" style="width:150px;height:150px;background:linear-gradient(135deg,#a855f7,#ec4899);top:60%;left:50%;animation-delay:-10s"></div>
             <div class="login-box" style="margin: 0 auto; align-self: center; z-index: 2;">
-                <div style="text-align:center; margin-bottom: 24px;">
+                <div style="text-align:center; margin-bottom: 20px;">
                     <div class="login-icon" id="loginLogoContainer" style="margin:0 auto 15px;width:70px;height:70px;font-size:35px;background:#f1f5f9;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,0.05);overflow:hidden;border:2px solid #e2e8f0;">
                         <i class="bi bi-mortarboard-fill" style="color:var(--primary);"></i>
                     </div>
-                    <h2 style="font-weight:800;color:#1e293b;margin:0;font-size:22px" id="loginSchoolName">School Fees Portal</h2>
+                    <h2 class="login-elite-name" style="color:#1e293b;margin:0;font-size:23px" id="loginSchoolName">School Fees Portal</h2>
+                    <div class="login-crest-divider"><span class="line"></span><span class="dot"></span><span class="line"></span></div>
+                    <div class="login-motto" id="loginSchoolMotto" style="display:none;color:#64748b;"></div>
                 </div>
                 <div id="loginAlert" class="alert" style="display:none"></div>
                 <form id="unifiedLoginForm" onsubmit="loginUnified(event)">
@@ -2718,7 +2765,7 @@
                             </span>
                         </div>
                         <div class="mt-2 text-end">
-                            <a href="#" onclick="showForgotPassword(); return false;" class="small text-decoration-none" style="color:var(--primary);font-size:12px;font-weight:500">Forgot password?</a>
+                            <a href="#" onclick="openForgotPasswordModal(); return false;" class="small text-decoration-none" style="color:var(--primary);font-size:12px;font-weight:500">Forgot password?</a>
                         </div>
                     </div>
                     <div class="mb-3 form-check d-flex align-items-center gap-2" style="padding-left:0">
@@ -2727,6 +2774,7 @@
                     </div>
                     <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold" style="border-radius:8px">Sign In</button>
                 </form>
+                <div class="login-create-account">Don't have an account? <a href="#" onclick="openSignupModal(); return false;">Create one</a></div>
                 <div style="position:relative;text-align:center;margin:20px 0 4px">
                     <hr style="border-color:#e2e8f0">
                     <span style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,0.95);padding:0 12px;font-size:12px;color:#94a3b8">or</span>
@@ -2764,6 +2812,85 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Create Account Modal -->
+    <div class="modal-overlay" id="signupModal">
+        <div class="modal-box" style="max-width: 420px;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-person-plus me-1 text-primary"></i>Create Account</h6>
+                <button type="button" class="btn-close" onclick="closeSignupModal()" aria-label="Close"></button>
+            </div>
+            <div id="signupAlert" class="alert alert-info py-2 px-3 mb-3" style="font-size:12px;">
+                <i class="bi bi-info-circle me-1"></i>Your account will be created but stays inactive until an admin approves it in Users Management.
+            </div>
+            <form id="signupForm" onsubmit="submitSignup(event)">
+                <div class="mb-2">
+                    <label class="form-label small fw-semibold">Full Name</label>
+                    <input type="text" class="form-control form-control-sm" id="signupName" required>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small fw-semibold">Email <span class="text-muted fw-normal">(recommended — needed for password reset)</span></label>
+                    <input type="email" class="form-control form-control-sm" id="signupEmail">
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small fw-semibold">Requested Role</label>
+                    <select class="form-select form-select-sm" id="signupRole">
+                        <option value="viewer">Viewer</option>
+                        <option value="collector">Collector</option>
+                        <option value="owner">School Owner</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small fw-semibold">Password</label>
+                    <input type="password" class="form-control form-control-sm" id="signupPassword" minlength="6" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Confirm Password</label>
+                    <input type="password" class="form-control form-control-sm" id="signupPasswordConfirm" minlength="6" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm w-100">Create Account</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Forgot Password Modal -->
+    <div class="modal-overlay" id="forgotPasswordModal">
+        <div class="modal-box" style="max-width: 400px;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0 fw-bold"><i class="bi bi-key me-1 text-primary"></i>Reset Password</h6>
+                <button type="button" class="btn-close" onclick="closeForgotPasswordModal()" aria-label="Close"></button>
+            </div>
+
+            <!-- Step 1: request code -->
+            <form id="fpStep1Form" onsubmit="submitRequestResetCode(event)">
+                <p class="text-muted small mb-2">Enter your username or email and we'll send a reset code.</p>
+                <div class="mb-3">
+                    <input type="text" class="form-control form-control-sm" id="fpIdentifier" placeholder="Username or email" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm w-100">Send Reset Code</button>
+            </form>
+
+            <!-- Step 2: enter code + new password -->
+            <form id="fpStep2Form" style="display:none" onsubmit="submitResetWithCode(event)">
+                <div id="fpCodeNotice" class="alert alert-success py-2 px-3 mb-3" style="font-size:12px;"></div>
+                <div class="mb-2">
+                    <label class="form-label small fw-semibold">Reset Code</label>
+                    <input type="text" class="form-control form-control-sm" id="fpCode" inputmode="numeric" maxlength="6" required>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small fw-semibold">New Password</label>
+                    <input type="password" class="form-control form-control-sm" id="fpNewPassword" minlength="6" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Confirm New Password</label>
+                    <input type="password" class="form-control form-control-sm" id="fpNewPasswordConfirm" minlength="6" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm w-100">Reset Password</button>
+                <button type="button" class="btn btn-link btn-sm w-100 mt-1" onclick="fpBackToStep1()">« Use a different code</button>
+            </form>
         </div>
     </div>
 
@@ -4196,6 +4323,7 @@
                                                 <th>Name</th>
                                                 <th>Email</th>
                                                 <th>Role</th>
+                                                <th>Status</th>
                                                 <th>Actions</th>
                                             </tr>
                                         </thead>
@@ -4479,6 +4607,18 @@
                                                     <button type="button" class="btn btn-danger btn-xs" onclick="clearUploadedImg(event, 'signature')" style="position:absolute; top:-5px; right:-5px; border-radius:50%; width:20px; height:20px; padding:0; display:flex; align-items:center; justify-content:center; font-size:10px; border:none; background:#ef4444; color:#fff;" title="Remove Signature">×</button>
                                                 </div>
                                                 <button class="btn btn-xs btn-outline-primary mt-1 w-100" style="font-size:10px; padding:2px;" onclick="uploadImg('signature')">Upload Sig</button>
+                                            </div>
+                                            <div class="col-12 text-center mt-2 pt-2" style="border-top:1px dashed #e2e8f0;">
+                                                <label class="form-label small fw-bold">Login Page Background Photo</label>
+                                                <div style="position:relative; width:100%; height:70px; margin:0 auto 5px;">
+                                                    <div class="upload-area mx-auto" onclick="document.getElementById('loginBgFile').click()" style="width:100%; height:70px; display:flex; align-items:center; justify-content:center; border: 2px dashed #cbd5e1; border-radius:12px; cursor:pointer; overflow:hidden;">
+                                                        <input type="file" id="loginBgFile" accept="image/*" style="display:none" onchange="previewImg(this,'loginBgPrev')">
+                                                        <div id="loginBgPrev" style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;"><i class="bi bi-image-alt" style="font-size:22px;color:#6366f1"></i></div>
+                                                    </div>
+                                                    <button type="button" class="btn btn-danger btn-xs" onclick="clearUploadedImg(event, 'loginBg')" style="position:absolute; top:-5px; right:-5px; border-radius:50%; width:20px; height:20px; padding:0; display:flex; align-items:center; justify-content:center; font-size:10px; border:none; background:#ef4444; color:#fff;" title="Remove Background Photo">×</button>
+                                                </div>
+                                                <button class="btn btn-xs btn-outline-primary mt-1 w-100" style="font-size:10px; padding:2px;" onclick="uploadImg('loginBg')">Upload Background Photo</button>
+                                                <div class="text-muted mt-1" style="font-size:10px;">Shown behind the login page. Leave empty to keep the default dark gradient.</div>
                                             </div>
                                         </div>
                                     </div>
@@ -7662,13 +7802,121 @@
         // ════════════════════════════════════════════════════════
         // AUTH
         // ════════════════════════════════════════════════════════
-        function showForgotPassword() {
-            showConfirm('Please contact the school administrator or support team to reset your password.', {
-                title: 'Forgot Password?',
-                icon: '🔑',
-                okLabel: 'Close',
-                okClass: 'primary'
-            });
+        // ── CREATE ACCOUNT (self-signup) ──
+        function openSignupModal() {
+            document.getElementById('signupForm').reset();
+            document.getElementById('signupModal').classList.add('show');
+        }
+        function closeSignupModal() {
+            document.getElementById('signupModal').classList.remove('show');
+        }
+        function submitSignup(e) {
+            e.preventDefault();
+            var name = document.getElementById('signupName').value.trim();
+            var email = document.getElementById('signupEmail').value.trim();
+            var role = document.getElementById('signupRole').value;
+            var pwd = document.getElementById('signupPassword').value;
+            var pwd2 = document.getElementById('signupPasswordConfirm').value;
+            if (pwd !== pwd2) { showToast('Passwords do not match', 'warning'); return; }
+            if (pwd.length < 6) { showToast('Password must be at least 6 characters', 'warning'); return; }
+
+            var data = { name: name, email: email, role: role, password: pwd };
+            showLoad('Creating account…');
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run
+                    .withSuccessHandler(function (r) {
+                        hideLoad();
+                        if (r.success) {
+                            closeSignupModal();
+                            showConfirm('Your account has been created and is awaiting admin approval. You\'ll be able to log in once an admin approves it in Users Management.', { title: 'Account Created', icon: '✅', okLabel: 'OK', okClass: 'primary' });
+                        } else {
+                            showToast(r.message || 'Could not create account', 'error');
+                        }
+                    })
+                    .withFailureHandler(function (err) { hideLoad(); showToast('Error: ' + err.message, 'error'); })
+                    .registerUser(data);
+            } else {
+                hideLoad();
+                showToast('Demo mode: account would be created pending approval', 'info');
+                closeSignupModal();
+            }
+        }
+
+        // ── FORGOT PASSWORD (self-service, email code) ──
+        var _fpIdentifier = null;
+        function openForgotPasswordModal() {
+            document.getElementById('fpStep1Form').reset();
+            document.getElementById('fpStep1Form').style.display = 'block';
+            document.getElementById('fpStep2Form').style.display = 'none';
+            _fpIdentifier = null;
+            document.getElementById('forgotPasswordModal').classList.add('show');
+        }
+        function closeForgotPasswordModal() {
+            document.getElementById('forgotPasswordModal').classList.remove('show');
+        }
+        function fpBackToStep1() {
+            document.getElementById('fpStep1Form').style.display = 'block';
+            document.getElementById('fpStep2Form').style.display = 'none';
+        }
+        function submitRequestResetCode(e) {
+            e.preventDefault();
+            var identifier = document.getElementById('fpIdentifier').value.trim();
+            if (!identifier) return;
+            _fpIdentifier = identifier;
+            showLoad('Sending reset code…');
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run
+                    .withSuccessHandler(function (r) {
+                        hideLoad();
+                        if (!r.success) { showToast(r.message || 'Could not send reset code', 'error'); return; }
+                        var notice = document.getElementById('fpCodeNotice');
+                        if (r.emailSent) {
+                            notice.className = 'alert alert-success py-2 px-3 mb-3';
+                            notice.style.fontSize = '12px';
+                            notice.innerHTML = '<i class="bi bi-envelope-check me-1"></i>A reset code has been emailed to you. Enter it below.';
+                        } else {
+                            notice.className = 'alert alert-warning py-2 px-3 mb-3';
+                            notice.style.fontSize = '12px';
+                            notice.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i>' + (r.message || 'Could not email the code.') + ' Your reset code is: <strong style="font-size:16px;letter-spacing:2px;">' + r.code + '</strong>';
+                        }
+                        document.getElementById('fpStep1Form').style.display = 'none';
+                        document.getElementById('fpStep2Form').style.display = 'block';
+                    })
+                    .withFailureHandler(function (err) { hideLoad(); showToast('Error: ' + err.message, 'error'); })
+                    .requestPasswordReset(identifier);
+            } else {
+                hideLoad();
+                showToast('Demo mode: reset code would be sent', 'info');
+            }
+        }
+        function submitResetWithCode(e) {
+            e.preventDefault();
+            var code = document.getElementById('fpCode').value.trim();
+            var pwd = document.getElementById('fpNewPassword').value;
+            var pwd2 = document.getElementById('fpNewPasswordConfirm').value;
+            if (pwd !== pwd2) { showToast('Passwords do not match', 'warning'); return; }
+            if (pwd.length < 6) { showToast('Password must be at least 6 characters', 'warning'); return; }
+            if (!_fpIdentifier) { showToast('Please request a code first', 'warning'); fpBackToStep1(); return; }
+
+            showLoad('Resetting password…');
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run
+                    .withSuccessHandler(function (r) {
+                        hideLoad();
+                        if (r.success) {
+                            closeForgotPasswordModal();
+                            showToast('Password reset! You can now log in with your new password.', 'success', 'Password Reset', 6000);
+                        } else {
+                            showToast(r.message || 'Could not reset password', 'error');
+                        }
+                    })
+                    .withFailureHandler(function (err) { hideLoad(); showToast('Error: ' + err.message, 'error'); })
+                    .resetPasswordWithCode(_fpIdentifier, code, pwd);
+            } else {
+                hideLoad();
+                showToast('Demo mode: password would be reset', 'info');
+                closeForgotPasswordModal();
+            }
         }
 
         function toggleLoginPasswordVisibility() {
@@ -11333,21 +11581,48 @@
             if (!body) return;
             lastLoadedUsers = users;
             if (!users || !users.length) {
-                body.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No users found</td></tr>';
+                body.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No users found</td></tr>';
                 return;
             }
-            body.innerHTML = users.map(function (u) {
+            // Pending self-signups first, so they don't get lost at the bottom of the list.
+            var sorted = users.slice().sort(function (a, b) {
+                var ap = a.status === 'pending' ? 0 : 1, bp = b.status === 'pending' ? 0 : 1;
+                return ap - bp;
+            });
+            body.innerHTML = sorted.map(function (u) {
                 var userJson = encodeURIComponent(JSON.stringify(u));
-                return '<tr>'
+                var isPending = u.status === 'pending';
+                var statusBadge = isPending
+                    ? '<span class="status-badge status-unpaid"><i class="bi bi-hourglass-split me-1"></i>Pending</span>'
+                    : '<span class="status-badge status-paid"><i class="bi bi-check-circle me-1"></i>Active</span>';
+                var approveBtn = isPending
+                    ? '<button class="btn btn-sm btn-outline-success me-2" onclick="approveUserRow(\'' + u.email + '\',\'' + u.name + '\')" title="Approve account"><i class="bi bi-check-lg"></i></button>'
+                    : '';
+                return '<tr' + (isPending ? ' style="background:#fffbeb"' : '') + '>'
                     + '<td><strong>' + u.name + '</strong></td>'
                     + '<td>' + (u.email || '-') + '</td>'
                     + '<td><span class="status-badge ' + (u.role === 'admin' ? 'status-paid' : 'status-partial') + '">' + getRoleLabel(u.role) + '</span></td>'
+                    + '<td>' + statusBadge + '</td>'
                     + '<td>'
+                    + approveBtn
                     + '<button class="btn btn-sm btn-outline-primary me-2" onclick="openEditUserModal(\'' + userJson + '\')" title="Edit user details"><i class="bi bi-pencil"></i></button>'
-                    + '<button class="btn btn-sm btn-outline-danger" onclick="delUser(\'' + u.email + '\',\'' + u.name + '\')" title="Delete user"><i class="bi bi-trash"></i></button>'
+                    + '<button class="btn btn-sm btn-outline-danger" onclick="delUser(\'' + u.email + '\',\'' + u.name + '\')" title="' + (isPending ? 'Reject' : 'Delete') + ' user"><i class="bi bi-trash"></i></button>'
                     + '</td>'
                     + '</tr>';
             }).join('');
+        }
+
+        function approveUserRow(email, name) {
+            showLoad('Approving…');
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run
+                    .withSuccessHandler(function (r) { hideLoad(); if (r.success) { showToast('Account approved — they can now log in.', 'success'); loadUsers(); } else showToast(r.message, 'error'); })
+                    .withFailureHandler(function (err) { hideLoad(); showToast('Error: ' + err.message, 'error'); })
+                    .approveUser(email, name);
+            } else {
+                hideLoad();
+                showToast('Demo mode: account approved', 'info');
+            }
         }
 
         function addUserForm(e) {
@@ -12689,6 +12964,22 @@
                 var el = document.getElementById('sidebarLogo');
                 if (el) el.innerHTML = '<img src="' + s.schoolLogo + '" style="width:36px;height:36px;border-radius:6px;object-fit:cover">';
             }
+            if (s.schoolMotto) {
+                var mottoEl = document.getElementById('loginSchoolMotto');
+                if (mottoEl) { mottoEl.textContent = '“' + s.schoolMotto + '”'; mottoEl.style.display = 'block'; }
+            }
+            if (s.hasOwnProperty && s.hasOwnProperty('loginBackgroundImage')) {
+                var loginPageEl = document.querySelector('#loginPage .login-page');
+                if (loginPageEl) {
+                    if (s.loginBackgroundImage) {
+                        loginPageEl.style.setProperty('--login-bg-photo', 'url(' + JSON.stringify(s.loginBackgroundImage) + ')');
+                        loginPageEl.classList.add('has-bg-photo');
+                    } else {
+                        loginPageEl.style.removeProperty('--login-bg-photo');
+                        loginPageEl.classList.remove('has-bg-photo');
+                    }
+                }
+            }
             // Apply Theme Color
             if (s.themeColor) {
                 document.documentElement.style.setProperty('--primary', s.themeColor);
@@ -12968,9 +13259,15 @@
         }
 
         function uploadImg(type) {
-            var ids = { logo: 'logoFile', stamp: 'stampFile', signature: 'sigFile' };
-            var keys = { logo: 'schoolLogo', stamp: 'schoolStamp', signature: 'signature' };
-            var fns = { logo: 'uploadSchoolLogo', stamp: 'uploadSchoolStamp', signature: 'uploadSignature' };
+            var ids = { logo: 'logoFile', stamp: 'stampFile', signature: 'sigFile', loginBg: 'loginBgFile' };
+            var keys = { logo: 'schoolLogo', stamp: 'schoolStamp', signature: 'signature', loginBg: 'loginBackgroundImage' };
+            var fns = { logo: 'uploadSchoolLogo', stamp: 'uploadSchoolStamp', signature: 'uploadSignature', loginBg: 'uploadLoginBackground' };
+            // Small badge-style images (logo/stamp/signature) stay tiny — 200px is
+            // plenty. The login background fills the whole screen, so it needs to
+            // be much bigger, but everything here is stored as a single Google
+            // Sheets cell (50,000-character hard limit), so it's still capped and
+            // more aggressively compressed than a full-resolution photo would be.
+            var profile = type === 'loginBg' ? { max: 1280, quality: 0.6 } : { max: 200, quality: 0.75 };
             var input = document.getElementById(ids[type]);
             if (!input.files || !input.files[0]) { showToast('Select a file first', 'warning'); return; }
 
@@ -12978,10 +13275,9 @@
             var file = input.files[0];
             var reader = new FileReader();
             reader.onload = function (e) {
-                // Compress via canvas - max 200x200px, quality 0.7
                 var img = new Image();
                 img.onload = function () {
-                    var MAX = 200;
+                    var MAX = profile.max;
                     var w = img.width, h = img.height;
                     if (w > MAX || h > MAX) {
                         var ratio = Math.min(MAX / w, MAX / h);
@@ -12991,7 +13287,22 @@
                     var canvas = document.createElement('canvas');
                     canvas.width = w; canvas.height = h;
                     canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                    var compressed = canvas.toDataURL('image/jpeg', 0.75);
+                    var quality = profile.quality;
+                    var compressed = canvas.toDataURL('image/jpeg', quality);
+                    // Google Sheets caps a single cell at 50,000 characters — back
+                    // off the JPEG quality a few times if we're still over that
+                    // before giving up and asking for a smaller/simpler photo.
+                    var attempts = 0;
+                    while (compressed.length > 48000 && attempts < 5) {
+                        quality = Math.max(0.25, quality - 0.15);
+                        compressed = canvas.toDataURL('image/jpeg', quality);
+                        attempts++;
+                    }
+                    if (compressed.length > 48000) {
+                        hideLoad();
+                        showToast('This photo is still too large after compression. Please try a smaller or simpler image.', 'error');
+                        return;
+                    }
                     var kb = Math.round(compressed.length * 0.75 / 1024);
                     document.getElementById('loadingText').textContent = 'Uploading (' + kb + ' KB)…';
                     if (typeof google !== 'undefined' && google.script) {
@@ -19512,47 +19823,15 @@
         // ════════════════════════════════════════════════════════
         // CLEAR/REMOVE UPLOADED IMAGE SETTING
         // ════════════════════════════════════════════════════════
-        function clearUploadedImg(e, type) {
-            if (e) e.stopPropagation();
-            var keys = { logo: 'schoolLogo', stamp: 'schoolStamp', signature: 'signature' };
-            var prevs = { logo: 'logoPrev', stamp: 'stampPrev', signature: 'sigPrev' };
-            var icons = { logo: 'bi-image', stamp: 'bi-patch-check', signature: 'bi-pen' };
-            
-            var key = keys[type];
-            if (!key) return;
-            
-            showLoad('Removing ' + type + '...');
-            var s = {}; s[key] = '';
-            if (typeof google !== 'undefined' && google.script) {
-                google.script.run.withSuccessHandler(function(r) {
-                    hideLoad();
-                    if (r.success) {
-                        settings[key] = '';
-                        lsSet('settings', settings);
-                        document.getElementById(prevs[type]).innerHTML = '<i class="bi ' + icons[type] + '" style="font-size:24px;color:#6366f1"></i>';
-                        applySettings(settings);
-                        showToast(type.charAt(0).toUpperCase() + type.slice(1) + ' removed!', 'success');
-                    } else showToast(r.message, 'error');
-                }).saveSettings(s);
-            } else {
-                hideLoad();
-                settings[key] = '';
-                lsSet('settings', settings);
-                document.getElementById(prevs[type]).innerHTML = '<i class="bi ' + icons[type] + '" style="font-size:24px;color:#6366f1"></i>';
-                applySettings(settings);
-                showToast('Removed ' + type + ' (demo mode)', 'info');
-            }
-        }
-
         // ════════════════════════════════════════════════════════
         // CLEAR/REMOVE UPLOADED IMAGE SETTING
         // ════════════════════════════════════════════════════════
         function clearUploadedImg(e, type) {
             if (e) e.stopPropagation();
-            var keys = { logo: 'schoolLogo', stamp: 'schoolStamp', signature: 'signature' };
-            var prevs = { logo: 'logoPrev', stamp: 'stampPrev', signature: 'sigPrev' };
-            var icons = { logo: 'bi-image', stamp: 'bi-patch-check', signature: 'bi-pen' };
-            
+            var keys = { logo: 'schoolLogo', stamp: 'schoolStamp', signature: 'signature', loginBg: 'loginBackgroundImage' };
+            var prevs = { logo: 'logoPrev', stamp: 'stampPrev', signature: 'sigPrev', loginBg: 'loginBgPrev' };
+            var icons = { logo: 'bi-image', stamp: 'bi-patch-check', signature: 'bi-pen', loginBg: 'bi-image-alt' };
+
             var key = keys[type];
             if (!key) return;
             

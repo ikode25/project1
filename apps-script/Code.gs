@@ -84,17 +84,50 @@ function getOrCreateSheet(name, headers) {
 function getOrCreateUsersSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(USERS_SHEET);
-  if (sheet) return sheet;
+  if (!sheet) {
+    try {
+      sheet = ss.insertSheet(USERS_SHEET);
+      sheet.appendRow(["email","name","password","role","lastLogin","status","resetCode","resetCodeExpiry"]);
+      sheet.getRange(1,1,1,8).setBackground('#4285F4').setFontColor('white').setFontWeight('bold');
+      sheet.appendRow(["admin@school.com","Administrator","School@Admin2024","admin","","active","",""]);
+      sheet.appendRow(["owner@school.com","School Owner","Owner@2024","owner","","active","",""]);
+      sheet.appendRow(["","viewer","View@User2024","viewer","","active","",""]);
+    } catch(e) {
+      sheet = ss.getSheetByName(USERS_SHEET);
+      if (!sheet) throw e;
+    }
+    return sheet;
+  }
+
+  // Migration: add status/resetCode/resetCodeExpiry columns if this sheet
+  // predates self-signup + password-reset. Existing rows are backfilled to
+  // 'active' — only accounts created through the new self-signup flow start
+  // out 'pending', never accounts an admin already had running.
   try {
-    sheet = ss.insertSheet(USERS_SHEET);
-    sheet.appendRow(["email","name","password","role","lastLogin"]);
-    sheet.getRange(1,1,1,5).setBackground('#4285F4').setFontColor('white').setFontWeight('bold');
-    sheet.appendRow(["admin@school.com","Administrator","School@Admin2024","admin",""]);
-    sheet.appendRow(["owner@school.com","School Owner","Owner@2024","owner",""]);
-    sheet.appendRow(["","viewer","View@User2024","viewer",""]);
-  } catch(e) {
-    sheet = ss.getSheetByName(USERS_SHEET);
-    if (!sheet) throw e;
+    var lastCol = sheet.getLastColumn();
+    var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim().toLowerCase());
+    var newCols = ['status', 'resetcode', 'resetcodeexpiry'];
+    var colNamesProper = { status: 'status', resetcode: 'resetCode', resetcodeexpiry: 'resetCodeExpiry' };
+    var addedStatusCol = false;
+    newCols.forEach(col => {
+      if (headers.indexOf(col) === -1) {
+        var lc = sheet.getLastColumn();
+        sheet.insertColumnAfter(lc);
+        sheet.getRange(1, lc + 1).setValue(colNamesProper[col])
+          .setBackground('#4285F4').setFontColor('white').setFontWeight('bold');
+        headers.push(col);
+        if (col === 'status') addedStatusCol = true;
+      }
+    });
+    if (addedStatusCol && sheet.getLastRow() > 1) {
+      var statusColIdx = headers.indexOf('status') + 1;
+      var numRows = sheet.getLastRow() - 1;
+      var existingStatuses = sheet.getRange(2, statusColIdx, numRows, 1).getValues();
+      var filled = existingStatuses.map(row => [row[0] ? row[0] : 'active']);
+      sheet.getRange(2, statusColIdx, numRows, 1).setValues(filled);
+    }
+  } catch (migErr) {
+    Logger.log('Users sheet migration info: ' + migErr.message);
   }
   return sheet;
 }
@@ -602,10 +635,17 @@ function authenticateUser(email, name, password, auditData) {
       const dbEmail = String(data[i][0] || '').trim().toLowerCase();
       const dbName  = String(data[i][1] || '').trim().toLowerCase();
       const dbPwd   = String(data[i][2] || '').trim();
-      
+
       const matchEmail = cleanId && dbEmail === cleanId && dbPwd === cleanPwd;
       const matchName  = cleanId && dbName === cleanId && dbPwd === cleanPwd;
       if (matchEmail || matchName) {
+        // A self-registered account is 'pending' until an admin approves it
+        // in Users Management — blank/missing status (every account that
+        // existed before self-signup was added) is treated as already-active.
+        const status = String(data[i][5] || 'active').trim().toLowerCase();
+        if (status === 'pending') {
+          return {success: false, message: "Your account is awaiting admin approval. You'll be able to log in once an admin approves it in Users Management."};
+        }
         sheet.getRange(i+1, 5).setValue(new Date().toISOString());
         const userObj = {email: data[i][0], name: data[i][1], role: data[i][3]};
         if (auditData) {
@@ -616,6 +656,147 @@ function authenticateUser(email, name, password, auditData) {
     }
     return {success: false, message: "Invalid credentials"};
   } catch(e) { return {success: false, message: e.message}; }
+}
+
+// Self-service signup — the account is created immediately but starts
+// 'pending' and cannot log in until an admin approves it (Users Management).
+function registerUser(data) {
+  try {
+    var email = String((data && data.email) || '').trim();
+    var name  = String((data && data.name) || '').trim();
+    var password = String((data && data.password) || '');
+    var role = String((data && data.role) || 'viewer').trim().toLowerCase();
+    if (!name || !password) return { success: false, message: 'Name and password are required.' };
+    if (password.length < 6) return { success: false, message: 'Password must be at least 6 characters.' };
+    if (['admin', 'collector', 'viewer', 'owner'].indexOf(role) === -1) role = 'viewer';
+
+    var sheet = getOrCreateUsersSheet();
+    var rows = sheet.getDataRange().getValues();
+    var cleanEmail = email.toLowerCase();
+    var cleanName = name.toLowerCase();
+    for (var i = 1; i < rows.length; i++) {
+      var rowEmail = String(rows[i][0] || '').trim().toLowerCase();
+      var rowName = String(rows[i][1] || '').trim().toLowerCase();
+      if ((cleanEmail && rowEmail === cleanEmail) || rowName === cleanName) {
+        return { success: false, message: 'An account with that ' + (cleanEmail && rowEmail === cleanEmail ? 'email' : 'username') + ' already exists.' };
+      }
+    }
+
+    sheet.appendRow([email, name, password, role, '', 'pending', '', '']);
+    logActivity('Account Signup', name + (email ? ' (' + email + ')' : '') + ' — role: ' + role + ' — pending approval');
+    return { success: true };
+  } catch (e) { return { success: false, message: e.message }; }
+}
+
+// Admin approves a pending self-signup, making it able to log in.
+function approveUser(email, name) {
+  try {
+    var sheet = getOrCreateUsersSheet();
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0].map(h => String(h).trim().toLowerCase());
+    var statusCol = headers.indexOf('status') + 1;
+    if (statusCol === 0) return { success: false, message: 'Status column not found' };
+    for (var i = 1; i < data.length; i++) {
+      if ((email && data[i][0] === email) || (name && data[i][1] === name)) {
+        sheet.getRange(i + 1, statusCol).setValue('active');
+        logActivity('Approved User', (name || email) + ' account activated');
+        return { success: true };
+      }
+    }
+    return { success: false, message: 'User not found' };
+  } catch (e) { return { success: false, message: e.message }; }
+}
+
+// Step 1 of self-service password reset: find the account, generate a
+// 6-digit code good for 15 minutes, and try to email it. If the account has
+// no email on file, or the email fails to send (e.g. the Drive/Mail auth
+// issue), the code is returned directly in the response so the client can
+// fall back to showing it on screen instead of leaving the admin locked out.
+function requestPasswordReset(identifier) {
+  try {
+    var clean = String(identifier || '').trim().toLowerCase();
+    if (!clean) return { success: false, message: 'Enter your username or email.' };
+    var sheet = getOrCreateUsersSheet();
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      var rowEmail = String(data[i][0] || '').trim().toLowerCase();
+      var rowName = String(data[i][1] || '').trim().toLowerCase();
+      if (rowEmail !== clean && rowName !== clean) continue;
+
+      var code = String(Math.floor(100000 + Math.random() * 900000));
+      var expiry = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      var headers = data[0].map(h => String(h).trim().toLowerCase());
+      var codeCol = headers.indexOf('resetcode') + 1;
+      var expiryCol = headers.indexOf('resetcodeexpiry') + 1;
+      if (codeCol > 0) sheet.getRange(i + 1, codeCol).setValue(code);
+      if (expiryCol > 0) sheet.getRange(i + 1, expiryCol).setValue(expiry);
+
+      var email = String(data[i][0] || '').trim();
+      var name = String(data[i][1] || '').trim();
+      if (!email) {
+        return { success: true, emailSent: false, code: code, message: 'No email is on file for this account, so here is your reset code directly.' };
+      }
+      try {
+        var settingsRes = getSettings();
+        var schoolName = (settingsRes.success && settingsRes.settings.schoolName) || 'School Fees Management';
+        MailApp.sendEmail({
+          to: email,
+          subject: schoolName + ' — Password Reset Code',
+          htmlBody: '<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;border:1px solid #e2e8f0;border-radius:8px;">' +
+            '<h2 style="color:#1e1b4b;margin:0 0 12px;">Password Reset</h2>' +
+            '<p>Hello ' + (name || 'there') + ',</p>' +
+            '<p>Use this code to reset your password. It expires in 15 minutes.</p>' +
+            '<div style="font-size:28px;font-weight:700;letter-spacing:4px;text-align:center;background:#f8fafc;padding:16px;border-radius:8px;margin:16px 0;">' + code + '</div>' +
+            '<p style="color:#64748b;font-size:12px;">If you did not request this, you can safely ignore this email.</p>' +
+            '</div>'
+        });
+        return { success: true, emailSent: true };
+      } catch (mailErr) {
+        Logger.log('requestPasswordReset email error: ' + mailErr.message);
+        return { success: true, emailSent: false, code: code, message: describeGoogleAuthError(mailErr.message, 'https://www.googleapis.com/auth/script.send_mail (or gmail.send)', 'requestPasswordReset') };
+      }
+    }
+    return { success: false, message: 'No account found with that username or email.' };
+  } catch (e) { return { success: false, message: e.message }; }
+}
+
+// Step 2 of self-service password reset: verify the code and set the new password.
+function resetPasswordWithCode(identifier, code, newPassword) {
+  try {
+    var clean = String(identifier || '').trim().toLowerCase();
+    var cleanCode = String(code || '').trim();
+    var pwd = String(newPassword || '');
+    if (!clean || !cleanCode) return { success: false, message: 'Missing username/email or code.' };
+    if (pwd.length < 6) return { success: false, message: 'Password must be at least 6 characters.' };
+
+    var sheet = getOrCreateUsersSheet();
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0].map(h => String(h).trim().toLowerCase());
+    var pwdCol = 3;
+    var codeCol = headers.indexOf('resetcode') + 1;
+    var expiryCol = headers.indexOf('resetcodeexpiry') + 1;
+
+    for (var i = 1; i < data.length; i++) {
+      var rowEmail = String(data[i][0] || '').trim().toLowerCase();
+      var rowName = String(data[i][1] || '').trim().toLowerCase();
+      if (rowEmail !== clean && rowName !== clean) continue;
+
+      var storedCode = codeCol > 0 ? String(data[i][codeCol - 1] || '').trim() : '';
+      var storedExpiry = expiryCol > 0 ? data[i][expiryCol - 1] : '';
+      if (!storedCode || storedCode !== cleanCode) {
+        return { success: false, message: 'Incorrect reset code.' };
+      }
+      if (storedExpiry && new Date(storedExpiry).getTime() < Date.now()) {
+        return { success: false, message: 'This reset code has expired. Request a new one.' };
+      }
+      sheet.getRange(i + 1, pwdCol).setValue(pwd);
+      if (codeCol > 0) sheet.getRange(i + 1, codeCol).setValue('');
+      if (expiryCol > 0) sheet.getRange(i + 1, expiryCol).setValue('');
+      logActivity('Password Reset', (data[i][1] || data[i][0]) + ' reset their password via email code');
+      return { success: true };
+    }
+    return { success: false, message: 'No account found with that username or email.' };
+  } catch (e) { return { success: false, message: e.message }; }
 }
 
 function changePassword(currentPassword, newPassword, newUsername) {
@@ -642,7 +823,9 @@ function changePassword(currentPassword, newPassword, newUsername) {
 
 function addUser(email, name, password, role) {
   try {
-    getOrCreateUsersSheet().appendRow([email||"", name, password, role, ""]);
+    // Admin-created accounts are usable immediately — only self-signups
+    // start 'pending'.
+    getOrCreateUsersSheet().appendRow([email||"", name, password, role, "", "active", "", ""]);
     return {success: true};
   } catch(e) { return {success: false, message: e.message}; }
 }
@@ -650,14 +833,18 @@ function addUser(email, name, password, role) {
 function getUsers() {
   try {
     const data  = getOrCreateUsersSheet().getDataRange().getValues();
+    const headers = data[0].map(h => String(h).trim().toLowerCase());
+    const statusIdx = headers.indexOf('status');
     const users = [];
     for (let i = 1; i < data.length; i++) {
       var email = String(data[i][0] || "").trim();
       var name  = String(data[i][1] || "").trim();
       var role  = String(data[i][3] || "").trim();
       var pwd   = String(data[i][2] || "").trim();
+      var status = statusIdx !== -1 ? String(data[i][statusIdx] || "active").trim().toLowerCase() : "active";
+      if (!status) status = "active";
       if (!name && !email) continue; // skip completely empty rows
-      users.push({email: email, name: name, role: role, password: pwd});
+      users.push({email: email, name: name, role: role, password: pwd, status: status});
     }
     return {success: true, users: users};
   } catch(e) { return {success: false, message: e.message}; }
@@ -803,6 +990,7 @@ function saveSettings(settingsData) {
 function uploadSchoolLogo(base64)  { return saveSettings({schoolLogo:  base64}); }
 function uploadSchoolStamp(base64) { return saveSettings({schoolStamp: base64}); }
 function uploadSignature(base64)   { return saveSettings({signature:   base64}); }
+function uploadLoginBackground(base64) { return saveSettings({loginBackgroundImage: base64}); }
 
 // ── Parent Portal ────────────────────────────────────────
 // Returns school info + student record for the portal (no auth needed)
