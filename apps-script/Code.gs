@@ -33,14 +33,24 @@ const DEFAULT_CLASSES = [
 
 function doGet(e) {
   try { initializeSpreadsheet(); } catch (err) { Logger.log('doGet initializeSpreadsheet warning: ' + err.message); }
-  var page = e && e.parameter && e.parameter.page ? e.parameter.page.toLowerCase() : 'index';
+  // No ?page= (or an explicit landing/home) now lands on the public marketing
+  // page first — staff (admin/collector/viewer/owner) reach the actual login
+  // via its "Staff Login" icon (?page=admin); parents reach the portal via
+  // its "Pay School Fees" button (?page=portal), same as before.
+  var page = e && e.parameter && e.parameter.page ? e.parameter.page.toLowerCase() : 'landing';
   if (page === 'portal') {
     return HtmlService.createHtmlOutputFromFile('Portal')
       .setTitle('Parent Portal - School Fees')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
-  return HtmlService.createHtmlOutputFromFile('index')
+  if (page === 'admin' || page === 'index') {
+    return HtmlService.createHtmlOutputFromFile('index')
+      .setTitle('School Fees Management')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
+  return HtmlService.createHtmlOutputFromFile('Landing')
     .setTitle('School Fees Management')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
@@ -799,22 +809,28 @@ function resetPasswordWithCode(identifier, code, newPassword) {
   } catch (e) { return { success: false, message: e.message }; }
 }
 
-function changePassword(currentPassword, newPassword, newUsername) {
+// NOTE: this app's login is entirely its own username/password system (the
+// Users sheet), separate from Google's identity — there is no real
+// server-side session to read a "current user" back out of, so the caller
+// must say who they are. (This used to read a 'currentUser' UserProperties
+// entry that nothing in this project ever wrote — meaning this always
+// failed with "Not logged in" for every role. Fixed by taking the identity
+// as parameters instead, the same way every other user-facing function
+// here already does.)
+function changePassword(currentPassword, newPassword, newUsername, myEmail, myName) {
   try {
-    const userProps   = PropertiesService.getUserProperties();
-    const userJson    = userProps.getProperty('currentUser');
-    if (!userJson) return {success: false, message: "Not logged in"};
-    const currentUser = JSON.parse(userJson);
     const sheet = getOrCreateUsersSheet();
     const data  = sheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
-      const match = (currentUser.email && data[i][0] === currentUser.email) ||
-                    (currentUser.name  && data[i][1] === currentUser.name);
+      const match = (myEmail && String(data[i][0]).trim().toLowerCase() === String(myEmail).trim().toLowerCase()) ||
+                    (myName  && String(data[i][1]).trim().toLowerCase() === String(myName).trim().toLowerCase());
       if (match) {
-        if (data[i][2] !== currentPassword) return {success: false, message: "Current password incorrect"};
+        if (String(data[i][2]) !== String(currentPassword)) return {success: false, message: "Current password incorrect"};
         sheet.getRange(i+1, 3).setValue(newPassword);
-        if (newUsername && currentUser.role === 'admin') sheet.getRange(i+1, 2).setValue(newUsername);
-        return {success: true};
+        if (newUsername && String(newUsername).trim() && String(newUsername).trim() !== String(data[i][1]).trim()) {
+          sheet.getRange(i+1, 2).setValue(String(newUsername).trim());
+        }
+        return {success: true, newUsername: newUsername ? String(newUsername).trim() : data[i][1]};
       }
     }
     return {success: false, message: "User not found"};
@@ -991,6 +1007,9 @@ function uploadSchoolLogo(base64)  { return saveSettings({schoolLogo:  base64});
 function uploadSchoolStamp(base64) { return saveSettings({schoolStamp: base64}); }
 function uploadSignature(base64)   { return saveSettings({signature:   base64}); }
 function uploadLoginBackground(base64) { return saveSettings({loginBackgroundImage: base64}); }
+function uploadLandingHeroImage(base64)  { return saveSettings({landingHeroImage:  base64}); }
+function uploadLandingHeroImage2(base64) { return saveSettings({landingHeroImage2: base64}); }
+function uploadLandingHeroImage3(base64) { return saveSettings({landingHeroImage3: base64}); }
 
 // ── Parent Portal ────────────────────────────────────────
 // Returns school info + student record for the portal (no auth needed)

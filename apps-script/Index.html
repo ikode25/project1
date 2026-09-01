@@ -2774,16 +2774,14 @@
                     </div>
                     <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold" style="border-radius:8px">Sign In</button>
                 </form>
-                <div class="login-create-account">Don't have an account? <a href="#" onclick="openSignupModal(); return false;">Create one</a></div>
-                <div style="position:relative;text-align:center;margin:20px 0 4px">
-                    <hr style="border-color:#e2e8f0">
-                    <span style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,0.95);padding:0 12px;font-size:12px;color:#94a3b8">or</span>
-                </div>
-                <a class="parent-pay-btn" id="parentPayPortalLink" href="#" onclick="openParentPortal(); return false;">
+                <!-- Parent Pay Portal link hidden but kept in the DOM: applySettings() /
+                     updateParentPortalLink() still target #parentPayPortalLink, and parents
+                     now reach the portal from the public landing page instead. -->
+                <a class="parent-pay-btn" id="parentPayPortalLink" href="#" onclick="openParentPortal(); return false;" style="display:none">
                     <i class="bi bi-wallet2"></i> Parent Pay Portal
                 </a>
                 <div class="roles-container" style="margin-top:20px; padding:16px; background:#f8fafc; border-radius:12px; border:1px solid #edf2f7;">
-                    <div style="font-weight:700; color:#475569; margin-bottom:12px; text-align:center; font-size:11px; letter-spacing:0.5px; text-transform:uppercase;">User Portals & Roles</div>
+                    <div style="font-weight:700; color:#475569; margin-bottom:12px; text-align:center; font-size:11px; letter-spacing:0.5px; text-transform:uppercase;">Staff Sign-In</div>
                     <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:8px;">
                         <div style="display:flex; flex-direction:column; align-items:center; text-align:center; padding:6px; background:#fff; border-radius:8px; border:1px solid #edf2f7; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
                             <div style="color:#4f46e5; margin-bottom:4px; display:flex;">
@@ -2795,7 +2793,7 @@
                             <div style="color:#0ea5e9; margin-bottom:4px; display:flex;">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
                             </div>
-                            <span style="font-size:10px; font-weight:600; color:#475569;" id="loginRoleLabelCollector">Collector</span>
+                            <span style="font-size:10px; font-weight:600; color:#475569;" id="loginRoleLabelCollector">Bursar</span>
                         </div>
                         <div style="display:flex; flex-direction:column; align-items:center; text-align:center; padding:6px; background:#fff; border-radius:8px; border:1px solid #edf2f7; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
                             <div style="color:#10b981; margin-bottom:4px; display:flex;">
@@ -2805,54 +2803,13 @@
                         </div>
                         <div style="display:flex; flex-direction:column; align-items:center; text-align:center; padding:6px; background:#fff; border-radius:8px; border:1px solid #edf2f7; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
                             <div style="color:#f43f5e; margin-bottom:4px; display:flex;">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"></path><line x1="16" y1="8" x2="2" y2="22"></line><line x1="17.5" y1="15" x2="9" y2="15"></line></svg>
                             </div>
-                            <span style="font-size:10px; font-weight:600; color:#475569;">Parent</span>
+                            <span style="font-size:10px; font-weight:600; color:#475569;">Manager / Owner</span>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- Create Account Modal -->
-    <div class="modal-overlay" id="signupModal">
-        <div class="modal-box" style="max-width: 420px;">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="mb-0 fw-bold"><i class="bi bi-person-plus me-1 text-primary"></i>Create Account</h6>
-                <button type="button" class="btn-close" onclick="closeSignupModal()" aria-label="Close"></button>
-            </div>
-            <div id="signupAlert" class="alert alert-info py-2 px-3 mb-3" style="font-size:12px;">
-                <i class="bi bi-info-circle me-1"></i>Your account will be created but stays inactive until an admin approves it in Users Management.
-            </div>
-            <form id="signupForm" onsubmit="submitSignup(event)">
-                <div class="mb-2">
-                    <label class="form-label small fw-semibold">Full Name</label>
-                    <input type="text" class="form-control form-control-sm" id="signupName" required>
-                </div>
-                <div class="mb-2">
-                    <label class="form-label small fw-semibold">Email <span class="text-muted fw-normal">(recommended — needed for password reset)</span></label>
-                    <input type="email" class="form-control form-control-sm" id="signupEmail">
-                </div>
-                <div class="mb-2">
-                    <label class="form-label small fw-semibold">Requested Role</label>
-                    <select class="form-select form-select-sm" id="signupRole">
-                        <option value="viewer">Viewer</option>
-                        <option value="collector">Collector</option>
-                        <option value="owner">School Owner</option>
-                        <option value="admin">Admin</option>
-                    </select>
-                </div>
-                <div class="mb-2">
-                    <label class="form-label small fw-semibold">Password</label>
-                    <input type="password" class="form-control form-control-sm" id="signupPassword" minlength="6" required>
-                </div>
-                <div class="mb-3">
-                    <label class="form-label small fw-semibold">Confirm Password</label>
-                    <input type="password" class="form-control form-control-sm" id="signupPasswordConfirm" minlength="6" required>
-                </div>
-                <button type="submit" class="btn btn-primary btn-sm w-100">Create Account</button>
-            </form>
         </div>
     </div>
 
@@ -4323,7 +4280,7 @@
                                                 <th>Name</th>
                                                 <th>Email</th>
                                                 <th>Role</th>
-                                                <th>Status</th>
+                                                <th>Password</th>
                                                 <th>Actions</th>
                                             </tr>
                                         </thead>
@@ -4619,6 +4576,77 @@
                                                 </div>
                                                 <button class="btn btn-xs btn-outline-primary mt-1 w-100" style="font-size:10px; padding:2px;" onclick="uploadImg('loginBg')">Upload Background Photo</button>
                                                 <div class="text-muted mt-1" style="font-size:10px;">Shown behind the login page. Leave empty to keep the default dark gradient.</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Public Landing Page -->
+                                <div class="col-12">
+                                    <div class="settings-card">
+                                        <h6 class="fw-bold mb-3"><i class="bi bi-window me-2 text-primary"></i>Public Landing Page</h6>
+                                        <p class="text-muted small mb-3">This is the first page anyone sees at your app's main link — parents click through to Pay Fees, and staff (admin/bursar/manager/owner) log in via the icon at top-right.</p>
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <form onsubmit="saveLandingTextSettings(event)">
+                                                    <div class="mb-2">
+                                                        <label class="form-label small fw-semibold">Enrollment Notice</label>
+                                                        <input type="text" class="form-control form-control-sm" id="setLandingEnrollText" placeholder="e.g. Enrollment is open from July 15 to August 30, 2026.">
+                                                    </div>
+                                                    <div class="mb-2">
+                                                        <label class="form-label small fw-semibold">Payment Deadline Notice</label>
+                                                        <input type="text" class="form-control form-control-sm" id="setLandingDeadlineText" placeholder="e.g. Pay fees by September 10, 2026 to avoid late penalties.">
+                                                    </div>
+                                                    <div class="mb-2">
+                                                        <label class="form-label small fw-semibold">Facebook URL</label>
+                                                        <input type="url" class="form-control form-control-sm" id="setLandingFacebook" placeholder="https://facebook.com/yourschool">
+                                                    </div>
+                                                    <div class="mb-2">
+                                                        <label class="form-label small fw-semibold">Instagram URL</label>
+                                                        <input type="url" class="form-control form-control-sm" id="setLandingInstagram" placeholder="https://instagram.com/yourschool">
+                                                    </div>
+                                                    <div class="mb-2">
+                                                        <label class="form-label small fw-semibold">YouTube URL</label>
+                                                        <input type="url" class="form-control form-control-sm" id="setLandingYoutube" placeholder="https://youtube.com/@yourschool">
+                                                    </div>
+                                                    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Save</button>
+                                                </form>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label small fw-semibold d-block">Hero Photos</label>
+                                                <div class="row g-2">
+                                                    <div class="col-4 text-center">
+                                                        <div style="position:relative; width:100%; height:70px; margin:0 auto 5px;">
+                                                            <div class="upload-area mx-auto" onclick="document.getElementById('landingHeroFile').click()" style="width:100%; height:70px; display:flex; align-items:center; justify-content:center; border: 2px dashed #cbd5e1; border-radius:12px; cursor:pointer; overflow:hidden;">
+                                                                <input type="file" id="landingHeroFile" accept="image/*" style="display:none" onchange="previewImg(this,'landingHeroPrev')">
+                                                                <div id="landingHeroPrev" style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;"><i class="bi bi-image-alt" style="font-size:20px;color:#6366f1"></i></div>
+                                                            </div>
+                                                            <button type="button" class="btn btn-danger btn-xs" onclick="clearUploadedImg(event, 'landingHero')" style="position:absolute; top:-5px; right:-5px; border-radius:50%; width:20px; height:20px; padding:0; display:flex; align-items:center; justify-content:center; font-size:10px; border:none; background:#ef4444; color:#fff;" title="Remove">×</button>
+                                                        </div>
+                                                        <button class="btn btn-xs btn-outline-primary w-100" style="font-size:9px; padding:2px;" onclick="uploadImg('landingHero')">Main Photo</button>
+                                                    </div>
+                                                    <div class="col-4 text-center">
+                                                        <div style="position:relative; width:100%; height:70px; margin:0 auto 5px;">
+                                                            <div class="upload-area mx-auto" onclick="document.getElementById('landingHero2File').click()" style="width:100%; height:70px; display:flex; align-items:center; justify-content:center; border: 2px dashed #cbd5e1; border-radius:12px; cursor:pointer; overflow:hidden;">
+                                                                <input type="file" id="landingHero2File" accept="image/*" style="display:none" onchange="previewImg(this,'landingHero2Prev')">
+                                                                <div id="landingHero2Prev" style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;"><i class="bi bi-image-alt" style="font-size:20px;color:#6366f1"></i></div>
+                                                            </div>
+                                                            <button type="button" class="btn btn-danger btn-xs" onclick="clearUploadedImg(event, 'landingHero2')" style="position:absolute; top:-5px; right:-5px; border-radius:50%; width:20px; height:20px; padding:0; display:flex; align-items:center; justify-content:center; font-size:10px; border:none; background:#ef4444; color:#fff;" title="Remove">×</button>
+                                                        </div>
+                                                        <button class="btn btn-xs btn-outline-primary w-100" style="font-size:9px; padding:2px;" onclick="uploadImg('landingHero2')">Side Photo 1</button>
+                                                    </div>
+                                                    <div class="col-4 text-center">
+                                                        <div style="position:relative; width:100%; height:70px; margin:0 auto 5px;">
+                                                            <div class="upload-area mx-auto" onclick="document.getElementById('landingHero3File').click()" style="width:100%; height:70px; display:flex; align-items:center; justify-content:center; border: 2px dashed #cbd5e1; border-radius:12px; cursor:pointer; overflow:hidden;">
+                                                                <input type="file" id="landingHero3File" accept="image/*" style="display:none" onchange="previewImg(this,'landingHero3Prev')">
+                                                                <div id="landingHero3Prev" style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;"><i class="bi bi-image-alt" style="font-size:20px;color:#6366f1"></i></div>
+                                                            </div>
+                                                            <button type="button" class="btn btn-danger btn-xs" onclick="clearUploadedImg(event, 'landingHero3')" style="position:absolute; top:-5px; right:-5px; border-radius:50%; width:20px; height:20px; padding:0; display:flex; align-items:center; justify-content:center; font-size:10px; border:none; background:#ef4444; color:#fff;" title="Remove">×</button>
+                                                        </div>
+                                                        <button class="btn btn-xs btn-outline-primary w-100" style="font-size:9px; padding:2px;" onclick="uploadImg('landingHero3')">Side Photo 2</button>
+                                                    </div>
+                                                </div>
+                                                <div class="text-muted mt-1" style="font-size:10px;">Main Photo is required for the two side photos to show. All optional — a themed placeholder shows if left empty.</div>
                                             </div>
                                         </div>
                                     </div>
@@ -6790,8 +6818,8 @@
         <div class="modal-box">
             <h6 class="mb-3"><i class="bi bi-key me-2"></i>Change Password</h6>
             <form onsubmit="changePwd(event)">
-                <div class="mb-2 admin-field" style="display:none"><input type="text"
-                        class="form-control form-control-sm" id="newUsername" placeholder="New Username (Admin only)">
+                <div class="mb-2"><input type="text"
+                        class="form-control form-control-sm" id="newUsername" placeholder="New Username (optional)">
                 </div>
                 <div class="mb-2"><input type="password" class="form-control form-control-sm" id="currPwd"
                         placeholder="Current Password" required></div>
@@ -7802,46 +7830,6 @@
         // ════════════════════════════════════════════════════════
         // AUTH
         // ════════════════════════════════════════════════════════
-        // ── CREATE ACCOUNT (self-signup) ──
-        function openSignupModal() {
-            document.getElementById('signupForm').reset();
-            document.getElementById('signupModal').classList.add('show');
-        }
-        function closeSignupModal() {
-            document.getElementById('signupModal').classList.remove('show');
-        }
-        function submitSignup(e) {
-            e.preventDefault();
-            var name = document.getElementById('signupName').value.trim();
-            var email = document.getElementById('signupEmail').value.trim();
-            var role = document.getElementById('signupRole').value;
-            var pwd = document.getElementById('signupPassword').value;
-            var pwd2 = document.getElementById('signupPasswordConfirm').value;
-            if (pwd !== pwd2) { showToast('Passwords do not match', 'warning'); return; }
-            if (pwd.length < 6) { showToast('Password must be at least 6 characters', 'warning'); return; }
-
-            var data = { name: name, email: email, role: role, password: pwd };
-            showLoad('Creating account…');
-            if (typeof google !== 'undefined' && google.script) {
-                google.script.run
-                    .withSuccessHandler(function (r) {
-                        hideLoad();
-                        if (r.success) {
-                            closeSignupModal();
-                            showConfirm('Your account has been created and is awaiting admin approval. You\'ll be able to log in once an admin approves it in Users Management.', { title: 'Account Created', icon: '✅', okLabel: 'OK', okClass: 'primary' });
-                        } else {
-                            showToast(r.message || 'Could not create account', 'error');
-                        }
-                    })
-                    .withFailureHandler(function (err) { hideLoad(); showToast('Error: ' + err.message, 'error'); })
-                    .registerUser(data);
-            } else {
-                hideLoad();
-                showToast('Demo mode: account would be created pending approval', 'info');
-                closeSignupModal();
-            }
-        }
-
         // ── FORGOT PASSWORD (self-service, email code) ──
         var _fpIdentifier = null;
         function openForgotPasswordModal() {
@@ -11584,44 +11572,38 @@
                 body.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No users found</td></tr>';
                 return;
             }
-            // Pending self-signups first, so they don't get lost at the bottom of the list.
-            var sorted = users.slice().sort(function (a, b) {
-                var ap = a.status === 'pending' ? 0 : 1, bp = b.status === 'pending' ? 0 : 1;
-                return ap - bp;
-            });
-            body.innerHTML = sorted.map(function (u) {
+            body.innerHTML = users.map(function (u, idx) {
                 var userJson = encodeURIComponent(JSON.stringify(u));
-                var isPending = u.status === 'pending';
-                var statusBadge = isPending
-                    ? '<span class="status-badge status-unpaid"><i class="bi bi-hourglass-split me-1"></i>Pending</span>'
-                    : '<span class="status-badge status-paid"><i class="bi bi-check-circle me-1"></i>Active</span>';
-                var approveBtn = isPending
-                    ? '<button class="btn btn-sm btn-outline-success me-2" onclick="approveUserRow(\'' + u.email + '\',\'' + u.name + '\')" title="Approve account"><i class="bi bi-check-lg"></i></button>'
-                    : '';
-                return '<tr' + (isPending ? ' style="background:#fffbeb"' : '') + '>'
+                var pwdId = 'usrPwd_' + idx;
+                // Every user logs in with an admin-set default password and is expected to
+                // change it themselves afterwards (Change Password, top-right menu) — so the
+                // admin still needs to be able to see whatever a user's password currently
+                // is (e.g. to help someone who's locked themselves out), masked until asked
+                // for to avoid it just sitting exposed on screen.
+                return '<tr>'
                     + '<td><strong>' + u.name + '</strong></td>'
                     + '<td>' + (u.email || '-') + '</td>'
                     + '<td><span class="status-badge ' + (u.role === 'admin' ? 'status-paid' : 'status-partial') + '">' + getRoleLabel(u.role) + '</span></td>'
-                    + '<td>' + statusBadge + '</td>'
+                    + '<td><span id="' + pwdId + '" data-pwd="' + encodeURIComponent(u.password || '') + '" style="font-family:monospace;letter-spacing:1px;">••••••••</span> '
+                    + '<button type="button" class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="toggleUserPwdVisible(\'' + pwdId + '\', this)" title="Show/hide password"><i class="bi bi-eye"></i></button></td>'
                     + '<td>'
-                    + approveBtn
                     + '<button class="btn btn-sm btn-outline-primary me-2" onclick="openEditUserModal(\'' + userJson + '\')" title="Edit user details"><i class="bi bi-pencil"></i></button>'
-                    + '<button class="btn btn-sm btn-outline-danger" onclick="delUser(\'' + u.email + '\',\'' + u.name + '\')" title="' + (isPending ? 'Reject' : 'Delete') + ' user"><i class="bi bi-trash"></i></button>'
+                    + '<button class="btn btn-sm btn-outline-danger" onclick="delUser(\'' + u.email + '\',\'' + u.name + '\')" title="Delete user"><i class="bi bi-trash"></i></button>'
                     + '</td>'
                     + '</tr>';
             }).join('');
         }
 
-        function approveUserRow(email, name) {
-            showLoad('Approving…');
-            if (typeof google !== 'undefined' && google.script) {
-                google.script.run
-                    .withSuccessHandler(function (r) { hideLoad(); if (r.success) { showToast('Account approved — they can now log in.', 'success'); loadUsers(); } else showToast(r.message, 'error'); })
-                    .withFailureHandler(function (err) { hideLoad(); showToast('Error: ' + err.message, 'error'); })
-                    .approveUser(email, name);
+        function toggleUserPwdVisible(pwdId, btn) {
+            var el = document.getElementById(pwdId);
+            if (!el) return;
+            var icon = btn.querySelector('i');
+            if (el.textContent === '••••••••') {
+                el.textContent = decodeURIComponent(el.getAttribute('data-pwd')) || '(none)';
+                if (icon) icon.className = 'bi bi-eye-slash';
             } else {
-                hideLoad();
-                showToast('Demo mode: account approved', 'info');
+                el.textContent = '••••••••';
+                if (icon) icon.className = 'bi bi-eye';
             }
         }
 
@@ -12583,6 +12565,15 @@
             if (settings.schoolLogo) document.getElementById('logoPrev').innerHTML = '<img src="' + settings.schoolLogo + '"  class="preview-img">';
             if (settings.schoolStamp) document.getElementById('stampPrev').innerHTML = '<img src="' + settings.schoolStamp + '" class="preview-img">';
             if (settings.signature) document.getElementById('sigPrev').innerHTML = '<img src="' + settings.signature + '"   class="preview-img">';
+            if (settings.loginBackgroundImage && document.getElementById('loginBgPrev')) document.getElementById('loginBgPrev').innerHTML = '<img src="' + settings.loginBackgroundImage + '" class="preview-img">';
+            if (settings.landingHeroImage && document.getElementById('landingHeroPrev')) document.getElementById('landingHeroPrev').innerHTML = '<img src="' + settings.landingHeroImage + '" class="preview-img">';
+            if (settings.landingHeroImage2 && document.getElementById('landingHero2Prev')) document.getElementById('landingHero2Prev').innerHTML = '<img src="' + settings.landingHeroImage2 + '" class="preview-img">';
+            if (settings.landingHeroImage3 && document.getElementById('landingHero3Prev')) document.getElementById('landingHero3Prev').innerHTML = '<img src="' + settings.landingHeroImage3 + '" class="preview-img">';
+            if (document.getElementById('setLandingEnrollText')) document.getElementById('setLandingEnrollText').value = settings.landingEnrollmentText || '';
+            if (document.getElementById('setLandingDeadlineText')) document.getElementById('setLandingDeadlineText').value = settings.landingDeadlineText || '';
+            if (document.getElementById('setLandingFacebook')) document.getElementById('setLandingFacebook').value = settings.schoolFacebookUrl || '';
+            if (document.getElementById('setLandingInstagram')) document.getElementById('setLandingInstagram').value = settings.schoolInstagramUrl || '';
+            if (document.getElementById('setLandingYoutube')) document.getElementById('setLandingYoutube').value = settings.schoolYoutubeUrl || '';
             renderFeeTypesTable();
             
             // Populate rollover custom fee checkboxes
@@ -12933,6 +12924,24 @@
 
         
 
+        function saveLandingTextSettings(e) {
+            e.preventDefault();
+            var s = {
+                landingEnrollmentText: document.getElementById('setLandingEnrollText').value.trim(),
+                landingDeadlineText: document.getElementById('setLandingDeadlineText').value.trim(),
+                schoolFacebookUrl: document.getElementById('setLandingFacebook').value.trim(),
+                schoolInstagramUrl: document.getElementById('setLandingInstagram').value.trim(),
+                schoolYoutubeUrl: document.getElementById('setLandingYoutube').value.trim()
+            };
+            showLoad('Saving…');
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run
+                    .withSuccessHandler(function (r) { hideLoad(); if (r.success) { Object.assign(settings, s); lsSet('settings', settings); showToast('Landing page settings saved!', 'success'); } else showToast(r.message, 'error'); })
+                    .withFailureHandler(function (err) { hideLoad(); showToast('Save failed: ' + err.message, 'error'); })
+                    .saveSettings(s);
+            } else { hideLoad(); Object.assign(settings, s); lsSet('settings', settings); showToast('Saved (demo mode)', 'info'); }
+        }
+
         function togglePasswordVisibility(id) {
             var el = document.getElementById(id);
             if (el) {
@@ -13259,15 +13268,16 @@
         }
 
         function uploadImg(type) {
-            var ids = { logo: 'logoFile', stamp: 'stampFile', signature: 'sigFile', loginBg: 'loginBgFile' };
-            var keys = { logo: 'schoolLogo', stamp: 'schoolStamp', signature: 'signature', loginBg: 'loginBackgroundImage' };
-            var fns = { logo: 'uploadSchoolLogo', stamp: 'uploadSchoolStamp', signature: 'uploadSignature', loginBg: 'uploadLoginBackground' };
+            var ids = { logo: 'logoFile', stamp: 'stampFile', signature: 'sigFile', loginBg: 'loginBgFile', landingHero: 'landingHeroFile', landingHero2: 'landingHero2File', landingHero3: 'landingHero3File' };
+            var keys = { logo: 'schoolLogo', stamp: 'schoolStamp', signature: 'signature', loginBg: 'loginBackgroundImage', landingHero: 'landingHeroImage', landingHero2: 'landingHeroImage2', landingHero3: 'landingHeroImage3' };
+            var fns = { logo: 'uploadSchoolLogo', stamp: 'uploadSchoolStamp', signature: 'uploadSignature', loginBg: 'uploadLoginBackground', landingHero: 'uploadLandingHeroImage', landingHero2: 'uploadLandingHeroImage2', landingHero3: 'uploadLandingHeroImage3' };
             // Small badge-style images (logo/stamp/signature) stay tiny — 200px is
-            // plenty. The login background fills the whole screen, so it needs to
-            // be much bigger, but everything here is stored as a single Google
-            // Sheets cell (50,000-character hard limit), so it's still capped and
-            // more aggressively compressed than a full-resolution photo would be.
-            var profile = type === 'loginBg' ? { max: 1280, quality: 0.6 } : { max: 200, quality: 0.75 };
+            // plenty. Full-bleed/hero-style photos need to be much bigger, but
+            // everything here is stored as a single Google Sheets cell
+            // (50,000-character hard limit), so they're still capped and more
+            // aggressively compressed than a full-resolution photo would be.
+            var bigPhotoTypes = ['loginBg', 'landingHero', 'landingHero2', 'landingHero3'];
+            var profile = bigPhotoTypes.indexOf(type) !== -1 ? { max: 1280, quality: 0.6 } : { max: 200, quality: 0.75 };
             var input = document.getElementById(ids[type]);
             if (!input.files || !input.files[0]) { showToast('Select a file first', 'warning'); return; }
 
@@ -13336,11 +13346,29 @@
         function closePwdModal() { document.getElementById('pwdModal').classList.remove('show'); }
         function changePwd(e) {
             e.preventDefault();
-            var curr = document.getElementById('currPwd').value, np = document.getElementById('newPwd2').value, cp = document.getElementById('confirmPwd').value, nu = document.getElementById('newUsername').value;
+            var curr = document.getElementById('currPwd').value, np = document.getElementById('newPwd2').value, cp = document.getElementById('confirmPwd').value, nu = document.getElementById('newUsername').value.trim();
             if (np !== cp) { showToast('Passwords do not match', 'error'); return; }
             showLoad('Changing password…');
             if (typeof google !== 'undefined' && google.script) {
-                google.script.run.withSuccessHandler(function (r) { hideLoad(); if (r.success) { showToast('Password changed successfully!', 'success'); closePwdModal(); if (nu && currentUser.role === 'admin') { currentUser.username = nu; lsSet('currentUser', currentUser); document.getElementById('topbarUserName').textContent = nu; } } else showToast(r.message, 'error'); }).changePassword(curr, np, nu);
+                google.script.run
+                    .withSuccessHandler(function (r) {
+                        hideLoad();
+                        if (r.success) {
+                            showToast('Credentials updated successfully!', 'success');
+                            closePwdModal();
+                            if (r.newUsername) {
+                                currentUser.username = r.newUsername;
+                                currentUser.name = r.newUsername;
+                                lsSet('currentUser', currentUser);
+                                var topbarEl = document.getElementById('topbarUserName');
+                                if (topbarEl) topbarEl.textContent = r.newUsername;
+                            }
+                        } else {
+                            showToast(r.message, 'error');
+                        }
+                    })
+                    .withFailureHandler(function (err) { hideLoad(); showToast('Error: ' + err.message, 'error'); })
+                    .changePassword(curr, np, nu, currentUser.email, currentUser.username || currentUser.name);
             } else { hideLoad(); showToast('Password changed (demo mode)', 'info'); closePwdModal(); }
         }
 
@@ -19828,9 +19856,9 @@
         // ════════════════════════════════════════════════════════
         function clearUploadedImg(e, type) {
             if (e) e.stopPropagation();
-            var keys = { logo: 'schoolLogo', stamp: 'schoolStamp', signature: 'signature', loginBg: 'loginBackgroundImage' };
-            var prevs = { logo: 'logoPrev', stamp: 'stampPrev', signature: 'sigPrev', loginBg: 'loginBgPrev' };
-            var icons = { logo: 'bi-image', stamp: 'bi-patch-check', signature: 'bi-pen', loginBg: 'bi-image-alt' };
+            var keys = { logo: 'schoolLogo', stamp: 'schoolStamp', signature: 'signature', loginBg: 'loginBackgroundImage', landingHero: 'landingHeroImage', landingHero2: 'landingHeroImage2', landingHero3: 'landingHeroImage3' };
+            var prevs = { logo: 'logoPrev', stamp: 'stampPrev', signature: 'sigPrev', loginBg: 'loginBgPrev', landingHero: 'landingHeroPrev', landingHero2: 'landingHero2Prev', landingHero3: 'landingHero3Prev' };
+            var icons = { logo: 'bi-image', stamp: 'bi-patch-check', signature: 'bi-pen', loginBg: 'bi-image-alt', landingHero: 'bi-image-alt', landingHero2: 'bi-image-alt', landingHero3: 'bi-image-alt' };
 
             var key = keys[type];
             if (!key) return;
