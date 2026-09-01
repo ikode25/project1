@@ -3141,7 +3141,7 @@
             });
             var totalFees = 0, totalPaid = 0;
             feeKeys.forEach(function (k) { totalFees += parseFloat(rec[k]) || 0; });
-            for (var i = 1; i <= 6; i++) totalPaid += parseFloat(rec['inst' + i]) || 0;
+            for (var i = 1; i <= 10; i++) totalPaid += parseFloat(rec['inst' + i]) || 0;
             if (parseFloat(rec.totalFees) > 0) {
                 totalFees = parseFloat(rec.totalFees); // server value is already net of any discount
             } else {
@@ -3604,7 +3604,7 @@
                 return {
                     wardIdx: wardIdx, feeType: 'regular', label: label,
                     totalFees: t.totalFees, totalPaid: t.totalPaid, balance: t.balance,
-                    numInst: 6,
+                    numInst: 10,
                     getInst: function (i) { return { amt: parseFloat(rec['inst' + i]) || 0, date: rec['inst' + i + 'Date'] || '' }; }
                 };
             } else {
@@ -4234,7 +4234,7 @@
             });
 
             feeKeys.forEach(function (k) { totalFees += parseFloat(rec[k]) || 0; });
-            for (var i = 1; i <= 6; i++) totalPaid += parseFloat(rec['inst' + i]) || 0;
+            for (var i = 1; i <= 10; i++) totalPaid += parseFloat(rec['inst' + i]) || 0;
             if (parseFloat(rec.totalFees) > 0) {
                 totalFees = parseFloat(rec.totalFees);
             } else {

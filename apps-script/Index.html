@@ -3974,6 +3974,30 @@
                                             min="0" step="0.01" oninput="onInstChange(6,this)">
                                         <input type="date" class="date-input" id="inst6Date">
                                     </div>
+                                    <div class="col-6 col-md-2 inst-group">
+                                        <label>Inst 7</label>
+                                        <input type="number" class="form-control form-control-sm" id="inst7" value="0"
+                                            min="0" step="0.01" oninput="onInstChange(7,this)">
+                                        <input type="date" class="date-input" id="inst7Date">
+                                    </div>
+                                    <div class="col-6 col-md-2 inst-group">
+                                        <label>Inst 8</label>
+                                        <input type="number" class="form-control form-control-sm" id="inst8" value="0"
+                                            min="0" step="0.01" oninput="onInstChange(8,this)">
+                                        <input type="date" class="date-input" id="inst8Date">
+                                    </div>
+                                    <div class="col-6 col-md-2 inst-group">
+                                        <label>Inst 9</label>
+                                        <input type="number" class="form-control form-control-sm" id="inst9" value="0"
+                                            min="0" step="0.01" oninput="onInstChange(9,this)">
+                                        <input type="date" class="date-input" id="inst9Date">
+                                    </div>
+                                    <div class="col-6 col-md-2 inst-group">
+                                        <label>Inst 10</label>
+                                        <input type="number" class="form-control form-control-sm" id="inst10" value="0"
+                                            min="0" step="0.01" oninput="onInstChange(10,this)">
+                                        <input type="date" class="date-input" id="inst10Date">
+                                    </div>
                                 </div>
                                 <div class="row g-2 mb-3">
                                     <div class="col-md-6">
@@ -4284,6 +4308,10 @@
                                                      <option value="4">4 Installments</option>
                                                      <option value="5">5 Installments</option>
                                                      <option value="6">6 Installments</option>
+                                                     <option value="7">7 Installments</option>
+                                                     <option value="8">8 Installments</option>
+                                                     <option value="9">9 Installments</option>
+                                                     <option value="10">10 Installments</option>
                                                  </select>
                                              </div>
                                              <div class="row g-2 mb-2">
@@ -7262,7 +7290,7 @@
                     fees += v;
                 });
                 var paid = 0;
-                for (var i = 1; i <= 6; i++) {
+                for (var i = 1; i <= 10; i++) {
                     var v = parseFloat(r['inst' + i]);
                     if (!isNaN(v)) paid += v;
                 }
@@ -8422,11 +8450,12 @@
         }
 
         // Sums installment amounts paid within the current calendar month for a fee record
-        // (works for both regular term records and custom/extra fee records — both share the inst1..inst6 / inst*Date shape)
+        // (works for both regular term records — now inst1..inst10 — and custom/extra fee
+        // records — still inst1..inst6; missing slots just parse to 0, harmlessly)
         function sumThisMonthPayments(r) {
             var sum = 0;
             var now = new Date();
-            for (var i = 1; i <= 6; i++) {
+            for (var i = 1; i <= 10; i++) {
                 var amt = parseFloat(r['inst' + i]) || 0;
                 var dateStr = r['inst' + i + 'Date'];
                 if (amt > 0 && dateStr) {
@@ -8708,7 +8737,7 @@
                 if (!sess.includes(activeSess)) return;
 
                 var tf = safeTotals(r);
-                for (var i = 1; i <= 6; i++) {
+                for (var i = 1; i <= 10; i++) {
                     var d = String(r['inst' + i + 'Date'] || '').trim();
                     var amt = parseFloat(r['inst' + i]) || 0;
                     if (amt > 0 && d === today) {
@@ -8802,7 +8831,7 @@
             }
 
             allRecords.forEach(function (r) {
-                for (var j = 1; j <= 6; j++) {
+                for (var j = 1; j <= 10; j++) {
                     var dateVal = String(r['inst' + j + 'Date'] || '').trim();
                     var amtVal = parseFloat(r['inst' + j]) || 0;
                     if (amtVal > 0 && dateVal && trendData[dateVal] !== undefined) {
@@ -9536,7 +9565,7 @@
             });
 
             var paid = 0;
-            for (var i = 1; i <= 6; i++) {
+            for (var i = 1; i <= 10; i++) {
                 var el = document.getElementById('inst' + i);
                 if (el) paid += parseFloat(el.value) || 0;
             }
@@ -9649,9 +9678,11 @@
                 var el = document.getElementById('fee_' + c.id);
                 rec[c.id] = el ? (parseFloat(el.value) || 0) : 0;
             });
-            for (var i = 1; i <= 6; i++) {
-                rec['inst' + i] = parseFloat(document.getElementById('inst' + i).value) || 0;
-                rec['inst' + i + 'Date'] = document.getElementById('inst' + i + 'Date').value || '';
+            for (var i = 1; i <= 10; i++) {
+                var instEl = document.getElementById('inst' + i);
+                var instDateEl = document.getElementById('inst' + i + 'Date');
+                rec['inst' + i] = instEl ? (parseFloat(instEl.value) || 0) : 0;
+                rec['inst' + i + 'Date'] = instDateEl ? (instDateEl.value || '') : '';
             }
 
             // Check if photo is selected
@@ -10244,7 +10275,7 @@
                 '                <thead><tr><th>Inst.</th><th>Amount</th><th>Date</th><th>Mode</th></tr></thead><tbody>';
                 
             var hasRegularPaid = false;
-            for (var i = 1; i <= 6; i++) {
+            for (var i = 1; i <= 10; i++) {
                 var amt = parseFloat(rec['inst' + i]) || 0;
                 if (amt > 0) {
                     hasRegularPaid = true;
@@ -10512,7 +10543,7 @@
                 document.getElementById('idPreviewBox').style.display = 'none';
                 buildFeeInputs(rec);
 
-                for (var i = 1; i <= 6; i++) {
+                for (var i = 1; i <= 10; i++) {
                     var v = rec['inst' + i];
                     document.getElementById('inst' + i).value = (v !== undefined && v !== null && v !== '') ? (parseFloat(v) || 0) : 0;
                     document.getElementById('inst' + i + 'Date').value = rec['inst' + i + 'Date'] || '';
@@ -10743,7 +10774,7 @@
             var t = safeTotals(rec);
             var cur = settings.currency || 'GHC';
             var pays = [];
-            for (var i = 1; i <= 6; i++) if (parseFloat(rec['inst' + i]) > 0) pays.push({ n: i, amt: rec['inst' + i], date: rec['inst' + i + 'Date'] || '-' });
+            for (var i = 1; i <= 10; i++) if (parseFloat(rec['inst' + i]) > 0) pays.push({ n: i, amt: rec['inst' + i], date: rec['inst' + i + 'Date'] || '-' });
             var rNo = 'REC-' + rec.id + '-' + Date.now().toString().slice(-6);
             var w = window.open('', '_blank');
             w.document.write('<!DOCTYPE html><html><head><title>Receipt - ' + rNo + '</title>');
@@ -10829,7 +10860,7 @@
             var t = safeTotals(rec);
             var cur = settings.currency || 'GHC';
             var pays = [];
-            for (var i = 1; i <= 6; i++) if (parseFloat(rec['inst' + i]) > 0) pays.push({ n: i, amt: rec['inst' + i], date: rec['inst' + i + 'Date'] || '-' });
+            for (var i = 1; i <= 10; i++) if (parseFloat(rec['inst' + i]) > 0) pays.push({ n: i, amt: rec['inst' + i], date: rec['inst' + i + 'Date'] || '-' });
             var rNo = 'REC-' + rec.id + '-' + Date.now().toString().slice(-6);
             
             var w = window.open('', '_blank');
@@ -11395,7 +11426,7 @@
                     gData[r.grade] = (gData[r.grade] || 0) + t.totalPaid;
                 }
 
-                for (var j = 1; j <= 6; j++) {
+                for (var j = 1; j <= 10; j++) {
                     var amt = parseFloat(r['inst' + j]) || 0;
                     var dateVal = String(r['inst' + j + 'Date'] || '').trim();
                     if (amt > 0 && dateVal) {
@@ -11532,7 +11563,7 @@
                     ttOut += Math.max(0, t.balance);
                 }
 
-                for (var j = 1; j <= 6; j++) {
+                for (var j = 1; j <= 10; j++) {
                     var amt = parseFloat(r['inst' + j]) || 0;
                     var dateVal = String(r['inst' + j + 'Date'] || '').trim();
                     if (amt > 0 && dateVal === today) {
@@ -11613,7 +11644,7 @@
 
             if (Array.isArray(allRecords)) {
                 allRecords.forEach(function (r) {
-                    for (var i = 1; i <= 6; i++) {
+                    for (var i = 1; i <= 10; i++) {
                         var amt = parseFloat(r['inst' + i]) || 0;
                         var d = r['inst' + i + 'Date'];
                         if (amt > 0 && _viewerPeriodMatch(d, period, r.academicSession)) {
@@ -11665,7 +11696,7 @@
 
             if (Array.isArray(allRecords)) {
                 allRecords.forEach(function (r) {
-                    for (var i = 1; i <= 6; i++) {
+                    for (var i = 1; i <= 10; i++) {
                         var amt = parseFloat(r['inst' + i]) || 0;
                         var d = r['inst' + i + 'Date'];
                         if (amt > 0 && _viewerPeriodMatch(d, period, r.academicSession)) {
@@ -11737,7 +11768,7 @@
             if (Array.isArray(allRecords)) {
                 allRecords.forEach(function (r) {
                     if (!r) return;
-                    for (var i = 1; i <= 6; i++) {
+                    for (var i = 1; i <= 10; i++) {
                         var amt = parseFloat(r['inst' + i]) || 0;
                         if (amt > 0) {
                             receivedByType['Regular School Fees'] = (receivedByType['Regular School Fees'] || 0) + amt;
@@ -12568,7 +12599,8 @@
 
         function applyInstallmentFieldCount() {
             var n = parseInt((settings.numInstallments) || (document.getElementById('setNumInstallments') ? document.getElementById('setNumInstallments').value : 6)) || 6;
-            for (var i = 1; i <= 6; i++) {
+            n = Math.max(1, Math.min(10, n));
+            for (var i = 1; i <= 10; i++) {
                 var group = document.getElementById('inst' + i);
                 var wrap = group ? group.closest('.inst-group') : null;
                 if (!wrap) continue;
@@ -12974,7 +13006,7 @@
         // ════════════════════════════════════════════════════════
         function downloadTemplate() {
             var active = comps().filter(function (c) { return c.isActive; });
-            var headers = ['Student Name', 'Phone Number', 'Grade', 'Academic Session'].concat(active.map(function (c) { return c.name; })).concat(['Is New Student', 'Inst 1', 'Inst 1 Date', 'Inst 2', 'Inst 2 Date', 'Inst 3', 'Inst 3 Date', 'Inst 4', 'Inst 4 Date', 'Inst 5', 'Inst 5 Date', 'Inst 6', 'Inst 6 Date']);
+            var headers = ['Student Name', 'Phone Number', 'Grade', 'Academic Session'].concat(active.map(function (c) { return c.name; })).concat(['Is New Student', 'Inst 1', 'Inst 1 Date', 'Inst 2', 'Inst 2 Date', 'Inst 3', 'Inst 3 Date', 'Inst 4', 'Inst 4 Date', 'Inst 5', 'Inst 5 Date', 'Inst 6', 'Inst 6 Date', 'Inst 7', 'Inst 7 Date', 'Inst 8', 'Inst 8 Date', 'Inst 9', 'Inst 9 Date', 'Inst 10', 'Inst 10 Date']);
             downloadCSV(headers.join(','), 'Import_Template.csv');
         }
 
@@ -13003,10 +13035,10 @@
 
         function exportAll() {
             var active = comps().filter(function (c) { return c.isActive; });
-            var csv = ['ID,Student,Phone,Grade,Session,' + active.map(function (c) { return c.name; }).join(',') + ',IsNew,Inst1,Date1,Inst2,Date2,Inst3,Date3,Inst4,Date4,Inst5,Date5,Inst6,Date6'];
+            var csv = ['ID,Student,Phone,Grade,Session,' + active.map(function (c) { return c.name; }).join(',') + ',IsNew,Inst1,Date1,Inst2,Date2,Inst3,Date3,Inst4,Date4,Inst5,Date5,Inst6,Date6,Inst7,Date7,Inst8,Date8,Inst9,Date9,Inst10,Date10'];
             allRecords.forEach(function (r) {
                 var fv = active.map(function (c) { return r[c.id] || 0; }).join(',');
-                csv.push(r.id + ',"' + r.studentName + '","' + (r.phoneNumber || '') + '","' + r.grade + '","' + r.academicSession + '",' + fv + ',' + (isBoolTrue(r.isNewStudent) ? 'Yes' : 'No') + ',' + (r.inst1 || 0) + ',' + (r.inst1Date || '') + ',' + (r.inst2 || 0) + ',' + (r.inst2Date || '') + ',' + (r.inst3 || 0) + ',' + (r.inst3Date || '') + ',' + (r.inst4 || 0) + ',' + (r.inst4Date || '') + ',' + (r.inst5 || 0) + ',' + (r.inst5Date || '') + ',' + (r.inst6 || 0) + ',' + (r.inst6Date || ''));
+                csv.push(r.id + ',"' + r.studentName + '","' + (r.phoneNumber || '') + '","' + r.grade + '","' + r.academicSession + '",' + fv + ',' + (isBoolTrue(r.isNewStudent) ? 'Yes' : 'No') + ',' + (r.inst1 || 0) + ',' + (r.inst1Date || '') + ',' + (r.inst2 || 0) + ',' + (r.inst2Date || '') + ',' + (r.inst3 || 0) + ',' + (r.inst3Date || '') + ',' + (r.inst4 || 0) + ',' + (r.inst4Date || '') + ',' + (r.inst5 || 0) + ',' + (r.inst5Date || '') + ',' + (r.inst6 || 0) + ',' + (r.inst6Date || '') + ',' + (r.inst7 || 0) + ',' + (r.inst7Date || '') + ',' + (r.inst8 || 0) + ',' + (r.inst8Date || '') + ',' + (r.inst9 || 0) + ',' + (r.inst9Date || '') + ',' + (r.inst10 || 0) + ',' + (r.inst10Date || ''));
             });
             downloadCSV(csv.join('\n'), 'All_Records_Export.csv');
         }
@@ -13584,7 +13616,7 @@
             allRecords.forEach(function (r) {
                 var sess = String(r.academicSession || '');
                 if (!sess.includes(activeSess)) return;
-                for (var i = 1; i <= 6; i++) {
+                for (var i = 1; i <= 10; i++) {
                     var d = String(r['inst' + i + 'Date'] || '').trim(), amt = parseFloat(r['inst' + i]) || 0;
                     if (amt > 0 && d === ds) { rows.push({ name: r.studentName, grade: r.grade, inst: i, amt: amt }); total += amt; }
                 }
@@ -17092,7 +17124,7 @@
                     var t = safeTotals(r);
                     totalBilled += t.totalFees;
                     totalCollected += t.totalPaid;
-                    for (var i = 1; i <= 6; i++) {
+                    for (var i = 1; i <= 10; i++) {
                         var amt = parseFloat(r['inst' + i]) || 0;
                         var d = r['inst' + i + 'Date'] || '';
                         if (amt > 0 && _reportPeriodMatches(d, period)) {
@@ -17300,7 +17332,7 @@
                         totalPaid += paidVal;
                     }
                     
-                    for (var i = 1; i <= 6; i++) {
+                    for (var i = 1; i <= 10; i++) {
                         var amt = parseFloat(r['inst'+i]) || 0;
                         if (amt > 0) {
                             var dStr = String(r['inst'+i+'Date'] || '').trim();
@@ -17664,7 +17696,7 @@
 
                     var bal = safeTotals(r).balance;
 
-                    for (var i = 1; i <= 6; i++) {
+                    for (var i = 1; i <= 10; i++) {
                         var d = String(r['inst'+i+'Date'] || '').trim();
                         var amt = parseFloat(r['inst'+i]) || 0;
                         if (amt > 0 && d === phDate) {
@@ -18685,7 +18717,7 @@
                         var idx = allRecords.findIndex(function(x) { return String(x.id) === String(w.id); });
                         if (idx !== -1) {
                             var rec = allRecords[idx];
-                            for (var j = 1; j <= 6; j++) {
+                            for (var j = 1; j <= 10; j++) {
                                 if ((parseFloat(rec['inst' + j]) || 0) === 0) {
                                     rec['inst' + j] = w.allocated;
                                     rec['inst' + j + 'Date'] = payDate;
@@ -19618,7 +19650,7 @@
             var pBody = document.getElementById('parentWardsPaymentsTableBody');
             var payments = [];
             parent.wards.forEach(function(w) {
-                for (var i = 1; i <= 6; i++) {
+                for (var i = 1; i <= 10; i++) {
                     var amt = parseFloat(w['inst' + i]) || 0;
                     if (amt > 0) {
                         payments.push({
@@ -20400,9 +20432,15 @@
             document.getElementById('extraFeeClassRatesWrap').style.display = on ? 'block' : 'none';
         }
 
+        function toggleExtraFeeInstallmentField() {
+            var on = document.getElementById('extraFeeInstallmentToggle').checked;
+            document.getElementById('extraFeeInstallmentWrap').style.display = on ? 'block' : 'none';
+        }
+
         function openExtraFeeModal(editIdx) {
             document.getElementById('extraFeeEditIndex').value = (editIdx !== undefined && editIdx !== null) ? editIdx : '';
             var classAmounts = {};
+            var installmentAllowed = false, numInst = 3;
             if (editIdx !== undefined && editIdx !== null) {
                 var extraFees = settings.extraFeeTypes || settings.customFeeTypes || [];
                 if (typeof extraFees === 'string') extraFees = JSON.parse(extraFees);
@@ -20413,6 +20451,8 @@
                     document.getElementById('extraFeeAmount').value = f.amount || f.defaultAmount || '';
                     document.getElementById('extraFeeTerm').value = f.term || 'All Terms';
                     classAmounts = f.classAmounts || {};
+                    installmentAllowed = !!f.installmentAllowed;
+                    numInst = parseInt(f.numInstallments) || 3;
                 }
             } else {
                 document.getElementById('extraFeeModalTitle').innerHTML = '<i class="bi bi-plus-circle me-1 text-primary"></i>Add Extra Fee Type';
@@ -20423,6 +20463,9 @@
             document.getElementById('extraFeePerClassToggle').checked = Object.keys(classAmounts).length > 0;
             renderExtraFeeClassRateInputs(classAmounts);
             toggleExtraFeeClassRates();
+            document.getElementById('extraFeeInstallmentToggle').checked = installmentAllowed;
+            document.getElementById('extraFeeNumInst').value = numInst;
+            toggleExtraFeeInstallmentField();
             document.getElementById('extraFeeModal').classList.add('show');
         }
 
@@ -20449,6 +20492,10 @@
                 });
             }
 
+            var installmentAllowed = document.getElementById('extraFeeInstallmentToggle').checked;
+            var numInst = installmentAllowed ? (parseInt(document.getElementById('extraFeeNumInst').value) || 3) : 1;
+            numInst = Math.max(1, Math.min(6, numInst));
+
             var extraFees = settings.extraFeeTypes || settings.customFeeTypes || [];
             if (typeof extraFees === 'string') {
                 try { extraFees = JSON.parse(extraFees); } catch(err) { extraFees = []; }
@@ -20461,6 +20508,8 @@
                 defaultAmount: amount,
                 classAmounts: classAmounts,
                 term: term,
+                installmentAllowed: installmentAllowed,
+                numInstallments: numInst,
                 isActive: true
             };
 
@@ -23023,6 +23072,15 @@
                 </div>
                 <div class="mb-3" id="extraFeeClassRatesWrap" style="display:none; max-height:180px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:8px; padding:8px;">
                     <div id="extraFeeClassRatesList"></div>
+                </div>
+                <div class="mb-2 form-check">
+                    <input type="checkbox" class="form-check-input" id="extraFeeInstallmentToggle" onchange="toggleExtraFeeInstallmentField()">
+                    <label class="form-check-label small">Allow parents to pay this in installments</label>
+                </div>
+                <div class="mb-3" id="extraFeeInstallmentWrap" style="display:none;">
+                    <label class="form-label small fw-semibold">Number of Installments</label>
+                    <input type="number" class="form-control form-control-sm" id="extraFeeNumInst" min="1" max="6" value="3">
+                    <div class="form-text" style="font-size:11px;">Some parents prefer to pay extra fees like this in parts.</div>
                 </div>
                 <div class="alert alert-info py-2 px-3 mb-3" style="font-size:11px;">
                     <i class="bi bi-info-circle me-1"></i>Saving will automatically bill this fee to every active student in the applicable class(es)/term(s) who doesn't already have it — existing bills are never changed.

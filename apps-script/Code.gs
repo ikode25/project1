@@ -141,6 +141,24 @@ function getOrCreateTermSheet(term) {
         }
       });
 
+      // Migrate inst7..inst10 (+ their Date columns) if missing — regular
+      // school fees were expanded from 6 to 10 installments so admins can
+      // collect in more parts. Insert right after inst6Date so the ten
+      // installment columns stay grouped together instead of landing at
+      // the far end of the sheet.
+      if (existingHeaders.indexOf('inst7') === -1) {
+        var afterCol = existingHeaders.indexOf('inst6Date');
+        if (afterCol === -1) afterCol = existingHeaders.indexOf('totalFees');
+        if (afterCol === -1) afterCol = existingHeaders.length - 1;
+        var newInstCols = ['inst7','inst7Date','inst8','inst8Date','inst9','inst9Date','inst10','inst10Date'];
+        newInstCols.forEach((colName, offset) => {
+          sheet.insertColumnAfter(afterCol + 1 + offset);
+          sheet.getRange(1, afterCol + 2 + offset).setValue(colName)
+            .setBackground('#4285F4').setFontColor('white').setFontWeight('bold');
+        });
+        existingHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(h => String(h).trim());
+      }
+
       if (existingHeaders.indexOf('isStopped') === -1) {
         var insertAfter = existingHeaders.indexOf('isNewStudent');
         if (insertAfter === -1) insertAfter = existingHeaders.length - 1;
@@ -252,6 +270,7 @@ const RESERVED_TERM_SHEET_COLUMNS = [
   "isNewStudent","isStopped","studentStatus","discount","totalFees",
   "inst1","inst1Date","inst2","inst2Date","inst3","inst3Date",
   "inst4","inst4Date","inst5","inst5Date","inst6","inst6Date",
+  "inst7","inst7Date","inst8","inst8Date","inst9","inst9Date","inst10","inst10Date",
   "totalPaid","balance","paymentStatus","createdAt","updatedAt",
   "paymentMode","recordedBy","isStaffChild","studentPhoto"
 ];
@@ -317,6 +336,7 @@ function buildHeaders() {
     "isNewStudent","isStopped","studentStatus","discount","totalFees",
     "inst1","inst1Date","inst2","inst2Date","inst3","inst3Date",
     "inst4","inst4Date","inst5","inst5Date","inst6","inst6Date",
+    "inst7","inst7Date","inst8","inst8Date","inst9","inst9Date","inst10","inst10Date",
     "totalPaid","balance","paymentStatus","createdAt","updatedAt",
     "paymentMode","recordedBy"
   ];
@@ -1243,7 +1263,7 @@ function recordPaymentAutomatically(studentId, amount, ref, momo, note) {
       // ── Handle Regular School Fees ──
       // Find first empty installment slot
       let instIndex = -1;
-      for (let j = 1; j <= 6; j++) {
+      for (let j = 1; j <= 10; j++) {
         const instKey = Object.keys(studentObj).find(k => String(k).trim().toLowerCase() === 'inst' + j);
         const rawVal = instKey ? studentObj[instKey] : '';
         const val = parseFloat(rawVal) || 0;
@@ -1278,7 +1298,7 @@ function recordPaymentAutomatically(studentId, amount, ref, momo, note) {
           return { success: false, message: 'Failed to save updated record: ' + saveRes.message };
         }
       } else {
-        return { success: false, message: 'All 6 installment slots are already filled.' };
+        return { success: false, message: 'All 10 installment slots are already filled.' };
       }
       
     } else {
@@ -1327,7 +1347,7 @@ function recordPaymentAutomatically(studentId, amount, ref, momo, note) {
             feeAmount = parseFloat(configItem.classAmounts[studentObj.grade]) || 0;
           }
           numInstallments = parseInt(configItem.numInstallments) || 1;
-          isInstallment = !!configItem.allowInstallment;
+          isInstallment = !!configItem.installmentAllowed;
         }
         
         existingRecord = {
@@ -1864,7 +1884,7 @@ function calculateFields(record) {
   record.totalFees     = totalFees;
   
   let totalPaid = 0;
-  for (let i = 1; i <= 6; i++) {
+  for (let i = 1; i <= 10; i++) {
     const v = parseFloat(normRec['inst' + i]);
     totalPaid += isNaN(v) ? 0 : v;
   }
@@ -2034,7 +2054,7 @@ function autoAssignExtraFeesForStudent(recordData) {
     if (!extraFeeAppliesToTerm(ft, term)) return;
     var amount = getExtraFeeClassRate(ft, recordData.grade);
     if (amount <= 0) return;
-    createCustomFeeRecordIfMissing(recordData.id, recordData.studentName, recordData.grade, recordData.academicSession, ft.name, amount);
+    createCustomFeeRecordIfMissing(recordData.id, recordData.studentName, recordData.grade, recordData.academicSession, ft.name, amount, ft);
   });
 }
 
@@ -2061,7 +2081,7 @@ function autoAssignExtraFeeToAllStudents(feeType) {
       var amount = getExtraFeeClassRate(feeType, grade);
       if (amount <= 0) continue;
       var created = createCustomFeeRecordIfMissing(
-        data[i][idIdx], data[i][nameIdx], grade, data[i][sessionIdx], feeType.name, amount
+        data[i][idIdx], data[i][nameIdx], grade, data[i][sessionIdx], feeType.name, amount, feeType
       );
       if (created) billedCount++;
     }
@@ -2070,7 +2090,11 @@ function autoAssignExtraFeeToAllStudents(feeType) {
 }
 
 // Shared upsert-if-missing helper used by both auto-assign paths above.
-function createCustomFeeRecordIfMissing(studentId, studentName, grade, academicSession, feeTypeName, amount) {
+// `feeType` (optional) is the Extra Fee Type config this record is being
+// billed from — when it allows installments, the new record is created with
+// that same installment count so the payment modal shows the right number
+// of installment rows immediately instead of defaulting to a one-time fee.
+function createCustomFeeRecordIfMissing(studentId, studentName, grade, academicSession, feeTypeName, amount, feeType) {
   studentId = String(studentId || '').trim();
   academicSession = String(academicSession || '').trim();
   if (!studentId || !academicSession) return false;
@@ -2090,6 +2114,9 @@ function createCustomFeeRecordIfMissing(studentId, studentName, grade, academicS
     }
   }
 
+  var installmentAllowed = !!(feeType && feeType.installmentAllowed);
+  var numInstallments = installmentAllowed ? Math.max(1, Math.min(6, parseInt(feeType.numInstallments) || 1)) : 1;
+
   saveCustomFeeRecord({
     studentId: studentId,
     studentName: studentName || '',
@@ -2097,8 +2124,8 @@ function createCustomFeeRecordIfMissing(studentId, studentName, grade, academicS
     academicSession: academicSession,
     feeTypeName: feeTypeName,
     amount: amount,
-    isInstallment: false,
-    numInstallments: 1
+    isInstallment: installmentAllowed,
+    numInstallments: numInstallments
   });
   return true;
 }
@@ -2194,7 +2221,7 @@ function importBulkRecords(rows) {
           }
           rec[comp.id] = val;
         });
-        for (let i = 1; i <= 6; i++) {
+        for (let i = 1; i <= 10; i++) {
           rec['inst'+i]        = parseFloat(row['Inst '+i] || row['inst'+i]) || 0;
           rec['inst'+i+'Date'] = row['Inst '+i+' Date']   || row['inst'+i+'Date'] || '';
         }
@@ -2212,7 +2239,9 @@ function getImportTemplate() {
               ...comps.map(c => c.name),"Is New Student",
               "Inst 1","Inst 1 Date","Inst 2","Inst 2 Date",
               "Inst 3","Inst 3 Date","Inst 4","Inst 4 Date",
-              "Inst 5","Inst 5 Date","Inst 6","Inst 6 Date"],
+              "Inst 5","Inst 5 Date","Inst 6","Inst 6 Date",
+              "Inst 7","Inst 7 Date","Inst 8","Inst 8 Date",
+              "Inst 9","Inst 9 Date","Inst 10","Inst 10 Date"],
     feeComponents: comps
   }};
 }
@@ -2336,7 +2365,7 @@ function getReportData(filters) {
     allRows.forEach(r => {
       let fees = 0, paid = 0;
       comps.forEach(c => { const v = parseFloat(r[c.id]) || 0; fees += v; compMap[c.id].total += v; });
-      for (let i = 1; i <= 6; i++) { 
+      for (let i = 1; i <= 10; i++) {
         let amt = parseFloat(r['inst'+i]) || 0;
         paid += amt;
         if (amt > 0) {
@@ -2445,7 +2474,7 @@ function getReportData(filters) {
     let regBilled = 0, regPaid = 0;
     allRows.forEach(r => {
       comps.forEach(c => { regBilled += parseFloat(r[c.id]) || 0; });
-      for (let i = 1; i <= 6; i++) { regPaid += parseFloat(r['inst'+i]) || 0; }
+      for (let i = 1; i <= 10; i++) { regPaid += parseFloat(r['inst'+i]) || 0; }
     });
 
     const customFeesMap = {};
@@ -2786,7 +2815,7 @@ function promoteStudentToNextTerm(studentId) {
     promotedRecord.arrears = Math.max(0, currentBalance);
     
     // Clear other payment fields
-    for (let i = 1; i <= 6; i++) {
+    for (let i = 1; i <= 10; i++) {
       promotedRecord['inst' + i] = 0;
       promotedRecord['inst' + i + 'Date'] = "";
     }
@@ -2915,8 +2944,8 @@ function promoteAllStudentsToNextTerm(termName, academicYear) {
       promotedRecord.academicSession = nextSession;
       promotedRecord.isNewStudent = false;
       promotedRecord.isStopped = false;
-      
-      for (let i = 1; i <= 6; i++) {
+
+      for (let i = 1; i <= 10; i++) {
         promotedRecord['inst' + i] = 0;
         promotedRecord['inst' + i + 'Date'] = "";
       }
@@ -3082,7 +3111,7 @@ function cleanAllSheetHeaders() {
           if (s.toLowerCase() === 'updatedat') return 'updatedAt';
           if (s.toLowerCase() === 'paymentmode') return 'paymentMode';
           if (s.toLowerCase() === 'recordedby') return 'recordedBy';
-          for (let j = 1; j <= 6; j++) {
+          for (let j = 1; j <= 10; j++) {
             if (s.toLowerCase() === 'inst' + j) return 'inst' + j;
             if (s.toLowerCase() === 'inst' + j + 'date') return 'inst' + j + 'Date';
           }
@@ -3130,7 +3159,7 @@ function autoMarkNotificationsRecorded(studentId, recordData) {
     
     // Extract non-zero installments
     const installments = [];
-    for (let j = 1; j <= 6; j++) {
+    for (let j = 1; j <= 10; j++) {
       const v = parseFloat(normRec['inst' + j]);
       if (!isNaN(v) && v > 0) {
         installments.push(v);
@@ -3317,7 +3346,7 @@ function saveSyncedStudents(students) {
         });
         
         // Clear payment slots and installment fields
-        for (let i = 1; i <= 6; i++) {
+        for (let i = 1; i <= 10; i++) {
           recordObj['inst' + i] = 0;
           recordObj['inst' + i + 'Date'] = '';
         }
@@ -3632,8 +3661,8 @@ function refundPayment(data) {
 }
 
 // Deducts `amount` from a regular term-fee record's paid installments,
-// working backwards from inst6 to inst1 (undoing the most recent
-// payments first), then recomputes totalPaid/balance/paymentStatus.
+// working backwards from the last installment to inst1 (undoing the most
+// recent payments first), then recomputes totalPaid/balance/paymentStatus.
 function refundRegularFee(studentId, session, amount) {
   const term = getTermFromSession(session);
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_PREFIX + ' - ' + term);
@@ -3683,7 +3712,10 @@ function refundCustomFee(studentId, session, feeTypeName, amount) {
 function applyRefundToInstallments(sheet, headers, rowIdx, amount, feesColName) {
   const normHeaders = headers.map(h => h.toLowerCase());
   const instIdx = [];
-  for (let n = 1; n <= 6; n++) instIdx.push(normHeaders.indexOf('inst' + n));
+  // Regular fee sheets now have inst1..inst10; custom fee sheets still only
+  // have inst1..inst6 — indexOf just returns -1 (harmlessly skipped below)
+  // for whichever slots a given sheet doesn't have.
+  for (let n = 1; n <= 10; n++) instIdx.push(normHeaders.indexOf('inst' + n));
 
   const rowRange = sheet.getRange(rowIdx + 1, 1, 1, headers.length);
   const row = rowRange.getValues()[0];
@@ -3695,7 +3727,7 @@ function applyRefundToInstallments(sheet, headers, rowIdx, amount, feesColName) 
   }
 
   let remaining = amount;
-  for (let n = 5; n >= 0 && remaining > 0.001; n--) {
+  for (let n = instIdx.length - 1; n >= 0 && remaining > 0.001; n--) {
     const idx = instIdx[n];
     if (idx === -1) continue;
     let val = parseFloat(row[idx]) || 0;
@@ -4556,7 +4588,7 @@ function recordSiblingPayments(wardsPaymentsJson, date, mode) {
       
       if (studentObj) {
         let instIndex = -1;
-        for (let j = 1; j <= 6; j++) {
+        for (let j = 1; j <= 10; j++) {
           const rawVal = studentObj['inst' + j];
           const val = parseFloat(rawVal) || 0;
           if (val === 0) {
@@ -4623,7 +4655,7 @@ function calculateStudentTotals(rec) {
   });
   let totalFees = 0, totalPaid = 0;
   feeKeys.forEach(k => { totalFees += parseFloat(rec[k]) || 0; });
-  for (let i = 1; i <= 6; i++) {
+  for (let i = 1; i <= 10; i++) {
     totalPaid += parseFloat(rec['inst' + i]) || 0;
   }
   if (parseFloat(rec.totalFees) > 0) totalFees = parseFloat(rec.totalFees);
@@ -4636,14 +4668,14 @@ function recordSingleAutoPayment(studentObj, amount, ref, momo, note) {
   if (amount <= 0) return { success: false, message: 'Amount is 0' };
   
   let instIndex = -1;
-  for (let j = 1; j <= 6; j++) {
+  for (let j = 1; j <= 10; j++) {
     const val = parseFloat(studentObj['inst' + j]) || 0;
     if (val === 0) {
       instIndex = j;
       break;
     }
   }
-  
+
   if (instIndex !== -1) {
     const instKey = studentObj.headers.find(h => String(h).trim().toLowerCase() === 'inst' + instIndex) || ('inst' + instIndex);
     const dateKey = studentObj.headers.find(h => String(h).trim().toLowerCase() === 'inst' + instIndex + 'date') || ('inst' + instIndex + 'Date');
@@ -4828,12 +4860,12 @@ function sendDailyAccountingReport() {
         const row = data[i];
         const studentName = String(row[hdrs.indexOf('studentName')] || '');
         const grade = String(row[hdrs.indexOf('grade')] || '');
-        
-        for (let j = 1; j <= 6; j++) {
+
+        for (let j = 1; j <= 10; j++) {
           const amtIdx = hdrs.indexOf('inst' + j);
           const dateIdx = hdrs.indexOf('inst' + j + 'Date');
           const modeIdx = hdrs.indexOf('inst' + j + 'Mode');
-          
+
           if (amtIdx !== -1 && dateIdx !== -1) {
             const amt = parseFloat(row[amtIdx]) || 0;
             const dVal = String(row[dateIdx] || '').trim();
