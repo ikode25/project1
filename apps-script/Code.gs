@@ -930,6 +930,37 @@ function editUser(oldEmail, oldName, newEmail, newName, newPassword, newRole) {
   } catch(e) { return {success: false, message: e.message}; }
 }
 
+// Lightweight settings for the public Landing page only -- deliberately
+// excludes large/unrelated fields (schoolStamp, signature,
+// loginBackgroundImage, schoolApiUrl/Key) that the landing page never uses,
+// to keep this response small over the public-facing sandboxed page. Added
+// while diagnosing getSettings() intermittently returning success:false to
+// Landing.html despite completing successfully server-side -- a smaller,
+// purpose-built response is a safe fix either way.
+function getLandingSettings() {
+  try { Logger.log('getLandingSettings: start'); } catch (logErr) {}
+  try {
+    const sheet = getOrCreateSheet(SETTINGS_SHEET, ["key","value"]);
+    const data = sheet.getDataRange().getValues();
+    const all = {};
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0]) all[data[i][0]] = data[i][1];
+    }
+    const fields = ['schoolName','schoolAddress','schoolPhone','schoolEmail','schoolMotto',
+      'themeColor','schoolLogo','schoolWhatsapp','currency',
+      'landingEnrollmentText','landingDeadlineText',
+      'schoolFacebookUrl','schoolInstagramUrl','schoolYoutubeUrl',
+      'landingHeroImage','landingHeroImage2','landingHeroImage3'];
+    const s = {};
+    fields.forEach(function (f) { if (all[f]) s[f] = all[f]; });
+    try { Logger.log('getLandingSettings: success, payload size=' + JSON.stringify(s).length); } catch (logErr) {}
+    return {success: true, settings: s};
+  } catch (e) {
+    try { Logger.log('getLandingSettings: CAUGHT ERROR: ' + e); } catch (logErr) {}
+    return {success: false, message: (e && e.message) ? e.message : String(e)};
+  }
+}
+
 // ── Settings ──────────────────────────────────────────────────
 function getSettings() {
   // TEMPORARY debug logging while diagnosing the intermittent settings-load

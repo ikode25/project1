@@ -405,7 +405,7 @@
         function toggleFaq(btn) { btn.closest('.faq-item').classList.toggle('open'); }
         document.getElementById('footerYear').textContent = new Date().getFullYear();
         // Deliberately NOT warming fetchBaseUrl()'s cache here: firing it at the same
-        // time as the getSettings() call below sends two google.script.run requests
+        // time as the getLandingSettings() call below sends two google.script.run requests
         // before the sandboxed iframe's initial handshake with Google's servers has
         // settled, which can cause one of them to silently fail. goToPortal()/
         // goToAdmin() still fetch the URL on demand if it isn't cached yet, at the
@@ -517,14 +517,14 @@
                 .withSuccessHandler(function (r) {
                     if (r && r.success) { applyLandingSettings(r.settings); return; }
                     if (retriesLeft > 0) { setTimeout(function () { loadLandingSettings(retriesLeft - 1); }, 800); }
-                    else { showLandingLoadError(r && r.message ? r.message : 'getSettings() returned success:false with no message'); }
+                    else { showLandingLoadError(r && r.message ? r.message : 'getLandingSettings() returned success:false with no message'); }
                 })
                 .withFailureHandler(function (err) {
                     console.error('Landing settings load failed:', err);
                     if (retriesLeft > 0) { setTimeout(function () { loadLandingSettings(retriesLeft - 1); }, 800); }
                     else { showLandingLoadError(err && err.message ? err.message : String(err)); }
                 })
-                .getSettings();
+                .getLandingSettings();
         }
         function showLandingLoadError(detail) {
             var el = document.createElement('div');
