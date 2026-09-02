@@ -24279,6 +24279,19 @@
         </div>
     </div>
 
+    <script>
+        // Baked in server-side by doGet() at page-generation time (see Code.gs's
+        // getLoginBrandingData_) -- applied immediately here, after
+        // applySettings() has already been defined above, so the login page's
+        // branding/theme/role-labels are correct on the very first paint before
+        // anyone has logged in, on every browser, with zero dependency on the
+        // google.script.run RPC channel that fetchAndApplySettings() uses later
+        // purely as a background refresh for the rest of the admin app's data.
+        var initialBranding = <?!= initialBrandingJson ?>;
+        if (initialBranding && Object.keys(initialBranding).length > 0) {
+            try { applySettings(initialBranding); } catch (e) { console.error('Initial branding apply failed:', e); }
+        }
+    </script>
 </body>
 
 </html>

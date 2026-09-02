@@ -375,6 +375,13 @@
     </a>
 
     <script>
+        // Baked in server-side by doGet() at page-generation time (see Code.gs) --
+        // applied immediately below, before anything else runs, so the correct
+        // branding/theme/photos show on the very first paint for every visitor on
+        // every browser, with zero dependency on the google.script.run call that
+        // loadLandingSettings() makes later purely as a background refresh.
+        var initialSettings = <?!= initialSettingsJson ?>;
+
         // This page's content is actually rendered inside Apps Script's sandboxed
         // "sandboxFrame" iframe (a different origin from the real script.google.com
         // /exec URL). A plain relative `window.location.href = '?page=...'` either
@@ -519,6 +526,12 @@
         }
         var landingCachedSettings = getCachedLandingSettings();
         if (landingCachedSettings) { try { applyLandingSettings(landingCachedSettings); } catch (e) {} }
+        // Server-baked settings are the primary source for the first paint --
+        // present even on a visitor's very first-ever visit, no prior cache
+        // needed, since doGet() embedded this directly into the page HTML.
+        if (initialSettings && Object.keys(initialSettings).length > 0) {
+            try { applyLandingSettings(initialSettings); cacheLandingSettings(initialSettings); } catch (e) {}
+        }
 
         var landingBackgroundRetryCount = 0;
         // Retries several times on transient failure. If a cached copy is
@@ -549,7 +562,8 @@
         }
         function onLandingLoadExhausted(detail) {
             console.warn('Landing settings load exhausted retries:', detail);
-            if (!landingCachedSettings) { showLandingLoadError(detail); }
+            var hasFallbackData = landingCachedSettings || (initialSettings && Object.keys(initialSettings).length > 0);
+            if (!hasFallbackData) { showLandingLoadError(detail); }
             if (landingBackgroundRetryCount < 10) {
                 landingBackgroundRetryCount++;
                 setTimeout(function () { loadLandingSettings(1); }, 20000);

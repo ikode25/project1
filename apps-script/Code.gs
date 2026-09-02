@@ -60,6 +60,42 @@ function doGet(e) {
   var route = routes[page] || routes.landing;
 
   try {
+    // The Landing page bakes its settings (school name, logo, theme color,
+    // hero photos, etc.) directly into the HTML at generation time here,
+    // instead of relying solely on a google.script.run call after the page
+    // loads. That RPC channel goes through Apps Script's sandboxed iframe and
+    // can be blocked by a browser's third-party-cookie/tracking-prevention
+    // settings (confirmed happening on some visitors' browsers) -- baking
+    // the data in server-side means the correct branding shows on the very
+    // first paint for every visitor, on every browser, with zero dependency
+    // on that channel working. A background google.script.run refresh (see
+    // Landing.html) still runs afterward to pick up any changes made after
+    // this exact page load, e.g. if the admin edits Settings in another tab.
+    if (route.file === 'Landing') {
+      var landingTemplate = HtmlService.createTemplateFromFile('Landing');
+      var landingSettingsData = {};
+      try { landingSettingsData = getLandingSettingsData_(); } catch (dataErr) { Logger.log('doGet: getLandingSettingsData_ failed: ' + dataErr.message); }
+      landingTemplate.initialSettingsJson = JSON.stringify(landingSettingsData).replace(/</g, '\\u003c');
+      return landingTemplate.evaluate()
+        .setTitle(route.title)
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
+    // Same fix for the admin login screen -- baking branding in server-side
+    // means it's correct on first paint before anyone has logged in, on every
+    // browser, regardless of that browser's handling of the sandboxed-iframe
+    // RPC channel. Deliberately a minimal subset (see getLoginBrandingData_)
+    // since this is reachable before authentication.
+    if (route.file === 'index') {
+      var indexTemplate = HtmlService.createTemplateFromFile('index');
+      var loginBrandingData = {};
+      try { loginBrandingData = getLoginBrandingData_(); } catch (dataErr) { Logger.log('doGet: getLoginBrandingData_ failed: ' + dataErr.message); }
+      indexTemplate.initialBrandingJson = JSON.stringify(loginBrandingData).replace(/</g, '\\u003c');
+      return indexTemplate.evaluate()
+        .setTitle(route.title)
+        .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1')
+        .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+    }
     return HtmlService.createHtmlOutputFromFile(route.file)
       .setTitle(route.title)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1')
@@ -963,21 +999,45 @@ function readAllSettingsRaw_() {
   return all;
 }
 
+// Raw field-selection logic shared by getLandingSettings() (the client RPC
+// entry point, used for a background refresh) and doGet()'s landing route
+// (which now bakes this directly into the served HTML -- see below -- so
+// the very first paint of the public page never depends on a
+// google.script.run round-trip succeeding at all).
+function getLandingSettingsData_() {
+  const all = readAllSettingsRaw_();
+  const fields = ['schoolName','schoolAddress','schoolPhone','schoolEmail','schoolMotto',
+    'themeColor','schoolLogo','schoolWhatsapp','currency',
+    'landingEnrollmentText','landingDeadlineText',
+    'schoolFacebookUrl','schoolInstagramUrl','schoolYoutubeUrl',
+    'landingHeroImage','landingHeroImage2','landingHeroImage3'];
+  const s = {};
+  fields.forEach(function (f) { if (all[f]) s[f] = all[f]; });
+  return s;
+}
+
+// Minimal branding subset safe to bake directly into the admin login page's
+// HTML at generation time (see doGet() below) -- school name/logo/motto,
+// theme colors, login background photo, and custom role labels. Deliberately
+// excludes admin-dashboard-only fields (reportEmails, monthlyCollectionTarget,
+// etc.) and API keys/URLs, since this route is reachable before anyone has
+// actually logged into the app itself.
+function getLoginBrandingData_() {
+  const all = readAllSettingsRaw_();
+  const fields = ['schoolName', 'schoolLogo', 'schoolMotto', 'themeColor', 'themeSecondary', 'themeBg',
+    'loginBackgroundImage', 'collectorRoleLabel', 'viewerRoleLabel'];
+  const s = {};
+  fields.forEach(function (f) { if (all[f]) s[f] = all[f]; });
+  return s;
+}
+
 // Lightweight settings for the public Landing page only -- deliberately
 // excludes large/unrelated fields (schoolStamp, signature,
 // loginBackgroundImage, schoolApiUrl/Key) that the landing page never uses,
 // to keep this response small over the public-facing sandboxed page.
 function getLandingSettings() {
   try {
-    const all = readAllSettingsRaw_();
-    const fields = ['schoolName','schoolAddress','schoolPhone','schoolEmail','schoolMotto',
-      'themeColor','schoolLogo','schoolWhatsapp','currency',
-      'landingEnrollmentText','landingDeadlineText',
-      'schoolFacebookUrl','schoolInstagramUrl','schoolYoutubeUrl',
-      'landingHeroImage','landingHeroImage2','landingHeroImage3'];
-    const s = {};
-    fields.forEach(function (f) { if (all[f]) s[f] = all[f]; });
-    return {success: true, settings: s};
+    return {success: true, settings: getLandingSettingsData_()};
   } catch (e) {
     return {success: false, message: (e && e.message) ? e.message : String(e)};
   }
