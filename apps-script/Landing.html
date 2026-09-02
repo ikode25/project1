@@ -360,10 +360,37 @@
     </a>
 
     <script>
-        function goToPortal() { window.location.href = '?page=portal'; }
-        function goToAdmin() { window.location.href = '?page=admin'; }
+        // This page's content is actually rendered inside Apps Script's sandboxed
+        // "sandboxFrame" iframe (a different origin from the real script.google.com
+        // /exec URL). A plain relative `window.location.href = '?page=...'` either
+        // resolves against that iframe's own origin or gets blocked by its sandbox
+        // policy, showing a blank page instead of navigating. The fix: fetch the
+        // real absolute web-app URL from the server and navigate window.top (the
+        // actual browser tab), which Apps Script deployments already rely on
+        // elsewhere in this app (see openParentPortal() in Index.html).
+        var scriptBaseUrl = null;
+        function fetchBaseUrl(callback) {
+            if (scriptBaseUrl) { callback(scriptBaseUrl); return; }
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run
+                    .withSuccessHandler(function (url) { scriptBaseUrl = url; callback(scriptBaseUrl); })
+                    .withFailureHandler(function () { callback(window.location.href.split('?')[0]); })
+                    .getScriptUrl();
+            } else {
+                callback(window.location.href.split('?')[0]);
+            }
+        }
+        function navigateTo(page) {
+            fetchBaseUrl(function (baseUrl) {
+                (window.top || window).location.href = baseUrl + '?page=' + page;
+            });
+        }
+        function goToPortal() { navigateTo('portal'); }
+        function goToAdmin() { navigateTo('admin'); }
         function toggleFaq(btn) { btn.closest('.faq-item').classList.toggle('open'); }
         document.getElementById('footerYear').textContent = new Date().getFullYear();
+        // Warm the URL cache immediately so the first click doesn't wait on a round-trip.
+        fetchBaseUrl(function () {});
 
         // Mixes a #rrggbb color toward black by `amount` (0-1) to derive a
         // darker shade for the topbar/footer/hover states from the admin's
