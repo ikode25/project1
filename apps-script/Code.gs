@@ -943,22 +943,33 @@ function editUser(oldEmail, oldName, newEmail, newName, newPassword, newRole) {
   } catch(e) { return {success: false, message: e.message}; }
 }
 
+// Settings fields that store large base64-encoded images. These are the
+// reason getSettings()'s full response is big enough (often 150KB+) to be an
+// unreliable google.script.run payload -- confirmed via Cloud logs showing
+// the server completing successfully while the client still received
+// success:false. Every settings-loading entry point below is now split so
+// the small, critical text/branding fields load first and reliably, with
+// images following separately and non-blocking.
+var HEAVY_SETTINGS_FIELDS = ['schoolLogo', 'schoolStamp', 'signature', 'loginBackgroundImage',
+  'landingHeroImage', 'landingHeroImage2', 'landingHeroImage3'];
+
+function readAllSettingsRaw_() {
+  const sheet = getOrCreateSheet(SETTINGS_SHEET, ["key","value"]);
+  const data = sheet.getDataRange().getValues();
+  const all = {};
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0]) all[data[i][0]] = data[i][1];
+  }
+  return all;
+}
+
 // Lightweight settings for the public Landing page only -- deliberately
 // excludes large/unrelated fields (schoolStamp, signature,
 // loginBackgroundImage, schoolApiUrl/Key) that the landing page never uses,
-// to keep this response small over the public-facing sandboxed page. Added
-// while diagnosing getSettings() intermittently returning success:false to
-// Landing.html despite completing successfully server-side -- a smaller,
-// purpose-built response is a safe fix either way.
+// to keep this response small over the public-facing sandboxed page.
 function getLandingSettings() {
-  try { Logger.log('getLandingSettings: start'); } catch (logErr) {}
   try {
-    const sheet = getOrCreateSheet(SETTINGS_SHEET, ["key","value"]);
-    const data = sheet.getDataRange().getValues();
-    const all = {};
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][0]) all[data[i][0]] = data[i][1];
-    }
+    const all = readAllSettingsRaw_();
     const fields = ['schoolName','schoolAddress','schoolPhone','schoolEmail','schoolMotto',
       'themeColor','schoolLogo','schoolWhatsapp','currency',
       'landingEnrollmentText','landingDeadlineText',
@@ -966,29 +977,57 @@ function getLandingSettings() {
       'landingHeroImage','landingHeroImage2','landingHeroImage3'];
     const s = {};
     fields.forEach(function (f) { if (all[f]) s[f] = all[f]; });
-    try { Logger.log('getLandingSettings: success, payload size=' + JSON.stringify(s).length); } catch (logErr) {}
     return {success: true, settings: s};
   } catch (e) {
-    try { Logger.log('getLandingSettings: CAUGHT ERROR: ' + e); } catch (logErr) {}
+    return {success: false, message: (e && e.message) ? e.message : String(e)};
+  }
+}
+
+// Fast, small settings load for the admin app's initial page render --
+// everything EXCEPT the heavy image fields (an exclude-list, not an
+// include-list, so no admin feature silently breaks from a forgotten field).
+function getCoreSettings() {
+  try {
+    const all = readAllSettingsRaw_();
+    const s = {};
+    Object.keys(all).forEach(function (k) {
+      if (HEAVY_SETTINGS_FIELDS.indexOf(k) === -1) s[k] = all[k];
+    });
+    try {
+      const scriptProps = PropertiesService.getScriptProperties();
+      const secureProps = scriptProps.getProperties();
+      s['schoolApiUrl'] = secureProps['schoolApiUrl'] || '';
+      s['schoolApiKey'] = secureProps['schoolApiKey'] ? '••••••••••••••••' : '';
+    } catch (propErr) {
+      Logger.log('Error reading script properties: ' + propErr.message);
+    }
+    return {success: true, settings: s};
+  } catch (e) {
+    return {success: false, message: (e && e.message) ? e.message : String(e)};
+  }
+}
+
+// Just the heavy image fields, fetched separately/non-blocking after
+// getCoreSettings() has already rendered the critical UI.
+function getSettingsImages() {
+  try {
+    const all = readAllSettingsRaw_();
+    const s = {};
+    HEAVY_SETTINGS_FIELDS.forEach(function (f) { if (all[f]) s[f] = all[f]; });
+    return {success: true, settings: s};
+  } catch (e) {
     return {success: false, message: (e && e.message) ? e.message : String(e)};
   }
 }
 
 // ── Settings ──────────────────────────────────────────────────
+// Full settings (all fields, including images) -- still used by the
+// Settings page itself (loadSettingsForm) to populate every field and image
+// preview when the admin actually opens Settings, where a slower/retried
+// load is an acceptable tradeoff for simplicity.
 function getSettings() {
-  // TEMPORARY debug logging while diagnosing the intermittent settings-load
-  // failure -- safe to strip out once resolved. Wrapped defensively so a
-  // logging problem itself can never be the cause of a failure here.
-  try { Logger.log('getSettings: start'); } catch (logErr) {}
   try {
-    const sheet = getOrCreateSheet(SETTINGS_SHEET, ["key","value"]);
-    try { Logger.log('getSettings: got sheet, rows=' + sheet.getLastRow()); } catch (logErr) {}
-    const data  = sheet.getDataRange().getValues();
-    try { Logger.log('getSettings: data.length=' + data.length); } catch (logErr) {}
-    const s     = {};
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][0]) s[data[i][0]] = data[i][1];
-    }
+    const s = readAllSettingsRaw_();
 
     // Load secure script properties
     try {
@@ -1000,7 +1039,6 @@ function getSettings() {
       Logger.log('Error reading script properties: ' + propErr.message);
     }
 
-    try { Logger.log('getSettings: success, keys=' + Object.keys(s).length); } catch (logErr) {}
     return {success: true, settings: s};
   } catch(e) {
     try { Logger.log('getSettings: CAUGHT ERROR: ' + e + ' | message=' + e.message + ' | stack=' + e.stack); } catch (logErr) {}

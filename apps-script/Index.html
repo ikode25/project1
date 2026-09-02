@@ -17470,6 +17470,16 @@
         // session with nothing to correct it. Retries a couple of times before
         // giving up, and is called again once more after login (see showApp()) so a
         // fresh session always gets one more chance at the real values.
+        // Loads settings in two phases: getCoreSettings() first (small, fast,
+        // everything except logo/stamp/signature/login-background images) so
+        // branding/UI renders immediately and reliably, then getSettingsImages()
+        // separately and non-blocking for the heavier image fields. Splitting
+        // this out fixed the admin app intermittently showing generic defaults
+        // ("School", "Active Term: Not set") on some devices -- Cloud logs
+        // showed the full getSettings() response completing successfully
+        // server-side while still failing to arrive at the browser, most
+        // likely because the combined payload (several ~48KB base64 images)
+        // was too large for google.script.run's bridge to reliably deliver.
         function fetchAndApplySettings(retriesLeft) {
             if (typeof google === 'undefined' || !google.script) {
                 applySettings(lsGet('settings') || {});
@@ -17477,7 +17487,13 @@
             }
             google.script.run
                 .withSuccessHandler(function (r) {
-                    if (r && r.success) { applySettings(r.settings); lsSet('settings', Object.assign({}, lsGet('settings') || {}, r.settings)); }
+                    if (r && r.success) {
+                        applySettings(r.settings);
+                        lsSet('settings', Object.assign({}, lsGet('settings') || {}, r.settings));
+                        fetchSettingsImages(2);
+                    } else if ((retriesLeft || 0) > 0) {
+                        setTimeout(function () { fetchAndApplySettings(retriesLeft - 1); }, 1500);
+                    }
                 })
                 .withFailureHandler(function (err) {
                     console.error('fetchAndApplySettings failed:', err);
@@ -17485,7 +17501,26 @@
                         setTimeout(function () { fetchAndApplySettings(retriesLeft - 1); }, 1500);
                     }
                 })
-                .getSettings();
+                .getCoreSettings();
+        }
+        function fetchSettingsImages(retriesLeft) {
+            if (typeof google === 'undefined' || !google.script) return;
+            google.script.run
+                .withSuccessHandler(function (r) {
+                    if (r && r.success && r.settings) {
+                        applySettings(r.settings);
+                        lsSet('settings', Object.assign({}, lsGet('settings') || {}, r.settings));
+                    } else if ((retriesLeft || 0) > 0) {
+                        setTimeout(function () { fetchSettingsImages(retriesLeft - 1); }, 1500);
+                    }
+                })
+                .withFailureHandler(function (err) {
+                    console.error('fetchSettingsImages failed:', err);
+                    if ((retriesLeft || 0) > 0) {
+                        setTimeout(function () { fetchSettingsImages(retriesLeft - 1); }, 1500);
+                    }
+                })
+                .getSettingsImages();
         }
         fetchAndApplySettings(2);
 
