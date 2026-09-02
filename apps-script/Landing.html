@@ -503,12 +503,32 @@
             }
         }
 
-        if (typeof google !== 'undefined' && google.script) {
+        // Retries a couple of times on transient failure, and — instead of failing
+        // silently — shows a visible banner if settings never load, so a stale
+        // page or a real fetch failure is obvious rather than just showing
+        // unexplained defaults.
+        function loadLandingSettings(retriesLeft) {
+            if (typeof google === 'undefined' || !google.script) return;
             google.script.run
-                .withSuccessHandler(function (r) { if (r && r.success) applyLandingSettings(r.settings); })
-                .withFailureHandler(function (err) { console.error('Landing settings load failed:', err); })
+                .withSuccessHandler(function (r) {
+                    if (r && r.success) { applyLandingSettings(r.settings); return; }
+                    if (retriesLeft > 0) { setTimeout(function () { loadLandingSettings(retriesLeft - 1); }, 800); }
+                    else { showLandingLoadError(); }
+                })
+                .withFailureHandler(function (err) {
+                    console.error('Landing settings load failed:', err);
+                    if (retriesLeft > 0) { setTimeout(function () { loadLandingSettings(retriesLeft - 1); }, 800); }
+                    else { showLandingLoadError(); }
+                })
                 .getSettings();
         }
+        function showLandingLoadError() {
+            var el = document.createElement('div');
+            el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2000;background:#fef2f2;color:#991b1b;text-align:center;padding:8px;font-size:13px;border-bottom:1px solid #fecaca;';
+            el.textContent = 'Could not load the latest school settings — showing defaults. Try reloading this page.';
+            document.body.prepend(el);
+        }
+        loadLandingSettings(2);
     </script>
 </body>
 
