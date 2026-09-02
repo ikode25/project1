@@ -507,30 +507,65 @@
             }
         }
 
-        // Retries a couple of times on transient failure, and — instead of failing
-        // silently — shows a visible banner if settings never load, so a stale
-        // page or a real fetch failure is obvious rather than just showing
-        // unexplained defaults.
+        // Cache the last successfully-loaded settings so a returning visitor's
+        // browser can paint real branding instantly, and so a later fetch
+        // failure doesn't need to alarm anyone if the correct data is already
+        // showing on screen.
+        function cacheLandingSettings(s) {
+            try { localStorage.setItem('landingSettingsCache', JSON.stringify(s)); } catch (e) {}
+        }
+        function getCachedLandingSettings() {
+            try { var raw = localStorage.getItem('landingSettingsCache'); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+        }
+        var landingCachedSettings = getCachedLandingSettings();
+        if (landingCachedSettings) { try { applyLandingSettings(landingCachedSettings); } catch (e) {} }
+
+        var landingBackgroundRetryCount = 0;
+        // Retries several times on transient failure. If a cached copy is
+        // already showing correct branding on screen, a later failure retries
+        // quietly in the background rather than alarming visitors with an
+        // error banner over data that's actually displaying correctly --
+        // the banner only appears when there's truly nothing to fall back on.
         function loadLandingSettings(retriesLeft) {
             if (typeof google === 'undefined' || !google.script) return;
             google.script.run
                 .withSuccessHandler(function (r) {
-                    if (r && r.success) { applyLandingSettings(r.settings); return; }
+                    if (r && r.success) {
+                        landingBackgroundRetryCount = 0;
+                        applyLandingSettings(r.settings);
+                        cacheLandingSettings(r.settings);
+                        hideLandingLoadError();
+                        return;
+                    }
                     if (retriesLeft > 0) { setTimeout(function () { loadLandingSettings(retriesLeft - 1); }, 1200); }
-                    else { showLandingLoadError(r && r.message ? r.message : 'getLandingSettings() returned success:false with no message'); }
+                    else { onLandingLoadExhausted(r && r.message ? r.message : 'getLandingSettings() returned success:false with no message'); }
                 })
                 .withFailureHandler(function (err) {
                     console.error('Landing settings load failed:', err);
                     if (retriesLeft > 0) { setTimeout(function () { loadLandingSettings(retriesLeft - 1); }, 1200); }
-                    else { showLandingLoadError(err && err.message ? err.message : String(err)); }
+                    else { onLandingLoadExhausted(err && err.message ? err.message : String(err)); }
                 })
                 .getLandingSettings();
         }
+        function onLandingLoadExhausted(detail) {
+            console.warn('Landing settings load exhausted retries:', detail);
+            if (!landingCachedSettings) { showLandingLoadError(detail); }
+            if (landingBackgroundRetryCount < 10) {
+                landingBackgroundRetryCount++;
+                setTimeout(function () { loadLandingSettings(1); }, 20000);
+            }
+        }
         function showLandingLoadError(detail) {
+            if (document.getElementById('landingLoadErrorBanner')) return;
             var el = document.createElement('div');
+            el.id = 'landingLoadErrorBanner';
             el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2000;background:#fef2f2;color:#991b1b;text-align:center;padding:8px;font-size:13px;border-bottom:1px solid #fecaca;';
             el.textContent = 'Could not load the latest school settings — showing defaults. Try reloading this page.' + (detail ? ' (' + detail + ')' : '');
             document.body.prepend(el);
+        }
+        function hideLandingLoadError() {
+            var el = document.getElementById('landingLoadErrorBanner');
+            if (el) el.remove();
         }
         loadLandingSettings(6);
     </script>

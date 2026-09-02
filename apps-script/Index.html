@@ -17480,6 +17480,7 @@
         // server-side while still failing to arrive at the browser, most
         // likely because the combined payload (several ~48KB base64 images)
         // was too large for google.script.run's bridge to reliably deliver.
+        var settingsBackgroundRetryCount = 0;
         function fetchAndApplySettings(retriesLeft) {
             if (typeof google === 'undefined' || !google.script) {
                 applySettings(lsGet('settings') || {});
@@ -17488,13 +17489,15 @@
             google.script.run
                 .withSuccessHandler(function (r) {
                     if (r && r.success) {
+                        settingsBackgroundRetryCount = 0;
                         applySettings(r.settings);
                         lsSet('settings', Object.assign({}, lsGet('settings') || {}, r.settings));
+                        hideSettingsLoadError();
                         fetchSettingsImages(4);
                     } else if ((retriesLeft || 0) > 0) {
                         setTimeout(function () { fetchAndApplySettings(retriesLeft - 1); }, 1200);
                     } else {
-                        showSettingsLoadError(r && r.message ? r.message : 'getCoreSettings() returned success:false with no message');
+                        onSettingsLoadExhausted(r && r.message ? r.message : 'getCoreSettings() returned success:false with no message');
                     }
                 })
                 .withFailureHandler(function (err) {
@@ -17502,10 +17505,26 @@
                     if ((retriesLeft || 0) > 0) {
                         setTimeout(function () { fetchAndApplySettings(retriesLeft - 1); }, 1200);
                     } else {
-                        showSettingsLoadError(err && err.message ? err.message : String(err));
+                        onSettingsLoadExhausted(err && err.message ? err.message : String(err));
                     }
                 })
                 .getCoreSettings();
+        }
+        // After 6 quick retries fail: if a cached copy is already on screen (the
+        // common case -- a returning device), don't alarm staff with an error
+        // banner over data that's actually showing correctly. Just keep quietly
+        // retrying in the background every 20s (up to 10 more attempts) so the
+        // page self-heals to the latest data without anyone needing to reload.
+        // Only show the banner when there's truly nothing to fall back on.
+        function onSettingsLoadExhausted(detail) {
+            console.warn('Settings load exhausted retries:', detail);
+            if (!settings || Object.keys(settings).length === 0) {
+                showSettingsLoadError(detail);
+            }
+            if (settingsBackgroundRetryCount < 10) {
+                settingsBackgroundRetryCount++;
+                setTimeout(function () { fetchAndApplySettings(1); }, 20000);
+            }
         }
         // Visible instead of only console.error, since a phone/tablet user has
         // no easy way to open DevTools to see what actually went wrong.
@@ -17516,6 +17535,10 @@
             el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#fef2f2;color:#991b1b;text-align:center;padding:8px;font-size:13px;border-bottom:1px solid #fecaca;';
             el.textContent = 'Could not load the latest school settings — showing defaults. Try reloading this page.' + (detail ? ' (' + detail + ')' : '');
             document.body.prepend(el);
+        }
+        function hideSettingsLoadError() {
+            var el = document.getElementById('settingsLoadErrorBanner');
+            if (el) el.remove();
         }
         function fetchSettingsImages(retriesLeft) {
             if (typeof google === 'undefined' || !google.script) return;
