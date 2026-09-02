@@ -4332,6 +4332,12 @@
                              <button class="nav-link active btn-sm" id="tab-general-settings" data-bs-toggle="pill" data-bs-target="#panel-general-settings" type="button" role="tab"><i class="bi bi-gear-fill me-1"></i>General Settings</button>
                          </li>
                          <li class="nav-item" role="presentation">
+                             <button class="nav-link btn-sm" id="tab-landing-settings" data-bs-toggle="pill" data-bs-target="#panel-landing-settings" type="button" role="tab"><i class="bi bi-window me-1"></i>Landing Page</button>
+                         </li>
+                         <li class="nav-item" role="presentation">
+                             <button class="nav-link btn-sm" id="tab-records-settings" data-bs-toggle="pill" data-bs-target="#panel-records-settings" type="button" role="tab"><i class="bi bi-ui-checks-grid me-1"></i>Records &amp; Access</button>
+                         </li>
+                         <li class="nav-item" role="presentation">
                              <button class="nav-link btn-sm" id="tab-typography-settings" data-bs-toggle="pill" data-bs-target="#panel-typography-settings" type="button" role="tab"><i class="bi bi-fonts me-1"></i>Typography &amp; Styling</button>
                          </li>
                          <li class="nav-item" role="presentation">
@@ -4467,60 +4473,6 @@
                                                 </div>
                                                 <small class="text-muted d-block" style="font-size:10px; line-height:1.3;">A Drive folder for student photos is created automatically the first time anyone uploads a photo — you don't need to do anything here. Photos are kept viewable via link for portal rendering.</small>
                                             </div>
-                                            <div class="mb-3 border rounded-3 p-3 bg-light text-start shadow-xs">
-                                                <label class="form-label small fw-bold text-dark mb-1"><i class="bi bi-ui-checks-grid me-1 text-primary"></i>Action Buttons on Student Records</label>
-                                                <small class="text-muted d-block mb-2" style="font-size:10px; line-height:1.3;">Choose which action buttons appear on each student's row (Students / Class list, Custom Fees, Collector view). Unchecked actions are hidden for everyone, including Admin. Leave all checked to show every button.</small>
-                                                <div id="actionBtnCheckboxes" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;">
-                                                    <div class="form-check">
-                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_profile" value="profile" checked>
-                                                        <label class="form-check-label small" for="actbtn_profile" style="font-size:11.5px;">View Profile</label>
-                                                    </div>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_edit" value="edit" checked>
-                                                        <label class="form-check-label small" for="actbtn_edit" style="font-size:11.5px;">Pay / Edit Fee</label>
-                                                    </div>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_bill" value="bill" checked>
-                                                        <label class="form-check-label small" for="actbtn_bill" style="font-size:11.5px;">Print Bill</label>
-                                                    </div>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_receipt" value="receipt" checked>
-                                                        <label class="form-check-label small" for="actbtn_receipt" style="font-size:11.5px;">Print Receipt</label>
-                                                    </div>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_thermal" value="thermal" checked>
-                                                        <label class="form-check-label small" for="actbtn_thermal" style="font-size:11.5px;">Thermal Receipt</label>
-                                                    </div>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_whatsapp" value="whatsapp" checked>
-                                                        <label class="form-check-label small" for="actbtn_whatsapp" style="font-size:11.5px;">WhatsApp</label>
-                                                    </div>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_sms" value="sms" checked>
-                                                        <label class="form-check-label small" for="actbtn_sms" style="font-size:11.5px;">Send SMS</label>
-                                                    </div>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_call" value="call" checked>
-                                                        <label class="form-check-label small" for="actbtn_call" style="font-size:11.5px;">Call Parent</label>
-                                                    </div>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_nextbill" value="nextbill" checked>
-                                                        <label class="form-check-label small" for="actbtn_nextbill" style="font-size:11.5px;">Next Term Bill</label>
-                                                    </div>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_promote" value="promote" checked>
-                                                        <label class="form-check-label small" for="actbtn_promote" style="font-size:11.5px;">Promote to Next Term</label>
-                                                    </div>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_refund" value="refund" checked>
-                                                        <label class="form-check-label small" for="actbtn_refund" style="font-size:11.5px;">Refund Payment</label>
-                                                    </div>
-                                                    <div class="form-check">
-                                                        <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_delete" value="delete" checked>
-                                                        <label class="form-check-label small" for="actbtn_delete" style="font-size:11.5px;">Delete Record</label>
-                                                    </div>
-                                                </div>
-                                            </div>
                                             <input type="hidden" id="setSigName">
                                             <input type="hidden" id="setSigTitle">
                                             <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Save Info</button>
@@ -4536,7 +4488,7 @@
                                                 <label class="form-label small fw-bold">Logo</label>
                                                 <div style="position:relative; width:80px; height:80px; margin:0 auto 5px;">
                                                     <div class="upload-area mx-auto" onclick="document.getElementById('logoFile').click()" style="width:80px; height:80px; display:flex; align-items:center; justify-content:center; border: 2px dashed #cbd5e1; border-radius:12px; cursor:pointer; overflow:hidden;">
-                                                        <input type="file" id="logoFile" accept="image/*" style="display:none" onchange="previewImg(this,'logoPrev')">
+                                                        <input type="file" id="logoFile" accept="image/*" style="display:none" onchange="previewImg(this,'logoPrev','logo')">
                                                         <div id="logoPrev" style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;"><i class="bi bi-image" style="font-size:24px;color:#6366f1"></i></div>
                                                     </div>
                                                     <button type="button" class="btn btn-danger btn-xs" onclick="clearUploadedImg(event, 'logo')" style="position:absolute; top:-5px; right:-5px; border-radius:50%; width:20px; height:20px; padding:0; display:flex; align-items:center; justify-content:center; font-size:10px; border:none; background:#ef4444; color:#fff;" title="Remove Logo">×</button>
@@ -4547,7 +4499,7 @@
                                                 <label class="form-label small fw-bold">Stamp</label>
                                                 <div style="position:relative; width:70px; height:70px; margin:0 auto 5px;">
                                                     <div class="upload-area mx-auto" onclick="document.getElementById('stampFile').click()" style="width:70px; height:70px; display:flex; align-items:center; justify-content:center; border: 2px dashed #cbd5e1; border-radius:12px; cursor:pointer; overflow:hidden;">
-                                                        <input type="file" id="stampFile" accept="image/*" style="display:none" onchange="previewImg(this,'stampPrev')">
+                                                        <input type="file" id="stampFile" accept="image/*" style="display:none" onchange="previewImg(this,'stampPrev','stamp')">
                                                         <div id="stampPrev" style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;"><i class="bi bi-patch-check" style="font-size:20px;color:#6366f1"></i></div>
                                                     </div>
                                                     <button type="button" class="btn btn-danger btn-xs" onclick="clearUploadedImg(event, 'stamp')" style="position:absolute; top:-5px; right:-5px; border-radius:50%; width:20px; height:20px; padding:0; display:flex; align-items:center; justify-content:center; font-size:10px; border:none; background:#ef4444; color:#fff;" title="Remove Stamp">×</button>
@@ -4558,7 +4510,7 @@
                                                 <label class="form-label small fw-bold">Signature</label>
                                                 <div style="position:relative; width:70px; height:70px; margin:0 auto 5px;">
                                                     <div class="upload-area mx-auto" onclick="document.getElementById('sigFile').click()" style="width:70px; height:70px; display:flex; align-items:center; justify-content:center; border: 2px dashed #cbd5e1; border-radius:12px; cursor:pointer; overflow:hidden;">
-                                                        <input type="file" id="sigFile" accept="image/*" style="display:none" onchange="previewImg(this,'sigPrev')">
+                                                        <input type="file" id="sigFile" accept="image/*" style="display:none" onchange="previewImg(this,'sigPrev','signature')">
                                                         <div id="sigPrev" style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;"><i class="bi bi-pen" style="font-size:20px;color:#6366f1"></i></div>
                                                     </div>
                                                     <button type="button" class="btn btn-danger btn-xs" onclick="clearUploadedImg(event, 'signature')" style="position:absolute; top:-5px; right:-5px; border-radius:50%; width:20px; height:20px; padding:0; display:flex; align-items:center; justify-content:center; font-size:10px; border:none; background:#ef4444; color:#fff;" title="Remove Signature">×</button>
@@ -4569,7 +4521,7 @@
                                                 <label class="form-label small fw-bold">Login Page Background Photo</label>
                                                 <div style="position:relative; width:100%; height:70px; margin:0 auto 5px;">
                                                     <div class="upload-area mx-auto" onclick="document.getElementById('loginBgFile').click()" style="width:100%; height:70px; display:flex; align-items:center; justify-content:center; border: 2px dashed #cbd5e1; border-radius:12px; cursor:pointer; overflow:hidden;">
-                                                        <input type="file" id="loginBgFile" accept="image/*" style="display:none" onchange="previewImg(this,'loginBgPrev')">
+                                                        <input type="file" id="loginBgFile" accept="image/*" style="display:none" onchange="previewImg(this,'loginBgPrev','loginBg')">
                                                         <div id="loginBgPrev" style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;"><i class="bi bi-image-alt" style="font-size:22px;color:#6366f1"></i></div>
                                                     </div>
                                                     <button type="button" class="btn btn-danger btn-xs" onclick="clearUploadedImg(event, 'loginBg')" style="position:absolute; top:-5px; right:-5px; border-radius:50%; width:20px; height:20px; padding:0; display:flex; align-items:center; justify-content:center; font-size:10px; border:none; background:#ef4444; color:#fff;" title="Remove Background Photo">×</button>
@@ -4581,7 +4533,36 @@
                                     </div>
                                 </div>
 
-                                <!-- Public Landing Page -->
+                                <!-- Theme Palette -->
+                                <div class="col-md-6 col-12">
+                                    <div class="settings-card h-100">
+                                        <h6 class="fw-bold mb-3"><i class="bi bi-palette-fill me-2 text-primary"></i>Theme Palette</h6>
+                                        <p class="text-muted small mb-3">Tap a palette to preview it below — nothing changes until you hit Apply &amp; Save Theme.</p>
+                                        <input type="hidden" id="setThemeColor" value="#4f46e5">
+                                        <input type="hidden" id="setThemeSecondary" value="#6366f1">
+                                        <input type="hidden" id="setThemeBg" value="#1e1b4b">
+                                        <div id="themePalettesGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; max-height: 180px; overflow-y: auto; padding: 10px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; margin-bottom: 12px;"></div>
+                                        <form onsubmit="saveThemeSettings(event)">
+                                            <div class="mb-3">
+                                                <label class="form-label small fw-bold">Background Doodle Pattern</label>
+                                                <select class="form-select form-select-sm" id="setThemePattern">
+                                                    <option value="none">None (Clean Solid Background)</option>
+                                                    <option value="school">School Doodles (Pencils, Rulers)</option>
+                                                    <option value="geometry">Geometric Grid</option>
+                                                    <option value="dots">Polka Dots</option>
+                                                    <option value="waves">Ocean Waves</option>
+                                                </select>
+                                            </div>
+                                            <button type="submit" class="btn btn-primary btn-sm w-100"><i class="bi bi-palette-fill me-1"></i>Apply &amp; Save Theme</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Landing Page Panel -->
+                        <div class="tab-pane fade" id="panel-landing-settings" role="tabpanel">
+                            <div class="row g-3">
                                 <div class="col-12">
                                     <div class="settings-card">
                                         <h6 class="fw-bold mb-3"><i class="bi bi-window me-2 text-primary"></i>Public Landing Page</h6>
@@ -4623,7 +4604,7 @@
                                                     <div class="col-4 text-center">
                                                         <div style="position:relative; width:100%; height:70px; margin:0 auto 5px;">
                                                             <div class="upload-area mx-auto" onclick="document.getElementById('landingHeroFile').click()" style="width:100%; height:70px; display:flex; align-items:center; justify-content:center; border: 2px dashed #cbd5e1; border-radius:12px; cursor:pointer; overflow:hidden;">
-                                                                <input type="file" id="landingHeroFile" accept="image/*" style="display:none" onchange="previewImg(this,'landingHeroPrev')">
+                                                                <input type="file" id="landingHeroFile" accept="image/*" style="display:none" onchange="previewImg(this,'landingHeroPrev','landingHero')">
                                                                 <div id="landingHeroPrev" style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;"><i class="bi bi-image-alt" style="font-size:20px;color:#6366f1"></i></div>
                                                             </div>
                                                             <button type="button" class="btn btn-danger btn-xs" onclick="clearUploadedImg(event, 'landingHero')" style="position:absolute; top:-5px; right:-5px; border-radius:50%; width:20px; height:20px; padding:0; display:flex; align-items:center; justify-content:center; font-size:10px; border:none; background:#ef4444; color:#fff;" title="Remove">×</button>
@@ -4633,7 +4614,7 @@
                                                     <div class="col-4 text-center">
                                                         <div style="position:relative; width:100%; height:70px; margin:0 auto 5px;">
                                                             <div class="upload-area mx-auto" onclick="document.getElementById('landingHero2File').click()" style="width:100%; height:70px; display:flex; align-items:center; justify-content:center; border: 2px dashed #cbd5e1; border-radius:12px; cursor:pointer; overflow:hidden;">
-                                                                <input type="file" id="landingHero2File" accept="image/*" style="display:none" onchange="previewImg(this,'landingHero2Prev')">
+                                                                <input type="file" id="landingHero2File" accept="image/*" style="display:none" onchange="previewImg(this,'landingHero2Prev','landingHero2')">
                                                                 <div id="landingHero2Prev" style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;"><i class="bi bi-image-alt" style="font-size:20px;color:#6366f1"></i></div>
                                                             </div>
                                                             <button type="button" class="btn btn-danger btn-xs" onclick="clearUploadedImg(event, 'landingHero2')" style="position:absolute; top:-5px; right:-5px; border-radius:50%; width:20px; height:20px; padding:0; display:flex; align-items:center; justify-content:center; font-size:10px; border:none; background:#ef4444; color:#fff;" title="Remove">×</button>
@@ -4643,7 +4624,7 @@
                                                     <div class="col-4 text-center">
                                                         <div style="position:relative; width:100%; height:70px; margin:0 auto 5px;">
                                                             <div class="upload-area mx-auto" onclick="document.getElementById('landingHero3File').click()" style="width:100%; height:70px; display:flex; align-items:center; justify-content:center; border: 2px dashed #cbd5e1; border-radius:12px; cursor:pointer; overflow:hidden;">
-                                                                <input type="file" id="landingHero3File" accept="image/*" style="display:none" onchange="previewImg(this,'landingHero3Prev')">
+                                                                <input type="file" id="landingHero3File" accept="image/*" style="display:none" onchange="previewImg(this,'landingHero3Prev','landingHero3')">
                                                                 <div id="landingHero3Prev" style="width:100%; height:100%; display:flex; align-items:center; justify-content:center;"><i class="bi bi-image-alt" style="font-size:20px;color:#6366f1"></i></div>
                                                             </div>
                                                             <button type="button" class="btn btn-danger btn-xs" onclick="clearUploadedImg(event, 'landingHero3')" style="position:absolute; top:-5px; right:-5px; border-radius:50%; width:20px; height:20px; padding:0; display:flex; align-items:center; justify-content:center; font-size:10px; border:none; background:#ef4444; color:#fff;" title="Remove">×</button>
@@ -4656,8 +4637,12 @@
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
 
-                                <!-- Row 2: Sibling Discounts (6 cols) & Student ID Prefix (6 cols) -->
+                        <!-- Records & Access Panel -->
+                        <div class="tab-pane fade" id="panel-records-settings" role="tabpanel">
+                            <div class="row g-3">
                                 <div class="col-md-6 col-12">
                                     <div class="settings-card h-100">
                                         <h6 class="fw-bold mb-3"><i class="bi bi-people-fill me-2 text-primary"></i>Sibling / Family Discounts</h6>
@@ -4677,7 +4662,7 @@
                                         </form>
                                     </div>
                                 </div>
-                                
+
                                 <div class="col-md-6 col-12">
                                     <div class="settings-card h-100">
                                         <h6 class="fw-bold mb-3"><i class="bi bi-hash me-2 text-primary"></i>Student ID Prefix Settings</h6>
@@ -4698,31 +4683,6 @@
                                     </div>
                                 </div>
 
-                                <!-- Row 3: Theme Palette (6 cols) & Sidebar Navigation Control (6 cols) -->
-                                <div class="col-md-6 col-12">
-                                    <div class="settings-card h-100">
-                                        <h6 class="fw-bold mb-3"><i class="bi bi-palette-fill me-2 text-primary"></i>Theme Palette</h6>
-                                        <p class="text-muted small mb-3">Tap a palette to preview it below — nothing changes until you hit Apply &amp; Save Theme.</p>
-                                        <input type="hidden" id="setThemeColor" value="#4f46e5">
-                                        <input type="hidden" id="setThemeSecondary" value="#6366f1">
-                                        <input type="hidden" id="setThemeBg" value="#1e1b4b">
-                                        <div id="themePalettesGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; max-height: 180px; overflow-y: auto; padding: 10px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 12px; margin-bottom: 12px;"></div>
-                                        <form onsubmit="saveThemeSettings(event)">
-                                            <div class="mb-3">
-                                                <label class="form-label small fw-bold">Background Doodle Pattern</label>
-                                                <select class="form-select form-select-sm" id="setThemePattern">
-                                                    <option value="none">None (Clean Solid Background)</option>
-                                                    <option value="school">School Doodles (Pencils, Rulers)</option>
-                                                    <option value="geometry">Geometric Grid</option>
-                                                    <option value="dots">Polka Dots</option>
-                                                    <option value="waves">Ocean Waves</option>
-                                                </select>
-                                            </div>
-                                            <button type="submit" class="btn btn-primary btn-sm w-100"><i class="bi bi-palette-fill me-1"></i>Apply &amp; Save Theme</button>
-                                        </form>
-                                    </div>
-                                </div>
-                                
                                 <div class="col-md-6 col-12">
                                     <div class="settings-card h-100">
                                         <h6 class="fw-bold mb-3"><i class="bi bi-list-check me-2 text-primary"></i>Sidebar Navigation Menu Control</h6>
@@ -4735,9 +4695,69 @@
                                         </form>
                                     </div>
                                 </div>
+
+                                <div class="col-md-6 col-12">
+                                    <div class="settings-card h-100">
+                                        <h6 class="fw-bold mb-3"><i class="bi bi-ui-checks-grid me-2 text-primary"></i>Action Buttons on Student Records</h6>
+                                        <p class="text-muted small mb-2">Choose which action buttons appear on each student's row (Students / Class list, Custom Fees, Collector view). Unchecked actions are hidden for everyone, including Admin. Leave all checked to show every button.</p>
+                                        <form onsubmit="saveActionButtonsSettings(event)">
+                                            <div id="actionBtnCheckboxes" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-bottom:12px;">
+                                                <div class="form-check">
+                                                    <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_profile" value="profile" checked>
+                                                    <label class="form-check-label small" for="actbtn_profile" style="font-size:11.5px;">View Profile</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_edit" value="edit" checked>
+                                                    <label class="form-check-label small" for="actbtn_edit" style="font-size:11.5px;">Pay / Edit Fee</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_bill" value="bill" checked>
+                                                    <label class="form-check-label small" for="actbtn_bill" style="font-size:11.5px;">Print Bill</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_receipt" value="receipt" checked>
+                                                    <label class="form-check-label small" for="actbtn_receipt" style="font-size:11.5px;">Print Receipt</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_thermal" value="thermal" checked>
+                                                    <label class="form-check-label small" for="actbtn_thermal" style="font-size:11.5px;">Thermal Receipt</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_whatsapp" value="whatsapp" checked>
+                                                    <label class="form-check-label small" for="actbtn_whatsapp" style="font-size:11.5px;">WhatsApp</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_sms" value="sms" checked>
+                                                    <label class="form-check-label small" for="actbtn_sms" style="font-size:11.5px;">Send SMS</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_call" value="call" checked>
+                                                    <label class="form-check-label small" for="actbtn_call" style="font-size:11.5px;">Call Parent</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_nextbill" value="nextbill" checked>
+                                                    <label class="form-check-label small" for="actbtn_nextbill" style="font-size:11.5px;">Next Term Bill</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_promote" value="promote" checked>
+                                                    <label class="form-check-label small" for="actbtn_promote" style="font-size:11.5px;">Promote to Next Term</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_refund" value="refund" checked>
+                                                    <label class="form-check-label small" for="actbtn_refund" style="font-size:11.5px;">Refund Payment</label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input actbtn-check" type="checkbox" id="actbtn_delete" value="delete" checked>
+                                                    <label class="form-check-label small" for="actbtn_delete" style="font-size:11.5px;">Delete Record</label>
+                                                </div>
+                                            </div>
+                                            <button type="submit" class="btn btn-primary btn-sm w-100"><i class="bi bi-save me-1"></i>Save Action Buttons</button>
+                                        </form>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        
+
                         <!-- Typography & Styling Panel -->
                         <div class="tab-pane fade" id="panel-typography-settings" role="tabpanel">
                             <div class="row g-3">
@@ -12831,6 +12851,38 @@
             }
         }
 
+        // Saves just the Action Buttons visibility checkboxes (now on their own
+        // tab, under Settings > Records & Access) without touching any of the
+        // other General Settings fields — saveSettings() on the server merges
+        // individual keys into the Settings sheet, so a partial save like this
+        // is safe and leaves everything else untouched.
+        function saveActionButtonsSettings(e) {
+            e.preventDefault();
+            var allActionBtnCbs = document.querySelectorAll('.actbtn-check');
+            var visibleActionButtonsVal = settings.visibleActionButtons || '';
+            if (allActionBtnCbs.length) {
+                var visibleActionBtns = [];
+                allActionBtnCbs.forEach(function(cb) {
+                    if (cb.checked) visibleActionBtns.push(cb.value);
+                });
+                // All checked means "show everything" — store as empty so actionEnabled() treats it as no restriction.
+                visibleActionButtonsVal = (visibleActionBtns.length < allActionBtnCbs.length) ? JSON.stringify(visibleActionBtns) : '';
+            }
+            showLoad('Saving...');
+            var s = { visibleActionButtons: visibleActionButtonsVal };
+            if (typeof google !== 'undefined' && google.script) {
+                google.script.run.withSuccessHandler(function(r) {
+                    hideLoad();
+                    if (r.success) { Object.assign(settings, s); lsSet('settings', settings); showToast('Action buttons saved!', 'success'); }
+                    else showToast(r.message, 'error');
+                }).withFailureHandler(function(err) { hideLoad(); showToast('Save error: ' + err.message, 'error'); }).saveSettings(s);
+            } else {
+                hideLoad();
+                Object.assign(settings, s); lsSet('settings', settings);
+                showToast('Action buttons saved (demo)!', 'success');
+            }
+        }
+
         function saveSettings(e) {
             e.preventDefault();
             var rolled = [];
@@ -13266,11 +13318,16 @@
             }
         }
 
-        function previewImg(input, prevId) {
+        function previewImg(input, prevId, type) {
             if (input.files && input.files[0]) {
                 var r = new FileReader();
                 r.onload = function (e) { document.getElementById(prevId).innerHTML = '<img src="' + e.target.result + '" class="preview-img">'; };
                 r.readAsDataURL(input.files[0]);
+                // Auto-upload right after selecting the file — previously this only
+                // showed a local preview, and the photo wasn't actually saved to the
+                // server until a separate small upload button was clicked, which was
+                // easy to miss (the preview looks identical either way).
+                if (type) uploadImg(type);
             }
         }
 
