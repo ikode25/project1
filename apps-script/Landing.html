@@ -404,8 +404,12 @@
         function goToAdmin() { navigateTo('admin'); }
         function toggleFaq(btn) { btn.closest('.faq-item').classList.toggle('open'); }
         document.getElementById('footerYear').textContent = new Date().getFullYear();
-        // Warm the URL cache immediately so the first click doesn't wait on a round-trip.
-        fetchBaseUrl(function () {});
+        // Deliberately NOT warming fetchBaseUrl()'s cache here: firing it at the same
+        // time as the getSettings() call below sends two google.script.run requests
+        // before the sandboxed iframe's initial handshake with Google's servers has
+        // settled, which can cause one of them to silently fail. goToPortal()/
+        // goToAdmin() still fetch the URL on demand if it isn't cached yet, at the
+        // small cost of one extra round-trip on the very first click.
 
         // Mixes a #rrggbb color toward black by `amount` (0-1) to derive a
         // darker shade for the topbar/footer/hover states from the admin's
@@ -513,19 +517,19 @@
                 .withSuccessHandler(function (r) {
                     if (r && r.success) { applyLandingSettings(r.settings); return; }
                     if (retriesLeft > 0) { setTimeout(function () { loadLandingSettings(retriesLeft - 1); }, 800); }
-                    else { showLandingLoadError(); }
+                    else { showLandingLoadError(r && r.message ? r.message : 'getSettings() returned success:false with no message'); }
                 })
                 .withFailureHandler(function (err) {
                     console.error('Landing settings load failed:', err);
                     if (retriesLeft > 0) { setTimeout(function () { loadLandingSettings(retriesLeft - 1); }, 800); }
-                    else { showLandingLoadError(); }
+                    else { showLandingLoadError(err && err.message ? err.message : String(err)); }
                 })
                 .getSettings();
         }
-        function showLandingLoadError() {
+        function showLandingLoadError(detail) {
             var el = document.createElement('div');
             el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2000;background:#fef2f2;color:#991b1b;text-align:center;padding:8px;font-size:13px;border-bottom:1px solid #fecaca;';
-            el.textContent = 'Could not load the latest school settings — showing defaults. Try reloading this page.';
+            el.textContent = 'Could not load the latest school settings — showing defaults. Try reloading this page.' + (detail ? ' (' + detail + ')' : '');
             document.body.prepend(el);
         }
         loadLandingSettings(2);
