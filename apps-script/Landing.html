@@ -179,6 +179,20 @@
         .footer a:hover { color: var(--gold); }
         .footer .bottom { max-width: 1180px; margin: 26px auto 0; padding-top: 18px; border-top: 1px solid rgba(255,255,255,0.12); font-size: 12px; text-align: center; color: rgba(255,255,255,0.55); }
 
+        /* ── Floating WhatsApp chat button ── */
+        .whatsapp-float {
+            position: fixed; bottom: 24px; right: 24px; z-index: 1000;
+            width: 58px; height: 58px; border-radius: 50%;
+            background: #25D366; color: #fff;
+            display: none; align-items: center; justify-content: center;
+            font-size: 30px; box-shadow: 0 10px 26px rgba(37,211,102,0.45);
+            transition: transform .2s, box-shadow .2s;
+        }
+        .whatsapp-float:hover { transform: scale(1.08); color: #fff; box-shadow: 0 14px 32px rgba(37,211,102,0.55); }
+        @media (max-width: 500px) {
+            .whatsapp-float { width: 52px; height: 52px; font-size: 26px; bottom: 16px; right: 16px; }
+        }
+
         @media (max-width: 900px) {
             .site-nav { display: none; }
             .nav-toggle { display: block; }
@@ -236,7 +250,6 @@
                 <p class="lead" id="heroLead">Easily settle your school payments — including tuition and other fees — anytime, anywhere with our secure parent portal.</p>
                 <div class="hero-ctas">
                     <a href="#" class="btn-pay" onclick="goToPortal(); return false;"><i class="bi bi-wallet2"></i> Pay School Fees</a>
-                    <a href="#" class="btn-outline-hero" onclick="goToPortal(); return false;">View Student Profile</a>
                 </div>
             </div>
             <div class="hero-media">
@@ -342,11 +355,30 @@
         <div class="bottom">© <span id="footerYear"></span> <span id="footerSchoolName2">School Fees Management</span>. All rights reserved. · Powered by School Fees Management System</div>
     </footer>
 
+    <a href="#" id="whatsappFloat" class="whatsapp-float" target="_blank" rel="noopener" title="Chat with us on WhatsApp">
+        <i class="bi bi-whatsapp"></i>
+    </a>
+
     <script>
         function goToPortal() { window.location.href = '?page=portal'; }
         function goToAdmin() { window.location.href = '?page=admin'; }
         function toggleFaq(btn) { btn.closest('.faq-item').classList.toggle('open'); }
         document.getElementById('footerYear').textContent = new Date().getFullYear();
+
+        // Mixes a #rrggbb color toward black by `amount` (0-1) to derive a
+        // darker shade for the topbar/footer/hover states from the admin's
+        // chosen theme color, the same way the theme color already drives the
+        // primary buttons/accents above.
+        function darkenColor(hex, amount) {
+            hex = String(hex || '').replace('#', '');
+            if (hex.length === 3) hex = hex.split('').map(function (c) { return c + c; }).join('');
+            if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null;
+            var num = parseInt(hex, 16);
+            var r = Math.max(0, Math.round(((num >> 16) & 0xff) * (1 - amount)));
+            var g = Math.max(0, Math.round(((num >> 8) & 0xff) * (1 - amount)));
+            var b = Math.max(0, Math.round((num & 0xff) * (1 - amount)));
+            return '#' + [r, g, b].map(function (c) { return c.toString(16).padStart(2, '0'); }).join('');
+        }
 
         function applyLandingSettings(s) {
             if (!s) return;
@@ -354,6 +386,21 @@
 
             if (s.themeColor) {
                 document.documentElement.style.setProperty('--primary', s.themeColor);
+                var darker = darkenColor(s.themeColor, 0.35);
+                if (darker) document.documentElement.style.setProperty('--primary-dark', darker);
+            }
+
+            var waNumber = s.schoolWhatsapp || s.schoolPhone;
+            if (waNumber) {
+                var digits = String(waNumber).replace(/[^0-9]/g, '');
+                // Local Ghanaian numbers (e.g. 024xxxxxxx) need the country code
+                // instead of the leading 0 for wa.me deep links to work.
+                if (digits.length === 10 && digits.charAt(0) === '0') digits = '233' + digits.substring(1);
+                var waBtn = document.getElementById('whatsappFloat');
+                if (waBtn && digits) {
+                    waBtn.href = 'https://wa.me/' + digits + '?text=' + encodeURIComponent('Hello, I would like to ask about school fees.');
+                    waBtn.style.display = 'flex';
+                }
             }
 
             var schoolName = s.schoolName || 'School Fees Management';

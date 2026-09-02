@@ -4598,6 +4598,11 @@
                                                         <input type="text" class="form-control form-control-sm" id="setLandingDeadlineText" placeholder="e.g. Pay fees by September 10, 2026 to avoid late penalties.">
                                                     </div>
                                                     <div class="mb-2">
+                                                        <label class="form-label small fw-semibold">WhatsApp Chat Number</label>
+                                                        <input type="text" class="form-control form-control-sm" id="setLandingWhatsapp" placeholder="e.g. 0244123456 (shows a floating chat button on the landing page)">
+                                                        <div class="text-muted" style="font-size:10px;">Leave blank to use the School Phone number instead. Leave both blank to hide the chat button.</div>
+                                                    </div>
+                                                    <div class="mb-2">
                                                         <label class="form-label small fw-semibold">Facebook URL</label>
                                                         <input type="url" class="form-control form-control-sm" id="setLandingFacebook" placeholder="https://facebook.com/yourschool">
                                                     </div>
@@ -12571,6 +12576,7 @@
             if (settings.landingHeroImage3 && document.getElementById('landingHero3Prev')) document.getElementById('landingHero3Prev').innerHTML = '<img src="' + settings.landingHeroImage3 + '" class="preview-img">';
             if (document.getElementById('setLandingEnrollText')) document.getElementById('setLandingEnrollText').value = settings.landingEnrollmentText || '';
             if (document.getElementById('setLandingDeadlineText')) document.getElementById('setLandingDeadlineText').value = settings.landingDeadlineText || '';
+            if (document.getElementById('setLandingWhatsapp')) document.getElementById('setLandingWhatsapp').value = settings.schoolWhatsapp || '';
             if (document.getElementById('setLandingFacebook')) document.getElementById('setLandingFacebook').value = settings.schoolFacebookUrl || '';
             if (document.getElementById('setLandingInstagram')) document.getElementById('setLandingInstagram').value = settings.schoolInstagramUrl || '';
             if (document.getElementById('setLandingYoutube')) document.getElementById('setLandingYoutube').value = settings.schoolYoutubeUrl || '';
@@ -12929,6 +12935,7 @@
             var s = {
                 landingEnrollmentText: document.getElementById('setLandingEnrollText').value.trim(),
                 landingDeadlineText: document.getElementById('setLandingDeadlineText').value.trim(),
+                schoolWhatsapp: document.getElementById('setLandingWhatsapp').value.trim(),
                 schoolFacebookUrl: document.getElementById('setLandingFacebook').value.trim(),
                 schoolInstagramUrl: document.getElementById('setLandingInstagram').value.trim(),
                 schoolYoutubeUrl: document.getElementById('setLandingYoutube').value.trim()

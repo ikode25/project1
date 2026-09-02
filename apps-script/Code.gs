@@ -38,22 +38,50 @@ function doGet(e) {
   // via its "Staff Login" icon (?page=admin); parents reach the portal via
   // its "Pay School Fees" button (?page=portal), same as before.
   var page = e && e.parameter && e.parameter.page ? e.parameter.page.toLowerCase() : 'landing';
-  if (page === 'portal') {
-    return HtmlService.createHtmlOutputFromFile('Portal')
-      .setTitle('Parent Portal - School Fees')
+  var routes = {
+    portal: { file: 'Portal', title: 'Parent Portal - School Fees' },
+    admin: { file: 'index', title: 'School Fees Management' },
+    index: { file: 'index', title: 'School Fees Management' },
+    landing: { file: 'Landing', title: 'School Fees Management' }
+  };
+  var route = routes[page] || routes.landing;
+
+  try {
+    return HtmlService.createHtmlOutputFromFile(route.file)
+      .setTitle(route.title)
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1')
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  } catch (fileErr) {
+    // A file is missing/renamed in the live Apps Script project (e.g. it was
+    // never added as a new file after being copied in from the repo). Rather
+    // than let the whole app go blank for every visitor, degrade gracefully:
+    // if the broken page isn't the staff login itself, fall back to it so the
+    // system stays usable; otherwise show a plain diagnostic message instead
+    // of a silent blank screen.
+    Logger.log('doGet: failed to load "' + route.file + '" for page="' + page + '": ' + fileErr.message);
+    if (route.file !== 'index') {
+      try {
+        return HtmlService.createHtmlOutputFromFile('index')
+          .setTitle('School Fees Management')
+          .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1')
+          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+      } catch (fallbackErr) {
+        Logger.log('doGet: fallback to index also failed: ' + fallbackErr.message);
+      }
+    }
+    return HtmlService.createHtmlOutput(
+      '<html><body style="font-family:sans-serif;padding:48px 24px;text-align:center;color:#334155;max-width:520px;margin:0 auto;">' +
+      '<h2 style="margin-bottom:12px;">Page temporarily unavailable</h2>' +
+      '<p>The "' + route.file + '" file could not be loaded. This usually means it is missing from the ' +
+      'Apps Script project, or was renamed. Please open the Apps Script editor and make sure a file ' +
+      'named exactly <b>' + route.file + '</b> exists, then Deploy → Manage deployments → New version.</p>' +
+      '<p style="color:#94a3b8;font-size:12px;margin-top:20px;">Error detail: ' +
+      (fileErr && fileErr.message ? fileErr.message : String(fileErr)) + '</p>' +
+      '</body></html>'
+    ).setTitle('School Fees Management')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1')
       .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
-  if (page === 'admin' || page === 'index') {
-    return HtmlService.createHtmlOutputFromFile('index')
-      .setTitle('School Fees Management')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1')
-      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
-  }
-  return HtmlService.createHtmlOutputFromFile('Landing')
-    .setTitle('School Fees Management')
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 function initializeSpreadsheet() {
