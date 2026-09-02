@@ -32,7 +32,20 @@ const DEFAULT_CLASSES = [
 ];
 
 function doGet(e) {
-  try { initializeSpreadsheet(); } catch (err) { Logger.log('doGet initializeSpreadsheet warning: ' + err.message); }
+  // initializeSpreadsheet() checks/migrates every sheet's structure (all 3 term
+  // sheets, custom fees, discount history, class fee rates, header cleanup) --
+  // with hundreds of student rows this is genuinely slow, and re-running it on
+  // every single page load (landing, admin, portal alike) made every click feel
+  // sluggish for no benefit, since the structure essentially never changes
+  // between one visitor's request and the next. Only re-run it at most once
+  // every 30 minutes (shared across all visitors via the script cache).
+  try {
+    var initCache = CacheService.getScriptCache();
+    if (!initCache.get('spreadsheetInitialized')) {
+      initializeSpreadsheet();
+      initCache.put('spreadsheetInitialized', 'true', 1800); // 30 minutes
+    }
+  } catch (err) { Logger.log('doGet initializeSpreadsheet warning: ' + err.message); }
   // No ?page= (or an explicit landing/home) now lands on the public marketing
   // page first — staff (admin/collector/viewer/owner) reach the actual login
   // via its "Staff Login" icon (?page=admin); parents reach the portal via
