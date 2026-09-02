@@ -932,14 +932,20 @@ function editUser(oldEmail, oldName, newEmail, newName, newPassword, newRole) {
 
 // ── Settings ──────────────────────────────────────────────────
 function getSettings() {
+  // TEMPORARY debug logging while diagnosing the intermittent settings-load
+  // failure -- safe to strip out once resolved. Wrapped defensively so a
+  // logging problem itself can never be the cause of a failure here.
+  try { Logger.log('getSettings: start'); } catch (logErr) {}
   try {
     const sheet = getOrCreateSheet(SETTINGS_SHEET, ["key","value"]);
+    try { Logger.log('getSettings: got sheet, rows=' + sheet.getLastRow()); } catch (logErr) {}
     const data  = sheet.getDataRange().getValues();
+    try { Logger.log('getSettings: data.length=' + data.length); } catch (logErr) {}
     const s     = {};
     for (let i = 1; i < data.length; i++) {
       if (data[i][0]) s[data[i][0]] = data[i][1];
     }
-    
+
     // Load secure script properties
     try {
       const scriptProps = PropertiesService.getScriptProperties();
@@ -949,9 +955,13 @@ function getSettings() {
     } catch(propErr) {
       Logger.log('Error reading script properties: ' + propErr.message);
     }
-    
+
+    try { Logger.log('getSettings: success, keys=' + Object.keys(s).length); } catch (logErr) {}
     return {success: true, settings: s};
-  } catch(e) { return {success: false, message: e.message}; }
+  } catch(e) {
+    try { Logger.log('getSettings: CAUGHT ERROR: ' + e + ' | message=' + e.message + ' | stack=' + e.stack); } catch (logErr) {}
+    return {success: false, message: (e && e.message) ? e.message : String(e)};
+  }
 }
 
 function saveSettings(settingsData) {
