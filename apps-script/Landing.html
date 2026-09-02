@@ -85,8 +85,23 @@
             overflow: hidden;
             padding: 56px 24px 130px;
         }
+        /* When the admin uploads a Main Photo, it's used as a full-bleed backdrop
+           behind the whole hero (not just the small photo box), dimmed with a
+           wash so the headline/CTA text stays readable. */
+        .hero::before {
+            content: ''; position: absolute; inset: 0;
+            background-image: var(--hero-bg-image, none);
+            background-size: cover; background-position: center;
+            opacity: 0; transition: opacity .3s; z-index: 0;
+        }
+        .hero.has-bg-photo::before { opacity: 0.16; }
+        .hero.has-bg-photo::after {
+            content: ''; position: absolute; inset: 0;
+            background: linear-gradient(180deg, rgba(248,245,242,.55), rgba(248,245,242,.94));
+            z-index: 0;
+        }
         .hero-grid {
-            max-width: 1180px; margin: 0 auto;
+            max-width: 1180px; margin: 0 auto; position: relative; z-index: 1;
             display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 40px; align-items: center;
         }
         .hero-eyebrow { color: var(--primary); font-weight: 700; font-size: 13px; letter-spacing: .3px; margin-bottom: 10px; }
@@ -472,6 +487,11 @@
 
             if (s.landingHeroImage) {
                 document.getElementById('heroMainPhoto').innerHTML = '<img src="' + s.landingHeroImage + '" alt="' + schoolName + '">';
+                var heroSection = document.querySelector('.hero');
+                if (heroSection) {
+                    heroSection.style.setProperty('--hero-bg-image', 'url("' + s.landingHeroImage + '")');
+                    heroSection.classList.add('has-bg-photo');
+                }
             }
             if (s.landingHeroImage2) {
                 document.getElementById('heroSidePhoto1Img').src = s.landingHeroImage2;
