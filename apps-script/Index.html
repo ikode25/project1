@@ -17493,15 +17493,29 @@
                         fetchSettingsImages(2);
                     } else if ((retriesLeft || 0) > 0) {
                         setTimeout(function () { fetchAndApplySettings(retriesLeft - 1); }, 1500);
+                    } else {
+                        showSettingsLoadError(r && r.message ? r.message : 'getCoreSettings() returned success:false with no message');
                     }
                 })
                 .withFailureHandler(function (err) {
                     console.error('fetchAndApplySettings failed:', err);
                     if ((retriesLeft || 0) > 0) {
                         setTimeout(function () { fetchAndApplySettings(retriesLeft - 1); }, 1500);
+                    } else {
+                        showSettingsLoadError(err && err.message ? err.message : String(err));
                     }
                 })
                 .getCoreSettings();
+        }
+        // Visible instead of only console.error, since a phone/tablet user has
+        // no easy way to open DevTools to see what actually went wrong.
+        function showSettingsLoadError(detail) {
+            if (document.getElementById('settingsLoadErrorBanner')) return;
+            var el = document.createElement('div');
+            el.id = 'settingsLoadErrorBanner';
+            el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#fef2f2;color:#991b1b;text-align:center;padding:8px;font-size:13px;border-bottom:1px solid #fecaca;';
+            el.textContent = 'Could not load the latest school settings — showing defaults. Try reloading this page.' + (detail ? ' (' + detail + ')' : '');
+            document.body.prepend(el);
         }
         function fetchSettingsImages(retriesLeft) {
             if (typeof google === 'undefined' || !google.script) return;

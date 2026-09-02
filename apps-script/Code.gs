@@ -987,6 +987,9 @@ function getLandingSettings() {
 // everything EXCEPT the heavy image fields (an exclude-list, not an
 // include-list, so no admin feature silently breaks from a forgotten field).
 function getCoreSettings() {
+  // TEMPORARY debug logging while diagnosing device-specific settings-load
+  // failures -- safe to strip out once resolved.
+  try { Logger.log('getCoreSettings: start'); } catch (logErr) {}
   try {
     const all = readAllSettingsRaw_();
     const s = {};
@@ -1001,8 +1004,10 @@ function getCoreSettings() {
     } catch (propErr) {
       Logger.log('Error reading script properties: ' + propErr.message);
     }
+    try { Logger.log('getCoreSettings: success, keys=' + Object.keys(s).length + ' payload size=' + JSON.stringify(s).length); } catch (logErr) {}
     return {success: true, settings: s};
   } catch (e) {
+    try { Logger.log('getCoreSettings: CAUGHT ERROR: ' + e); } catch (logErr) {}
     return {success: false, message: (e && e.message) ? e.message : String(e)};
   }
 }
