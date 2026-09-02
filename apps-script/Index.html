@@ -8105,7 +8105,7 @@
             // (nothing to instantly paint from cache) or may simply have failed;
             // this guarantees every login gets a fresh, correct copy of the
             // school's actual saved name/logo/branding, not stale defaults.
-            try { fetchAndApplySettings(2); } catch (e) { console.error('Settings refresh on login failed:', e); }
+            try { fetchAndApplySettings(6); } catch (e) { console.error('Settings refresh on login failed:', e); }
 
             try {
                 document.getElementById('loginPage').style.display = 'none';
@@ -17490,9 +17490,9 @@
                     if (r && r.success) {
                         applySettings(r.settings);
                         lsSet('settings', Object.assign({}, lsGet('settings') || {}, r.settings));
-                        fetchSettingsImages(2);
+                        fetchSettingsImages(4);
                     } else if ((retriesLeft || 0) > 0) {
-                        setTimeout(function () { fetchAndApplySettings(retriesLeft - 1); }, 1500);
+                        setTimeout(function () { fetchAndApplySettings(retriesLeft - 1); }, 1200);
                     } else {
                         showSettingsLoadError(r && r.message ? r.message : 'getCoreSettings() returned success:false with no message');
                     }
@@ -17500,7 +17500,7 @@
                 .withFailureHandler(function (err) {
                     console.error('fetchAndApplySettings failed:', err);
                     if ((retriesLeft || 0) > 0) {
-                        setTimeout(function () { fetchAndApplySettings(retriesLeft - 1); }, 1500);
+                        setTimeout(function () { fetchAndApplySettings(retriesLeft - 1); }, 1200);
                     } else {
                         showSettingsLoadError(err && err.message ? err.message : String(err));
                     }
@@ -17525,18 +17525,24 @@
                         applySettings(r.settings);
                         lsSet('settings', Object.assign({}, lsGet('settings') || {}, r.settings));
                     } else if ((retriesLeft || 0) > 0) {
-                        setTimeout(function () { fetchSettingsImages(retriesLeft - 1); }, 1500);
+                        setTimeout(function () { fetchSettingsImages(retriesLeft - 1); }, 1200);
                     }
                 })
                 .withFailureHandler(function (err) {
                     console.error('fetchSettingsImages failed:', err);
                     if ((retriesLeft || 0) > 0) {
-                        setTimeout(function () { fetchSettingsImages(retriesLeft - 1); }, 1500);
+                        setTimeout(function () { fetchSettingsImages(retriesLeft - 1); }, 1200);
                     }
                 })
                 .getSettingsImages();
         }
-        fetchAndApplySettings(2);
+        // Paint immediately from last-known-good cached settings (if any) so a
+        // returning device shows correct branding right away even before the
+        // network round-trip completes, then fetchAndApplySettings() below
+        // refreshes from the server in the background. A first-time device
+        // with no cache yet still shows defaults briefly, which is unavoidable.
+        if (lsGet('settings')) { try { applySettings(lsGet('settings')); } catch (e) {} }
+        fetchAndApplySettings(6);
 
         // ════════════════════════════════════════════════════════
         // INCOME & EXPENSES MODULE

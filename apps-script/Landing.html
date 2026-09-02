@@ -516,12 +516,12 @@
             google.script.run
                 .withSuccessHandler(function (r) {
                     if (r && r.success) { applyLandingSettings(r.settings); return; }
-                    if (retriesLeft > 0) { setTimeout(function () { loadLandingSettings(retriesLeft - 1); }, 800); }
+                    if (retriesLeft > 0) { setTimeout(function () { loadLandingSettings(retriesLeft - 1); }, 1200); }
                     else { showLandingLoadError(r && r.message ? r.message : 'getLandingSettings() returned success:false with no message'); }
                 })
                 .withFailureHandler(function (err) {
                     console.error('Landing settings load failed:', err);
-                    if (retriesLeft > 0) { setTimeout(function () { loadLandingSettings(retriesLeft - 1); }, 800); }
+                    if (retriesLeft > 0) { setTimeout(function () { loadLandingSettings(retriesLeft - 1); }, 1200); }
                     else { showLandingLoadError(err && err.message ? err.message : String(err)); }
                 })
                 .getLandingSettings();
@@ -532,7 +532,7 @@
             el.textContent = 'Could not load the latest school settings — showing defaults. Try reloading this page.' + (detail ? ' (' + detail + ')' : '');
             document.body.prepend(el);
         }
-        loadLandingSettings(2);
+        loadLandingSettings(6);
     </script>
 </body>
 
