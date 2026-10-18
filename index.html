@@ -4,19 +4,60 @@
   Front-end — index.html
   Public marketing/booking site + secured admin/staff dashboard, in one file.
   Routing: '#admin' switches to the dashboard. Everything else is public.
+
+  Design system: Manuel Script signature (Quecci Manuel) — Plus Jakarta
+  Sans, the violet→pink→amber signature gradient, 22px card radius, and
+  the shared button/badge/card/table/modal component language defined in
+  the :root tokens just below. See the About page for the developer credit.
   ============================================================================
 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --clr-primary: #1a1a1a;
-    --clr-secondary: #c9a227;
-    --clr-accent: #c9a227;
-    --clr-bg: #f7f5f2;
-    --clr-text: #1a1a1a;
-    --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    --radius: 10px;
-    --shadow: 0 2px 14px rgba(0,0,0,.08);
-    --shadow-lift: 0 14px 34px rgba(0,0,0,.1);
+    /* ---- Manuel Script signature gradients ----
+       Buyers recognise the developer at a glance by these, so they stay
+       fixed — not admin-customizable like the rest of this system's
+       branding (logo/stamp/signature uploads are). */
+    --grad:  linear-gradient(135deg, #7c3aed 0%, #db2777 55%, #f59e0b 100%); /* SIGNATURE: violet → pink → amber */
+    --grad2: linear-gradient(135deg, #06b6d4 0%, #3b82f6 50%, #7c3aed 100%); /* cyan → blue → violet */
+    --grad3: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);             /* green → cyan (success, money in) */
+    --grad4: linear-gradient(135deg, #f43f5e 0%, #f97316 100%);             /* rose → orange (danger, money owed) */
+    --gbtn:  linear-gradient(135deg, #7c3aed 0%, #db2777 55%, #ea580c 100%); /* deeper, for white-text buttons */
+    --gbtn2: linear-gradient(135deg, #0e7490 0%, #1d4ed8 50%, #6d28d9 100%);
+    --gbtn3: linear-gradient(135deg, #047857 0%, #0e7490 100%);
+    --gbtn4: linear-gradient(135deg, #e11d48 0%, #c2410c 100%);
+    --violet: #7c3aed; --pink: #db2777; --amber: #f59e0b; --cyan: #06b6d4; --green: #10b981;
+
+    /* ---- Light theme (default) ---- */
+    --bg: #eef0fb; --side: #ffffff; --card: #ffffff; --card2: #f7f8fe; --card-b: rgba(30,41,99,.10);
+    --muted: #5f6a8f; --input: rgba(255,255,255,.9); --modal: #ffffff;
+    --b-ok: #047857; --b-bad: #be123c; --b-warn: #b45309; --b-info: #0369a1; --b-vio: #6d28d9;
+
+    /* ---- Existing app-wide tokens, repointed at the signature palette so
+       every rule already written against them re-skins automatically.
+       --clr-accent stays light (amber, like the gold it replaces) so the
+       many existing dark-text-on-accent pairings throughout this file
+       stay legible without having to touch each one individually. ---- */
+    --clr-primary: #17122e;
+    --clr-secondary: #7c3aed;
+    --clr-accent: #f59e0b;
+    --clr-bg: var(--bg);
+    --clr-text: #101634;
+    --font: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --radius: 22px;
+    --radius-sm: 14px;
+    --shadow: 0 2px 14px rgba(16,22,52,.08);
+    --shadow-lift: 0 14px 34px rgba(16,22,52,.14);
+  }
+  /* ---- Dark theme — remembered per device via the existing #adminApp.dark
+     toggle (the public site has no dark mode of its own). ---- */
+  #adminApp.dark {
+    --bg: #070b1d; --side: #0d1230; --card: #11163a; --card2: #171d4a; --card-b: rgba(255,255,255,.11);
+    --muted: #98a2c9; --input: rgba(255,255,255,.06); --modal: #11163a;
+    --b-ok: #34d399; --b-bad: #fb7185; --b-warn: #fbbf24; --b-info: #7dd3fc; --b-vio: #d8b4fe;
+    --clr-bg: var(--bg); --clr-text: #eef1ff;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
@@ -43,24 +84,25 @@
   .icon { flex-shrink: 0; }
   .btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-    padding: 13px 26px; border-radius: 999px; border: none;
-    background: var(--clr-primary); color: #fff; cursor: pointer; font-weight: 700; letter-spacing: .01em;
+    padding: 13px 26px; border-radius: 14px; border: none;
+    background: var(--gbtn); color: #fff; cursor: pointer; font-weight: 700; letter-spacing: .01em;
     transition: opacity .15s ease, transform .15s ease, box-shadow .15s ease;
   }
-  .btn:hover { opacity: .9; transform: translateY(-1px); box-shadow: 0 8px 20px rgba(0,0,0,.14); }
+  .btn:hover { opacity: .92; transform: translateY(-1px); box-shadow: 0 8px 20px rgba(124,58,237,.25); }
   .btn:active { transform: scale(.97) translateY(0); }
   .btn-accent { background: var(--clr-accent); color: #1a1a1a; }
   .btn-outline { background: transparent; border: 2px solid var(--clr-primary); color: var(--clr-primary); }
-  .btn-sm { padding: 7px 14px; font-size: .85rem; border-radius: 6px; }
-  .btn-danger { background: #c0392b; color: #fff; }
+  .btn-sm { padding: 7px 14px; font-size: .85rem; border-radius: 10px; }
+  .btn-xs { padding: 4px 10px; font-size: .76rem; border-radius: 8px; }
+  .btn-danger { background: var(--gbtn4); color: #fff; }
   .btn-block { width: 100%; }
   .btn:disabled { opacity: .5; cursor: not-allowed; }
   .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .75rem; font-weight: 700; }
-  .badge-pending { background: #fff4d6; color: #8a6d00; }
-  .badge-confirmed { background: #dbeeff; color: #0b5da3; }
-  .badge-completed { background: #dcf5e3; color: #1c7c3c; }
-  .badge-cancelled, .badge-no-show { background: #fbe0e0; color: #b32424; }
-  .warn-line { display: flex; align-items: center; gap: 8px; color: #8a6d00; }
+  .badge-pending { background: #fef3e2; color: var(--b-warn); }
+  .badge-confirmed { background: #e0f2fe; color: var(--b-info); }
+  .badge-completed { background: #d1fae5; color: var(--b-ok); }
+  .badge-cancelled, .badge-no-show { background: #fee2e2; color: var(--b-bad); }
+  .warn-line { display: flex; align-items: center; gap: 8px; color: var(--b-warn); }
 
   /* ---------- PUBLIC NAV ---------- */
   #publicNav {
@@ -178,7 +220,7 @@
   section.pub.alt { background: #fff; }
   @media (max-width: 700px) { section.pub { padding: 56px 0; } }
   .section-title { text-align: center; margin-bottom: 10px; font-size: 2.1rem; }
-  .section-title::after { content: ''; display: block; width: 52px; height: 4px; border-radius: 4px; background: var(--clr-accent); margin: 16px auto 0; }
+  .section-title::after { content: ''; display: block; width: 52px; height: 4px; border-radius: 4px; background: var(--grad); margin: 16px auto 0; }
   .section-sub { text-align: center; color: #777; margin-bottom: 44px; font-size: 1.05rem; }
   @media (max-width: 700px) { .section-title { font-size: 1.6rem; } }
 
@@ -462,13 +504,12 @@
   .wh-actions { padding-top: 12px; }
 
   /* ---------- ADMIN ---------- */
-  #adminApp { display: none; height: 100vh; overflow: hidden; background: #f1f2f5; color: #1a1a1a; }
-  #adminApp.dark { background: #14161a; color: #e8e8e8; }
+  #adminApp { display: none; height: 100vh; overflow: hidden; background: var(--bg); color: var(--clr-text); }
   #loginScreen {
     display: none; min-height: 100vh; align-items: center; justify-content: center;
-    background: linear-gradient(135deg, #1a1a1a, #2c2c2c);
+    background: var(--gbtn2);
   }
-  #loginScreen .box { background: #fff; padding: 40px; border-radius: var(--radius); width: 100%; max-width: 380px; box-shadow: var(--shadow); }
+  #loginScreen .box { background: #fff; padding: 40px; border-radius: var(--radius); width: 100%; max-width: 380px; box-shadow: var(--shadow-lift); }
   #loginScreen h2 { text-align: center; }
   .password-field { position: relative; }
   .password-field input { padding-right: 42px; }
@@ -481,26 +522,26 @@
   html, body { overscroll-behavior-y: none; }
   .admin-shell { display: flex; height: 100vh; overflow: hidden; }
   .admin-sidebar {
-    width: 230px; flex-shrink: 0; background: #1a1a1a; color: #fff; height: 100vh; overflow-y: auto;
+    width: 230px; flex-shrink: 0; background: var(--clr-primary); color: #fff; height: 100vh; overflow-y: auto;
     display: flex; flex-direction: column; transition: width .2s ease, transform .2s ease;
   }
-  #adminApp.dark .admin-sidebar { background: #0c0d10; }
+  #adminApp.dark .admin-sidebar { background: var(--side); }
   .admin-sidebar .logo {
-    padding: 16px 18px; font-weight: 800; font-size: .92rem; line-height: 1.25; border-bottom: 1px solid #333; margin-bottom: 10px;
+    padding: 16px 18px; font-weight: 800; font-size: .92rem; line-height: 1.25; border-bottom: 1px solid rgba(255,255,255,.12); margin-bottom: 10px;
     display: flex; align-items: center; gap: 10px;
   }
-  .admin-sidebar .logo img { width: 34px; height: 34px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: #fff; }
+  .admin-sidebar .logo img { width: 34px; height: 34px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: var(--grad); padding: 2px; }
   .admin-sidebar .logo span { overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   #navItems { flex: 1; }
   .admin-sidebar .nav-item {
     display: flex; align-items: center; gap: 10px; padding: 11px 18px; cursor: pointer; font-size: .9rem; opacity: .85; white-space: nowrap;
   }
-  .admin-sidebar .nav-item:hover { background: #2a2a2a; opacity: 1; }
+  .admin-sidebar .nav-item:hover { background: rgba(255,255,255,.08); opacity: 1; }
   .admin-sidebar .nav-item.active { background: var(--clr-accent); color: #1a1a1a; opacity: 1; font-weight: 700; }
   .admin-sidebar .nav-item span { overflow: hidden; text-overflow: ellipsis; }
   .nav-group-head {
     display: flex; align-items: center; gap: 10px; padding: 11px 18px; cursor: pointer; font-size: .74rem;
-    text-transform: uppercase; letter-spacing: .05em; color: #888; margin-top: 8px; white-space: nowrap;
+    text-transform: uppercase; letter-spacing: .05em; color: rgba(255,255,255,.55); margin-top: 8px; white-space: nowrap;
   }
   .nav-group-head:hover { color: #fff; }
   .nav-group-head .chev { margin-left: auto; transition: transform .15s ease; flex-shrink: 0; }
@@ -509,10 +550,10 @@
   .nav-group-body.open { display: block; }
   .admin-sidebar .nav-sub-item { padding-left: 34px; }
   .sidebar-collapse-btn {
-    display: flex; align-items: center; gap: 8px; background: none; border: none; color: #999; cursor: pointer;
-    padding: 13px 18px; font-size: .78rem; border-top: 1px solid #333; white-space: nowrap; flex-shrink: 0;
+    display: flex; align-items: center; gap: 8px; background: none; border: none; color: rgba(255,255,255,.6); cursor: pointer;
+    padding: 13px 18px; font-size: .78rem; border-top: 1px solid rgba(255,255,255,.12); white-space: nowrap; flex-shrink: 0;
   }
-  .sidebar-collapse-btn:hover { color: #fff; background: #2a2a2a; }
+  .sidebar-collapse-btn:hover { color: #fff; background: rgba(255,255,255,.08); }
 
   /* Desktop: collapses to a narrow icon-only rail (the logo mark stays visible, just its text hides) */
   .admin-sidebar.collapsed { width: 64px; }
@@ -563,13 +604,23 @@
      colors on both themes so they're never invisible-on-invisible. */
   .icon-btn {
     display: flex; align-items: center; justify-content: center; width: 38px; height: 38px;
-    border-radius: 10px; border: 1.5px solid #ddd; background: #fff; color: #1a1a1a; cursor: pointer; flex-shrink: 0;
+    border-radius: 12px; border: 1.5px solid var(--card-b); background: var(--card); color: var(--clr-text); cursor: pointer; flex-shrink: 0;
   }
   .icon-btn:hover { border-color: var(--clr-accent); color: var(--clr-accent); }
-  #adminApp.dark .icon-btn { background: #23262d; border-color: #383d47; color: #e8e8e8; }
-  #adminApp.dark .icon-btn:hover { border-color: var(--clr-accent); color: var(--clr-accent); }
   .icon-btn.spinning svg { animation: spin .6s linear; }
   @keyframes spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+  /* Manuel Script signature motion set. "Light & fast mode" rule: every
+     looping entrance animation here (rise) runs ONCE and stops — only
+     spinners/loading bars/alerts keep moving — and the whole set is
+     silenced under prefers-reduced-motion (a plain, instant fade instead
+     of a slide). */
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes gshift { 0%, 100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+  @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+  @keyframes pulseGlow { 0%, 100% { box-shadow: 0 0 0 0 rgba(124,58,237,.35); } 50% { box-shadow: 0 0 0 8px rgba(124,58,237,0); } }
+  @media (prefers-reduced-motion: reduce) {
+    .stat-card, .panel, .modal-box { animation: none !important; }
+  }
 
   /* Admin chat bubble: floats bottom-right on desktop as usual; on mobile
      it moves into the topbar itself (a plain icon button there instead)
@@ -581,19 +632,17 @@
     #adminChatWidget .chat-panel { top: 66px; bottom: auto; right: 12px; max-height: calc(100vh - 100px); }
   }
 
-  .admin-greeting { padding: 0 26px 16px; font-size: .93rem; color: #777; }
-  #adminApp.dark .admin-greeting { color: #9aa1ad; }
+  .admin-greeting { padding: 0 26px 16px; font-size: .93rem; color: var(--muted); }
   .admin-greeting b { font-weight: 800; color: inherit; }
 
   .bell-wrap { position: relative; }
   .bell-badge {
-    position: absolute; top: -5px; right: -5px; background: #c0392b; color: #fff; font-size: .65rem; font-weight: 800;
+    position: absolute; top: -5px; right: -5px; background: var(--gbtn4); color: #fff; font-size: .65rem; font-weight: 800;
     min-width: 18px; height: 18px; border-radius: 999px; display: flex; align-items: center; justify-content: center; padding: 0 4px;
-    border: 2px solid #fff;
+    border: 2px solid var(--card);
   }
-  #adminApp.dark .bell-badge { border-color: #14161a; }
   .bell-dropdown {
-    position: absolute; top: 46px; right: 0; width: 300px; background: #fff; border-radius: 12px; box-shadow: var(--shadow);
+    position: absolute; top: 46px; right: 0; width: 300px; background: var(--card); border-radius: 16px; box-shadow: var(--shadow-lift);
     padding: 10px; z-index: 60; max-height: 360px; overflow-y: auto;
   }
   /* On narrow screens the bell button can sit close enough to the left edge
@@ -606,13 +655,10 @@
   @media (max-width: 860px) {
     .bell-dropdown { position: fixed; top: 66px; left: 12px; right: 12px; width: auto; max-height: calc(100vh - 100px); }
   }
-  #adminApp.dark .bell-dropdown { background: #1e2127; }
-  .bell-item { display: block; padding: 10px 10px; border-radius: 8px; font-size: .82rem; border-bottom: 1px solid #f0f0f0; }
-  #adminApp.dark .bell-item { border-bottom-color: #2a2e37; }
-  .bell-item:hover { background: #f7f5f2; }
-  #adminApp.dark .bell-item:hover { background: #262a31; }
+  .bell-item { display: block; padding: 10px 10px; border-radius: 10px; font-size: .82rem; border-bottom: 1px solid var(--card-b); }
+  .bell-item:hover { background: var(--card2); }
   .bell-item b { display: block; }
-  .bell-empty { padding: 14px; text-align: center; color: #888; font-size: .85rem; }
+  .bell-empty { padding: 14px; text-align: center; color: var(--muted); font-size: .85rem; }
   @media (max-width: 860px) {
     .admin-topbar { padding: 14px 14px 12px; }
     #adminContent { padding: 0 14px 40px; }
@@ -622,21 +668,26 @@
   }
 
   .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px,1fr)); gap: 14px; margin-bottom: 24px; }
-  .stat-card { background: #fff; border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
-  #adminApp.dark .stat-card, #adminApp.dark .panel, #adminApp.dark table, #adminApp.dark .wizard-box { background: #1e2127; color: #e8e8e8; }
-  .stat-card .val { font-size: 1.7rem; font-weight: 800; }
-  .stat-card .lbl { color: #888; font-size: .85rem; }
+  .stat-card {
+    position: relative; overflow: hidden;
+    background: var(--card); border-radius: var(--radius); padding: 18px 18px 16px;
+    box-shadow: var(--shadow); animation: rise .4s ease backwards;
+  }
+  .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--grad); }
+  .stat-card .val { font-size: 1.85rem; font-weight: 800; }
+  .stat-card .lbl { color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; font-size: .72rem; margin-top: 2px; }
 
-  .panel { background: #fff; border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; margin-bottom: 22px; }
+  .panel { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; margin-bottom: 22px; border: 1px solid var(--card-b); animation: rise .4s ease backwards; }
   .panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
   .filters-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
-  .filters-bar input, .filters-bar select { padding: 8px 10px; border-radius: 6px; border: 1px solid #ccc; }
+  .filters-bar input, .filters-bar select { padding: 9px 12px; border-radius: 14px; border: 1px solid var(--card-b); background: var(--input); color: var(--clr-text); }
   .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
   @media (max-width: 860px) { .chart-row { grid-template-columns: 1fr; } }
 
-  table { width: 100%; border-collapse: collapse; font-size: .88rem; background: #fff; }
-  table th, table td { text-align: left; padding: 9px 10px; border-bottom: 1px solid #eee; }
-  table th { color: #888; font-weight: 700; text-transform: uppercase; font-size: .72rem; }
+  table { width: 100%; border-collapse: collapse; font-size: .88rem; background: var(--card); color: var(--clr-text); }
+  table th, table td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--card-b); }
+  table th { color: var(--muted); font-weight: 700; text-transform: uppercase; font-size: .72rem; position: sticky; top: 0; background: var(--card); }
+  table tbody tr:hover { background: var(--card2); }
   .table-wrap { overflow-x: auto; }
   .pager { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 14px 0 4px; flex-wrap: wrap; }
   th.sortable-th { cursor: pointer; user-select: none; white-space: nowrap; }
@@ -644,69 +695,58 @@
   th.sortable-th svg { vertical-align: -2px; }
   .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 
-  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: flex-start; justify-content: center; z-index: 999; overflow-y: auto; padding: 40px 16px; }
-  .modal-box { background: #fff; border-radius: var(--radius); padding: 26px; width: 100%; max-width: 560px; box-shadow: var(--shadow); }
-  #adminApp.dark .modal-box { background: #1e2127; color: #e8e8e8; }
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(10,8,24,.55); display: flex; align-items: flex-start; justify-content: center; z-index: 999; overflow-y: auto; padding: 40px 16px; }
+  .modal-box { background: var(--modal); color: var(--clr-text); border-radius: 24px; padding: 26px; width: 100%; max-width: 560px; box-shadow: var(--shadow-lift); animation: rise .25s ease; }
   .modal-box h3 { margin-top: 0; }
   .modal-close { float: right; background: none; border: none; cursor: pointer; color: inherit; }
   .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   @media (max-width: 500px) { .field-grid { grid-template-columns: 1fr; } }
   .field-grid label { font-size: .82rem; font-weight: 600; display: block; margin-bottom: 4px; }
-  .field-grid input, .field-grid select, .field-grid textarea { width: 100%; padding: 9px 10px; border-radius: 6px; border: 1px solid #ccc; }
+  .field-grid input, .field-grid select, .field-grid textarea { width: 100%; padding: 10px 12px; border-radius: 14px; border: 1px solid var(--card-b); background: var(--input); color: var(--clr-text); }
 
   /* POS */
   .pos-layout { display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px; }
   @media (max-width: 900px) { .pos-layout { grid-template-columns: 1fr; } }
   .pos-item-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(150px,1fr)); gap: 10px; max-height: 480px; overflow-y: auto; }
-  .pos-item-card { background: #f7f7f7; border-radius: 8px; padding: 10px; cursor: pointer; border: 2px solid #eee; position: relative; transition: border-color .15s ease, background .15s ease; }
-  #adminApp.dark .pos-item-card { background: #262a31; border-color: #333; }
-  .pos-item-photo { width: 100%; aspect-ratio: 4/3; border-radius: 6px; background-size: cover; background-position: center; background-color: #eee; margin-bottom: 8px; }
+  .pos-item-card { background: var(--card2); border-radius: 14px; padding: 10px; cursor: pointer; border: 2px solid var(--card-b); position: relative; transition: border-color .15s ease, background .15s ease; }
+  .pos-item-photo { width: 100%; aspect-ratio: 4/3; border-radius: 10px; background-size: cover; background-position: center; background-color: #eee; margin-bottom: 8px; }
   .pos-item-photo-empty { display: flex; align-items: center; justify-content: center; color: #aaa; }
-  #adminApp.dark .pos-item-photo { background-color: #333; }
   .pos-item-card:hover { border-color: var(--clr-accent); }
-  .pos-item-card.selected { border-color: var(--clr-accent); background: rgba(201,162,39,.1); }
-  #adminApp.dark .pos-item-card.selected { background: rgba(201,162,39,.16); }
+  .pos-item-card.selected { border-color: var(--violet); background: rgba(124,58,237,.1); }
   .pos-item-qty-badge {
-    position: absolute; top: -8px; right: -8px; background: var(--clr-accent); color: #1a1a1a; font-size: .72rem;
+    position: absolute; top: -8px; right: -8px; background: var(--gbtn); color: #fff; font-size: .72rem;
     font-weight: 800; min-width: 22px; height: 22px; border-radius: 999px; display: flex; align-items: center;
-    justify-content: center; padding: 0 5px; box-shadow: 0 2px 6px rgba(0,0,0,.25); border: 2px solid #fff;
+    justify-content: center; padding: 0 5px; box-shadow: 0 2px 6px rgba(124,58,237,.35); border: 2px solid var(--card);
   }
-  #adminApp.dark .pos-item-qty-badge { border-color: #14161a; }
   .pos-item-card .item-name { display: flex; align-items: center; gap: 6px; font-weight: 700; }
-  .cart-line { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; font-size: .88rem; }
+  .cart-line { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--card-b); font-size: .88rem; }
   .cart-tot-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: .92rem; }
-  .cart-tot-row.grand { font-weight: 800; font-size: 1.15rem; border-top: 2px solid #ddd; padding-top: 10px; margin-top: 8px; }
+  .cart-tot-row.grand { font-weight: 800; font-size: 1.15rem; border-top: 2px solid var(--card-b); padding-top: 10px; margin-top: 8px; }
 
-  .color-field { display: flex; align-items: center; gap: 8px; }
-  .color-field input[type=color] { width: 46px; height: 36px; border: none; padding: 0; background: none; }
-
-  .settings-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; border-bottom: 1px solid #e5e2da; padding-bottom: 10px; }
-  #adminApp.dark .settings-tabs { border-bottom-color: #2a2e37; }
+  .settings-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 18px; border-bottom: 1px solid var(--card-b); padding-bottom: 10px; }
   .settings-tab {
-    display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; border: 1.5px solid #e5e2da;
-    background: #fff; color: inherit; font-size: .82rem; font-weight: 600; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; border: 1.5px solid var(--card-b);
+    background: var(--card); color: inherit; font-size: .82rem; font-weight: 600; cursor: pointer;
   }
-  #adminApp.dark .settings-tab { background: #1e2127; border-color: #2a2e37; }
   .settings-tab.active { background: var(--clr-accent); border-color: var(--clr-accent); color: #1a1a1a; }
   .settings-tab:hover:not(.active) { border-color: var(--clr-accent); }
 
-  .receipt-modern { border-radius: 14px; overflow: hidden; box-shadow: 0 6px 20px rgba(0,0,0,.12); }
-  .receipt-modern .rh { background: linear-gradient(135deg, var(--clr-primary), var(--clr-accent)); color: #fff; padding: 24px 22px 18px; text-align: center; }
+  .receipt-modern { border-radius: 14px; overflow: hidden; box-shadow: 0 6px 20px rgba(16,22,52,.14); }
+  .receipt-modern .rh { background: var(--gbtn); color: #fff; padding: 24px 22px 18px; text-align: center; }
   .receipt-modern .rh img { height: 38px; border-radius: 8px; margin: 0 auto 8px; }
   .receipt-modern .rh .check { color: #fff; }
   .receipt-modern .rbody { background: #fff; padding: 20px 22px; color: #1a1a1a; }
   .receipt-line { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #eee; font-size: .9rem; }
   .receipt-line .qty { color: #888; font-size: .78rem; }
   .receipt-total-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: .88rem; color: #666; }
-  .receipt-total-row.grand { font-size: 1.2rem; font-weight: 800; color: var(--clr-primary); border-top: 2px solid #eee; margin-top: 8px; padding-top: 12px; }
+  .receipt-total-row.grand { font-size: 1.2rem; font-weight: 800; color: var(--violet); border-top: 2px solid #eee; margin-top: 8px; padding-top: 12px; }
   .receipt-pay-badge { display: inline-flex; align-items: center; gap: 6px; background: #f0eee8; padding: 6px 14px; border-radius: 999px; font-weight: 700; font-size: .8rem; margin-top: 10px; }
   .receipt-footer { text-align: center; padding: 14px; color: #888; font-size: .78rem; background: #fafaf8; }
 
   /* Receipt print-format toggle (A4 vs Thermal), shown above the receipt in
      the modal — never printed, see the print-isolation rules below. */
   .receipt-format-toggle { display: flex; gap: 8px; margin-bottom: 14px; }
-  .receipt-format-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 10px; border-radius: 8px; border: 1.5px solid #e5e2da; background: #fff; color: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; }
-  #adminApp.dark .receipt-format-btn { background: #1e2127; border-color: #2a2e37; }
+  .receipt-format-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 10px; border-radius: 10px; border: 1.5px solid var(--card-b); background: var(--card); color: inherit; font-size: .8rem; font-weight: 700; cursor: pointer; }
   .receipt-format-btn.active { background: var(--clr-accent); border-color: var(--clr-accent); color: #1a1a1a; }
   .receipt-format-btn:hover:not(.active) { border-color: var(--clr-accent); }
 
@@ -735,13 +775,20 @@
   body.printing-receipt * { visibility: hidden !important; }
   body.printing-receipt #receiptPrint, body.printing-receipt #receiptPrint * { visibility: visible !important; }
   body.printing-receipt #receiptPrint { position: absolute !important; left: 0; top: 0; width: 100%; margin: 0 !important; box-shadow: none !important; }
+  /* Printed documents are always plain black-on-white, signature gradient
+     included — the A4 receipt's on-screen gradient header would otherwise
+     either print as a solid grey block or burn through a customer's ink
+     for no good reason. */
+  @media print {
+    #receiptPrint .rh { background: #fff !important; color: #1a1a1a !important; border-bottom: 2px solid #1a1a1a; }
+    #receiptPrint .rh .check { color: #1a1a1a !important; }
+  }
 
   /* Charts */
   .hbar-chart { display: flex; flex-direction: column; gap: 10px; }
   .hbar-row { display: grid; grid-template-columns: 120px 1fr 90px; align-items: center; gap: 10px; font-size: .85rem; }
   .hbar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .hbar-track { background: #eee; border-radius: 6px; height: 12px; overflow: hidden; }
-  #adminApp.dark .hbar-track { background: #2a2e37; }
+  .hbar-track { background: var(--card2); border-radius: 6px; height: 12px; overflow: hidden; }
   .hbar-fill { height: 100%; border-radius: 6px; transition: width .4s ease; }
   .hbar-value { text-align: right; font-weight: 700; }
   .donut-wrap { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
@@ -1191,7 +1238,8 @@ var ICONS = {
   play: '<polygon points="5 3 19 12 5 21 5 3"/>',
   landmark: '<line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/><line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/><line x1="18" y1="18" x2="18" y2="11"/><polygon points="12 2 20 7 4 7 12 2"/>',
   printer: '<polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/>',
-  fileText: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>'
+  fileText: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+  code: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>'
 };
 function icon(name, size, cls) {
   size = size || 20;
@@ -1404,15 +1452,13 @@ function formatNiceDate(dateStr) {
 
 /* =====================================================================
  * THEME APPLICATION
+ * ---------------------------------------------------------------------
+ * The Manuel Script signature gradient/colour scheme is fixed and not
+ * admin-customizable, so this is intentionally a no-op kept only because
+ * several call sites still pass it the loaded Settings object.
  * ===================================================================*/
 function applyTheme(settings) {
-  var r = document.documentElement;
-  r.style.setProperty('--clr-primary', settings.PrimaryColor || '#1a1a1a');
-  r.style.setProperty('--clr-secondary', settings.SecondaryColor || '#c9a227');
-  r.style.setProperty('--clr-accent', settings.AccentColor || '#c9a227');
-  r.style.setProperty('--clr-bg', settings.BackgroundColor || '#f7f5f2');
-  r.style.setProperty('--clr-text', settings.TextColor || '#1a1a1a');
-  r.style.setProperty('--font', settings.FontFamily || '-apple-system, sans-serif');
+  return;
 }
 
 /**
@@ -4573,7 +4619,6 @@ function deleteVideoRow(id) {
 /* ---------- SETTINGS / BRANDING / THEME ---------- */
 var SETTINGS_TABS = [
   { key: 'branding', label: 'Branding', icon: 'droplet' },
-  { key: 'theme', label: 'Theme & Colors', icon: 'droplet' },
   { key: 'social', label: 'Social & Contact', icon: 'globe' },
   { key: 'payments', label: 'Payments & Loyalty', icon: 'card' },
   { key: 'sms', label: 'SMS Gateway', icon: 'smartphone' },
@@ -4614,15 +4659,6 @@ function renderSettingsAdmin(content) {
       '<label class="chip-toggle"><input type="checkbox" id="stShowGreeting"' + (s.ShowGreetingBanner !== 'N' ? ' checked' : '') + '> Greeting banner</label>' +
       '<label class="chip-toggle"><input type="checkbox" id="stShowTeam"' + (s.ShowTeamSection !== 'N' ? ' checked' : '') + '> Our Team section</label>' +
       '</div></div></div>' +
-
-      '<div class="settings-panel hidden" data-panel="theme"><div class="panel"><div class="field-grid">' +
-      colorField('Primary Color', 'stPrimaryColor', s.PrimaryColor) +
-      colorField('Secondary Color', 'stSecondaryColor', s.SecondaryColor) +
-      colorField('Accent Color', 'stAccentColor', s.AccentColor) +
-      colorField('Background Color', 'stBackgroundColor', s.BackgroundColor) +
-      colorField('Text Color', 'stTextColor', s.TextColor) +
-      fontField(s.FontFamily) +
-      '</div><button type="button" class="btn btn-sm btn-outline" style="margin-top:10px" onclick="previewTheme()">' + icon('eye', 13) + ' Preview Theme</button></div></div>' +
 
       '<div class="settings-panel hidden" data-panel="social"><div class="panel"><div class="field-grid">' +
       field('WhatsApp Number (233...)', 'stWhatsAppNumber', s.WhatsAppNumber) +
@@ -4694,7 +4730,6 @@ function renderSettingsAdmin(content) {
       });
     });
     bindPhotoPicker('stLogo');
-    bindFontPresetField();
     bindPaymentMethodsPicker();
     bindWeeklyHoursEditor();
     renderQrCard(s);
@@ -4710,8 +4745,8 @@ function renderQrCard(s, customUrl) {
   var targetUrl = (customUrl || '').trim() || bookingUrl;
   var isBooking = targetUrl === bookingUrl;
   var qrImgUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=360x360&margin=12&data=' + encodeURIComponent(targetUrl);
-  var accent = s.AccentColor || '#c9a227';
-  var primary = s.PrimaryColor || '#1a1a1a';
+  var accent = '#f59e0b';
+  var primary = '#17122e';
   var cardHtml =
     '<div style="max-width:320px;margin:0 auto;background:#fff;border:3px solid ' + accent + ';border-radius:16px;padding:26px;text-align:center;font-family:Arial,Helvetica,sans-serif;">' +
     (s.LogoURL ? '<img src="' + esc(s.LogoURL) + '" style="height:50px;border-radius:8px;margin-bottom:10px;">' : '') +
@@ -4840,47 +4875,8 @@ function bindPaymentMethodsPicker() {
     });
   });
 }
-var FONT_PRESETS = {
-  'System Default': "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-  'Classic Serif': "Georgia, 'Times New Roman', serif",
-  'Modern Sans': "Verdana, Geneva, Tahoma, sans-serif",
-  'Elegant Serif': "Garamond, 'Palatino Linotype', 'Book Antiqua', Palatino, serif",
-  'Rounded Sans': "Avenir, 'Trebuchet MS', sans-serif",
-  'Technical Mono': "'Courier New', Courier, monospace"
-};
-function fontField(currentValue) {
-  var current = currentValue || FONT_PRESETS['System Default'];
-  var presetName = Object.keys(FONT_PRESETS).find(function (k) { return FONT_PRESETS[k] === current; });
-  var opts = Object.keys(FONT_PRESETS);
-  if (!presetName) { presetName = 'Custom (from theme)'; opts = opts.concat(presetName); }
-  return '<div style="grid-column:1/-1"><label>Site Font</label><select id="stFontPreset">' +
-    opts.map(function (o) { return '<option value="' + esc(o) + '"' + (o === presetName ? ' selected' : '') + '>' + o + '</option>'; }).join('') +
-    '</select><div id="stFontPreview" style="margin-top:8px;padding:10px 12px;border:1px solid #ddd;border-radius:8px;font-size:1rem;font-family:' + esc(current) + ';">The quick brown fox jumps over the lazy dog — 0123456789</div>' +
-    '<input type="hidden" id="stFontFamily" value="' + esc(current) + '"></div>';
-}
-function bindFontPresetField() {
-  var sel = document.getElementById('stFontPreset');
-  if (!sel) return;
-  sel.addEventListener('change', function () {
-    var stack = FONT_PRESETS[sel.value];
-    if (!stack) return; // "Custom (from theme)" — leave the stored value untouched
-    document.getElementById('stFontFamily').value = stack;
-    document.getElementById('stFontPreview').style.fontFamily = stack;
-  });
-}
-function colorField(label, id, val) {
-  return '<div><label>' + label + '</label><div class="color-field"><input type="color" id="' + id + '" value="' + (val || '#000000') + '"><span>' + esc(val || '') + '</span></div></div>';
-}
 function selectField(label, id, options, val) {
   return '<div><label>' + label + '</label><select id="' + id + '">' + options.map(function (o) { return '<option' + (o === val ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select></div>';
-}
-function previewTheme() {
-  applyTheme({
-    PrimaryColor: document.getElementById('stPrimaryColor').value, SecondaryColor: document.getElementById('stSecondaryColor').value,
-    AccentColor: document.getElementById('stAccentColor').value, BackgroundColor: document.getElementById('stBackgroundColor').value,
-    TextColor: document.getElementById('stTextColor').value, FontFamily: document.getElementById('stFontFamily').value
-  });
-  toast('Preview applied — click "Save All Settings" to make it permanent', 'success');
 }
 function saveAllSettings() {
   resolvePhotoPicker('stLogo', function (logoUrl) {
@@ -4895,9 +4891,6 @@ function saveAllSettings() {
       SocialFacebook: document.getElementById('stSocialFacebook').value, SocialInstagram: document.getElementById('stSocialInstagram').value,
       SocialTwitter: document.getElementById('stSocialTwitter').value, SocialTiktok: document.getElementById('stSocialTiktok').value,
       SocialYoutube: document.getElementById('stSocialYoutube').value,
-      PrimaryColor: document.getElementById('stPrimaryColor').value, SecondaryColor: document.getElementById('stSecondaryColor').value,
-      AccentColor: document.getElementById('stAccentColor').value, BackgroundColor: document.getElementById('stBackgroundColor').value,
-      TextColor: document.getElementById('stTextColor').value, FontFamily: document.getElementById('stFontFamily').value,
       SlotIntervalMinutes: document.getElementById('stSlotIntervalMinutes').value,
       TaxRatePercent: document.getElementById('stTaxRatePercent').value, LoyaltyPointsPerCedi: document.getElementById('stLoyaltyPointsPerCedi').value,
       LoyaltyRedeemRate: document.getElementById('stLoyaltyRedeemRate').value,
@@ -5151,12 +5144,19 @@ function renderAbout(content) {
     '<h4 style="margin-top:22px;">Permissions Table</h4>' +
     '<div class="table-wrap"><table><thead><tr><th>Page</th><th>Owner</th><th>Manager</th><th>Staff</th><th>Receptionist</th></tr></thead><tbody>' + permRows + '</tbody></table></div>' +
 
+    '<h4 style="margin-top:22px;">Developer</h4>' +
+    '<div style="background:var(--grad);border-radius:var(--radius);padding:22px;text-align:center;color:#fff;">' +
+    '<div style="width:52px;height:52px;border-radius:14px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;">' + icon('code', 24) + '</div>' +
+    '<p style="font-weight:800;font-size:1.1rem;margin:0;">Quecci Manuel — Manuel Script</p>' +
+    '<p style="margin:6px 0 0;opacity:.9;font-size:.88rem;">Need a custom system for your own business? Reach out any time — support and new builds, done the same way this one was.</p>' +
+    '<div style="margin-top:14px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">' +
+    '<a class="btn btn-sm" style="background:rgba(255,255,255,.22);color:#fff;" href="https://wa.me/233547359015" target="_blank" rel="noopener">' + icon('chat', 14) + ' WhatsApp</a>' +
+    '<a class="btn btn-sm" style="background:rgba(255,255,255,.22);color:#fff;" href="https://www.youtube.com/@manuelspctips" target="_blank" rel="noopener">' + icon('smartphone', 14) + ' YouTube — @manuelspctips</a>' +
+    '</div></div>' +
+
     '<hr style="border:none;border-top:1px solid #eee;margin:24px 0;">' +
-    '<div style="text-align:center;">' +
-    '<p style="font-weight:700;">Developed by Quecci Manuel (Manuel Scripts)</p>' +
-    '<p><a class="btn btn-sm btn-outline" href="https://wa.me/233547359015" target="_blank" rel="noopener">' + icon('chat', 14) + ' WhatsApp — Custom Projects</a></p>' +
-    '<p><a class="btn btn-sm btn-outline" href="https://www.youtube.com/@manuelspctips" target="_blank" rel="noopener">' + icon('smartphone', 14) + ' YouTube — @manuelspctips</a></p>' +
-    '</div></div>';
+    '<p class="muted" style="text-align:center;font-size:.8rem;">© ' + new Date().getFullYear() + ' Manuel Script · Developed by Quecci Manuel</p>' +
+    '</div>';
 }
 
 /* ---------- MY ACCOUNT ---------- */

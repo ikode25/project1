@@ -88,12 +88,12 @@ var DEFAULT_SETTINGS = {
   BusinessName: 'Golden Clippers Barber & Salon',
   Tagline: 'Sharp Fades. Fresh Styles. Real Confidence.',
   LogoURL: '',
-  PrimaryColor: '#1a1a1a',
-  SecondaryColor: '#c9a227',
-  AccentColor: '#c9a227',
-  BackgroundColor: '#f7f5f2',
-  TextColor: '#1a1a1a',
-  FontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+  PrimaryColor: '#17122e',
+  SecondaryColor: '#7c3aed',
+  AccentColor: '#f59e0b',
+  BackgroundColor: '#eef0fb',
+  TextColor: '#101634',
+  FontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', sans-serif",
   WhatsAppNumber: '233241234567',
   ContactPhone: '0241234567',
   ContactEmail: 'info@goldenclippers.com.gh',
@@ -2673,8 +2673,8 @@ function emailDetailTable_(rows) {
  */
 function buildEmailHtml_(headline, bodyHtml, ctaText, ctaLink) {
   var s = getSettingsMap_();
-  var primary = s.PrimaryColor || '#1a1a1a';
-  var accent = s.AccentColor || '#c9a227';
+  var primary = '#17122e';
+  var accent = '#f59e0b';
   // Embedded as the actual image bytes (a data: URI), not linked to this
   // app's own URL — a remote-hosted <img src> in an email depends on the
   // recipient's mail client choosing to fetch it, which most (Gmail,
